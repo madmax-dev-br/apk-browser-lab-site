@@ -1,6 +1,6 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=5baf5691b052';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=5baf5691b052';
-import { createDeviceView, createViewState } from './device-view.js?v=5baf5691b052';
+import { APKWorkerClient } from './apk-worker-client.js?v=38ea11051357';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=38ea11051357';
+import { createDeviceView, createViewState } from './device-view.js?v=38ea11051357';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -141,7 +141,6 @@ function showInventory(inventory) {
   const unsupported = inventory.unsupportedFeatures || [];
   $('unsupported-notice').hidden = !unsupported.length;
   $('unsupported-list').replaceChildren(...unsupported.map((item) => { const li = document.createElement('li'); li.textContent = item; return li; }));
-  $('unsupported-compose').hidden = !inventory.compose;
   const archiveSummary = $('archive-summary'); archiveSummary.replaceChildren();
   const dexSummary = document.createElement('strong'); dexSummary.textContent = `${inventory.dexFiles?.length || 0} DEX · ${inventory.inspectionComplete === false ? 'contagem parcial' : 'contagem completa de classes'}`;
   archiveSummary.append(dexSummary);
@@ -386,44 +385,20 @@ async function loadScenarioCatalog() {
     const message = document.createElement('p'); message.className = 'catalog-loading'; message.textContent = `Catálogo indisponível: ${error.message}. Tente recarregar a página.`; list.replaceChildren(message);
   }
 }
-function startCompose(reload = false) {
-  if (state.composeStarted && !reload) return;
-  state.composeStarted = true; state.composeReady = false; $('compose-loading').hidden = false; $('compose-state').hidden = true;
-  clearTimeout(state.composeTimer);
-  $('compose-frame').src = new URL(`./compose/${reload ? `?reload=${Date.now()}` : ''}`, location.href).href;
-  setStatus('Carregando o aplicativo Kotlin/Wasm…');
-  state.composeTimer = setTimeout(() => {
-    if (state.mode !== 'compose' || $('compose-loading').hidden) return;
-    $('compose-loading').hidden = true;
-    showError(new Error('O módulo Compose Web ainda não respondeu. Verifique o carregamento dos arquivos Kotlin/Wasm ou tente recarregar o exemplo.'), 'Compose Web não respondeu');
-  }, 45000);
-}
-function switchMode(mode) {
-  state.mode = mode;
-  const compose = mode === 'compose';
-  $('apk-panel').hidden = compose; $('compose-panel').hidden = !compose;
-  $('apk-tab').classList.toggle('active', !compose); $('compose-tab').classList.toggle('active', compose);
-  $('apk-tab').setAttribute('aria-selected', String(!compose)); $('compose-tab').setAttribute('aria-selected', String(compose));
-  $('compose-container').hidden = !compose; $('back-button').hidden = compose || !state.canGoBack;
-  $('android-device').hidden = compose || !state.apkRunning;
-  $('android-device').inert = compose;
-  $('empty-preview').hidden = compose || state.apkRunning;
+// The lab has a single mode (APK); switchMode('apk') resets the preview chrome to the APK's current state.
+function switchMode() {
+  state.mode = 'apk';
+  $('back-button').hidden = !state.canGoBack;
+  $('android-device').hidden = !state.apkRunning; $('android-device').inert = false;
+  $('empty-preview').hidden = state.apkRunning;
   hideError();
-  $('execution-engine').textContent = compose ? 'KOTLIN / WASM' : '411 × 840 dp · DENSIDADE 1';
-  if (compose) {
-    $('preview-name').textContent = 'Compose Multiplatform · Web';
-    $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> KOTLIN / WASM';
-    startCompose();
-    if (state.composeReady) { $('runtime-badge').className = 'runtime-badge running'; $('runtime-badge').innerHTML = '<span></span> EM EXECUÇÃO'; setStatus('Compose Web em execução · Kotlin/Wasm', 'ok'); }
-    else setStatus('Carregando o aplicativo Kotlin/Wasm…');
-  } else {
-    $('preview-name').textContent = state.inventory?.packageName || 'Prévia do aplicativo';
-    const running = state.apkRunning;
-    $('runtime-badge').className = `runtime-badge${running ? ' running' : ''}`;
-    $('runtime-badge').innerHTML = `<span></span> ${running ? 'EM EXECUÇÃO' : state.inventory?.unsupportedFeatures?.length ? 'BLOQUEADO' : state.runtime ? 'INSPECIONADO' : 'INATIVO'}`;
-    if (state.lastAPKError) { showError(state.lastAPKError.error, state.lastAPKError.title); return; }
-    setStatus(running ? 'Activity em execução · interaja com a interface' : state.inventory?.unsupportedFeatures?.length ? 'APK identificado · execução bloqueada por recursos não suportados' : state.runtime ? 'Inspecionado · tentativa de execução disponível' : 'Aguardando um aplicativo', running ? 'ok' : state.inventory?.unsupportedFeatures?.length ? 'error' : '');
-  }
+  $('execution-engine').textContent = '411 × 840 dp · DENSIDADE 1';
+  $('preview-name').textContent = state.inventory?.packageName || 'Prévia do aplicativo';
+  const running = state.apkRunning;
+  $('runtime-badge').className = `runtime-badge${running ? ' running' : ''}`;
+  $('runtime-badge').innerHTML = `<span></span> ${running ? 'EM EXECUÇÃO' : state.inventory?.unsupportedFeatures?.length ? 'BLOQUEADO' : state.runtime ? 'INSPECIONADO' : 'INATIVO'}`;
+  if (state.lastAPKError) { showError(state.lastAPKError.error, state.lastAPKError.title); return; }
+  setStatus(running ? 'Activity em execução · interaja com a interface' : state.inventory?.unsupportedFeatures?.length ? 'APK identificado · execução bloqueada por recursos não suportados' : state.runtime ? 'Inspecionado · tentativa de execução disponível' : 'Aguardando um aplicativo', running ? 'ok' : state.inventory?.unsupportedFeatures?.length ? 'error' : '');
 }
 $('apk-file').addEventListener('change', (event) => { chooseFile(event.target.files?.[0]); event.target.value = ''; });
 $('drop-zone').addEventListener('dragover', (event) => { event.preventDefault(); if (!state.busy) $('drop-zone').classList.add('dragging'); });
@@ -437,29 +412,10 @@ $('native-abi').addEventListener('change', populateNativeLibraries);
 $('inspect-native-button').addEventListener('click', inspectSelectedNative);
 $('reopen-file').addEventListener('click', () => { if (state.currentSource) importSource(state.currentSource); });
 $('demo-button').addEventListener('click', runDemo);
-$('apk-tab').addEventListener('click', () => switchMode('apk'));
-$('compose-tab').addEventListener('click', () => switchMode('compose'));
-$('open-compose').addEventListener('click', () => switchMode('compose'));
-$('unsupported-compose').addEventListener('click', () => switchMode('compose'));
-$('compose-phone').addEventListener('click', () => { $('preview-stage').classList.add('compose-phone'); $('compose-phone').setAttribute('aria-pressed', 'true'); $('compose-wide').setAttribute('aria-pressed', 'false'); });
-$('compose-wide').addEventListener('click', () => { $('preview-stage').classList.remove('compose-phone'); $('compose-phone').setAttribute('aria-pressed', 'false'); $('compose-wide').setAttribute('aria-pressed', 'true'); });
-$('reload-compose').addEventListener('click', () => { hideError(); startCompose(true); });
 window.addEventListener('message', (event) => {
   if (event.origin !== location.origin || !event.data || typeof event.data !== 'object') return;
-  if (event.source === $('compose-frame').contentWindow) {
-    if (event.data.type === 'compose-ready') {
-      state.composeReady = true; clearTimeout(state.composeTimer); $('compose-loading').hidden = true;
-      if (state.mode === 'compose') { hideError(); $('runtime-badge').className = 'runtime-badge running'; $('runtime-badge').innerHTML = '<span></span> EM EXECUÇÃO'; setStatus('Compose Web em execução · Kotlin/Wasm', 'ok'); }
-      appendTrace('Compose Web: módulo Kotlin/Wasm iniciado.');
-    }
-    if (event.data.type === 'feature-state' && Number.isFinite(event.data.count)) {
-      $('compose-state').hidden = false; $('compose-count').textContent = `count = ${event.data.count}`;
-      $('compose-request').textContent = typeof event.data.request === 'string' ? event.data.request : JSON.stringify(event.data.request ?? '');
-      appendTrace(`Compose Web: count=${event.data.count}`); notifyParent('apk-lab-compose-state', { count: event.data.count, request: event.data.request });
-    }
-  } else if (event.source === window.parent && window.parent !== window) {
+  if (event.source === window.parent && window.parent !== window) {
     if (event.data.type === 'apk-lab-run-demo') runDemo();
-    if (event.data.type === 'apk-lab-switch-mode' && ['apk', 'compose'].includes(event.data.mode)) switchMode(event.data.mode);
   }
 });
 // The lab chrome theme is a per-viewer preference; the emulated Android screen keeps the APK's own colors.
@@ -470,6 +426,5 @@ document.getElementById('theme-toggle')?.addEventListener('click', () => {
 });
 loadScenarioCatalog();
 notifyParent('apk-lab-ready');
-if (params.get('mode') === 'compose') switchMode('compose');
-else if (params.get('demo') === '1') runDemo();
+if (params.get('demo') === '1') runDemo();
 initDevicePanel();

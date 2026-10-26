@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=5baf5691b052';
+import { APKError } from './apk-error.js?v=38ea11051357';
 
 const FILTER='Landroid/graphics/ColorFilter;',REGISTRY='Llibcore/util/NativeAllocationRegistry;',FINALIZER=0x43464c5401n;
 export const COLOR_FILTER_CLEANER='Lapkweb/bridge/ColorFilterCleaner;';
