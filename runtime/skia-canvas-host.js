@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=8749e43f476b';
-import {getVectorGraphics} from './vector-native.js?v=8749e43f476b';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=8749e43f476b';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=8749e43f476b';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun} from './skia-paragraph.js?v=8749e43f476b';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=8749e43f476b';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=8749e43f476b';
-import {createBitmapHost} from './bitmap-host.js?v=8749e43f476b';
-import { gcRoot } from './heap-gc.js?v=8749e43f476b';
+import {APKError} from './apk-runtime.js?v=af3232247547';
+import {getVectorGraphics} from './vector-native.js?v=af3232247547';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=af3232247547';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=af3232247547';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun} from './skia-paragraph.js?v=af3232247547';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=af3232247547';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=af3232247547';
+import {createBitmapHost} from './bitmap-host.js?v=af3232247547';
+import { gcRoot } from './heap-gc.js?v=af3232247547';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -33,7 +33,9 @@ function makeFont(backend,state,text){
  const CK=backend.CanvasKit;if(typeof text!=='string'||text.length>65536)fail('Skia text run exceeds65536characters');
  const size=state.textSize??12,scale=state.textScaleX??1,skew=state.textSkewX??0;if(![size,scale,skew].every(Number.isFinite)||size<0||size>512||Math.abs(scale)>16||Math.abs(skew)>16)fail('Skia font extent exceeds VM limits');
  if(state.hyphenEdit)fail('Text drawing with Android hyphen edits requires the Minikin boundary');
- if(state.letterSpacing||state.wordSpacing||/\p{Mark}/u.test(text)||/[^\u0020-\u024f]/u.test(text))fail('Text shaping/fallback for this run requires the Android text layout bridge');
+ // A simple glyph run is exact for scripts without contextual shaping (Latin, Greek, Cyrillic, punctuation, symbols);
+ // complex scripts, combining marks and emoji/joiner sequences need Minikin/HarfBuzz. Missing glyphs still fail below.
+ if(state.letterSpacing||state.wordSpacing||/[\p{Mark}\u200c\u200d\ufe0e\ufe0f\p{Extended_Pictographic}]|[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Gurmukhi}\p{Script=Gujarati}\p{Script=Oriya}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Kannada}\p{Script=Malayalam}\p{Script=Sinhala}\p{Script=Thai}\p{Script=Lao}\p{Script=Tibetan}\p{Script=Myanmar}\p{Script=Khmer}\p{Script=Mongolian}\p{Script=Hangul}]/u.test(text))fail('Text shaping/fallback for this run requires the Android text layout bridge');
  if(state.flags&0x800)fail('The CanvasKit font API does not expose force-auto-hinting');
  const font=new CK.Font(state.nativeTypeface??backend.typeface,state.textSize??12);font.setScaleX(state.textScaleX??1);font.setSkewX(state.textSkewX??0);font.setEmbolden(!!(state.flags&0x20));font.setLinearMetrics(!!(state.flags&0x40));font.setSubpixel(!!(state.flags&0x80));font.setEmbeddedBitmaps(!!(state.flags&0x400));
  // Embind's public enum ABI is {value:number};0.42 omits the Alias symbol (SkFont::Edging::kAlias=0).

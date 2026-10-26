@@ -1,5 +1,5 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=8749e43f476b';
-import { APKError } from './apk-runtime.js?v=8749e43f476b';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=af3232247547';
+import { APKError } from './apk-runtime.js?v=af3232247547';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -67,8 +67,10 @@ export class AndroidStyleBackend {
     if (object.baseContext && (startType === 'Landroid/content/ContextWrapper;' || !object.themeResId)) return this.theme(runtime, object.baseContext);
     const name = object.type.slice(1, -1).replaceAll('/', '.');
     const declaration = this.platform.manifest?.activities?.find(activity => activity.name === name);
-    const id = object.themeResId || declaration?.theme || this.platform.manifest?.application?.theme;
-    if (!id) fail('The context has no explicit manifest theme; original default-theme selection has not been installed');
+    let id = object.themeResId || declaration?.theme || this.platform.manifest?.application?.theme;
+    // No manifest theme: ContextImpl.getTheme asks the original Resources.selectDefaultTheme(0, targetSdkVersion).
+    if (!id) id = runtime.dispatch({ owner: RESOURCES, name: 'selectDefaultTheme', parameters: ['I', 'I'], result: 'I', signature: '(II)I' }, [0, Number(this.platform.manifest?.usesSdk?.targetSdkVersion ?? 1)], 'static');
+    if (!id) fail('Resources.selectDefaultTheme returned no theme');
     object.themeRef = this.createTheme(runtime); object.themeResId = Number(id) >>> 0;
     if (object.baseContext) { const base = this.theme(runtime, object.baseContext); if (base) this.copyTheme(runtime, object.themeRef, base); }
     this.applyStyle(runtime, object.themeRef, object.themeResId, true); return object.themeRef;

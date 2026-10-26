@@ -1,28 +1,28 @@
-import { loadAPK } from './apk-loader.js?v=8749e43f476b';
-import { FrameworkProvider } from './framework-provider.js?v=8749e43f476b';
-import { createRasterSender } from './raster-cache.js?v=8749e43f476b';
-import { isFreedId } from './heap-gc.js?v=8749e43f476b';
-import { dispatchPointer } from './pointer-input-host.js?v=8749e43f476b';
-import { resolveDevice } from './device-profile.js?v=8749e43f476b';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=8749e43f476b';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=8749e43f476b';
-import { SkiaProvider } from './skia-provider.js?v=8749e43f476b';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=8749e43f476b';
-import { disposeTextLayout } from './text-layout-native.js?v=8749e43f476b';
-import { IcuBreakProvider } from './icu-break-provider.js?v=8749e43f476b';
-import { SqliteProvider } from './sqlite-native.js?v=8749e43f476b';
-import { TzdataProvider } from './java-time-native.js?v=8749e43f476b';
-import { ZlibProvider } from './zip-native.js?v=8749e43f476b';
-import { IcuConverterProvider } from './icu-converter-native.js?v=8749e43f476b';
-import { disposeColorFilters } from './color-filter-native.js?v=8749e43f476b';
-import { disposeRegex } from './regex-native.js?v=8749e43f476b';
-import { disposeRenderNodes } from './rendernode-native.js?v=8749e43f476b';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=8749e43f476b';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=8749e43f476b';
+import { loadAPK } from './apk-loader.js?v=af3232247547';
+import { FrameworkProvider } from './framework-provider.js?v=af3232247547';
+import { createRasterSender } from './raster-cache.js?v=af3232247547';
+import { isFreedId } from './heap-gc.js?v=af3232247547';
+import { dispatchPointer } from './pointer-input-host.js?v=af3232247547';
+import { resolveDevice } from './device-profile.js?v=af3232247547';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=af3232247547';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=af3232247547';
+import { SkiaProvider } from './skia-provider.js?v=af3232247547';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=af3232247547';
+import { disposeTextLayout } from './text-layout-native.js?v=af3232247547';
+import { IcuBreakProvider } from './icu-break-provider.js?v=af3232247547';
+import { SqliteProvider } from './sqlite-native.js?v=af3232247547';
+import { TzdataProvider } from './java-time-native.js?v=af3232247547';
+import { ZlibProvider } from './zip-native.js?v=af3232247547';
+import { IcuConverterProvider } from './icu-converter-native.js?v=af3232247547';
+import { disposeColorFilters } from './color-filter-native.js?v=af3232247547';
+import { disposeRegex } from './regex-native.js?v=af3232247547';
+import { disposeRenderNodes } from './rendernode-native.js?v=af3232247547';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=af3232247547';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=af3232247547';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=8749e43f476b';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=8749e43f476b';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=8749e43f476b';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=af3232247547';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=af3232247547';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=af3232247547';
 
 let sharedSkiaProvider = null;
 let sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -94,7 +94,7 @@ self.onmessage = async ({ data }) => {
       const icuBreakProvider = sharedICUBreakProvider ??= new IcuBreakProvider();
       const sqliteProvider = sharedSqliteProvider ??= new SqliteProvider(), tzdataProvider = sharedTzdataProvider ??= new TzdataProvider(), zlibProvider = sharedZlibProvider ??= new ZlibProvider(), icuConverterProvider = sharedIcuConverterProvider ??= new IcuConverterProvider();
       // The browser product lays every APK's Views out in the VM (original AOSP LinearLayout/FrameLayout/ScrollView + Skia text), never with page CSS.
-      const result = await loadAPK(data.buffer, { device: resolveDevice(data.device || {}), enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
+      const result = await loadAPK(data.buffer, { device: resolveDevice(data.device || {}), tolerateMissingVoid: !!data.tolerateMissingVoid, enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
       runtime = result.runtime; inventory = result.inventory; inspectNativeLibraries = result.inspectNativeLibraries;
       if (self.location?.origin) runtime.javaProperties.set('apkweb.origin', self.location.origin);   // the page origin (same as this worker's): lets sample apps address documents the lab serves itself
       runtime.platform.onExternalActivity = () => { if (!busy) scheduleEvents(); };   // network exchanges finishing wake the event pump

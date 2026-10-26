@@ -1,12 +1,12 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=8749e43f476b';
-import { inspectELF } from './native-inspector.js?v=8749e43f476b';
-import { inflateRaw } from './inflate.js?v=8749e43f476b';
-import { resolveDevice } from './device-profile.js?v=8749e43f476b';
-import { resourceProfileFor } from './device-configuration.js?v=8749e43f476b';
-import { JniBridge } from './jni-host.js?v=8749e43f476b';
-import { AndroidResources } from './android-resources.js?v=8749e43f476b';
-import { AndroidPlatform } from './android-platform.js?v=8749e43f476b';
-import { FrameworkProvider } from './framework-provider.js?v=8749e43f476b';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=af3232247547';
+import { inspectELF } from './native-inspector.js?v=af3232247547';
+import { inflateRaw } from './inflate.js?v=af3232247547';
+import { resolveDevice } from './device-profile.js?v=af3232247547';
+import { resourceProfileFor } from './device-configuration.js?v=af3232247547';
+import { JniBridge } from './jni-host.js?v=af3232247547';
+import { AndroidResources } from './android-resources.js?v=af3232247547';
+import { AndroidPlatform } from './android-platform.js?v=af3232247547';
+import { FrameworkProvider } from './framework-provider.js?v=af3232247547';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -526,7 +526,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const runtime = new APKRuntime(program, { apkEntries: new Set(names), apkReader: name => archive.extractSync(name, 256 * 1024 * 1024), launcherActivity: manifest.launcherActivity, unsupportedFeatures,
     maxInstructionsPerEvent: options.maxInstructionsPerEvent,
     maxCallDepth: options.maxCallDepth,
-    maxHeapObjects: options.maxHeapObjects,
+    maxHeapObjects: options.maxHeapObjects, tolerateMissingVoid: !!options.tolerateMissingVoid,
     icuBreakBackend,sqliteBackend,tzdata,zlibBackend,icuConverterBackend,
     nativeLibraries: nativeLibraryDetails, resources: resources.environment, nativeBindings: framework?.nativeBindings, skia,
     platform: new AndroidPlatform({ device: options.device, resources: resources.environment,

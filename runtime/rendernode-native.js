@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=8749e43f476b';
-import {getVectorGraphics} from './vector-native.js?v=8749e43f476b';
-import {getSolidPaintByHandle} from './paint-host.js?v=8749e43f476b';
-import {createMatrixNativeBindings} from './matrix-native.js?v=8749e43f476b';
+import {APKError} from './apk-error.js?v=af3232247547';
+import {getVectorGraphics} from './vector-native.js?v=af3232247547';
+import {getSolidPaintByHandle} from './paint-host.js?v=af3232247547';
+import {createMatrixNativeBindings} from './matrix-native.js?v=af3232247547';
 
 const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;',RECORD='Landroid/view/RecordingCanvas;';
 const REG='Llibcore/util/NativeAllocationRegistry;';

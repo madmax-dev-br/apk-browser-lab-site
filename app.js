@@ -1,6 +1,6 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=8749e43f476b';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=8749e43f476b';
-import { createDeviceView, createViewState } from './device-view.js?v=8749e43f476b';
+import { APKWorkerClient } from './apk-worker-client.js?v=af3232247547';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=af3232247547';
+import { createDeviceView, createViewState } from './device-view.js?v=af3232247547';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -216,7 +216,7 @@ async function importSource(source, autoRun = false) {
     if (token !== state.operation) return;
     if (buffer.byteLength > 1024 * 1024 * 1024) throw new Error('O APK excede o limite de 1 GiB.');
     $('file-size').textContent = `${formatSize(buffer.byteLength)} · processado no navegador`;
-    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceState.settings }); // Ownership transfers to the Worker.
+    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceState.settings, tolerateMissingVoid: !!$('tolerate-missing-void')?.checked }); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
     state.runtime = apkVM; state.inventory = result.inventory;
     showInventory(result.inventory);

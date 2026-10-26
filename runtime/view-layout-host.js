@@ -1,6 +1,6 @@
-import { APKError } from './apk-runtime.js?v=8749e43f476b';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=8749e43f476b';
-import { gcRoot } from './heap-gc.js?v=8749e43f476b';
+import { APKError } from './apk-runtime.js?v=af3232247547';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=af3232247547';
+import { gcRoot } from './heap-gc.js?v=af3232247547';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));

@@ -75,3 +75,5 @@
 :root[data-theme=dark] .device-grid output,:root[data-theme=dark] .device-status-note{color:#8f8c9d}
 :root[data-theme=dark] .device-reset{background:#1d1c25;border-color:#2c2b36;color:#a9a6b8}
 :root[data-theme=dark] .device-panel summary .quiet-badge{background:#23222c;color:#8f8c9d}
+.tolerant-toggle{display:flex;gap:7px;align-items:flex-start;font-size:9px;line-height:1.6;color:#8d94a4;margin:0 1px 12px;cursor:pointer}.tolerant-toggle input{accent-color:var(--accent);margin-top:2px}.tolerant-toggle code{font:8px ui-monospace,monospace}
+:root[data-theme=dark] .tolerant-toggle{color:#8f8c9d}

@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=8749e43f476b';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=8749e43f476b';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=8749e43f476b';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=8749e43f476b';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=8749e43f476b';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=8749e43f476b';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=8749e43f476b';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=8749e43f476b';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=8749e43f476b';
-import { APKError } from './apk-error.js?v=8749e43f476b';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=8749e43f476b';
-import { Scheduler, Blocked } from './scheduler.js?v=8749e43f476b';
-import { bootClassLacksMember } from './boot-class-members.js?v=8749e43f476b';
-export { APKError } from './apk-error.js?v=8749e43f476b';
+import { VMClock } from './vm-clock.js?v=af3232247547';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=af3232247547';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=af3232247547';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=af3232247547';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=af3232247547';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=af3232247547';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=af3232247547';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=af3232247547';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=af3232247547';
+import { APKError } from './apk-error.js?v=af3232247547';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=af3232247547';
+import { Scheduler, Blocked } from './scheduler.js?v=af3232247547';
+import { bootClassLacksMember } from './boot-class-members.js?v=af3232247547';
+export { APKError } from './apk-error.js?v=af3232247547';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -527,6 +527,8 @@ for(const builder of ['StringBuilder','StringBuffer']){
  addBridge('java/lang/'+builder, ['<init>()V', '<init>(Ljava/lang/String;)V', '<init>(I)V', 'toString()Ljava/lang/String;', 'length()I', 'charAt(I)C', 'subSequence(II)Ljava/lang/CharSequence;']);
  addBridge('java/lang/'+builder, [`append([CII)Ljava/lang/${builder};`, `append([C)Ljava/lang/${builder};`]);
  addBridge('java/lang/'+builder, [`append(Ljava/lang/CharSequence;II)Ljava/lang/${builder};`]);
+ // The synthetic covariant bridges javac emits for Appendable (what an Appendable.append call resolves to).
+ addBridge('java/lang/'+builder, ['append(Ljava/lang/CharSequence;)Ljava/lang/Appendable;', 'append(Ljava/lang/CharSequence;II)Ljava/lang/Appendable;', 'append(C)Ljava/lang/Appendable;']);
  const self=`Ljava/lang/${builder};`;
  addBridge('java/lang/'+builder, [`delete(II)${self}`,`deleteCharAt(I)${self}`,'setCharAt(IC)V','setLength(I)V',`replace(IILjava/lang/String;)${self}`,`reverse()${self}`,'indexOf(Ljava/lang/String;)I','indexOf(Ljava/lang/String;I)I','lastIndexOf(Ljava/lang/String;)I','lastIndexOf(Ljava/lang/String;I)I','capacity()I','ensureCapacity(I)V','trimToSize()V','substring(I)Ljava/lang/String;','substring(II)Ljava/lang/String;','codePointAt(I)I',`appendCodePoint(I)${self}`,'getChars(II[CI)V',`insert(I[C)${self}`,`insert(I[CII)${self}`,`insert(ILjava/lang/CharSequence;II)${self}`]);
  for (const t of ['Ljava/lang/String;','Ljava/lang/Object;','Ljava/lang/CharSequence;','I','J','Z','C']) addBridge('java/lang/'+builder, [`insert(I${t})${self}`]);
@@ -840,10 +842,13 @@ class Heap {
 }
 
 export class APKRuntime {
-  constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 28, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 10000000 } = {}) {
+  constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 28, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 10000000, tolerateMissingVoid = false } = {}) {
     if (!Number.isInteger(maxCallDepth) || maxCallDepth < 16 || maxCallDepth > 100000) fail('VM maxCallDepth must be an integer from 16 to 100000');
     if(!Number.isInteger(maxHeapObjects)||maxHeapObjects<1024||maxHeapObjects>262144)fail('VM maxHeapObjects must be an integer from 1024 to 262144');
     this.maxHeapObjects=maxHeapObjects; this.apkEntries=apkEntries; this.apkReader=apkReader;
+    // Opt-in tolerant mode: a platform method the lab does not implement and that returns void is logged and skipped
+    // instead of stopping the app. Nothing is returned for it, so no value is invented; the default stays strict.
+    this.tolerateMissingVoid = !!tolerateMissingVoid; this.missingVoid = new Map();
     this.maxCallDepth = maxCallDepth; this.peakCallDepth = 0;
     if (!Number.isInteger(maxInstructionsPerEvent) || maxInstructionsPerEvent < 1000 || maxInstructionsPerEvent > 20000000) fail('VM maxInstructionsPerEvent must be an integer from 1000 to 20000000');
     this.maxInstructionsPerEvent = maxInstructionsPerEvent;
@@ -944,7 +949,7 @@ export class APKRuntime {
   }
   executionSnapshot() {
     return { framework: { ...(this.dex.frameworkSummary ?? { dexFiles: [], classes: 0, bytes: 0, shadowedAPKClasses: [], policy: 'no-boot-layer' }) },
-      executionByOrigin: { apk: { ...this.executionByOrigin.apk }, framework: { ...this.executionByOrigin.framework }, host: { ...this.executionByOrigin.host } }, callDepth: { limit: this.maxCallDepth, peak: this.peakCallDepth }, heapBudget: { oomCount: this.oomCount ?? 0, objects: this.heap.size, limit: this.maxHeapObjects, arrayCells: this.arrayCells, fieldSlots: this.fieldSlots, collectionCells: this.collectionCells, garbageCollection: !!this.gcEnabled, collections: this.gcStats?.collections ?? 0, freedObjects: this.gcStats?.freed ?? 0, peakLiveAfterCollection: this.gcStats?.peakLiveAfterGc ?? 0 }, instructionBudget: { limit: this.maxInstructionsPerEvent, currentEvent: this.steps }, unicodeCaseBackend: this.unicodeCaseBackend ?? null, methodEvidenceSummary:{uniqueMethods:this.methodEvidence?.size??0,truncated:!!this.methodEvidenceTruncated} };
+      missingVoid: [...this.missingVoid].map(([key, count]) => ({ key, count })), executionByOrigin: { apk: { ...this.executionByOrigin.apk }, framework: { ...this.executionByOrigin.framework }, host: { ...this.executionByOrigin.host } }, callDepth: { limit: this.maxCallDepth, peak: this.peakCallDepth }, heapBudget: { oomCount: this.oomCount ?? 0, objects: this.heap.size, limit: this.maxHeapObjects, arrayCells: this.arrayCells, fieldSlots: this.fieldSlots, collectionCells: this.collectionCells, garbageCollection: !!this.gcEnabled, collections: this.gcStats?.collections ?? 0, freedObjects: this.gcStats?.freed ?? 0, peakLiveAfterCollection: this.gcStats?.peakLiveAfterGc ?? 0 }, instructionBudget: { limit: this.maxInstructionsPerEvent, currentEvent: this.steps }, unicodeCaseBackend: this.unicodeCaseBackend ?? null, methodEvidenceSummary:{uniqueMethods:this.methodEvidence?.size??0,truncated:!!this.methodEvidenceTruncated} };
   }
   compactArguments(method, words, mode) {
     const staticCall = mode === 'static';
@@ -1336,6 +1341,7 @@ export class APKRuntime {
       let slot = byMode[mode]; if (slot === undefined) slot = byMode[mode] = new Map();
       let resolution = slot.get(ownerKey);
       if (resolution === undefined) { resolution = this.resolveInvoke(method, args, mode, callerOwner); slot.set(ownerKey, resolution); }
+      if (resolution.kind === 'missing-void') return this.noteMissingVoid(resolution.key);
       if (resolution.kind === 'bridge') { this.lastBridge = resolution; this.lastBridgeDepth = this.depth; this.record(resolution.text ??= `${resolution.skia ? 'SKIA' : 'SHIM'} ${resolution.key}`); return hostReturn(resolution.selected, this.bridge(resolution.selected, args, mode, resolution.key, resolution)); }
       if (resolution.kind === 'default') {
         const defaultMethod = resolution.defaultMethod;
@@ -1394,7 +1400,14 @@ export class APKRuntime {
     // Java 8 default methods: after the class chain, a concrete method inherited from a (super)interface of the receiver's class.
     const defaultMethod = this.findInterfaceDefault(mode === 'virtual' ? this.typeOf(args[0]) : method.owner, method);
     if (defaultMethod?.code) return { kind: 'default', defaultMethod };
+    if (this.tolerateMissingVoid && method.result === 'V') return { kind: 'missing-void', key: methodKey(method) };
     fail(`Unsupported API/method: ${methodKey(method)}`);
+  }
+  /** Tolerant mode: count a skipped void call; the first one per method goes to the trace as STUB-VOID. */
+  noteMissingVoid(key) {
+    const count = (this.missingVoid.get(key) ?? 0) + 1; this.missingVoid.set(key, count);
+    if (count === 1) this.record(`STUB-VOID ${key}`);
+    return undefined;
   }
   /**
    * Static availability of a referenced method, mirroring dispatch(): 'framework-dex' (AOSP DEX body), 'framework-native' (native with approved binding),
@@ -3147,7 +3160,7 @@ export class APKRuntime {
         if (!Number.isFinite(size) || size < 1 || size > 200) fail('Unsupported TextView size');
         obj.textSize = size; return undefined;
       }
-      default: fail(`Unsupported API: ${methodKey(method)}`);
+      default: if (this.tolerateMissingVoid && method.result === 'V') return this.noteMissingVoid(methodKey(method)); fail(`Unsupported API: ${methodKey(method)}`);
     }
   }
   checkArrayValue(array, value) {
