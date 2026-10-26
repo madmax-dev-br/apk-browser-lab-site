@@ -1,19 +1,20 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=9fc86cc65ae6';
-import { inspectELF } from './native-inspector.js?v=9fc86cc65ae6';
-import { inflateRaw } from './inflate.js?v=9fc86cc65ae6';
-import { resolveDevice } from './device-profile.js?v=9fc86cc65ae6';
-import { resourceProfileFor } from './device-configuration.js?v=9fc86cc65ae6';
-import { JniBridge } from './jni-host.js?v=9fc86cc65ae6';
-import { AndroidResources } from './android-resources.js?v=9fc86cc65ae6';
-import { AndroidPlatform } from './android-platform.js?v=9fc86cc65ae6';
-import { FrameworkProvider } from './framework-provider.js?v=9fc86cc65ae6';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=6e138f531f83';
+import { inspectELF } from './native-inspector.js?v=6e138f531f83';
+import { inflateRaw } from './inflate.js?v=6e138f531f83';
+import { resolveDevice } from './device-profile.js?v=6e138f531f83';
+import { resourceProfileFor } from './device-configuration.js?v=6e138f531f83';
+import { JniBridge } from './jni-host.js?v=6e138f531f83';
+import { AndroidResources } from './android-resources.js?v=6e138f531f83';
+import { AndroidPlatform } from './android-platform.js?v=6e138f531f83';
+import { FrameworkProvider } from './framework-provider.js?v=6e138f531f83';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
 const MAX_APK = 500 * 1024 * 1024;
 const MAX_DEX = 64 * 1024 * 1024;
 const MAX_DEX_TOTAL = 256 * 1024 * 1024;
-const MAX_DEX_FILES = 32;
+// ART has no fixed multidex count; this only bounds memory for hostile archives.
+const MAX_DEX_FILES = 1024;
 const MAX_ZIP_ENTRIES = 32768;
 const crcTable = Uint32Array.from({ length: 256 }, (_, n) => {
   let c = n;
@@ -361,9 +362,13 @@ async function prepareResources(archive, names, options, report, yieldControl, w
 export async function loadAPK(arrayBuffer, options = {}) {
   if (!(arrayBuffer instanceof ArrayBuffer) && !(arrayBuffer instanceof Uint8Array)) fail('loadAPK requires an APK ArrayBuffer');
   const archive = new APKArchive(arrayBuffer), names = [...archive.entries.keys()];
-  const dexFiles = names.filter(name => /^classes(?:\d+)?\.dex$/.test(name))
-    .sort((a, b) => a === 'classes.dex' ? -1 : b === 'classes.dex' ? 1 : Number(a.slice(7, -4)) - Number(b.slice(7, -4)) || a.localeCompare(b));
   if (!archive.entries.has('classes.dex')) fail('APK has no root classes.dex');
+  // Same discovery as ART's DexFileLoader: classes.dex, then classes2.dex, classes3.dex, ... up to the first gap.
+  const dexFiles = ['classes.dex'];
+  for (let index = 2; archive.entries.has(`classes${index}.dex`); index++) {
+    if (dexFiles.length >= MAX_DEX_FILES) fail(`APK exceeds ${MAX_DEX_FILES} root DEX files`);
+    dexFiles.push(`classes${index}.dex`);
+  }
   if (dexFiles.length > MAX_DEX_FILES) fail(`APK exceeds ${MAX_DEX_FILES} root DEX files`);
   let totalDexBytes = 0;
   for (const name of dexFiles) {
