@@ -1,6 +1,6 @@
-import {APKError} from './apk-error.js?v=dee55583552d';
-import {getPaintStateByHandle} from './paint-host.js?v=dee55583552d';
-import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=dee55583552d';
+import {APKError} from './apk-error.js?v=cfd2299f1410';
+import {getPaintStateByHandle} from './paint-host.js?v=cfd2299f1410';
+import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=cfd2299f1410';
 
 const MT='Landroid/graphics/text/MeasuredText;',BUILDER=MT.slice(0,-1)+'$Builder;',LB='Landroid/graphics/text/LineBreaker;';
 const REG='Llibcore/util/NativeAllocationRegistry;';
@@ -19,9 +19,10 @@ const chars=(r,ref)=>{const a=r.array(ref);if(a.type!=='[C'||a.elements.length>6
 const validateText=text=>{
  const rejected=[];
  for(const char of text){const cp=char.codePointAt(0),dir=androidCharacterDirectionality(cp);
-  if((cp<0x20&&cp!==10)||cp===0x7f||!/^[^\p{Mark}]$/u.test(char)||![0,3,4,5,7,9,10,12,13].includes(dir))rejected.push('U+'+cp.toString(16).toUpperCase());
+  // Strong RTL (R, AL, AN), marks (NSM) and joiners are shaped by SkParagraph/HarfBuzz; tabs, other controls and explicit bidi embeddings/isolates are not.
+  if((cp<0x20&&cp!==10)||cp===0x7f||![0,1,2,3,4,5,6,7,8,9,10,12,13].includes(dir))rejected.push('U+'+cp.toString(16).toUpperCase());
  }
- if(rejected.length)fail('LTR text layout does not support RTL, combining marks, tabs or control runs: '+[...new Set(rejected)].slice(0,8).join(','));
+ if(rejected.length)fail('Text layout does not support tabs, control runs or explicit bidi embeddings/isolates: '+[...new Set(rejected)].slice(0,8).join(','));
 };
 const bounds=(m,start,end)=>{if(!Number.isInteger(start)||!Number.isInteger(end)||start<0||end<start||end>m.text.length)fail('Invalid measured-text UTF16 range');};
 function paintSnapshot(r,handle){
@@ -32,18 +33,21 @@ function paintSnapshot(r,handle){
 }
 function nativeParagraph(r,m,width){
  const b=backend(r),c=b.CanvasKit,first=m.runs[0]?.paint??{hinting:1};
- const builder=c.ParagraphBuilder.Make(new c.ParagraphStyle({textDirection:c.TextDirection.LTR,textAlign:c.TextAlign.Left,textStyle:{},disableHinting:first.hinting===0}),b.fontManager);
+ // Minikin itemization: runs Roboto covers keep the original single-family path; the others are split per fallback font (HarfBuzz shapes each run).
+ const itemized=m.runs.map(run=>b.fallback?.itemize(m.text.slice(run.start,run.end),{weight:run.paint.weight,italic:run.paint.italic})??null),anyFallback=itemized.some(Boolean);m.fallbackUsed=anyFallback;
+ const style=new c.ParagraphStyle({textDirection:c.TextDirection.LTR,textAlign:c.TextAlign.Left,textStyle:{},disableHinting:first.hinting===0}),builder=anyFallback?b.fallback.makeBuilder(style):c.ParagraphBuilder.Make(style,b.fontManager);
  let paragraph;
  try{
-  for(const run of m.runs){
+  for(const [index,run] of m.runs.entries()){
    const p=run.paint;if(p.hinting!==first.hinting)fail('Mixed font hinting inside a paragraph is unavailable');
-   builder.pushStyle(new c.TextStyle({fontFamilies:['Roboto'],fontSize:p.textSize,locale:p.textLocaleTag??'en-US',letterSpacing:p.letterSpacing*p.textSize,wordSpacing:p.wordSpacing,
+   const textStyle={fontFamilies:['Roboto'],fontSize:p.textSize,locale:p.textLocaleTag??'en-US',letterSpacing:p.letterSpacing*p.textSize,wordSpacing:p.wordSpacing,
     fontStyle:{weight:{value:p.weight},width:c.FontWidth.Normal,slant:p.italic?c.FontSlant.Italic:c.FontSlant.Upright},
-    fontFeatures:[{name:'kern',value:p.flags&0x100?1:0}]}));
-   builder.addText(m.text.slice(run.start,run.end));builder.pop();
+    fontFeatures:[{name:'kern',value:p.flags&0x100?1:0}]};
+   if(itemized[index])b.fallback.addRuns(builder,m.text.slice(run.start,run.end),textStyle,itemized[index]);
+   else{builder.pushStyle(new c.TextStyle(textStyle));builder.addText(m.text.slice(run.start,run.end));builder.pop();}
   }
   paragraph=builder.build();paragraph.layout(width);
-  const missing=paragraph.unresolvedCodepoints();if(missing.length)fail('Pinned Roboto fonts lack paragraph glyphs: '+missing.slice(0,8).join(','));
+  const missing=paragraph.unresolvedCodepoints().filter(code=>!(code===10||code===13||code===0xad||code===0x34f||code===0x61c||(code>=0x200b&&code<=0x200f)||(code>=0x202a&&code<=0x202e)||(code>=0x2060&&code<=0x206f)||code===0xfeff||(code>=0xfe00&&code<=0xfe0f)||(code>=0xe0100&&code<=0xe01ef)));if(missing.length)fail('Pinned Roboto and Android fallback fonts lack paragraph glyphs: '+missing.slice(0,8).join(','));
   if(paragraph.getNumberOfLines()>4096)fail('Paragraph exceeds4096 native lines');
   return paragraph;
  }catch(error){paragraph?.delete();throw error;}finally{builder.delete();}
@@ -52,20 +56,30 @@ function rangeWidth(r,m,start,end){
  bounds(m,start,end);if(start===end)return 0;const c=backend(r).CanvasKit;
  return Math.fround(m.paragraph.getRectsForRange(start,end,c.RectHeightStyle.Tight,c.RectWidthStyle.Tight).reduce((sum,box)=>sum+box.rect[2]-box.rect[0],0));
 }
+/** SkParagraph cluster offsets are UTF-8 byte offsets: map each one back to its UTF-16 index. */
+function utf16Offsets(text){const map=[];let byte=0;for(let i=0;i<text.length;){const cp=text.codePointAt(i),n=cp>0xffff?2:1,size=cp<0x80?1:cp<0x800?2:cp<0x10000?3:4;for(let k=0;k<size;k++)map[byte+k]=i;byte+=size;i+=n;}map[byte]=text.length;return map;}
 function metrics(r,m,start,end){
  bounds(m,start,end);let ascent=0,descent=0;
  for(const run of m.runs)if(run.start<end&&run.end>start){const f=r.skiaHost.measureText('',run.paint).metrics;ascent=Math.min(ascent,Math.round(f.ascent));descent=Math.max(descent,Math.round(f.descent));}
+ // Minikin's extent is the union over every font of the run, fallback fonts included.
+ if(m.fallbackUsed){const c=backend(r).CanvasKit,toU16=utf16Offsets(m.text);
+  for(const line of m.paragraph.getShapedLines())for(const run of line.runs){
+   let inside=false;
+   for(const offset of run.offsets){const at=toU16[offset];if(at>=start&&at<end){inside=true;break;}}
+   if(inside){const font=new c.Font(run.typeface,run.size);try{const f=font.getMetrics();ascent=Math.min(ascent,Math.round(f.ascent));descent=Math.max(descent,Math.round(f.descent));}finally{font.delete();}}
+   run.typeface.delete();
+  }}
  return{ascent,descent};
 }
 function inkBounds(r,m,start,end){
- bounds(m,start,end);if(start===end)return[0,0,0,0];const c=backend(r).CanvasKit,origin=rangeWidth(r,m,0,start);
+ bounds(m,start,end);if(start===end)return[0,0,0,0];const c=backend(r).CanvasKit,origin=rangeWidth(r,m,0,start),toU16=utf16Offsets(m.text);
  let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
  for(const line of m.paragraph.getShapedLines())for(const run of line.runs){
   const font=new c.Font(run.typeface,run.size);
   try{
    const boxes=font.getGlyphBounds(run.glyphs);
    for(let i=0;i<run.glyphs.length;i++){
-    const clusterStart=run.offsets[i];let clusterEnd=run.offsets[i+1];for(let j=i+1;j<run.offsets.length&&clusterEnd<=clusterStart;j++)clusterEnd=run.offsets[j];
+    const clusterStart=toU16[run.offsets[i]];let clusterEnd=toU16[run.offsets[i+1]];for(let j=i+1;j<run.offsets.length&&clusterEnd<=clusterStart;j++)clusterEnd=toU16[run.offsets[j]];
     if(clusterStart>=end||clusterEnd<=start)continue;
     const box=boxes.slice(i*4,i*4+4);if(Array.from(box).every(v=>v===0))continue;
     const x=run.positions[i*2]-origin,y=run.positions[i*2+1]-line.baseline;
@@ -85,9 +99,9 @@ export function createTextLayoutNativeBindings(){
  add(MT,'nGetReleaseFunc',[],'J',()=>0x5445585401n);add(LB,'nGetReleaseFunc',[],'J',()=>0x5445585402n);add(LB,'nGetReleaseResultFunc',[],'J',()=>0x5445585403n);
  add(BUILDER,'nInitBuilder',[],'J',r=>{backend(r);return allocate(r,'builder',{runs:[]});});
  add(BUILDER,'nAddStyleRun',['J','J','I','I','I','I','Z'],'V',(r,[h,p,style,word,start,end,rtl])=>{
-  const b=get(r,h,'builder');if(rtl||style||word)fail('RTL or configured line-break style requires a separate text backend');
+  const b=get(r,h,'builder');if(style||word)fail('Configured line-break style/word style requires a separate text backend');
   if(start!==(b.runs.at(-1)?.end??0)||end<=start||end>65536||b.runs.length>=4096)fail('Invalid or excessive measured-text style runs');
-  b.runs.push({start,end,paint:paintSnapshot(r,p)});
+  b.runs.push({start,end,paint:paintSnapshot(r,p),rtl:!!rtl});
  });
  add(BUILDER,'nAddReplacementRun',['J','J','I','I','F'],'V',()=>fail('ReplacementSpan native measured-text runs are unavailable'));
  add(BUILDER,'nBuildMeasuredText',['J','J','[C','Z','Z','Z'],'J',(r,[h,hint,buffer,hyphenation,layout,fast])=>{

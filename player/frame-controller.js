@@ -1,7 +1,7 @@
 // Message-driven controller of one player frame. DOM-free: the VM client, the shared device view and the postMessage sink are injected, so the
 // same code runs in the real frame (frame.js) and in the headless smoke test.
-import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, MAX_APK_BYTES } from './protocol.js?v=dee55583552d';
-import { sanitizeSettings } from '../device-settings.js?v=dee55583552d';
+import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, MAX_APK_BYTES } from './protocol.js?v=cfd2299f1410';
+import { sanitizeSettings } from '../device-settings.js?v=cfd2299f1410';
 export function createFrameController({ vm, state, deviceState, post, fetchImpl = globalThis.fetch?.bind(globalThis), hooks = {} }) {
   let view = null, source = null, config = {}, lastActivity = null, destroyed = false, chain = Promise.resolve(), inflight = 0, oomSeen = 0;
   const send = (type, payload) => post(envelope(type, payload));
@@ -39,12 +39,19 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     navigationChanged() {},
     closed() { send('closed'); },
   };
-  async function load(buffer, activity) {
+  let dataKey = null;   // last app-data usage sent to the host: `data-status` is only emitted when it changes
+  const reportData = status => {
+    if (!status) return; const key = `${status.enabled}|${status.bytes}|${status.files}|${status.overLimit}|${status.error ?? ''}`; if (key === dataKey) return; dataKey = key;
+    send('data-status', { status: { enabled: !!status.enabled, bytes: status.bytes | 0, files: status.files | 0, limitBytes: status.limitBytes | 0, restoredFiles: status.restoredFiles | 0, overLimit: !!status.overLimit, error: status.error ?? null } });
+  };
+  vm.onAppData = reportData;
+  async function load(buffer, activity, dataOptions = {}) {
     state.viewSession++; clearPending(); state.runtime = null; state.apkRunning = false; lastActivity = null; oomSeen = 0;
     const token = operations.beginOperation();
     try {
       const keep = buffer.slice(0); source.bytes = keep;
-      const result = await vm.load(buffer, { device: deviceState.settings }); if (token !== state.operation) return;
+      const result = await vm.load(buffer, { device: deviceState.settings, keepData: source.keepData, clearData: !!dataOptions.clearData }); if (token !== state.operation) return;
+      dataKey = null; reportData(result.appData);
       state.runtime = vm; state.inventory = result.inventory;
       const snapshot = await vm.launch(activity || undefined); if (token !== state.operation) return;
       view.renderSnapshot(snapshot);
@@ -61,9 +68,9 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
   }
   const handlers = {
     init: message => enqueue(async () => {
-      source = { name: message.name || '', url: message.url, activity: message.activity, bytes: null };
+      source = { name: message.name || '', url: message.url, activity: message.activity, bytes: null, keepData: message.keepData === true };
       config = {}; applyConfig(message.config); hooks.settingsChanged?.(deviceState.settings);
-      try { await load(await bytesOf(message), message.activity); } catch (error) { fail(error, 'load'); }
+      try { await load(await bytesOf(message), message.activity, { clearData: message.clearData === true }); } catch (error) { fail(error, 'load'); }
     }),
     config: message => enqueue(async () => {
       const { settings, rejected } = applyConfig(message.config); hooks.settingsChanged?.(settings);
@@ -81,6 +88,15 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     restart: () => enqueue(async () => {
       if (!source) return;
       try { await load(source.bytes ? source.bytes.slice(0) : await bytesOf({ url: source.url }), source.activity); } catch (error) { fail(error, 'restart'); }
+    }),
+    // Settings > Apps > Clear storage: wipe the stored data of the loaded app and restart it from the retained bytes (a killed process starts from empty storage).
+    'clear-data': () => enqueue(async () => {
+      if (!source) return;
+      try {
+        let status = null; if (vm.worker && state.runtime === vm) status = await vm.clearAppData();
+        await load(source.bytes ? source.bytes.slice(0) : await bytesOf({ url: source.url }), source.activity, { clearData: true });
+        send('data-cleared', { status: { enabled: !!(status?.enabled ?? source.keepData), bytes: 0, files: 0, limitBytes: status?.limitBytes | 0 } });
+      } catch (error) { fail(error, 'clear-data'); }
     }),
     destroy: () => { destroyed = true; try { vm.cancel(); } catch { /* already gone */ } state.runtime = null; state.apkRunning = false; clearPending(); hooks.destroyed?.(); },
   };

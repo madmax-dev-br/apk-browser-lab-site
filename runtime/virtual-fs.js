@@ -89,7 +89,7 @@ export class VirtualFileSystem {
     if (!node) { if (!create) return 'ENOENT'; const result = this.createFile(p); if (result !== 'ok') return result; node = this.nodes.get(p); }
     if (node.type === 'dir') return 'EISDIR';
     if (write && this.isReadOnly(p)) return 'EACCES';
-    if (truncate) { node.size = 0; node.mtime = this.now(); }
+    if (truncate) { node.size = 0; node.mtime = this.now(); node.rev = (node.rev ?? 0) + 1; }
     return node;
   }
   readAt(node, position, target, offset, length) {
@@ -101,7 +101,7 @@ export class VirtualFileSystem {
     if (end > 256 * 1024 * 1024) throw new RangeError('Virtual filesystem file size limit (256 MiB) exceeded');
     if (end > node.buf.length) { const grown = new Uint8Array(Math.max(end, node.buf.length * 2, 64)); grown.set(node.buf.subarray(0, node.size)); node.buf = grown; }
     if (position > node.size) node.buf.fill(0, node.size, position);
-    node.buf.set(source.subarray(offset, offset + length), position); node.size = Math.max(node.size, end); node.mtime = this.now(); return length;
+    node.buf.set(source.subarray(offset, offset + length), position); node.size = Math.max(node.size, end); node.mtime = this.now(); node.rev = (node.rev ?? 0) + 1; return length;   // `rev` lets src/app-data-store.js see a change made within the same millisecond
   }
   bytes(path) { const node = this.node(path); return node?.type === 'file' ? node.buf.slice(0, node.size) : null; }
   setBytes(path, bytes) { const node = this.open(path, { create: true, truncate: true, write: true }); if (typeof node === 'string') return node; this.writeAt(node, 0, bytes, 0, bytes.length); return 'ok'; }

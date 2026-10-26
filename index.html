@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=dee55583552d">
-  <meta name="apk-browser-build" content="dee55583552d">
+  <link rel="stylesheet" href="./styles.css?v=cfd2299f1410">
+  <meta name="apk-browser-build" content="cfd2299f1410">
 </head>
 <body>
   <header class="topbar">
@@ -63,6 +63,11 @@
             <button id="device-reset" class="device-reset" type="button">Restaurar padrão</button>
           </details>
           <label class="tolerant-toggle" for="tolerate-missing"><span>Modo tolerante: APIs do Android que faltam viram <code>STUB-VOID</code>/<code>STUB-RETURN</code> no log em vez de parar o app</span><select id="tolerate-missing"><option value="off">Desligado (estrito)</option><option value="void">Só métodos void</option><option value="primitives" selected>void e primitivos (0, false)</option><option value="all">Todos os tipos (0, false, null)</option></select></label>
+          <div class="app-data-row" id="app-data-row">
+            <label class="tolerant-toggle" for="keep-app-data"><span>Manter dados do app entre recargas (SharedPreferences, bancos SQLite, arquivos e cache do app, por pacote e certificado)</span><input id="keep-app-data" type="checkbox" checked></label>
+            <p id="app-data-usage" class="support-note" role="status" aria-live="polite">Dados do app: abra um APK para ver o uso.</p>
+            <button id="clear-app-data" class="device-reset" type="button" disabled>Limpar dados do app</button>
+          </div>
           <button id="run-button" class="run-button" disabled><span aria-hidden="true">▶</span> Executar APK <kbd>RUN</kbd></button>
           <p class="support-note"><span aria-hidden="true">ⓘ</span><span>VM experimental para Android Views e bytecode DEX. Multidex é inspecionado no Worker; Android, Compose e JNI ainda podem exigir APIs não implementadas. </span></p>
         </section>
@@ -97,6 +102,6 @@
     </details>
     <footer><span><span class="footer-dot"></span> Sem instalação. Sem emulador. Sem upload.</span><a href="./hermes-proof/">Experimento Hermes no navegador ↗</a><span>APK Browser Lab <span class="footer-slash">/</span> protótipo técnico</span></footer>
   </main>
-  <script type="module" src="./app.js?v=dee55583552d"></script>
+  <script type="module" src="./app.js?v=cfd2299f1410"></script>
 </body>
 </html>

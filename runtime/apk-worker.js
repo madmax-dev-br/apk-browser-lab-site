@@ -1,34 +1,36 @@
-import { loadAPK } from './apk-loader.js?v=dee55583552d';
-import { FrameworkProvider } from './framework-provider.js?v=dee55583552d';
-import { createRasterSender } from './raster-cache.js?v=dee55583552d';
-import { isFreedId } from './heap-gc.js?v=dee55583552d';
-import { dispatchPointer } from './pointer-input-host.js?v=dee55583552d';
-import { resolveDevice } from './device-profile.js?v=dee55583552d';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=dee55583552d';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=dee55583552d';
-import { SkiaProvider } from './skia-provider.js?v=dee55583552d';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=dee55583552d';
-import { disposeTextLayout } from './text-layout-native.js?v=dee55583552d';
-import { IcuBreakProvider } from './icu-break-provider.js?v=dee55583552d';
-import { SqliteProvider } from './sqlite-native.js?v=dee55583552d';
-import { TzdataProvider } from './java-time-native.js?v=dee55583552d';
-import { ZlibProvider } from './zip-native.js?v=dee55583552d';
-import { IcuConverterProvider } from './icu-converter-native.js?v=dee55583552d';
-import { disposeColorFilters } from './color-filter-native.js?v=dee55583552d';
-import { disposeRegex } from './regex-native.js?v=dee55583552d';
-import { disposeRenderNodes } from './rendernode-native.js?v=dee55583552d';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=dee55583552d';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=dee55583552d';
+import { loadAPK } from './apk-loader.js?v=cfd2299f1410';
+import { FrameworkProvider } from './framework-provider.js?v=cfd2299f1410';
+import { createRasterSender } from './raster-cache.js?v=cfd2299f1410';
+import { isFreedId } from './heap-gc.js?v=cfd2299f1410';
+import { dispatchPointer } from './pointer-input-host.js?v=cfd2299f1410';
+import { resolveDevice } from './device-profile.js?v=cfd2299f1410';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=cfd2299f1410';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=cfd2299f1410';
+import { SkiaProvider } from './skia-provider.js?v=cfd2299f1410';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=cfd2299f1410';
+import { disposeTextLayout } from './text-layout-native.js?v=cfd2299f1410';
+import { IcuBreakProvider } from './icu-break-provider.js?v=cfd2299f1410';
+import { SqliteProvider } from './sqlite-native.js?v=cfd2299f1410';
+import { TzdataProvider } from './java-time-native.js?v=cfd2299f1410';
+import { ZlibProvider } from './zip-native.js?v=cfd2299f1410';
+import { IcuConverterProvider } from './icu-converter-native.js?v=cfd2299f1410';
+import { disposeColorFilters } from './color-filter-native.js?v=cfd2299f1410';
+import { disposeRegex } from './regex-native.js?v=cfd2299f1410';
+import { disposeRenderNodes } from './rendernode-native.js?v=cfd2299f1410';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=cfd2299f1410';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=cfd2299f1410';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=cfd2299f1410';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=dee55583552d';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=dee55583552d';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=dee55583552d';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=cfd2299f1410';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=cfd2299f1410';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=cfd2299f1410';
 
 let sharedSkiaProvider = null;
 let sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
 let sharedLayoutProvider = null;
 let sharedConfigurationProvider = null;
 let runtime = null;
+let appData = null, appDataInfo = null;   // per-app private data persistence (src/app-data-store.js): the live persistence object (null when disabled) and the last status
 let composeSemantics = null;
 let inspectNativeLibraries = null;
 let inventory = null;
@@ -38,6 +40,7 @@ let eventTimer = null, lastEventMs = 0;
 function errorData(error) { return { name: error.name || 'Error', message: error.message || String(error), stack: error.stack, details: error.details, navigation: runtime?.platform?.navigationState?.(runtime), trace: Array.isArray(runtime?.trace) ? runtime.trace.slice(-512) : [], stubs: runtime ? [...(runtime.missingClasses ?? []), ...(runtime.missingReturns ?? []), ...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`) : [] }; }
 const rasterSender = createRasterSender();
 function currentSnapshot() {
+  appData?.touch();
   runtime.steps = 0; // A bounded inspection event, separate from the APK callback that just finished.
   const snapshot = runtime.snapshot();
   if (!snapshot.closed && composeSemantics) snapshot.composeSemantics = composeSemantics.snapshot();
@@ -77,11 +80,13 @@ self.onmessage = async ({ data }) => {
   if (!data || !Number.isSafeInteger(data.requestId)) return;
   const { requestId, type } = data;
   const send = (message) => self.postMessage({ requestId, ...message });
+  if (type === 'app-data-flush') { appData?.syncPoint('page-hide'); return; }   // the page is being hidden/closed: store now, even while the VM is busy (no reply)
   if (busy) { send({ type: 'error', error: { name: 'ProtocolError', message: 'A VM já está processando outra operação.' } }); return; }
   busy = true; activeRequestId = requestId; let succeeded = false; clearTimeout(eventTimer);
   try {
     if (type === 'load') {
       rasterSender.reset();
+      if (appData) { await appData.close().catch(() => {}); } appData = null; appDataInfo = null;
       if (runtime) { disposeRegex(runtime); disposeRenderNodes(runtime); disposeTextLayout(runtime); disposeColorFilters(runtime); } runtime?.skiaHost?.dispose?.(); runtime = null; composeSemantics = null;
       if (!(data.buffer instanceof ArrayBuffer)) throw new TypeError('O Worker precisa receber um ArrayBuffer de APK.');
       const frameworkProvider = data.frameworkDex ? new FrameworkProvider({ bytes: data.frameworkDex }) : FRAMEWORK_ASSET_URL ? new FrameworkProvider({ url: new URL(FRAMEWORK_ASSET_URL, import.meta.url), provenanceURL: new URL(FRAMEWORK_ASSET_URL.replace('framework.dex', 'manifestprovenance.json'), import.meta.url) }) : null;
@@ -100,7 +105,16 @@ self.onmessage = async ({ data }) => {
       runtime.platform.onExternalActivity = () => { if (!busy) scheduleEvents(); };   // network exchanges finishing wake the event pump
       composeSemantics = createComposeSemanticsDriver(runtime);
       runtime.gcEnabled = data.gc !== false;   // unreachable Java objects are reclaimed between events (src/heap-gc.js)
-      send({ type: 'result', inventory: result.inventory });
+      // Stored app data goes back into the virtual filesystem before any app code runs (Application.onCreate happens at launch).
+      const attached = await attachAppData(runtime, { keep: data.keepData !== false, clear: data.clearData === true, onStatus: status => self.postMessage({ type: 'app-data', status }) });
+      appData = attached.persistence; appDataInfo = attached.status;
+      send({ type: 'result', inventory: result.inventory, appData: appDataInfo });
+    } else if (type === 'app-data-clear') {
+      // Settings > Apps > Clear storage: the stored data is wiped and this process stops persisting; the page restarts the app.
+      if (!runtime) throw new Error('Abra um APK antes de limpar os dados do app.');
+      if (appData) appDataInfo = await appData.clear();
+      else { const backend = defaultBackend(); if (backend) { const { key } = await appKeyFor(runtime.platform.packageName, runtime.apkSigningCertificates?.() ?? []); await backend.clear(key); } appDataInfo = { ...(appDataInfo ?? {}), bytes: 0, files: 0 }; }
+      send({ type: 'result', appData: appDataInfo });
     } else if (type === 'device') {
       // Virtual-device settings changed while an APK runs: Configuration/resources/lifecycle exactly like ActivityThread.handleConfigurationChanged.
       if (!runtime) { send({ type: 'result', outcome: { changed: 0, applied: false } }); }

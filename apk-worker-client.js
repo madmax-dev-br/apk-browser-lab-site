@@ -1,6 +1,6 @@
-import { createRasterReceiver } from './raster-cache.js?v=dee55583552d';
+import { createRasterReceiver } from './raster-cache.js?v=cfd2299f1410';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=dee55583552d', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 30000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=cfd2299f1410', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 30000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -17,6 +17,7 @@ export class APKWorkerClient {
       if (worker !== this.worker) return;
       // Every snapshot, delivered or not, passes the raster cache in order so Worker and page LRUs stay identical.
       if (data?.snapshot) { try { this.rasters.resolve(data.snapshot); } catch (error) { this.cancel(error); return; } }
+      if (data?.type === 'app-data') { this.appData = data.status; this.onAppData?.(data.status); return; }
       if (data?.type === 'runtime-busy') { this.onRuntimeBusy?.(true); return; }
       if (data?.type === 'runtime-idle') { this.onRuntimeBusy?.(false); return; }
       if (data?.type === 'runtime-event') { this.onRuntimeSnapshot?.(data.snapshot); return; }
@@ -53,11 +54,16 @@ export class APKWorkerClient {
       catch (error) { this.cancel(error); }
     });
   }
-  async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off' } = {}) {
+  async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', keepData = true, clearData = false } = {}) {
     this.cancel(); this.rasters.reset();
-    const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
-    return { inventory: response.inventory };
+    const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, keepData, clearData }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
+    this.appData = response.appData ?? null;
+    return { inventory: response.inventory, appData: this.appData };
   }
+  /** Settings > Apps > Clear storage for the loaded app: wipes its stored data; the caller restarts the app. Resolves with the new usage status. */
+  async clearAppData() { const response = await this.request('app-data-clear', {}, { timeoutMs: this.eventTimeoutMs }); this.appData = response.appData ?? null; return this.appData; }
+  /** Fire-and-forget: ask the Worker to store the app data now (page hidden or closing). Works while the VM is busy. */
+  flushAppData() { try { this.worker?.postMessage({ type: 'app-data-flush', requestId: ++this.sequence }); } catch { /* worker already gone */ } }
   async launch(activity, { onProgress } = {}) {
     return (await this.request('launch', { activity }, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot;
   }

@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=dee55583552d';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=dee55583552d';
+import { APKError } from './apk-error.js?v=cfd2299f1410';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=cfd2299f1410';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -129,14 +129,16 @@ export function createPaintHost() {
         if(contextStart<0||start<contextStart||offset<start||end<offset||contextEnd<end||contextEnd>length)runtime.throwJava('Ljava/lang/IndexOutOfBoundsException;','Invalid Paint run/context range');
         if(start===end)return rawFloat(0);
         if(contextEnd-contextStart>65536)fail('Run context exceeds65536UTF16units');
-        if(isRtl||start!==contextStart||end!==contextEnd)fail('Run advance requires a complete LTR shaping run; partial context/bidi items need the Android Minikin boundary');
         if(paint.hyphenEdit)fail('Run advance with Android hyphen editing requires an implemented Minikin backend');
         let chars;
         if(isArray){const source=runtime.array(text);if(source.type!=='[C')runtime.throwJava('Ljava/lang/ClassCastException;','Paint run requires char[]');chars=source.elements.slice(contextStart,contextEnd);}
         else{const buffer=runtime.newArray('[C',contextEnd-contextStart);runtime.dispatch({owner:'Landroid/text/TextUtils;',name:'getChars',parameters:['Ljava/lang/CharSequence;','I','I','[C','I'],result:'V',signature:'(Ljava/lang/CharSequence;II[CI)V'},[text,contextStart,contextEnd,buffer,0],'static');chars=runtime.array(buffer).elements;}
         let content='';for(let from=0;from<chars.length;from+=16384)content+=String.fromCharCode(...chars.slice(from,from+16384));
+        // Partial/RTL items: the whole context is shaped (joining and clusters need it) and the advance is the sum of the cluster boxes of [start,offset).
+        // Plain Latin partial LTR items stay unsupported: Minikin shapes them as their own run, and cross-boundary kerning would differ.
+        if((isRtl||start!==contextStart||end!==contextEnd)&&!isRtl&&/^[\u0020-\u024f]*$/.test(content))fail('Run advance requires a complete LTR shaping run; partial context/bidi items need the Android Minikin boundary');
         if(!runtime.skiaHost?.measureRun)fail('Paint run advance requires the verified Skia shaping backend');
-        const value=runtime.skiaHost.measureRun(content,{offset:offset-contextStart},paint);runtime.record('HOST Paint.getRunAdvance [original SkParagraph/SkShaper; complete LTR run]');return rawFloat(value);
+        const value=runtime.skiaHost.measureRun(content,{offset:offset-contextStart,start:start-contextStart,isRtl},paint);runtime.record('HOST Paint.getRunAdvance [original SkParagraph/SkShaper; complete LTR run]');return rawFloat(value);
       }
       if (name === 'reset') { runtime.storeField(object.fields,`${PAINT}->mBidiFlags:I`,2); object.webPaint = initial(1); initializeTextLocales(runtime,object.webPaint); return; }
       if (name === 'set') { runtime.storeField(object.fields,`${PAINT}->mBidiFlags:I`,runtime.object(args[1]).fields.get(`${PAINT}->mBidiFlags:I`)??2); object.webPaint = { ...getPaintState(runtime, args[1]) }; return; }

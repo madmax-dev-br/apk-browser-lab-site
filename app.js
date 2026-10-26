@@ -1,6 +1,6 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=dee55583552d';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=dee55583552d';
-import { createDeviceView, createViewState } from './device-view.js?v=dee55583552d';
+import { APKWorkerClient } from './apk-worker-client.js?v=cfd2299f1410';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=cfd2299f1410';
+import { createDeviceView, createViewState } from './device-view.js?v=cfd2299f1410';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -25,6 +25,7 @@ function setBusy(busy) {
   $('apk-file').disabled = busy;
   $('reopen-file').disabled = busy;
   $('inspect-native-button').disabled = busy || !state.runtime;
+  if ($('clear-app-data')) $('clear-app-data').disabled = busy || !state.runtime;
   $('native-abi').disabled = busy; $('native-library').disabled = busy;
   document.querySelectorAll('[data-inspect-apk]').forEach((button) => { button.disabled = busy || button.dataset.available === 'false'; });
   $('run-button').querySelector('kbd').textContent = busy ? '…' : 'RUN';
@@ -119,6 +120,26 @@ function cancelOperation() {
   setBusy(false);
   if (state.mode === 'apk') { hideError(); setStatus('VM encerrada · reabra o APK para continuar'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> CANCELADO'; }
 }
+// ---- App data persistence (src/app-data-store.js): the toggle, the usage line and Clear storage.
+function showAppData(info) {
+  const element = $('app-data-usage'); if (!element) return;
+  if (!info) { element.textContent = 'Dados do app: abra um APK para ver o uso.'; return; }
+  const cap = formatSize(info.limitBytes ?? 0), used = `${formatSize(info.bytes ?? 0)} de ${cap} · ${info.files ?? 0} arquivo(s)`;
+  element.textContent = info.enabled === false ? (info.reason === 'disabled' ? `Persistência desligada para esta execução · guardado: ${used}` : 'Persistência indisponível neste navegador (sem IndexedDB).')
+    : info.error ? `Dados do app: erro ao gravar (${info.error}) · ${used}` : info.overLimit ? `Dados do app acima do limite: a gravação foi recusada e o último estado salvo foi mantido · ${used}` : `Dados do app guardados: ${used}${info.restoredFiles ? ` · ${info.restoredFiles} restaurado(s)` : ''}`;
+}
+apkVM.onAppData = showAppData;
+try { if (localStorage.getItem('apkweb.keepAppData') === '0') $('keep-app-data').checked = false; } catch { /* storage may be blocked */ }
+$('keep-app-data')?.addEventListener('change', () => { try { localStorage.setItem('apkweb.keepAppData', $('keep-app-data').checked ? '1' : '0'); } catch { /* ignore */ } setStatus($('keep-app-data').checked ? 'Os dados do app serão mantidos a partir da próxima abertura do APK.' : 'Os dados do app não serão lidos nem gravados a partir da próxima abertura do APK.'); });
+$('clear-app-data')?.addEventListener('click', async () => {
+  if (state.busy || !state.runtime) return;
+  if (!confirm('Apagar todos os dados guardados deste app (preferências, bancos e arquivos)? O app será reiniciado.')) return;
+  try { const info = await apkVM.clearAppData(); showAppData(info); appendTrace('Dados do app apagados (como Configurações > Apps > Limpar armazenamento).'); if (state.currentSource) await importSource(state.currentSource); setStatus('Dados do app apagados · abra o app de novo para iniciar do zero'); }
+  catch (error) { reportAPKError(error, 'Não foi possível limpar os dados do app'); }
+});
+// Page hidden or closing: ask the Worker to store the app data right away (best effort; the write is already a transaction by the time the page goes).
+document.addEventListener?.('visibilitychange', () => { if (document.visibilityState === 'hidden') apkVM.flushAppData(); });
+globalThis.addEventListener?.('pagehide', () => apkVM.flushAppData());
 function formatSize(size) {
   return size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` : `${(size / (1024 * 1024)).toFixed(2)} MB`;
 }
@@ -230,9 +251,9 @@ async function importSource(source, autoRun = false) {
     if (token !== state.operation) return;
     if (buffer.byteLength > 1024 * 1024 * 1024) throw new Error('O APK excede o limite de 1 GiB.');
     $('file-size').textContent = `${formatSize(buffer.byteLength)} · processado no navegador`;
-    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceState.settings, tolerateMissing: $('tolerate-missing')?.value ?? 'off' }); // Ownership transfers to the Worker.
+    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceState.settings, tolerateMissing: $('tolerate-missing')?.value ?? 'off', keepData: $('keep-app-data')?.checked !== false }); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
-    state.runtime = apkVM; state.inventory = result.inventory;
+    state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);
     showInventory(result.inventory);
     appendTrace(`Pacote: ${result.inventory.packageName || '(não identificado)'}`);
     if (state.mode === 'apk') {

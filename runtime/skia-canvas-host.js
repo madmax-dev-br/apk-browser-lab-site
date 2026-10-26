@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=dee55583552d';
-import {getVectorGraphics} from './vector-native.js?v=dee55583552d';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=dee55583552d';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=dee55583552d';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun} from './skia-paragraph.js?v=dee55583552d';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=dee55583552d';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=dee55583552d';
-import {createBitmapHost} from './bitmap-host.js?v=dee55583552d';
-import { gcRoot } from './heap-gc.js?v=dee55583552d';
+import {APKError} from './apk-runtime.js?v=cfd2299f1410';
+import {getVectorGraphics} from './vector-native.js?v=cfd2299f1410';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=cfd2299f1410';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=cfd2299f1410';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=cfd2299f1410';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=cfd2299f1410';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=cfd2299f1410';
+import {createBitmapHost} from './bitmap-host.js?v=cfd2299f1410';
+import { gcRoot } from './heap-gc.js?v=cfd2299f1410';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -33,17 +33,27 @@ function makeFont(backend,state,text){
  const CK=backend.CanvasKit;if(typeof text!=='string'||text.length>65536)fail('Skia text run exceeds65536characters');
  const size=state.textSize??12,scale=state.textScaleX??1,skew=state.textSkewX??0;if(![size,scale,skew].every(Number.isFinite)||size<0||size>512||Math.abs(scale)>16||Math.abs(skew)>16)fail('Skia font extent exceeds VM limits');
  if(state.hyphenEdit)fail('Text drawing with Android hyphen edits requires the Minikin boundary');
- // A simple glyph run is exact for scripts without contextual shaping (Latin, Greek, Cyrillic, punctuation, symbols);
- // complex scripts, combining marks and emoji/joiner sequences need Minikin/HarfBuzz. Missing glyphs still fail below.
- if(state.letterSpacing||state.wordSpacing||/[\p{Mark}\u200c\u200d\ufe0e\ufe0f\p{Extended_Pictographic}]|[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Gurmukhi}\p{Script=Gujarati}\p{Script=Oriya}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Kannada}\p{Script=Malayalam}\p{Script=Sinhala}\p{Script=Thai}\p{Script=Lao}\p{Script=Tibetan}\p{Script=Myanmar}\p{Script=Khmer}\p{Script=Mongolian}\p{Script=Hangul}]/u.test(text))fail('Text shaping/fallback for this run requires the Android text layout bridge');
+ // A simple glyph run is exact for scripts without contextual shaping (Latin, punctuation, symbols) that Roboto covers;
+ // complex scripts, combining marks, emoji/joiner sequences, letter/word spacing and code points Roboto lacks are shaped
+ // run by run through the Android font fallback chain (SkParagraph/HarfBuzz) instead: makeFont then returns {shaped:true}.
+ const shaped=state.letterSpacing||state.wordSpacing||/[\p{Mark}\u200c\u200d\ufe0e\ufe0f\p{Extended_Pictographic}]|[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Gurmukhi}\p{Script=Gujarati}\p{Script=Oriya}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Kannada}\p{Script=Malayalam}\p{Script=Sinhala}\p{Script=Thai}\p{Script=Lao}\p{Script=Tibetan}\p{Script=Myanmar}\p{Script=Khmer}\p{Script=Mongolian}\p{Script=Hangul}]/u.test(text);
  if(state.flags&0x800)fail('The CanvasKit font API does not expose force-auto-hinting');
  const font=new CK.Font(state.nativeTypeface??backend.typeface,state.textSize??12);font.setScaleX(state.textScaleX??1);font.setSkewX(state.textSkewX??0);font.setEmbolden(!!(state.flags&0x20));font.setLinearMetrics(!!(state.flags&0x40));font.setSubpixel(!!(state.flags&0x80));font.setEmbeddedBitmaps(!!(state.flags&0x400));
  // Embind's public enum ABI is {value:number};0.42 omits the Alias symbol (SkFont::Edging::kAlias=0).
  font.setEdging(state.flags&1?CK.FontEdging.AntiAlias:(CK.FontEdging.Alias??{value:0}));
  font.setHinting(state.hinting===0?CK.FontHinting.None:CK.FontHinting.Normal);
- const glyphs=font.getGlyphIDs(text);if(glyphs.some(id=>id===0)){font.delete();fail('The supplied Roboto font lacks a glyph in this run');}return {font,glyphs};
+ if(shaped){font.delete();return {shaped:true};}
+ const glyphs=font.getGlyphIDs(text);if(glyphs.some(id=>id===0)){font.delete();return {shaped:true};}return {font,glyphs};
 }
-export function measureSkiaText(backend,text,state={}){const {font,glyphs}=makeFont(backend,state,text);try{return {width:font.getGlyphWidths(glyphs).reduce((a,b)=>a+b,0),metrics:font.getMetrics(),glyphCount:glyphs.length,source:'official-Skia-Font/Roboto/simple-glyph-run'};}finally{font.delete();}}
+const RTL_SCRIPT=/[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Adlam}\p{Script=Samaritan}\p{Script=Mandaic}]/u;
+/** Paint.BIDI_DEFAULT_LTR: the paragraph direction of Canvas.drawText(String) is that of the first strong character. */
+const firstStrongRtl=text=>{for(const char of text)if(/\p{L}/u.test(char))return RTL_SCRIPT.test(char);return false;};
+const mergeMetrics=(base,extra)=>{const m={...base};for(const e of extra){m.ascent=Math.min(m.ascent,e.ascent);m.descent=Math.max(m.descent,e.descent);m.leading=Math.max(m.leading??0,e.leading??0);if(m.bounds&&e.bounds){m.bounds=[Math.min(m.bounds[0],e.bounds[0]),Math.min(m.bounds[1],e.bounds[1]),Math.max(m.bounds[2],e.bounds[2]),Math.max(m.bounds[3],e.bounds[3])];}}return m;};
+export function measureSkiaText(backend,text,state={}){const made=makeFont(backend,state,text);
+ if(made.shaped){const CK=backend.CanvasKit,face=new CK.Font(state.nativeTypeface??backend.typeface,state.textSize??12);try{face.setScaleX(state.textScaleX??1);face.setSkewX(state.textSkewX??0);face.setEmbolden(!!(state.flags&0x20));face.setLinearMetrics(!!(state.flags&0x40));face.setSubpixel(!!(state.flags&0x80));
+   const run=measureSkiaShapedText(backend,text,{...state,weight:state.weight??400,italic:!!state.italic});
+   return {width:run.width,metrics:mergeMetrics(face.getMetrics(),run.fontMetrics),glyphCount:run.glyphCount,source:'official-Skia-SkParagraph/Roboto+Android-fallback-chain'};}finally{face.delete();}}
+ const {font,glyphs}=made;try{return {width:font.getGlyphWidths(glyphs).reduce((a,b)=>a+b,0),metrics:font.getMetrics(),glyphCount:glyphs.length,source:'official-Skia-Font/Roboto/simple-glyph-run'};}finally{font.delete();}}
 function applyClips(CK,canvas,clips){for(const clip of clips??[]){let path,builder;
  if(clip.commands)path=CK.Path.MakeFromCmds(clip.commands);else{builder=new CK.PathBuilder();builder.addRect(clip.rect);path=builder.snapshot();builder.delete();}
  if(clip.fillType!==undefined)path.setFillType({value:clip.fillType});
@@ -103,11 +113,13 @@ export function rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,heig
      }else drawImage(paint);}finally{image.delete();}}
     else if(command.op==='paragraphRun')drawSkiaTextRun(backend,canvas,command.text,command.args[0],command.args[1],command.paint,command.isRtl,paint,{start:command.runStart??0,end:command.runEnd??command.text.length});
     else if(command.op==='text'){
-     const {font,glyphs}=makeFont(backend,command.paint,command.text);try{canvas.drawText(command.text,command.args[0],command.args[1],paint,font);
+     const made=makeFont(backend,command.paint,command.text);
+     if(made.shaped)drawSkiaTextRun(backend,canvas,command.text,command.args[0],command.args[1],{...command.paint,weight:command.paint.weight??400,italic:!!command.paint.italic},firstStrongRtl(command.text),paint);
+     else{const {font,glyphs}=made;try{canvas.drawText(command.text,command.args[0],command.args[1],paint,font);
       if(command.paint.flags&0x18){const metrics=font.getMetrics(),width=font.getGlyphWidths(glyphs).reduce((a,b)=>a+b,0),decoration=paint.copy();decoration.setStyle(CK.PaintStyle.Fill);
        if(command.paint.flags&8)canvas.drawRect(CK.XYWHRect(command.args[0],command.args[1]+metrics.underlinePosition,width,metrics.underlineThickness),decoration);
        if(command.paint.flags&16)canvas.drawRect(CK.XYWHRect(command.args[0],command.args[1]+metrics.strikeoutPosition,width,metrics.strikeoutThickness),decoration);decoration.delete();}
-     }finally{font.delete();}
+     }finally{font.delete();}}
     }else fail('Unsupported recorded Skia command '+command.op);paint?.delete();
    }else fail('A legacy graphics command has no Skia representation');canvas.restore();
  };
@@ -161,7 +173,7 @@ export function createSkiaCanvasHost(runtime,backend){
   recordNative(handle,command){const graphics=getVectorGraphics(runtime),state=graphics.get(handle,'canvas');let rasterBytes=command.raster?.dataURL?.length??0;for(const value of graphics.handles.values())if(value.kind==='canvas')for(const draw of value.draws){rasterBytes+=draw.raster?.dataURL?.length??0;if(rasterBytes>32*1024*1024)fail('Recorded Canvas rasters exceed32MiB');}getVectorGraphics(runtime).reserveDrawStorage((command.commands?.length??0)*4+(command.text?.length??0));if(state.draws.length>=1024)fail('Skia command limit exceeded');state.draws.push({kind:'skia',...command,matrix:state.matrix.slice(),clips:(state.clips??[]).slice()});},
   textBounds(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaTextBounds(backend,text,{...state,weight:face.weight,italic:face.italic});},
   measureRun(text,options={},state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaRun(backend,text,{...state,...options,weight:face.weight,italic:face.italic});},
-  measureText(text,state={}){return measureSkiaText(backend,text,{...state,nativeTypeface:resolveTypeface(state.typefaceRef).face});},
+  measureText(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaText(backend,text,{...state,nativeTypeface:face.face,weight:face.weight,italic:face.italic});},
   readStatic(vm,field){const bitmapStatic=bitmaps.readStatic(field);if(bitmapStatic)return bitmapStatic;if(field.owner===TYPEFACE&&['DEFAULT','DEFAULT_BOLD','SANS_SERIF'].includes(field.name))return{handled:true,value:makeTypeface('sans-serif',field.name==='DEFAULT_BOLD'?1:0)};return null;},
   dispose(){for(const p of paths.values())p.builder.delete();paths.clear();pathHandles.clear();},
   invoke(vm,method,args){if(bitmaps.supports(method.owner+'->'+method.name+method.signature))return bitmaps.invoke(vm,method,args);if(matrixHost.supports(method.owner+'->'+method.name+method.signature))return matrixHost.invoke(vm,method,args);const name=method.name,receiver=args[0];
@@ -225,7 +237,7 @@ export function createSkiaCanvasHost(runtime,backend){
     const surface=CK.MakeSurface(state.width??411,state.height??840);try{const canvas=surface.getCanvas();applyClips(CK,canvas,state.clips);return canvas.quickReject(CK.LTRBRect(0,0,state.width??411,state.height??840))?0:1;}finally{surface.dispose();}
    }
    if(name==='drawColor'){record(receiver,{op:'color',color:args[1]});return;}
-   const paint={...getSolidPaint(vm,args.at(-1)),nativeTypeface:resolveTypeface(getPaintState(vm,args.at(-1)).typefaceRef).face};
+   const paintFace=resolveTypeface(getPaintState(vm,args.at(-1)).typefaceRef),paint={...getSolidPaint(vm,args.at(-1)),nativeTypeface:paintFace.face,weight:paintFace.weight,italic:paintFace.italic};
    if(name==='drawPath'){record(receiver,{op:'path',...snapshot(args[1]),paint});return;}
    if(name==='drawArc'){const rect=method.parameters[0]==='Landroid/graphics/RectF;'?rectF(args[1]):finite(values.slice(0,4)),angles=method.parameters[0]==='Landroid/graphics/RectF;'?[number(args[2]),number(args[3])]:values.slice(4,6),useCenter=!!args[method.parameters[0]==='Landroid/graphics/RectF;'?4:7];record(receiver,{op:'arc',args:finite([...rect,...angles]),useCenter,paint});return;}
    if(method.parameters[0]==='Landroid/graphics/RectF;'){

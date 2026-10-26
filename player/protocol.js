@@ -1,5 +1,5 @@
 // Versioned host <-> frame message schema and the <apk-player> configuration model. No DOM: shared by the host script, the frame and the tests.
-import { sanitizeSettings } from '../device-settings.js?v=dee55583552d';
+import { sanitizeSettings } from '../device-settings.js?v=cfd2299f1410';
 export const PROTOCOL = 'apk-player';
 export const VERSION = 1;
 export const MAX_APK_BYTES = 1024 * 1024 * 1024;
@@ -62,10 +62,11 @@ const HOST_TYPES = {
     if ((message.apk === undefined) === (message.url === undefined)) return 'init needs exactly one of apk or url';
     if (message.name !== undefined && !str(message.name, 256)) return 'init.name must be a short string';
     if (message.activity !== undefined && !str(message.activity, 512)) return 'init.activity must be a string';
+    for (const key of ['keepData', 'clearData']) if (message[key] !== undefined && typeof message[key] !== 'boolean') return `init.${key} must be a boolean`;
     return null;
   },
   config: message => (isObject(message.config) ? null : 'config.config must be an object'),
-  back: () => null, restart: () => null, destroy: () => null,
+  back: () => null, restart: () => null, destroy: () => null, 'clear-data': () => null,
 };
 const FRAME_TYPES = {
   hello: () => null,
@@ -73,6 +74,8 @@ const FRAME_TYPES = {
   'activity-changed': message => (str(message.activity, 512) && typeof message.canGoBack === 'boolean' ? null : 'activity-changed needs activity and canGoBack'),
   'config-applied': message => (isObject(message.config) && Array.isArray(message.rejected) && typeof message.live === 'boolean' ? null : 'config-applied needs config, rejected and live'),
   closed: () => null,
+  'data-status': message => (isObject(message.status) ? null : 'data-status needs status'),
+  'data-cleared': message => (isObject(message.status) ? null : 'data-cleared needs status'),
   error: message => (str(message.message, 16384) && str(message.kind, 128) && (message.frontier === null || isObject(message.frontier)) && str(message.phase, 64) ? null : 'error needs kind, message, phase and frontier'),
 };
 function validate(table, data) {

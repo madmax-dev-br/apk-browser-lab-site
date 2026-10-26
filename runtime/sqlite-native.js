@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=dee55583552d';
-import { JavaException } from './apk-runtime.js?v=dee55583552d';
-import { bitsDouble, doubleBits } from './host-contract.js?v=dee55583552d';
+import { APKError } from './apk-error.js?v=cfd2299f1410';
+import { JavaException } from './apk-runtime.js?v=cfd2299f1410';
+import { bitsDouble, doubleBits } from './host-contract.js?v=cfd2299f1410';
 
 // Host bindings for the framework's SQLite natives.
 //
@@ -182,7 +182,7 @@ class SqliteEngine {
           if (outFlags) view().setInt32(outFlags, granted, true); return h;
         },
         fs_close(h) {
-          const file = handle(h); self.setLevel(h, file, 0); self.files.delete(h);
+          const file = handle(h); self.setLevel(h, file, 0); self.files.delete(h); self.commitPoint('sqlite-close');
           if (file.deleteOnClose && file.path !== null) fs().delete(file.path); return 0;
         },
         fs_read(h, buffer, count, offset) {
@@ -190,11 +190,11 @@ class SqliteEngine {
         },
         fs_write(h, buffer, count, offset) {
           const file = handle(h); if (file.readOnly) return -1;
-          try { fs().writeAt(file.node, Number(offset), memory().subarray(buffer, buffer + count), 0, count); return 0; } catch (error) { if (error instanceof RangeError) return -2; throw error; }
+          try { fs().writeAt(file.node, Number(offset), memory().subarray(buffer, buffer + count), 0, count); self.dirty = true; return 0; } catch (error) { if (error instanceof RangeError) return -2; throw error; }
         },
         fs_truncate(h, size) {
           const file = handle(h), target = Number(size); if (file.readOnly) return 1;
-          if (target < file.node.size) { file.node.size = target; file.node.mtime = Date.now(); } else if (target > file.node.size) fs().writeAt(file.node, target, new Uint8Array(0), 0, 0); return 0;
+          if (target < file.node.size) { file.node.size = target; file.node.mtime = Date.now(); file.node.rev = (file.node.rev ?? 0) + 1; self.dirty = true; } else if (target > file.node.size) fs().writeAt(file.node, target, new Uint8Array(0), 0, 0); return 0;
         },
         fs_size(h) { return BigInt(handle(h).node.size); },
         fs_delete(pointer) { const files = fs(), p = path(pointer), node = files.node(p); if (!node) return 1; return node.type === 'file' && files.delete(p) === 'ok' ? 0 : 2; },
@@ -207,7 +207,7 @@ class SqliteEngine {
           const bytes = memory(); bytes.set(full, outPointer); bytes[outPointer + full.length] = 0; return 0;
         },
         fs_lock(h, level) { const file = handle(h); return self.lock(h, file, level); },
-        fs_unlock(h, level) { const file = handle(h); self.setLevel(h, file, level); return 0; },
+        fs_unlock(h, level) { const file = handle(h), wasWriting = file.level >= 2; self.setLevel(h, file, level); if (wasWriting && level < 2) self.commitPoint('sqlite-unlock'); return 0; },
         fs_check_reserved(h) { const file = handle(h); if (file.path === null) return 0; for (const [other, state] of self.fileGroup(file.path)) if (other !== h && state.level >= 2) return 1; return 0; },
         host_now_ms() { return runtime.clock.wall(); },
         host_random(buffer, count) { globalThis.crypto.getRandomValues(memory().subarray(buffer, buffer + count)); },
@@ -256,6 +256,8 @@ class SqliteEngine {
     file.level = level; return OK;
   }
   setLevel(_h, file, level) { file.level = level; }
+  /** A write transaction ended (or a connection/file closed): lets app-data persistence store what SQLite just committed. Only acts when files were written since the last point. */
+  commitPoint(reason) { if (!this.dirty) return; this.dirty = false; this.runtime.platform.appData?.syncPoint(reason); }
   /** An error the host raised from inside a Wasm callback (e.g. an ICU collation this lab cannot provide); surfaced after the SQLite call returns. */
   takePending() {
     const pending = this.pending; if (!pending) return;
@@ -390,10 +392,10 @@ export function createSqliteNativeBindings() {
     const err = engine.x.sqlite3_prepare16_v2(db, sqlPointer, sql.length * 2, out, 0); engine.x.free(sqlPointer);
     checked(r, connection);
     if (err !== OK) throwHandle(r, engine, db, `, while compiling: ${sql}`);
-    return BigInt(engine.view().getUint32(out, true));
+    const handleOut = BigInt(engine.view().getUint32(out, true)); (connection.sqls ??= new Map()).set(Number(handleOut), sql); return handleOut;
   });
   const statement = (r, [handle, statementHandle]) => ({ connection: connectionOf(r, handle), stmt: stmtPointer(statementHandle) });
-  add(CONNECTION, 'nativeFinalizeStatement(JJ)V', (r, args) => { const { connection, stmt } = statement(r, args); connection.engine.x.sqlite3_finalize(stmt); });
+  add(CONNECTION, 'nativeFinalizeStatement(JJ)V', (r, args) => { const { connection, stmt } = statement(r, args); connection.engine.x.sqlite3_finalize(stmt); connection.sqls?.delete(stmt); });
   add(CONNECTION, 'nativeGetParameterCount(JJ)I', (r, args) => { const { connection, stmt } = statement(r, args); return connection.engine.x.sqlite3_bind_parameter_count(stmt); });
   add(CONNECTION, 'nativeIsReadOnly(JJ)Z', (r, args) => { const { connection, stmt } = statement(r, args); return connection.engine.x.sqlite3_stmt_readonly(stmt) !== 0 ? 1 : 0; });
   add(CONNECTION, 'nativeGetColumnCount(JJ)I', (r, args) => { const { connection, stmt } = statement(r, args); return connection.engine.x.sqlite3_column_count(stmt); });
@@ -422,6 +424,11 @@ export function createSqliteNativeBindings() {
     checked(r, connection);
     if (rc === SQLITE_ROW) throwPlain(r, 'Queries can be performed using SQLiteDatabase query or rawQuery methods only.');
     else if (rc !== SQLITE_DONE) throwHandle(r, engine, connection.db);
+    // App-data persistence: a statement outside a transaction (or the COMMIT/END/ROLLBACK that closes one) has committed, also in WAL mode where no db-file lock changes.
+    const sql = connection.sqls?.get(stmt) ?? '';
+    if (/^\s*(BEGIN|SAVEPOINT)\b/i.test(sql)) connection.inTransaction = true;
+    else if (/^\s*(COMMIT|END|ROLLBACK(?!\s+(TRANSACTION\s+)?TO\b)|RELEASE)\b/i.test(sql)) { connection.inTransaction = false; engine.commitPoint('sqlite-commit'); }
+    else if (!connection.inTransaction) engine.commitPoint('sqlite-statement');
     return rc;
   };
   add(CONNECTION, 'nativeExecute(JJZ)V', (r, args) => { const { connection, stmt } = statement(r, args); executeNonQuery(r, connection, stmt, !!args[2]); });

@@ -1,6 +1,6 @@
 // Embeddable APK runner. Usage: <script type="module" src="…/player/apk-player.js"></script> then <apk-player src="app.apk" device="phone" locale="pt-BR" theme="dark">.
 // The APK runs inside an iframe (player/frame.html) served from the runtime's origin; this script only talks to it through versioned postMessage.
-import { ATTRIBUTES, configFromAttributes, parseConfig, envelope, validateFrameMessage } from './protocol.js?v=dee55583552d';
+import { ATTRIBUTES, configFromAttributes, parseConfig, envelope, validateFrameMessage } from './protocol.js?v=cfd2299f1410';
 
 const FRAME_TIMEOUT_MS = 20000;
 const DEFAULT_ASSETS_BASE = new URL('../', import.meta.url).href;
@@ -10,9 +10,9 @@ const sleepless = () => {};
 export class ApkPlayer extends EventTarget {
   /** ApkPlayer.mount(element, { apk: File|Blob|ArrayBuffer|URL string, config, assetsBase, name, activity, lazy, transfer }) */
   static mount(element, options = {}) { return new ApkPlayer(element, options); }
-  constructor(target, { apk = null, config = {}, assetsBase = DEFAULT_ASSETS_BASE, name = '', activity = '', lazy = false, transfer = true, title = 'Android app (APK player)', eventTarget = null, scale = 'fit' } = {}) {
+  constructor(target, { apk = null, config = {}, assetsBase = DEFAULT_ASSETS_BASE, name = '', activity = '', lazy = false, transfer = true, title = 'Android app (APK player)', eventTarget = null, scale = 'fit', keepData = false, clearData = false } = {}) {
     super();
-    this.target = target; this.eventTarget = eventTarget; this.options = { apk, name, activity, transfer, title, scale }; this.config = {}; this.destroyed = false; this.helloReceived = false; this.ready = false; this.outbox = [];
+    this.target = target; this.eventTarget = eventTarget; this.options = { apk, name, activity, transfer, title, scale, keepData: !!keepData, clearData: !!clearData }; this.config = {}; this.destroyed = false; this.helloReceived = false; this.ready = false; this.outbox = [];
     const base = new URL(assetsBase, globalThis.location?.href); this.frameURL = new URL('player/frame.html', base.href.endsWith('/') ? base.href : base.href + '/');
     this.frameOrigin = this.frameURL.origin;
     this.onMessage = event => this.receive(event);
@@ -54,9 +54,9 @@ export class ApkPlayer extends EventTarget {
     const { protocol, version, type, ...detail } = message; this.emit(type, detail);
   }
   async sendInit() {
-    const { apk, name, activity, transfer } = this.options;
+    const { apk, name, activity, transfer, keepData, clearData } = this.options;
     try {
-      const base = { config: this.pendingConfig, name, activity: activity || undefined };
+      const base = { config: this.pendingConfig, name, activity: activity || undefined, keepData, clearData };
       if (typeof apk === 'string') { this.post(envelope('init', { ...base, url: new URL(apk, globalThis.location.href).href })); return; }
       let buffer;
       if (apk instanceof ArrayBuffer) buffer = transfer ? apk : apk.slice(0);
@@ -73,6 +73,8 @@ export class ApkPlayer extends EventTarget {
   }
   back() { this.post(envelope('back')); return this; }
   restart() { this.post(envelope('restart')); return this; }
+  /** Wipe the app's stored data (Settings > Apps > Clear storage) and restart it from empty storage. Resolves via the `data-cleared` event. */
+  clearData() { this.post(envelope('clear-data')); return this; }
   destroy() {
     if (this.destroyed) return; try { if (this.helloReceived) this.iframe.contentWindow.postMessage(envelope('destroy'), this.frameOrigin); } catch { sleepless(); }
     this.destroyed = true; clearTimeout(this.helloTimer); this.observer?.disconnect(); globalThis.removeEventListener('message', this.onMessage); this.iframe?.remove(); this.iframe = null; this.outbox.length = 0;
@@ -81,7 +83,7 @@ export class ApkPlayer extends EventTarget {
 
 /** <apk-player src="app.apk" device="phone" locale="pt-BR" theme="dark" font-scale="1.1" orientation="portrait" …> */
 export class ApkPlayerElement extends HTMLElement {
-  static get observedAttributes() { return ['src', 'activity', 'assets-base', 'scale', ...Object.keys(ATTRIBUTES)]; }
+  static get observedAttributes() { return ['src', 'activity', 'assets-base', 'scale', 'keep-data', 'clear-data', ...Object.keys(ATTRIBUTES)]; }
   constructor() { super(); this.player = null; this.mounted = false; }
   connectedCallback() {
     if (this.mounted) return; this.mounted = true;
@@ -92,21 +94,24 @@ export class ApkPlayerElement extends HTMLElement {
   }
   start(host = this.host) {
     const { config, rejected } = configFromAttributes(name => this.getAttribute(name));
-    this.player = new ApkPlayer(host, { apk: this.getAttribute('src'), config, assetsBase: this.getAttribute('assets-base') || DEFAULT_ASSETS_BASE, activity: this.getAttribute('activity') || '', lazy: this.getAttribute('loading') === 'lazy', title: this.getAttribute('title') || 'Android app (APK player)', eventTarget: this, scale: this.getAttribute('scale') === 'actual' ? 'actual' : 'fit' });
+    this.player = new ApkPlayer(host, { apk: this.getAttribute('src'), config, assetsBase: this.getAttribute('assets-base') || DEFAULT_ASSETS_BASE, activity: this.getAttribute('activity') || '', lazy: this.getAttribute('loading') === 'lazy', title: this.getAttribute('title') || 'Android app (APK player)', eventTarget: this, scale: this.getAttribute('scale') === 'actual' ? 'actual' : 'fit', keepData: this.flag('keep-data'), clearData: this.flag('clear-data') });
     if (rejected.length) queueMicrotask(() => this.dispatchEvent(new CustomEvent('error', { detail: { kind: 'config', message: `Ignored invalid attributes: ${rejected.join(', ')}`, phase: 'mount', frontier: null } })));
   }
   attributeChangedCallback(name, oldValue, value) {
     if (!this.mounted || oldValue === value) return;
-    if (name === 'src' || name === 'assets-base' || name === 'activity' || name === 'scale') { this.player?.destroy(); this.player = null; if (this.hasAttribute('src')) this.start(); return; }
+    if (name === 'src' || name === 'assets-base' || name === 'activity' || name === 'scale' || name === 'keep-data' || name === 'clear-data') { this.player?.destroy(); this.player = null; if (this.hasAttribute('src')) this.start(); return; }
     if (this.player && ATTRIBUTES[name]) this.player.setConfig(configFromAttributes(attribute => this.getAttribute(attribute)).config);
   }
   disconnectedCallback() { this.player?.destroy(); this.player = null; this.mounted = false; }
   setConfig(patch) { this.player?.setConfig(patch); return this; }
   back() { this.player?.back(); return this; }
   restart() { this.player?.restart(); return this; }
+  clearData() { this.player?.clearData(); return this; }
   destroy() { this.player?.destroy(); this.player = null; return this; }
   /** Mount a File/ArrayBuffer programmatically (the `src` attribute only takes URLs). */
-  load(apk, options = {}) { this.player?.destroy(); const config = configFromAttributes(name => this.getAttribute(name)).config; this.player = new ApkPlayer(this.host ?? this.shadowRoot.firstChild, { apk, config, assetsBase: this.getAttribute('assets-base') || DEFAULT_ASSETS_BASE, eventTarget: this, ...options }); return this.player; }
+  load(apk, options = {}) { this.player?.destroy(); const config = configFromAttributes(name => this.getAttribute(name)).config; this.player = new ApkPlayer(this.host ?? this.shadowRoot.firstChild, { apk, config, assetsBase: this.getAttribute('assets-base') || DEFAULT_ASSETS_BASE, eventTarget: this, keepData: this.flag('keep-data'), clearData: this.flag('clear-data'), ...options }); return this.player; }
+  /** Boolean attribute: present (or "true"/"") is on; "false"/"0" is off. */
+  flag(name) { const value = this.getAttribute(name); return value !== null && value !== 'false' && value !== '0'; }
 }
 if (globalThis.customElements && !customElements.get('apk-player')) customElements.define('apk-player', ApkPlayerElement);
 globalThis.ApkPlayer = ApkPlayer;

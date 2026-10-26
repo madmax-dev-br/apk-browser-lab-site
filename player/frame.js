@@ -1,9 +1,9 @@
 // Entry of dist/player/frame.html: device frame + system bars + rendering, driven by postMessage from the embedding page.
-import { APKWorkerClient } from '../apk-worker-client.js?v=dee55583552d';
-import { createDeviceView, createViewState } from '../device-view.js?v=dee55583552d';
-import { sanitizeSettings } from '../device-settings.js?v=dee55583552d';
-import { createFrameController } from './frame-controller.js?v=dee55583552d';
-import { validateHostMessage, envelope } from './protocol.js?v=dee55583552d';
+import { APKWorkerClient } from '../apk-worker-client.js?v=cfd2299f1410';
+import { createDeviceView, createViewState } from '../device-view.js?v=cfd2299f1410';
+import { sanitizeSettings } from '../device-settings.js?v=cfd2299f1410';
+import { createFrameController } from './frame-controller.js?v=cfd2299f1410';
+import { validateHostMessage, envelope } from './protocol.js?v=cfd2299f1410';
 
 const parentOrigin = new URLSearchParams(location.search).get('parent');
 const $ = id => document.getElementById(id) ?? (frameStub[id] ??= Object.assign(document.createElement('div'), { id }));
@@ -38,6 +38,8 @@ window.addEventListener('message', event => {
   if (result.message.type === 'init') status('Loading the APK…');
   controller.handle(result.message);
 });
+// Frame hidden or closing: store the app data right away (only has an effect when the page opted in with keep-data).
+document.addEventListener?.('visibilitychange', () => { if (document.visibilityState === 'hidden') vm.flushAppData(); }); globalThis.addEventListener?.('pagehide', () => vm.flushAppData());
 if (!parentOrigin || parentOrigin === 'null') status('Missing or opaque ?parent= origin: this frame only runs inside <apk-player>.');
 else post(envelope('hello'));
 

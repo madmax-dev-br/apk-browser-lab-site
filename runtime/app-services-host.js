@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=dee55583552d';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=dee55583552d';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=dee55583552d';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=dee55583552d';
+import { APKError } from './apk-error.js?v=cfd2299f1410';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=cfd2299f1410';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=cfd2299f1410';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=cfd2299f1410';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -305,13 +305,18 @@ export function createAppServicesHost(platform) {
   }
   def(EDITOR_IMPL, 'commit', '()Z', (r, _m, [self]) => {
     const editor = ed(r, self), mcr = commitToMemory(r, editor); let ok = true;
-    if (writeNeeded(r, mcr)) { ok = writeFile(r, mcr.st.path, mcr.snapshot); if (ok) mcr.st.diskGeneration = mcr.generation; }
+    if (writeNeeded(r, mcr)) { ok = writeFile(r, mcr.st.path, mcr.snapshot); if (ok) { mcr.st.diskGeneration = mcr.generation; platform.appData?.syncPoint('prefs-commit'); } }   // commit(): on disk (and in the app-data store) before it returns
     notifyListeners(r, mcr, editor.prefs); return ok ? 1 : 0;
   });
   def(EDITOR_IMPL, 'apply', '()V', (r, _m, [self]) => {
     const editor = ed(r, self), mcr = commitToMemory(r, editor);
     // Memory and listeners are updated now; the file is written by a later task, in order (enqueueDiskWrite on the single-threaded writer).
-    if (writeNeeded(r, mcr)) platform.queueTask(() => { if (writeFile(r, mcr.st.path, mcr.snapshot)) mcr.st.diskGeneration = Math.max(mcr.st.diskGeneration ?? 0, mcr.generation); }, 0, []);
+    if (writeNeeded(r, mcr)) {
+      // QueuedWork: the same write is also reachable from appData.finishQueuedWork() (Activity onStop waits for pending apply() writes); whichever runs first does it.
+      const write = () => { if (!queued.delete(write)) return; if (writeFile(r, mcr.st.path, mcr.snapshot)) { mcr.st.diskGeneration = Math.max(mcr.st.diskGeneration ?? 0, mcr.generation); platform.appData?.touch(); } };
+      const queued = platform.appData?.queuedWork ?? new Set(); queued.add(write);
+      platform.queueTask(write, 0, []);
+    }
     notifyListeners(r, mcr, editor.prefs);
   });
 
