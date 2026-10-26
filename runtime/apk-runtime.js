@@ -1,16 +1,16 @@
-import { VMClock } from './vm-clock.js?v=32afb2a18437';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=32afb2a18437';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=32afb2a18437';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=32afb2a18437';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=32afb2a18437';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=32afb2a18437';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=32afb2a18437';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=32afb2a18437';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=32afb2a18437';
-import { APKError } from './apk-error.js?v=32afb2a18437';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=32afb2a18437';
-import { Scheduler, Blocked } from './scheduler.js?v=32afb2a18437';
-export { APKError } from './apk-error.js?v=32afb2a18437';
+import { VMClock } from './vm-clock.js?v=e9d35ddef77e';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=e9d35ddef77e';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=e9d35ddef77e';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e9d35ddef77e';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=e9d35ddef77e';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=e9d35ddef77e';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=e9d35ddef77e';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=e9d35ddef77e';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=e9d35ddef77e';
+import { APKError } from './apk-error.js?v=e9d35ddef77e';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=e9d35ddef77e';
+import { Scheduler, Blocked } from './scheduler.js?v=e9d35ddef77e';
+export { APKError } from './apk-error.js?v=e9d35ddef77e';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -135,19 +135,18 @@ export class DexFile {
     });
     const [cn, co] = table(96, 32);
     this.classes = new Map();
-    let definitions = 0, totalCode = 0, totalInterfaces = 0;
+    let definitions = 0;
     for (let i = 0; i < cn; i++) {
       const p = co + i * 32, name = type(b.u32(p)), parent = b.u32(p + 8);
       const cls = { name, superclass: parent === NO_INDEX ? null : type(parent), interfaces: typeList(b.u32(p + 12)),
         staticValuesOffset: b.u32(p + 28), annotationsOffset: b.u32(p + 20), staticFields: [], fields: [], methods: new Map(), flags: b.u32(p + 4) };
       Object.defineProperty(cls, 'dex', { value: this });
-      totalInterfaces += cls.interfaces.length;
-      if (totalInterfaces > 200000) fail('DEX interface limit exceeded');
       const c = { p: b.u32(p + 24) };
       if (c.p) {
         const ns = b.uleb(c), ni = b.uleb(c), nd = b.uleb(c), nv = b.uleb(c);
         definitions += ns + ni + nd + nv;
-        if (ns > fn || ni > fn || nd > mn || nv > mn || definitions > 200000) fail('Invalid/excessive DEX class data');
+        // Each field_id and method_id is defined by at most one class, so the id tables bound the total.
+        if (ns > fn || ni > fn || nd > mn || nv > mn || definitions > fn + mn) fail('Invalid/excessive DEX class data');
         for (const [count, target] of [[ns, cls.staticFields], [ni, cls.fields]]) {
           let index = 0;
           for (let j = 0; j < count; j++) {
@@ -163,8 +162,8 @@ export class DexFile {
             let code = null;
             if (offset) {
               const registers = b.u16(offset), incoming = b.u16(offset + 2), tries = b.u16(offset + 6), units = b.u32(offset + 12);
-              totalCode += units;
-              if (registers > 4096 || incoming > registers || units > 1000000 || totalCode > 16 * 1024 * 1024) fail('DEX code exceeds prototype limits');
+              // registers and ins are u16 in the format; b.check below bounds the code by the file.
+              if (incoming > registers) fail('DEX code has more incoming than total registers');
               b.check(offset + 16, units * 2);
               code = { registers, incoming, tries, units, offset: offset + 16 };
             }

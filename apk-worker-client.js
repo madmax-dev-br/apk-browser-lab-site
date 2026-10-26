@@ -1,6 +1,6 @@
-import { createRasterReceiver } from './raster-cache.js?v=32afb2a18437';
+import { createRasterReceiver } from './raster-cache.js?v=e9d35ddef77e';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=32afb2a18437', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 30000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=e9d35ddef77e', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 30000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
