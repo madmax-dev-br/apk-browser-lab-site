@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=12647cd43215';
+import { APKError } from './apk-runtime.js?v=5c4318daa7f6';
 // android.graphics.drawable.NinePatchDrawable for compiled 9-patch PNGs (aapt2 npTc chunk).
 // Layout contract (intrinsic size, getPadding) comes from the real compiled chunk; pixels are stretched with the
 // official Skia rasterizer (CanvasKit) exactly along the chunk's stretch regions. No platform-drawable look-alikes.

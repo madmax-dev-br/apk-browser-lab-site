@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=12647cd43215';
-import { Blocked, QUANTUM } from './scheduler.js?v=12647cd43215';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=12647cd43215';
+import { APKError } from './apk-error.js?v=5c4318daa7f6';
+import { Blocked, QUANTUM } from './scheduler.js?v=5c4318daa7f6';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=5c4318daa7f6';
 
 // Frame-based DEX interpreter.
 //

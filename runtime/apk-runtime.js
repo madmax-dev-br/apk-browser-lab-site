@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=12647cd43215';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=12647cd43215';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=12647cd43215';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=12647cd43215';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=12647cd43215';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=12647cd43215';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=12647cd43215';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=12647cd43215';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=12647cd43215';
-import { APKError } from './apk-error.js?v=12647cd43215';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=12647cd43215';
-import { Scheduler, Blocked } from './scheduler.js?v=12647cd43215';
-import { bootClassLacksMember } from './boot-class-members.js?v=12647cd43215';
-export { APKError } from './apk-error.js?v=12647cd43215';
+import { VMClock } from './vm-clock.js?v=5c4318daa7f6';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=5c4318daa7f6';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=5c4318daa7f6';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=5c4318daa7f6';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=5c4318daa7f6';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=5c4318daa7f6';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=5c4318daa7f6';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=5c4318daa7f6';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=5c4318daa7f6';
+import { APKError } from './apk-error.js?v=5c4318daa7f6';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=5c4318daa7f6';
+import { Scheduler, Blocked } from './scheduler.js?v=5c4318daa7f6';
+import { bootClassLacksMember } from './boot-class-members.js?v=5c4318daa7f6';
+export { APKError } from './apk-error.js?v=5c4318daa7f6';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -851,10 +851,10 @@ export class APKRuntime {
     if (!Number.isInteger(maxCallDepth) || maxCallDepth < 16 || maxCallDepth > 100000) fail('VM maxCallDepth must be an integer from 16 to 100000');
     if(!Number.isInteger(maxHeapObjects)||maxHeapObjects<1024||maxHeapObjects>262144)fail('VM maxHeapObjects must be an integer from 1024 to 262144');
     this.maxHeapObjects=maxHeapObjects; this.apkEntries=apkEntries; this.apkReader=apkReader;
-    // Opt-in tolerant mode for platform methods the lab does not implement: 'void' skips void ones; 'all' also answers the
-    // others with their type's default (0, false, null). Every stubbed call is counted and traced (STUB-VOID / STUB-RETURN), so the run
+    // Opt-in tolerant mode for platform methods the lab does not implement: 'void' skips void ones; 'primitives' also answers
+    // boolean/byte/short/char/int/long/float/double methods with 0/false; 'all' also answers object methods with null. Every stubbed call is counted and traced (STUB-VOID / STUB-RETURN), so the run
     // doubles as the to-do list of missing bridges; a run that stubbed anything is never treated as validated. The default stays strict.
-    if (!['off', 'void', 'all'].includes(tolerateMissing)) fail('VM tolerateMissing must be off, void or all');
+    if (!['off', 'void', 'primitives', 'all'].includes(tolerateMissing)) fail('VM tolerateMissing must be off, void, primitives or all');
     this.tolerateMissing = tolerateMissing; this.missingVoid = new Map(); this.missingReturns = new Map(); this.missingClasses = new Map();
     this.maxCallDepth = maxCallDepth; this.peakCallDepth = 0;
     if (!Number.isInteger(maxInstructionsPerEvent) || maxInstructionsPerEvent < 1000 || maxInstructionsPerEvent > 20000000) fail('VM maxInstructionsPerEvent must be an integer from 1000 to 20000000');
@@ -1414,7 +1414,7 @@ export class APKRuntime {
     if (this.toleratesMissing(method)) return { kind: 'missing-stub', key: methodKey(method), result: method.result };
     fail(`Unsupported API/method: ${methodKey(method)}`);
   }
-  toleratesMissing(method) { return this.tolerateMissing === 'all' || (this.tolerateMissing === 'void' && method.result === 'V'); }
+  toleratesMissing(method) { const mode = this.tolerateMissing; return mode === 'all' || (mode !== 'off' && method.result === 'V') || (mode === 'primitives' && /^[ZBSCIJFD]$/.test(method.result)); }
   /** Tolerant mode: count a stubbed call and answer with the return type's default; the first call per method is traced. */
   noteMissingStub(key, result = 'V') {
     const map = result === 'V' ? this.missingVoid : this.missingReturns, count = (map.get(key) ?? 0) + 1; map.set(key, count);
