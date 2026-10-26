@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=f37f4659b412';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=f37f4659b412';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=f37f4659b412';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=f37f4659b412';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=f37f4659b412';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=f37f4659b412';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=f37f4659b412';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=f37f4659b412';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=f37f4659b412';
-import { APKError } from './apk-error.js?v=f37f4659b412';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=f37f4659b412';
-import { Scheduler, Blocked } from './scheduler.js?v=f37f4659b412';
-import { bootClassLacksMember } from './boot-class-members.js?v=f37f4659b412';
-export { APKError } from './apk-error.js?v=f37f4659b412';
+import { VMClock } from './vm-clock.js?v=2bb44ccf6413';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=2bb44ccf6413';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=2bb44ccf6413';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=2bb44ccf6413';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=2bb44ccf6413';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=2bb44ccf6413';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=2bb44ccf6413';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=2bb44ccf6413';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=2bb44ccf6413';
+import { APKError } from './apk-error.js?v=2bb44ccf6413';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=2bb44ccf6413';
+import { Scheduler, Blocked } from './scheduler.js?v=2bb44ccf6413';
+import { bootClassLacksMember } from './boot-class-members.js?v=2bb44ccf6413';
+export { APKError } from './apk-error.js?v=2bb44ccf6413';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };

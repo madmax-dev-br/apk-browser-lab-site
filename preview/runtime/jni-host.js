@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=f37f4659b412';
-import { JavaException } from './apk-runtime.js?v=f37f4659b412';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=f37f4659b412';
-import { buildElfDescriptor } from './native-descriptor.js?v=f37f4659b412';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=f37f4659b412';
+import { APKError } from './apk-error.js?v=2bb44ccf6413';
+import { JavaException } from './apk-runtime.js?v=2bb44ccf6413';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=2bb44ccf6413';
+import { buildElfDescriptor } from './native-descriptor.js?v=2bb44ccf6413';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=2bb44ccf6413';
 
 // JNI -> WebAssembly bridge.
 //

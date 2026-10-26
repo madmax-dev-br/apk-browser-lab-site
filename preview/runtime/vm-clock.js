@@ -12,7 +12,7 @@ export class VMClock {
     this.reads++; return Math.min(performance.now(), this.frozenAt + this.reads * 0.001) + this.skew;
   }
   /** Starts an event: time stands still (apart from per-read ticks) until thaw(). Nested calls keep the outer start. */
-  freeze() { if (globalThis.process?.env?.NOFREEZE) return false; if (this.frozenAt === null) { this.frozenAt = performance.now(); this.reads = 0; return true; } return false; }
+  freeze() { if (this.frozenAt === null) { this.frozenAt = performance.now(); this.reads = 0; return true; } return false; }
   thaw() { this.frozenAt = null; this.reads = 0; }
   /** Wall-clock milliseconds since the epoch. */
   wall() { return Date.now() + this.skew; }

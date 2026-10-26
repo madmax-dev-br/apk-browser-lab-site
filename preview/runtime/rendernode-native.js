@@ -1,9 +1,10 @@
-import {APKError} from './apk-error.js?v=f37f4659b412';
-import {getVectorGraphics} from './vector-native.js?v=f37f4659b412';
-import {getSolidPaintByHandle} from './paint-host.js?v=f37f4659b412';
-import {createMatrixNativeBindings} from './matrix-native.js?v=f37f4659b412';
+import {APKError} from './apk-error.js?v=2bb44ccf6413';
+import {getVectorGraphics} from './vector-native.js?v=2bb44ccf6413';
+import {getSolidPaintByHandle} from './paint-host.js?v=2bb44ccf6413';
+import {createMatrixNativeBindings} from './matrix-native.js?v=2bb44ccf6413';
 
 const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;',RECORD='Landroid/view/RecordingCanvas;';
+const NODE33='Landroid/graphics/RenderNode;',RC33='Landroid/graphics/RecordingCanvas;',BRC='Landroid/graphics/BaseRecordingCanvas;';
 const REG='Llibcore/util/NativeAllocationRegistry;';
 export const RENDER_NODE_CLEANER='Lapkweb/bridge/RenderNodeCleaner;';
 const FINALIZER=0x524e444601n,states=new WeakMap(),bits=new DataView(new ArrayBuffer(4));
@@ -51,7 +52,7 @@ export function themeLighting(r,context=r.activity){
  * a host may override fields through runtime.renderLightInfo. */
 export function renderLightInfo(r,width,context=r.activity){const t=themeLighting(r,context);return {x:width/2,y:t.y,z:t.z,radius:t.radius,ambientShadowAlpha:t.ambientShadowAlpha,spotShadowAlpha:t.spotShadowAlpha,...(r.renderLightInfo??{})};}
 /** Live hwui property state of a node reference (the single store behind the View transform). */
-export function renderNodeProperties(r,reference){return node(r,r.object(reference).fields.get(`${NODE}->mNativeRenderNode:J`));}
+export function renderNodeProperties(r,reference){const f=r.object(reference).fields;return node(r,f.get(`${NODE33}->mNativeRenderNode:J`)??f.get(`${NODE}->mNativeRenderNode:J`));}
 /** Returns the live display list. Child nodes are deliberately not rasterized at record time. */
 export function getRenderNodeSnapshot(r,h){const n=node(r,h,true);return {...n,matrix:renderNodeTransform(r,n),displayList:n.displayList};}
 export function disposeRenderNodes(r){const s=stateFor(r),g=getVectorGraphics(r);for(const h of s.canvases)g.handles.delete(h);s.canvases.clear();s.recordings.clear();s.nodes.clear();}
@@ -135,5 +136,45 @@ export function createRenderNodeNativeBindings(){const map=new Map();
  rec('nDrawText',['J','[C','I','I','F','F','I','J'],(r,[h,t,start,count,x,y,bidi,p])=>{if(bidi!==0&&bidi!==1&&bidi!==2)fail('RecordingCanvas text bidi flag not implemented');text(r,h,t,start,start+count,start,start+count,x,y,bidi===1,p);});
  rec('nDrawTextRun',['J','Ljava/lang/String;','I','I','I','I','F','F','Z','J'],(r,[h,t,start,end,cs,ce,x,y,rtl,p])=>text(r,h,t,start,end,cs,ce,x,y,rtl,p));
  rec('nDrawTextRun',['J','[C','I','I','I','I','F','F','Z','J','J'],(r,[h,t,start,count,cs,cc,x,y,rtl,p])=>text(r,h,t,start,start+count,cs,cs+cc,x,y,rtl,p));
+ 
+ // ---- API 33 frontend: android.graphics.RenderNode / RecordingCanvas / BaseRecordingCanvas (android-13.0.0_r1, compiled by compile-aosp-hardware-recording.py) ----
+ // Same hwui-property store and same display-list recorder as the API 28 frontend above; only the JNI surface differs (names, arities, bitmap handles).
+ for(const [key,fn] of [...map]){
+  if(key.startsWith(NODE+'->'))map.set(NODE33+key.slice(NODE.length),fn);        // RenderNode property natives keep their names and signatures
+  else if(key.startsWith(RECORD+'->'))map.set(BRC+key.slice(RECORD.length),fn);   // android.view.RecordingCanvas draw natives == BaseRecordingCanvas draw natives
+ }
+ const n3=(name,p,result,fn)=>add(NODE33,name,p,result,fn),r3=(name,p,result,fn)=>add(RC33,name,p,result,fn),b3=(name,p,result,fn)=>add(BRC,name,p,result,fn);
+ // RenderNode: renamed / new natives
+ n3('nSetOutlinePath',['J','J','F'],'Z',(r,[h,path,alpha])=>{const x=node(r,h),shape=r.skiaHost.pathByHandle(path);x.outline={...shape,alpha:finite([alpha])[0]};return 1;});
+ n3('nDiscardDisplayList',['J'],'V',(r,[h])=>{node(r,h).displayList=null;});
+ for(const name of ['nEndAllAnimators','nForceEndAnimators'])n3(name,['J'],'V',(r,[h])=>{node(r,h);});   // no RenderThread animators exist until a RenderNodeAnimator is added (nAddAnimator is unbound)
+ for(const [suffix,key]of[['Left','left'],['Top','top'],['Right','right'],['Bottom','bottom']])n3('nGet'+suffix,['J'],'I',(r,[h])=>node(r,h)[key]);
+ n3('nGetWidth',['J'],'I',(r,[h])=>{const x=node(r,h);return x.right-x.left;});n3('nGetHeight',['J'],'I',(r,[h])=>{const x=node(r,h);return x.bottom-x.top;});
+ n3('nGetLayerType',['J'],'I',(r,[h])=>node(r,h).layerType);
+ n3('nGetClipToBounds',['J'],'Z',(r,[h])=>node(r,h).clipToBounds?1:0);
+ n3('nStretch',['J','F','F','F','F'],'Z',(r,[h,...v])=>{node(r,h);if(v.some(x=>x!==0))fail('RenderNode.stretch (overscroll stretch) requires the hwui stretch shader backend');return 0;});
+ n3('nClearStretch',['J'],'Z',(r,[h])=>{node(r,h);return 0;});
+ n3('nSetRenderEffect',['J','J'],'Z',(r,[h,effect])=>{node(r,h);if(effect)fail('RenderNode RenderEffect (blur / shader effects) requires a Skia image-filter backend');return 0;});
+ n3('nSetUsageHint',['J','I'],'V',(r,[h,v])=>{node(r,h).usageHint=v;});
+ for(const [suffix,key]of[['AllowForceDark','allowForceDark']]){n3('nSet'+suffix,['J','Z'],'Z',(r,[h,v])=>{const x=node(r,h),old=x[key]??true;x[key]=!!v;return old!==!!v?1:0;});n3('nGet'+suffix,['J'],'Z',(r,[h])=>(node(r,h)[key]??true)?1:0);}
+ n3('nGetAnimationMatrix',['J','J'],'Z',(r,[h,m])=>{const x=node(r,h);if(!x.animationMatrix)return 0;const arr=r.newArray('[F',9);r.array(arr).elements=x.animationMatrix.map(encode);createMatrixNativeBindings().get('Landroid/graphics/Matrix;->nSetValues(J[F)V')(r,[m,arr]);return 1;});
+ {let unique=1n;n3('nGetUniqueId',['J'],'J',(r,[h])=>{const x=node(r,h);return x.uniqueId??=unique++;});}
+ // Not available without hwui: sizes, debug output, position-update listeners and RT animators fail explicitly instead of inventing values.
+ // RecordingCanvas
+ r3('nCreateDisplayListCanvas',['J','I','I'],'J',(r,[h,w,height])=>{node(r,h);if(w<0||height<0||w>4096||height>4096)fail('RecordingCanvas extent exceeds4096');const id=getVectorGraphics(r).createCanvas(),c=canvas(r,id);Object.assign(c,{width:w,height,renderNode:h});stateFor(r).canvases.add(id);return id;});
+ r3('nResetDisplayListCanvas',['J','J','I','I'],'V',(r,[c,h,w,height])=>{node(r,h);if(w<0||height<0||w>4096||height>4096)fail('RecordingCanvas extent exceeds4096');Object.assign(canvas(r,c),{draws:[],matrix:[1,0,0,1,0,0],clips:[],stack:[],width:w,height,renderNode:h});});
+ for(const name of ['nGetMaximumTextureWidth','nGetMaximumTextureHeight'])r3(name,[],'I',()=>4096);
+ r3('nEnableZ',['J','Z'],'V',(r,[c,enabled])=>{const x=canvas(r,c),active=!!x.reorderBarrier;if(active)r.skiaHost.recordNative(c,{op:'reorderEnd'});if(enabled)r.skiaHost.recordNative(c,{op:'reorderBegin'});x.reorderBarrier=!!enabled;});
+ r3('nFinishRecording',['J','J'],'V',(r,[c,h])=>{const id=finish(r,c),s=stateFor(r),list=s.recordings.get(id);node(r,h).displayList=list;s.recordings.delete(id);});
+ r3('nDrawRenderNode',['J','J'],'V',(r,[c,h])=>{node(r,h);r.skiaHost.recordNative(c,{op:'renderNode',node:h});});
+ // BaseRecordingCanvas: bitmaps arrive as Bitmap.getNativeInstance() tokens
+ const BH=r=>r.skiaHost.bitmaps;
+ b3('nDrawBitmap',['J','J','F','F','J','I','I','I'],'V',(r,[h,bitmap,left,top,paint,canvasDensity,screenDensity,bitmapDensity])=>BH(r).nativeDraw(h,BH(r).byNativeInstance(bitmap),{left:finite([left])[0],top:finite([top])[0],paint,canvasDensity,bitmapDensity}));
+ b3('nDrawBitmap',['J','J','F','F','F','F','F','F','F','F','J','I','I'],'V',(r,[h,bitmap,sl,st,sr,sb,dl,dt,dr,db,paint])=>BH(r).nativeDraw(h,BH(r).byNativeInstance(bitmap),{src:finite([sl,st,sr,sb]),dst:finite([dl,dt,dr,db]),paint}));
+ b3('nDrawBitmapMatrix',['J','J','J','J'],'V',(r,[h,bitmap,matrix,paint])=>{const m=matrixFromHandle(r,matrix);if(m?.length!==9)fail('Invalid Matrix token');BH(r).nativeDraw(h,BH(r).byNativeInstance(bitmap),{transform:[m[0],m[1],m[2],m[3],m[4],m[5],0,0,1],paint});});
+ map.delete(BRC+'->nDrawBitmap(J'+BMP+'FFJIII)V');map.delete(BRC+'->nDrawBitmap(J'+BMP+'FFFFFFFFJII)V');map.delete(BRC+'->nDrawBitmapMatrix(J'+BMP+'JJ)V');
+ b3('nDrawPoints',['J','[F','I','I','J'],'V',(r,[h,pts,offset,count,paint])=>{const a=r.array(pts).elements.map(decode);if(offset<0||count<0||offset+count>a.length)r.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','drawPoints range');for(let i=offset;i+1<offset+count;i+=2)draw(r,h,'point',[a[i],a[i+1]],paint);});
+ b3('nDrawLines',['J','[F','I','I','J'],'V',(r,[h,pts,offset,count,paint])=>{const a=r.array(pts).elements.map(decode);if(offset<0||count<0||offset+count>a.length)r.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','drawLines range');for(let i=offset;i+3<offset+count;i+=4)draw(r,h,'line',a.slice(i,i+4),paint);});
+ b3('nPunchHole',['J','F','F','F','F','F','F'],'V',(r,[h])=>{canvas(r,h);fail('Canvas.punchHole requires the hwui CLEAR-mode compositing backend');});
  return map;
 }

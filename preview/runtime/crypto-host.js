@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=f37f4659b412';
+import { createHostRegistry } from './host-contract.js?v=2bb44ccf6413';
 
 // java.security.MessageDigest with synchronous pure-JS MD5, SHA-1, SHA-224/256 and SHA-384/512 (WebCrypto is asynchronous and the VM is synchronous).
 // Contract: java.security.MessageDigest (android-13.0.0_r1). Other Security providers (Cipher, Mac, Signature, KeyStore) are not implemented.

@@ -1,6 +1,6 @@
-import {APKError} from './apk-runtime.js?v=f37f4659b412';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=f37f4659b412';
-import {getVectorGraphics} from './vector-native.js?v=f37f4659b412';
+import {APKError} from './apk-runtime.js?v=2bb44ccf6413';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=2bb44ccf6413';
+import {getVectorGraphics} from './vector-native.js?v=2bb44ccf6413';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;';
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -142,7 +142,7 @@ export function createComposeCanvasHost(platform){
       return null;
     },
     renderTree(r,root){
-      const seen=new Set();drawingTime=Math.floor(process.env.OLDDRAW?performance.now():(r.platform?.lastFrameMs??r.clock.now()));
+      const seen=new Set();drawingTime=Math.floor(r.platform?.lastFrameMs??r.clock.now());
       const visit=(receiver,depth=0)=>{
         const view=r.object(receiver);if(seen.has(view.id)||seen.size>=4096||depth>64)fail('Cyclic/excessive custom Canvas View tree');seen.add(view.id);
         if(view.visibility===4||view.visibility===8)return;
