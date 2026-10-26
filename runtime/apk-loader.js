@@ -1,12 +1,12 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=88ca7fbf670e';
-import { inspectELF } from './native-inspector.js?v=88ca7fbf670e';
-import { inflateRaw } from './inflate.js?v=88ca7fbf670e';
-import { resolveDevice } from './device-profile.js?v=88ca7fbf670e';
-import { resourceProfileFor } from './device-configuration.js?v=88ca7fbf670e';
-import { JniBridge } from './jni-host.js?v=88ca7fbf670e';
-import { AndroidResources } from './android-resources.js?v=88ca7fbf670e';
-import { AndroidPlatform } from './android-platform.js?v=88ca7fbf670e';
-import { FrameworkProvider } from './framework-provider.js?v=88ca7fbf670e';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=0e6d4aa783cd';
+import { inspectELF } from './native-inspector.js?v=0e6d4aa783cd';
+import { inflateRaw } from './inflate.js?v=0e6d4aa783cd';
+import { resolveDevice } from './device-profile.js?v=0e6d4aa783cd';
+import { resourceProfileFor } from './device-configuration.js?v=0e6d4aa783cd';
+import { JniBridge } from './jni-host.js?v=0e6d4aa783cd';
+import { AndroidResources } from './android-resources.js?v=0e6d4aa783cd';
+import { AndroidPlatform } from './android-platform.js?v=0e6d4aa783cd';
+import { FrameworkProvider } from './framework-provider.js?v=0e6d4aa783cd';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -17,7 +17,8 @@ const MAX_DEX = 64 * 1024 * 1024;
 export const MAX_DEX_TOTAL = 768 * 1024 * 1024;
 // ART has no fixed multidex count; this only bounds memory for hostile archives.
 const MAX_DEX_FILES = 1024;
-const MAX_ZIP_ENTRIES = 32768;
+// The ZIP end record counts entries in 16 bits; this accepts every non-ZIP64 APK.
+const MAX_ZIP_ENTRIES = 65535;
 const crcTable = Uint32Array.from({ length: 256 }, (_, n) => {
   let c = n;
   for (let j = 0; j < 8; j++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;

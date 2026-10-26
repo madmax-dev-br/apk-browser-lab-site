@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=88ca7fbf670e';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=88ca7fbf670e';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=88ca7fbf670e';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=88ca7fbf670e';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=88ca7fbf670e';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=88ca7fbf670e';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=88ca7fbf670e';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=88ca7fbf670e';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=88ca7fbf670e';
-import { APKError } from './apk-error.js?v=88ca7fbf670e';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=88ca7fbf670e';
-import { Scheduler, Blocked } from './scheduler.js?v=88ca7fbf670e';
-import { bootClassLacksMember } from './boot-class-members.js?v=88ca7fbf670e';
-export { APKError } from './apk-error.js?v=88ca7fbf670e';
+import { VMClock } from './vm-clock.js?v=0e6d4aa783cd';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=0e6d4aa783cd';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=0e6d4aa783cd';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=0e6d4aa783cd';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=0e6d4aa783cd';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=0e6d4aa783cd';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=0e6d4aa783cd';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=0e6d4aa783cd';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=0e6d4aa783cd';
+import { APKError } from './apk-error.js?v=0e6d4aa783cd';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=0e6d4aa783cd';
+import { Scheduler, Blocked } from './scheduler.js?v=0e6d4aa783cd';
+import { bootClassLacksMember } from './boot-class-members.js?v=0e6d4aa783cd';
+export { APKError } from './apk-error.js?v=0e6d4aa783cd';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -34,7 +34,8 @@ export class BinaryReader {
   u16(p) { this.check(p, 2); return this.view.getUint16(p, true); }
   u32(p) { this.check(p, 4); return this.view.getUint32(p, true); }
   slice(p, n) { this.check(p, n); return this.bytes.subarray(p, p + n); }
-  table(n, p, width) { if (n > 200000) fail('DEX table exceeds prototype limit'); this.check(p, n * width); }
+  // The table must fit in the file; ART has no separate entry-count cap.
+  table(n, p, width) { this.check(p, n * width); }
   uleb(cursor) {
     let value = 0;
     for (let shift = 0; shift <= 28; shift += 7) {
@@ -109,17 +110,21 @@ export class DexFile {
     // method/field refs, supertypes, annotations) is read from this table, so renaming here re-binds the whole DEX to its own copies.
     this.types = Array.from({ length: tn }, (_, i) => { const t = string(b.u32(to + i * 4)); return typeRename ? typeRename(t) : t; });
     const type = i => indexed(this.types, i, 'type');
+    // Protos and classes may share one type_list; parse each offset once so shared lists cost nothing extra.
+    const typeLists = new Map();
     const typeList = offset => {
       if (!offset) return [];
-      const n = b.u32(offset); b.table(n, offset + 4, 2);
-      return Array.from({ length: n }, (_, i) => type(b.u16(offset + 4 + i * 2)));
+      let list = typeLists.get(offset);
+      if (!list) {
+        const n = b.u32(offset); b.table(n, offset + 4, 2);
+        list = Array.from({ length: n }, (_, i) => type(b.u16(offset + 4 + i * 2)));
+        typeLists.set(offset, list);
+      }
+      return list.slice();
     };
     const [pn, po] = table(72, 12), protos = [];
-    let totalParams = 0;
     for (let i = 0; i < pn; i++) {
       const p = po + i * 12, parameters = typeList(b.u32(p + 8)), result = type(b.u32(p + 4));
-      totalParams += parameters.length;
-      if (totalParams > 200000) fail('DEX parameter limit exceeded');
       protos.push({ parameters, result, signature: `(${parameters.join('')})${result}` });
     }
     const [fn, fo] = table(80, 8);
@@ -217,7 +222,7 @@ export class DexFile {
     }
     if(type===0x1d&&arg===0)return this.encodedAnnotation(cursor,depth+1);
     if (type === 0x1c && arg === 0) {
-      const count = b.uleb(cursor); if (count > 100000) fail('Encoded array exceeds limit');
+      const count = b.uleb(cursor); if (count > b.length - cursor.p) fail('Encoded array is longer than its DEX'); // each value takes at least one byte
       return { encoded: 'array', values: Array.from({ length: count }, () => this.encodedValue(cursor, depth + 1)) };
     }
     if (type === 0x1e && arg === 0) return null;
@@ -246,7 +251,6 @@ export class DexProgram {
       }
       this.methods = this.methods.concat(dex.methods); this.fields = this.fields.concat(dex.fields);
       this.types = this.types.concat(dex.types); this.strings = this.strings.concat(dex.strings);
-      if (this.classes.size > 200000 || this.methods.length > 2000000 || this.fields.length > 2000000 || this.strings.length > 2000000) fail('Aggregate DEX metadata exceeds limit');
     }
     if (!Array.isArray(bootFiles) || bootFiles.length > 16) fail('Framework layer requires at most 16 DEX files');
     this.bootFiles = []; this.bootClasses = new Map(); this.bootDexes = new Set(); let bootBytes = 0;
