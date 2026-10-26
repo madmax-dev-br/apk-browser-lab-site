@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=5c4318daa7f6';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=5c4318daa7f6';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=5c4318daa7f6';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=5c4318daa7f6';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=5c4318daa7f6';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=5c4318daa7f6';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=5c4318daa7f6';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=5c4318daa7f6';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=5c4318daa7f6';
-import { APKError } from './apk-error.js?v=5c4318daa7f6';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=5c4318daa7f6';
-import { Scheduler, Blocked } from './scheduler.js?v=5c4318daa7f6';
-import { bootClassLacksMember } from './boot-class-members.js?v=5c4318daa7f6';
-export { APKError } from './apk-error.js?v=5c4318daa7f6';
+import { VMClock } from './vm-clock.js?v=c81d48011848';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=c81d48011848';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=c81d48011848';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=c81d48011848';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=c81d48011848';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=c81d48011848';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=c81d48011848';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=c81d48011848';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=c81d48011848';
+import { APKError } from './apk-error.js?v=c81d48011848';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=c81d48011848';
+import { Scheduler, Blocked } from './scheduler.js?v=c81d48011848';
+import { bootClassLacksMember } from './boot-class-members.js?v=c81d48011848';
+export { APKError } from './apk-error.js?v=c81d48011848';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -427,6 +427,8 @@ addBridge('java/lang/Long',['bitCount(J)I','numberOfLeadingZeros(J)I','numberOfT
 addBridge('java/lang/Runtime', ['availableProcessors()I']);
 addBridge('java/lang/System', ['getProperty(Ljava/lang/String;)Ljava/lang/String;', 'getProperty(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;', 'setProperty(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;', 'clearProperty(Ljava/lang/String;)Ljava/lang/String;']);
 addBridge('java/lang/Long', ['getLong(Ljava/lang/String;)Ljava/lang/Long;', 'getLong(Ljava/lang/String;J)Ljava/lang/Long;', 'getLong(Ljava/lang/String;Ljava/lang/Long;)Ljava/lang/Long;']);
+addBridge('java/lang/Integer', ['getInteger(Ljava/lang/String;)Ljava/lang/Integer;', 'getInteger(Ljava/lang/String;I)Ljava/lang/Integer;', 'getInteger(Ljava/lang/String;Ljava/lang/Integer;)Ljava/lang/Integer;', 'decode(Ljava/lang/String;)Ljava/lang/Integer;']);
+addBridge('java/lang/Boolean', ['getBoolean(Ljava/lang/String;)Z']);
 addBridge('java/lang/Math', ['min(JJ)J','max(JJ)J','abs(J)J']);
 for (const key of ICU_BREAK_KEYS) SHIMS.add(key);
 addBridge('java/lang/Math',['copySign(DD)D','copySign(FF)F','nextAfter(DD)D','ulp(D)D','IEEEremainder(DD)D','cosh(D)D','expm1(D)D','log1p(D)D','pow(DD)D','log(D)D','exp(D)D','sqrt(D)D','hypot(DD)D','cos(D)D','sin(D)D','rint(D)D','ceil(D)D','floor(D)D','signum(D)D','signum(F)F','round(F)I','round(D)J']);
@@ -1977,6 +1979,20 @@ export class APKRuntime {
       const number=BigInt((match[3]?'0x':match[5]?'0o':'')+digits)*(match[1]==='-'?-1n:1n);
       return number<-(1n<<63n)||number>(1n<<63n)-1n?invalid():this.boxPrimitive('J',number);
     }
+    // Integer.getInteger / Integer.decode (java.lang.Integer): a system property decoded like Integer.decode ("0x", "#", leading-0 octal,
+    // sign); a missing or malformed property yields the default (boxed), decode throws NumberFormatException instead.
+    if(method.owner==='Ljava/lang/Integer;'&&staticCall&&(name==='getInteger'||name==='decode')){
+      const decode=name==='decode',fallback=decode?null:method.parameters[1]==='I'?this.boxPrimitive('I',args[1]):args[1]??null,text=decode?args[0]:typeof args[0]==='string'?this.javaProperties.get(args[0]):undefined;
+      if(decode&&isNull(text))this.throwJava('Ljava/lang/NullPointerException;','Integer string is null');
+      const invalid=()=>{if(decode)this.throwJava('Ljava/lang/NumberFormatException;',`For input string: "${text}"`);return fallback;};
+      if(typeof text!=='string')return invalid();
+      const match=/^([+-]?)(?:(0[xX]|#)([0-9a-fA-F]+)|(0)([0-7]+)|([1-9][0-9]*|0))$/.exec(text);if(!match)return invalid();
+      const digits=(match[3]??match[5]??match[6]).replace(/^0+/,'')||'0';if(digits.length>12)return invalid();
+      const number=BigInt((match[3]?'0x':match[5]?'0o':'')+digits)*(match[1]==='-'?-1n:1n);
+      return number<-(1n<<31n)||number>(1n<<31n)-1n?invalid():this.boxPrimitive('I',Number(number));
+    }
+    // Boolean.getBoolean(name): true only when the system property equals "true", ignoring case.
+    if(method.owner==='Ljava/lang/Boolean;'&&staticCall&&name==='getBoolean'&&method.signature==='(Ljava/lang/String;)Z'){const value=typeof args[0]==='string'?this.javaProperties.get(args[0]):undefined;return typeof value==='string'&&value.toLowerCase()==='true'?1:0;}
     if (method.owner === 'Ljava/lang/Double;' && staticCall && ['doubleToRawLongBits', 'doubleToLongBits', 'longBitsToDouble'].includes(name)) { // doubles travel as their IEEE-754 bit patterns, so the raw conversions are identity
       const bits = wide(args[0]); return name === 'doubleToLongBits' && Number.isNaN(doubleNumber(bits)) ? 0x7ff8000000000000n : bits;
     }
@@ -2831,7 +2847,7 @@ export class APKRuntime {
       if (name === 'compareAndSet' || name === 'weakCompareAndSet') { const same = equal(current, args[1]); if (same) obj.atomicValue = args[2]; return same ? 1 : 0; }
       if (name === 'intValue') return long ? Number(BigInt.asIntN(32, current)) : current;
       if (name === 'longValue') return long ? current : BigInt(current);
-      const delta = name.includes('Add') ? args[1] : name.includes('Decrement') || name.startsWith('decrement') ? (long ? -1n : -1) : (long ? 1n : 1);
+      const delta = name === 'getAndAdd' || name === 'addAndGet' ? args[1] : name.includes('Decrement') || name.startsWith('decrement') ? (long ? -1n : -1) : (long ? 1n : 1);
       const next = long ? BigInt.asIntN(64, current + delta) : (current + delta) | 0;
       obj.atomicValue = next; return name.startsWith('getAnd') ? current : next;
     }
