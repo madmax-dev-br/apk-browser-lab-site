@@ -1,0 +1,31 @@
+Opt-in original Android13 layout profile
+
+Build default framework first, then:
+    scripts/build-aosp-layouts-profile.sh
+
+framework.dex contains only original Gravity, FrameLayout, LinearLayout and
+nested classes. Methods/fields/constructors remain unmodified upstream Java.
+The support directory contains compilation declarations only and is excluded
+from D8 inputs. SDK android.jar is metadata only. Full source hashes and the
+required default-framework SHA are in framework-provenance.json.
+
+Do not load the frame and linear profiles together: each contains Gravity.
+The layouts profile combines them without duplicate definitions. The base DEX excludes this profile. The configured loader selects it generically
+when a manifest Activity inherits actual AppCompatActivity; callers can explicitly
+enable or disable selection. Source APK screen flows validate this usage.
+
+Platform contracts:
+- ViewGroup constructor initializes actual Context/attrs and platform View state.
+- View mPaddingLeft/Top/Right/Bottom and mTop/mBottom/mLeft/mRight correspond to
+  actual platform geometry, not a separate invented source-only copy.
+- View.sPreserveMarginParamsInLayoutParamConversion is targetSdkVersion>=24,
+  exactly as assigned by pinned View.java; LinearLayout's compatibility flag
+  is targetSdkVersion<=23 and executes in its original Java constructor.
+- LayoutParams width/height, MarginLayoutParams margins and Frame/Linear
+  gravity/weight are actual APK/XML values; source constructors read real
+  TypedArray styleable data. No Android SDK constructor bodies are packaged.
+- Child measure/layout methods must enter actual APK overridden callbacks,
+  using source MeasureSpec helpers. Child lists come from actual ViewGroup state.
+- Baselines, suggested minimums, padding/foreground and divider rendering are
+  platform/native inputs; Gravity.getAbsoluteGravity and all layout algorithms
+  execute original DEX.

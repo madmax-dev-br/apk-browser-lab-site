@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>APK player: embedding example</title>
+  <style>
+    :root{color-scheme:light dark;--bg:#f7f8fa;--card:#fff;--ink:#252a35;--muted:#667085;--line:#e4e6ed;--accent:#6159e8;--code:#f1f2f6}
+    @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#14161c;--card:#1b1e26;--ink:#e9ebf2;--muted:#9aa1b2;--line:#2b303b;--code:#0f1116}}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+    main{max-width:1100px;margin:0 auto;padding:24px 16px 56px}h1{font-size:26px;margin:0 0 4px}p.lead{color:var(--muted);margin:0 0 24px;max-width:70ch}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
+    figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px}
+    figcaption{font-size:13px;color:var(--muted)}figcaption b{color:var(--ink)}
+    apk-player{height:640px;border-radius:10px;background:repeating-linear-gradient(45deg,transparent 0 10px,rgba(127,127,127,.06) 10px 20px)}
+    .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    button,select{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+    button:focus-visible,select:focus-visible{outline:3px solid #b1adff;outline-offset:2px}
+    pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;font-size:13px;line-height:1.5}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}h2{margin:36px 0 10px;font-size:19px}
+    .log{font-size:12px;color:var(--muted);max-height:96px;overflow:auto;white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace}
+  </style>
+</head>
+<body>
+<main>
+  <h1>APK player</h1>
+  <p class="lead">Two independent players on one page. Each APK runs in its own isolated frame with its own VM Worker; the attributes below are the same settings as the lab's "Dispositivo virtual" panel.</p>
+  <div class="grid">
+    <figure>
+      <apk-player id="p1" src="../fixtures/xml-projects-debug.apk" device="phone" locale="pt-BR" theme="light" aria-label="xml-projects, light, pt-BR"></apk-player>
+      <figcaption><b>xml-projects</b> · phone · light · pt-BR · portrait</figcaption>
+      <div class="row"><button data-act="back" data-target="p1">Back</button><button data-act="restart" data-target="p1">Restart</button><button data-act="large" data-target="p1">Font ×1.3</button></div>
+      <div class="log" id="log1" aria-live="polite"></div>
+    </figure>
+    <figure>
+      <apk-player id="p2" src="../fixtures/compose-approvals-debug.apk" device="phone" orientation="landscape" theme="dark" locale="en-US" aria-label="compose-approvals, dark, landscape"></apk-player>
+      <figcaption><b>compose-approvals</b> · phone · dark · landscape · en-US</figcaption>
+      <div class="row"><button data-act="back" data-target="p2">Back</button><button data-act="restart" data-target="p2">Restart</button><button data-act="portrait" data-target="p2">Portrait</button></div>
+      <div class="log" id="log2" aria-live="polite"></div>
+    </figure>
+  </div>
+
+  <h2>Embed it</h2>
+  <pre><code>&lt;script type="module" src="https://YOUR-HOST/player/apk-player.js"&gt;&lt;/script&gt;
+
+&lt;apk-player src="/apks/app-debug.apk" device="phone" locale="pt-BR"
+            theme="dark" font-scale="1.1" orientation="portrait"
+            style="height:640px"&gt;&lt;/apk-player&gt;
+
+&lt;script type="module"&gt;
+  const player = document.querySelector('apk-player');
+  player.addEventListener('ready', e =&gt; console.log('running', e.detail.activity));
+  player.addEventListener('error', e =&gt; console.warn(e.detail.kind, e.detail.frontier));
+  player.setConfig({ theme: 'light', locale: 'en-US' });   // applied live (Android semantics)
+&lt;/script&gt;</code></pre>
+  <h2>Mount from a File or ArrayBuffer</h2>
+  <pre><code>import { ApkPlayer } from 'https://YOUR-HOST/player/apk-player.js';
+const player = ApkPlayer.mount(document.querySelector('#slot'), {
+  apk: fileInput.files[0],                 // File | Blob | ArrayBuffer (transferred) | URL string
+  config: { device: 'tablet', theme: 'dark' },
+  assetsBase: 'https://YOUR-HOST/'         // where player/frame.html and the runtime live
+});
+player.addEventListener('ready', e =&gt; console.log(e.detail));
+player.destroy();</code></pre>
+</main>
+<script type="module">
+  import './apk-player.js';
+  const log = (id, text) => { const el = document.getElementById(id); el.textContent = (text + '\n' + el.textContent).split('\n').slice(0, 6).join('\n'); };
+  for (const [id, logId] of [['p1', 'log1'], ['p2', 'log2']]) {
+    const player = document.getElementById(id);
+    for (const type of ['ready', 'activity-changed', 'config-applied', 'closed']) player.addEventListener(type, event => log(logId, `${type} ${event.detail.activity ?? ''} ${event.detail.live === undefined ? '' : event.detail.live ? '(live)' : '(next launch)'}`.trim()));
+    player.addEventListener('error', event => log(logId, `error ${event.detail.kind}: ${event.detail.message.slice(0, 140)}`));
+  }
+  document.addEventListener('click', event => {
+    const button = event.target.closest('button[data-act]'); if (!button) return;
+    const player = document.getElementById(button.dataset.target), act = button.dataset.act;
+    if (act === 'back') player.back(); else if (act === 'restart') player.restart();
+    else if (act === 'large') player.setConfig({ fontScale: 1.3 }); else if (act === 'portrait') player.setConfig({ orientation: 'portrait' });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+SQLite is in the public domain (https://www.sqlite.org/copyright.html). The sources built here are AOSP external/sqlite (tag android-13.0.0_r1)
+dist/sqlite3.c and dist/sqlite3.h; the Android additions (android/sqlite3_android.cpp, PhoneNumberUtils) are Apache-2.0, see
+AOSP-external-sqlite-android-NOTICE.txt.

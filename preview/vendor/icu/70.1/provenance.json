@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "implementation": "Original ICU4C70.1 boundary-analysis and regex C/C++ compiled to WebAssembly",
+  "upstream": {
+    "version": "70.1",
+    "unicodeVersion": "14.0",
+    "releaseTag": "release-70-1",
+    "url": "https://github.com/unicode-org/icu/releases/download/release-70-1/icu4c-70_1-src.tgz",
+    "sha256": "8d205428c17bf13bb535300669ed28b338a157b1c01ae66d31d0d3e2d47c3fd5",
+    "bytes": 25449582
+  },
+  "androidReference": {
+    "tag": "android-13.0.0_r1",
+    "icuVersion": "70.1",
+    "versionHeaderURL": "https://android.googlesource.com/platform/external/icu/+/android-13.0.0_r1/icu4c/source/common/unicode/uvernum.h?format=TEXT",
+    "versionHeaderSha256": "9fc8da61323174f3b0c9ca6bd9cbab70b6f786aa228cb64f39098b9d17a79b26",
+    "note": "Upstream ICU70.1 release, matching Android13 ICU version; not claimed byte-identical to Android-specific patches."
+  },
+  "algorithmPatches": [],
+  "adapter": "icu-break-wrapper.cpp (bounded ABI/memory wrapper only)",
+  "limits": {
+    "utf16Units": 65536,
+    "memoryBytes": 67108864,
+    "uniqueLocales": 256
+  },
+  "capabilities": [
+    "line",
+    "word",
+    "character",
+    "sentence",
+    "regex"
+  ],
+  "dataSelection": {
+    "retainedPaths": [
+      "brkitr/burmesedict.dict",
+      "brkitr/char.brk",
+      "brkitr/cjdict.dict",
+      "brkitr/de.res",
+      "brkitr/el.res",
+      "brkitr/en.res",
+      "brkitr/en_US.res",
+      "brkitr/en_US_POSIX.res",
+      "brkitr/es.res",
+      "brkitr/fr.res",
+      "brkitr/it.res",
+      "brkitr/ja.res",
+      "brkitr/khmerdict.dict",
+      "brkitr/laodict.dict",
+      "brkitr/line.brk",
+      "brkitr/line_cj.brk",
+      "brkitr/line_loose.brk",
+      "brkitr/line_loose_cj.brk",
+      "brkitr/line_normal.brk",
+      "brkitr/line_normal_cj.brk",
+      "brkitr/pt.res",
+      "brkitr/res_index.res",
+      "brkitr/root.res",
+      "brkitr/ru.res",
+      "brkitr/sent.brk",
+      "brkitr/sent_el.brk",
+      "brkitr/thaidict.dict",
+      "brkitr/title.brk",
+      "brkitr/word.brk",
+      "brkitr/word_POSIX.brk",
+      "brkitr/zh.res",
+      "brkitr/zh_Hant.res",
+      "cnvalias.icu",
+      "nfkc.nrm",
+      "nfkc_cf.nrm",
+      "ulayout.icu"
+    ],
+    "note": "Original complete brkitr resources/rules/dictionaries plus normalization/Unicode support; no replacement rule, segmentation heuristic or regenerated rule data. icupkg dependency check passes.",
+    "retainedItems": "data-items.json"
+  },
+  "compiler": {
+    "toolchain": "Emscripten3.1.74",
+    "flags": [
+      "-O2",
+      "UCONFIG_NO_FILE_IO=1",
+      "UCONFIG_NO_COLLATION=1",
+      "UCONFIG_NO_FORMATTING=1",
+      "UCONFIG_NO_TRANSLITERATION=1",
+      "UCONFIG_NO_SERVICE=1"
+    ],
+    "buildHostAlias": "i686-pc-linux-gnu (configure compatibility only; actual compiler target wasm32-emscripten)",
+    "imports": [
+      "wasi_snapshot_preview1.environ_sizes_get",
+      "wasi_snapshot_preview1.environ_get"
+    ],
+    "environment": "Explicit empty process environment; no host locale, filesystem, threads or network access from Wasm."
+  },
+  "license": "LICENSE",
+  "wasm": {
+    "file": "icu-break.wasm",
+    "bytes": 723510,
+    "sha256": "40366b00740e9c7ee4707882b4ab2847aa0e8999763c7efa3cca5266016c3307"
+  },
+  "data": {
+    "file": "icudt70l.dat",
+    "bytes": 3450768,
+    "sha256": "a261e18e579c7a5e0697f44d628c5713fbec8e2ec9ea43956cb98ee5af094937"
+  },
+  "buildScript": "scripts/build-icu-break.sh",
+  "nativeReference": {
+    "source": "native-reference.cpp",
+    "result": "tests/fixtures/icu/native-70.1-boundaries.json",
+    "note": "Unmodified ICU70.1 natively compiled. All seven vectors also match full original data, not only the retained data subset.",
+    "fullDataMatchesSelectedData": true
+  },
+  "ruleSourceReferences": [
+    {
+      "file": "rules-reference/line.txt",
+      "url": "https://raw.githubusercontent.com/unicode-org/icu/release-70-1/icu4c/source/data/brkitr/rules/line.txt",
+      "sha256": "02ec04bd3dd3a35f63ad3fec12fc79c20e991df64815a1599cac4e5e6ab84702",
+      "bytes": 11089
+    },
+    {
+      "file": "rules-reference/word.txt",
+      "url": "https://raw.githubusercontent.com/unicode-org/icu/release-70-1/icu4c/source/data/brkitr/rules/word.txt",
+      "sha256": "8c623551556473c97f32a1ecc22716c4d73fbf71b8dc500a4b461302ca146171",
+      "bytes": 5929
+    },
+    {
+      "file": "rules-reference/char.txt",
+      "url": "https://raw.githubusercontent.com/unicode-org/icu/release-70-1/icu4c/source/data/brkitr/rules/char.txt",
+      "sha256": "9fe2755019ad0636ac4ecf81f79dcc888c69b6e08a1002ddbe13638fec7c9d50",
+      "bytes": 2503
+    },
+    {
+      "file": "rules-reference/sent.txt",
+      "url": "https://raw.githubusercontent.com/unicode-org/icu/release-70-1/icu4c/source/data/brkitr/rules/sent.txt",
+      "sha256": "ca0bed81197afb942aba26d20592ea8802afb468c8ebd821de57dca42379ad03",
+      "bytes": 2506
+    }
+  ],
+  "regexLimits": {
+    "patternUtf16Units": 16384,
+    "inputUtf16Units": 65536,
+    "captureGroups": 1024,
+    "handlesPerSession": 256,
+    "handlesPerBackend": 1024,
+    "processingTimeLimit": 1000,
+    "stackBytesPerMatcher": 1048576,
+    "note": "ICU original processing-step/time and stack guards; Java flags/semantics remain in original Pattern/Matcher DEX."
+  },
+  "regexAPI": "createRegexSession: compile/openMatcher/setInput/find/findNext/matches/lookingAt/groupCount/matchedGroupIndex/hitEnd/requireEnd/useAnchoringBounds/useTransparentBounds/close/dispose",
+  "correspondingSource": {
+    "file": "source-bundle.zip",
+    "bytes": 5201755,
+    "sha256": "3ef599ede1b0661a7572512636f6ae6b8323c8a04bfa5b4b73b6afb8a3428788",
+    "scope": "Original ICU common/i18n/tools/config source, original rule text references, bounded adapter/provider/build source. Complete release archive is pinned by URL+SHA and fetched by build script."
+  }
+}

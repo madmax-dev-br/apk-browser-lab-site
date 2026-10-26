@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark light">
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
+  <title>APK Browser Lab</title>
+  <link rel="stylesheet" href="./styles.css?v=099934d1e7de">
+  <meta name="apk-browser-build" content="099934d1e7de">
+</head>
+<body>
+  <header class="topbar">
+    <a href="./" class="brand" aria-label="APK Browser Lab"><span class="brand-icon">a<span>›</span></span><span>APK <b>Browser Lab</b></span><span class="beta">EXPERIMENTAL</span></a>
+    <a class="comparison-link" href="./comparison/">Comparar com Android ↗</a><a class="integration-link" href="./embed-example.html">Exemplo de integração <span aria-hidden="true">↗</span></a><button type="button" id="theme-toggle" class="theme-toggle" aria-label="Alternar tema claro/escuro"><span aria-hidden="true">◐</span></button>
+  </header>
+  <main>
+    <section class="intro">
+      <div><div class="eyebrow"><span></span> ANDROID, DIRETO NA WEB</div><h1>Abra. Execute. Explore.</h1><p>Um laboratório para rodar APKs simples e interfaces Compose no navegador.</p></div>
+      <div class="local-badge"><span class="shield" aria-hidden="true">◇</span><div><strong>Execução local</strong><span>O arquivo fica no seu navegador</span></div></div>
+    </section>
+    <div class="workspace">
+      <aside class="controls">
+        <div class="mode-switch" role="tablist" aria-label="Ambiente de execução">
+          <button id="apk-tab" class="active" role="tab" aria-selected="true" aria-controls="apk-panel">APK local</button>
+          <button id="compose-tab" role="tab" aria-selected="false" aria-controls="compose-panel">Compose Web <span>Wasm</span></button>
+        </div>
+        <section id="apk-panel" role="tabpanel" aria-labelledby="apk-tab">
+          <div class="section-label">01 <span>SELECIONE O APLICATIVO</span></div>
+          <label id="drop-zone" class="drop-zone" for="apk-file">
+            <span class="upload-icon" aria-hidden="true">↥</span><strong>Solte seu APK aqui</strong><span>ou <u>escolha um arquivo</u> no computador</span><small>.apk · processamento 100% local</small>
+          </label>
+          <input id="apk-file" type="file" accept=".apk,application/vnd.android.package-archive" class="visually-hidden">
+          <div class="demo-row"><span>Quer experimentar primeiro?</span><button id="demo-button">Rodar demo <span aria-hidden="true">↗</span></button></div>
+          <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div><button id="stop-vm" class="stop-vm" aria-label="Encerrar VM e cancelar callbacks" hidden>Encerrar</button><button id="reopen-file" class="reopen-file" hidden>Reabrir</button><span class="file-check">✓</span></div>
+          <div id="operation-panel" class="operation-panel" hidden><div><span class="spinner"></span><strong id="operation-message">Processando no Web Worker…</strong><button id="cancel-operation">Cancelar</button></div><progress id="operation-progress" max="1"></progress><small id="operation-detail">A interface permanece disponível · limite de 120 s para inspeção</small></div>
+          <div class="section-label inspection-label">02 <span>INSPEÇÃO DO PACOTE</span><span id="inspection-badge" class="quiet-badge">AGUARDANDO</span></div>
+          <div id="inventory-empty" class="inventory-empty"><span aria-hidden="true">⌘</span><p>Pacote, classes e dependências<br>aparecerão aqui.</p></div>
+          <div id="inventory" class="inventory" hidden>
+            <div class="inventory-heading"><span class="tiny-label">PACOTE</span><strong id="package-name"></strong></div>
+            <div class="stats"><div><strong id="class-count">0</strong><span>classes DEX</span></div><div><strong id="activity-count">0</strong><span>activities</span></div><div><strong id="dependency-count">0</strong><span>dependências</span></div></div>
+            <label class="activity-label" for="activity-select">Activity inicial</label><select id="activity-select"></select>
+            <div id="archive-summary" class="archive-summary" hidden></div><details class="findings"><summary>Classes e dependências <span>+</span></summary><div id="inventory-details"></div></details>
+          </div>
+          <details id="native-inspection" class="native-inspection" hidden><summary>Analisar bibliotecas nativas <span>ELF</span></summary><p>Inspeção de metadados de uma biblioteca por vez, até 32 MiB. Não executa código nativo nem implementa JNI.</p><label for="native-abi">ABI</label><select id="native-abi"></select><label for="native-library">Biblioteca</label><select id="native-library"></select><button id="inspect-native-button">Analisar ELF selecionado</button><pre id="native-result" hidden></pre></details>
+          <div id="unsupported-notice" class="unsupported-notice" role="status" hidden><strong>Este APK ainda não pode ser executado</strong><p>O relatório indica limites de arquivo que impedem a tentativa. Veja os detalhes abaixo; uma inspeção parcial não comprova compatibilidade.</p><ul id="unsupported-list"></ul><button id="unsupported-compose" hidden>Abrir exemplo separado em Compose Web ↗</button></div>
+          <details id="device-panel" class="device-panel">
+            <summary><span>Dispositivo virtual</span><span id="device-summary" class="quiet-badge">411 × 914 · retrato</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
+            <div class="device-grid">
+              <label for="dev-screen">Tela</label><select id="dev-screen"></select>
+              <label for="dev-orientation">Orientação</label><select id="dev-orientation"><option value="portrait">Retrato</option><option value="landscape">Paisagem</option></select>
+              <label for="dev-font">Escala da fonte <output id="dev-font-out">1,00×</output></label><input id="dev-font" type="range" min="0.85" max="2" step="0.05">
+              <label for="dev-locale">Idioma e região</label><select id="dev-locale"></select>
+              <label for="dev-dark">Tema escuro (uiMode)</label><input id="dev-dark" type="checkbox">
+              <label for="dev-animator">Escala de animação</label><select id="dev-animator"><option value="0">Desligada</option><option value="0.5">0,5×</option><option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select>
+              <label for="dev-hour24">Relógio de 24 horas</label><input id="dev-hour24" type="checkbox">
+              <label for="dev-tz">Fuso horário</label><select id="dev-tz"></select>
+              <label for="dev-battery">Bateria <output id="dev-battery-out">80%</output></label><input id="dev-battery" type="range" min="0" max="100" step="1">
+              <label for="dev-charging">Carregando</label><input id="dev-charging" type="checkbox">
+              <label for="dev-network">Conectividade</label><select id="dev-network"><option value="online">Wi‑Fi (sem tarifação)</option><option value="metered">Dados móveis (tarifado)</option><option value="offline">Sem conexão</option></select>
+              <label for="dev-hosts">Hosts permitidos na rede</label><input id="dev-hosts" type="text" spellcheck="false" autocomplete="off" placeholder="api.exemplo.com, *.cdn.exemplo.com" aria-describedby="dev-hosts-note">
+              <label for="dev-proxy">Proxy de rede (opcional)</label><input id="dev-proxy" type="text" spellcheck="false" autocomplete="off" placeholder="https://relay.exemplo.com/?url={url}">
+              <p id="dev-hosts-note" class="device-status-note">Sem hosts na lista, todo nome falha como em um telefone offline. Um host listado ainda depende de CORS no servidor (ou de um proxy seu).</p>
+              <label for="dev-nav">Navegação</label><select id="dev-nav"><option value="gesture">Gestos</option><option value="buttons">3 botões</option></select>
+            </div>
+            <p id="device-status" class="device-status-note" role="status" aria-live="polite">As mudanças chegam ao app como no Android: Configuration, recursos reselecionados e Activity recriada ou onConfigurationChanged.</p>
+            <button id="device-reset" class="device-reset" type="button">Restaurar padrão</button>
+          </details>
+          <label class="tolerant-toggle"><input type="checkbox" id="tolerate-missing-void"> <span>Modo tolerante: APIs <code>void</code> que faltam viram <code>STUB-VOID</code> no log em vez de parar o app</span></label>
+          <button id="run-button" class="run-button" disabled><span aria-hidden="true">▶</span> Executar APK <kbd>RUN</kbd></button>
+          <p class="support-note"><span aria-hidden="true">ⓘ</span><span>VM experimental para Android Views e bytecode DEX. Multidex é inspecionado no Worker; Android, Compose e JNI ainda podem exigir APIs não implementadas. <button id="open-compose">Conhecer Compose Web ↗</button></span></p>
+        </section>
+        <section id="compose-panel" role="tabpanel" aria-labelledby="compose-tab" hidden>
+          <div class="section-label">01 <span>COMPOSE MULTIPLATFORM</span></div>
+          <div class="compose-description"><div class="compose-mark" aria-hidden="true">◇</div><h2>Kotlin real. Na web.</h2><p>Uma interface Compose compilada do código-fonte para Kotlin/Wasm, executada dentro desta página.</p><div class="stack-tags"><span>Kotlin</span><span>Compose</span><span>WebAssembly</span></div></div>
+          <div class="source-note"><strong>Um caminho diferente do APK</strong><p>Este exemplo usa uma compilação para web. Ele não converte nem executa a biblioteca Android Compose de um APK importado.</p></div>
+          <button id="reload-compose" class="run-button"><span aria-hidden="true">↻</span> Recarregar Compose <kbd>WEB</kbd></button>
+          <div class="compose-width-controls" role="group" aria-label="Largura da prévia"><button id="compose-phone" aria-pressed="false">Celular</button><button id="compose-wide" aria-pressed="true">Amplo</button></div>
+          <p class="support-note"><span aria-hidden="true">ⓘ</span><span>Experimente o formulário, a busca, os filtros e os detalhes das solicitações. O estado e as interações vêm do código Kotlin/Wasm compilado.</span></p>
+          <div id="compose-state" class="compose-state" hidden><span class="tiny-label">ESTADO RECEBIDO DO COMPOSE</span><strong id="compose-count">count = 0</strong><code id="compose-request"></code></div>
+        </section>
+      </aside>
+      <section class="preview" aria-label="Aplicativo em execução">
+        <div class="preview-bar"><div class="preview-title"><span class="window-dots"><i></i><i></i><i></i></span><span id="preview-name">Prévia do aplicativo</span></div><button id="back-button" class="back-button" hidden>← Voltar</button><span class="runtime-badge" id="runtime-badge"><span></span> INATIVO</span></div>
+        <div class="preview-stage" id="preview-stage">
+          <div id="empty-preview" class="empty-preview"><div class="empty-device"><span></span><div>▶</div><i></i></div><h2>Seu aplicativo começa aqui.</h2><p>Selecione um APK e clique em Executar.<br>Ou rode a demonstração para testar.</p><span class="browser-chip"><span>◉</span> Tudo acontece neste navegador</span></div>
+          <div id="android-device" class="android-device" hidden>
+            <div id="android-screen" class="android-screen">
+              <div id="android-content" class="android-content"></div>
+              <div id="android-window-layer" class="android-window-layer"></div>
+              <div class="system-bars" aria-hidden="true">
+                <div id="sysbar-status" class="sysbar-status"><span id="sysbar-clock" class="sysbar-clock">9:41</span><span class="sysbar-cutout"></span><span class="sysbar-icons"><svg id="sysbar-wifi" viewBox="0 0 24 24" width="14" height="14"><path d="M12 18.5a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM2.4 9.2l1.9 1.9a10.8 10.8 0 0 1 15.4 0l1.9-1.9a13.5 13.5 0 0 0-19.2 0zM6.2 13l1.9 1.9a5.4 5.4 0 0 1 7.8 0l1.9-1.9a8.1 8.1 0 0 0-11.6 0z" fill="currentColor"/></svg><svg id="sysbar-cell" viewBox="0 0 24 24" width="14" height="14"><path d="M2 22h20V2z" fill="currentColor"/></svg><span class="sysbar-battery"><span id="sysbar-battery-level" class="sysbar-battery-level"></span><b id="sysbar-bolt" hidden>⚡</b></span></span></div>
+                <div id="sysbar-nav" class="sysbar-nav"><span class="sysbar-handle"></span><span class="sysbar-buttons"><i class="sysbar-back"></i><i class="sysbar-home"></i><i class="sysbar-recents"></i></span></div>
+              </div>
+            </div>
+          </div>
+          <div id="compose-container" class="compose-container" hidden><iframe id="compose-frame" title="Aplicativo Compose compilado para WebAssembly" allow="clipboard-write"></iframe><div id="compose-loading" class="compose-loading"><span class="spinner"></span><strong>Iniciando Compose Web…</strong><span>Carregando o módulo Kotlin/Wasm</span></div></div>
+          <div id="error-panel" class="error-panel" role="alert" hidden><span class="error-icon">!</span><h2 id="error-title">Não foi possível executar</h2><p id="error-message"></p><details id="error-diagnostics" hidden><summary>Detalhes técnicos da execução</summary><pre id="error-detail" hidden></pre></details><button id="error-compose" hidden>Abrir Compose Web ↗</button></div>
+        </div>
+        <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Aguardando um aplicativo</span></span><span id="execution-engine">411 × 914 dp · DENSIDADE 1</span></div>
+        <details id="trace" class="trace"><summary><span>Log de execução</span><span id="trace-count">0 eventos</span><span class="trace-chevron">⌄</span></summary><pre id="trace-output">O log aparecerá após a execução.</pre></details>
+      </section>
+    </div>
+    <details id="scenario-catalog" class="scenario-catalog">
+      <summary><span class="catalog-icon" aria-hidden="true">▦</span><span>Biblioteca de APKs <small>Cenários de teste</small></span><span class="catalog-toggle" aria-hidden="true">+</span></summary>
+      <div class="catalog-body">
+        <div class="catalog-intro"><div><h2>Aplicativos reais para explorar os limites da VM.</h2><p>Baixe um APK ou inspecione seu pacote, Activities e dependências no próprio navegador.</p></div><span class="catalog-local">ARQUIVOS LOCAIS · SEM UPLOAD</span></div>
+        <p class="catalog-boundary"><span aria-hidden="true">ⓘ</span> Os casos avançados são APKs Android reais para tentativas experimentais e diagnóstico. Inspecionar lê os DEX reais; Executar tenta iniciar a Activity e informa o primeiro limite encontrado. Bibliotecas nativas empacotadas não garantem suporte JNI. O exemplo Compose Web permanece separado.</p>
+        <div id="scenario-list" class="scenario-list" aria-live="polite"><p class="catalog-loading">Carregando catálogo…</p></div>
+      </div>
+    </details>
+    <footer><span><span class="footer-dot"></span> Sem instalação. Sem emulador. Sem upload.</span><a href="./hermes-proof/">Experimento Hermes no navegador ↗</a><span>APK Browser Lab <span class="footer-slash">/</span> protótipo técnico</span></footer>
+  </main>
+  <script type="module" src="./app.js?v=099934d1e7de"></script>
+</body>
+</html>

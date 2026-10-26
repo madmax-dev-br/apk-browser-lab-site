@@ -1,0 +1,267 @@
+{
+  "memory": {
+    "count": 1,
+    "initialPages": 256,
+    "initialBytes": 16777216,
+    "maxPages": 4096,
+    "maxBytes": 268435456
+  },
+  "imports": [
+    {
+      "module": "a",
+      "name": "a",
+      "kind": "function",
+      "glueFunction": "_exit"
+    },
+    {
+      "module": "a",
+      "name": "b",
+      "kind": "function",
+      "glueFunction": "_fd_close"
+    },
+    {
+      "module": "a",
+      "name": "c",
+      "kind": "function",
+      "glueFunction": "_fd_write"
+    },
+    {
+      "module": "a",
+      "name": "d",
+      "kind": "function",
+      "glueFunction": "_fd_read"
+    },
+    {
+      "module": "a",
+      "name": "e",
+      "kind": "function",
+      "glueFunction": "___syscall_fcntl64"
+    },
+    {
+      "module": "a",
+      "name": "f",
+      "kind": "function",
+      "glueFunction": "___syscall_openat"
+    },
+    {
+      "module": "a",
+      "name": "g",
+      "kind": "function",
+      "glueFunction": "_emscripten_date_now"
+    },
+    {
+      "module": "a",
+      "name": "h",
+      "kind": "function",
+      "glueFunction": "__emscripten_memcpy_js"
+    },
+    {
+      "module": "a",
+      "name": "i",
+      "kind": "function",
+      "glueFunction": "___syscall_faccessat"
+    },
+    {
+      "module": "a",
+      "name": "j",
+      "kind": "function",
+      "glueFunction": "__abort_js"
+    },
+    {
+      "module": "a",
+      "name": "k",
+      "kind": "function",
+      "glueFunction": "_proc_exit"
+    },
+    {
+      "module": "a",
+      "name": "l",
+      "kind": "function",
+      "glueFunction": "_fd_pread"
+    },
+    {
+      "module": "a",
+      "name": "m",
+      "kind": "function",
+      "glueFunction": "__mmap_js"
+    },
+    {
+      "module": "a",
+      "name": "n",
+      "kind": "function",
+      "glueFunction": "__munmap_js"
+    },
+    {
+      "module": "a",
+      "name": "o",
+      "kind": "function",
+      "glueFunction": "__localtime_js"
+    },
+    {
+      "module": "a",
+      "name": "p",
+      "kind": "function",
+      "glueFunction": "__mktime_js"
+    },
+    {
+      "module": "a",
+      "name": "q",
+      "kind": "function",
+      "glueFunction": "_fd_seek"
+    },
+    {
+      "module": "a",
+      "name": "r",
+      "kind": "function",
+      "glueFunction": "___syscall_ftruncate64"
+    },
+    {
+      "module": "a",
+      "name": "s",
+      "kind": "function",
+      "glueFunction": "_environ_get"
+    },
+    {
+      "module": "a",
+      "name": "t",
+      "kind": "function",
+      "glueFunction": "_clock_time_get"
+    },
+    {
+      "module": "a",
+      "name": "u",
+      "kind": "function",
+      "glueFunction": "_random_get"
+    },
+    {
+      "module": "a",
+      "name": "v",
+      "kind": "function",
+      "glueFunction": "_emscripten_resize_heap"
+    },
+    {
+      "module": "a",
+      "name": "w",
+      "kind": "function",
+      "glueFunction": "__setitimer_js"
+    },
+    {
+      "module": "a",
+      "name": "x",
+      "kind": "function",
+      "glueFunction": "___syscall_renameat"
+    },
+    {
+      "module": "a",
+      "name": "y",
+      "kind": "function",
+      "glueFunction": "___syscall_rmdir"
+    },
+    {
+      "module": "a",
+      "name": "z",
+      "kind": "function",
+      "glueFunction": "___syscall_unlinkat"
+    },
+    {
+      "module": "a",
+      "name": "A",
+      "kind": "function",
+      "glueFunction": "___call_sighandler"
+    },
+    {
+      "module": "a",
+      "name": "B",
+      "kind": "function",
+      "glueFunction": "__emscripten_runtime_keepalive_clear"
+    },
+    {
+      "module": "a",
+      "name": "C",
+      "kind": "function",
+      "glueFunction": "__tzset_js"
+    },
+    {
+      "module": "a",
+      "name": "D",
+      "kind": "function",
+      "glueFunction": "_environ_sizes_get"
+    },
+    {
+      "module": "a",
+      "name": "E",
+      "kind": "function",
+      "glueFunction": "_fd_fdstat_get"
+    },
+    {
+      "module": "a",
+      "name": "F",
+      "kind": "function",
+      "glueFunction": "___syscall_lstat64"
+    },
+    {
+      "module": "a",
+      "name": "G",
+      "kind": "function",
+      "glueFunction": "___syscall_newfstatat"
+    },
+    {
+      "module": "a",
+      "name": "H",
+      "kind": "function",
+      "glueFunction": "___syscall_stat64"
+    },
+    {
+      "module": "a",
+      "name": "I",
+      "kind": "function",
+      "glueFunction": "___syscall_fstat64"
+    },
+    {
+      "module": "a",
+      "name": "J",
+      "kind": "function",
+      "glueFunction": "___syscall_ioctl"
+    },
+    {
+      "module": "a",
+      "name": "K",
+      "kind": "function",
+      "glueFunction": "js_platform_unicode_localeCompare"
+    }
+  ],
+  "exports": [
+    {
+      "name": "L",
+      "kind": "memory"
+    },
+    {
+      "name": "M",
+      "kind": "function"
+    },
+    {
+      "name": "N",
+      "kind": "function"
+    },
+    {
+      "name": "O",
+      "kind": "table"
+    },
+    {
+      "name": "P",
+      "kind": "function"
+    },
+    {
+      "name": "Q",
+      "kind": "function"
+    },
+    {
+      "name": "R",
+      "kind": "function"
+    },
+    {
+      "name": "S",
+      "kind": "function"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+CanvasKit 0.42.0 is the official Skia Wasm distribution by the Skia authors (BSD-3-Clause).
+Roboto Regular is from google/skia resources; copyright 2011 Google Inc., Apache-2.0.
+Roboto Bold/Italic/BoldItalic/Medium are unmodified official googlefonts/roboto-2 files at commit 38062f4b4a0be4346d07a928408da21602545e9e; Apache-2.0.
+The ESM wrapper changes packaging only; original source and hashes are retained.

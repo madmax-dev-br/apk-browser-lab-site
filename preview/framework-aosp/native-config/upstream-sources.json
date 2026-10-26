@@ -1,0 +1,56 @@
+[
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "libs/androidfw/ResourceTypes.cpp",
+    "file": "upstream/ResourceTypes.cpp",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/libs/androidfw/ResourceTypes.cpp?format=TEXT",
+    "sha256": "709f0a7d9e5fafec4d5724b294825a3b64491915383a80c7b82fda7f93a65898",
+    "bytes": 284508
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "libs/androidfw/include/androidfw/ResourceTypes.h",
+    "file": "upstream/ResourceTypes.h",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/libs/androidfw/include/androidfw/ResourceTypes.h?format=TEXT",
+    "sha256": "9c62cd39fa6193e5033be72d710aa384c7b07abddf165912c73356b3b3d879a8",
+    "bytes": 80675
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "libs/androidfw/LocaleData.cpp",
+    "file": "upstream/LocaleData.cpp",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/libs/androidfw/LocaleData.cpp?format=TEXT",
+    "sha256": "55c35cc1bdcd20dd02dd873ee2311c347044a50f06f3b8aee013db63a63f412a",
+    "bytes": 9871
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "libs/androidfw/include/androidfw/LocaleData.h",
+    "file": "upstream/LocaleData.h",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/libs/androidfw/include/androidfw/LocaleData.h?format=TEXT",
+    "sha256": "5ce8ff86889ef43bbc8e5be26bc94abf29fdd832451d3f3aa72aecfe59bb50e2",
+    "bytes": 1153
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "libs/androidfw/LocaleDataTables.cpp",
+    "file": "upstream/LocaleDataTables.cpp",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/libs/androidfw/LocaleDataTables.cpp?format=TEXT",
+    "sha256": "25025abffa795af95d8e4b866de3c21e3ac9458ff0d57134e11d390bafcdc312",
+    "bytes": 97201
+  },
+  {
+    "project": "platform/frameworks/native",
+    "tag": "android-13.0.0_r1",
+    "path": "include/android/configuration.h",
+    "file": "upstream/configuration.h",
+    "url": "https://android.googlesource.com/platform/frameworks/native/+/android-13.0.0_r1/include/android/configuration.h?format=TEXT",
+    "sha256": "d082fa20d2bd2d1a7cc9ae37996d69bbcb4bfa103da6571c1f6860249e2b6bfe",
+    "bytes": 25709
+  }
+]

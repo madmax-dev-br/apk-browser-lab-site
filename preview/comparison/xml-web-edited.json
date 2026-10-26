@@ -1,0 +1,14 @@
+{
+  "crop": {
+    "height": 638.4000244140625,
+    "width": 312.6806640625,
+    "x": 987.65185546875,
+    "y": 338.2043762207031
+  },
+  "viewport": {
+    "height": 1314,
+    "width": 1935
+  },
+  "state": "title=Solicitação web;urgent=true;pendingOnly=false;query=;total=4,pending=3,added=1,progress=25",
+  "capture": "CUA browser screenshot"
+}

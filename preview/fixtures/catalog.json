@@ -1,0 +1,327 @@
+{
+  "version": 1,
+  "scenarios": [
+    {
+      "id": "aosp-boot-probe",
+      "file": "aosp-boot-probe.apk",
+      "title": "Código original AOSP · DEX",
+      "description": "Código original AOSP compilado de fontes: propriedades, dimensões, Pools e Pair. O APK inclui uma Pair alternativa; a classe original AOSP tem prioridade e aparece separada no trace.",
+      "tags": [
+        "AOSP original",
+        "Propriedades + dimensões",
+        "Pools / Pair"
+      ],
+      "advanced": false,
+      "executionValidated": true,
+      "sizeBytes": 12691,
+      "available": true
+    },
+    {
+      "id": "aosp-collections-probe",
+      "file": "aosp-collections-probe.apk",
+      "title": "Código original AOSP · coleções e observadores",
+      "description": "SparseArray, SparseBooleanArray, SparseIntArray e LongSparseArray executam algoritmos originais AOSP em DEX. O mesmo APK inclui callbacks reais para ViewTreeObserver.",
+      "tags": [
+        "AOSP original",
+        "Sparse collections",
+        "ViewTreeObserver"
+      ],
+      "advanced": false,
+      "executionValidated": true,
+      "sizeBytes": 12691,
+      "available": true
+    },
+    {
+      "id": "vector-source-probe",
+      "file": "vector-source-probe.apk",
+      "title": "Vetor · desenho AOSP original",
+      "description": "ImageView XML com VectorDrawable e ColorStateList originais em DEX: caminhos, grupo rotacionado, recorte, transparência, espelho e cor por estado. Duas Activities preservam as opções via Intent; draw(Canvas) produz os comandos gráficos reais.",
+      "tags": [
+        "AOSP original",
+        "VectorDrawable + Canvas",
+        "Estado + duas Activities"
+      ],
+      "advanced": false,
+      "executionValidated": true,
+      "sizeBytes": 17066,
+      "available": true
+    },
+    {
+      "id": "measure-source-probe",
+      "file": "measure-source-probe.apk",
+      "title": "Medida e layout · DEX real",
+      "description": "ViewGroup definido no APK cria TextView e Button em DEX. Seus callbacks onMeasure/onLayout usam MeasureSpec e algoritmos originais AOSP; métricas vêm de Skia/Roboto. O clique solicita outra travessia real e reposiciona os mesmos filhos.",
+      "tags": [
+        "onMeasure / onLayout DEX",
+        "AOSP MeasureSpec",
+        "Métricas Skia"
+      ],
+      "advanced": false,
+      "executionValidated": true,
+      "sizeBytes": 12756,
+      "available": true
+    },
+    {
+      "id": "kotlin-counter",
+      "file": "kotlin-counter.apk",
+      "title": "Contador Kotlin",
+      "description": "Activity com Android Views e contador. O clique executa o callback DEX e métodos da biblioteca Kotlin empacotada.",
+      "tags": [
+        "Kotlin",
+        "Android Views",
+        "Callback DEX"
+      ],
+      "advanced": false,
+      "executionValidated": true,
+      "sizeBytes": 622995,
+      "available": true
+    },
+    {
+      "id": "multidex-counter",
+      "file": "multidex-counter.apk",
+      "title": "Contador · multidex real",
+      "description": "Três DEX reais: Activity no primeiro, helper no segundo e listener no terceiro. Contador e fallback Java para biblioteca nativa opcional; JNI obrigatório produz diagnóstico explícito.",
+      "tags": [
+        "Multidex",
+        "Callback DEX",
+        "Android Views"
+      ],
+      "advanced": false,
+      "executionValidated": true,
+      "sizeBytes": 16991,
+      "available": true
+    },
+    {
+      "id": "xml-navigation",
+      "file": "xml-navigation.apk",
+      "title": "XML · duas Activities",
+      "description": "Layouts XML e strings reais de resources.arsc. Contador, Intent com extras, abertura de detalhe e retorno preservando os mesmos Views e o estado da Activity anterior.",
+      "tags": [
+        "XML + ARSC",
+        "Intent extras",
+        "Voltar / finish"
+      ],
+      "advanced": false,
+      "executionValidated": true,
+      "expected": {
+        "packageName": "dev.apkweb.xmlnavigation",
+        "launcherActivity": "dev.apkweb.xmlnavigation.MainActivity",
+        "activities": [
+          "dev.apkweb.xmlnavigation.MainActivity",
+          "dev.apkweb.xmlnavigation.DetailActivity"
+        ]
+      },
+      "sizeBytes": 12841,
+      "available": true
+    },
+    {
+      "id": "xml-dashboard",
+      "file": "xml-dashboard.apk",
+      "title": "XML · painel interativo",
+      "description": "ScrollView, FrameLayout, métricas com pesos, formulário EditText/TextWatcher, CheckBox/Switch, filtros reais e progresso. Salve uma solicitação e abra o detalhe em outra Activity.",
+      "tags": [
+        "XML complexo",
+        "Callbacks DEX",
+        "Formulário + filtros"
+      ],
+      "advanced": false,
+      "executionValidated": true,
+      "sizeBytes": 17783,
+      "available": true
+    },
+    {
+      "id": "handler-counter",
+      "file": "handler-counter.apk",
+      "title": "Application · Handler e mensagens",
+      "description": "Application custom executa seu onCreate DEX antes da Activity. Handler agenda Runnable imediato e atrasado, cancela callbacks e entrega Message a handleMessage real.",
+      "tags": [
+        "Application DEX",
+        "Handler / Looper",
+        "Fila + cancelamento"
+      ],
+      "advanced": false,
+      "executionValidated": true,
+      "sizeBytes": 12691,
+      "available": true
+    },
+    {
+      "id": "net-probe",
+      "file": "net-probe.apk",
+      "title": "Rede · HttpURLConnection sobre fetch",
+      "description": "Uma thread em segundo plano baixa um JSON com java.net.HttpURLConnection (código original da libcore) e mostra status e corpo. A rede do dispositivo virtual começa sem hosts permitidos: em Dispositivo, adicione o host desta página (por exemplo localhost) em \"Hosts permitidos na rede\" e toque em Load; sem isso o app vê UnknownHostException, como em um telefone offline.",
+      "tags": [
+        "java.net original",
+        "Thread + fetch",
+        "Política de rede"
+      ],
+      "advanced": false,
+      "executionValidated": true,
+      "sizeBytes": 16787,
+      "available": true
+    },
+    {
+      "id": "compose-state",
+      "file": "compose-state-debug.apk",
+      "title": "Compose · estado e formulários",
+      "description": "Material 3 com lista, filtro, formulário, diálogo e mudanças de estado em uma interface Android Compose real.",
+      "tags": [
+        "Compose",
+        "Material 3",
+        "Estado"
+      ],
+      "advanced": true,
+      "expected": {
+        "packageName": "dev.apkweb.fixtures.state",
+        "launcherActivity": "dev.apkweb.fixtures.state.MainActivity",
+        "activities": [
+          "dev.apkweb.fixtures.state.MainActivity"
+        ]
+      },
+      "sizeBytes": 9388660,
+      "available": true
+    },
+    {
+      "id": "compose-navigation",
+      "file": "compose-navigation-debug.apk",
+      "title": "Compose · navegação e Activities",
+      "description": "Fluxo lista → detalhe → editar com Navigation Compose, SettingsActivity e retorno de resultado via Activity Result.",
+      "tags": [
+        "Navigation Compose",
+        "Activities",
+        "Activity Result"
+      ],
+      "advanced": true,
+      "expected": {
+        "packageName": "dev.apkweb.fixtures.navigation",
+        "launcherActivity": "dev.apkweb.fixtures.navigation.MainActivity",
+        "activities": [
+          "dev.apkweb.fixtures.navigation.MainActivity",
+          "dev.apkweb.fixtures.navigation.SettingsActivity"
+        ]
+      },
+      "sizeBytes": 9761987,
+      "available": true
+    },
+    {
+      "id": "fragments-navigation",
+      "file": "fragments-navigation-debug.apk",
+      "title": "Fragments · navegação XML",
+      "description": "NavHostFragment, grafo XML e RecyclerView com edição, confirmação, cancelamento e retorno à lista. AboutActivity recebe extras e devolve ActivityResult. Fluxo validado no APK original.",
+      "tags": [
+        "Fragments",
+        "Navigation XML",
+        "RecyclerView"
+      ],
+      "advanced": true,
+      "expected": {
+        "packageName": "dev.apkweb.fragments",
+        "launcherActivity": "dev.apkweb.fragments.MainActivity",
+        "activities": [
+          "dev.apkweb.fragments.MainActivity",
+          "dev.apkweb.fragments.AboutActivity"
+        ]
+      },
+      "executionValidated": true,
+      "sizeBytes": 4309689,
+      "available": true
+    },
+    {
+      "id": "hybrid-navigation",
+      "file": "hybrid-navigation-debug.apk",
+      "title": "Híbrido · Views e Compose",
+      "description": "NavHostFragment com navegação XML, ComposeView e AndroidView, combinando interfaces e várias Activities.",
+      "tags": [
+        "ComposeView",
+        "AndroidView",
+        "Fragments"
+      ],
+      "advanced": true,
+      "expected": {
+        "packageName": "dev.apkweb.hybrid",
+        "launcherActivity": "dev.apkweb.hybrid.MainActivity",
+        "activities": [
+          "dev.apkweb.hybrid.MainActivity",
+          "dev.apkweb.hybrid.ReviewActivity"
+        ]
+      },
+      "sizeBytes": 10385581,
+      "available": true
+    },
+    {
+      "id": "lifecycle-probe",
+      "file": "lifecycle-probe.apk",
+      "title": "Lifecycle · retenção real",
+      "description": "Splash abre a Main e encerra. Recriar executa onSave/onRestore, preserva o token retornado por onRetainNonConfigurationInstance e retém a mesma instância de Fragment com seus callbacks DEX.",
+      "tags": [
+        "Lifecycle",
+        "Fragment retido",
+        "Bundle + token"
+      ],
+      "advanced": false,
+      "executionValidated": true,
+      "sizeBytes": 12766,
+      "available": true
+    },
+    {
+      "id": "xml-projects",
+      "file": "xml-projects-debug.apk",
+      "title": "Projetos · XML, Fragments e três Activities",
+      "description": "Lista RecyclerView com busca e filtros, formulário condicional com validação, rascunho após recriar, confirmação e revisão via Activity Result. Tentativa experimental: a execução na web ainda não passou todos os critérios de validação.",
+      "tags": [
+        "Navigation XML",
+        "SavedStateHandle + recriação",
+        "Review / Help Activities"
+      ],
+      "advanced": true,
+      "executionValidated": false,
+      "expected": {
+        "packageName": "dev.apkweb.projects",
+        "launcherActivity": "dev.apkweb.projects.MainActivity",
+        "activities": [
+          "dev.apkweb.projects.MainActivity",
+          "dev.apkweb.projects.ReviewActivity",
+          "dev.apkweb.projects.HelpActivity"
+        ]
+      },
+      "validation": {
+        "evidence": "evidence/validation/xml-projects.json",
+        "generatedAt": "2026-10-26T15:02:26.330Z",
+        "verdict": false,
+        "criteria": {
+          "flowsNode": false,
+          "diagnostics": false,
+          "layoutSanity": false,
+          "parity": true,
+          "flowsBrowser": false,
+          "realTaps": true,
+          "strict": true
+        }
+      },
+      "sizeBytes": 4372611,
+      "available": true
+    },
+    {
+      "id": "compose-approvals",
+      "file": "compose-approvals-debug.apk",
+      "title": "Aprovações · Compose e orçamento",
+      "description": "Material 3 com lista, pesquisa, filtros, resumo, edição validada e diálogo de aprovação. Navigation Compose, estado restaurável e BudgetActivity com retorno de resultado. A execução Android Compose na web ainda está em desenvolvimento.",
+      "tags": [
+        "Compose + Material 3",
+        "Navigation + SavedState",
+        "BudgetActivity"
+      ],
+      "advanced": true,
+      "executionValidated": false,
+      "expected": {
+        "packageName": "dev.apkweb.approvals",
+        "launcherActivity": "dev.apkweb.approvals.MainActivity",
+        "activities": [
+          "dev.apkweb.approvals.MainActivity",
+          "dev.apkweb.approvals.BudgetActivity"
+        ]
+      },
+      "sizeBytes": 9822027,
+      "available": true
+    }
+  ]
+}

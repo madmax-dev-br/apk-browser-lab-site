@@ -1,0 +1,5 @@
+<resources>
+  <string name="seed_access">Acesso ao ambiente</string>
+  <string name="seed_equipment">Compra de equipamento</string>
+  <string name="seed_contract">Revisão de contrato</string>
+</resources>
