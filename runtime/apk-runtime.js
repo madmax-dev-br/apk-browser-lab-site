@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=dc4f5903d89b';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=dc4f5903d89b';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=dc4f5903d89b';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=dc4f5903d89b';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=dc4f5903d89b';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=dc4f5903d89b';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=dc4f5903d89b';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=dc4f5903d89b';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=dc4f5903d89b';
-import { APKError } from './apk-error.js?v=dc4f5903d89b';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=dc4f5903d89b';
-import { Scheduler, Blocked } from './scheduler.js?v=dc4f5903d89b';
-import { bootClassLacksMember } from './boot-class-members.js?v=dc4f5903d89b';
-export { APKError } from './apk-error.js?v=dc4f5903d89b';
+import { VMClock } from './vm-clock.js?v=f98eb8e2dd09';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=f98eb8e2dd09';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=f98eb8e2dd09';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=f98eb8e2dd09';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=f98eb8e2dd09';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=f98eb8e2dd09';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=f98eb8e2dd09';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=f98eb8e2dd09';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=f98eb8e2dd09';
+import { APKError } from './apk-error.js?v=f98eb8e2dd09';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=f98eb8e2dd09';
+import { Scheduler, Blocked } from './scheduler.js?v=f98eb8e2dd09';
+import { bootClassLacksMember } from './boot-class-members.js?v=f98eb8e2dd09';
+export { APKError } from './apk-error.js?v=f98eb8e2dd09';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1904,7 +1904,7 @@ export class APKRuntime {
       if(array.elements.length>values.length)array.elements[values.length]=null;
       return target;
     }
-    if(staticCall&&name==='hashCode'&&method.parameters.length===1&&method.signature.length===5&&/^[ZBSCIJFD]$/.test(method.parameters[0])){
+    if(staticCall&&name==='hashCode'&&method.parameters.length===1&&method.signature.length===4&&/^[ZBSCIJFD]$/.test(method.parameters[0])){ // static Xxx.hashCode(primitive): '(Z)I' is 4 characters
       const kind=method.parameters[0];
       if(kind==='Z')return args[0]?1231:1237;
       if(kind==='J'){const v=BigInt.asUintN(64,wide(args[0]));return Number(BigInt.asIntN(32,v^(v>>32n)));}
