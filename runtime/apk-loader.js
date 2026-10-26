@@ -1,12 +1,12 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=38ea11051357';
-import { inspectELF } from './native-inspector.js?v=38ea11051357';
-import { inflateRaw } from './inflate.js?v=38ea11051357';
-import { resolveDevice } from './device-profile.js?v=38ea11051357';
-import { resourceProfileFor } from './device-configuration.js?v=38ea11051357';
-import { JniBridge } from './jni-host.js?v=38ea11051357';
-import { AndroidResources } from './android-resources.js?v=38ea11051357';
-import { AndroidPlatform } from './android-platform.js?v=38ea11051357';
-import { FrameworkProvider } from './framework-provider.js?v=38ea11051357';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=dee55583552d';
+import { inspectELF } from './native-inspector.js?v=dee55583552d';
+import { inflateRaw } from './inflate.js?v=dee55583552d';
+import { resolveDevice } from './device-profile.js?v=dee55583552d';
+import { resourceProfileFor } from './device-configuration.js?v=dee55583552d';
+import { JniBridge } from './jni-host.js?v=dee55583552d';
+import { AndroidResources } from './android-resources.js?v=dee55583552d';
+import { AndroidPlatform } from './android-platform.js?v=dee55583552d';
+import { FrameworkProvider } from './framework-provider.js?v=dee55583552d';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });

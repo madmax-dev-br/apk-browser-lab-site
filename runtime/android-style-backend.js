@@ -1,5 +1,5 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=38ea11051357';
-import { APKError } from './apk-runtime.js?v=38ea11051357';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=dee55583552d';
+import { APKError } from './apk-runtime.js?v=dee55583552d';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };

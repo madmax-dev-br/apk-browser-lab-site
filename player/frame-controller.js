@@ -1,7 +1,7 @@
 // Message-driven controller of one player frame. DOM-free: the VM client, the shared device view and the postMessage sink are injected, so the
 // same code runs in the real frame (frame.js) and in the headless smoke test.
-import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, MAX_APK_BYTES } from './protocol.js?v=38ea11051357';
-import { sanitizeSettings } from '../device-settings.js?v=38ea11051357';
+import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, MAX_APK_BYTES } from './protocol.js?v=dee55583552d';
+import { sanitizeSettings } from '../device-settings.js?v=dee55583552d';
 export function createFrameController({ vm, state, deviceState, post, fetchImpl = globalThis.fetch?.bind(globalThis), hooks = {} }) {
   let view = null, source = null, config = {}, lastActivity = null, destroyed = false, chain = Promise.resolve(), inflight = 0, oomSeen = 0;
   const send = (type, payload) => post(envelope(type, payload));

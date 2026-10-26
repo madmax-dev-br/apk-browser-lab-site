@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=38ea11051357';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=38ea11051357';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=38ea11051357';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=38ea11051357';
+import { APKError } from './apk-error.js?v=dee55583552d';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=dee55583552d';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=dee55583552d';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=dee55583552d';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -146,6 +146,10 @@ export function createAppServicesHost(platform) {
       call(r, descriptor, 'onUnbind', [INTENT], 'Z', [service.ref, service.intent]); call(r, descriptor, 'onDestroy', [], 'V', [service.ref]); r.record(`SERVICE unbind+destroy ${className}`);
     }
   });
+  // Context.getAttributionTag() (API 30): null unless the Context came from createAttributionContext, which the lab does not create.
+  defContext('getAttributionTag', `()${STRING}`, () => null);
+  // Activity.getTaskId(): the virtual device keeps every Activity of the app in one task, whose id is stable for the process.
+  def('Landroid/app/Activity;', 'getTaskId', '()I', () => 1);
   defContext('checkSelfPermission', `(${STRING})I`, (r, _m, [, permission]) => check(r, permission));
   defContext('checkPermission', `(${STRING}II)I`, (r, _m, [, permission, pid, uid]) => pid === platform.virtualProcess.pid && uid === platform.virtualProcess.uid ? check(r, permission) : (needPermission(r, permission), PERMISSION_DENIED));   // no other process exists
   defContext('checkCallingPermission', `(${STRING})I`, (r, _m, [, permission]) => { needPermission(r, permission); return PERMISSION_DENIED; });   // not inside a Binder transaction: the calling pid is this process
