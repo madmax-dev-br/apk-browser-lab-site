@@ -1,6 +1,6 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=f2127a72f766';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=f2127a72f766';
-import { createDeviceView, createViewState } from './device-view.js?v=f2127a72f766';
+import { APKWorkerClient } from './apk-worker-client.js?v=5baf5691b052';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=5baf5691b052';
+import { createDeviceView, createViewState } from './device-view.js?v=5baf5691b052';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -72,7 +72,6 @@ function showError(error, title = 'Tentativa de execução interrompida') {
   $('error-detail').hidden = !details.length;
   $('error-diagnostics').hidden = !details.length;
   $('error-diagnostics').open = false;
-  $('error-compose').hidden = !inventory?.compose;
   $('error-panel').hidden = false;
   $('runtime-badge').className = 'runtime-badge';
   $('runtime-badge').innerHTML = '<span></span> INTERROMPIDO';
@@ -441,7 +440,6 @@ $('demo-button').addEventListener('click', runDemo);
 $('apk-tab').addEventListener('click', () => switchMode('apk'));
 $('compose-tab').addEventListener('click', () => switchMode('compose'));
 $('open-compose').addEventListener('click', () => switchMode('compose'));
-$('error-compose').addEventListener('click', () => switchMode('compose'));
 $('unsupported-compose').addEventListener('click', () => switchMode('compose'));
 $('compose-phone').addEventListener('click', () => { $('preview-stage').classList.add('compose-phone'); $('compose-phone').setAttribute('aria-pressed', 'true'); $('compose-wide').setAttribute('aria-pressed', 'false'); });
 $('compose-wide').addEventListener('click', () => { $('preview-stage').classList.remove('compose-phone'); $('compose-phone').setAttribute('aria-pressed', 'false'); $('compose-wide').setAttribute('aria-pressed', 'true'); });

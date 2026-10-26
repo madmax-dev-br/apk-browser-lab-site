@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=f2127a72f766';
-import { createHostRegistry } from './host-contract.js?v=f2127a72f766';
-import { resolveDevice } from './device-profile.js?v=f2127a72f766';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=f2127a72f766';
-import { gcRoot } from './heap-gc.js?v=f2127a72f766';
+import { APKError } from './apk-error.js?v=5baf5691b052';
+import { createHostRegistry } from './host-contract.js?v=5baf5691b052';
+import { resolveDevice } from './device-profile.js?v=5baf5691b052';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=5baf5691b052';
+import { gcRoot } from './heap-gc.js?v=5baf5691b052';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
