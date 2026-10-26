@@ -1,6 +1,6 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=2bb44ccf6413';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=2bb44ccf6413';
-import { createDeviceView, createViewState } from './device-view.js?v=2bb44ccf6413';
+import { APKWorkerClient } from './apk-worker-client.js?v=5db7b8182013';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=5db7b8182013';
+import { createDeviceView, createViewState } from './device-view.js?v=5db7b8182013';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };

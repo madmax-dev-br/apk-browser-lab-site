@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=2bb44ccf6413';
-import {getVectorGraphics} from './vector-native.js?v=2bb44ccf6413';
-import {getSolidPaintByHandle} from './paint-host.js?v=2bb44ccf6413';
-import {createMatrixNativeBindings} from './matrix-native.js?v=2bb44ccf6413';
+import {APKError} from './apk-error.js?v=5db7b8182013';
+import {getVectorGraphics} from './vector-native.js?v=5db7b8182013';
+import {getSolidPaintByHandle} from './paint-host.js?v=5db7b8182013';
+import {createMatrixNativeBindings} from './matrix-native.js?v=5db7b8182013';
 
 const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;',RECORD='Landroid/view/RecordingCanvas;';
 const NODE33='Landroid/graphics/RenderNode;',RC33='Landroid/graphics/RecordingCanvas;',BRC='Landroid/graphics/BaseRecordingCanvas;';
@@ -58,6 +58,7 @@ export function getRenderNodeSnapshot(r,h){const n=node(r,h,true);return {...n,m
 export function disposeRenderNodes(r){const s=stateFor(r),g=getVectorGraphics(r);for(const h of s.canvases)g.handles.delete(h);s.canvases.clear();s.recordings.clear();s.nodes.clear();}
 export function renderNodeRegistryBridge(r,m,a){
  if(m.owner===REG&&m.name==='<init>'&&m.signature==='(Ljava/lang/ClassLoader;JJ)V'&&a[2]===FINALIZER){r.object(a[0]).renderNodeRegistry=true;return{value:undefined};}
+ if(m.owner===REG&&m.name==='createMalloced'&&m.signature==='(Ljava/lang/ClassLoader;J)'+REG&&a[1]===FINALIZER){const value=r.makeObject(REG);r.object(value).renderNodeRegistry=true;return{value};}   // API 29+ RenderNode: NativeAllocationRegistry.createMalloced(loader, nGetNativeFinalizer())
  if(m.owner===REG&&m.name==='registerNativeAllocation'&&m.signature==='(Ljava/lang/Object;J)Ljava/lang/Runnable;'&&r.object(a[0]).renderNodeRegistry){r.object(a[1]);node(r,a[2]);const value=r.makeObject(RENDER_NODE_CLEANER);r.object(value).renderNodeCleanup=a[2];return{value};}
  if(m.owner===RENDER_NODE_CLEANER&&m.name==='run'&&m.signature==='()V'){const c=r.object(a[0]);if(c.renderNodeCleanup){const s=stateFor(r),h=c.renderNodeCleanup,n=node(r,h);n.javaReleased=true;const owns=list=>(list??[]).some(v=>v.op==='renderNode'&&v.node===h);let retained=false;for(const value of s.nodes.values())if(value!==n&&owns(value.displayList))retained=true;for(const list of s.recordings.values())if(owns(list))retained=true;for(const id of s.canvases)if(owns(canvas(r,id).draws))retained=true;if(!retained)s.nodes.delete(h);c.renderNodeCleanup=0n;}return{value:undefined};}return null;
 }

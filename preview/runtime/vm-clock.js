@@ -4,8 +4,8 @@
 // interval is visible to the app exactly as if it had slept. Real time keeps flowing as well; skipping only ever adds to it.
 export class VMClock {
   constructor() { this.skew = 0; this.frozenAt = null; this.reads = 0; }
-  /** Monotonic milliseconds (performance.now() timeline). While an event is dispatched (freeze/thaw) the clock is the event's start time, advanced one microsecond
-   *  per read and never past real time: a simulated device executes a message or frame callback in no time, so work that checks "how much of this frame is left"
+  /** Monotonic milliseconds (performance.now() timeline). While a Choreographer frame is dispatched (freeze/thaw) the clock is the frame's start time, advanced one microsecond
+   *  per read and never past real time: a simulated device runs a frame's callbacks in no time, so work that checks "how much of this frame is left"
    *  (Compose's prefetch scheduler against the vsync deadline) sees the budget a fast device would, not the host interpreter's slowness. A spin on nanoTime still ends. */
   now() {
     if (this.frozenAt === null) return performance.now() + this.skew;

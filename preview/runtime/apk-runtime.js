@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=2bb44ccf6413';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=2bb44ccf6413';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=2bb44ccf6413';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=2bb44ccf6413';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=2bb44ccf6413';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=2bb44ccf6413';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=2bb44ccf6413';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=2bb44ccf6413';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=2bb44ccf6413';
-import { APKError } from './apk-error.js?v=2bb44ccf6413';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=2bb44ccf6413';
-import { Scheduler, Blocked } from './scheduler.js?v=2bb44ccf6413';
-import { bootClassLacksMember } from './boot-class-members.js?v=2bb44ccf6413';
-export { APKError } from './apk-error.js?v=2bb44ccf6413';
+import { VMClock } from './vm-clock.js?v=5db7b8182013';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=5db7b8182013';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=5db7b8182013';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=5db7b8182013';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=5db7b8182013';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=5db7b8182013';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=5db7b8182013';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=5db7b8182013';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=5db7b8182013';
+import { APKError } from './apk-error.js?v=5db7b8182013';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=5db7b8182013';
+import { Scheduler, Blocked } from './scheduler.js?v=5db7b8182013';
+import { bootClassLacksMember } from './boot-class-members.js?v=5db7b8182013';
+export { APKError } from './apk-error.js?v=5db7b8182013';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -387,7 +387,8 @@ EXTERNAL_PARENTS.set('Ljava/lang/reflect/InvocationTargetException;', 'Ljava/lan
 EXTERNAL_PARENTS.set('Ljava/util/ConcurrentModificationException;', 'Ljava/lang/RuntimeException;');
 EXTERNAL_PARENTS.set('Ljava/util/NoSuchElementException;', 'Ljava/lang/RuntimeException;');
 EXTERNAL_PARENTS.set('Ljava/lang/UnsupportedOperationException;', 'Ljava/lang/RuntimeException;');
-const SHIMS = new Set([
+// Exported for the bridge audit test (tests/bridge-return-types.test.mjs).
+export const SHIMS = new Set([
   'Ljava/lang/Object;-><init>()V', 'Landroid/app/Activity;-><init>()V',
   'Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V',
   'Landroid/app/Activity;->setContentView(Landroid/view/View;)V',
@@ -786,7 +787,8 @@ const EXTERNAL_INTERFACE_NAMES=new Set([...EXTERNAL_INTERFACES.values()].flat())
 // Float/double registers carry IEEE bit patterns; typed-array views reinterpret them (little-endian hosts only, which every browser and Node target is).
 const BITS = new ArrayBuffer(8), F32 = new Float32Array(BITS), I32 = new Int32Array(BITS), F64 = new Float64Array(BITS), B64 = new BigInt64Array(BITS);
 const floatNumber = bits => { if (typeof bits !== 'number') int(bits); I32[0] = bits; return F32[0]; };
-const floatBits = n => { F32[0] = n; return I32[0]; };
+// A NaN produced by arithmetic is the canonical quiet NaN on ART (and the JDK); JS engines may hand back another payload.
+const floatBits = n => { if (n !== n) return 0x7fc00000; F32[0] = n; return I32[0]; };
 // Parse Java's decimal/hex float grammar as a rational and round once to binary32.
 // Number(text)->Math.fround would double-round decimal values near a float midpoint.
 function parseJavaFloatBits(input) {
@@ -816,7 +818,7 @@ function parseJavaFloatBits(input) {
   return (sign|((exponent+127)<<23)|(Number(significand)-0x800000))|0;
 }
 const doubleNumber = bits => { B64[0] = typeof bits === 'bigint' ? bits : BigInt(bits); return F64[0]; };
-const doubleBits = n => { F64[0] = n; return B64[0]; };
+const doubleBits = n => { if (n !== n) return 0x7ff8000000000000n; F64[0] = n; return B64[0]; };
 const wide = value => { if (typeof value !== 'bigint') fail('Expected wide register pair'); return BigInt.asIntN(64, value); };
 const narrowVariant = (value, variant) => variant === 2 ? value : variant === 3 ? int(value) & 1 : variant === 4 ? signed8(int(value)) : variant === 5 ? int(value) & 65535 : variant === 6 ? signed16(int(value)) : variant === 1 ? wide(value) : int(value);
 const narrow = (value, type) => /^[L[]/.test(type) ? value : type === 'J' || type === 'D' ? wide(value) : type === 'B' ? signed8(int(value)) : type === 'C' ? int(value) & 65535 : type === 'S' ? signed16(int(value)) : type === 'Z' ? int(value) & 1 : int(value);
@@ -1906,7 +1908,7 @@ export class APKRuntime {
       if(array.elements.length>values.length)array.elements[values.length]=null;
       return target;
     }
-    if(staticCall&&name==='hashCode'&&method.parameters.length===1&&method.signature.length===5&&/^[ZBSCIJFD]$/.test(method.parameters[0])){
+    if(staticCall&&name==='hashCode'&&method.parameters.length===1&&method.signature.length===4&&/^[ZBSCIJFD]$/.test(method.parameters[0])){ // static Xxx.hashCode(primitive): '(Z)I' is 4 characters
       const kind=method.parameters[0];
       if(kind==='Z')return args[0]?1231:1237;
       if(kind==='J'){const v=BigInt.asUintN(64,wide(args[0]));return Number(BigInt.asIntN(32,v^(v>>32n)));}
@@ -1929,7 +1931,7 @@ export class APKRuntime {
     if (staticCall && ['Ljava/lang/Integer;', 'Ljava/lang/Long;', 'Ljava/lang/Short;', 'Ljava/lang/Character;', 'Ljava/lang/Byte;'].includes(method.owner) && ['reverseBytes', 'reverse', 'sum', 'max', 'min', 'divideUnsigned', 'remainderUnsigned', 'toUnsignedLong', 'toUnsignedInt', 'parseUnsignedInt'].includes(name) || staticCall && ['Ljava/lang/Short;', 'Ljava/lang/Byte;'].includes(method.owner) && name === 'compare') {
       const owner = method.owner;
       if (owner === 'Ljava/lang/Long;') {
-        const a = wide(args[0]), b = args.length > 2 ? wide(args[2]) : 0n;
+        const a = wide(args[0]), b = args.length > 1 ? wide(args[1]) : 0n; // host arguments are compacted: the second long is args[1]
         if (name === 'reverseBytes') { let v = BigInt.asUintN(64, a), r = 0n; for (let i = 0; i < 8; i++) { r = (r << 8n) | (v & 0xffn); v >>= 8n; } return BigInt.asIntN(64, r); }
         if (name === 'reverse') { let v = BigInt.asUintN(64, a), r = 0n; for (let i = 0; i < 64; i++) { r = (r << 1n) | (v & 1n); v >>= 1n; } return BigInt.asIntN(64, r); }
         if (name === 'sum') return BigInt.asIntN(64, a + b); if (name === 'max') return a > b ? a : b; if (name === 'min') return a < b ? a : b;
