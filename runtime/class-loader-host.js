@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=af3232247547';
-import { APKArchive } from './apk-loader.js?v=af3232247547';
-import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=af3232247547';
-import { createHostRegistry } from './host-contract.js?v=af3232247547';
-import { normalizePath } from './virtual-fs.js?v=af3232247547';
+import { APKError } from './apk-error.js?v=dc4f5903d89b';
+import { APKArchive } from './apk-loader.js?v=dc4f5903d89b';
+import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=dc4f5903d89b';
+import { createHostRegistry } from './host-contract.js?v=dc4f5903d89b';
+import { normalizePath } from './virtual-fs.js?v=dc4f5903d89b';
 
 // dalvik.system.{BaseDexClassLoader, InMemoryDexClassLoader, DexClassLoader, PathClassLoader, DexFile}: code that is only available at run time
 // (decrypted payloads, downloaded plugins). The DEX bytes are parsed by the same DexFile reader as APK classes and joined to the single VM class
@@ -160,6 +160,15 @@ export function createClassLoaderHost(platform) {
   def(LOADER, '<init>', '()V', (r, _m, [self]) => { newState(r, self, r.applicationClassLoader ??= createApplicationLoader(r), 'custom'); });
   def(LOADER, '<init>', `(${LOADER})V`, (r, _m, [self, parent]) => { newState(r, self, parent, 'custom'); });
   def(LOADER, 'getParent', `()${LOADER}`, (r, _m, [self]) => classLoaderState(r, self)?.parent ?? null);
+  // ClassLoader.getResources (parent, then DexPathList.findResources over the APK): when no APK entry has that name, Android
+  // returns an empty enumeration, which is what ServiceLoader-style lookups (e.g. kotlinx FastServiceLoader) rely on.
+  // Reading a present entry through a jar: URL is not implemented yet, so that case fails explicitly.
+  def(LOADER, 'getResources', `(${STRING})Ljava/util/Enumeration;`, (r, _m, [_self, name]) => {
+    if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'name == null');
+    const entry = r.stringCharacters(name).replace(/^\/+/, '');
+    if (r.apkEntries?.has(entry)) throw new APKError(`ClassLoader.getResources for an existing APK entry (${entry}) needs jar: URL support`);
+    return r.dispatch({ owner: 'Ljava/util/Collections;', name: 'emptyEnumeration', parameters: [], result: 'Ljava/util/Enumeration;', signature: '()Ljava/util/Enumeration;' }, [], 'static');
+  });
   def(LOADER, 'loadClass', `(${STRING})${CLASS}`, (r, _m, [self, name]) => virtualCall(r, self, 'loadClass', [STRING, 'Z'], CLASS, [name, 0]));
   def(LOADER, 'loadClass', `(${STRING}Z)${CLASS}`, (r, _m, [self, name]) => {
     if (name === null) r.throwJava('Ljava/lang/NullPointerException;', null);

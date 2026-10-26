@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=af3232247547';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=af3232247547';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=af3232247547';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=af3232247547';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=af3232247547';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=af3232247547';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=af3232247547';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=af3232247547';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=af3232247547';
-import { APKError } from './apk-error.js?v=af3232247547';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=af3232247547';
-import { Scheduler, Blocked } from './scheduler.js?v=af3232247547';
-import { bootClassLacksMember } from './boot-class-members.js?v=af3232247547';
-export { APKError } from './apk-error.js?v=af3232247547';
+import { VMClock } from './vm-clock.js?v=dc4f5903d89b';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=dc4f5903d89b';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=dc4f5903d89b';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=dc4f5903d89b';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=dc4f5903d89b';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=dc4f5903d89b';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=dc4f5903d89b';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=dc4f5903d89b';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=dc4f5903d89b';
+import { APKError } from './apk-error.js?v=dc4f5903d89b';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=dc4f5903d89b';
+import { Scheduler, Blocked } from './scheduler.js?v=dc4f5903d89b';
+import { bootClassLacksMember } from './boot-class-members.js?v=dc4f5903d89b';
+export { APKError } from './apk-error.js?v=dc4f5903d89b';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -640,6 +640,9 @@ EXTERNAL_PARENTS.set('Landroid/os/Looper;', 'Ljava/lang/Object;');
 EXTERNAL_PARENTS.set('Landroid/view/Choreographer;', 'Ljava/lang/Object;');
 addBridge('java/lang/Thread', ['currentThread()Ljava/lang/Thread;', 'getName()Ljava/lang/String;', 'isAlive()Z', 'getId()J']);
 addBridge('android/os/Looper', ['getMainLooper()Landroid/os/Looper;', 'myLooper()Landroid/os/Looper;', 'getThread()Ljava/lang/Thread;', 'isCurrentThread()Z']);
+// ContextImpl.getMainLooper() returns the process main thread's Looper for every Context (Activity, Application, Service, wrappers).
+addBridge('android/content/Context', ['getMainLooper()Landroid/os/Looper;']);
+addBridge('android/content/ContextWrapper', ['getMainLooper()Landroid/os/Looper;']);
 addBridge('android/os/SystemClock', ['uptimeMillis()J', 'elapsedRealtime()J', 'elapsedRealtimeNanos()J']);
 for (const name of ['Throwable', 'Error', 'LinkageError', 'UnsatisfiedLinkError', 'Exception', 'RuntimeException', 'NullPointerException',
   'IllegalArgumentException', 'IllegalStateException', 'IllegalMonitorStateException', 'ClassCastException', 'IndexOutOfBoundsException',
@@ -1342,7 +1345,7 @@ export class APKRuntime {
       let resolution = slot.get(ownerKey);
       if (resolution === undefined) { resolution = this.resolveInvoke(method, args, mode, callerOwner); slot.set(ownerKey, resolution); }
       if (resolution.kind === 'missing-void') return this.noteMissingVoid(resolution.key);
-      if (resolution.kind === 'bridge') { this.lastBridge = resolution; this.lastBridgeDepth = this.depth; this.record(resolution.text ??= `${resolution.skia ? 'SKIA' : 'SHIM'} ${resolution.key}`); return hostReturn(resolution.selected, this.bridge(resolution.selected, args, mode, resolution.key, resolution)); }
+      if (resolution.kind === 'bridge') { this.lastBridge = resolution; this.lastBridgeDepth = this.depth; this.record(resolution.text ??= `${resolution.skia ? 'SKIA' : 'SHIM'} ${resolution.key}`); this.lastHostCall = resolution.key; return hostReturn(resolution.selected, this.bridge(resolution.selected, args, mode, resolution.key, resolution)); }
       if (resolution.kind === 'default') {
         const defaultMethod = resolution.defaultMethod;
         this.recordMethod(defaultMethod.method);
@@ -1363,7 +1366,7 @@ export class APKRuntime {
           this.nativeRequired(definition.method.key);
         }
         this.executionByOrigin.host.calls++;
-        this.record(`HOST ${definition.method.key} [AOSP:${definition.method.dex.filename}]`);
+        this.record(`HOST ${definition.method.key} [AOSP:${definition.method.dex.filename}]`); this.lastHostCall = definition.method.key;
         const result = binding(this, this.hostArguments(definition.method, args, mode), definition.method);
         if (result && typeof result.then === 'function') fail(`Framework native binding must be synchronous: ${definition.method.key}`);
         return hostReturn(definition.method, result);
@@ -2303,7 +2306,7 @@ export class APKRuntime {
     }
     if (method.owner === 'Ljava/lang/ThreadLocal;' && name === 'withInitial') { const local = this.makeObject('Ljava/lang/ThreadLocal;'); this.object(local).threadLocalSupplier = args[0]; return local; } // SuppliedThreadLocal
     if (method.owner === 'Ljava/lang/Thread;' && name === 'currentThread') return this.mainThread ??= this.makeObject('Ljava/lang/Thread;');
-    if (method.owner === 'Landroid/os/Looper;' && name === 'getMainLooper') return this.mainLooper ??= this.makeObject('Landroid/os/Looper;');
+    if ((method.owner === 'Landroid/os/Looper;' || method.owner === 'Landroid/content/Context;' || method.owner === 'Landroid/content/ContextWrapper;') && name === 'getMainLooper') return this.mainLooper ??= this.makeObject('Landroid/os/Looper;');
     // The main thread's Looper is the platform event queue; any other thread has one only after Looper.prepare() (HandlerThread does that) -- see concurrency-host.js.
     if (method.owner === 'Landroid/os/Looper;' && name === 'myLooper') return this.thread === null || this.thread === this.scheduler.main ? (this.mainLooper ??= this.makeObject('Landroid/os/Looper;')) : (this.thread.looper ?? null);
     if (method.owner === 'Landroid/os/Looper;' && name === 'isCurrentThread') return this.thread === null || this.thread === this.scheduler.main ? 1 : (this.thread.looper ? 1 : 0);

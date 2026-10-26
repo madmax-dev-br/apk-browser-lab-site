@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=af3232247547';
-import { Blocked, QUANTUM } from './scheduler.js?v=af3232247547';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=af3232247547';
+import { APKError } from './apk-error.js?v=dc4f5903d89b';
+import { Blocked, QUANTUM } from './scheduler.js?v=dc4f5903d89b';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=dc4f5903d89b';
 
 // Frame-based DEX interpreter.
 //
@@ -630,7 +630,7 @@ function runLoop(rt, owner, base) {
       regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats;
       if (f.cur >= 0) { start = f.cur; f.cur = -1; }               // thrown by compiled code: the instruction it was executing
       // Unwind: the frame that failed handles it, then its callers (and any host step waiting on them) until the run's base frame.
-      let current = error;
+      let current = error, innermost = true;
       for (;;) {
         if (current instanceof APKError && /^(Integer|Long) (divide|remainder) by zero/.test(current.message)) {
           try { rt.throwJava('Ljava/lang/ArithmeticException;', current.message); } catch (converted) { current = converted; }
@@ -640,8 +640,11 @@ function runLoop(rt, owner, base) {
           if (target !== null) { f.pendingException = current.value; pc = target; rt.record(`CATCH ${rt.typeOf(current.value)} in ${f.method.key}`); regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; break; }
           current.message = `${f.method.key} [${prog.filename}] at PC 0x${start.toString(16).padStart(4, '0')}: ${current.message}`;
         } else {
-          current = new APKError(`${f.method.key} [${prog.filename}] at PC 0x${start.toString(16).padStart(4, '0')}: ${current.message ?? current}`, current.details);
+          // A register-type error names the failing opcode and the last host bridge the VM called, which is usually where the bad value came from.
+          const where = innermost && /^Expected (int|long|wide|object|reference)/.test(current.message ?? '') ? ` [opcode 0x${(u[start] & 0xff).toString(16).padStart(2, '0')}${rt.lastHostCall ? `; last host call ${rt.lastHostCall}` : ''}]` : '';
+          current = new APKError(`${f.method.key} [${prog.filename}] at PC 0x${start.toString(16).padStart(4, '0')}: ${current.message ?? current}${where}`, current.details);
         }
+        innermost = false;
         frames.pop();
         if (thread === owner && frames.length <= base) throw current;
         const below = frames[frames.length - 1];
