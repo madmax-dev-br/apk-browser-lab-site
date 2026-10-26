@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=94afba6d22ec';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=94afba6d22ec';
+import { APKError } from './apk-runtime.js?v=f2127a72f766';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=f2127a72f766';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';

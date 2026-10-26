@@ -1,6 +1,6 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=94afba6d22ec';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=94afba6d22ec';
-import { createDeviceView, createViewState } from './device-view.js?v=94afba6d22ec';
+import { APKWorkerClient } from './apk-worker-client.js?v=f2127a72f766';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=f2127a72f766';
+import { createDeviceView, createViewState } from './device-view.js?v=f2127a72f766';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -63,7 +63,7 @@ function showError(error, title = 'Tentativa de execução interrompida') {
   const frames = [...raw.matchAll(/(L[^\s:]+?;->[^\s]+?) \[([^\]]+)\] at PC (0x[\da-f]+)/gi)].map(([, frame, dex, pc]) => `  ${frame} [${dex}] @${pc}`);
   const trace = error.trace ?? [], stubs = error.stubs?.length ? error.stubs : [...new Set(trace.filter(line => /^STUB-/.test(line)))];
   state.errorReport = [
-    `APK Browser Lab ${document.querySelector('script[src*="app.js"]')?.src.split('v=')[1] ?? ''} · ${inventory?.packageName ?? state.fileName ?? 'APK'} · modo tolerante: ${$('tolerate-missing')?.value ?? 'off'}`,
+    `APK Browser Lab ${document.querySelector?.('script[src*="app.js"]')?.src?.split('v=')[1] ?? ''} · ${inventory?.packageName ?? state.fileName ?? 'APK'} · modo tolerante: ${$('tolerate-missing')?.value ?? 'off'}`,
     `Erro: ${cause}`,
     frames.length ? `Pilha (mais interna por último):\n${frames.slice(-12).join('\n')}` : '',
     stubs.length ? `APIs com stub (${stubs.length}):\n${stubs.slice(0, 60).join('\n')}` : '',
