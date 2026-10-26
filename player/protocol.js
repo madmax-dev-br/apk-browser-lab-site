@@ -1,8 +1,8 @@
 // Versioned host <-> frame message schema and the <apk-player> configuration model. No DOM: shared by the host script, the frame and the tests.
-import { sanitizeSettings } from '../device-settings.js?v=6e138f531f83';
+import { sanitizeSettings } from '../device-settings.js?v=32afb2a18437';
 export const PROTOCOL = 'apk-player';
 export const VERSION = 1;
-export const MAX_APK_BYTES = 500 * 1024 * 1024;
+export const MAX_APK_BYTES = 1024 * 1024 * 1024;
 /** Public config keys (camelCase) <-> element attributes (kebab-case). The values go through the lab's own sanitizer (device-settings.js). */
 export const CONFIG_KEYS = Object.freeze(['device', 'orientation', 'locale', 'theme', 'fontScale', 'animatorScale', 'hour24', 'timeZone', 'battery', 'charging', 'connectivity', 'navigation', 'allowedHosts', 'proxyUrl']);
 export const ATTRIBUTES = Object.freeze({ device: 'device', orientation: 'orientation', locale: 'locale', theme: 'theme', 'font-scale': 'fontScale', 'animator-scale': 'animatorScale', 'hour-24': 'hour24', 'time-zone': 'timeZone', battery: 'battery', charging: 'charging', connectivity: 'connectivity', navigation: 'navigation', 'allowed-hosts': 'allowedHosts', 'proxy-url': 'proxyUrl' });
@@ -57,7 +57,7 @@ const HOST_TYPES = {
   init: message => {
     if (!isObject(message.config)) return 'init.config must be an object';
     if (message.apk !== undefined && !(message.apk instanceof ArrayBuffer)) return 'init.apk must be an ArrayBuffer';
-    if (message.apk && message.apk.byteLength > MAX_APK_BYTES) return 'init.apk exceeds 500 MiB';
+    if (message.apk && message.apk.byteLength > MAX_APK_BYTES) return 'init.apk exceeds 1 GiB';
     if (message.url !== undefined && !str(message.url, 8192)) return 'init.url must be a string';
     if ((message.apk === undefined) === (message.url === undefined)) return 'init needs exactly one of apk or url';
     if (message.name !== undefined && !str(message.name, 256)) return 'init.name must be a short string';

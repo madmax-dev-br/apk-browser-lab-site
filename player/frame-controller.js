@@ -1,7 +1,7 @@
 // Message-driven controller of one player frame. DOM-free: the VM client, the shared device view and the postMessage sink are injected, so the
 // same code runs in the real frame (frame.js) and in the headless smoke test.
-import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, MAX_APK_BYTES } from './protocol.js?v=6e138f531f83';
-import { sanitizeSettings } from '../device-settings.js?v=6e138f531f83';
+import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, MAX_APK_BYTES } from './protocol.js?v=32afb2a18437';
+import { sanitizeSettings } from '../device-settings.js?v=32afb2a18437';
 export function createFrameController({ vm, state, deviceState, post, fetchImpl = globalThis.fetch?.bind(globalThis), hooks = {} }) {
   let view = null, source = null, config = {}, lastActivity = null, destroyed = false, chain = Promise.resolve(), inflight = 0;
   const send = (type, payload) => post(envelope(type, payload));
@@ -52,7 +52,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     if (!fetchImpl) throw new Error('fetch is not available in this frame');
     const response = await fetchImpl(message.url, { cache: 'no-store', credentials: 'omit' });
     if (!response.ok) throw Object.assign(new Error(`Could not load the APK (HTTP ${response.status}).`), { details: { kind: 'apk-fetch-failed', status: response.status } });
-    const buffer = await response.arrayBuffer(); if (buffer.byteLength > MAX_APK_BYTES) throw Object.assign(new Error('The APK exceeds 500 MiB.'), { details: { kind: 'apk-too-large' } });
+    const buffer = await response.arrayBuffer(); if (buffer.byteLength > MAX_APK_BYTES) throw Object.assign(new Error('The APK exceeds 1 GiB.'), { details: { kind: 'apk-too-large' } });
     return buffer;
   }
   const handlers = {

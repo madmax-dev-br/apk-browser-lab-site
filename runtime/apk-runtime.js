@@ -1,16 +1,16 @@
-import { VMClock } from './vm-clock.js?v=6e138f531f83';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=6e138f531f83';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=6e138f531f83';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=6e138f531f83';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=6e138f531f83';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=6e138f531f83';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=6e138f531f83';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=6e138f531f83';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=6e138f531f83';
-import { APKError } from './apk-error.js?v=6e138f531f83';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=6e138f531f83';
-import { Scheduler, Blocked } from './scheduler.js?v=6e138f531f83';
-export { APKError } from './apk-error.js?v=6e138f531f83';
+import { VMClock } from './vm-clock.js?v=32afb2a18437';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=32afb2a18437';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=32afb2a18437';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=32afb2a18437';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=32afb2a18437';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=32afb2a18437';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=32afb2a18437';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=32afb2a18437';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=32afb2a18437';
+import { APKError } from './apk-error.js?v=32afb2a18437';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=32afb2a18437';
+import { Scheduler, Blocked } from './scheduler.js?v=32afb2a18437';
+export { APKError } from './apk-error.js?v=32afb2a18437';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -238,7 +238,7 @@ export class DexProgram {
       if (!(dex instanceof DexFile)) fail('DexProgram requires parsed DexFile instances');
       const filename = item.filename ?? item.name ?? dex.filename ?? `classes${i ? i + 1 : ''}.dex`;
       dex.filename = filename; bytes += dex.reader.length;
-      if (bytes > 256 * 1024 * 1024) fail('Aggregate DEX size exceeds 256 MiB limit');
+      if (bytes > 768 * 1024 * 1024) fail('Aggregate DEX size exceeds 768 MiB limit');
       this.files.push({ filename, dex });
       for (const [name, cls] of dex.classes) {
         // DexPathList searches its dex elements in order, so the first definition wins and later ones are never loaded.

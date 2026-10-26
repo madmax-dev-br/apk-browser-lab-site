@@ -1,18 +1,20 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=6e138f531f83';
-import { inspectELF } from './native-inspector.js?v=6e138f531f83';
-import { inflateRaw } from './inflate.js?v=6e138f531f83';
-import { resolveDevice } from './device-profile.js?v=6e138f531f83';
-import { resourceProfileFor } from './device-configuration.js?v=6e138f531f83';
-import { JniBridge } from './jni-host.js?v=6e138f531f83';
-import { AndroidResources } from './android-resources.js?v=6e138f531f83';
-import { AndroidPlatform } from './android-platform.js?v=6e138f531f83';
-import { FrameworkProvider } from './framework-provider.js?v=6e138f531f83';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=32afb2a18437';
+import { inspectELF } from './native-inspector.js?v=32afb2a18437';
+import { inflateRaw } from './inflate.js?v=32afb2a18437';
+import { resolveDevice } from './device-profile.js?v=32afb2a18437';
+import { resourceProfileFor } from './device-configuration.js?v=32afb2a18437';
+import { JniBridge } from './jni-host.js?v=32afb2a18437';
+import { AndroidResources } from './android-resources.js?v=32afb2a18437';
+import { AndroidPlatform } from './android-platform.js?v=32afb2a18437';
+import { FrameworkProvider } from './framework-provider.js?v=32afb2a18437';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
-const MAX_APK = 500 * 1024 * 1024;
+const MAX_APK = 1024 * 1024 * 1024;
 const MAX_DEX = 64 * 1024 * 1024;
-const MAX_DEX_TOTAL = 256 * 1024 * 1024;
+// Android sets no combined DEX limit. Parsed DEX takes about 5x its size in JS heap
+// (22 MB of DEX -> ~115 MB), so this keeps the parse within a desktop tab's heap.
+export const MAX_DEX_TOTAL = 768 * 1024 * 1024;
 // ART has no fixed multidex count; this only bounds memory for hostile archives.
 const MAX_DEX_FILES = 1024;
 const MAX_ZIP_ENTRIES = 32768;
@@ -42,7 +44,7 @@ async function frameworkBytesHash(files) {
 export class APKArchive {
   constructor(input) {
     const b = this.reader = new BinaryReader(input);
-    if (b.length < 22 || b.length > MAX_APK) fail('Invalid APK size: expected a ZIP from 22 bytes to 500 MiB');
+    if (b.length < 22 || b.length > MAX_APK) fail('Invalid APK size: expected a ZIP from 22 bytes to 1 GiB');
     let end = -1;
     for (let p = b.length - 22; p >= Math.max(0, b.length - 65557); p--)
       if (b.u32(p) === 0x06054b50 && p + 22 + b.u16(p + 20) === b.length) { end = p; break; }
@@ -375,7 +377,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     const size = archive.entries.get(name).size;
     if (size > MAX_DEX) fail(`${name} exceeds 64 MiB DEX limit (${size} bytes)`);
     totalDexBytes += size;
-    if (totalDexBytes > MAX_DEX_TOTAL) fail('APK DEX files exceed combined 256 MiB limit');
+    if (totalDexBytes > MAX_DEX_TOTAL) fail(`APK DEX files exceed the combined ${MAX_DEX_TOTAL / 1048576} MiB limit: parsing them needs about 5x that in browser memory`);
   }
   const report = async (phase, completed, total, filename, message) => {
     if (options.onProgress) await options.onProgress({ phase, completed, total, ...(filename ? { filename } : {}), message });

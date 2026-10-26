@@ -1,6 +1,6 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=6e138f531f83';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=6e138f531f83';
-import { createDeviceView, createViewState } from './device-view.js?v=6e138f531f83';
+import { APKWorkerClient } from './apk-worker-client.js?v=32afb2a18437';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=32afb2a18437';
+import { createDeviceView, createViewState } from './device-view.js?v=32afb2a18437';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -210,11 +210,11 @@ async function importSource(source, autoRun = false) {
       state.abortController = new AbortController();
       const response = await fetch(source.url, { cache: 'no-store', signal: state.abortController.signal });
       if (!response.ok) throw new Error(`Não foi possível carregar o APK (HTTP ${response.status}).`);
-      if (Number(response.headers.get('Content-Length')) > 500 * 1024 * 1024) throw new Error('O APK excede o limite de 500 MiB.');
+      if (Number(response.headers.get('Content-Length')) > 1024 * 1024 * 1024) throw new Error('O APK excede o limite de 1 GiB.');
       buffer = await response.arrayBuffer();
     }
     if (token !== state.operation) return;
-    if (buffer.byteLength > 500 * 1024 * 1024) throw new Error('O APK excede o limite de 500 MiB.');
+    if (buffer.byteLength > 1024 * 1024 * 1024) throw new Error('O APK excede o limite de 1 GiB.');
     $('file-size').textContent = `${formatSize(buffer.byteLength)} · processado no navegador`;
     const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceState.settings }); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
@@ -233,7 +233,7 @@ async function importSource(source, autoRun = false) {
 }
 async function chooseFile(file) {
   if (!file || state.busy) return;
-  if (file.size > 500 * 1024 * 1024) { switchMode('apk'); showError(new Error('O limite deste laboratório é 500 MiB por APK. Escolha um arquivo menor para continuar.'), 'APK acima do limite de tamanho'); return; }
+  if (file.size > 1024 * 1024 * 1024) { switchMode('apk'); showError(new Error('O limite deste laboratório é 1 GiB por APK. Escolha um arquivo menor para continuar.'), 'APK acima do limite de tamanho'); return; }
   if (!/\.apk$/i.test(file.name)) { switchMode('apk'); showError(new Error('Escolha um arquivo com a extensão .apk.'), 'Formato de arquivo inválido'); return; }
   await importSource({ file, name: file.name });
 }
