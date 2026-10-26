@@ -1,0 +1,66 @@
+{
+  "apkSha256": "61be655af9f966c9273fb8a78e0728a66ff64c8e259e4a4b1b09968e00178501",
+  "android": {
+    "generatedAt": "2026-10-25T13:21:54.401407+00:00",
+    "runner": "Android Instrumentation (original APK)",
+    "avd": "Pixel_API36",
+    "serial": "emulator-5554",
+    "apkTargetSdk": 28,
+    "androidSdk": 36,
+    "inputs": {
+      "fixtures/vector-source-probe.apk": {
+        "bytes": 17066,
+        "sha256": "61be655af9f966c9273fb8a78e0728a66ff64c8e259e4a4b1b09968e00178501"
+      },
+      "work/vector-android-test/vector-android-test.apk": {
+        "bytes": 12691,
+        "sha256": "c8b16952d00d4a0cd9fc56950ba22dfeb9023df04f076c3ee27a1d0b5d09c978"
+      },
+      "framework-aosp/vector-probe/android-test/java/dev/apkweb/vectorprobe/test/VectorInstrumentation.java": {
+        "bytes": 5862,
+        "sha256": "641951db38b5ab38e9111a13c4c1d593d03bca94af8bfa1e5d563535eb1c93d7"
+      }
+    },
+    "assertionsReport": "report.json",
+    "captures": {
+      "android-vector-initial.png": "c1f92d4c46f031ff66d2468f6873e8f74482f44a09deba50dcae4756e63eb68b",
+      "android-vector-detail.png": "9ef5d6021e5bcb7898ce651f8c62d3574c183fe1799964279249411eaf562466",
+      "android-vector-returned.png": "9b5166b3e3f00f6aec1c12fed922cc5c1fb7aae5134719f798329382e88e9acb",
+      "android-vector-edited.png": "f3fcf2b525d82f960ae3846446b21727a986efa9ed4ad97cf4695df990653667"
+    }
+  },
+  "browser": {
+    "build": "c39c4089b9b1",
+    "apkSha256": "61be655af9f966c9273fb8a78e0728a66ff64c8e259e4a4b1b09968e00178501",
+    "graphics": "Original AOSP DEX -> official Skia 0.42.0 CPU WebAssembly -> PNG",
+    "initial": {
+      "height": 638.4000244140625,
+      "imageSourcePrefix": "url(\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA",
+      "width": 312.6806640625,
+      "x": 987.65185546875,
+      "y": 339.2043762207031,
+      "screenshotWidthPx": 1935,
+      "screenshotHeightPx": 1314,
+      "sha256": "dd66b352305b6d77a57008423343e3a700bf37a6a5a6c5093b4756148c28eb8a"
+    },
+    "edited": {
+      "height": 638.4000244140625,
+      "imageSourcePrefix": "url(\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA",
+      "width": 312.6806640625,
+      "x": 987.65185546875,
+      "y": 349.2043762207031,
+      "screenshotWidthPx": 1935,
+      "screenshotHeightPx": 1314,
+      "sha256": "951b62656dc36043efb555ae80a94131bcda9f62f9b2cac0c0d191b6795c942c"
+    },
+    "testedFlow": [
+      "launch",
+      "alpha128",
+      "mirrorRTL",
+      "pressedOrange",
+      "openDetailState",
+      "backPreservesState"
+    ],
+    "pixelVerification": "vector-browser-pixels.json"
+  }
+}

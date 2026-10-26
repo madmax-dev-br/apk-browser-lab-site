@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "profile": "configuration",
+  "enabledByDefault": false,
+  "artifact": "framework.dex",
+  "tag": "android-13.0.0_r1",
+  "sha256": "23d936b7588cd7a49d5b2a11268e588d8d703816f24103fa839a0bf26ded1e6f",
+  "bytes": 46412,
+  "classes": [
+    "Landroid/app/WindowConfiguration$1;",
+    "Landroid/app/WindowConfiguration$ActivityType;",
+    "Landroid/app/WindowConfiguration$AlwaysOnTop;",
+    "Landroid/app/WindowConfiguration$WindowConfig;",
+    "Landroid/app/WindowConfiguration$WindowingMode;",
+    "Landroid/app/WindowConfiguration;",
+    "Landroid/content/res/Configuration$1;",
+    "Landroid/content/res/Configuration$NativeConfig;",
+    "Landroid/content/res/Configuration$Orientation;",
+    "Landroid/content/res/Configuration;",
+    "Landroid/os/LocaleList$1;",
+    "Landroid/os/LocaleList;"
+  ],
+  "classCount": 12,
+  "algorithmPatches": [],
+  "compiledSources": [
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/content/res/Configuration.java",
+      "localPath": "framework-aosp/upstream/android/content/res/Configuration.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/res/Configuration.java?format=TEXT",
+      "sha256": "9108ff13d9fa19692ecc9f3af9dfec58d3ecb281d803b31d06e97807acb7e9d4",
+      "bytes": 125863,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/app/WindowConfiguration.java",
+      "localPath": "framework-aosp/upstream/android/app/WindowConfiguration.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/WindowConfiguration.java?format=TEXT",
+      "sha256": "f7dfe0035db2e0da214b97818c10a88b8492fe5d52710e406403075a00bb9cde",
+      "bytes": 34464,
+      "license": "Apache-2.0",
+      "role": "candidate-configuration-profile"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/LocaleList.java",
+      "localPath": "framework-aosp/upstream/android/os/LocaleList.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/LocaleList.java?format=TEXT",
+      "sha256": "ec2b56428378ee6e37facabac99884b14e9b41ce7f281b0b59f9cca2d7ae9885",
+      "bytes": 21981,
+      "license": "Apache-2.0",
+      "role": "candidate-configuration-profile"
+    }
+  ],
+  "requiresDefaultFrameworkSha256": "685e86f4fa61212f51d838cdc821481018ccc52a9cd5cd8b084d1a5dac4dcac1",
+  "compileOnlyDeclarationsPackaged": false,
+  "sourceExtractions": [],
+  "integrationStatus": "Validated source configuration and locale-direction profile; loaded by actual APK Configuration references",
+  "activationPolicy": "APK DEX references android.content.res.Configuration (or explicit loader option)",
+  "protoMetadata": {
+    "inputs": [
+      {
+        "project": "platform/frameworks/base",
+        "tag": "android-13.0.0_r1",
+        "path": "core/java/android/util/proto/ProtoStream.java",
+        "localPath": "framework-aosp/upstream/android/util/proto/ProtoStream.java",
+        "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/util/proto/ProtoStream.java?format=TEXT",
+        "sha256": "95ade653ea393f78c20582306cd2691b9db0f90c85574567f147b1c24b4c08a1",
+        "bytes": 21093,
+        "license": "Apache-2.0",
+        "role": "candidate-configuration-compile-metadata"
+      },
+      {
+        "project": "platform/frameworks/base",
+        "tag": "android-13.0.0_r1",
+        "path": "core/proto/android/content/configuration.proto",
+        "localPath": "framework-aosp/upstream/android/content/configuration.proto",
+        "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/proto/android/content/configuration.proto?format=TEXT",
+        "sha256": "b4b8ab998833e7973ce31902e1f030a5b15c14e9471e36b14b792dc1f380a4c8",
+        "bytes": 3249,
+        "license": "Apache-2.0",
+        "role": "candidate-configuration-compile-metadata"
+      },
+      {
+        "project": "platform/frameworks/base",
+        "tag": "android-13.0.0_r1",
+        "path": "core/proto/android/content/locale.proto",
+        "localPath": "framework-aosp/upstream/android/content/locale.proto",
+        "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/proto/android/content/locale.proto?format=TEXT",
+        "sha256": "b294c8a254b491257573d557f6902681b9d9670f5579ca5119bc1b89c1546746",
+        "bytes": 1007,
+        "license": "Apache-2.0",
+        "role": "candidate-configuration-compile-metadata"
+      },
+      {
+        "project": "platform/frameworks/base",
+        "tag": "android-13.0.0_r1",
+        "path": "core/proto/android/app/window_configuration.proto",
+        "localPath": "framework-aosp/upstream/android/app/window_configuration.proto",
+        "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/proto/android/app/window_configuration.proto?format=TEXT",
+        "sha256": "a30f2721a0d527aab070eb44ef4bf83e4ece4e30cd7e783dafd99dc21f10f890",
+        "bytes": 1425,
+        "license": "Apache-2.0",
+        "role": "candidate-configuration-compile-metadata"
+      }
+    ],
+    "generated": [
+      {
+        "path": "framework-aosp/profiles/configuration/support/android/content/ConfigurationProto.java",
+        "sha256": "4f1e38e4fa8c0ac4a616848c5ac2614e9034145c2777d04adb0801f606cd0ed9",
+        "fields": 21
+      },
+      {
+        "path": "framework-aosp/profiles/configuration/support/android/content/ResourcesConfigurationProto.java",
+        "sha256": "0f278d00b958378ecb9bd27bc0ec81f919d02a7f576ae310e6f0bdfc931aab2c",
+        "fields": 4
+      },
+      {
+        "path": "framework-aosp/profiles/configuration/support/android/content/DeviceConfigurationProto.java",
+        "sha256": "3ee736db652eef7ab159e0db4263e286469b4f516f8fc4589e129d8e2830f8f5",
+        "fields": 12
+      },
+      {
+        "path": "framework-aosp/profiles/configuration/support/android/content/GlobalConfigurationProto.java",
+        "sha256": "220b4c193553a0d5e49e77c322d9442ee5a730abdcd7f274d4880010e1897cda",
+        "fields": 2
+      },
+      {
+        "path": "framework-aosp/profiles/configuration/support/android/content/LocaleProto.java",
+        "sha256": "1734537ef2a55bab6bfe67d57fb52680950db4556b8dc08871601e184390c533",
+        "fields": 4
+      },
+      {
+        "path": "framework-aosp/profiles/configuration/support/android/app/WindowConfigurationProto.java",
+        "sha256": "25442b89740656af9c18b1a4ec365dd610588c296750fe9b797a2ced489d8e2e",
+        "fields": 5
+      }
+    ],
+    "packaged": false,
+    "rule": "Original schema field number | original ProtoStream field-type flags | original field-count flags"
+  },
+  "correspondingSource": "source-bundle.zip",
+  "licenses": [
+    "../../LICENSE",
+    "../../NOTICE"
+  ]
+}

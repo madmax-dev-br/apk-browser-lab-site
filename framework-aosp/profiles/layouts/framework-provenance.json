@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "profile": "layouts",
+  "enabledByDefault": false,
+  "artifact": "framework.dex",
+  "tag": "android-13.0.0_r1",
+  "sha256": "bf5f3a451d1a8d956c361fd8f9027e6df68315209818ceec828d9774bbee4597",
+  "bytes": 51740,
+  "classes": [
+    "Landroid/view/Gravity$GravityFlags;",
+    "Landroid/view/Gravity;",
+    "Landroid/widget/FrameLayout$LayoutParams;",
+    "Landroid/widget/FrameLayout;",
+    "Landroid/widget/LinearLayout$DividerMode;",
+    "Landroid/widget/LinearLayout$LayoutParams;",
+    "Landroid/widget/LinearLayout$OrientationMode;",
+    "Landroid/widget/LinearLayout;",
+    "Landroid/widget/ScrollView$SavedState$1;",
+    "Landroid/widget/ScrollView$SavedState;",
+    "Landroid/widget/ScrollView;"
+  ],
+  "classCount": 11,
+  "algorithmPatches": [],
+  "compiledSources": [
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/FrameLayout.java",
+      "localPath": "framework-aosp/upstream/android/widget/FrameLayout.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/FrameLayout.java?format=TEXT",
+      "sha256": "6a04023a4daba7d8f1959a34b433460afa8ba9cc2d0ef031def9eb4e30f7a6c2",
+      "bytes": 19813,
+      "license": "Apache-2.0",
+      "role": "candidate-frame-layout-profile"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/Gravity.java",
+      "localPath": "framework-aosp/upstream/android/view/Gravity.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/Gravity.java?format=TEXT",
+      "sha256": "7f39e056397e2748c3ca09f243a7e49182adf821443115bc7a950e980799022f",
+      "bytes": 22989,
+      "license": "Apache-2.0",
+      "role": "candidate-layout-profile"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/LinearLayout.java",
+      "localPath": "framework-aosp/upstream/android/widget/LinearLayout.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/LinearLayout.java?format=TEXT",
+      "sha256": "ab889453a73dba31034478e8c5e5c5bc149f42ae0c6c1b3632c53defd7d1ce0e",
+      "bytes": 84076,
+      "license": "Apache-2.0",
+      "role": "candidate-layout-profile"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/ScrollView.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ScrollView.java?format=TEXT",
+      "sha256": "9bbb1ecb2dc0e0111657098d0a4afed087743af4af09f0bf26e8ad3b8ade708d",
+      "bytes": 75415,
+      "localPath": "framework-aosp/upstream/android/widget/ScrollView.java",
+      "license": "Apache-2.0"
+    }
+  ],
+  "requiresDefaultFrameworkSha256": "685e86f4fa61212f51d838cdc821481018ccc52a9cd5cd8b084d1a5dac4dcac1",
+  "compileOnlyDeclarationsPackaged": false,
+  "scrollViewMetadata": {
+    "schemaVersion": 1,
+    "SDKJar": "$ANDROID_SDK/platforms/android-36/android.jar",
+    "classes": [
+      {
+        "SDKClass": "android/view/View.class",
+        "sdkClassSha256": "c8bb036fbf7a0f4081074d12d909812e8337309178d9474e1edd330ae97abc75",
+        "metadataSha256": "adecebe40bb8b3678b081fad5d4868645e84cd3798f6b59e1f3f8ba8c889f16c"
+      },
+      {
+        "SDKClass": "android/view/ViewGroup.class",
+        "sdkClassSha256": "b540dabf75aab2478e07d81ed309131a874167b97c52a4329daac1814f410d93",
+        "metadataSha256": "b540dabf75aab2478e07d81ed309131a874167b97c52a4329daac1814f410d93"
+      },
+      {
+        "SDKClass": "android/graphics/Canvas.class",
+        "sdkClassSha256": "9496165421e8ca08572462d6dca2c1998376ce47a904e1a673ce42eb89be2896",
+        "metadataSha256": "9496165421e8ca08572462d6dca2c1998376ce47a904e1a673ce42eb89be2896"
+      },
+      {
+        "SDKClass": "android/content/res/Configuration.class",
+        "sdkClassSha256": "0c2271728f33ebc9ca4e2fc67c7c6b7baf909e114c588f84223ba3603e61ea4d",
+        "metadataSha256": "0c2271728f33ebc9ca4e2fc67c7c6b7baf909e114c588f84223ba3603e61ea4d"
+      }
+    ],
+    "additionalProtectedFields": {
+      "mPaddingLeft": "I",
+      "mPaddingTop": "I",
+      "mPaddingRight": "I",
+      "mPaddingBottom": "I",
+      "mScrollX": "I",
+      "mScrollY": "I",
+      "mLeft": "I",
+      "mTop": "I",
+      "mRight": "I",
+      "mBottom": "I",
+      "mPrivateFlags": "I",
+      "mParent": "Landroid/view/ViewParent;",
+      "mContext": "Landroid/content/Context;"
+    },
+    "additionalHiddenMethods": [
+      [
+        "invalidateParentIfNeeded",
+        "()V",
+        4
+      ],
+      [
+        "performAccessibilityActionInternal",
+        "(ILandroid/os/Bundle;)Z",
+        1
+      ],
+      [
+        "onInitializeAccessibilityNodeInfoInternal",
+        "(Landroid/view/accessibility/AccessibilityNodeInfo;)V",
+        1
+      ],
+      [
+        "onInitializeAccessibilityEventInternal",
+        "(Landroid/view/accessibility/AccessibilityEvent;)V",
+        1
+      ],
+      [
+        "encodeProperties",
+        "(Landroid/view/ViewHierarchyEncoder;)V",
+        4
+      ]
+    ],
+    "packaged": false,
+    "role": "SDK API declarations only; no SDK classfile or method body is copied into implementation output. AOSP ScrollView/EdgeEffect source bodies remain unchanged."
+  },
+  "integrationStatus": "Compiled opt-in candidate; requires coordinated platform validation before default activation"
+}

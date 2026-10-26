@@ -1,0 +1,34 @@
+{
+  "sources/RequestFeature.kt": {
+    "bytes": 11074,
+    "sha256": "c9d13ca1fee31717c7a4cb7617da29a659d17f9d4b8b58f372eee12cac290112"
+  },
+  "sources/wasm-main.kt": {
+    "bytes": 777,
+    "sha256": "b9eef42c1b794404e5894805d9524d07108142f4fa646f699a688bcc4a914d94"
+  },
+  "sources/xml-dashboard/AndroidManifest.xml": {
+    "bytes": 585,
+    "sha256": "c351eba27ef547021a71434c782920803b79948534ab8a977511159752a1cab7"
+  },
+  "sources/xml-dashboard/res/layout/activity_detail.xml": {
+    "bytes": 1294,
+    "sha256": "5e5c159f8682fd92b964e05fd1a03b60a2d55689113ec08620167ffb7bc01e69"
+  },
+  "sources/xml-dashboard/res/layout/activity_main.xml": {
+    "bytes": 9415,
+    "sha256": "54d43a14b7c02d25fe329637ecc891d48cae7bdc1e74e206bed93c6d8b10339d"
+  },
+  "sources/xml-dashboard/res/values/strings.xml": {
+    "bytes": 206,
+    "sha256": "5642074352ae8b43402105b1b6a7775767cff8a29d842a71d910e06418697516"
+  },
+  "sources/xml-dashboard/java/dev/apkweb/dashboard/DetailActivity.java": {
+    "bytes": 863,
+    "sha256": "9f89f4768a1fcacf875712012b991cf98e8bf5ab162d5d1afd227aaf4664bcc8"
+  },
+  "sources/xml-dashboard/java/dev/apkweb/dashboard/MainActivity.java": {
+    "bytes": 4550,
+    "sha256": "c8fbb52f74e2f7ad9f8f7980b52c8c7aee5f62b5a139ee966fe128c482dc1b48"
+  }
+}

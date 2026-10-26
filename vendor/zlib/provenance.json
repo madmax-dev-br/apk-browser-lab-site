@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "file": "zlib.wasm",
+  "bytes": 80506,
+  "sha256": "4197a19150d16d200b0011071ad434a3d7fd4f013726ac9ffab702bb24bc82fc",
+  "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 3.1.74 (1092ec30a3fb1d46b1782ff1b4db5094d3d06ae5)",
+  "upstream": {
+    "project": "https://android.googlesource.com/platform/external/zlib",
+    "tag": "android-13.0.0_r1",
+    "zlibVersion": "1.2.11 (Chromium fork as shipped by Android 13)",
+    "files": {
+      "LICENSE": "942755efa272dbfbcd7afea7a38556801e36c16dcad002d572378367094a2593",
+      "adler32.c": "677ef1bb8c69eebc70b54299f43559ea23eec7dbfb0f122662eb0a086b350fd3",
+      "adler32_simd.h": "72e8cf9485f5590243e9119a0bef80b1d8c4a580727a5ff516d3536570cf5b4a",
+      "chromeconf.h": "fb0dcee3dc6fc94207d1711541ffbf61b1e02927d31238e2de374f0c67313609",
+      "compress.c": "2ec8b62688daa431c4acc76c00753a28db8e37e6f0212ecb339c92823e5a2fad",
+      "contrib/optimizations/insert_string.h": "70468049f93b23f0667d23c5c3d2275117d59d014f65a50deb20fdae721617d7",
+      "contrib/optimizations/slide_hash_neon.h": "6168139cbd1dbc2ee87596577743838ca2e75a6f5a239b1067a7383bf1cdb790",
+      "cpu_features.c": "0c3bda2c6a10e3d335d4c98f963aa05694479d3b0478431a9307bdd6b9e0dd4f",
+      "cpu_features.h": "c6cf0733273eb37a3e7f93dd9cdafcbc8ec8c3e19282a76b54309cdd8cbcb85f",
+      "crc32.c": "0164faf6f1893c84a36071bcc40193c626ecef172498181a5fdfd72ebfe592e7",
+      "crc32.h": "407af59d0abfea84a6507c603eb29809411797f98249614fe76a661def783ce1",
+      "crc32_simd.h": "7d4c8d46b877413ca32d916dbf58e9384b5e68867025eca4cbb725c5a8eda7b1",
+      "deflate.c": "b1a3027e2f15ba99deac231362d142ebee5a86e35fb500d4c362fb4a541277b3",
+      "deflate.h": "3a5fd9425416936b65d20e425a4ef8034e6b5be59152704a3314b94b1aac9730",
+      "gzguts.h": "1ef4741cf10441feeca5c8dde2b6c754f0cbd96fcae697d54a604757289a5e9b",
+      "inffast.c": "c082f23c041ed4d8c2e90b439bab1699cd9e178296d06ac9cbd6b4006f5b1782",
+      "inffast.h": "acb22ef0fe32f0ed2975e0c2dc641bc093ed76a9b6d7bad397b0d4dcd545f44e",
+      "inffixed.h": "237ba710f090e432b62ebf963bee8b302867e9691406b2d3f8ee89ee7bfef9b0",
+      "inflate.c": "07119de679fb87582acaeae3fc4f112fbd84681727daf2498e33cc83793db940",
+      "inflate.h": "8ec9ac297790276f7e46a961d4c6f9f944fb1dec92401339ec2666973cc5983c",
+      "inftrees.c": "1960ca67384376f65b6ce8c08fdb501f8eb33923e11ef5f61a855708c6cb0a8a",
+      "inftrees.h": "c510b36402784b1f898be3b049b923469aa92701de2d9195aed19f6b65c0dce2",
+      "trees.c": "bb64a6e7cb529857d8a1e949e7e134315bab9c8c6088a08f496d276dd0d55610",
+      "trees.h": "bb0a9d3ca88ee00c81adb7c636e73b97085f6ef1b52d6d58edbe2b6dc3adeb4d",
+      "uncompr.c": "31922aa982ee12fd28d1ce5fe6a94a3f07c2a941c821b566a881ca21845cdfaf",
+      "zconf.h": "ded43a7e9adac7fd5ea33865932a12ef411d03d2d39e550958247d403f747f6d",
+      "zlib.h": "a60d7379ffdeee56f1b6ba4442657bcb49018604128e1b8e923bfb948ce3afef",
+      "zutil.c": "f7fdc9ef326a2683eb33c794face54e83c751ec17f3d1ba581847a62af36ddcd",
+      "zutil.h": "a9c4afa25ddfb17c3631351c9a73fae06650498cae035793c1c1e53a4946094f"
+    },
+    "license": "zlib licence (Chromium zlib LICENSE)"
+  },
+  "flags": "-O2 -DNDEBUG -DCPU_NO_SIMD -DZLIB_IMPLEMENTATION -DHAVE_HIDDEN",
+  "glue": "scripts/wasm/zlib-host.c (z_stream wrappers mirroring libcore ojluni Inflater.c/Deflater.c/CRC32.c/Adler32.c), scripts/wasm/zip-host.c + shim-zip (JVM_* file primitives and field accessors around libcore ojluni zip_util.c)",
+  "libcoreNative": {
+    "path": "ojluni/src/main/native",
+    "files": {
+      "zip_util.c": "6f3c678754b05ca91e4297978d5fda640bd40f21da4b37ae29e27eeab481bf08",
+      "zip_util.h": "30d4a3b8962a8b7cf2f528696d37ea3800dea1a7526e93ce102dd63882630284"
+    }
+  },
+  "build": "scripts/build-zlib.sh",
+  "deviations": [
+    "SIMD paths compiled out: deflate output may differ byte-for-byte from devices using hashing/CRC intrinsics; inflate is bit-exact"
+  ]
+}

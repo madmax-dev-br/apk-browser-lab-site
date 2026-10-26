@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="dev.apkweb.hybrid.HybridFlowTest" tests="1" failures="0" errors="0" skipped="0" time="5.293" timestamp="2026-10-25T10:51:16" hostname="localhost">
+  <properties>
+    <property name="device" value="Pixel_API36(AVD) - 16" />
+    <property name="flavor" value="" />
+    <property name="project" value=":hybrid-navigation" />
+  </properties>
+  <testcase name="nativeWidgetComposeAndActivityResult" classname="dev.apkweb.hybrid.HybridFlowTest" time="5.112" />
+</testsuite>

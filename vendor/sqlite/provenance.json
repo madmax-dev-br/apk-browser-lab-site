@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "file": "sqlite3.wasm",
+  "bytes": 950838,
+  "sha256": "f54e9121ce8b29940c8d714f5a0d19112e84cf937755992f641a6b363c45e3bd",
+  "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 3.1.74 (1092ec30a3fb1d46b1782ff1b4db5094d3d06ae5)",
+  "sqliteVersion": "3.32.2",
+  "sourceId": "2021-07-12 15:00:17 bcd014c473794b09f61fbc0f4d9488365b023f16123b278dbbd49948c27c0fee",
+  "upstream": {
+    "project": "https://android.googlesource.com/platform/external/sqlite",
+    "tag": "android-13.0.0_r1",
+    "files": {
+      "sqlite3.c": {
+        "sha256": "e7636b429eb5771dba93fc826fafd611cf40bffe682d804ed0a2664ee1442a7a",
+        "bytes": 8121096
+      },
+      "sqlite3.h": {
+        "sha256": "66b8eb067ae75ddec77cc4c8b9017750a9bc4b8c9d22b07e621b606149da3615",
+        "bytes": 581196
+      },
+      "sqlite3_android.cpp": {
+        "sha256": "e5ca750bf21f06e98873866d21908a2717f4f3bc30b361345252d26556706092",
+        "bytes": 18716
+      },
+      "sqlite3_android.h": {
+        "sha256": "4fddda110375d61c57bf571e9f6e6b8347c704dd7d0aded6b5dc38dc28c1c4ee",
+        "bytes": 951
+      },
+      "PhoneNumberUtils.cpp": {
+        "sha256": "9b468e524fe2450f1d238ce57afc1473552a86e1e3ec572482291b6db79654b0",
+        "bytes": 16172
+      },
+      "OldPhoneNumberUtils.cpp": {
+        "sha256": "0822bf88d7c957b741cfe9ddac0540c019c910a59b398cc8db7311a9cbe6c7ed",
+        "bytes": 7782
+      },
+      "PhoneNumberUtils.h": {
+        "sha256": "83e6b3f1d2506485013ef5ec2895981c2aba34436728c939ce6798f62039e70f",
+        "bytes": 1124
+      }
+    },
+    "note": "dist/sqlite3.c is the SQLite 3.32.2 amalgamation as Android 13 ships it: the public-domain release plus upstream security backports (SOURCE_ID 2021-07-12) and dist/Android.Patch. The unmodified release amalgamation sqlite-amalgamation-3320200.zip (sha256 7e1ebd182a61682f94b67df24c3e6563ace182126139315b659f25511e2d0b5d) differs from it by those backports only."
+  },
+  "flags": "-DNDEBUG=1 -DANDROID=1 -DSQLITE_OS_OTHER=1 -DSQLITE_THREADSAFE=0 -DSQLITE_HAVE_ISNAN -DSQLITE_DEFAULT_JOURNAL_SIZE_LIMIT=1048576 -DSQLITE_TEMP_STORE=3 -DSQLITE_POWERSAFE_OVERWRITE=1 -DSQLITE_DEFAULT_FILE_FORMAT=4 -DSQLITE_DEFAULT_AUTOVACUUM=1 -DSQLITE_ENABLE_MEMORY_MANAGEMENT=1 -DSQLITE_ENABLE_FTS3 -DSQLITE_ENABLE_FTS3_BACKWARDS -DSQLITE_ENABLE_FTS4 -DSQLITE_OMIT_BUILTIN_TEST -DSQLITE_OMIT_COMPILEOPTION_DIAGS -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_DEFAULT_FILE_PERMISSIONS=0600 -DSQLITE_SECURE_DELETE -DSQLITE_ENABLE_BATCH_ATOMIC_WRITE -DSQLITE_DEFAULT_LEGACY_ALTER_TABLE -DSQLITE_ENABLE_DBSTAT_VTAB",
+  "glue": "scripts/wasm/sqlite-host.c (lab-authored), scripts/wasm/shim/log/log.h",
+  "build": "scripts/build-sqlite.sh",
+  "licenses": {
+    "sqlite": "public domain",
+    "androidFunctions": "Apache-2.0 (external/sqlite/android)",
+    "glue": "project licence"
+  },
+  "deviations": [
+    "SQLITE_THREADSAFE=0 (single-threaded wasm; Android uses 2)",
+    "SQLITE_ENABLE_ICU off: the lab ICU data bundle has no collation data, so LOCALIZED/PHONEBOOK/UNICODE collations compare through an explicit host failure and FTS ICU tokenizer is absent",
+    "SQLITE_OS_OTHER with a VFS over the lab virtual filesystem and in-process WAL-index shared memory (no mmap, no POSIX locks)",
+    "xSleep returns without waiting (cooperative VM)"
+  ],
+  "hostImportModules": [
+    "apkweb_sqlite",
+    "wasi_snapshot_preview1",
+    "env"
+  ]
+}

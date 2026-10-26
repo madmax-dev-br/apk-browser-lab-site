@@ -1,0 +1,4 @@
+ICU4C70.1 © Unicode, Inc. and others. See LICENSE.
+Original boundary rules and compiled resource data are retained unmodified.
+C++/C implementation: upstream release-70-1, not Android-specific-patch parity.
+Only an explicit ABI adapter and bounded Web memory/environment boundary are added.

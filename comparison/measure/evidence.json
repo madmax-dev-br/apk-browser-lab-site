@@ -1,0 +1,134 @@
+{
+  "apkSha256": "dbf9e7a750f98bff9465049b05939eea46631b2fd0732633892055a0d2b2a1db",
+  "android": {
+    "generatedAt": "2026-10-25T13:57:38.508014+00:00",
+    "runner": "Android Instrumentation on unchanged signed target APK",
+    "avd": "Pixel_API36",
+    "serial": "emulator-5554",
+    "androidSdk": 36,
+    "apkTargetSdk": 28,
+    "assertionCount": 44,
+    "inputs": {
+      "fixtures/measure-source-probe.apk": {
+        "bytes": 12756,
+        "sha256": "dbf9e7a750f98bff9465049b05939eea46631b2fd0732633892055a0d2b2a1db"
+      },
+      "work/measure-android-test/measure-android-test.apk": {
+        "bytes": 16787,
+        "sha256": "1f18ee2617b43981fa141b12f67f182a370ad22547a40f161e39458b9ee506e7"
+      },
+      "framework-aosp/measure-probe/android-test/java/dev/apkweb/measureprobe/test/MeasureInstrumentation.java": {
+        "bytes": 6346,
+        "sha256": "a7bdc891dacb37eb9f4ada72e550d219abc9714553003c296c26814201c108a3"
+      },
+      "framework-aosp/measure-probe/java/dev/apkweb/measureprobe/ProbeLayout.java": {
+        "bytes": 1631,
+        "sha256": "16b6be6ade38d2c52b9645bf24614a0e8b7c2f4a90c4c30418f6931f9490aaef"
+      }
+    },
+    "captures": {
+      "android-measure-initial.png": "33e2bf48868539cf39c180f6cdfce44c2975a5c924aa10da329576016f7b39d1",
+      "android-measure-edited.png": "3c6de4e5a138aaeb0b82942a91e45e63c93090a4b580c94492779e70f8ab5125"
+    },
+    "assertionsReport": "report.json",
+    "limitations": "Geometry compared at the same density1. Android may perform extra measurement passes; pass counts and complete widget pixels are not asserted equal.",
+    "displayOverride": {
+      "size": "411x915",
+      "densityDpi": 160,
+      "restoredAfterCapture": true
+    }
+  },
+  "browser": {
+    "capturedAt": "2026-10-25T13:51:20.505Z",
+    "build": "018a266c8b05",
+    "apkSha256": "dbf9e7a750f98bff9465049b05939eea46631b2fd0732633892055a0d2b2a1db",
+    "initial": {
+      "height": 638.4000244140625,
+      "screenshotHeightPx": 1314,
+      "screenshotWidthPx": 1935,
+      "views": [
+        {
+          "bounds": {
+            "height": 57,
+            "width": 312.3599853515625,
+            "x": 987.65185546875,
+            "y": 339.2043762207031
+          },
+          "id": "40",
+          "text": "Filho criado no DEXMedir novamente"
+        },
+        {
+          "bounds": {
+            "height": 14.44000244140625,
+            "width": 312.3599853515625,
+            "x": 987.65185546875,
+            "y": 339.2043762207031
+          },
+          "id": "41",
+          "text": "Filho criado no DEX"
+        },
+        {
+          "bounds": {
+            "height": 36.47998046875,
+            "width": 312.3599853515625,
+            "x": 987.65185546875,
+            "y": 356.68438720703125
+          },
+          "id": "42",
+          "text": "Medir novamente"
+        }
+      ],
+      "width": 312.6806640625,
+      "x": 987.65185546875,
+      "y": 339.2043762207031
+    },
+    "edited": {
+      "height": 638.4000244140625,
+      "screenshotHeightPx": 1314,
+      "screenshotWidthPx": 1935,
+      "views": [
+        {
+          "bounds": {
+            "height": 57,
+            "width": 312.3599853515625,
+            "x": 987.65185546875,
+            "y": 349.2043762207031
+          },
+          "id": "40",
+          "text": "Filho criado no DEXMedir novamente 2"
+        },
+        {
+          "bounds": {
+            "height": 14.44000244140625,
+            "width": 312.3599853515625,
+            "x": 987.65185546875,
+            "y": 349.2043762207031
+          },
+          "id": "41",
+          "text": "Filho criado no DEX"
+        },
+        {
+          "bounds": {
+            "height": 36.47998046875,
+            "width": 312.3599853515625,
+            "x": 987.65185546875,
+            "y": 366.6843872070313
+          },
+          "id": "42",
+          "text": "Medir novamente 2"
+        }
+      ],
+      "width": 312.6806640625,
+      "x": 987.65185546875,
+      "y": 349.2043762207031
+    },
+    "testedFlow": [
+      "load actual APK",
+      "launch",
+      "click Medir novamente",
+      "click Medir novamente 1",
+      "observe Medir novamente 2 and stable DEX-created child identities"
+    ],
+    "note": "Read-only DOM measurements and browser screenshots. Native density differs; no claim of exact Android text/font metrics."
+  }
+}

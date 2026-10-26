@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>APK player frame</title>
+  <link rel="stylesheet" href="../styles.css?v=9fc86cc65ae6">
+  <link rel="stylesheet" href="./frame.css?v=9fc86cc65ae6">
+</head>
+<body class="player-frame">
+  <main id="preview-stage" class="preview-stage player-stage">
+    <div id="android-device" class="android-device" hidden>
+            <div id="android-screen" class="android-screen">
+              <div id="android-content" class="android-content"></div>
+              <div id="android-window-layer" class="android-window-layer"></div>
+              <div class="system-bars" aria-hidden="true">
+                <div id="sysbar-status" class="sysbar-status"><span id="sysbar-clock" class="sysbar-clock">9:41</span><span class="sysbar-cutout"></span><span class="sysbar-icons"><svg id="sysbar-wifi" viewBox="0 0 24 24" width="14" height="14"><path d="M12 18.5a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM2.4 9.2l1.9 1.9a10.8 10.8 0 0 1 15.4 0l1.9-1.9a13.5 13.5 0 0 0-19.2 0zM6.2 13l1.9 1.9a5.4 5.4 0 0 1 7.8 0l1.9-1.9a8.1 8.1 0 0 0-11.6 0z" fill="currentColor"/></svg><svg id="sysbar-cell" viewBox="0 0 24 24" width="14" height="14"><path d="M2 22h20V2z" fill="currentColor"/></svg><span class="sysbar-battery"><span id="sysbar-battery-level" class="sysbar-battery-level"></span><b id="sysbar-bolt" hidden>⚡</b></span></span></div>
+                <div id="sysbar-nav" class="sysbar-nav"><span class="sysbar-handle"></span><span class="sysbar-buttons"><i class="sysbar-back"></i><i class="sysbar-home"></i><i class="sysbar-recents"></i></span></div>
+              </div>
+            </div>
+          </div>
+    <div id="player-status" class="player-status" role="status" aria-live="polite">Waiting for the host page…</div>
+    <div id="player-error" class="player-error" role="alert" hidden><strong id="player-error-title"></strong><p id="player-error-message"></p></div>
+  </main>
+  <script type="module" src="./frame.js?v=9fc86cc65ae6"></script>
+</body>
+</html>

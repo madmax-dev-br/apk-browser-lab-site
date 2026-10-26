@@ -1,0 +1,26 @@
+{
+  "crop": {
+    "height": 840,
+    "width": 411.421875,
+    "x": 938.28125,
+    "y": 324.984375
+  },
+  "hostState": "ESTADO RECEBIDO DO COMPOSE\ncount = 1\nSolicitação web",
+  "url": "http://127.0.0.1:8874/?build=154f0c9125be",
+  "viewport": {
+    "dpr": 1,
+    "height": 1314,
+    "width": 1935
+  },
+  "observedCanvasState": {
+    "total": 4,
+    "pending": 3,
+    "added": 1,
+    "progress": 25,
+    "query": "Solicitação web",
+    "filter": "Pendentes",
+    "resultTitle": "Solicitação web",
+    "category": "Compras",
+    "urgent": true
+  }
+}

@@ -1,0 +1,14 @@
+Android framework resource data
+Copyright The Android Open Source Project
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+Data extracted without substituting resource values from the official installed
+Android SDK Platform 16 API36 revision2 resources.arsc. Only unqualified resource
+variants are selected; provenance.json records the source and output hashes.
+No android.jar executable class stubs, raster images, fonts or media are included.
+framework-xml.bin.gz contains exact compiled XML resources referenced by this
+profile, including vector definitions, selectors, layouts and animations.
+framework-xml-index.json records the source hash and every original XML entry.
+Original AOSP style/attribute/public-ID reference XML headers are preserved in
+upstream-reference/. They are reference sources, not a claim that SDK revision2
+was rebuilt bit-for-bit from that tag.
