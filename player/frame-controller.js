@@ -1,12 +1,12 @@
 // Message-driven controller of one player frame. DOM-free: the VM client, the shared device view and the postMessage sink are injected, so the
 // same code runs in the real frame (frame.js) and in the headless smoke test.
-import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, MAX_APK_BYTES } from './protocol.js?v=e9d35ddef77e';
-import { sanitizeSettings } from '../device-settings.js?v=e9d35ddef77e';
+import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, MAX_APK_BYTES } from './protocol.js?v=88ca7fbf670e';
+import { sanitizeSettings } from '../device-settings.js?v=88ca7fbf670e';
 export function createFrameController({ vm, state, deviceState, post, fetchImpl = globalThis.fetch?.bind(globalThis), hooks = {} }) {
-  let view = null, source = null, config = {}, lastActivity = null, destroyed = false, chain = Promise.resolve(), inflight = 0;
+  let view = null, source = null, config = {}, lastActivity = null, destroyed = false, chain = Promise.resolve(), inflight = 0, oomSeen = 0;
   const send = (type, payload) => post(envelope(type, payload));
   const fail = (error, phase) => { const info = describeError(error, phase); hooks.error?.(info); send('error', info); };
-  const clearPending = () => { state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); };
+  const clearPending = () => { state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; };
   const enqueue = work => { inflight++; chain = chain.then(() => (destroyed ? undefined : work())).catch(error => fail(error, 'operation')).finally(() => { inflight--; }); return chain; };
   const applyConfig = patch => {
     const { config: parsed, rejected } = parseConfig(patch); const next = { ...config, ...parsed }, { settings, rejected: more } = configToSettings(next);
@@ -14,7 +14,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
   };
   const operations = {
     beginOperation() { state.busy = true; return ++state.operation; },
-    finishOperation(token) { if (token !== state.operation) return; state.busy = false; if (state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size) view?.flushPendingInputs(); },
+    finishOperation(token) { if (token !== state.operation) return; state.busy = false; if (state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length) view?.flushPendingInputs(); },
     reportAPKError(error, title) {
       state.lastAPKError = { error, title }; clearPending(); hooks.interrupted?.(error);
       if (error?.navigation) state.canGoBack = !!error.navigation.canGoBack;
@@ -29,6 +29,10 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
       finally { operations.finishOperation(token); }
     },
     snapshotRendered(snapshot) {
+      const health = snapshot?.vmHealth;
+      if (health && health.oomCount > oomSeen) {   // java.lang.OutOfMemoryError raised by the VM: reported to the embedding page even if the app swallowed it
+        oomSeen = health.oomCount; fail(Object.assign(new Error(`java.lang.OutOfMemoryError: ${health.lastOom?.reason ?? 'heap exhausted'} (${health.liveObjects} live objects, limit ${health.limit})`), { details: { kind: 'java-heap-exhausted', ...health } }), 'runtime');
+      }
       if (!snapshot?.activityName) return;
       if (snapshot.activityName !== lastActivity) { const first = lastActivity === null; lastActivity = snapshot.activityName; if (!first) send('activity-changed', { activity: snapshot.activityName, canGoBack: !!snapshot.canGoBack }); }
     },
@@ -36,7 +40,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     closed() { send('closed'); },
   };
   async function load(buffer, activity) {
-    state.viewSession++; clearPending(); state.runtime = null; state.apkRunning = false; lastActivity = null;
+    state.viewSession++; clearPending(); state.runtime = null; state.apkRunning = false; lastActivity = null; oomSeen = 0;
     const token = operations.beginOperation();
     try {
       const keep = buffer.slice(0); source.bytes = keep;

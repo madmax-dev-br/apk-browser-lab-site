@@ -1,26 +1,28 @@
-import { loadAPK } from './apk-loader.js?v=e9d35ddef77e';
-import { FrameworkProvider } from './framework-provider.js?v=e9d35ddef77e';
-import { createRasterSender } from './raster-cache.js?v=e9d35ddef77e';
-import { resolveDevice } from './device-profile.js?v=e9d35ddef77e';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=e9d35ddef77e';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=e9d35ddef77e';
-import { SkiaProvider } from './skia-provider.js?v=e9d35ddef77e';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=e9d35ddef77e';
-import { disposeTextLayout } from './text-layout-native.js?v=e9d35ddef77e';
-import { IcuBreakProvider } from './icu-break-provider.js?v=e9d35ddef77e';
-import { SqliteProvider } from './sqlite-native.js?v=e9d35ddef77e';
-import { TzdataProvider } from './java-time-native.js?v=e9d35ddef77e';
-import { ZlibProvider } from './zip-native.js?v=e9d35ddef77e';
-import { IcuConverterProvider } from './icu-converter-native.js?v=e9d35ddef77e';
-import { disposeColorFilters } from './color-filter-native.js?v=e9d35ddef77e';
-import { disposeRegex } from './regex-native.js?v=e9d35ddef77e';
-import { disposeRenderNodes } from './rendernode-native.js?v=e9d35ddef77e';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=e9d35ddef77e';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=e9d35ddef77e';
+import { loadAPK } from './apk-loader.js?v=88ca7fbf670e';
+import { FrameworkProvider } from './framework-provider.js?v=88ca7fbf670e';
+import { createRasterSender } from './raster-cache.js?v=88ca7fbf670e';
+import { isFreedId } from './heap-gc.js?v=88ca7fbf670e';
+import { dispatchPointer } from './pointer-input-host.js?v=88ca7fbf670e';
+import { resolveDevice } from './device-profile.js?v=88ca7fbf670e';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=88ca7fbf670e';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=88ca7fbf670e';
+import { SkiaProvider } from './skia-provider.js?v=88ca7fbf670e';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=88ca7fbf670e';
+import { disposeTextLayout } from './text-layout-native.js?v=88ca7fbf670e';
+import { IcuBreakProvider } from './icu-break-provider.js?v=88ca7fbf670e';
+import { SqliteProvider } from './sqlite-native.js?v=88ca7fbf670e';
+import { TzdataProvider } from './java-time-native.js?v=88ca7fbf670e';
+import { ZlibProvider } from './zip-native.js?v=88ca7fbf670e';
+import { IcuConverterProvider } from './icu-converter-native.js?v=88ca7fbf670e';
+import { disposeColorFilters } from './color-filter-native.js?v=88ca7fbf670e';
+import { disposeRegex } from './regex-native.js?v=88ca7fbf670e';
+import { disposeRenderNodes } from './rendernode-native.js?v=88ca7fbf670e';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=88ca7fbf670e';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=88ca7fbf670e';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=e9d35ddef77e';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=e9d35ddef77e';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=e9d35ddef77e';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=88ca7fbf670e';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=88ca7fbf670e';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=88ca7fbf670e';
 
 let sharedSkiaProvider = null;
 let sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -32,7 +34,7 @@ let inspectNativeLibraries = null;
 let inventory = null;
 let activeRequestId = null;
 let busy = false;
-let eventTimer = null;
+let eventTimer = null, lastEventMs = 0;
 function errorData(error) { return { name: error.name || 'Error', message: error.message || String(error), stack: error.stack, details: error.details, navigation: runtime?.platform?.navigationState?.(runtime), trace: Array.isArray(runtime?.trace) ? runtime.trace.slice(-512) : [] }; }
 const rasterSender = createRasterSender();
 function currentSnapshot() {
@@ -40,6 +42,10 @@ function currentSnapshot() {
   const snapshot = runtime.snapshot();
   if (!snapshot.closed && composeSemantics) snapshot.composeSemantics = composeSemantics.snapshot();
   Object.assign(snapshot, runtime.executionSnapshot());
+  // VM health the page can show: live Java objects, collections, and any OutOfMemoryError the VM raised (even if the app caught it).
+  snapshot.queueDebug = (runtime.platform.eventQueue || []).slice(0, 6).map(event => Object.keys(event).filter(key => !['when', 'sequence', 'front', 'roots'].includes(key)).join('/') + '@' + Math.round(event.when - runtime.platform.clock.now()));
+  snapshot.pendingEventDelay = runtime.platform.nextEventDelay?.() ?? null;   // ms until the VM's next scheduled event (frame, timer); null when nothing is scheduled
+  snapshot.vmHealth = { liveObjects: runtime.heap.size, limit: runtime.maxHeapObjects, lastEventMs, collections: runtime.gcStats?.collections ?? 0, freedObjects: runtime.gcStats?.freed ?? 0, oomCount: runtime.oomCount ?? 0, lastOom: runtime.lastOom ?? null };
   return rasterSender.intern(snapshot); // repeated PNGs travel once; the page resolves rasterId to a cached Blob URL
 }
 function drainReadyEvents() {
@@ -58,9 +64,10 @@ function scheduleEvents() {
   eventTimer = setTimeout(() => {
     if (busy) { scheduleEvents(); return; }
     busy = true; let succeeded = false;
+    self.postMessage({ type: 'runtime-busy' });   // the page must not treat the screen as settled while a scheduled VM event is being processed
     try {
-      const drained = drainReadyEvents();
-      if (drained.processed) self.postMessage({ type: 'runtime-event', snapshot: currentSnapshot() });
+      const started = performance.now(), drained = drainReadyEvents(); lastEventMs = Math.round(performance.now() - started);
+      if (drained.processed) self.postMessage({ type: 'runtime-event', snapshot: currentSnapshot() }); else self.postMessage({ type: 'runtime-idle' });
       succeeded = true;
     } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); }
     finally { busy = false; if (succeeded) scheduleEvents(); }
@@ -92,6 +99,7 @@ self.onmessage = async ({ data }) => {
       if (self.location?.origin) runtime.javaProperties.set('apkweb.origin', self.location.origin);   // the page origin (same as this worker's): lets sample apps address documents the lab serves itself
       runtime.platform.onExternalActivity = () => { if (!busy) scheduleEvents(); };   // network exchanges finishing wake the event pump
       composeSemantics = createComposeSemanticsDriver(runtime);
+      runtime.gcEnabled = data.gc !== false;   // unreachable Java objects are reclaimed between events (src/heap-gc.js)
       send({ type: 'result', inventory: result.inventory });
     } else if (type === 'device') {
       // Virtual-device settings changed while an APK runs: Configuration/resources/lifecycle exactly like ActivityThread.handleConfigurationChanged.
@@ -101,16 +109,23 @@ self.onmessage = async ({ data }) => {
       if (!runtime || typeof inspectNativeLibraries !== 'function') throw new Error('Reabra o APK para disponibilizar a inspeção ELF.');
       const libraries = await inspectNativeLibraries(data.paths, data.limits);
       send({ type: 'result', libraries, nativeInspection: inventory.nativeInspection });
-    } else if (type === 'launch' || type === 'click' || type === 'back' || type === 'input' || type === 'check' || type === 'focus' || type === 'press' || type === 'scroll' || type === 'compose-action') {
+    } else if (type === 'launch' || type === 'click' || type === 'back' || type === 'input' || type === 'check' || type === 'focus' || type === 'press' || type === 'scroll' || type === 'compose-action' || type === 'pointer') {
       if (!runtime) throw new Error('Reabra um APK antes de executar a VM.');
       send({ type: 'progress', progress: { phase: type, completed: 0, total: 1 } });
-      runtime.steps = 0; let droppedComposeAction = null;
-      if (type === 'scroll') {
+      runtime.steps = 0; let droppedComposeAction = null, droppedEvent = null;
+      // An id the page took from an older snapshot can name a View that has since been collected (it was removed from the hierarchy): Android would not deliver the event either.
+      const staleId = ['click', 'input', 'check', 'focus', 'press', 'scroll'].includes(type) ? data.id : type === 'compose-action' || type === 'pointer' ? data.ownerViewId : null;
+      if (staleId !== null && isFreedId(runtime, staleId)) {
+        droppedEvent = { kind: 'stale-view-id', type, id: staleId };
+        runtime.record(`EVENT dropped (${type} on View ${staleId} that no longer exists)`);
+      }
+      else if (type === 'scroll') {
         if (![data.x,data.y].every(value=>Number.isInteger(value)&&value>=-2147483648&&value<=2147483647)) throw new TypeError('A rolagem requer coordenadas inteiras Android.');
         const receiver={ref:data.id};
         if(!runtime.isSubtype(runtime.object(receiver).type,'Landroid/view/View;'))throw new TypeError('O alvo de rolagem precisa ser uma View real.');
         runtime.dispatch({owner:'Landroid/view/View;',name:'scrollTo',parameters:['I','I'],result:'V',signature:'(II)V'},[receiver,data.x,data.y],'virtual');
       }
+      else if (type === 'pointer') { const outcome = dispatchPointer(runtime, data); if (outcome.dropped && outcome.dropped !== 'unchanged') { droppedEvent = { kind: 'pointer-' + outcome.dropped, type, id: data.ownerViewId }; runtime.record(`EVENT dropped (pointer ${data.action}: ${outcome.dropped})`); } }
       else if (type === 'compose-action') {
         try { composeSemantics.performAction({ownerViewId:data.ownerViewId,nodeId:data.nodeId,action:data.action,args:data.args}); }
         catch (error) {
@@ -126,7 +141,7 @@ self.onmessage = async ({ data }) => {
       else if (type === 'check') runtime.platform.checkInput(runtime, data.id, data.checked);
       else await (type === 'launch' ? runtime.launch(data.activity) : type === 'back' ? runtime.back() : runtime.click(data.id));
       drainReadyEvents();
-      const resultSnapshot = currentSnapshot(); if (droppedComposeAction) resultSnapshot.droppedComposeAction = droppedComposeAction;
+      const resultSnapshot = currentSnapshot(); if (droppedComposeAction) resultSnapshot.droppedComposeAction = droppedComposeAction; if (droppedEvent) resultSnapshot.droppedEvent = droppedEvent;
       send({ type: 'result', snapshot: resultSnapshot });
     } else throw new Error(`Operação de Worker desconhecida: ${type}`);
     succeeded = true;

@@ -508,9 +508,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 3113824,
-  "sha256": "685e86f4fa61212f51d838cdc821481018ccc52a9cd5cd8b084d1a5dac4dcac1",
-  "classCount": 1755,
+  "bytes": 3320544,
+  "sha256": "f6a82c8aa0887c967523c31d4494be5c1ae5e83e92167b209339c91d583b6205",
+  "classCount": 1871,
   "classes": [
     "Landroid/animation/AnimationHandler$$ExternalSyntheticLambda0;",
     "Landroid/animation/AnimationHandler$1;",
@@ -585,6 +585,7 @@
     "Landroid/app/Dialog$$ExternalSyntheticLambda0;",
     "Landroid/app/Dialog$$ExternalSyntheticLambda1;",
     "Landroid/app/Dialog$ListenersHandler;",
+    "Landroid/view/KeyEvent$Callback;",
     "Landroid/app/Dialog;",
     "Landroid/compat/Compatibility$BehaviorChangeDelegate;",
     "Landroid/compat/Compatibility$1;",
@@ -757,6 +758,8 @@
     "Landroid/graphics/PixelFormat;",
     "Landroid/graphics/Point$1;",
     "Landroid/graphics/Point;",
+    "Landroid/graphics/PointF$1;",
+    "Landroid/graphics/PointF;",
     "Landroid/graphics/PorterDuff$Mode;",
     "Landroid/graphics/PorterDuff;",
     "Landroid/graphics/PorterDuffColorFilter;",
@@ -765,7 +768,10 @@
     "Landroid/graphics/Rect;",
     "Landroid/graphics/RectF$1;",
     "Landroid/graphics/RectF;",
+    "Landroid/graphics/Region$1;",
     "Landroid/graphics/Region$Op;",
+    "Landroid/graphics/Region;",
+    "Landroid/graphics/RegionIterator;",
     "Landroid/graphics/Xfermode;",
     "Landroid/graphics/animation/HasNativeInterpolator;",
     "Landroid/graphics/animation/NativeInterpolator;",
@@ -900,6 +906,11 @@
     "Landroid/graphics/text/MeasuredText$Builder$HyphenationMode;",
     "Landroid/graphics/text/MeasuredText$Builder;",
     "Landroid/graphics/text/MeasuredText;",
+    "Landroid/location/Location$$ExternalSyntheticLambda1;",
+    "Landroid/location/Location$1;",
+    "Landroid/location/Location$BearingDistanceCache;",
+    "Landroid/location/Location$Format;",
+    "Landroid/location/Location;",
     "Landroid/os/BadParcelableException;",
     "Landroid/os/BadTypeParcelableException;",
     "Landroid/os/CancellationSignal$1;",
@@ -944,6 +955,7 @@
     "Landroid/os/TransactionTooLargeException;",
     "Landroid/os/UserHandle$1;",
     "Landroid/os/UserHandle;",
+    "Landroid/sysprop/InputProperties;",
     "Landroid/system/ErrnoException;",
     "Landroid/system/GaiException;",
     "Landroid/system/IcmpHeaders;",
@@ -1050,6 +1062,12 @@
     "Landroid/text/TextLine$DecorationInfo;",
     "Landroid/text/TextLine;",
     "Landroid/text/TextPaint;",
+    "Landroid/text/TextUtils$1;",
+    "Landroid/text/TextUtils$Reverser;",
+    "Landroid/text/TextUtils$SafeStringFlags;",
+    "Landroid/text/TextUtils$StringSplitter;",
+    "Landroid/text/TextUtils$SimpleStringSplitter;",
+    "Landroid/text/TextUtils$StringWithRemovedChars;",
     "Landroid/text/TextUtils$TruncateAt;",
     "Landroid/text/TextUtils;",
     "Landroid/text/method/BaseKeyListener$1;",
@@ -1064,11 +1082,23 @@
     "Landroid/text/method/TextKeyListener$NullKeyListener;",
     "Landroid/text/method/TextKeyListener$SettingsObserver;",
     "Landroid/text/method/TextKeyListener;",
+    "Landroid/text/style/AccessibilityClickableSpan$1;",
+    "Landroid/text/style/CharacterStyle;",
+    "Landroid/text/style/UpdateAppearance;",
+    "Landroid/text/style/ClickableSpan;",
+    "Landroid/text/style/AccessibilityClickableSpan;",
+    "Landroid/text/style/AccessibilityReplacementSpan$1;",
+    "Landroid/text/style/UpdateLayout;",
+    "Landroid/text/style/MetricAffectingSpan;",
+    "Landroid/text/style/ReplacementSpan;",
+    "Landroid/text/style/AccessibilityReplacementSpan;",
+    "Landroid/text/style/URLSpan;",
+    "Landroid/text/style/AccessibilityURLSpan;",
     "Landroid/text/style/ParagraphStyle;",
     "Landroid/text/style/AlignmentSpan;",
     "Landroid/text/style/AlignmentSpan$Standard;",
-    "Landroid/text/style/CharacterStyle;",
     "Landroid/text/style/CharacterStyle$Passthrough;",
+    "Landroid/text/style/EasyEditSpan;",
     "Landroid/text/style/LeadingMarginSpan;",
     "Landroid/text/style/LeadingMarginSpan$LeadingMarginSpan2;",
     "Landroid/text/style/LeadingMarginSpan$Standard;",
@@ -1077,13 +1107,31 @@
     "Landroid/text/style/LineHeightSpan;",
     "Landroid/text/style/LineHeightSpan$Standard;",
     "Landroid/text/style/LineHeightSpan$WithDensity;",
-    "Landroid/text/style/UpdateAppearance;",
-    "Landroid/text/style/UpdateLayout;",
-    "Landroid/text/style/MetricAffectingSpan;",
+    "Landroid/text/style/LocaleSpan;",
     "Landroid/text/style/MetricAffectingSpan$Passthrough;",
-    "Landroid/text/style/ReplacementSpan;",
+    "Landroid/text/style/SpellCheckSpan;",
+    "Landroid/text/style/SuggestionRangeSpan$1;",
+    "Landroid/text/style/SuggestionRangeSpan;",
+    "Landroid/text/style/SuggestionSpan$1;",
+    "Landroid/text/style/SuggestionSpan;",
     "Landroid/text/style/TabStopSpan;",
     "Landroid/text/style/TabStopSpan$Standard;",
+    "Landroid/text/style/TtsSpan$Builder;",
+    "Landroid/text/style/TtsSpan$SemioticClassBuilder;",
+    "Landroid/text/style/TtsSpan$CardinalBuilder;",
+    "Landroid/text/style/TtsSpan$DateBuilder;",
+    "Landroid/text/style/TtsSpan$DecimalBuilder;",
+    "Landroid/text/style/TtsSpan$DigitsBuilder;",
+    "Landroid/text/style/TtsSpan$ElectronicBuilder;",
+    "Landroid/text/style/TtsSpan$FractionBuilder;",
+    "Landroid/text/style/TtsSpan$MeasureBuilder;",
+    "Landroid/text/style/TtsSpan$MoneyBuilder;",
+    "Landroid/text/style/TtsSpan$OrdinalBuilder;",
+    "Landroid/text/style/TtsSpan$TelephoneBuilder;",
+    "Landroid/text/style/TtsSpan$TextBuilder;",
+    "Landroid/text/style/TtsSpan$TimeBuilder;",
+    "Landroid/text/style/TtsSpan$VerbatimBuilder;",
+    "Landroid/text/style/TtsSpan;",
     "Landroid/util/MapCollections;",
     "Landroid/util/ArrayMap$1;",
     "Landroid/util/ArrayMap;",
@@ -1137,6 +1185,7 @@
     "Landroid/util/SparseIntArray;",
     "Landroid/util/SparseLongArray;",
     "Landroid/util/StateSet;",
+    "Landroid/util/TimeUtils;",
     "Landroid/util/TypedValue$ComplexDimensionUnit;",
     "Landroid/util/TypedValue;",
     "Landroid/util/UtilConfig;",
@@ -1146,6 +1195,16 @@
     "Landroid/view/ContextThemeWrapper;",
     "Landroid/view/RecordingCanvas;",
     "Landroid/view/DisplayListCanvas;",
+    "Landroid/view/InputEvent$1;",
+    "Landroid/view/InputEvent;",
+    "Landroid/view/KeyCharacterMap$1;",
+    "Landroid/view/KeyCharacterMap$FallbackAction;",
+    "Landroid/view/KeyCharacterMap$KeyData;",
+    "Landroid/view/KeyCharacterMap$UnavailableException;",
+    "Landroid/view/KeyCharacterMap;",
+    "Landroid/view/KeyEvent$1;",
+    "Landroid/view/KeyEvent$DispatcherState;",
+    "Landroid/view/KeyEvent;",
     "Landroid/view/LayoutInflater$BlinkLayout$1;",
     "Landroid/view/LayoutInflater$BlinkLayout;",
     "Landroid/view/LayoutInflater$Factory;",
@@ -1153,6 +1212,11 @@
     "Landroid/view/LayoutInflater$FactoryMerger;",
     "Landroid/view/LayoutInflater$Filter;",
     "Landroid/view/LayoutInflater;",
+    "Landroid/view/MotionEvent$1;",
+    "Landroid/view/MotionEvent$Classification;",
+    "Landroid/view/MotionEvent$PointerCoords;",
+    "Landroid/view/MotionEvent$PointerProperties;",
+    "Landroid/view/MotionEvent;",
     "Landroid/view/PrivacyIndicatorBounds$1;",
     "Landroid/view/PrivacyIndicatorBounds;",
     "Landroid/view/RenderNode$NoImagePreloadHolder;",
@@ -1162,6 +1226,9 @@
     "Landroid/view/RoundedCorner;",
     "Landroid/view/RoundedCorners$1;",
     "Landroid/view/RoundedCorners;",
+    "Landroid/view/VelocityTracker$Estimator;",
+    "Landroid/view/VelocityTracker$VelocityTrackerStrategy;",
+    "Landroid/view/VelocityTracker;",
     "Landroid/view/View$AccessibilityDelegate;",
     "Landroid/view/View$BaseSavedState$1;",
     "Landroid/view/View$BaseSavedState;",
@@ -1202,7 +1269,34 @@
     "Landroid/view/WindowInsets$Type$InsetsType;",
     "Landroid/view/WindowInsets$Type;",
     "Landroid/view/WindowInsets;",
+    "Landroid/view/accessibility/AccessibilityEvent$$ExternalSyntheticLambda0;",
+    "Landroid/view/accessibility/AccessibilityEvent$$ExternalSyntheticLambda1;",
+    "Landroid/view/accessibility/AccessibilityEvent$$ExternalSyntheticLambda2;",
+    "Landroid/view/accessibility/AccessibilityEvent$1;",
+    "Landroid/view/accessibility/AccessibilityEvent$ContentChangeTypes;",
+    "Landroid/view/accessibility/AccessibilityEvent$EventType;",
+    "Landroid/view/accessibility/AccessibilityEvent$SpeechStateChangeTypes;",
+    "Landroid/view/accessibility/AccessibilityEvent$WindowsChangeTypes;",
+    "Landroid/view/accessibility/AccessibilityRecord;",
+    "Landroid/view/accessibility/AccessibilityEvent;",
+    "Landroid/view/accessibility/AccessibilityInteractionClient;",
+    "Landroid/view/accessibility/AccessibilityNodeInfo$1;",
+    "Landroid/view/accessibility/AccessibilityNodeInfo$AccessibilityAction$1;",
+    "Landroid/view/accessibility/AccessibilityNodeInfo$AccessibilityAction;",
+    "Landroid/view/accessibility/AccessibilityNodeInfo$CollectionInfo;",
+    "Landroid/view/accessibility/AccessibilityNodeInfo$CollectionItemInfo$Builder;",
+    "Landroid/view/accessibility/AccessibilityNodeInfo$CollectionItemInfo;",
+    "Landroid/view/accessibility/AccessibilityNodeInfo$ExtraRenderingInfo;",
+    "Landroid/view/accessibility/AccessibilityNodeInfo$PrefetchingStrategy;",
+    "Landroid/view/accessibility/AccessibilityNodeInfo$RangeInfo;",
+    "Landroid/view/accessibility/AccessibilityNodeInfo$TouchDelegateInfo$1;",
+    "Landroid/view/accessibility/AccessibilityNodeInfo$TouchDelegateInfo;",
+    "Landroid/view/accessibility/AccessibilityNodeInfo;",
     "Landroid/view/accessibility/AccessibilityNodeProvider;",
+    "Landroid/view/accessibility/AccessibilityWindowInfo$1;",
+    "Landroid/view/accessibility/AccessibilityWindowInfo$WindowListSparseArray$1;",
+    "Landroid/view/accessibility/AccessibilityWindowInfo$WindowListSparseArray;",
+    "Landroid/view/accessibility/AccessibilityWindowInfo;",
     "Landroid/view/animation/Interpolator;",
     "Landroid/view/animation/BaseInterpolator;",
     "Landroid/view/animation/AccelerateDecelerateInterpolator;",
@@ -1270,7 +1364,27 @@
     "Lcom/android/internal/util/AnnotationValidations;",
     "Lcom/android/internal/util/ArrayUtils;",
     "Lcom/android/internal/util/BitUtils;",
+    "Lcom/android/internal/util/CollectionUtils;",
     "Lcom/android/internal/util/FastMath;",
+    "Lcom/android/internal/util/FunctionalUtils$$ExternalSyntheticLambda0;",
+    "Lcom/android/internal/util/FunctionalUtils$RemoteExceptionIgnoringConsumer$-CC;",
+    "Lcom/android/internal/util/FunctionalUtils$RemoteExceptionIgnoringConsumer;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingBiConsumer$-CC;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingBiConsumer;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingBiFunction$-CC;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingBiFunction;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingChecked2Consumer;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingCheckedConsumer;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingCheckedFunction;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingConsumer$-CC;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingConsumer;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingFunction$-CC;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingFunction;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingRunnable$-CC;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingRunnable;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingSupplier$-CC;",
+    "Lcom/android/internal/util/FunctionalUtils$ThrowingSupplier;",
+    "Lcom/android/internal/util/FunctionalUtils;",
     "Lcom/android/internal/util/GrowingArrayUtils;",
     "Lcom/android/internal/util/Parcelling$BuiltIn$ForBoolean;",
     "Lcom/android/internal/util/Parcelling$BuiltIn$ForInstant;",
@@ -1327,6 +1441,8 @@
     "Ldev/apkweb/net/BridgeSSLSocketFactory;",
     "Ldev/apkweb/net/MainThreadPolicy;",
     "Ldev/apkweb/net/NetBridge;",
+    "Ldev/apkweb/os/BundleHidden;",
+    "Ldev/apkweb/view/ViewHidden;",
     "Ljava/io/Bits;",
     "Ljava/io/FilterInputStream;",
     "Ljava/io/BufferedInputStream;",
@@ -4070,6 +4186,17 @@
       "license": "Apache-2.0"
     },
     {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/TextUtils.java",
+      "localPath": "framework-aosp/upstream/android/text/TextUtils.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/TextUtils.java?format=TEXT",
+      "sha256": "9cda7f24d20c1aa8ac196333bf10e173b0e9b0ab7693e08eae54b8dfe4f10e16",
+      "bytes": 92580,
+      "license": "Apache-2.0",
+      "role": "configuration-profile-source-extraction-input"
+    },
+    {
       "project": "platform/libcore",
       "tag": "android-13.0.0_r1",
       "path": "ojluni/src/main/java/java/util/IdentityHashMap.java",
@@ -4372,6 +4499,17 @@
       "license": "Apache-2.0",
       "localPath": "framework-aosp/upstream/android/text/TextPaint.java",
       "role": "original-runtime-source"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/KeyEvent.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/KeyEvent.java?format=TEXT",
+      "sha256": "287780a6cd1492a83fad1e529d56cb44102b37f555ba7baf0701c0cb92be7de3",
+      "bytes": 134791,
+      "license": "Apache-2.0",
+      "localPath": "framework-aosp/upstream/android/view/KeyEvent.java",
+      "role": "compile-only-ABI-reference"
     },
     {
       "project": "platform/frameworks/base",
@@ -5420,6 +5558,16 @@
       "localPath": "framework-aosp/upstream/android/compat/Compatibility.java",
       "sha256": "b8867f079c464d4a611a2a86e1e598831211f007aabee95bbe7b7f969658c519",
       "bytes": 10942,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/Region.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/Region.java?format=TEXT",
+      "localPath": "framework-aosp/upstream/android/graphics/Region.java",
+      "sha256": "8c27a607e9c87b32b72aad09059b61f8631a5aa74e84443ed8727c3350e4877e",
+      "bytes": 14724,
       "license": "Apache-2.0"
     },
     {
@@ -11423,6 +11571,206 @@
       "sha256": "86b0508875e6931be844ddaf9e94d8ea874b841f03d4d6d03907e5c01049aec0",
       "bytes": 1080,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/InputEvent.java",
+      "localPath": "framework-aosp/upstream/android/view/InputEvent.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/InputEvent.java?format=TEXT",
+      "sha256": "06936905afe3fc068fcafe2d5cb4ace672968f959e7198ae65713717108bf7b4",
+      "bytes": 8965,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/MotionEvent.java",
+      "localPath": "framework-aosp/upstream/android/view/MotionEvent.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/MotionEvent.java?format=TEXT",
+      "sha256": "6076efc8ab9d48f0346148b1caaec65349edca51e2ae427fd2ce5c1e8be81ca7",
+      "bytes": 173075,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/KeyCharacterMap.java",
+      "localPath": "framework-aosp/upstream/android/view/KeyCharacterMap.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/KeyCharacterMap.java?format=TEXT",
+      "sha256": "85853ee78fe31822a17d3de6293fe8b0e05004a230d330a854ee061e3a97713b",
+      "bytes": 32869,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/VelocityTracker.java",
+      "localPath": "framework-aosp/upstream/android/view/VelocityTracker.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/VelocityTracker.java?format=TEXT",
+      "sha256": "53c7d2a6a3bde611c3e799651eb3e0266acd1f463918b1de8f2491ded8c00904",
+      "bytes": 18148,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/accessibility/AccessibilityNodeInfo.java",
+      "localPath": "framework-aosp/upstream/android/view/accessibility/AccessibilityNodeInfo.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/accessibility/AccessibilityNodeInfo.java?format=TEXT",
+      "sha256": "e54c97bfbae24b375ae3d3014b8fa27677d063286b7503fbcf284d147c870e72",
+      "bytes": 238151,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/accessibility/AccessibilityEvent.java",
+      "localPath": "framework-aosp/upstream/android/view/accessibility/AccessibilityEvent.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/accessibility/AccessibilityEvent.java?format=TEXT",
+      "sha256": "18b43dff5273ed23aafde7363e20a91c7b2d2a5061da7ab5a9686dddf7febea0",
+      "bytes": 65754,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/accessibility/AccessibilityRecord.java",
+      "localPath": "framework-aosp/upstream/android/view/accessibility/AccessibilityRecord.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/accessibility/AccessibilityRecord.java?format=TEXT",
+      "sha256": "789412165554660c05ca9838a0c602a706922cac2062a61428e1efe8c25066dc",
+      "bytes": 30050,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/accessibility/AccessibilityWindowInfo.java",
+      "localPath": "framework-aosp/upstream/android/view/accessibility/AccessibilityWindowInfo.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/accessibility/AccessibilityWindowInfo.java?format=TEXT",
+      "sha256": "7e5f4b4c4b37f3ff5f098fb34ec9980ba78db95d4014230abdbf8a0900a19a06",
+      "bytes": 29891,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/com/android/internal/util/CollectionUtils.java",
+      "localPath": "framework-aosp/upstream/com/android/internal/util/CollectionUtils.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/util/CollectionUtils.java?format=TEXT",
+      "sha256": "d6eda36c89259ab07b3a467764316b14bcebadbe641427705a6610a265e15044",
+      "bytes": 16102,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/style/AccessibilityClickableSpan.java",
+      "localPath": "framework-aosp/upstream/android/text/style/AccessibilityClickableSpan.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/AccessibilityClickableSpan.java?format=TEXT",
+      "sha256": "1bf60cac40ac2c0b97c6eb18b961aed2cbc09d96c3a409b3d6ee02a3011b1b84",
+      "bytes": 5917,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/style/AccessibilityReplacementSpan.java",
+      "localPath": "framework-aosp/upstream/android/text/style/AccessibilityReplacementSpan.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/AccessibilityReplacementSpan.java?format=TEXT",
+      "sha256": "78bc0ca383a7facb264239444509bf453eb1ebe42fbf015a68e11618aef24bdc",
+      "bytes": 3202,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/style/AccessibilityURLSpan.java",
+      "localPath": "framework-aosp/upstream/android/text/style/AccessibilityURLSpan.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/AccessibilityURLSpan.java?format=TEXT",
+      "sha256": "266c2ea76d71cfb45fee22468b1f78b4716500c8d14da6b8b6e445a9577a2438",
+      "bytes": 2495,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/com/android/internal/util/FunctionalUtils.java",
+      "localPath": "framework-aosp/upstream/com/android/internal/util/FunctionalUtils.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/util/FunctionalUtils.java?format=TEXT",
+      "sha256": "95ebf1b06a3226163ee6f736e48cb044b5546e6691b826d5be6ba1204d9cf67b",
+      "bytes": 10876,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/style/SpellCheckSpan.java",
+      "localPath": "framework-aosp/upstream/android/text/style/SpellCheckSpan.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/SpellCheckSpan.java?format=TEXT",
+      "sha256": "10a0b179d1f5cc1e97ccff4dbe0ea19e45e3a7a37db4d8161259990f2f0ad954",
+      "bytes": 2187,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/style/URLSpan.java",
+      "localPath": "framework-aosp/upstream/android/text/style/URLSpan.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/URLSpan.java?format=TEXT",
+      "sha256": "bc86ab8a710307402594562b3a58a42ff577dffd5dd861fd6363220a0469a933",
+      "bytes": 3318,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/style/ClickableSpan.java",
+      "localPath": "framework-aosp/upstream/android/text/style/ClickableSpan.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/ClickableSpan.java?format=TEXT",
+      "sha256": "219932130b020d965eab00e3b08b5b5fed0f94de3688d62b7a40f4d3f9a5262d",
+      "bytes": 2408,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "location/java/android/location/Location.java",
+      "localPath": "framework-aosp/upstream/android/location/Location.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/location/java/android/location/Location.java?format=TEXT",
+      "sha256": "859886a0f3e5627e5b34f31362b45564a1af397b60ca4b93ca228bdd3d7b4dd8",
+      "bytes": 47716,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/PointF.java",
+      "localPath": "framework-aosp/upstream/android/graphics/PointF.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/PointF.java?format=TEXT",
+      "sha256": "2a3c5c9c032d81c405d36bc6821dcfdeb0b68ab9e7554ff772387f5fde9797ec",
+      "bytes": 4459,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/util/TimeUtils.java",
+      "localPath": "framework-aosp/upstream/android/util/TimeUtils.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/util/TimeUtils.java?format=TEXT",
+      "sha256": "0f90c9d766e68aaad4c4a3e17d7660c23cb32863dca3247be8edcaec8ea29e24",
+      "bytes": 17559,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/RegionIterator.java",
+      "localPath": "framework-aosp/upstream/android/graphics/RegionIterator.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/RegionIterator.java?format=TEXT",
+      "sha256": "34b72d1cbca20e713ad04c1732d3333ba0929c11295bcb7e4ba31b9f0c830b53",
+      "bytes": 1898,
+      "license": "Apache-2.0"
     }
   ],
   "algorithmPatches": [],
@@ -11445,12 +11793,86 @@
         "kind": "java9-anonymous-diamond-to-explicit-type-argument",
         "inputSha256": "267a69ae40a94c6d898cf27ebac106d285c969ba40da99c8f75caf78005843ee",
         "outputSha256": "278b76b22d0e268e84879777ee1e4a7d5b887e698b6d2e821ee692d5e6ba6d13"
+      },
+      {
+        "path": "android/view/accessibility/AccessibilityNodeInfo.java",
+        "kind": "hidden-api-members-to-lab-helper-or-aosp-constant",
+        "inputSha256": "e54c97bfbae24b375ae3d3014b8fa27677d063286b7503fbcf284d147c870e72",
+        "outputSha256": "3b598256c5df49735714fa48308fd3f29d7469c0487efa259f62628694d44111"
+      },
+      {
+        "path": "android/view/accessibility/AccessibilityEvent.java",
+        "kind": "hidden-api-members-to-lab-helper-or-aosp-constant",
+        "inputSha256": "18b43dff5273ed23aafde7363e20a91c7b2d2a5061da7ab5a9686dddf7febea0",
+        "outputSha256": "c8bb930808828f6508034e693f18934abd9bcf80879e8a87dc80cf4cda79bae3"
+      },
+      {
+        "path": "android/view/accessibility/AccessibilityRecord.java",
+        "kind": "hidden-api-members-to-lab-helper-or-aosp-constant",
+        "inputSha256": "789412165554660c05ca9838a0c602a706922cac2062a61428e1efe8c25066dc",
+        "outputSha256": "2aeb99ee958ab63e8d69f317ddf68608b209abd971caafaa71d7e5a55c80c13e"
+      },
+      {
+        "path": "android/view/accessibility/AccessibilityWindowInfo.java",
+        "kind": "hidden-api-members-to-lab-helper-or-aosp-constant",
+        "inputSha256": "7e5f4b4c4b37f3ff5f098fb34ec9980ba78db95d4014230abdbf8a0900a19a06",
+        "outputSha256": "8aa35389884d58dc55c3d2bcfc53a18c4e1e3aae629aa156cdcebbaec4638e27"
+      },
+      {
+        "path": "android/text/style/AccessibilityClickableSpan.java",
+        "kind": "hidden-api-members-to-lab-helper-or-aosp-constant",
+        "inputSha256": "1bf60cac40ac2c0b97c6eb18b961aed2cbc09d96c3a409b3d6ee02a3011b1b84",
+        "outputSha256": "ac168058832a913dd13a25b41f4696f2b368188babc46ee773b2385635101586"
+      },
+      {
+        "path": "android/text/style/AccessibilityReplacementSpan.java",
+        "kind": "hidden-api-members-to-lab-helper-or-aosp-constant",
+        "inputSha256": "78bc0ca383a7facb264239444509bf453eb1ebe42fbf015a68e11618aef24bdc",
+        "outputSha256": "cc74603af0706f955003fd19a2a976803cffd9dbdcde066ce48de5201c54edfd"
+      },
+      {
+        "path": "android/text/style/AccessibilityURLSpan.java",
+        "kind": "hidden-api-members-to-lab-helper-or-aosp-constant",
+        "inputSha256": "266c2ea76d71cfb45fee22468b1f78b4716500c8d14da6b8b6e445a9577a2438",
+        "outputSha256": "ccb0262e0c7e5d330fb2c60c5c04a8463b4cff251034d7e9817d73f19794b22b"
+      },
+      {
+        "path": "android/text/style/SuggestionSpan.java",
+        "kind": "theme-resolved-underline-style-to-public-api",
+        "inputSha256": "91d1a4fcb77d2ca0efcf5707d22a5eded7ab3465fad6432300bfade73571cbbc",
+        "outputSha256": "07f70063088dfeb069c72301b0d2a674e98e3f9d18efd2609dfc5f114b329b33"
+      },
+      {
+        "path": "android/location/Location.java",
+        "kind": "hidden-bundle-members-to-lab-helper",
+        "inputSha256": "859886a0f3e5627e5b34f31362b45564a1af397b60ca4b93ca228bdd3d7b4dd8",
+        "outputSha256": "7ff12cfcd888d046db97493e05c8db7b349bdf1904a95a71ecfe013a2e27892a"
+      },
+      {
+        "path": "android/util/TimeUtils.java",
+        "kind": "drop-icu-time-zone-lookup-keep-duration-formatting",
+        "inputSha256": "0f90c9d766e68aaad4c4a3e17d7660c23cb32863dca3247be8edcaec8ea29e24",
+        "outputSha256": "c9a23bb7a2858a23cc51b22fccfbda878f3fb53a9bcabcf7cab6eb5d5d50c53b"
+      },
+      {
+        "path": "android/graphics/Region.java",
+        "kind": "hidden-path-native-pointer-to-unsupported-native",
+        "inputSha256": "8c27a607e9c87b32b72aad09059b61f8631a5aa74e84443ed8727c3350e4877e",
+        "outputSha256": "5ff322b1baddeeb64b303bd6d5b55a49f17ffb1c262b4d12d4c09d3f7d74afd0"
       }
     ],
     "labAuthored": [
       {
+        "path": "framework-aosp/lab-java/android/sysprop/InputProperties.java",
+        "sha256": "6f29fdd1bd662dc1d6c84f4a66cf0e48e7de78df38ed81c06f8a0c525a1fd788"
+      },
+      {
         "path": "framework-aosp/lab-java/android/util/Slog.java",
         "sha256": "376a4252f65a3f855c9055ff1b710532c8dff571cdd1758f071612c6fd5f892e"
+      },
+      {
+        "path": "framework-aosp/lab-java/android/view/accessibility/AccessibilityInteractionClient.java",
+        "sha256": "8a40c2ec93e4a7e35218dd94ae115b128c2a1719839b348e46af6e7cd715f394"
       },
       {
         "path": "framework-aosp/lab-java/com/android/okhttp/HttpHandler.java",
@@ -11495,6 +11917,14 @@
       {
         "path": "framework-aosp/lab-java/dev/apkweb/net/NetBridge.java",
         "sha256": "d5dcebee0a63e8163daf7a82dc585a934066a4645d66302aa613590c2204c396"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/os/BundleHidden.java",
+        "sha256": "dc6b74a66d42e4252e7a6f063101cc9623800748a40c2162ce0edb5048b6178c"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/view/ViewHidden.java",
+        "sha256": "e7a822bb22d870f88a97f85e5e050c6b34b3e27a5688fae1fdf2831383249d51"
       },
       {
         "path": "framework-aosp/lab-java/java/time/zone/IcuZoneRulesProvider.java",
@@ -12640,42 +13070,6 @@
       "shellPackaged": false,
       "runtimeClasses": [
         "Landroid/text/CharacterAlgorithms;"
-      ]
-    },
-    {
-      "schemaVersion": 1,
-      "tag": "android-13.0.0_r1",
-      "originalSource": {
-        "project": "platform/frameworks/base",
-        "tag": "android-13.0.0_r1",
-        "path": "graphics/java/android/graphics/Region.java",
-        "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/Region.java?format=TEXT",
-        "localPath": "framework-aosp/upstream/android/graphics/Region.java",
-        "sha256": "8c27a607e9c87b32b72aad09059b61f8631a5aa74e84443ed8727c3350e4877e",
-        "bytes": 14724,
-        "license": "Apache-2.0"
-      },
-      "declarations": [
-        {
-          "name": "Op",
-          "originalStartByte": 1300,
-          "originalEndByte": 1642,
-          "originalStartLine": 40,
-          "bytes": 342,
-          "sha256": "205cdcb9ad95acc7761161ce6043a0de1dbf4b327e0336ff6410ea73d369463f"
-        }
-      ],
-      "extractedSourcePath": "framework-aosp/extracted/region-enum/src/android/graphics/Region.java",
-      "extractedSourceSha256": "bd3c3422396934f8073badf4b65bb9dc73ec5e450e6649796ab1949d0957aadd",
-      "algorithmPatches": [],
-      "structuralAdaptations": [
-        "One complete original enum declaration copied byte-for-byte inside a compile-only outer Region shell.",
-        "Only Region$Op.class become D8 inputs.",
-        "Region.class shell is excluded; outer Region remains the explicit graphics backend boundary."
-      ],
-      "shellPackaged": false,
-      "runtimeClasses": [
-        "Landroid/graphics/Region$Op;"
       ]
     },
     {

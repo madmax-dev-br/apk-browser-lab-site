@@ -1,10 +1,10 @@
-import { APKError } from './apk-runtime.js?v=e9d35ddef77e';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=e9d35ddef77e';
-import { gcRoot } from './heap-gc.js?v=e9d35ddef77e';
+import { APKError } from './apk-runtime.js?v=88ca7fbf670e';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=88ca7fbf670e';
+import { gcRoot } from './heap-gc.js?v=88ca7fbf670e';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
-add(VIEW, ['requestLayout()V', 'forceLayout()V', 'isLayoutRequested()Z', 'isLaidOut()Z', 'measure(II)V', 'onMeasure(II)V', 'setMeasuredDimension(II)V', 'getMeasuredWidth()I', 'getMeasuredHeight()I', 'getMeasuredWidthAndState()I', 'getMeasuredHeightAndState()I', 'getMeasuredState()I', 'getWidth()I', 'getHeight()I', 'getLeft()I', 'getTop()I', 'getRight()I', 'getBottom()I', 'layout(IIII)V', 'onLayout(ZIIII)V', 'onSizeChanged(IIII)V', 'getMinimumWidth()I', 'getMinimumHeight()I', 'getSuggestedMinimumWidth()I', 'getSuggestedMinimumHeight()I', 'setMinimumWidth(I)V', 'setMinimumHeight(I)V', 'getBaseline()I', 'isLayoutRtl()Z', 'getLayoutDirection()I', 'setLayoutDirection(I)V', 'getPaddingStart()I', 'getPaddingEnd()I', 'addOnLayoutChangeListener(Landroid/view/View$OnLayoutChangeListener;)V', 'removeOnLayoutChangeListener(Landroid/view/View$OnLayoutChangeListener;)V']);
+add(VIEW, ['requestLayout()V', 'forceLayout()V', 'isLayoutRequested()Z', 'isLaidOut()Z', 'measure(II)V', 'onMeasure(II)V', 'setMeasuredDimension(II)V', 'getMeasuredWidth()I', 'getMeasuredHeight()I', 'getMeasuredWidthAndState()I', 'getMeasuredHeightAndState()I', 'getMeasuredState()I', 'getWidth()I', 'getHeight()I', 'getLeft()I', 'getTop()I', 'getRight()I', 'getBottom()I', 'setLeft(I)V', 'setTop(I)V', 'setRight(I)V', 'setBottom(I)V', 'layout(IIII)V', 'onLayout(ZIIII)V', 'onSizeChanged(IIII)V', 'getMinimumWidth()I', 'getMinimumHeight()I', 'getSuggestedMinimumWidth()I', 'getSuggestedMinimumHeight()I', 'setMinimumWidth(I)V', 'setMinimumHeight(I)V', 'getBaseline()I', 'isLayoutRtl()Z', 'getLayoutDirection()I', 'setLayoutDirection(I)V', 'getPaddingStart()I', 'getPaddingEnd()I', 'addOnLayoutChangeListener(Landroid/view/View$OnLayoutChangeListener;)V', 'removeOnLayoutChangeListener(Landroid/view/View$OnLayoutChangeListener;)V']);
 add(VIEW, ['onScrollChanged(IIII)V', 'setOnScrollChangeListener(Landroid/view/View$OnScrollChangeListener;)V']);
 add(VIEW, ['getScrollX()I', 'getScrollY()I']);
 add(VIEW, ['scrollTo(II)V', 'scrollBy(II)V', 'setScrollX(I)V', 'setScrollY(I)V']);
@@ -182,6 +182,14 @@ export function createViewLayoutHost(platform) {
       if (name === 'removeOnLayoutChangeListener') { view.layoutListeners = (view.layoutListeners || []).filter(ref => ref.ref !== args[1]?.ref); return; }
       if (name === 'getBaseline') { if (runtime.isSubtype(view.type, 'Landroid/widget/TextView;')) { if (view.textBaseline == null) fail('Native TextView baseline requires actual font layout'); return view.textBaseline; } return -1; }
       if (name.startsWith('getMeasured')) { if (name === 'getMeasuredState') return ((view.measuredWidth || 0) & STATE) | (((view.measuredHeight || 0) >> 16) & (STATE >> 16)); const value = name.includes('Width') ? view.measuredWidth || 0 : view.measuredHeight || 0; return name.endsWith('AndState') ? value : value & SIZE; }
+      if (['setLeft', 'setTop', 'setRight', 'setBottom'].includes(name)) {   // View.setLeft/..: move one edge of the frame (Compose's ripple host view), invalidate, notify a size change
+        const bounds = view.bounds ||= { left: 0, top: 0, right: 0, bottom: 0 }, edge = name.slice(3).toLowerCase(), value = args[1] | 0;
+        if (bounds[edge] === value) return;
+        const oldWidth = bounds.right - bounds.left, oldHeight = bounds.bottom - bounds.top; bounds[edge] = value;
+        const width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
+        if (width !== oldWidth || height !== oldHeight) call(runtime, receiver, VIEW, 'onSizeChanged', '(IIII)V', [width, height, oldWidth, oldHeight]);
+        platform.requestDraw(runtime, receiver); return;
+      }
       if (['getLeft', 'getTop', 'getRight', 'getBottom', 'getWidth', 'getHeight'].includes(name)) { const bounds = view.bounds || { left: 0, top: 0, right: 0, bottom: 0 }; return name === 'getWidth' ? bounds.right - bounds.left : name === 'getHeight' ? bounds.bottom - bounds.top : bounds[name.slice(3).toLowerCase()]; }
       if (name.startsWith('setMinimum')) { view[name === 'setMinimumWidth' ? 'minimumWidth' : 'minimumHeight'] = args[1]; store(runtime, receiver, name === 'setMinimumWidth' ? 'mMinWidth' : 'mMinHeight', args[1]); request(runtime, receiver); return; }
       if (name.startsWith('getMinimum') || name.startsWith('getSuggestedMinimum')) { const width = name.endsWith('Width'); let result = view[width ? 'minimumWidth' : 'minimumHeight'] || 0; if (name.startsWith('getSuggested') && view.backgroundDrawable) result = Math.max(result, call(runtime, view.backgroundDrawable, 'Landroid/graphics/drawable/Drawable;', width ? 'getMinimumWidth' : 'getMinimumHeight', '()I')); return result; }

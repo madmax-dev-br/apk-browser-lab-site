@@ -1,6 +1,6 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=e9d35ddef77e';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=e9d35ddef77e';
-import { createDeviceView, createViewState } from './device-view.js?v=e9d35ddef77e';
+import { APKWorkerClient } from './apk-worker-client.js?v=88ca7fbf670e';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=88ca7fbf670e';
+import { createDeviceView, createViewState } from './device-view.js?v=88ca7fbf670e';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -65,7 +65,7 @@ function showError(error, title = 'Tentativa de execução interrompida') {
 }
 function reportAPKError(error, title) {
   state.lastAPKError = { error, title };
-  state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear();
+  state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0;
   $('android-content').inert = true; $('android-window-layer').inert = true;
   if (error.navigation) state.canGoBack = !!error.navigation.canGoBack;
   if (!apkVM.worker) { state.runtime = null; state.apkRunning = false; $('android-device').hidden = true; }
@@ -85,7 +85,7 @@ function beginOperation(message) {
 }
 function finishOperation(token) {
   if (token !== state.operation) return;
-  clearInterval(state.operationTimer); $('operation-panel').hidden = true; state.abortController = null; setBusy(false); if (state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size) flushPendingInputs();
+  clearInterval(state.operationTimer); $('operation-panel').hidden = true; state.abortController = null; setBusy(false); if (state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length) flushPendingInputs();
 }
 function onWorkerProgress(progress = {}) {
   const phases = { 'framework-resources': 'Carregando dados originais de estilos Android', framework: 'Carregando código AOSP compilado', manifest: 'Lendo o manifesto', dex: 'Inspecionando DEX', native: 'Inventariando bibliotecas nativas', complete: 'Inspeção concluída', launch: 'Tentando iniciar a Activity', click: 'Executando callback DEX', back: 'Retornando à Activity anterior', resources: 'Lendo recursos e layouts XML' };
@@ -98,7 +98,7 @@ function onWorkerProgress(progress = {}) {
 }
 function cancelOperation() {
   ++state.operation; state.abortController?.abort(); apkVM.cancel();
-  state.viewSession++; state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.runtime = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true; state.lastAPKError = null;
+  state.viewSession++; state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.runtime = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true; state.lastAPKError = null;
   clearInterval(state.operationTimer); $('operation-panel').hidden = true;
   $('android-device').hidden = true; $('empty-preview').hidden = state.mode !== 'apk';
   setBusy(false);
@@ -193,7 +193,7 @@ async function inspectSelectedNative() {
 }
 async function importSource(source, autoRun = false) {
   if (state.busy) return;
-  state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.viewSession++; for (const id of ['android-content', 'android-window-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear();
+  state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.viewSession++; for (const id of ['android-content', 'android-window-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0;
   switchMode('apk'); hideError(); state.runtime = null; state.inventory = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true;
   $('empty-preview').querySelector('h2').textContent = 'Seu aplicativo começa aqui.'; $('empty-preview').querySelector('p').innerHTML = 'Selecione um APK e clique em Executar.<br>Ou rode a demonstração para testar.';
   const token = beginOperation('Lendo o arquivo APK…');
@@ -247,6 +247,9 @@ const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTr
   },
   rendered(snapshot, composeReady) {
     $('empty-preview').hidden = true;
+    if (snapshot.droppedEvent) appendTrace(`Evento descartado: a View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) já não existe na VM.`);
+    // The VM raised java.lang.OutOfMemoryError (even if the app caught it): never silent.
+    if ((snapshot.vmHealth?.oomCount ?? 0) > (state.oomSeen ?? 0)) { state.oomSeen = snapshot.vmHealth.oomCount; appendTrace(`OutOfMemoryError: ${snapshot.vmHealth.lastOom?.reason} (${snapshot.vmHealth.liveObjects} objetos vivos)`); setStatus(`java.lang.OutOfMemoryError na VM (${snapshot.vmHealth.liveObjects} objetos vivos, limite ${snapshot.vmHealth.limit})`, 'error'); }
     if (state.mode === 'apk') { $('runtime-badge').className = 'runtime-badge running'; $('runtime-badge').innerHTML = '<span></span> EM EXECUÇÃO'; $('preview-name').textContent = snapshot.activityName?.split('.').pop() || state.inventory?.packageName || 'APK local'; if (composeReady === false) { $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> INICIALIZADO'; setStatus('Activity iniciada · composição ainda sem conteúdo acessível e desenhado'); } else setStatus('Activity em execução · interaja com a interface', 'ok'); }
   },
 } });

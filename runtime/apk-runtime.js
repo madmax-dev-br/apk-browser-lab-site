@@ -1,16 +1,17 @@
-import { VMClock } from './vm-clock.js?v=e9d35ddef77e';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=e9d35ddef77e';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=e9d35ddef77e';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e9d35ddef77e';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=e9d35ddef77e';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=e9d35ddef77e';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=e9d35ddef77e';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=e9d35ddef77e';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=e9d35ddef77e';
-import { APKError } from './apk-error.js?v=e9d35ddef77e';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=e9d35ddef77e';
-import { Scheduler, Blocked } from './scheduler.js?v=e9d35ddef77e';
-export { APKError } from './apk-error.js?v=e9d35ddef77e';
+import { VMClock } from './vm-clock.js?v=88ca7fbf670e';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=88ca7fbf670e';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=88ca7fbf670e';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=88ca7fbf670e';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=88ca7fbf670e';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=88ca7fbf670e';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=88ca7fbf670e';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=88ca7fbf670e';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=88ca7fbf670e';
+import { APKError } from './apk-error.js?v=88ca7fbf670e';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=88ca7fbf670e';
+import { Scheduler, Blocked } from './scheduler.js?v=88ca7fbf670e';
+import { bootClassLacksMember } from './boot-class-members.js?v=88ca7fbf670e';
+export { APKError } from './apk-error.js?v=88ca7fbf670e';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -75,11 +76,10 @@ export class DexFile {
     const indexed = (list, i, name) => { if (i >= list.length) fail(`Invalid DEX ${name} index ${i}`); return list[i]; };
     const [sn, so] = table(56, 4);
     this.strings = [];
-    let totalUnits = 0;
     for (let i = 0; i < sn; i++) {
       const c = { p: b.u32(so + i * 4) }, size = b.uleb(c);
-      totalUnits += size;
-      if (size > 1000000 || totalUnits > 32 * 1024 * 1024) fail('DEX strings exceed prototype limits');
+      // Each UTF-16 unit takes at least one MUTF-8 byte, so the file itself bounds every string.
+      if (size > b.length - c.p) fail('DEX string is longer than its file');
       const units = [];
       while (true) {
         const a = b.u8(c.p++);
@@ -259,7 +259,7 @@ export class DexProgram {
       if (bootBytes > 128 * 1024 * 1024) fail('Framework DEX layer exceeds 128 MiB');
       this.bootFiles.push({ filename, dex }); this.bootDexes.add(dex);
       for (const [name, cls] of dex.classes) {
-        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|dev\/apkweb\/net\/|com\/android\/(?:internal|icu|okhttp)\/|jdk\/(?:internal\/(?:util|misc|math)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch)|security\/(?:action|util)|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
+        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|dev\/apkweb\/(?:net|view|os)\/|com\/android\/(?:internal|icu|okhttp)\/|jdk\/(?:internal\/(?:util|misc|math)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch)|security\/(?:action|util)|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
         if (this.bootClasses.has(name)) fail(`Duplicate framework class: ${name}`);
         this.bootClasses.set(name, cls);
       }
@@ -424,7 +424,7 @@ addBridge('java/lang/System', ['getProperty(Ljava/lang/String;)Ljava/lang/String
 addBridge('java/lang/Long', ['getLong(Ljava/lang/String;)Ljava/lang/Long;', 'getLong(Ljava/lang/String;J)Ljava/lang/Long;', 'getLong(Ljava/lang/String;Ljava/lang/Long;)Ljava/lang/Long;']);
 addBridge('java/lang/Math', ['min(JJ)J','max(JJ)J','abs(J)J']);
 for (const key of ICU_BREAK_KEYS) SHIMS.add(key);
-addBridge('java/lang/Math',['pow(DD)D','log(D)D','exp(D)D','sqrt(D)D','hypot(DD)D','cos(D)D','sin(D)D','rint(D)D','ceil(D)D','floor(D)D','signum(D)D','signum(F)F','round(F)I','round(D)J']);
+addBridge('java/lang/Math',['copySign(DD)D','copySign(FF)F','nextAfter(DD)D','ulp(D)D','IEEEremainder(DD)D','cosh(D)D','expm1(D)D','log1p(D)D','pow(DD)D','log(D)D','exp(D)D','sqrt(D)D','hypot(DD)D','cos(D)D','sin(D)D','rint(D)D','ceil(D)D','floor(D)D','signum(D)D','signum(F)F','round(F)I','round(D)J']);
 for(const type of ['F','D'])addBridge('java/lang/Math',[`min(${type}${type})${type}`,`max(${type}${type})${type}`,`abs(${type})${type}`]);
 EXTERNAL_PARENTS.set('Ljava/util/concurrent/CancellationException;', 'Ljava/lang/IllegalStateException;');
 addBridge('java/util/concurrent/CancellationException',['<init>()V','<init>(Ljava/lang/String;)V']);
@@ -469,7 +469,7 @@ addBridge('java/lang/Object', ['getClass()Ljava/lang/Class;', 'hashCode()I', 'eq
 addBridge('java/lang/Class', ['getName()Ljava/lang/String;', 'getSimpleName()Ljava/lang/String;', 'getSuperclass()Ljava/lang/Class;', 'isInterface()Z',
   'isArray()Z', 'isPrimitive()Z', 'getComponentType()Ljava/lang/Class;', 'isAssignableFrom(Ljava/lang/Class;)Z', 'isInstance(Ljava/lang/Object;)Z',
   'forName(Ljava/lang/String;)Ljava/lang/Class;', 'forName(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;',
-  'desiredAssertionStatus()Z']);
+  'desiredAssertionStatus()Z', 'isEnum()Z', 'getEnumConstants()[Ljava/lang/Object;']);
 addBridge('java/lang/Class',['getAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','getDeclaredAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','isAnnotationPresent(Ljava/lang/Class;)Z','getAnnotations()[Ljava/lang/annotation/Annotation;','getDeclaredAnnotations()[Ljava/lang/annotation/Annotation;']);
 addBridge('java/lang/Class', ['getCanonicalName()Ljava/lang/String;', 'getDeclaringClass()Ljava/lang/Class;', 'getEnclosingClass()Ljava/lang/Class;',
   'getResource(Ljava/lang/String;)Ljava/net/URL;','getResourceAsStream(Ljava/lang/String;)Ljava/io/InputStream;','getEnclosingMethod()Ljava/lang/reflect/Method;', 'getEnclosingConstructor()Ljava/lang/reflect/Constructor;', 'isAnonymousClass()Z', 'isLocalClass()Z', 'isMemberClass()Z', 'getInterfaces()[Ljava/lang/Class;', 'getModifiers()I', 'getClassLoader()Ljava/lang/ClassLoader;']);
@@ -535,6 +535,7 @@ for (const type of ['Ljava/lang/String;', 'Ljava/lang/Object;', 'Ljava/lang/Char
 addBridge('java/lang/Character',['isWhitespace(C)Z','isWhitespace(I)Z','isSpaceChar(C)Z','isSpaceChar(I)Z']);
 addBridge('android/graphics/Canvas',['setCompatibilityVersion(I)V']);
 addBridge('java/lang/System',['logW(Ljava/lang/String;)V','logW(Ljava/lang/String;Ljava/lang/Throwable;)V','lineSeparator()Ljava/lang/String;']);
+addBridge('java/lang/Character',['isSurrogate(C)Z','isSurrogatePair(CC)Z','toTitleCase(C)C','toTitleCase(I)I','getType(C)I','getType(I)I','codePointBefore(Ljava/lang/CharSequence;I)I']);
 addBridge('java/lang/Character',['getDirectionality(C)B','getDirectionality(I)B','charCount(I)I','codePointAt(Ljava/lang/CharSequence;I)I','isHighSurrogate(C)Z','isLowSurrogate(C)Z','toCodePoint(CC)I','toUpperCase(C)C','toUpperCase(I)I','toLowerCase(C)C','toLowerCase(I)I','isDigit(C)Z','isDigit(I)Z','isLetter(C)Z','isLetter(I)Z','isLetterOrDigit(C)Z','isLetterOrDigit(I)Z','isUpperCase(C)Z','isUpperCase(I)Z','isLowerCase(C)Z','isLowerCase(I)Z','digit(CI)I','digit(II)I','forDigit(II)C']);
 addBridge('java/lang/String',['getBytes()[B','getBytes(Ljava/lang/String;)[B','getBytes(Ljava/nio/charset/Charset;)[B','<init>([B)V','<init>([BII)V','<init>([BI)V','<init>([BIII)V','<init>([BLjava/lang/String;)V','<init>([BLjava/nio/charset/Charset;)V','<init>([BIILjava/lang/String;)V','<init>([BIILjava/nio/charset/Charset;)V']);
 addBridge('java/lang/String',['<init>()V','<init>([C)V','<init>([CII)V','<init>(Ljava/lang/String;)V','getChars(II[CI)V','toCharArray()[C']);
@@ -554,7 +555,7 @@ addBridge('java/lang/System', ['loadLibrary(Ljava/lang/String;)V', 'load(Ljava/l
   'arraycopy(Ljava/lang/Object;ILjava/lang/Object;II)V', 'identityHashCode(Ljava/lang/Object;)I', 'currentTimeMillis()J', 'nanoTime()J']);
 addBridge('java/lang/Runtime', ['getRuntime()Ljava/lang/Runtime;', 'loadLibrary(Ljava/lang/String;)V', 'load(Ljava/lang/String;)V']);
 addBridge('java/lang/Enum', ['<init>(Ljava/lang/String;I)V', 'name()Ljava/lang/String;', 'ordinal()I', 'toString()Ljava/lang/String;']);
-addBridge('java/lang/Enum', ['compareTo(Ljava/lang/Enum;)I', 'compareTo(Ljava/lang/Object;)I', 'getDeclaringClass()Ljava/lang/Class;']);
+addBridge('java/lang/Enum', ['valueOf(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum;', 'compareTo(Ljava/lang/Enum;)I', 'compareTo(Ljava/lang/Object;)I', 'getDeclaringClass()Ljava/lang/Class;']);
 addBridge('java/lang/Integer', ['valueOf(I)Ljava/lang/Integer;', 'intValue()I', 'parseInt(Ljava/lang/String;)I', 'parseInt(Ljava/lang/String;I)I']);
 addBridge('java/lang/Boolean', ['parseBoolean(Ljava/lang/String;)Z', 'valueOf(Z)Ljava/lang/Boolean;', 'booleanValue()Z']);
 addBridge('java/lang/Math', ['min(II)I', 'max(II)I', 'abs(I)I']);
@@ -612,7 +613,10 @@ addBridge('java/util/Collections', ['synchronizedMap(Ljava/util/Map;)Ljava/util/
 EXTERNAL_PARENTS.set('Ljava/util/Collections$SynchronizedMap;', 'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set('Ljava/util/Collections$SynchronizedMap;', ['Ljava/util/Map;']);
 for (const key of [...SHIMS]) if (key.startsWith('Ljava/util/HashMap;->') && !key.includes('-><init>')) SHIMS.add(key.replace('Ljava/util/HashMap;', 'Ljava/util/Collections$SynchronizedMap;'));
-for (const type of ['[I', '[J', '[B', '[C', '[Ljava/lang/Object;']) addBridge('java/util/Arrays', [`copyOf(${type}I)${type}`, `copyOfRange(${type}II)${type}`]);
+for (const type of ['[I', '[J', '[B', '[C', '[S', '[F', '[D', '[Z', '[Ljava/lang/Object;']) addBridge('java/util/Arrays', [`copyOf(${type}I)${type}`, `copyOfRange(${type}II)${type}`]);
+// The rest of the primitive-array overloads of java.util.Arrays: toString / hashCode / natural-order sort / binarySearch (plain and ranged) for every primitive component type.
+for (const c of ['Z', 'B', 'S', 'C', 'I', 'J', 'F', 'D']) addBridge('java/util/Arrays', [`toString([${c})Ljava/lang/String;`, `hashCode([${c})I`, ...(c === 'Z' ? [] : [`sort([${c})V`, `sort([${c}II)V`, `binarySearch([${c}${c})I`, `binarySearch([${c}II${c})I`])]);
+addBridge('java/util/Arrays', ['deepHashCode([Ljava/lang/Object;)I']);
 for (const component of ['Z','B','S','C','I','J','F','D','Ljava/lang/Object;']) addBridge('java/util/Arrays', [`fill([${component}${component})V`,`fill([${component}II${component})V`,`equals([${component}[${component})Z`]);
 EXTERNAL_PARENTS.set('Ljava/util/Arrays$ArrayList;','Ljava/util/AbstractList;');
 EXTERNAL_INTERFACES.set('Ljava/util/Arrays$ArrayList;',['Ljava/util/RandomAccess;','Ljava/io/Serializable;']);
@@ -645,6 +649,31 @@ for (const name of ['java/util/concurrent/ExecutionException', 'java/util/concur
   'java/lang/NegativeArraySizeException', 'java/lang/ArrayStoreException', 'java/lang/StringIndexOutOfBoundsException', 'java/lang/NumberFormatException', 'java/lang/reflect/InvocationTargetException'])
   addBridge(name, ['<init>()V', '<init>(Ljava/lang/String;)V', '<init>(Ljava/lang/Throwable;)V', '<init>(Ljava/lang/String;Ljava/lang/Throwable;)V']);
 addBridge('java/lang/Throwable', ['getMessage()Ljava/lang/String;', 'getCause()Ljava/lang/Throwable;', 'toString()Ljava/lang/String;']);
+// More platform exception/error types (libcore hierarchy; each has the four standard Throwable constructors, which the generic Throwable bridge implements).
+const STD_THROWABLE_CTORS = ['<init>()V', '<init>(Ljava/lang/String;)V', '<init>(Ljava/lang/Throwable;)V', '<init>(Ljava/lang/String;Ljava/lang/Throwable;)V'];
+for (const [name, parent] of Object.entries({
+  'java/security/GeneralSecurityException': 'java/lang/Exception', 'java/security/KeyException': 'java/security/GeneralSecurityException', 'java/security/InvalidKeyException': 'java/security/KeyException',
+  'java/security/InvalidAlgorithmParameterException': 'java/security/GeneralSecurityException', 'java/security/NoSuchAlgorithmException': 'java/security/GeneralSecurityException',
+  'java/security/SignatureException': 'java/security/GeneralSecurityException', 'java/security/KeyStoreException': 'java/security/GeneralSecurityException',
+  'java/security/spec/InvalidKeySpecException': 'java/security/GeneralSecurityException', 'java/security/spec/InvalidParameterSpecException': 'java/security/GeneralSecurityException',
+  'java/security/InvalidParameterException': 'java/lang/IllegalArgumentException', 'java/security/cert/CertificateException': 'java/security/GeneralSecurityException',
+  'java/security/cert/CertificateEncodingException': 'java/security/cert/CertificateException', 'java/security/cert/CertificateParsingException': 'java/security/cert/CertificateException',
+  'java/security/cert/CertPathValidatorException': 'java/security/GeneralSecurityException', 'java/security/cert/CertPathBuilderException': 'java/security/GeneralSecurityException',
+  'java/security/cert/CRLException': 'java/security/GeneralSecurityException', 'javax/crypto/IllegalBlockSizeException': 'java/security/GeneralSecurityException',
+  'javax/crypto/BadPaddingException': 'java/security/GeneralSecurityException', 'javax/crypto/ShortBufferException': 'java/security/GeneralSecurityException',
+  'javax/crypto/NoSuchPaddingException': 'java/security/GeneralSecurityException', 'java/io/ObjectStreamException': 'java/io/IOException',
+  'java/io/InvalidObjectException': 'java/io/ObjectStreamException', 'java/io/NotSerializableException': 'java/io/ObjectStreamException', 'java/io/StreamCorruptedException': 'java/io/ObjectStreamException',
+  'java/nio/file/FileSystemException': 'java/io/IOException', 'java/nio/file/FileSystemLoopException': 'java/nio/file/FileSystemException',
+  'java/lang/VirtualMachineError': 'java/lang/Error', 'java/lang/OutOfMemoryError': 'java/lang/VirtualMachineError', 'java/lang/InternalError': 'java/lang/VirtualMachineError',
+  'java/lang/StackOverflowError': 'java/lang/VirtualMachineError', 'java/lang/IncompatibleClassChangeError': 'java/lang/LinkageError', 'java/lang/NoSuchMethodError': 'java/lang/IncompatibleClassChangeError',
+  'java/lang/NoSuchFieldError': 'java/lang/IncompatibleClassChangeError', 'java/lang/IllegalAccessError': 'java/lang/IncompatibleClassChangeError', 'java/lang/AbstractMethodError': 'java/lang/IncompatibleClassChangeError',
+  'java/lang/NoClassDefFoundError': 'java/lang/LinkageError', 'java/lang/ExceptionInInitializerError': 'java/lang/LinkageError', 'java/lang/ClassFormatError': 'java/lang/LinkageError',
+  'android/content/res/Resources$NotFoundException': 'java/lang/RuntimeException', 'android/view/InflateException': 'java/lang/RuntimeException',
+  'android/view/inspector/InspectionCompanion$UninitializedPropertyMapException': 'java/lang/RuntimeException'
+})) {
+  if (!EXTERNAL_PARENTS.has(`L${name};`)) EXTERNAL_PARENTS.set(`L${name};`, `L${parent};`);
+  addBridge(name, STD_THROWABLE_CTORS);
+}
 const SET_TYPES = ['java/util/HashSet', 'java/util/LinkedHashSet', 'java/util/concurrent/CopyOnWriteArraySet', 'java/util/Collections$SingletonSet'];
 for (const owner of SET_TYPES) {
   EXTERNAL_PARENTS.set(`L${owner};`, owner==='java/util/LinkedHashSet'?'Ljava/util/HashSet;':'Ljava/util/AbstractSet;'); EXTERNAL_INTERFACES.set(`L${owner};`, ['Ljava/util/Set;', 'Ljava/util/Collection;', 'Ljava/lang/Iterable;']);
@@ -719,10 +748,12 @@ addBridge('java/util/ArrayDeque', ['toArray()[Ljava/lang/Object;', '<init>(Ljava
   'poll()Ljava/lang/Object;', 'pollFirst()Ljava/lang/Object;', 'pollLast()Ljava/lang/Object;', 'getFirst()Ljava/lang/Object;', 'getLast()Ljava/lang/Object;',
   'peek()Ljava/lang/Object;', 'peekFirst()Ljava/lang/Object;', 'peekLast()Ljava/lang/Object;', 'iterator()Ljava/util/Iterator;']);
 addBridge('android/util/Log', ['isLoggable(Ljava/lang/String;I)Z', 'println(ILjava/lang/String;Ljava/lang/String;)I', 'wtf(Ljava/lang/String;Ljava/lang/String;)I', 'wtf(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I', 'wtf(Ljava/lang/String;Ljava/lang/Throwable;)I', 'getStackTraceString(Ljava/lang/Throwable;)Ljava/lang/String;']);
+addBridge('android/util/Log', ['w(Ljava/lang/String;Ljava/lang/Throwable;)I']);
 for (const name of ['v', 'd', 'i', 'w', 'e']) addBridge('android/util/Log', [`${name}(Ljava/lang/String;Ljava/lang/String;)I`, `${name}(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I`]);
 const descriptor = name => name.startsWith('L') && name.endsWith(';') ? name : `L${name.replaceAll('.', '/')};`;
 // Classes redefined by a second ClassLoader live under an internal alias descriptor (Lfoo/Bar$$ldr2;); every user-visible name is the original.
 export const LOADER_ALIAS = /\$\$ldr\d+;$/;
+const PRIMITIVE_NAMES = { Z: 'boolean', B: 'byte', S: 'short', C: 'char', I: 'int', J: 'long', F: 'float', D: 'double', V: 'void' };
 export const dottedName = name => name.replace(LOADER_ALIAS, ';').slice(1, -1).replaceAll('/', '.');
 const ref = id => ({ ref: id });
 const isNull = value => value === null || value === 0;
@@ -902,7 +933,7 @@ export class APKRuntime {
   }
   executionSnapshot() {
     return { framework: { ...(this.dex.frameworkSummary ?? { dexFiles: [], classes: 0, bytes: 0, shadowedAPKClasses: [], policy: 'no-boot-layer' }) },
-      executionByOrigin: { apk: { ...this.executionByOrigin.apk }, framework: { ...this.executionByOrigin.framework }, host: { ...this.executionByOrigin.host } }, callDepth: { limit: this.maxCallDepth, peak: this.peakCallDepth }, heapBudget: { objects: this.heap.size, limit: this.maxHeapObjects, arrayCells: this.arrayCells, fieldSlots: this.fieldSlots, collectionCells: this.collectionCells, garbageCollection: false }, instructionBudget: { limit: this.maxInstructionsPerEvent, currentEvent: this.steps }, unicodeCaseBackend: this.unicodeCaseBackend ?? null, methodEvidenceSummary:{uniqueMethods:this.methodEvidence?.size??0,truncated:!!this.methodEvidenceTruncated} };
+      executionByOrigin: { apk: { ...this.executionByOrigin.apk }, framework: { ...this.executionByOrigin.framework }, host: { ...this.executionByOrigin.host } }, callDepth: { limit: this.maxCallDepth, peak: this.peakCallDepth }, heapBudget: { oomCount: this.oomCount ?? 0, objects: this.heap.size, limit: this.maxHeapObjects, arrayCells: this.arrayCells, fieldSlots: this.fieldSlots, collectionCells: this.collectionCells, garbageCollection: !!this.gcEnabled, collections: this.gcStats?.collections ?? 0, freedObjects: this.gcStats?.freed ?? 0, peakLiveAfterCollection: this.gcStats?.peakLiveAfterGc ?? 0 }, instructionBudget: { limit: this.maxInstructionsPerEvent, currentEvent: this.steps }, unicodeCaseBackend: this.unicodeCaseBackend ?? null, methodEvidenceSummary:{uniqueMethods:this.methodEvidence?.size??0,truncated:!!this.methodEvidenceTruncated} };
   }
   compactArguments(method, words, mode) {
     const staticCall = mode === 'static';
@@ -975,7 +1006,7 @@ export class APKRuntime {
     if(this.isSubtype(object.type,'Ljava/util/AbstractList;'))this.storeField(object.fields,'Ljava/util/AbstractList;->modCount:I',object.modCount);
   }
   storeField(storage, key, value) {
-    if (!storage.has(key) && ++this.fieldSlots > 1000000) fail('Object/static field storage limit exceeded');
+    if (!storage.has(key) && ++this.fieldSlots > 1000000) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
     storage.set(key, value);
   }
   resolveField(field) {
@@ -1091,7 +1122,7 @@ export class APKRuntime {
   }
   typeOf(value) { return typeof value === 'string' ? 'Ljava/lang/String;' : this.object(value).type; }
   makeObject(type) {
-    if (this.heap.size >= this.maxHeapObjects) fail(`Object limit (${this.maxHeapObjects}) exceeded`);
+    if (this.heap.size >= this.maxHeapObjects) this.outOfMemory(`Object limit (${this.maxHeapObjects}) exceeded`);
     const id = this.nextId++;
     this.heap.set(id, { id, type, fields: new Map(), text: '', orientation: 0, textSize: 20, children: [], listener: null });
     return ref(id);
@@ -1402,6 +1433,19 @@ export class APKRuntime {
     }
     return out;
   }
+  /**
+   * The VM heap is full: like ART, throw java.lang.OutOfMemoryError into the running code. The error is also recorded on the host side (oomCount/lastOom, trace line, the
+   * heapBudget of executionSnapshot and the Worker's snapshot), so an app that catches Throwable cannot hide it from the page, the harness or the validation flows.
+   * The collector (src/heap-gc.js) runs between events; an event that allocates more than the free headroom still fails here.
+   */
+  outOfMemory(reason) {
+    this.oomCount = (this.oomCount ?? 0) + 1; this.lastOom = { reason, liveObjects: this.heap.size, limit: this.maxHeapObjects, fieldSlots: this.fieldSlots, count: this.oomCount };
+    this.record(`OOM java.lang.OutOfMemoryError: ${reason}; ${this.heap.size} live objects`);
+    if (this.inOutOfMemory) fail(reason);
+    this.inOutOfMemory = true; this.maxHeapObjects += 64;   // headroom for the throwable itself
+    try { this.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate: ${reason} (${this.heap.size} live objects)`, { kind: 'java-heap-exhausted', limit: this.maxHeapObjects - 64, liveObjects: this.heap.size }); }
+    finally { this.maxHeapObjects -= 64; this.inOutOfMemory = false; }
+  }
   throwJava(type, message, details = null) {
     const value = this.makeObject(type), obj = this.object(value); obj.message = message; obj.exceptionDetails = details; obj.stack = this.captureStack();
     throw new JavaException(value, message, details);
@@ -1625,7 +1669,7 @@ export class APKRuntime {
           const found = this.bridgeReflection(owner, kind === 'constructor' ? '<init>' : name, parameters);
           if (found) return found;
         }
-        if (owner === type) fail(`External reflection metadata is not implemented: ${owner}->${name}${parameters ? '(' + parameters.join('') + ')' : ''} (${kind})`);
+        if (owner === type && !bootClassLacksMember(owner, kind, name)) fail(`External reflection metadata is not implemented: ${owner}->${name}${parameters ? '(' + parameters.join('') + ')' : ''} (${kind})`);
         continue;
       }
       if (kind === 'field') {
@@ -1639,7 +1683,10 @@ export class APKRuntime {
       }
       if (publicOnly && kind !== 'constructor') pending.push(cls.superclass, ...cls.interfaces);
     }
-    this.throwJava(kind === 'field' ? 'Ljava/lang/NoSuchFieldException;' : 'Ljava/lang/NoSuchMethodException;', `${type}->${name}${parameters ? '(' + parameters.join('') + ')' : ''}`);
+    // ART's messages: Class.getField -> the bare name; getDeclaredField -> "No field x in class Lpkg/C;"; methods and constructors -> "pkg.C.name [class A, int]".
+    if (kind === 'field') this.throwJava('Ljava/lang/NoSuchFieldException;', publicOnly ? name : `No field ${name} in class ${type}`);
+    const typeName = descriptor => { if (/^\[/.test(descriptor)) return 'class ' + descriptor.replaceAll('/', '.'); if (!descriptor.startsWith('L')) return PRIMITIVE_NAMES[descriptor] ?? descriptor; return (((this.classes.get(descriptor)?.flags ?? 0) & 0x200) || EXTERNAL_INTERFACE_NAMES.has(descriptor) ? 'interface ' : 'class ') + dottedName(descriptor); };
+    this.throwJava('Ljava/lang/NoSuchMethodException;', `${dottedName(type)}.${kind === 'constructor' ? '<init>' : name} [${(parameters ?? []).map(typeName).join(', ')}]`);
   }
   apkCodePath(path) { return typeof path === 'string' && /^\/data\/app\/.+\/base\.apk$/.test(path); }
   bridgeReflection(owner, name, parameters) {
@@ -1766,6 +1813,29 @@ export class APKRuntime {
       return value>=0&&value<radix?value:-1;
     }
     if(method.owner==='Ljava/lang/Character;'&&name==='getDirectionality')return androidCharacterDirectionality(int(args[0]));
+    if(method.owner==='Ljava/lang/Character;'&&name==='isSurrogate'){const c=int(args[0])&0xffff;return c>=0xd800&&c<=0xdfff?1:0;}
+    if(method.owner==='Ljava/lang/Character;'&&name==='isSurrogatePair'){const h=int(args[0])&0xffff,l=int(args[1])&0xffff;return h>=0xd800&&h<=0xdbff&&l>=0xdc00&&l<=0xdfff?1:0;}
+    if(method.owner==='Ljava/lang/Character;'&&name==='toTitleCase'){
+      // UnicodeData titlecase mapping: the digraph letters (DZ, Dz, dz; LJ, NJ, DŽ families) map to their Lt form; every other character titlecases as it uppercases.
+      const cp=int(args[0]);const TITLE={0x1c4:0x1c5,0x1c5:0x1c5,0x1c6:0x1c5,0x1c7:0x1c8,0x1c8:0x1c8,0x1c9:0x1c8,0x1ca:0x1cb,0x1cb:0x1cb,0x1cc:0x1cb,0x1f1:0x1f2,0x1f2:0x1f2,0x1f3:0x1f2};
+      if(TITLE[cp]!==undefined)return TITLE[cp];
+      const source=cp>=0&&cp<=0x10ffff?String.fromCodePoint(cp):'',mapped=source.toUpperCase();return source&&[...mapped].length===1?mapped.codePointAt(0):cp;
+    }
+    if(method.owner==='Ljava/lang/Character;'&&name==='getType'){
+      // java.lang.Character.getType: the Unicode general category as the Character.* byte constants.
+      const cp=int(args[0]);if(cp<0||cp>0x10ffff)return 0;const ch=String.fromCodePoint(cp);
+      const CATEGORIES=[['Cn',0],['Lu',1],['Ll',2],['Lt',3],['Lm',4],['Lo',5],['Mn',6],['Me',7],['Mc',8],['Nd',9],['Nl',10],['No',11],['Zs',12],['Zl',13],['Zp',14],['Cc',15],['Cf',16],['Co',18],['Cs',19],['Pd',20],['Ps',21],['Pe',22],['Pc',23],['Po',24],['Sm',25],['Sc',26],['Sk',27],['So',28],['Pi',29],['Pf',30]];
+      for(const [category,value] of CATEGORIES)if(category!=='Cn'&&new RegExp(`^\\p{${category}}$`,'u').test(ch))return value;
+      return 0;
+    }
+    if(method.owner==='Ljava/lang/Character;'&&name==='codePointBefore'){
+      const seq=args[0],index=int(args[1]);if(seq===null||seq===undefined)this.throwJava('Ljava/lang/NullPointerException;','Attempt to get length of null object');
+      const at=i=>typeof seq==='string'?seq.charCodeAt(i):int(this.dispatch({owner:'Ljava/lang/CharSequence;',name:'charAt',parameters:['I'],result:'C',signature:'(I)C'},[seq,i],'virtual'));
+      const length=typeof seq==='string'?seq.length:int(this.dispatch({owner:'Ljava/lang/CharSequence;',name:'length',parameters:[],result:'I',signature:'()I'},[seq],'virtual'));
+      if(index<1||index>length)this.throwJava('Ljava/lang/IndexOutOfBoundsException;',`index=${index}, length=${length}`);
+      const low=at(index-1);if(low>=0xdc00&&low<=0xdfff&&index>=2){const high=at(index-2);if(high>=0xd800&&high<=0xdbff)return ((high-0xd800)<<10)+(low-0xdc00)+0x10000;}
+      return low;
+    }
     if(method.owner==='Ljava/lang/Character;'&&['charCount','codePointAt','isHighSurrogate','isLowSurrogate','toCodePoint'].includes(name))return this.dispatch({...method,owner:'Landroid/text/CharacterAlgorithms;'},this.argumentWords(method.parameters,args),'static');
     if(method.owner==='Ljava/lang/reflect/Array;'&&['getLength','get','set'].includes(name)){
       // java.lang.reflect.Array: non-array receivers raise IllegalArgumentException("Argument is not an array"); index errors ArrayIndexOutOfBoundsException.
@@ -1807,7 +1877,7 @@ export class APKRuntime {
       if(array.elements.length>values.length)array.elements[values.length]=null;
       return target;
     }
-    if(staticCall&&name==='hashCode'&&method.parameters.length===1&&method.signature.length===5){
+    if(staticCall&&name==='hashCode'&&method.parameters.length===1&&method.signature.length===5&&/^[ZBSCIJFD]$/.test(method.parameters[0])){
       const kind=method.parameters[0];
       if(kind==='Z')return args[0]?1231:1237;
       if(kind==='J'){const v=BigInt.asUintN(64,wide(args[0]));return Number(BigInt.asIntN(32,v^(v>>32n)));}
@@ -2082,6 +2152,15 @@ export class APKRuntime {
       }
       if(name==='pow')return doubleBits(Math.pow(doubleNumber(args[0]),doubleNumber(args[1])));
       if(['log','exp','sqrt','cos','sin','ceil','floor'].includes(name))return doubleBits(Math[name](doubleNumber(args[0])));
+      if(name==='copySign'){const double=method.parameters[0]==='D',decode=double?doubleNumber:floatNumber,encode=double?doubleBits:floatBits,m=decode(args[0]),sgn=decode(args[1]);const negative=Number.isNaN(sgn)?false:(sgn<0||Object.is(sgn,-0));return encode(negative?-Math.abs(m):Math.abs(m));}
+      if(name==='nextAfter'&&method.parameters[0]==='D'){
+        const start=doubleNumber(args[0]),direction=doubleNumber(args[1]);if(Number.isNaN(start)||Number.isNaN(direction))return doubleBits(NaN);if(start===direction)return doubleBits(direction);
+        if(start===0)return doubleBits(direction>0?Number.MIN_VALUE:-Number.MIN_VALUE);
+        const view=new DataView(new ArrayBuffer(8));view.setFloat64(0,start);let bits=view.getBigUint64(0);bits+=(direction>start)===(start>0)?1n:-1n;view.setBigUint64(0,bits);return doubleBits(view.getFloat64(0));
+      }
+      if(name==='ulp'&&method.parameters[0]==='D'){const x=Math.abs(doubleNumber(args[0]));if(!Number.isFinite(x))return doubleBits(Number.isNaN(x)?NaN:Infinity);const view=new DataView(new ArrayBuffer(8));view.setFloat64(0,x);const bits=view.getBigUint64(0);if(x===Number.MAX_VALUE)return doubleBits(2**971);view.setBigUint64(0,bits+1n);return doubleBits(view.getFloat64(0)-x);}
+      if(name==='IEEEremainder'){const x=doubleNumber(args[0]),y=doubleNumber(args[1]);if(Number.isNaN(x)||Number.isNaN(y)||!Number.isFinite(x)||y===0)return doubleBits(NaN);if(!Number.isFinite(y))return doubleBits(x);const q=x/y;let n=Math.round(q);if(Math.abs(q-Math.trunc(q))===0.5)n=2*Math.round(q/2);const r=x-n*y;return doubleBits(r===0?(x<0?-0:0):r);}
+      if(['cosh','expm1','log1p'].includes(name))return doubleBits(Math[name](doubleNumber(args[0])));
       if(name==='hypot')return doubleBits(Math.hypot(doubleNumber(args[0]),doubleNumber(args[1])));
       if(name==='signum'){const decode=method.parameters[0]==='F'?floatNumber:doubleNumber,encode=method.result==='F'?floatBits:doubleBits,n=decode(args[0]);return Number.isNaN(n)||n===0?args[0]:encode(n<0?-1:1);}
       if(name==='round'){
@@ -2098,7 +2177,7 @@ export class APKRuntime {
     }
     if (method.owner === 'Landroid/text/TextUtils;') return name === 'isEmpty' ? (isNull(args[0]) || args[0] === '' ? 1 : 0) : (equal(args[0], args[1]) ? 1 : 0);
     if (method.owner === 'Ljava/util/Arrays;') {
-      if(name==='sort'){
+      if(name==='sort'&&method.parameters[0]==='[Ljava/lang/Object;'||name==='sort'&&method.parameters.at(-1)==='Ljava/util/Comparator;'){
         const array=this.array(args[0]),ranged=method.parameters.length===4,from=ranged?int(args[1]):0,to=ranged?int(args[2]):array.elements.length,comparator=args[ranged?3:1];
         if(from>to)this.throwJava('Ljava/lang/IllegalArgumentException;','fromIndex > toIndex');if(from<0||to>array.elements.length)this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','Arrays.sort range');
         if(isNull(comparator))fail('Natural-order sorting requires a Comparable bridge; provide the APK Comparator');this.object(comparator);
@@ -2122,6 +2201,32 @@ export class APKRuntime {
         const value=narrow(args[ranged?3:1],source.type.slice(1));this.checkArrayValue(source,value);source.elements.fill(value,from,to);return;
       }
       if (name === 'asList') {if(!source.type.startsWith('[L')&&!source.type.startsWith('[['))this.throwJava('Ljava/lang/ClassCastException;','Arrays.asList requires a reference array');const value = this.makeObject('Ljava/util/Arrays$ArrayList;'); Object.assign(this.object(value),{list:source.elements,fixedSize:true,arrayRef:args[0],modCount:0});return value;}
+      {   // primitive-array overloads (toString / hashCode / natural sort / binarySearch) -- elements: float = int bits, double = long bits, long = BigInt, boolean = 0/1
+        const component = source.type[1], isFloat = component === 'F', isDouble = component === 'D', isLong = component === 'J';
+        const floatOf = bits => { const v = new DataView(new ArrayBuffer(4)); v.setInt32(0, int(bits), true); return v.getFloat32(0, true); };
+        const doubleOf = bits => { const v = new DataView(new ArrayBuffer(8)); v.setBigInt64(0, wide(bits), true); return v.getFloat64(0, true); };
+        const numeric = v => isFloat ? floatOf(v) : isDouble ? doubleOf(v) : isLong ? wide(v) : int(v);
+        const order = (a, b) => { if (a < b) return -1; if (a > b) return 1; if (typeof a === 'number' && (Number.isNaN(a) || Number.isNaN(b))) return Number.isNaN(a) ? (Number.isNaN(b) ? 0 : 1) : -1; if (a === 0 && b === 0 && typeof a === 'number') return Object.is(a, b) ? 0 : Object.is(a, -0) ? -1 : 1; return 0; };
+        if (name === 'sort' && method.parameters.length <= 3 && source.type.length === 2 && component !== 'Z' && (method.parameters.length === 1 || method.parameters[1] === 'I')) {
+          const ranged = method.parameters.length === 3, from = ranged ? int(args[1]) : 0, to = ranged ? int(args[2]) : source.elements.length;
+          if (from > to) this.throwJava('Ljava/lang/IllegalArgumentException;', `fromIndex(${from}) > toIndex(${to})`); if (from < 0 || to > source.elements.length) this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `Array index out of range: ${from < 0 ? from : to}`);
+          const part = source.elements.slice(from, to).sort((a, b) => order(numeric(a), numeric(b))); for (let i = 0; i < part.length; i++) source.elements[from + i] = part[i]; return;
+        }
+        if (name === 'toString' && source.type.length === 2) {
+          const text = v => component === 'Z' ? (int(v) ? 'true' : 'false') : component === 'C' ? String.fromCharCode(int(v) & 0xffff) : isFloat ? this.javaString(int(v), 'F') : isDouble ? this.javaString(wide(v), 'D') : String(isLong ? wide(v) : int(v));
+          return '[' + source.elements.map(text).join(', ') + ']';
+        }
+        if (name === 'hashCode' && source.type.length === 2 && component !== 'I' && component !== 'J') {
+          let h = 1; const view = new DataView(new ArrayBuffer(8));
+          for (const v of source.elements) { let e; if (component === 'Z') e = int(v) ? 1231 : 1237; else if (isDouble) { const bits = BigInt.asUintN(64, wide(v)); e = Number(BigInt.asIntN(32, bits ^ (bits >> 32n))); } else e = int(v); h = (Math.imul(31, h) + e) | 0; } void view; return h;
+        }
+        if (name === 'binarySearch' && source.type.length === 2 && (isDouble || component === 'B' || component === 'S' || component === 'C' || method.parameters.length === 4) && component !== 'F' && !(isLong && method.parameters.length === 2)) {
+          const ranged = method.parameters.length === 4, from = ranged ? int(args[1]) : 0, to = ranged ? int(args[2]) : source.elements.length, key = numeric(args[ranged ? 3 : 1]);
+          if (from > to) this.throwJava('Ljava/lang/IllegalArgumentException;', `fromIndex(${from}) > toIndex(${to})`); if (from < 0 || to > source.elements.length) this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', 'Array index out of range');
+          let low = from, high = to - 1; while (low <= high) { const mid = (low + high) >>> 1, c = order(numeric(source.elements[mid]), key); if (c < 0) low = mid + 1; else if (c > 0) high = mid - 1; else return mid; } return -(low + 1);
+        }
+      }
+      if (name === 'deepHashCode') { const hash = value => { if (isNull(value)) return 0; const o = this.object(value); if (o.elements && o.type.startsWith('[L') || o.elements && o.type.startsWith('[[')) { let h = 1; for (const v of o.elements) h = (Math.imul(31, h) + hash(v)) | 0; return h; } if (o.elements) return this.dispatch({ owner: 'Ljava/util/Arrays;', name: 'hashCode', parameters: [o.type], result: 'I', signature: `(${o.type})I` }, [value], 'static'); return this.javaHash(value); }; return hash(args[0]); }
       if (name === 'hashCode') { let h = 1; const wideKind = source.type === '[J'; for (const v of source.elements) h = (Math.imul(31, h) + (wideKind ? Number(BigInt.asIntN(32, wide(v) ^ (wide(v) >> 32n))) : int(v))) | 0; return h; }
       if (name === 'toString' && source.type.startsWith('[L')) return '[' + source.elements.map(v => isNull(v) ? 'null' : this.javaString(v, 'Ljava/lang/Object;')).join(', ') + ']';
       if (name === 'binarySearch' && method.parameters[0] === '[F') { // java.util.Arrays.binarySearch(float[], float): Float.compare order (-0.0 < 0.0, NaN last), as DualPivot/Arrays use floatToIntBits
@@ -2159,6 +2264,19 @@ export class APKRuntime {
       obj.list = name === 'singletonList' ? [args[0]] : name === 'unmodifiableList' ? this.collectionValues(this.object(args[0])) : [];
       obj.readOnly = true; return value;
     }
+    if (method.owner === 'Ljava/lang/Enum;' && name === 'valueOf') {   // Enum.valueOf(Class, String): the constant of that name among the enum class's ACC_ENUM static fields
+      if (isNull(args[0]) || isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', isNull(args[0]) ? 'enumClass == null' : 'name == null');
+      const type = this.object(args[0]).classType, cls = type && this.classes.get(type);
+      if (!cls || !this.isSubtype(type, 'Ljava/lang/Enum;')) this.throwJava('Ljava/lang/ClassCastException;', `${(type ?? '').slice(1, -1).replaceAll('/', '.')} is not an enum type`);
+      this.initialize(type);
+      const wanted = this.stringCharacters(args[1]);
+      for (const entry of cls.staticFields) {
+        if (!(entry.flags & 0x4000)) continue;
+        const field = cls.dex.fields[entry.index], value = this.staticFields.get(field.key);
+        if (value && typeof value === 'object' && this.object(value).enumName !== undefined && this.stringCharacters(this.object(value).enumName) === wanted) return value;
+      }
+      this.throwJava('Ljava/lang/IllegalArgumentException;', `No enum constant ${type.slice(1, -1).replaceAll('/', '.').replaceAll('$', '.')}.${wanted}`);
+    }
     if (method.owner === 'Ljava/lang/ThreadLocal;' && name === 'withInitial') { const local = this.makeObject('Ljava/lang/ThreadLocal;'); this.object(local).threadLocalSupplier = args[0]; return local; } // SuppliedThreadLocal
     if (method.owner === 'Ljava/lang/Thread;' && name === 'currentThread') return this.mainThread ??= this.makeObject('Ljava/lang/Thread;');
     if (method.owner === 'Landroid/os/Looper;' && name === 'getMainLooper') return this.mainLooper ??= this.makeObject('Landroid/os/Looper;');
@@ -2181,7 +2299,10 @@ export class APKRuntime {
         return lines.join('\n') + '\n';
       }
       if (name === 'println') { const level = ({ 2: 'V', 3: 'D', 4: 'I', 5: 'W', 6: 'E', 7: 'A' })[int(args[0])] ?? 'V', text = `${args[1]}: ${args[2] ?? ''}`; this.record(`LOG ${level} ${text}`); return new TextEncoder().encode(text).length; }
-      const message = `${args[0]}: ${args[1] ?? ''}`; this.record(`LOG ${name === 'wtf' ? 'A' : name.toUpperCase()} ${message}`); return new TextEncoder().encode(message).length;
+      // Log.x(tag, msg, tr) logs msg + '\n' + getStackTraceString(tr); Log.w(tag, tr) / Log.wtf(tag, tr) log just the stack trace string.
+      const trace = throwable => this.dispatch({ owner: 'Landroid/util/Log;', name: 'getStackTraceString', parameters: ['Ljava/lang/Throwable;'], result: 'Ljava/lang/String;', signature: '(Ljava/lang/Throwable;)Ljava/lang/String;' }, [throwable], 'static');
+      const text = method.parameters.length === 3 ? `${args[1] ?? ''}\n${trace(args[2])}` : method.parameters[1] === 'Ljava/lang/Throwable;' ? trace(args[1]) : (args[1] ?? '');
+      const message = `${args[0]}: ${text}`; this.record(`LOG ${name === 'wtf' ? 'A' : name.toUpperCase()} ${message}`); return new TextEncoder().encode(message).length;
     }
     if (method.owner === 'Landroid/os/Handler;' && name === 'createAsync') {
       this.object(args[0]); const value = this.makeObject(method.owner); this.object(value).looper = args[0]; this.object(value).async = true; return value;
@@ -2228,10 +2349,12 @@ export class APKRuntime {
       if (name === 'toString') return String(int(args[0]));
       if (name === 'valueOf') { const object = this.makeObject(method.owner); this.object(object).boxed = int(args[0]); return object; }
       if (name === 'parseInt') {
-        const value = String(args[0]), radix = args[1] ?? 10;
-        if (radix < 2 || radix > 36 || !/^[+-]?[0-9a-z]+$/i.test(value)) fail('Integer.parseInt invalid input');
-        for (const c of value.replace(/^[+-]/, '').toLowerCase()) if (parseInt(c, 36) >= radix) fail('Integer.parseInt invalid digit');
-        const n = parseInt(value, radix); if (n < -2147483648 || n > 2147483647) fail('Integer.parseInt overflow'); return n | 0;
+        if (isNull(args[0])) this.throwJava('Ljava/lang/NumberFormatException;', 'Cannot parse null string');
+        const value = this.stringCharacters(args[0]), radix = args[1] ?? 10, invalid = () => this.throwJava('Ljava/lang/NumberFormatException;', `For input string: "${value}"${radix === 10 ? '' : ` under radix ${radix}`}`);
+        if (radix < 2 || radix > 36) this.throwJava('Ljava/lang/NumberFormatException;', `radix ${radix} ${radix < 2 ? 'less than Character.MIN_RADIX' : 'greater than Character.MAX_RADIX'}`);
+        if (!/^[+-]?[0-9a-z]+$/i.test(value)) invalid();
+        for (const c of value.replace(/^[+-]/, '').toLowerCase()) if (parseInt(c, 36) >= radix) invalid();
+        const n = parseInt(value, radix); if (n < -2147483648 || n > 2147483647) invalid(); return n | 0;
       }
     }
     if (method.owner === 'Ljava/lang/Boolean;' && staticCall) return this.readStatic({ owner: method.owner, name: args[0] ? 'TRUE' : 'FALSE', type: method.owner, key: `${method.owner}->${args[0] ? 'TRUE' : 'FALSE'}:${method.owner}` });
@@ -2910,6 +3033,11 @@ export class APKRuntime {
       if (name === 'getClassLoader') { if (this.classOwners?.has(type)) { const owner = this.classOwners.get(type); return this.object(owner).type === 'Ldalvik/system/DexFile;' ? (this.dexFileLoaders?.get(type) ?? null) : owner; } const definition = this.classes.get(type.replace(/^\[+/, '')); if (type.length === 1 || !definition || this.dex.bootDexes?.has(definition.dex)) return null; return this.applicationClassLoader ??= this.platform?.classLoaders?.createApplicationLoader(this) ?? this.makeObject('Ljava/lang/ClassLoader;'); }
       if (name === 'getSuperclass') { const parent = this.classes.get(type)?.flags & 0x200 ? null : type.startsWith('[') ? 'Ljava/lang/Object;' : this.parent(type); return parent ? this.classObject(parent) : null; }
       if (name === 'isInterface') return (this.classes.get(type)?.flags??(EXTERNAL_INTERFACE_NAMES.has(type)?0x200:0))&0x200?1:0;
+      if (name === 'isEnum') { const flags = this.classes.get(type)?.flags ?? 0; return flags & 0x4000 && this.parent(type) === 'Ljava/lang/Enum;' ? 1 : 0; }
+      if (name === 'getEnumConstants') {   // Class.getEnumConstantsShared: the enum's values() array (a copy), null for a class that is not an enum
+        const flags = this.classes.get(type)?.flags ?? 0; if (!(flags & 0x4000 && this.parent(type) === 'Ljava/lang/Enum;')) return null;
+        this.initialize(type); return this.dispatch({ owner: type, name: 'values', parameters: [], result: `[${type}`, signature: `()[${type}` }, [], 'static');
+      }
       if (name === 'isPrimitive') return type.length === 1 ? 1 : 0;
       if (name === 'isArray') return type.startsWith('[') ? 1 : 0;
       if (name === 'getComponentType') return type.startsWith('[') ? this.classObject(type.slice(1)) : null;

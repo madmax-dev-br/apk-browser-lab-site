@@ -1,6 +1,6 @@
-import { createRasterReceiver } from './raster-cache.js?v=e9d35ddef77e';
+import { createRasterReceiver } from './raster-cache.js?v=88ca7fbf670e';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=e9d35ddef77e', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 30000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=88ca7fbf670e', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 30000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -17,7 +17,10 @@ export class APKWorkerClient {
       if (worker !== this.worker) return;
       // Every snapshot, delivered or not, passes the raster cache in order so Worker and page LRUs stay identical.
       if (data?.snapshot) { try { this.rasters.resolve(data.snapshot); } catch (error) { this.cancel(error); return; } }
+      if (data?.type === 'runtime-busy') { this.onRuntimeBusy?.(true); return; }
+      if (data?.type === 'runtime-idle') { this.onRuntimeBusy?.(false); return; }
       if (data?.type === 'runtime-event') { this.onRuntimeSnapshot?.(data.snapshot); return; }
+      if (data?.type === 'runtime-error') this.onRuntimeBusy?.(false);
       if (data?.type === 'runtime-error') { const error = new Error(data.error?.message || 'Falha em callback assíncrono da VM.'); Object.assign(error, data.error || {}); this.onRuntimeError?.(error); return; }
       const pending = this.pending;
       if (worker !== this.worker || !pending || data?.requestId !== pending.requestId) return;
@@ -62,6 +65,8 @@ export class APKWorkerClient {
     return (await this.request('click', { id }, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot;
   }
   async setDevice(device) { const response = await this.request('device', { device }, { timeoutMs: this.eventTimeoutMs }); return { outcome: response.outcome, snapshot: response.snapshot ?? null }; }
+  /** One pointer sample for a Compose view: { ownerViewId, action (0 down,1 up,2 move,3 cancel), x, y (dp inside the view), t (ms, page clock) }. */
+  async pointer(sample) { return (await this.request('pointer', sample, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async press(id, pressed) { return (await this.request('press', { id, pressed }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async focus(id, focused) { return (await this.request('focus', { id, focused }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async input(id, text) { return (await this.request('input', { id, text }, { timeoutMs: this.eventTimeoutMs })).snapshot; }

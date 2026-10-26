@@ -138,6 +138,7 @@ export function collectGarbage(runtime, { audit = globalThis.process?.env?.APKWE
     fieldSlots += record.fields?.size ?? 0; if (record.elements) arrayCells += record.elements.length;
     collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
   }
+  runtime.gcNextAt = Math.min(Math.floor(runtime.maxHeapObjects * 0.85), heap.size + Math.floor(runtime.maxHeapObjects * 0.25));
   runtime.gcLastNextId = runtime.nextId; runtime.fieldSlots = fieldSlots; runtime.arrayCells = arrayCells; runtime.collectionCells = collectionCells;
   runtime.gcStats = { collections: (runtime.gcStats?.collections ?? 0) + 1, freed: (runtime.gcStats?.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(runtime.gcStats?.peakLiveAfterGc ?? 0, heap.size), lastReason: reason };
   return { collected: true, reason, before, after: heap.size, freed, ms: Math.round(performance.now() - started), markMs: Math.round(markMs) };
@@ -147,8 +148,9 @@ export function collectGarbage(runtime, { audit = globalThis.process?.env?.APKWE
 export function maybeCollect(runtime, options = {}) {
   const audit = options.audit ?? globalThis.process?.env?.APKWEB_GC_AUDIT === '1';
   if (!audit && !runtime.gcEnabled) return { collected: false, reason: 'disabled', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // opt-in until the audit suites are clean
-  const threshold = options.threshold ?? Math.floor(runtime.maxHeapObjects * 0.4);
-  if (runtime.gcLastNextId === runtime.nextId) return { collected: false, reason: 'nothing-allocated', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // no allocation since the last collection: nothing new can be garbage
-  if (!audit && runtime.heap.size < threshold) return { collected: false, reason: 'below-threshold', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };
+  const threshold = options.threshold ?? Math.floor(runtime.maxHeapObjects * 0.5);
+  if (!audit && runtime.gcLastNextId === runtime.nextId) return { collected: false, reason: 'nothing-allocated', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // no allocation since the last collection: nothing new can be garbage
+  // Hysteresis: after a collection the next one waits until the heap grew by 25% of the limit (a heap that is legitimately large must not be re-scanned on every event).
+  if (!audit && runtime.heap.size < Math.max(threshold, runtime.gcNextAt ?? 0)) return { collected: false, reason: 'below-threshold', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };
   return collectGarbage(runtime, { ...options, audit, reason: audit ? 'audit' : 'threshold' });
 }

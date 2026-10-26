@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=e9d35ddef77e';
+import { APKError } from './apk-runtime.js?v=88ca7fbf670e';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;';
 const OWNER = 'Landroidx/compose/ui/semantics/SemanticsOwner;', NODE = 'Landroidx/compose/ui/semantics/SemanticsNode;', CONFIG = 'Landroidx/compose/ui/semantics/SemanticsConfiguration;', KEY = 'Landroidx/compose/ui/semantics/SemanticsPropertyKey;';
 const ACTION = 'Landroidx/compose/ui/semantics/AccessibilityAction;', ANNOTATED = 'Landroidx/compose/ui/text/AnnotatedString;', RECT = 'Landroidx/compose/ui/geometry/Rect;';
@@ -61,6 +61,12 @@ export function createComposeSemanticsDriver(runtime) {
     }
     return values;
   };
+  /** ProgressBarRangeInfo (Slider, progress indicators): current value, [start, end] and the number of discrete steps. */
+  const rangeInfo = value => {
+    const RANGE_INFO = 'Landroidx/compose/ui/semantics/ProgressBarRangeInfo;', RANGE = 'Lkotlin/ranges/ClosedFloatingPointRange;', COMPARABLE = 'Ljava/lang/Comparable;';
+    const range = call(value, RANGE_INFO, 'getRange', `()${RANGE}`), unbox = box => call(box, 'Ljava/lang/Float;', 'floatValue', '()F');
+    return { current: float(call(value, RANGE_INFO, 'getCurrent', '()F')), start: float(unbox(call(range, 'Lkotlin/ranges/ClosedRange;', 'getStart', `()${COMPARABLE}`))), end: float(unbox(call(range, 'Lkotlin/ranges/ClosedRange;', 'getEndInclusive', `()${COMPARABLE}`))), steps: call(value, RANGE_INFO, 'getSteps', '()I') };
+  };
   const normalize = (viewId, ref, parentId) => {
     const nodeId = call(ref, NODE, 'getId', '()I'), config = call(ref, NODE, 'getConfig', `()${CONFIG}`), values = properties(config);
     const rect = call(ref, NODE, 'getBoundsInRoot', `()${RECT}`), bounds = {};
@@ -80,6 +86,7 @@ export function createComposeSemanticsDriver(runtime) {
       selected: values.has('Selected') ? boolean(values.get('Selected')) : null,
       toggleState: values.has('ToggleableState') ? string(call(values.get('ToggleableState'), 'Ljava/lang/Enum;', 'name', '()Ljava/lang/String;')) : null,
       role: values.has('Role') ? runtime.javaString(values.get('Role')) : null,
+      rangeInfo: values.has('ProgressBarRangeInfo') ? rangeInfo(values.get('ProgressBarRangeInfo')) : null,
       isDialog: values.has('IsDialog'), isPopup: values.has('IsPopup'), boundsInRoot: bounds,
       placed: bounds.right > bounds.left && bounds.bottom > bounds.top,
       propertyNames: [...values.keys()], actions };

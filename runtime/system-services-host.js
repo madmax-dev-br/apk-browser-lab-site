@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=e9d35ddef77e';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=e9d35ddef77e';
+import { APKError } from './apk-error.js?v=88ca7fbf670e';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=88ca7fbf670e';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -173,6 +173,12 @@ export function createSystemServicesHost(platform) {
   def(STE, 'getClassName', '()Ljava/lang/String;', (r, _m, [self]) => r.object(self).ste.cls); def(STE, 'getMethodName', '()Ljava/lang/String;', (r, _m, [self]) => r.object(self).ste.method);
   def(STE, 'getFileName', '()Ljava/lang/String;', (r, _m, [self]) => r.object(self).ste.file); def(STE, 'getLineNumber', '()I', (r, _m, [self]) => r.object(self).ste.line);
   def(STE, 'isNativeMethod', '()Z', () => 0);
+  // new StackTraceElement(declaringClass, methodName, fileName, lineNumber): the only public constructor on Android; the first two arguments must not be null (libcore message "Declaring class is null").
+  def(STE, '<init>', '(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V', (r, _m, [self, cls, method, file, line]) => {
+    if (cls === null) r.throwJava('Ljava/lang/NullPointerException;', 'Declaring class is null');
+    if (method === null) r.throwJava('Ljava/lang/NullPointerException;', 'Method name is null');
+    r.object(self).ste = { cls: r.stringCharacters(cls), method: r.stringCharacters(method), file: file === null ? null : r.stringCharacters(file), line };
+  });
   const steText = e => `${e.cls}.${e.method}(${e.file ? e.file + (e.line >= 0 ? ':' + e.line : '') : 'Unknown Source'})`;
   def(STE, 'toString', '()Ljava/lang/String;', (r, _m, [self]) => steText(r.object(self).ste));
   /** The lines printStackTrace writes: "Type: message", the frames, then "Caused by:" sections. */

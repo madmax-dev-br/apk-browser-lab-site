@@ -1,49 +1,50 @@
-import { createComposeCanvasHost } from './compose-canvas-host.js?v=e9d35ddef77e';
-import { createViewTransformHost } from './view-transform-host.js?v=e9d35ddef77e';
-import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=e9d35ddef77e';
-import { createViewOutlineHost } from './view-outline-host.js?v=e9d35ddef77e';
-import { createShaderHost } from './shader-host.js?v=e9d35ddef77e';
-import { createSystemBarsHost } from './system-bars-host.js?v=e9d35ddef77e';
-import { createDeviceStateHost } from './device-state-host.js?v=e9d35ddef77e';
-import { createJobSchedulerHost } from './job-scheduler-host.js?v=e9d35ddef77e';
-import { createPendingIntentHost } from './pending-intent-host.js?v=e9d35ddef77e';
-import { createBinderHost } from './binder-host.js?v=e9d35ddef77e';
-import { resolveDevice } from './device-profile.js?v=e9d35ddef77e';
-import { configurationFor } from './device-configuration.js?v=e9d35ddef77e';
-import { createViewCoordinateHost } from './view-coordinate-host.js?v=e9d35ddef77e';
-import { createEditableTextHost } from './editable-text-host.js?v=e9d35ddef77e';
-import { createComponentCallbacksHost } from './component-callbacks-host.js?v=e9d35ddef77e';
-import { createViewStateHost } from './view-state-host.js?v=e9d35ddef77e';
-import { createLocaleServiceHost } from './locale-service-host.js?v=e9d35ddef77e';
-import { APKError } from './apk-runtime.js?v=e9d35ddef77e';
-import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=e9d35ddef77e';
-import { createViewTreeHost } from './view-tree-host.js?v=e9d35ddef77e';
-import { createDialogWindowHost } from './dialog-window-host.js?v=e9d35ddef77e';
-import { createViewWindowHost } from './view-window-host.js?v=e9d35ddef77e';
-import { createVectorCanvasHost } from './vector-native.js?v=e9d35ddef77e';
-import { createPaintHost } from './paint-host.js?v=e9d35ddef77e';
-import { createContentResolverHost } from './content-resolver-host.js?v=e9d35ddef77e';
-import { createDrawableViewHost } from './drawable-view-host.js?v=e9d35ddef77e';
-import { createDeviceServicesHost } from './device-services-host.js?v=e9d35ddef77e';
-import { createSystemServicesHost } from './system-services-host.js?v=e9d35ddef77e';
-import { createJavaIoHost } from './java-io-host.js?v=e9d35ddef77e';
-import { createClassLoaderHost } from './class-loader-host.js?v=e9d35ddef77e';
-import { createAppServicesHost } from './app-services-host.js?v=e9d35ddef77e';
-import { createConcurrencyHost } from './concurrency-host.js?v=e9d35ddef77e';
-import { createDateTimeHost } from './datetime-host.js?v=e9d35ddef77e';
-import { createFormatterHost } from './formatter-host.js?v=e9d35ddef77e';
-import { createCryptoHost } from './crypto-host.js?v=e9d35ddef77e';
-import { createDatabaseSupportHost } from './database-support-host.js?v=e9d35ddef77e';
-import { VMClock } from './vm-clock.js?v=e9d35ddef77e';
-import { createWindowInsetsHost } from './window-insets-host.js?v=e9d35ddef77e';
-import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=e9d35ddef77e';
-import { createViewLayoutHost } from './view-layout-host.js?v=e9d35ddef77e';
-import { createInputMethodServiceHost } from './input-method-service-host.js?v=e9d35ddef77e';
-import { createAutofillServiceHost } from './autofill-service-host.js?v=e9d35ddef77e';
-import { createClipboardServiceHost } from './clipboard-service-host.js?v=e9d35ddef77e';
-import { createViewInputHost } from './view-input-host.js?v=e9d35ddef77e';
-import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=e9d35ddef77e';
-import { maybeCollect } from './heap-gc.js?v=e9d35ddef77e';
+import { createComposeCanvasHost } from './compose-canvas-host.js?v=88ca7fbf670e';
+import { createViewTransformHost } from './view-transform-host.js?v=88ca7fbf670e';
+import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=88ca7fbf670e';
+import { createViewOutlineHost } from './view-outline-host.js?v=88ca7fbf670e';
+import { createShaderHost } from './shader-host.js?v=88ca7fbf670e';
+import { createSystemBarsHost } from './system-bars-host.js?v=88ca7fbf670e';
+import { createDeviceStateHost } from './device-state-host.js?v=88ca7fbf670e';
+import { createJobSchedulerHost } from './job-scheduler-host.js?v=88ca7fbf670e';
+import { createPendingIntentHost } from './pending-intent-host.js?v=88ca7fbf670e';
+import { createBinderHost } from './binder-host.js?v=88ca7fbf670e';
+import { createInputManagerHost } from './input-native.js?v=88ca7fbf670e';
+import { resolveDevice } from './device-profile.js?v=88ca7fbf670e';
+import { configurationFor } from './device-configuration.js?v=88ca7fbf670e';
+import { createViewCoordinateHost } from './view-coordinate-host.js?v=88ca7fbf670e';
+import { createEditableTextHost } from './editable-text-host.js?v=88ca7fbf670e';
+import { createComponentCallbacksHost } from './component-callbacks-host.js?v=88ca7fbf670e';
+import { createViewStateHost } from './view-state-host.js?v=88ca7fbf670e';
+import { createLocaleServiceHost } from './locale-service-host.js?v=88ca7fbf670e';
+import { APKError } from './apk-runtime.js?v=88ca7fbf670e';
+import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=88ca7fbf670e';
+import { createViewTreeHost } from './view-tree-host.js?v=88ca7fbf670e';
+import { createDialogWindowHost } from './dialog-window-host.js?v=88ca7fbf670e';
+import { createViewWindowHost } from './view-window-host.js?v=88ca7fbf670e';
+import { createVectorCanvasHost } from './vector-native.js?v=88ca7fbf670e';
+import { createPaintHost } from './paint-host.js?v=88ca7fbf670e';
+import { createContentResolverHost } from './content-resolver-host.js?v=88ca7fbf670e';
+import { createDrawableViewHost } from './drawable-view-host.js?v=88ca7fbf670e';
+import { createDeviceServicesHost } from './device-services-host.js?v=88ca7fbf670e';
+import { createSystemServicesHost } from './system-services-host.js?v=88ca7fbf670e';
+import { createJavaIoHost } from './java-io-host.js?v=88ca7fbf670e';
+import { createClassLoaderHost } from './class-loader-host.js?v=88ca7fbf670e';
+import { createAppServicesHost } from './app-services-host.js?v=88ca7fbf670e';
+import { createConcurrencyHost } from './concurrency-host.js?v=88ca7fbf670e';
+import { createDateTimeHost } from './datetime-host.js?v=88ca7fbf670e';
+import { createFormatterHost } from './formatter-host.js?v=88ca7fbf670e';
+import { createCryptoHost } from './crypto-host.js?v=88ca7fbf670e';
+import { createDatabaseSupportHost } from './database-support-host.js?v=88ca7fbf670e';
+import { VMClock } from './vm-clock.js?v=88ca7fbf670e';
+import { createWindowInsetsHost } from './window-insets-host.js?v=88ca7fbf670e';
+import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=88ca7fbf670e';
+import { createViewLayoutHost } from './view-layout-host.js?v=88ca7fbf670e';
+import { createInputMethodServiceHost } from './input-method-service-host.js?v=88ca7fbf670e';
+import { createAutofillServiceHost } from './autofill-service-host.js?v=88ca7fbf670e';
+import { createClipboardServiceHost } from './clipboard-service-host.js?v=88ca7fbf670e';
+import { createViewInputHost } from './view-input-host.js?v=88ca7fbf670e';
+import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=88ca7fbf670e';
+import { maybeCollect } from './heap-gc.js?v=88ca7fbf670e';
 
 const ACTIVITY = 'Landroid/app/Activity;', INTENT = 'Landroid/content/Intent;', BUNDLE = 'Landroid/os/Bundle;';
 const APPLICATION = 'Landroid/app/Application;', APP_CONTEXT = 'Landroid/app/ContextImpl;';
@@ -106,8 +107,8 @@ add(MARGIN_PARAMS, [`<init>(${MARGIN_PARAMS})V`]);
 add('Landroid/widget/LinearLayout$LayoutParams;', ['<init>(IIF)V']); add(MARGIN_PARAMS, ['setMargins(IIII)V']);
 add('Landroid/view/View;', ['setLayoutParams(Landroid/view/ViewGroup$LayoutParams;)V', 'getLayoutParams()Landroid/view/ViewGroup$LayoutParams;', 'setTag(ILjava/lang/Object;)V', 'getTag(I)Ljava/lang/Object;', 'setTag(Ljava/lang/Object;)V', 'getTag()Ljava/lang/Object;']);
 const WIDGET_PARENTS = { FrameLayout: 'Landroid/view/ViewGroup;', ScrollView: 'Landroid/widget/FrameLayout;', EditText: 'Landroid/widget/TextView;', CompoundButton: 'Landroid/widget/Button;', CheckBox: 'Landroid/widget/CompoundButton;', Switch: 'Landroid/widget/CompoundButton;', ProgressBar: 'Landroid/view/View;' };
-add('Landroid/view/ViewGroup;', ['addViewInLayout(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;)Z', 'addViewInLayout(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;Z)Z', 'removeViewInLayout(Landroid/view/View;)V', 'detachViewFromParent(I)V', 'detachViewFromParent(Landroid/view/View;)V', 'detachViewsFromParent(II)V', 'detachAllViewsFromParent()V', 'attachViewToParent(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;)V', 'removeDetachedView(Landroid/view/View;Z)V']);
-for (const owner of ['Landroid/view/ViewParent;', 'Landroid/view/ViewGroup;']) add(owner, ['onDescendantInvalidated(Landroid/view/View;Landroid/view/View;)V']);
+add('Landroid/view/ViewGroup;', ['addViewInLayout(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;)Z', 'addViewInLayout(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;Z)Z', 'removeViewInLayout(Landroid/view/View;)V', 'removeAllViewsInLayout()V', 'detachViewFromParent(I)V', 'detachViewFromParent(Landroid/view/View;)V', 'detachViewsFromParent(II)V', 'detachAllViewsFromParent()V', 'attachViewToParent(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;)V', 'removeDetachedView(Landroid/view/View;Z)V']);
+for (const owner of ['Landroid/view/ViewParent;', 'Landroid/view/ViewGroup;']) add(owner, ['onDescendantInvalidated(Landroid/view/View;Landroid/view/View;)V', 'requestDisallowInterceptTouchEvent(Z)V']);
 for (const name of Object.keys(WIDGET_PARENTS)) add(`Landroid/widget/${name};`, ['<init>(Landroid/content/Context;)V']);
 add('Landroid/widget/EditText;', ['getText()Landroid/text/Editable;']);
 add('Landroid/widget/TextView;', ['setText(Ljava/lang/CharSequence;)V', 'addTextChangedListener(Landroid/text/TextWatcher;)V', 'removeTextChangedListener(Landroid/text/TextWatcher;)V', 'setHint(Ljava/lang/CharSequence;)V', 'getHint()Ljava/lang/CharSequence;']);
@@ -115,12 +116,13 @@ add('Landroid/widget/CompoundButton;', ['setChecked(Z)V', 'isChecked()Z', 'toggl
 add('Landroid/widget/ProgressBar;', ['setProgress(I)V', 'getProgress()I', 'setMax(I)V', 'getMax()I', 'setIndeterminate(Z)V', 'isIndeterminate()Z']);
 add('Landroid/view/View;', ['setVisibility(I)V', 'getVisibility()I', 'setBackgroundColor(I)V']);
 add(EDITABLE, ['toString()Ljava/lang/String;', 'length()I', 'charAt(I)C', 'subSequence(II)Ljava/lang/CharSequence;']);
-const VALUE_TYPES = new Map([['String', 'Ljava/lang/String;'], ['CharSequence', 'Ljava/lang/CharSequence;'], ['Int', 'I'], ['Long', 'J'], ['Boolean', 'Z'], ['Float', 'F'], ['Double', 'D'], ['Bundle', BUNDLE], ['Parcelable', 'Landroid/os/Parcelable;'], ['Serializable', 'Ljava/io/Serializable;'], ['StringArray', '[Ljava/lang/String;'], ['IntArray', '[I'], ['ByteArray', '[B'], ['StringArrayList', 'Ljava/util/ArrayList;'], ['IntegerArrayList', 'Ljava/util/ArrayList;'], ['ParcelableArrayList', 'Ljava/util/ArrayList;'], ['ParcelableArray', '[Landroid/os/Parcelable;'], ['SparseParcelableArray', 'Landroid/util/SparseArray;']]);
+const VALUE_TYPES = new Map([['String', 'Ljava/lang/String;'], ['CharSequence', 'Ljava/lang/CharSequence;'], ['Int', 'I'], ['Long', 'J'], ['Boolean', 'Z'], ['Float', 'F'], ['Double', 'D'], ['Bundle', BUNDLE], ['Parcelable', 'Landroid/os/Parcelable;'], ['Serializable', 'Ljava/io/Serializable;'], ['StringArray', '[Ljava/lang/String;'], ['IntArray', '[I'], ['ByteArray', '[B'], ['StringArrayList', 'Ljava/util/ArrayList;'], ['IntegerArrayList', 'Ljava/util/ArrayList;'], ['ParcelableArrayList', 'Ljava/util/ArrayList;'], ['ParcelableArray', '[Landroid/os/Parcelable;'], ['SparseParcelableArray', 'Landroid/util/SparseArray;'], ['LongArray', '[J'], ['FloatArray', '[F'], ['DoubleArray', '[D'], ['BooleanArray', '[Z'], ['CharArray', '[C'], ['ShortArray', '[S'], ['Byte', 'B'], ['Char', 'C'], ['Short', 'S'], ['Binder', 'Landroid/os/IBinder;'], ['CharSequenceArray', '[Ljava/lang/CharSequence;'], ['CharSequenceArrayList', 'Ljava/util/ArrayList;'], ['Size', 'Landroid/util/Size;'], ['SizeF', 'Landroid/util/SizeF;']]);
 for (const owner of [BUNDLE, 'Landroid/os/BaseBundle;', 'Landroid/os/PersistableBundle;']) {
   add(owner, ['<init>()V', '<init>(I)V', `<init>(${BUNDLE})V`, 'size()I', 'isEmpty()Z', 'containsKey(Ljava/lang/String;)Z', 'remove(Ljava/lang/String;)V', 'clear()V', `putAll(${BUNDLE})V`, 'keySet()Ljava/util/Set;', 'get(Ljava/lang/String;)Ljava/lang/Object;', 'clone()Ljava/lang/Object;', 'deepCopy()Landroid/os/Bundle;', 'setClassLoader(Ljava/lang/ClassLoader;)V', 'getClassLoader()Ljava/lang/ClassLoader;']);
   for (const [name, type] of VALUE_TYPES) {
     add(owner, [`put${name}(Ljava/lang/String;${type})V`, `get${name}(Ljava/lang/String;)${type}`]);
-    if (['String', 'Int', 'Long', 'Boolean', 'Float', 'Double'].includes(name)) add(owner, [`get${name}(Ljava/lang/String;${type})${type}`]);
+    if (['String', 'Int', 'Long', 'Boolean', 'Float', 'Double', 'Byte', 'Char', 'Short', 'CharSequence'].includes(name)) add(owner, [`get${name}(Ljava/lang/String;${type})${type}`]);
+    if (['Parcelable', 'ParcelableArray', 'ParcelableArrayList', 'Serializable', 'SparseParcelableArray'].includes(name)) add(owner, [`get${name}(Ljava/lang/String;Ljava/lang/Class;)${name === 'Serializable' ? 'Ljava/io/Serializable;' : type}`]);   // Android 13 typed getters
   }
 }
 for (const [name, type] of VALUE_TYPES) {
@@ -154,7 +156,7 @@ function checkString(value, context) { if (typeof value !== 'string') error(`${c
 
 /** Explicit local Activity/Intent/Bundle and basic XML Views subset. Never bridges AndroidX. */
 export class AndroidPlatform {
-  constructor({ resources = null, applicationName = null, packageName = null, manifest = null, apkBytes = null, device = null } = {}) { this.device = resolveDevice(device || {}); this.clock = new VMClock(); this.apkBytes = apkBytes; this.manifest = manifest; this.resources = resources; this.applicationName = applicationName; this.packageName = packageName; this.application = null; this.applicationState = 'new'; this.frames = []; this.taskClosed = false; this.resourceObject = null; this.finishedActivities = new Set(); this.eventQueue = []; this.eventSequence = 0; this.virtualProcess = { source: 'browser-vm', pid: 1, uid: 10000, foreground: true }; this.transactionSequence = 0; this.porterModes = new Map(); this.inflaters = new Map(); this.applicationCallbacks = []; this.styleBackend = new AndroidStyleBackend(this); this.viewTreeHost = createViewTreeHost(this); this.viewWindowHost = createViewWindowHost(this); this.canvasHost = createVectorCanvasHost(); this.paintHost = createPaintHost(); this.contentHost = createContentResolverHost(this); this.drawableViewHost = createDrawableViewHost(this); this.deviceServices = createDeviceServicesHost(this); this.insetsHost = createWindowInsetsHost(this); this.accessibilityService = createAccessibilityServiceHost(this); this.viewLayoutHost = createViewLayoutHost(this); this.autofillService = createAutofillServiceHost(this); this.inputMethodService = createInputMethodServiceHost(); this.clipboardService = createClipboardServiceHost(this); this.viewInputHost = createViewInputHost(this); this.xmlHost = new AndroidXmlHost(this); this.localeService = createLocaleServiceHost(this); this.viewStateHost = createViewStateHost(); this.componentCallbacksHost = createComponentCallbacksHost(this); this.editableTextHost = createEditableTextHost(this); this.viewCoordinateHost = createViewCoordinateHost(this); this.viewTransformHost = createViewTransformHost(this); this.viewPropertyAnimatorHost = createViewPropertyAnimatorHost(this); this.viewOutlineHost = createViewOutlineHost(this); this.composeCanvasHost = createComposeCanvasHost(this); this.dialogWindowHost = createDialogWindowHost(this); this.systemServices = createSystemServicesHost(this); this.javaIo = createJavaIoHost(this); this.classLoaders = createClassLoaderHost(this); this.appServices = createAppServicesHost(this); this.concurrency = createConcurrencyHost(this); this.dateTime = createDateTimeHost(this); this.formatter = createFormatterHost(this); this.crypto = createCryptoHost(this); this.databaseSupport = createDatabaseSupportHost(this); this.shaderHost = createShaderHost(this); this.systemBarsHost = createSystemBarsHost(this); this.deviceState = createDeviceStateHost(this); this.jobScheduler = createJobSchedulerHost(this); this.pendingIntents = createPendingIntentHost(this); this.binderHost = createBinderHost(this); this.contractHosts = [this.systemServices, this.javaIo, this.classLoaders, this.appServices, this.concurrency, this.dateTime, this.formatter, this.crypto, this.databaseSupport, this.shaderHost, this.deviceState, this.jobScheduler, this.pendingIntents, this.binderHost]; }
+  constructor({ resources = null, applicationName = null, packageName = null, manifest = null, apkBytes = null, device = null } = {}) { this.device = resolveDevice(device || {}); this.clock = new VMClock(); this.apkBytes = apkBytes; this.manifest = manifest; this.resources = resources; this.applicationName = applicationName; this.packageName = packageName; this.application = null; this.applicationState = 'new'; this.frames = []; this.taskClosed = false; this.resourceObject = null; this.finishedActivities = new Set(); this.eventQueue = []; this.eventSequence = 0; this.virtualProcess = { source: 'browser-vm', pid: 1, uid: 10000, foreground: true }; this.transactionSequence = 0; this.porterModes = new Map(); this.inflaters = new Map(); this.applicationCallbacks = []; this.styleBackend = new AndroidStyleBackend(this); this.viewTreeHost = createViewTreeHost(this); this.viewWindowHost = createViewWindowHost(this); this.canvasHost = createVectorCanvasHost(); this.paintHost = createPaintHost(); this.contentHost = createContentResolverHost(this); this.drawableViewHost = createDrawableViewHost(this); this.deviceServices = createDeviceServicesHost(this); this.insetsHost = createWindowInsetsHost(this); this.accessibilityService = createAccessibilityServiceHost(this); this.viewLayoutHost = createViewLayoutHost(this); this.autofillService = createAutofillServiceHost(this); this.inputMethodService = createInputMethodServiceHost(); this.clipboardService = createClipboardServiceHost(this); this.viewInputHost = createViewInputHost(this); this.xmlHost = new AndroidXmlHost(this); this.localeService = createLocaleServiceHost(this); this.viewStateHost = createViewStateHost(); this.componentCallbacksHost = createComponentCallbacksHost(this); this.editableTextHost = createEditableTextHost(this); this.viewCoordinateHost = createViewCoordinateHost(this); this.viewTransformHost = createViewTransformHost(this); this.viewPropertyAnimatorHost = createViewPropertyAnimatorHost(this); this.viewOutlineHost = createViewOutlineHost(this); this.composeCanvasHost = createComposeCanvasHost(this); this.dialogWindowHost = createDialogWindowHost(this); this.systemServices = createSystemServicesHost(this); this.javaIo = createJavaIoHost(this); this.classLoaders = createClassLoaderHost(this); this.appServices = createAppServicesHost(this); this.concurrency = createConcurrencyHost(this); this.dateTime = createDateTimeHost(this); this.formatter = createFormatterHost(this); this.crypto = createCryptoHost(this); this.databaseSupport = createDatabaseSupportHost(this); this.shaderHost = createShaderHost(this); this.systemBarsHost = createSystemBarsHost(this); this.deviceState = createDeviceStateHost(this); this.jobScheduler = createJobSchedulerHost(this); this.pendingIntents = createPendingIntentHost(this); this.binderHost = createBinderHost(this); this.inputManagerHost = createInputManagerHost(this); this.contractHosts = [this.systemServices, this.javaIo, this.classLoaders, this.appServices, this.concurrency, this.dateTime, this.formatter, this.crypto, this.databaseSupport, this.shaderHost, this.deviceState, this.jobScheduler, this.pendingIntents, this.binderHost, this.inputManagerHost]; }
   readStatic(runtime, field) {
     for (const host of this.contractHosts) { const hosted = host.readStatic(runtime, field); if (hosted) return hosted; }
     // Android 13 Bundle.EMPTY: one singleton whose mMap is the immutable ArrayMap.EMPTY; any insertion throws UnsupportedOperationException("ArrayMap is immutable").
@@ -644,6 +646,11 @@ export class AndroidPlatform {
       if (name === 'onBackPressed') return this.finish(runtime, receiver);
     }
     const object = runtime.object(receiver);
+    if (name === 'requestDisallowInterceptTouchEvent') {   // ViewGroup: set/clear FLAG_DISALLOW_INTERCEPT, then ask the parent the same
+      const want = !!args[1]; if (!!object.disallowIntercept === want) return; object.disallowIntercept = want;
+      if (object.parent) runtime.dispatch({ owner: 'Landroid/view/ViewParent;', name, parameters: ['Z'], result: 'V', signature: '(Z)V' }, [object.parent, want ? 1 : 0], 'virtual');
+      return;
+    }
     if (name === 'onDescendantInvalidated') {
       runtime.object(args[1]); runtime.object(args[2]); object.drawingCacheValid = false;
       this.requestDraw(runtime, receiver);
@@ -691,7 +698,7 @@ export class AndroidPlatform {
       if (name === 'getDimensionPixelOffset') return Math.trunc(resource.value);
       return resource.value;
     }
-    if (['Landroid/view/ViewGroup;', 'Landroid/widget/LinearLayout;', 'Landroid/widget/FrameLayout;', 'Landroid/widget/ScrollView;'].includes(owner) && ['getChildCount', 'getChildAt', 'indexOfChild', 'removeViewAt', 'removeViews', 'removeAllViews', 'removeView', 'removeViewInLayout', 'detachViewFromParent', 'detachViewsFromParent', 'detachAllViewsFromParent', 'attachViewToParent', 'removeDetachedView', 'addView', 'addViewInLayout', 'setClipChildren', 'getClipChildren', 'setClipToPadding', 'getClipToPadding'].includes(name)) {
+    if (['Landroid/view/ViewGroup;', 'Landroid/widget/LinearLayout;', 'Landroid/widget/FrameLayout;', 'Landroid/widget/ScrollView;'].includes(owner) && ['getChildCount', 'getChildAt', 'indexOfChild', 'removeViewAt', 'removeViews', 'removeAllViews', 'removeAllViewsInLayout', 'removeView', 'removeViewInLayout', 'detachViewFromParent', 'detachViewsFromParent', 'detachAllViewsFromParent', 'attachViewToParent', 'removeDetachedView', 'addView', 'addViewInLayout', 'setClipChildren', 'getClipChildren', 'setClipToPadding', 'getClipToPadding'].includes(name)) {
       if (name === 'setClipChildren') { object.clipChildren = !!args[1]; this.requestDraw(runtime, receiver); return; } if (name === 'getClipChildren') return object.clipChildren === false ? 0 : 1; if (name === 'setClipToPadding') { object.clipToPadding = !!args[1]; this.requestDraw(runtime, receiver); return; } if (name === 'getClipToPadding') return object.clipToPadding === false ? 0 : 1;
       if (name === 'getChildCount') return object.children.length;
       if (name === 'getChildAt') return object.children[args[1]] ?? null;
@@ -702,6 +709,7 @@ export class AndroidPlatform {
       }
       if (name === 'indexOfChild') return object.children.findIndex(child => sameRef(child, args[1])); // AOSP ViewGroup.indexOfChild: identity index, -1 when absent
       if (name === 'removeAllViews') { for (const child of [...object.children]) this.invoke(runtime, { owner: 'Landroid/view/ViewGroup;', name: 'removeView' }, [receiver, child]); return; }
+      if (name === 'removeAllViewsInLayout') { for (const child of [...object.children].reverse()) this.invoke(runtime, { owner: 'Landroid/view/ViewGroup;', name: 'removeViewInLayout' }, [receiver, child]); return; }   // ViewGroup.removeAllViewsInLayout: no requestLayout
       // AOSP ViewGroup detach/attach: only the parent link and child array change; no window detach, onViewRemoved/Added, or layout request (callers like RecyclerView re-attach or removeDetachedView later).
       if (name === 'detachViewFromParent' || name === 'detachViewsFromParent') {
         const view = method.parameters?.[0] === 'Landroid/view/View;'; let start = view ? object.children.findIndex(child => sameRef(child, args[1])) : args[1]; const count = name === 'detachViewsFromParent' ? args[2] : 1;
@@ -715,12 +723,12 @@ export class AndroidPlatform {
         this.invoke(runtime, { owner: 'Landroid/view/View;', name: 'setLayoutParams' }, [args[1], args[3]]); runtime.object(args[1]).parent = receiver; object.children.splice(at, 0, args[1]); this.requestDraw(runtime, receiver); return;
       }
       if (name === 'removeDetachedView') {
-        const child = runtime.object(args[1]); if (child.attached) this.attachTree(runtime, args[1], false);
+        const child = runtime.object(args[1]); if (child.attached) { this.viewWindowHost.unfocusSubtree(runtime, args[1]); this.attachTree(runtime, args[1], false); }
         runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'onViewRemoved', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [receiver, args[1]], 'virtual'); return;
       }
       if (name === 'removeView' || name === 'removeViewInLayout') {
         if (!object.children.some(child => sameRef(child, args[1]))) return;
-        const child = runtime.object(args[1]); if (child.attached) this.attachTree(runtime, args[1], false);
+        const child = runtime.object(args[1]); if (child.attached) { this.viewWindowHost.unfocusSubtree(runtime, args[1]); this.attachTree(runtime, args[1], false); }
         const index = object.children.findIndex(value => sameRef(value, args[1])); if (index < 0) return; object.children.splice(index, 1); if (sameRef(child.parent, receiver)) child.parent = null;
         runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'onViewRemoved', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [receiver, args[1]], 'virtual'); this.requestDraw(runtime, receiver); if (object.laidOut && name !== 'removeViewInLayout') this.viewLayoutHost.invoke(runtime, { name: 'requestLayout' }, [receiver]); return;
       }
@@ -825,8 +833,11 @@ export class AndroidPlatform {
     }
     if (name.startsWith('put')) return this.put(runtime, args[0], args[1], method.parameters[1], args[2]);
     if (name.startsWith('get')) {
-      const type = method.result; const fallback = args.length > 2 ? args[2] : ['J', 'D'].includes(type) ? 0n : /^[ZIF]$/.test(type) ? 0 : null;
-      return this.get(runtime, args[0], args[1], type, fallback);
+      const type = method.result, typed = method.parameters[1] === 'Ljava/lang/Class;';
+      const fallback = args.length > 2 && !typed ? args[2] : ['J', 'D'].includes(type) ? 0n : /^[ZIFBCS]$/.test(type) ? 0 : null;
+      const found = this.get(runtime, args[0], args[1], typed && method.name !== 'getSerializable' ? this.extras(runtime, args[0]).get(args[1])?.type ?? type : type, fallback);
+      if (typed && !nullish(found) && !nullish(args[2]) && !runtime.isSubtype(runtime.typeOf(found), runtime.object(args[2]).classType ?? 'Ljava/lang/Object;') && !Array.isArray(runtime.object(found).elements)) return null;   // BaseBundle.getValue(key, clazz): a mismatched type is warned about and read as null
+      return found;
     }
     error(`Unsupported Bundle operation ${name}`);
   }
@@ -877,8 +888,11 @@ export class AndroidPlatform {
   attachTree(runtime, ref, attached, seen = new Set()) {
     if (!ref) return; const object = runtime.object(ref);
     if (seen.has(object.id) || seen.size >= 4096) error('Cyclic/excessive attachment hierarchy'); seen.add(object.id);
+    // ViewGroup.dispatchAttachedToWindow runs the parent first; dispatchDetachedFromWindow runs the children first (Compose's AndroidViewHolder needs its owner while detaching).
+    if (!attached) for (const child of [...object.children]) this.attachTree(runtime, child, false, seen);
     if (!!object.attached !== attached) {
-      object.attached = attached;
+      // View.dispatchDetachedFromWindow keeps mAttachInfo (isAttachedToWindow() == true) through onDetachedFromWindow and the OnAttachStateChangeListeners; it is cleared last.
+      if (attached) object.attached = true;
       this.viewWindowHost.afterAttach(runtime, ref, attached);
       this.insetsHost.afterAttach(runtime, ref, attached);
       this.viewLayoutHost.afterAttach(runtime, ref, attached);
@@ -887,8 +901,9 @@ export class AndroidPlatform {
       this.drawableViewHost.afterAttach(runtime, ref, attached);
       this.viewTreeHost.afterAttach(runtime, ref, attached);
       for (const listener of [...(object.attachListeners || [])]) runtime.dispatch({ owner: runtime.object(listener).type, name: attached ? 'onViewAttachedToWindow' : 'onViewDetachedFromWindow', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [listener, ref], 'virtual');
+      if (!attached) object.attached = false;
     }
-    for (const child of [...object.children]) this.attachTree(runtime, child, attached, seen);
+    if (attached) for (const child of [...object.children]) this.attachTree(runtime, child, true, seen);
   }
   notifyActivity(runtime, frame, event, bundle) {
     const parameters = [ACTIVITY]; const values = [frame.activity];
@@ -898,9 +913,10 @@ export class AndroidPlatform {
   lifecycleCall(runtime, receiver, name, parameters = [], values = []) {
     const activity = runtime.isSubtype(runtime.object(receiver).type, ACTIVITY), frame = activity ? this.frames.find(frame => sameRef(frame.activity, receiver)) : null;
     const before = { onPause: 3, onStop: 2, onDestroy: 0 };
-    if (frame && Object.hasOwn(before, name)) { if (name === 'onDestroy') { frame.destroyed = true; this.attachTree(runtime, frame.root, false); } this.moveFragments(runtime, frame, before[name]); }
+    if (frame && Object.hasOwn(before, name)) { if (name === 'onDestroy') frame.destroyed = true; this.moveFragments(runtime, frame, before[name]); }
     const result = runtime.dispatch({ owner: runtime.object(receiver).type, name, signature: `(${parameters.join('')})V`, parameters, result: 'V' }, [receiver, ...values], 'virtual');
-    if (frame && name === 'onDestroy') this.dialogWindowHost.activityDestroyed(runtime, receiver);
+    // ActivityThread.handleDestroyActivity: fragments and Activity.onDestroy run first (Compose disposes its compositions there), the window is removed afterwards.
+    if (frame && name === 'onDestroy') { if (frame.root) this.viewWindowHost.unfocusSubtree(runtime, frame.root); this.attachTree(runtime, frame.root, false); this.dialogWindowHost.activityDestroyed(runtime, receiver); }
     if (frame && name === 'onStart') this.moveFragments(runtime, frame, 3);
     if (frame && name === 'onResume') { this.moveFragments(runtime, frame, 4); this.lifecycleCall(runtime, receiver, 'onPostResume'); }
     return result;
@@ -924,9 +940,9 @@ export class AndroidPlatform {
     },delay,[root]);
   }
   /** `roots`: the Java values the callback closes over (the heap collector cannot inspect closures; a task without a roots list blocks collection). */
-  queueTask(callback, delay = 0, roots = []) {
+  queueTask(callback, delay = 0, roots = undefined) {
     if (this.eventQueue.length >= 1024) error('Framework event queue exceeds 1024');
-    this.eventQueue.push({ when: this.clock.now() + delay, sequence: ++this.eventSequence, front: false, platformTask: callback, roots });
+    this.eventQueue.push({ when: this.clock.now() + delay, sequence: ++this.eventSequence, front: false, platformTask: callback, ...(roots !== undefined ? { roots } : {}) });
     this.eventQueue.sort((a, b) => a.front !== b.front ? a.front ? -1 : 1 : a.front ? b.sequence - a.sequence : a.when - b.when || a.sequence - b.sequence);
   }
   captureViewState(runtime, root, result = []) {

@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=e9d35ddef77e';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=e9d35ddef77e';
+import { APKError } from './apk-runtime.js?v=88ca7fbf670e';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=88ca7fbf670e';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -93,6 +93,8 @@ export function createViewWindowHost(platform){
   supports:key=>keys.has(key),
   interfaces:type=>type===TOKEN?['Landroid/os/IBinder;']:[],
   parent:type=>type===TOKEN||type===DISPLAY?'Ljava/lang/Object;':null,
+  /** ViewGroup.removeViewInternal / window removal: the focused descendant is un-focused BEFORE the subtree is detached (callbacks still see an attached hierarchy). */
+  unfocusSubtree(runtime,receiver){clearFocus(runtime,receiver);},
   afterAttach(runtime,receiver,attached){if(attached){if(runtime.object(receiver).focused)focusedWindows.set(focusKey(runtime,receiver),receiver);let value=receiver;const seen=new Set();while(value){if(seen.has(value.ref)||seen.size>=4096)error('Cyclic View callback attachment hierarchy');seen.add(value.ref);const pending=pendingViews.get(value.ref)||[];pendingViews.delete(value.ref);pendingViewCount-=pending.length;for(const item of pending)enqueueView(runtime,value,item.callback,item.delay,item.onAnimation);value=runtime.object(value).parent;}}else clearFocus(runtime,receiver);},
   invoke(runtime,method,args){const name=method.name,receiver=args[0];if(name==='clearAnimation')return;if(name==='getAnimation')return null;
    if(method.owner===VIEW&&name==='generateViewId'){
