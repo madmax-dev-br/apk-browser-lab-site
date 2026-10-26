@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=0e6d4aa783cd';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=0e6d4aa783cd';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=0e6d4aa783cd';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=0e6d4aa783cd';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=0e6d4aa783cd';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=0e6d4aa783cd';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=0e6d4aa783cd';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=0e6d4aa783cd';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=0e6d4aa783cd';
-import { APKError } from './apk-error.js?v=0e6d4aa783cd';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=0e6d4aa783cd';
-import { Scheduler, Blocked } from './scheduler.js?v=0e6d4aa783cd';
-import { bootClassLacksMember } from './boot-class-members.js?v=0e6d4aa783cd';
-export { APKError } from './apk-error.js?v=0e6d4aa783cd';
+import { VMClock } from './vm-clock.js?v=8749e43f476b';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=8749e43f476b';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=8749e43f476b';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=8749e43f476b';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=8749e43f476b';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=8749e43f476b';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=8749e43f476b';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=8749e43f476b';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=8749e43f476b';
+import { APKError } from './apk-error.js?v=8749e43f476b';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=8749e43f476b';
+import { Scheduler, Blocked } from './scheduler.js?v=8749e43f476b';
+import { bootClassLacksMember } from './boot-class-members.js?v=8749e43f476b';
+export { APKError } from './apk-error.js?v=8749e43f476b';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -761,7 +761,14 @@ const PRIMITIVE_NAMES = { Z: 'boolean', B: 'byte', S: 'short', C: 'char', I: 'in
 export const dottedName = name => name.replace(LOADER_ALIAS, ';').slice(1, -1).replaceAll('/', '.');
 const ref = id => ({ ref: id });
 const isNull = value => value === null || value === 0;
-const int = value => { if (typeof value !== 'number' || !Number.isInteger(value)) fail('Expected int register'); return value | 0; };
+const describeRegister = value => value === undefined ? 'an uninitialized register' : value === null ? 'null' : typeof value === 'bigint' ? `a long (${value})` : typeof value === 'object' ? (value.ref !== undefined ? 'an object reference' : 'a host object') : `${typeof value} ${String(value).slice(0, 40)}`;
+const int = value => { if (typeof value !== 'number' || !Number.isInteger(value)) fail(`Expected int register, got ${describeRegister(value)}`); return value | 0; };
+// Dalvik keeps boolean/byte/short/char/int results as 32-bit ints; host bridges written in JS may answer
+// with true/false, so results are normalized by the method's declared return type at the boundary.
+const hostReturn = (method, value) => {
+  const type = method?.result ?? method?.signature?.slice(method.signature.indexOf(')') + 1);
+  return typeof value === 'boolean' && /^[ZBSCI]$/.test(type ?? '') ? (value ? 1 : 0) : value;
+};
 const equal = (a, b) => (isNull(a) && isNull(b)) || (a && b && typeof a === 'object' && typeof b === 'object' ? a.ref === b.ref : a === b);
 const signed16 = n => (n << 16) >> 16;
 const signed8 = n => (n << 24) >> 24;
@@ -1329,7 +1336,7 @@ export class APKRuntime {
       let slot = byMode[mode]; if (slot === undefined) slot = byMode[mode] = new Map();
       let resolution = slot.get(ownerKey);
       if (resolution === undefined) { resolution = this.resolveInvoke(method, args, mode, callerOwner); slot.set(ownerKey, resolution); }
-      if (resolution.kind === 'bridge') { this.lastBridge = resolution; this.lastBridgeDepth = this.depth; this.record(resolution.text ??= `${resolution.skia ? 'SKIA' : 'SHIM'} ${resolution.key}`); return this.bridge(resolution.selected, args, mode, resolution.key, resolution); }
+      if (resolution.kind === 'bridge') { this.lastBridge = resolution; this.lastBridgeDepth = this.depth; this.record(resolution.text ??= `${resolution.skia ? 'SKIA' : 'SHIM'} ${resolution.key}`); return hostReturn(resolution.selected, this.bridge(resolution.selected, args, mode, resolution.key, resolution)); }
       if (resolution.kind === 'default') {
         const defaultMethod = resolution.defaultMethod;
         this.recordMethod(defaultMethod.method);
@@ -1353,7 +1360,7 @@ export class APKRuntime {
         this.record(`HOST ${definition.method.key} [AOSP:${definition.method.dex.filename}]`);
         const result = binding(this, this.hostArguments(definition.method, args, mode), definition.method);
         if (result && typeof result.then === 'function') fail(`Framework native binding must be synchronous: ${definition.method.key}`);
-        return result;
+        return hostReturn(definition.method, result);
       }
       if (!definition.code) fail(`Unsupported abstract/missing-code method: ${definition.method.key}`);
       this.recordMethod(definition.method);

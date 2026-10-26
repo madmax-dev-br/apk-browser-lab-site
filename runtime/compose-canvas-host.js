@@ -1,6 +1,6 @@
-import {APKError} from './apk-runtime.js?v=0e6d4aa783cd';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=0e6d4aa783cd';
-import {getVectorGraphics} from './vector-native.js?v=0e6d4aa783cd';
+import {APKError} from './apk-runtime.js?v=8749e43f476b';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=8749e43f476b';
+import {getVectorGraphics} from './vector-native.js?v=8749e43f476b';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;';
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
