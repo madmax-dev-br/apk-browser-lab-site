@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=b08d65940904';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=b08d65940904';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=b08d65940904';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=b08d65940904';
+import { APKError } from './apk-error.js?v=12647cd43215';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=12647cd43215';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=12647cd43215';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=12647cd43215';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -103,6 +103,49 @@ export function createAppServicesHost(platform) {
   const enforce = (r, permission, result, selfToo, message) => {
     if (result !== PERMISSION_GRANTED) r.throwJava('Ljava/lang/SecurityException;', `${message === null ? '' : r.stringCharacters(message) + ': '}${selfToo ? `Neither user ${platform.virtualProcess.uid} nor current process has ` : `uid ${platform.virtualProcess.uid} does not have `}${r.stringCharacters(permission)}.`);
   };
+  // Service binding (ContextImpl.bindServiceCommon / ActiveServices): an implicit Intent is refused on API 21+; a service in another
+  // package cannot be bound because the virtual device has no other packages (no Google Play services), so bindService returns false
+  // as Android does for a missing service. This app's own declared services are bound in-process: created once (BIND_AUTO_CREATE),
+  // onCreate, onBind once, and ServiceConnection.onServiceConnected (or onNullBinding) posted to the main thread; the last unbind runs
+  // onUnbind and onDestroy. Started services (startService) are not covered here.
+  const INTENT = 'Landroid/content/Intent;', COMPONENT = 'Landroid/content/ComponentName;', SERVICE_CONNECTION = 'Landroid/content/ServiceConnection;';
+  const boundServices = gcRoot(new Map()), boundConnections = new Map();   // className -> { ref, binder, intent, component, connections:Set<ref> }; connection ref -> className
+  const call = (r, owner, name, parameters, result, args, mode = 'virtual') => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, args, mode);
+  const intentCall = (r, intent, name, result) => r.dispatch({ owner: INTENT, name, parameters: [], result, signature: `()${result}` }, [intent], 'virtual');
+  defContext('bindService', `(${INTENT}Landroid/content/ServiceConnection;I)Z`, (r, _m, [, intent, connection, flags]) => {
+    if (connection === null) r.throwJava('Ljava/lang/IllegalArgumentException;', 'connection is null');
+    const component = intentCall(r, intent, 'getComponent', 'Landroid/content/ComponentName;'), explicitPackage = intentCall(r, intent, 'getPackage', STRING);
+    const targetPackage = component !== null ? r.stringCharacters(r.dispatch({ owner: 'Landroid/content/ComponentName;', name: 'getPackageName', parameters: [], result: STRING, signature: `()${STRING}` }, [component], 'virtual')) : explicitPackage === null ? null : r.stringCharacters(explicitPackage);
+    if (targetPackage === null) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Service Intent must be explicit');
+    if (targetPackage !== pkg()) { r.record(`SERVICE bind ${targetPackage}: package not installed`); return 0; }
+    if (component === null) throw new APKError('Context.bindService by package and action inside this app is not resolved yet; pass a ComponentName', { kind: 'service-binding-unsupported' });
+    const className = r.stringCharacters(call(r, COMPONENT, 'getClassName', [], STRING, [component])), descriptor = `L${className.replaceAll('.', '/')};`;
+    if (!(platform.manifest?.services ?? []).includes(className) || !r.classes.has(descriptor)) { r.record(`SERVICE bind ${className}: not declared`); return 0; }
+    let service = boundServices.get(className);
+    if (!service) {
+      if (!(flags & 1)) { r.record(`SERVICE bind ${className}: not running and no BIND_AUTO_CREATE`); return 1; }
+      const ref = r.allocate(descriptor); call(r, descriptor, '<init>', [], 'V', [ref], 'direct'); r.object(ref).baseContext = platform.application;
+      call(r, descriptor, 'onCreate', [], 'V', [ref]);
+      service = { ref, binder: call(r, descriptor, 'onBind', [INTENT], 'Landroid/os/IBinder;', [ref, intent]), intent, component, connections: new Set() };
+      boundServices.set(className, service); r.record(`SERVICE create+bind ${className}`);
+    }
+    service.connections.add(connection.ref); boundConnections.set(connection.ref, className);
+    platform.queueTask(() => {
+      if (!service.connections.has(connection.ref)) return;
+      if (service.binder === null) call(r, SERVICE_CONNECTION, 'onNullBinding', [COMPONENT], 'V', [connection, service.component]);
+      else call(r, SERVICE_CONNECTION, 'onServiceConnected', [COMPONENT, 'Landroid/os/IBinder;'], 'V', [connection, service.component, service.binder]);
+    }, 0, [connection, service.component, service.binder]);
+    return 1;
+  });
+  defContext('unbindService', '(Landroid/content/ServiceConnection;)V', (r, _m, [, connection]) => {
+    const className = boundConnections.get(connection?.ref);
+    if (className === undefined) r.throwJava('Ljava/lang/IllegalArgumentException;', `Service not registered: ${r.typeOf(connection).slice(1, -1).replaceAll('/', '.')}`);
+    boundConnections.delete(connection.ref); const service = boundServices.get(className); service.connections.delete(connection.ref);
+    if (!service.connections.size) {
+      const descriptor = r.typeOf(service.ref); boundServices.delete(className);
+      call(r, descriptor, 'onUnbind', [INTENT], 'Z', [service.ref, service.intent]); call(r, descriptor, 'onDestroy', [], 'V', [service.ref]); r.record(`SERVICE unbind+destroy ${className}`);
+    }
+  });
   defContext('checkSelfPermission', `(${STRING})I`, (r, _m, [, permission]) => check(r, permission));
   defContext('checkPermission', `(${STRING}II)I`, (r, _m, [, permission, pid, uid]) => pid === platform.virtualProcess.pid && uid === platform.virtualProcess.uid ? check(r, permission) : (needPermission(r, permission), PERMISSION_DENIED));   // no other process exists
   defContext('checkCallingPermission', `(${STRING})I`, (r, _m, [, permission]) => { needPermission(r, permission); return PERMISSION_DENIED; });   // not inside a Binder transaction: the calling pid is this process
@@ -289,7 +332,8 @@ export function createAppServicesHost(platform) {
     }
     return bundle;
   }
-  const processName = () => platform.manifest?.application?.process ?? pkg();
+  // The app's process: android:process on <application> (":name" is private to the package, as in PackageParser), else the package name.
+  const processName = () => { const process = platform.manifest?.application?.process; return process ? (process.startsWith(':') ? pkg() + process : process) : pkg(); };
   function makeProviderInfo(r, detail, withMeta) {
     const info = r.allocate(PROVIDER_INFO), put = (owner, name, ftype, value) => r.storeField(r.object(info).fields, `${owner}->${name}:${ftype}`, value);
     put(ITEM_INFO, 'name', STRING, detail.name); put(ITEM_INFO, 'packageName', STRING, pkg()); put(ITEM_INFO, 'metaData', BUNDLE, withMeta ? metaDataBundle(r, detail.metaData) : null);
@@ -332,6 +376,31 @@ export function createAppServicesHost(platform) {
   def(USER_MANAGER, 'isUserRunning', '(Landroid/os/UserHandle;)Z', () => 1); def(USER_MANAGER, 'isSystemUser', '()Z', () => 1);
   def(USER_MANAGER, 'isManagedProfile', '()Z', () => 0); def(USER_MANAGER, 'isDemoUser', '()Z', () => 0); def(USER_MANAGER, 'isGuestUser', '()Z', () => 0);
 
+  // NotificationManager: the virtual device has no status bar. Channels the app creates are kept (and returned by getNotificationChannel[s]);
+  // posted notifications are counted and traced, never shown. areNotificationsEnabled follows Android 13's rule: apps targeting 33+ need
+  // POST_NOTIFICATIONS declared (the lab grants declared runtime permissions); older targets are enabled by default.
+  const NOTIFICATION_MANAGER = service('notification', 'Landroid/app/NotificationManager;'), CHANNEL = 'Landroid/app/NotificationChannel;';
+  const notificationState = { delegate: null, channels: gcRoot(new Map()), posted: gcRoot(new Map()) };
+  const channelId = (r, channel) => { try { return r.stringCharacters(r.dispatch({ owner: CHANNEL, name: 'getId', parameters: [], result: STRING, signature: `()${STRING}` }, [channel], 'virtual')); } catch { return null; } };
+  def(NOTIFICATION_MANAGER, 'setNotificationDelegate', `(${STRING})V`, (r, _m, [, delegate]) => { notificationState.delegate = delegate === null ? null : r.stringCharacters(delegate); });
+  def(NOTIFICATION_MANAGER, 'getNotificationDelegate', `()${STRING}`, () => notificationState.delegate);
+  def(NOTIFICATION_MANAGER, 'canNotifyAsPackage', `(${STRING})Z`, () => 0);
+  def(NOTIFICATION_MANAGER, 'areNotificationsEnabled', '()Z', () => {
+    const target = Number(platform.manifest?.usesSdk?.targetSdkVersion ?? 1), declared = (platform.manifest?.usesPermissions ?? []).some(p => p.name === 'android.permission.POST_NOTIFICATIONS');
+    return target < 33 || declared ? 1 : 0;
+  });
+  def(NOTIFICATION_MANAGER, 'getImportance', '()I', () => 3);   // IMPORTANCE_DEFAULT
+  def(NOTIFICATION_MANAGER, 'createNotificationChannel', `(${CHANNEL})V`, (r, _m, [, channel]) => { const id = channelId(r, channel); if (id !== null && !notificationState.channels.has(id)) notificationState.channels.set(id, channel); });
+  def(NOTIFICATION_MANAGER, 'getNotificationChannel', `(${STRING})${CHANNEL}`, (r, _m, [, id]) => notificationState.channels.get(text(r, id)) ?? null);
+  def(NOTIFICATION_MANAGER, 'getNotificationChannels', '()Ljava/util/List;', r => { const list = newEmptyList(r); for (const channel of notificationState.channels.values()) r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, channel], 'virtual'); return list; });
+  def(NOTIFICATION_MANAGER, 'deleteNotificationChannel', `(${STRING})V`, (r, _m, [, id]) => { notificationState.channels.delete(text(r, id)); });
+  const post = (r, key, notification) => { notificationState.posted.set(key, notification); r.record(`NOTIFICATION post ${key}`); };
+  def(NOTIFICATION_MANAGER, 'notify', '(ILandroid/app/Notification;)V', (r, _m, [, id, notification]) => post(r, `:${id}`, notification));
+  def(NOTIFICATION_MANAGER, 'notify', `(${STRING}ILandroid/app/Notification;)V`, (r, _m, [, tag, id, notification]) => post(r, `${tag === null ? '' : r.stringCharacters(tag)}:${id}`, notification));
+  def(NOTIFICATION_MANAGER, 'cancel', '(I)V', (_r, _m, [, id]) => { notificationState.posted.delete(`:${id}`); });
+  def(NOTIFICATION_MANAGER, 'cancel', `(${STRING}I)V`, (r, _m, [, tag, id]) => { notificationState.posted.delete(`${tag === null ? '' : r.stringCharacters(tag)}:${id}`); });
+  def(NOTIFICATION_MANAGER, 'cancelAll', '()V', () => { notificationState.posted.clear(); });
+
   // ActivityManager: the virtual device runs exactly this app's process, in the foreground; memory figures are the VM's declared device (4 GiB RAM, 256 MiB app heap).
   const ACTIVITY_MANAGER = service('activity', 'Landroid/app/ActivityManager;'), PROC_INFO = 'Landroid/app/ActivityManager$RunningAppProcessInfo;', MEM_INFO = 'Landroid/app/ActivityManager$MemoryInfo;';
   type(PROC_INFO, OBJECT, [], { allocatable: true }); type(MEM_INFO, OBJECT, [], { allocatable: true });
@@ -340,6 +409,8 @@ export function createAppServicesHost(platform) {
   // Choreographer's frame bookkeeping is read by reflection in some libraries (hidden-API greylist 'unsupported' fields, still reachable on API 28-ish targets): the value is the last frame time the VM produced.
   registry.instanceField('Landroid/view/Choreographer;', 'mLastFrameTimeNanos', 'J', { reflect: true });
   for (const [name, ftype] of [['availMem', 'J'], ['totalMem', 'J'], ['threshold', 'J'], ['lowMemory', 'Z']]) registry.instanceField(MEM_INFO, name, ftype, { reflect: true });
+  // Application.getProcessName() (API 28): ActivityThread.currentProcessName(), the process the app runs in.
+  def('Landroid/app/Application;', 'getProcessName', `()${STRING}`, () => processName(), { static: true });
   def(ACTIVITY_MANAGER, 'getRunningAppProcesses', '()Ljava/util/List;', r => {
     const list = newEmptyList(r), info = r.allocate(PROC_INFO), put = (name, ftype, value) => r.storeField(r.object(info).fields, `${PROC_INFO}->${name}:${ftype}`, value), packages = r.newArray('[Ljava/lang/String;', 1);
     r.array(packages).elements = [pkg()];
@@ -443,18 +514,44 @@ export function createAppServicesHost(platform) {
   });
   def(ASSETS, 'close', '()V', () => {});
 
+  // ---- android.content.pm.Signature / SigningInfo (AOSP semantics: a byte[] certificate, hex toCharsString, Arrays.hashCode) ----------------------
+  const SIGNATURE = 'Landroid/content/pm/Signature;', SIGNATURES = '[Landroid/content/pm/Signature;', SIGNING_INFO = 'Landroid/content/pm/SigningInfo;';
+  type(SIGNATURE, OBJECT, ['Landroid/os/Parcelable;'], { allocatable: true }); type(SIGNING_INFO, OBJECT, ['Landroid/os/Parcelable;'], { allocatable: true });
+  const bytesOf = (r, self) => r.object(self).signatureBytes ?? r.throwJava('Ljava/lang/IllegalStateException;', 'Signature has no bytes');
+  const byteArray = (r, bytes) => { const array = r.newArray('[B', bytes.length); r.array(array).elements = Array.from(bytes, v => (v << 24) >> 24); return array; };
+  const newSignature = (r, bytes) => { const signature = r.allocate(SIGNATURE); r.object(signature).signatureBytes = Int8Array.from(bytes, v => (v << 24) >> 24); return signature; };
+  const signatureArray = r => { const certificates = r.apkSigningCertificates?.() ?? [], array = r.newArray(SIGNATURES, certificates.length); r.array(array).elements = certificates.map(der => newSignature(r, der)); return array; };
+  const hex = bytes => Array.from(bytes, v => (v & 0xff).toString(16).padStart(2, '0')).join('');
+  def(SIGNATURE, '<init>', '([B)V', (r, _m, [self, bytes]) => { if (bytes === null) r.throwJava('Ljava/lang/NullPointerException;', null); r.object(self).signatureBytes = Int8Array.from(r.array(bytes).elements); });
+  def(SIGNATURE, '<init>', `(${STRING})V`, (r, _m, [self, text]) => {
+    const value = r.stringCharacters(text); if (value.length % 2 || /[^0-9a-fA-F]/.test(value)) r.throwJava('Ljava/lang/IllegalArgumentException;', `Invalid character in signature: ${value}`);
+    r.object(self).signatureBytes = Int8Array.from(value.match(/../g) ?? [], pair => (parseInt(pair, 16) << 24) >> 24);
+  });
+  def(SIGNATURE, 'toByteArray', '()[B', (r, _m, [self]) => byteArray(r, bytesOf(r, self)));
+  def(SIGNATURE, 'toCharsString', `()${STRING}`, (r, _m, [self]) => hex(bytesOf(r, self)));
+  def(SIGNATURE, 'toChars', '()[C', (r, _m, [self]) => { const text = hex(bytesOf(r, self)), array = r.newArray('[C', text.length); r.array(array).elements = [...text].map(c => c.charCodeAt(0)); return array; });
+  def(SIGNATURE, 'hashCode', '()I', (r, _m, [self]) => { let h = 1; for (const v of bytesOf(r, self)) h = (Math.imul(31, h) + v) | 0; return h; });
+  def(SIGNATURE, 'equals', `(${OBJECT})Z`, (r, _m, [self, other]) => { if (other === null || typeof other !== 'object' || r.object(other).type !== SIGNATURE) return 0; const a = bytesOf(r, self), b = bytesOf(r, other); return a.length === b.length && a.every((v, i) => v === b[i]) ? 1 : 0; });
+  def(SIGNING_INFO, 'getApkContentsSigners', `()${SIGNATURES}`, (r, _m, [self]) => r.object(self).signers);
+  def(SIGNING_INFO, 'getSigningCertificateHistory', `()${SIGNATURES}`, (r, _m, [self]) => r.object(self).signers);   // no key rotation recorded: history = current signers
+  def(SIGNING_INFO, 'hasMultipleSigners', '()Z', (r, _m, [self]) => r.array(r.object(self).signers).elements.length > 1 ? 1 : 0);
+  def(SIGNING_INFO, 'hasPastSigningCertificates', '()Z', () => 0);
+
   // ---- PackageManager.getPackageInfo (only this package is installed; Play Services and every other package are NameNotFoundException) -----------
   const PACKAGE_INFO = 'Landroid/content/pm/PackageInfo;', installTime = Date.now();
   type(PACKAGE_INFO, OBJECT, [], { allocatable: true });
-  for (const [name, ftype] of [['packageName', STRING], ['versionName', STRING], ['versionCode', 'I'], ['longVersionCode', 'J'], ['firstInstallTime', 'J'], ['lastUpdateTime', 'J'], ['applicationInfo', APPLICATION_INFO], ['requestedPermissions', '[Ljava/lang/String;'], ['signatures', '[Landroid/content/pm/Signature;']]) registry.instanceField(PACKAGE_INFO, name, ftype, { reflect: true });
+  for (const [name, ftype] of [['packageName', STRING], ['versionName', STRING], ['versionCode', 'I'], ['longVersionCode', 'J'], ['firstInstallTime', 'J'], ['lastUpdateTime', 'J'], ['applicationInfo', APPLICATION_INFO], ['requestedPermissions', '[Ljava/lang/String;'], ['signatures', '[Landroid/content/pm/Signature;'], ['signingInfo', 'Landroid/content/pm/SigningInfo;']]) registry.instanceField(PACKAGE_INFO, name, ftype, { reflect: true });
   def(PACKAGE_INFO, 'getLongVersionCode', '()J', (r, _m, [self]) => r.object(self).fields.get(`${PACKAGE_INFO}->longVersionCode:J`) ?? 0n);
   def(PACKAGE_MANAGER, 'getPackageInfo', `(${STRING}I)${PACKAGE_INFO}`, (r, _m, [, name, flags]) => {
     const n = text(r, name); if (n !== pkg()) r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', n);
-    if (flags & (0x40 | 0x08000000)) throw new APKError('PackageManager.getPackageInfo with GET_SIGNATURES / GET_SIGNING_CERTIFICATES needs the APK signing block, which is not parsed yet', { kind: 'signatures-unsupported' });
     const info = r.allocate(PACKAGE_INFO), put = (name2, ftype, value) => r.storeField(r.object(info).fields, `${PACKAGE_INFO}->${name2}:${ftype}`, value), attrs = platform.manifest?.manifestAttrs ?? {};
     const code = Number(attrs.versionCode ?? 0) | 0;
     put('packageName', STRING, pkg()); put('versionName', STRING, typeof attrs.versionName === 'string' ? attrs.versionName : null); put('versionCode', 'I', code); put('longVersionCode', 'J', BigInt(code));
-    put('firstInstallTime', 'J', BigInt(installTime)); put('lastUpdateTime', 'J', BigInt(installTime)); put('applicationInfo', APPLICATION_INFO, platform.applicationInfo(r)); return info;
+    put('firstInstallTime', 'J', BigInt(installTime)); put('lastUpdateTime', 'J', BigInt(installTime)); put('applicationInfo', APPLICATION_INFO, platform.applicationInfo(r));
+    // GET_SIGNATURES (0x40) / GET_SIGNING_CERTIFICATES (0x08000000): the APK's real signer certificates (v3, v2 or v1 block).
+    if (flags & 0x40) put('signatures', SIGNATURES, signatureArray(r));
+    if (flags & 0x08000000) { const signing = r.allocate(SIGNING_INFO); r.object(signing).signers = signatureArray(r); put('signingInfo', SIGNING_INFO, signing); }
+    return info;
   });
 
   // The lab installs the APK itself: no store recorded it, so the installer package is null (what adb/sideloaded installs report).

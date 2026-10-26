@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=b08d65940904';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=b08d65940904';
+import { APKError } from './apk-error.js?v=12647cd43215';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=12647cd43215';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -147,6 +147,24 @@ export function createSystemServicesHost(platform) {
   def(B64, 'encode', '([BI)[B', (r, _m, [a, flags]) => bytesArray(r, new TextEncoder().encode(b64encode(toUnsigned(r, a, 0, r.array(a).elements.length), flags))), { static: true });
   def(B64, 'encode', '([BIII)[B', (r, _m, [a, o, l, flags]) => bytesArray(r, new TextEncoder().encode(b64encode(toUnsigned(r, a, o, l), flags))), { static: true });
   def(B64, 'decode', '(Ljava/lang/String;I)[B', (r, _m, [s2, flags]) => bytesArray(r, b64decode(r, r.stringCharacters(s2), flags)), { static: true });
+  // android.util.Base64OutputStream: written bytes are encoded (or decoded) with Base64's flags and reach the wrapped stream by close(),
+  // which also closes it unless NO_CLOSE (16) is set. The output equals Base64.encode(all bytes, flags), as AOSP's incremental coder produces.
+  const B64OS = 'Landroid/util/Base64OutputStream;', OUTPUT_STREAM = 'Ljava/io/OutputStream;', FILTER_OUT = 'Ljava/io/FilterOutputStream;';
+  registry.type(B64OS, FILTER_OUT, [], { allocatable: true });
+  const b64state = (r, self) => r.object(self).base64Stream ?? r.throwJava('Ljava/lang/IllegalStateException;', 'Base64OutputStream used before construction');
+  const b64init = (r, self, out, flags, encode) => { r.storeField(r.object(self).fields, `${FILTER_OUT}->out:${OUTPUT_STREAM}`, out); r.object(self).base64Stream = { out, flags, encode, buffer: [], closed: false }; };
+  def(B64OS, '<init>', `(${OUTPUT_STREAM}I)V`, (r, _m, [self, out, flags]) => b64init(r, self, out, flags, true));
+  def(B64OS, '<init>', `(${OUTPUT_STREAM}IZ)V`, (r, _m, [self, out, flags, encode]) => b64init(r, self, out, flags, !!encode));
+  def(B64OS, 'write', '(I)V', (r, _m, [self, value]) => { b64state(r, self).buffer.push(value & 255); });
+  def(B64OS, 'write', '([BII)V', (r, _m, [self, array, offset, length]) => { const state = b64state(r, self); for (const v of toUnsigned(r, array, offset, length)) state.buffer.push(v); });
+  def(B64OS, 'write', '([B)V', (r, _m, [self, array]) => { const state = b64state(r, self); for (const v of toUnsigned(r, array, 0, r.array(array).elements.length)) state.buffer.push(v); });
+  def(B64OS, 'close', '()V', (r, _m, [self]) => {
+    const state = b64state(r, self); if (state.closed) return; state.closed = true;
+    const output = state.encode ? new TextEncoder().encode(b64encode(state.buffer, state.flags)) : Uint8Array.from(b64decode(r, String.fromCharCode(...state.buffer), state.flags), v => v & 255);
+    const array = bytesArray(r, Int8Array.from(output, v => (v << 24) >> 24)), stream = (name, parameters, args2) => r.dispatch({ owner: OUTPUT_STREAM, name, parameters, result: 'V', signature: `(${parameters.join('')})V` }, args2, 'virtual');
+    stream('write', ['[B', 'I', 'I'], [state.out, array, 0, output.length]);
+    if (state.flags & 16) stream('flush', [], [state.out]); else stream('close', [], [state.out]);
+  });
   def(B64, 'decode', '([BI)[B', (r, _m, [a, flags]) => bytesArray(r, b64decode(r, String.fromCharCode(...toUnsigned(r, a, 0, r.array(a).elements.length)), flags)), { static: true });
   def(B64, 'decode', '([BIII)[B', (r, _m, [a, o, l, flags]) => bytesArray(r, b64decode(r, String.fromCharCode(...toUnsigned(r, a, o, l)), flags)), { static: true });
 
@@ -322,6 +340,8 @@ export function createSystemServicesHost(platform) {
   const threadPriorities = new Map(); // tid -> nice value; the single-threaded VM has no scheduler, so priorities are recorded, never enforced
   for (const [name, value] of Object.entries({ THREAD_PRIORITY_DEFAULT: 0, THREAD_PRIORITY_LOWEST: 19, THREAD_PRIORITY_BACKGROUND: 10, THREAD_PRIORITY_FOREGROUND: -2, THREAD_PRIORITY_DISPLAY: -4, THREAD_PRIORITY_URGENT_DISPLAY: -8, THREAD_PRIORITY_AUDIO: -16, THREAD_PRIORITY_URGENT_AUDIO: -19, THREAD_PRIORITY_MORE_FAVORABLE: -1, THREAD_PRIORITY_LESS_FAVORABLE: 1, SYSTEM_UID: 1000, FIRST_APPLICATION_UID: 10000, LAST_APPLICATION_UID: 19999, ROOT_UID: 0 }))
     registry.staticField(PROCESS, name, 'I', () => value);
+  // Process.myProcessName() (API 33): the app's process name, android:process on <application> (":x" is package-private) or the package name.
+  def(PROCESS, 'myProcessName', '()Ljava/lang/String;', () => { const process = platform.manifest?.application?.process, pkg = platform.packageName; return process ? (process.startsWith(':') ? pkg + process : process) : pkg; }, { static: true });
   def(PROCESS, 'is64Bit', '()Z', () => 0, { static: true }); // the VM's native word is wasm32 (Build.SUPPORTED_ABIS = wasm32), so VMRuntime.is64Bit() is false
   const processStart = platform.clock.now(); // the virtual process starts when the VM is created; uptime/elapsed clocks both count from VM creation (SystemClock bridge uses platform.clock.now())
   for (const name of ['getStartUptimeMillis', 'getStartElapsedRealtime', 'getStartRequestedUptimeMillis', 'getStartRequestedElapsedRealtime']) def(PROCESS, name, '()J', () => BigInt(Math.floor(processStart)), { static: true });
@@ -373,7 +393,14 @@ export function createSystemServicesHost(platform) {
   const messengerTarget = (runtime, self) => runtime.object(self).messengerTarget ?? runtime.throwJava('Ljava/lang/IllegalStateException;', 'Messenger used before construction');
   const impl = (runtime, handler) => { const object = runtime.object(handler); if (!object.messengerImpl) { object.messengerImpl = runtime.allocate(MESSENGER_IMPL); runtime.object(object.messengerImpl).messengerHandler = handler; } return object.messengerImpl; };
   def(MESSENGER, '<init>', `(${HANDLER_TYPE})V`, (r, _m, [self, handler]) => { if (handler === null) r.throwJava('Ljava/lang/NullPointerException;', null); r.object(self).messengerTarget = handler; });
-  def(MESSENGER, '<init>', `(${IBINDER})V`, () => { throw new APKError('android.os.Messenger(IBinder): remote messengers need a Binder driver, which the browser VM does not have', { kind: 'binder-unavailable' }); });
+  // Messenger(IBinder) = IMessenger.Stub.asInterface(target): a binder from this process (another Messenger's getBinder(), e.g. a bound
+  // service's onBind result) answers queryLocalInterface with its Handler, so send() posts to it directly; only remote binders need a driver.
+  def(MESSENGER, '<init>', `(${IBINDER})V`, (r, _m, [self, binder]) => {
+    if (binder === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    const handler = r.object(binder).messengerHandler;
+    if (handler) { r.object(self).messengerTarget = handler; return; }
+    throw new APKError('android.os.Messenger(IBinder): remote messengers need a Binder driver, which the browser VM does not have', { kind: 'binder-unavailable' });
+  });
   def(MESSENGER, 'send', `(${MESSAGE_TYPE})V`, (r, _m, [self, message]) => {
     if (message === null) r.throwJava('Ljava/lang/NullPointerException;', null);
     r.storeField(r.object(message).fields, `${MESSAGE_TYPE}->sendingUid:I`, platform.virtualProcess.uid);

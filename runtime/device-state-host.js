@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=b08d65940904';
-import { createHostRegistry } from './host-contract.js?v=b08d65940904';
-import { resolveDevice } from './device-profile.js?v=b08d65940904';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=b08d65940904';
-import { gcRoot } from './heap-gc.js?v=b08d65940904';
+import { APKError } from './apk-error.js?v=12647cd43215';
+import { createHostRegistry } from './host-contract.js?v=12647cd43215';
+import { resolveDevice } from './device-profile.js?v=12647cd43215';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=12647cd43215';
+import { gcRoot } from './heap-gc.js?v=12647cd43215';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -106,7 +106,20 @@ export function createDeviceStateHost(platform) {
     def(TRAFFIC, name, '()J', () => -1n, { static: true });
   for (const name of ['getUidTxBytes', 'getUidRxBytes', 'getUidTxPackets', 'getUidRxPackets']) def(TRAFFIC, name, '(I)J', () => -1n, { static: true });
   for (const name of ['getTxBytes', 'getRxBytes', 'getTxPackets', 'getRxPackets']) def(TRAFFIC, name, `(${STRING})J`, () => -1n, { static: true });
-  const SERVICE_TYPES = { batterymanager: BATTERY, connectivity: CONNECTIVITY };
+  // TelephonyManager: the virtual device carries the emulator's SIM ("Android", MCC/MNC 310260, country "us"); the data network type
+  // follows the device panel (LTE on mobile data, unknown otherwise). Calls that need READ_PHONE_STATE or carrier privileges are not exposed.
+  const TELEPHONY = 'Landroid/telephony/TelephonyManager;'; type(TELEPHONY, 'Ljava/lang/Object;');
+  const onMobile = () => platform.device.connectivity === 'metered';
+  for (const [name, value] of [['getNetworkOperatorName', 'Android'], ['getNetworkOperator', '310260'], ['getSimOperatorName', 'Android'], ['getSimOperator', '310260'], ['getNetworkCountryIso', 'us'], ['getSimCountryIso', 'us']])
+    def(TELEPHONY, name, `()${STRING}`, () => value);
+  def(TELEPHONY, 'getPhoneType', '()I', () => 1);                       // PHONE_TYPE_GSM
+  def(TELEPHONY, 'getSimState', '()I', () => 5);                        // SIM_STATE_READY
+  def(TELEPHONY, 'getNetworkType', '()I', () => onMobile() ? 13 : 0);   // NETWORK_TYPE_LTE / UNKNOWN
+  def(TELEPHONY, 'isNetworkRoaming', '()Z', () => 0); def(TELEPHONY, 'hasCarrierPrivileges', '()Z', () => 0); def(TELEPHONY, 'isVoiceCapable', '()Z', () => 1);
+  def(TELEPHONY, 'getPhoneCount', '()I', () => 1); def(TELEPHONY, 'getActiveModemCount', '()I', () => 1); def(TELEPHONY, 'isDataEnabled', '()Z', () => onMobile() ? 1 : 0);
+  def(NET_INFO, 'getSubtype', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? 0 : 13);
+  def(NET_INFO, 'getSubtypeName', `()${STRING}`, (r, _m, [self]) => r.object(self).transport === 1 ? '' : 'LTE');
+  const SERVICE_TYPES = { batterymanager: BATTERY, connectivity: CONNECTIVITY, phone: TELEPHONY };
   const getService = (r, name) => { const typeName = SERVICE_TYPES[name]; if (!typeName) return null; const cache = platform.deviceServiceObjects ??= new Map(); if (!cache.has(name)) cache.set(name, r.makeObject(typeName)); return cache.get(name); };
   const notify = (r, previous, next, diff) => {
     const changed = key => JSON.stringify(previous[key]) !== JSON.stringify(next[key]);

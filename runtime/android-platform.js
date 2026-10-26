@@ -1,50 +1,50 @@
-import { createComposeCanvasHost } from './compose-canvas-host.js?v=b08d65940904';
-import { createViewTransformHost } from './view-transform-host.js?v=b08d65940904';
-import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=b08d65940904';
-import { createViewOutlineHost } from './view-outline-host.js?v=b08d65940904';
-import { createShaderHost } from './shader-host.js?v=b08d65940904';
-import { createSystemBarsHost } from './system-bars-host.js?v=b08d65940904';
-import { createDeviceStateHost } from './device-state-host.js?v=b08d65940904';
-import { createJobSchedulerHost } from './job-scheduler-host.js?v=b08d65940904';
-import { createPendingIntentHost } from './pending-intent-host.js?v=b08d65940904';
-import { createBinderHost } from './binder-host.js?v=b08d65940904';
-import { createInputManagerHost } from './input-native.js?v=b08d65940904';
-import { resolveDevice } from './device-profile.js?v=b08d65940904';
-import { configurationFor } from './device-configuration.js?v=b08d65940904';
-import { createViewCoordinateHost } from './view-coordinate-host.js?v=b08d65940904';
-import { createEditableTextHost } from './editable-text-host.js?v=b08d65940904';
-import { createComponentCallbacksHost } from './component-callbacks-host.js?v=b08d65940904';
-import { createViewStateHost } from './view-state-host.js?v=b08d65940904';
-import { createLocaleServiceHost } from './locale-service-host.js?v=b08d65940904';
-import { APKError } from './apk-runtime.js?v=b08d65940904';
-import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=b08d65940904';
-import { createViewTreeHost } from './view-tree-host.js?v=b08d65940904';
-import { createDialogWindowHost } from './dialog-window-host.js?v=b08d65940904';
-import { createViewWindowHost } from './view-window-host.js?v=b08d65940904';
-import { createVectorCanvasHost } from './vector-native.js?v=b08d65940904';
-import { createPaintHost } from './paint-host.js?v=b08d65940904';
-import { createContentResolverHost } from './content-resolver-host.js?v=b08d65940904';
-import { createDrawableViewHost } from './drawable-view-host.js?v=b08d65940904';
-import { createDeviceServicesHost } from './device-services-host.js?v=b08d65940904';
-import { createSystemServicesHost } from './system-services-host.js?v=b08d65940904';
-import { createJavaIoHost } from './java-io-host.js?v=b08d65940904';
-import { createClassLoaderHost } from './class-loader-host.js?v=b08d65940904';
-import { createAppServicesHost } from './app-services-host.js?v=b08d65940904';
-import { createConcurrencyHost } from './concurrency-host.js?v=b08d65940904';
-import { createDateTimeHost } from './datetime-host.js?v=b08d65940904';
-import { createFormatterHost } from './formatter-host.js?v=b08d65940904';
-import { createCryptoHost } from './crypto-host.js?v=b08d65940904';
-import { createDatabaseSupportHost } from './database-support-host.js?v=b08d65940904';
-import { VMClock } from './vm-clock.js?v=b08d65940904';
-import { createWindowInsetsHost } from './window-insets-host.js?v=b08d65940904';
-import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=b08d65940904';
-import { createViewLayoutHost } from './view-layout-host.js?v=b08d65940904';
-import { createInputMethodServiceHost } from './input-method-service-host.js?v=b08d65940904';
-import { createAutofillServiceHost } from './autofill-service-host.js?v=b08d65940904';
-import { createClipboardServiceHost } from './clipboard-service-host.js?v=b08d65940904';
-import { createViewInputHost } from './view-input-host.js?v=b08d65940904';
-import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=b08d65940904';
-import { maybeCollect } from './heap-gc.js?v=b08d65940904';
+import { createComposeCanvasHost } from './compose-canvas-host.js?v=12647cd43215';
+import { createViewTransformHost } from './view-transform-host.js?v=12647cd43215';
+import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=12647cd43215';
+import { createViewOutlineHost } from './view-outline-host.js?v=12647cd43215';
+import { createShaderHost } from './shader-host.js?v=12647cd43215';
+import { createSystemBarsHost } from './system-bars-host.js?v=12647cd43215';
+import { createDeviceStateHost } from './device-state-host.js?v=12647cd43215';
+import { createJobSchedulerHost } from './job-scheduler-host.js?v=12647cd43215';
+import { createPendingIntentHost } from './pending-intent-host.js?v=12647cd43215';
+import { createBinderHost } from './binder-host.js?v=12647cd43215';
+import { createInputManagerHost } from './input-native.js?v=12647cd43215';
+import { resolveDevice } from './device-profile.js?v=12647cd43215';
+import { configurationFor } from './device-configuration.js?v=12647cd43215';
+import { createViewCoordinateHost } from './view-coordinate-host.js?v=12647cd43215';
+import { createEditableTextHost } from './editable-text-host.js?v=12647cd43215';
+import { createComponentCallbacksHost } from './component-callbacks-host.js?v=12647cd43215';
+import { createViewStateHost } from './view-state-host.js?v=12647cd43215';
+import { createLocaleServiceHost } from './locale-service-host.js?v=12647cd43215';
+import { APKError } from './apk-runtime.js?v=12647cd43215';
+import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=12647cd43215';
+import { createViewTreeHost } from './view-tree-host.js?v=12647cd43215';
+import { createDialogWindowHost } from './dialog-window-host.js?v=12647cd43215';
+import { createViewWindowHost } from './view-window-host.js?v=12647cd43215';
+import { createVectorCanvasHost } from './vector-native.js?v=12647cd43215';
+import { createPaintHost } from './paint-host.js?v=12647cd43215';
+import { createContentResolverHost } from './content-resolver-host.js?v=12647cd43215';
+import { createDrawableViewHost } from './drawable-view-host.js?v=12647cd43215';
+import { createDeviceServicesHost } from './device-services-host.js?v=12647cd43215';
+import { createSystemServicesHost } from './system-services-host.js?v=12647cd43215';
+import { createJavaIoHost } from './java-io-host.js?v=12647cd43215';
+import { createClassLoaderHost } from './class-loader-host.js?v=12647cd43215';
+import { createAppServicesHost } from './app-services-host.js?v=12647cd43215';
+import { createConcurrencyHost } from './concurrency-host.js?v=12647cd43215';
+import { createDateTimeHost } from './datetime-host.js?v=12647cd43215';
+import { createFormatterHost } from './formatter-host.js?v=12647cd43215';
+import { createCryptoHost } from './crypto-host.js?v=12647cd43215';
+import { createDatabaseSupportHost } from './database-support-host.js?v=12647cd43215';
+import { VMClock } from './vm-clock.js?v=12647cd43215';
+import { createWindowInsetsHost } from './window-insets-host.js?v=12647cd43215';
+import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=12647cd43215';
+import { createViewLayoutHost } from './view-layout-host.js?v=12647cd43215';
+import { createInputMethodServiceHost } from './input-method-service-host.js?v=12647cd43215';
+import { createAutofillServiceHost } from './autofill-service-host.js?v=12647cd43215';
+import { createClipboardServiceHost } from './clipboard-service-host.js?v=12647cd43215';
+import { createViewInputHost } from './view-input-host.js?v=12647cd43215';
+import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=12647cd43215';
+import { maybeCollect } from './heap-gc.js?v=12647cd43215';
 
 const ACTIVITY = 'Landroid/app/Activity;', INTENT = 'Landroid/content/Intent;', BUNDLE = 'Landroid/os/Bundle;';
 const APPLICATION = 'Landroid/app/Application;', APP_CONTEXT = 'Landroid/app/ContextImpl;';
@@ -129,6 +129,7 @@ for (const [name, type] of VALUE_TYPES) {
   add(INTENT, [`putExtra(Ljava/lang/String;${type})${INTENT}`, `get${name}Extra(Ljava/lang/String;${type})${type}`]);
   if (type.startsWith('L') || type.startsWith('[')) add(INTENT, [`get${name}Extra(Ljava/lang/String;)${type}`]);
 }
+add(INTENT, ['getParcelableExtra(Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;', 'getSerializableExtra(Ljava/lang/String;Ljava/lang/Class;)Ljava/io/Serializable;', 'getParcelableArrayExtra(Ljava/lang/String;Ljava/lang/Class;)[Ljava/lang/Object;', 'getParcelableArrayListExtra(Ljava/lang/String;Ljava/lang/Class;)Ljava/util/ArrayList;']);
 add(KEY_SET, ['size()I', 'isEmpty()Z', 'contains(Ljava/lang/Object;)Z', 'remove(Ljava/lang/Object;)Z', 'clear()V', 'iterator()Ljava/util/Iterator;']);
 add(KEY_ITERATOR, ['hasNext()Z', 'next()Ljava/lang/Object;', 'remove()V']);
 const PARENTS = new Map([['Landroid/content/pm/PackageManager$NameNotFoundException;','Landroid/util/AndroidException;'],['Landroid/util/AndroidException;','Ljava/lang/Exception;'],[ACTIVITY, 'Landroid/view/ContextThemeWrapper;'], ['Landroid/view/ContextThemeWrapper;', 'Landroid/content/ContextWrapper;'], ['Landroid/content/ContextWrapper;', 'Landroid/content/Context;'], ['Landroid/content/Context;', 'Ljava/lang/Object;'], [INTENT, 'Ljava/lang/Object;'], [BUNDLE, 'Landroid/os/BaseBundle;'], ['Landroid/os/PersistableBundle;', 'Landroid/os/BaseBundle;'], ['Landroid/os/BaseBundle;', 'Ljava/lang/Object;'], ['Landroid/content/res/Resources;', 'Ljava/lang/Object;']]);
@@ -595,7 +596,7 @@ export class AndroidPlatform {
       if(name==='createConfigurationContext')return this.createConfigurationContext(runtime,receiver,args[1]);
       if (name === 'isRestricted') { let ref = receiver; const seen = new Set(); while (ref) { if (seen.has(ref.ref) || seen.size > 64) error('Cyclic ContextWrapper chain'); seen.add(ref.ref); const context = runtime.object(ref); if (context.contextFlags !== undefined) return context.contextFlags & 4 ? 1 : 0; ref = context.baseContext; } return 0; }
       if (name === 'getClassLoader') return runtime.applicationClassLoader ??= this.classLoaders.createApplicationLoader(runtime);
-      if (name === 'getSystemService') { let serviceName = args[1]; if (method.parameters[0] === 'Ljava/lang/Class;') { const type = runtime.object(args[1]).classType; serviceName = ({ 'Landroid/view/LayoutInflater;': 'layout_inflater', 'Landroid/view/WindowManager;':'window', 'Landroid/view/accessibility/AccessibilityManager;': 'accessibility', 'Landroid/view/autofill/AutofillManager;': 'autofill', 'Landroid/content/ClipboardManager;': 'clipboard', 'Landroid/view/inputmethod/InputMethodManager;': 'input_method', 'Landroid/os/BatteryManager;': 'batterymanager', 'Landroid/net/ConnectivityManager;': 'connectivity', 'Landroid/app/job/JobScheduler;': 'jobscheduler' })[type] ?? this.appServices.serviceNameForClass(type); if (!serviceName) error(`System service class ${type} is not installed in the virtual device`); } if (serviceName === 'layout_inflater') return this.inflater(runtime, receiver); const service = this.dialogWindowHost.getService(runtime,receiver,serviceName) || this.accessibilityService.getService(runtime, serviceName) || this.autofillService.getService(runtime, serviceName) || this.clipboardService.getService(runtime, serviceName) || this.inputMethodService.getService(runtime, serviceName) || this.deviceState.getService(runtime, serviceName) || this.jobScheduler.getService(runtime, serviceName) || this.appServices.getService(runtime, serviceName); if (service) return service; error(`System service ${serviceName} is not installed in the virtual device`); }
+      if (name === 'getSystemService') { let serviceName = args[1]; if (method.parameters[0] === 'Ljava/lang/Class;') { const type = runtime.object(args[1]).classType; serviceName = ({ 'Landroid/view/LayoutInflater;': 'layout_inflater', 'Landroid/view/WindowManager;':'window', 'Landroid/view/accessibility/AccessibilityManager;': 'accessibility', 'Landroid/view/autofill/AutofillManager;': 'autofill', 'Landroid/content/ClipboardManager;': 'clipboard', 'Landroid/view/inputmethod/InputMethodManager;': 'input_method', 'Landroid/os/BatteryManager;': 'batterymanager', 'Landroid/net/ConnectivityManager;': 'connectivity', 'Landroid/app/job/JobScheduler;': 'jobscheduler', 'Landroid/telephony/TelephonyManager;': 'phone' })[type] ?? this.appServices.serviceNameForClass(type); if (!serviceName) error(`System service class ${type} is not installed in the virtual device`); } if (serviceName === 'layout_inflater') return this.inflater(runtime, receiver); const service = this.dialogWindowHost.getService(runtime,receiver,serviceName) || this.accessibilityService.getService(runtime, serviceName) || this.autofillService.getService(runtime, serviceName) || this.clipboardService.getService(runtime, serviceName) || this.inputMethodService.getService(runtime, serviceName) || this.deviceState.getService(runtime, serviceName) || this.jobScheduler.getService(runtime, serviceName) || this.appServices.getService(runtime, serviceName); if (service) return service; error(`System service ${serviceName} is not installed in the virtual device`); }
       if (owner === APPLICATION && name === 'registerActivityLifecycleCallbacks') { this.applicationCallbacks.push(args[1]); return; }
       if (owner === APPLICATION && name === 'unregisterActivityLifecycleCallbacks') { const index = this.applicationCallbacks.findIndex(ref => sameRef(ref, args[1])); if (index >= 0) this.applicationCallbacks.splice(index, 1); return; }
       if (owner === APPLICATION && (name === '<init>' || name === 'onCreate')) return; // Defined empty framework lifecycle bodies.
@@ -1307,10 +1308,18 @@ export class AndroidPlatform {
     if (name === 'getType') return intent.mimeType ?? null;
     if (name === 'setType') { intent.mimeType = args[1]; intent.data = null; return value; }
     if (name === 'setData' || name === 'setDataAndType') { if (args[1] && !runtime.isSubtype(runtime.object(args[1]).type, 'Landroid/net/Uri;')) error('Intent data must be a Uri'); intent.data = args[1] || null; intent.mimeType = name === 'setDataAndType' ? args[2] : null; return value; }
-    if (name === 'setClass') { intent.target = runtime.object(args[2]).classType; return value; }
+    if (name === 'setClass') { intent.target = runtime.object(args[2]).classType; intent.component = null; return value; }
     if (name === 'setClassName') { const className = checkString(args[2], 'Intent class name'); const packageName = typeof args[1] === 'string' ? args[1] : this.resources?.table?.packages?.[0]?.name || runtime.activityType.slice(1, -1).split('/').slice(0, -1).join('.'); intent.target = descriptor(className.startsWith('.') ? packageName + className : className.includes('.') ? className : `${packageName}.${className}`); return value; }
     if (name === 'setComponent') { intent.component = args[1] ?? null; if (args[1]) { const className = runtime.object(args[1]).className; if (typeof className === 'string' && runtime.classes.has(descriptor(className))) intent.target = descriptor(className); } return value; }
-    if (name === 'getComponent') return intent.component ?? null;
+    if (name === 'getComponent') {
+      // Intent(Context, Class) / setClass / setClassName set mComponent = new ComponentName(package, class) on Android.
+      if (!intent.component && intent.target) {
+        const component = runtime.allocate('Landroid/content/ComponentName;');
+        runtime.dispatch({ owner: 'Landroid/content/ComponentName;', name: '<init>', parameters: ['Ljava/lang/String;', 'Ljava/lang/String;'], result: 'V', signature: '(Ljava/lang/String;Ljava/lang/String;)V' }, [component, this.packageName, intent.target.slice(1, -1).replaceAll('/', '.')], 'direct');
+        intent.component = component;
+      }
+      return intent.component ?? null;
+    }
     if (name === 'setPackage') { intent.package = args[1] ?? null; return value; }
     if (name === 'getPackage') return intent.package ?? null;
     if (name === 'addCategory') { (intent.categories ??= []).includes(args[1]) || intent.categories.push(args[1]); return value; }
@@ -1331,6 +1340,11 @@ export class AndroidPlatform {
       return value;
     }
     if (name === 'putExtra') { this.put(runtime, value, args[1], method.parameters[1], args[2]); return value; }
+    if (name.startsWith('get') && name.endsWith('Extra') && method.parameters[1] === 'Ljava/lang/Class;') {
+      // API 33 typed getters (getParcelableExtra(name, Class) ...): null when the key is absent or the value is not an instance of the class.
+      const found = this.get(runtime, value, args[1], method.result, null), wanted = runtime.object(args[2])?.classType;
+      return found === null || found === undefined || !wanted || (typeof found === 'object' && found.ref !== undefined && !runtime.isSubtype(runtime.typeOf(found), wanted)) ? null : found;
+    }
     if (name.startsWith('get') && name.endsWith('Extra')) { const fallback = args.length > 2 ? args[2] : null; return this.get(runtime, value, args[1], method.result, fallback); }
     error(`Unsupported Intent operation ${name}`);
   }

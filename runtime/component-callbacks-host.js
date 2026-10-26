@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=b08d65940904';
+import { APKError } from './apk-runtime.js?v=12647cd43215';
 const APP = 'Landroid/app/Application;', CONTROLLER = 'Landroid/content/ComponentCallbacksController;', CALLBACK = 'Landroid/content/ComponentCallbacks;', CONFIG = 'Landroid/content/res/Configuration;';
 const CONTEXTS = [APP, 'Landroid/content/Context;', 'Landroid/content/ContextWrapper;', 'Landroid/view/ContextThemeWrapper;', 'Landroid/app/Activity;'];
 const keys = new Set();

@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=b08d65940904';
-import { createHostRegistry } from './host-contract.js?v=b08d65940904';
-import { Blocked, VMThread } from './scheduler.js?v=b08d65940904';
-import { Invoke } from './interpreter.js?v=b08d65940904';
+import { APKError } from './apk-error.js?v=12647cd43215';
+import { createHostRegistry } from './host-contract.js?v=12647cd43215';
+import { Blocked, VMThread } from './scheduler.js?v=12647cd43215';
+import { Invoke } from './interpreter.js?v=12647cd43215';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -421,6 +421,12 @@ export function createConcurrencyHost(platform) {
   type(SCHEDULED_TASK, FUTURE_TASK, ['Ljava/util/concurrent/ScheduledFuture;', 'Ljava/util/concurrent/Delayed;'], { allocatable: true });
   def(STPE, '<init>', '(I)V', (r, _m, [self, core]) => configure(r, self, core, 2147483647, 10n, null, newObject(r, 'Ljava/util/concurrent/LinkedBlockingQueue;', [], []), null, null));
   def(STPE, '<init>', `(I${FACTORY})V`, (r, _m, [self, core, f]) => configure(r, self, core, 2147483647, 10n, null, newObject(r, 'Ljava/util/concurrent/LinkedBlockingQueue;', [], []), f, null));
+  // ScheduledThreadPoolExecutor policies (API 21; kotlinx.coroutines sets removeOnCancel by reflection). The values are kept and
+  // readable with Java's defaults; the timer queue here never runs a cancelled task, and shutdown keeps its existing behaviour.
+  for (const [policy, slot, initial] of [['RemoveOnCancelPolicy', 'removeOnCancel', false], ['ContinueExistingPeriodicTasksAfterShutdownPolicy', 'continuePeriodicAfterShutdown', false], ['ExecuteExistingDelayedTasksAfterShutdownPolicy', 'executeDelayedAfterShutdown', true]]) {
+    def(STPE, 'set' + policy, '(Z)V', (r, _m, [self, value]) => { pool(r, self)[slot] = !!value; });
+    def(STPE, 'get' + policy, '()Z', (r, _m, [self]) => (pool(r, self)[slot] ?? initial) ? 1 : 0);
+  }
   const scheduled = (r, self, task, delayMs, periodMs, wrap) => {
     if (task === null) throwNew(r, 'Ljava/lang/NullPointerException;');
     const p = pool(r, self); if (p.shutdown) { reject(r, self, task); return null; }

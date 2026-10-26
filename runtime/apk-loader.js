@@ -1,12 +1,12 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=b08d65940904';
-import { inspectELF } from './native-inspector.js?v=b08d65940904';
-import { inflateRaw } from './inflate.js?v=b08d65940904';
-import { resolveDevice } from './device-profile.js?v=b08d65940904';
-import { resourceProfileFor } from './device-configuration.js?v=b08d65940904';
-import { JniBridge } from './jni-host.js?v=b08d65940904';
-import { AndroidResources } from './android-resources.js?v=b08d65940904';
-import { AndroidPlatform } from './android-platform.js?v=b08d65940904';
-import { FrameworkProvider } from './framework-provider.js?v=b08d65940904';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=12647cd43215';
+import { inspectELF } from './native-inspector.js?v=12647cd43215';
+import { inflateRaw } from './inflate.js?v=12647cd43215';
+import { resolveDevice } from './device-profile.js?v=12647cd43215';
+import { resourceProfileFor } from './device-configuration.js?v=12647cd43215';
+import { JniBridge } from './jni-host.js?v=12647cd43215';
+import { AndroidResources } from './android-resources.js?v=12647cd43215';
+import { AndroidPlatform } from './android-platform.js?v=12647cd43215';
+import { FrameworkProvider } from './framework-provider.js?v=12647cd43215';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -53,7 +53,7 @@ export class APKArchive {
     const count = b.u16(end + 10), directorySize = b.u32(end + 12), start = b.u32(end + 16);
     if (b.u16(end + 4) || b.u16(end + 6) || b.u16(end + 8) !== count || !count || count > MAX_ZIP_ENTRIES || start + directorySize > end)
       fail('Unsupported APK ZIP layout: ZIP64, multiple volumes or excessive entries');
-    this.entries = new Map();
+    this.entries = new Map(); this.centralDirectoryOffset = start;
     let p = start, filenameBytes = 0;
     for (let i = 0; i < count; i++) {
       if (b.u32(p) !== 0x02014b50) fail('Malformed APK central directory entry');
@@ -358,6 +358,42 @@ async function prepareResources(archive, names, options, report, yieldControl, w
 }
 
 /**
+ * The APK's signer certificates (DER), as PackageManager reports them: APK Signature Scheme v3, else v2 (the "APK Sig Block 42"
+ * right before the central directory), else the v1 JAR signature's PKCS#7 block. Signatures are not verified here (the lab installs
+ * the file it was given); only the certificates are read. Returns [] for an unsigned APK.
+ */
+export function apkSigningCertificates(archive) {
+  const b = archive.reader, cd = archive.centralDirectoryOffset;
+  const ascii = (p, n) => String.fromCharCode(...b.slice(p, n));
+  if (cd >= 32 && ascii(cd - 16, 16) === 'APK Sig Block 42') {
+    const size = Number(b.u32(cd - 24)) + Number(b.u32(cd - 20)) * 2 ** 32, begin = cd - size - 8;
+    if (begin >= 0 && Number(b.u32(begin)) + Number(b.u32(begin + 4)) * 2 ** 32 === size) {
+      const pairs = new Map();
+      for (let p = begin + 8; p < cd - 24;) { const length = Number(b.u32(p)) + Number(b.u32(p + 4)) * 2 ** 32; pairs.set(b.u32(p + 8), [p + 12, p + 8 + length]); p += 8 + length; }
+      const sequence = (from, to) => { const items = []; for (let p = from; p < to;) { const n = b.u32(p); items.push([p + 4, p + 4 + n]); p += 4 + n; } return items; };
+      for (const id of [0xf05368c0, 0x7109871a]) {           // v3, then v2
+        const range = pairs.get(id); if (!range) continue;
+        const [signersFrom] = range, signersLength = b.u32(signersFrom), certificates = [];
+        for (const [signerFrom] of sequence(signersFrom + 4, signersFrom + 4 + signersLength)) {
+          const signedLength = b.u32(signerFrom), signedFrom = signerFrom + 4;
+          const digestsLength = b.u32(signedFrom), certsAt = signedFrom + 4 + digestsLength, certsLength = b.u32(certsAt);
+          for (const [from, to] of sequence(certsAt + 4, certsAt + 4 + certsLength)) certificates.push(b.slice(from, to - from).slice());
+          if (certsAt + 4 + certsLength > signedFrom + signedLength) throw new APKError('Malformed APK signing block');
+        }
+        if (certificates.length) return certificates;
+      }
+    }
+  }
+  const pkcs7 = [...archive.entries.keys()].find(name => /^META-INF\/[^/]+\.(RSA|DSA|EC)$/i.test(name));
+  if (!pkcs7) return [];
+  // DER walk: ContentInfo SEQ { OID, [0] { SignedData SEQ { version, digestAlgorithms, contentInfo, [0] IMPLICIT certificates... } } }
+  const der = archive.extractSync(pkcs7, 1024 * 1024), node = p => { let length = der[p + 1], header = 2; if (length & 0x80) { const n = length & 0x7f; length = 0; for (let i = 0; i < n; i++) length = length * 256 + der[p + 2 + i]; header = 2 + n; } return { tag: der[p], start: p, body: p + header, end: p + header + length }; };
+  const children = parent => { const out = []; for (let p = parent.body; p < parent.end;) { const child = node(p); out.push(child); p = child.end; } return out; };
+  const signedData = children(children(children(node(0))[1])[0]), certificateSet = signedData.find(child => child.tag === 0xa0);
+  return certificateSet ? children(certificateSet).map(cert => der.slice(cert.start, cert.end)) : [];
+}
+
+/**
  * Local APK loading, with per-DEX indices preserved by DexProgram.
  * onProgress receives {phase,message,completed,total,filename?}; yieldControl can
  * supply a scheduler. Native metadata is always listed, ELF expansion is opt-in.
@@ -526,7 +562,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const runtime = new APKRuntime(program, { apkEntries: new Set(names), apkReader: name => archive.extractSync(name, 256 * 1024 * 1024), launcherActivity: manifest.launcherActivity, unsupportedFeatures,
     maxInstructionsPerEvent: options.maxInstructionsPerEvent,
     maxCallDepth: options.maxCallDepth,
-    maxHeapObjects: options.maxHeapObjects, tolerateMissingVoid: !!options.tolerateMissingVoid,
+    maxHeapObjects: options.maxHeapObjects, tolerateMissingVoid: !!options.tolerateMissingVoid, tolerateMissing: options.tolerateMissing ?? (options.tolerateMissingVoid ? 'void' : 'off'),
     icuBreakBackend,sqliteBackend,tzdata,zlibBackend,icuConverterBackend,
     nativeLibraries: nativeLibraryDetails, resources: resources.environment, nativeBindings: framework?.nativeBindings, skia,
     platform: new AndroidPlatform({ device: options.device, resources: resources.environment,
@@ -596,5 +632,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   };
   if (options.inspectNative) await inspectNativeLibraries(options.inspectNative === true ? nativeLibraries : options.inspectNative, options.nativeInspectionLimits);
   await report('complete', dexFiles.length, dexFiles.length, undefined, `Loaded ${dexFiles.length} DEX files and ${program.classes.size} classes`);
+  let signingCertificates;   // read on first PackageManager request: the APK's signer certificates
+  runtime.apkSigningCertificates = () => signingCertificates ??= apkSigningCertificates(archive);
   return { runtime, inventory, inspectNativeLibraries };
 }

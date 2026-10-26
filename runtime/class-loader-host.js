@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=b08d65940904';
-import { APKArchive } from './apk-loader.js?v=b08d65940904';
-import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=b08d65940904';
-import { createHostRegistry } from './host-contract.js?v=b08d65940904';
-import { normalizePath } from './virtual-fs.js?v=b08d65940904';
+import { APKError } from './apk-error.js?v=12647cd43215';
+import { APKArchive } from './apk-loader.js?v=12647cd43215';
+import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=12647cd43215';
+import { createHostRegistry } from './host-contract.js?v=12647cd43215';
+import { normalizePath } from './virtual-fs.js?v=12647cd43215';
 
 // dalvik.system.{BaseDexClassLoader, InMemoryDexClassLoader, DexClassLoader, PathClassLoader, DexFile}: code that is only available at run time
 // (decrypted payloads, downloaded plugins). The DEX bytes are parsed by the same DexFile reader as APK classes and joined to the single VM class
@@ -163,6 +163,14 @@ export function createClassLoaderHost(platform) {
   // ClassLoader.getResources (parent, then DexPathList.findResources over the APK): when no APK entry has that name, Android
   // returns an empty enumeration, which is what ServiceLoader-style lookups (e.g. kotlinx FastServiceLoader) rely on.
   // Reading a present entry through a jar: URL is not implemented yet, so that case fails explicitly.
+  // ClassLoader.getResourceAsStream: the APK entry's bytes (what the PathClassLoader's DexPathList finds in base.apk), else null.
+  def(LOADER, 'getResourceAsStream', `(${STRING})Ljava/io/InputStream;`, (r, _m, [_self, name]) => {
+    if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'name == null');
+    const entry = r.stringCharacters(name).replace(/^\/+/, '');
+    if (!r.apkEntries?.has(entry)) return null;
+    const bytes = r.apkReader(entry), array = r.newArray('[B', bytes.length); r.array(array).elements = Array.from(bytes, v => (v << 24) >> 24);
+    const stream = r.allocate('Ljava/io/ByteArrayInputStream;'); r.dispatch({ owner: 'Ljava/io/ByteArrayInputStream;', name: '<init>', parameters: ['[B'], result: 'V', signature: '([B)V' }, [stream, array], 'direct'); return stream;
+  });
   def(LOADER, 'getResources', `(${STRING})Ljava/util/Enumeration;`, (r, _m, [_self, name]) => {
     if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'name == null');
     const entry = r.stringCharacters(name).replace(/^\/+/, '');

@@ -1,9 +1,15 @@
-import { APKError } from './apk-runtime.js?v=b08d65940904';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=b08d65940904';
+import { APKError } from './apk-runtime.js?v=12647cd43215';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=12647cd43215';
 const RESOLVER = 'Landroid/content/ContentResolver;', URI = 'Landroid/net/Uri;', GLOBAL = 'Landroid/provider/Settings$Global;', OBSERVER = 'Landroid/database/ContentObserver;';
 const fail = message => { throw new APKError(message, { kind: 'virtual-content-provider-unsupported' }); };
 const keys = new Set();
 const add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
+// android.net.Uri.Builder (android-13.0.0_r1 Uri.java): decoded setters encode like Part.fromDecoded (paths keep '/'), encoded setters store raw text.
+const URI_BUILDER = 'Landroid/net/Uri$Builder;';
+add(URI_BUILDER, ['<init>()V', 'build()Landroid/net/Uri;', 'toString()Ljava/lang/String;', 'clearQuery()Landroid/net/Uri$Builder;',
+  ...['scheme', 'opaquePart', 'encodedOpaquePart', 'authority', 'encodedAuthority', 'path', 'encodedPath', 'appendPath', 'appendEncodedPath', 'query', 'encodedQuery', 'fragment', 'encodedFragment'].map(name => `${name}(Ljava/lang/String;)Landroid/net/Uri$Builder;`),
+  'appendQueryParameter(Ljava/lang/String;Ljava/lang/String;)Landroid/net/Uri$Builder;']);
+add('Landroid/net/Uri;', ['buildUpon()Landroid/net/Uri$Builder;']);
 for (const owner of ['Landroid/content/Context;', 'Landroid/content/ContextWrapper;', 'Landroid/app/Application;', 'Landroid/app/Activity;']) add(owner, ['getContentResolver()Landroid/content/ContentResolver;']);
 add(GLOBAL, ['getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;', 'getFloat(Landroid/content/ContentResolver;Ljava/lang/String;F)F', 'putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z', 'putFloat(Landroid/content/ContentResolver;Ljava/lang/String;F)Z', 'getUriFor(Ljava/lang/String;)Landroid/net/Uri;']);
 add(RESOLVER, ['registerContentObserver(Landroid/net/Uri;ZLandroid/database/ContentObserver;)V', 'unregisterContentObserver(Landroid/database/ContentObserver;)V', 'notifyChange(Landroid/net/Uri;Landroid/database/ContentObserver;)V', 'notifyChange(Landroid/net/Uri;Landroid/database/ContentObserver;Z)V']);
@@ -97,14 +103,50 @@ export function createContentResolverHost(platform) {
   return {
     [GC_ROOTS](visit) { visit(resolver); },
     notifySetting: (runtime, key, scope = 'global') => notify(runtime, `content://settings/${scope}/${encodeURIComponent(key)}`, null),
-    supports: key => keys.has(key), canAllocate: type => type === RESOLVER || type === URI,
-    parent: type => [RESOLVER, URI].includes(type) ? 'Ljava/lang/Object;' : null,
+    supports: key => keys.has(key), canAllocate: type => type === RESOLVER || type === URI || type === URI_BUILDER,
+    parent: type => [RESOLVER, URI, URI_BUILDER].includes(type) ? 'Ljava/lang/Object;' : null,
     invoke(runtime, method, args) {
       const { owner, name } = method;
       if (owner === 'Landroid/os/Binder;') return platform.virtualProcess.uid;
       if (owner === 'Landroid/os/Process;') return name === 'myPid' ? platform.virtualProcess.pid : platform.virtualProcess.uid;
       if (owner === 'Landroid/app/compat/CompatChanges;') { if (args[0] !== 150939131n) fail(`Unmodeled compatibility change ${args[0]}`); runtime.record('COMPAT ContentObserver flags disabled in explicit API28 virtual profile'); return 0; }
       if (name === 'getContentResolver') { resolver ??= runtime.makeObject(RESOLVER); runtime.record(`CONTENT VM Settings provider, animator_duration_scale=${settings.get('animator_duration_scale')}; no host services`); return resolver; }
+      if (owner === URI_BUILDER) {
+        const state = runtime.object(args[0]).uriBuilder ??= { scheme: null, opaque: null, authority: null, path: null, query: null, fragment: null }, self = args[0], value = args[1] ?? null;
+        const appendSegment = segment => { const old = state.path ?? ''; state.path = !old.length ? '/' + segment : old.endsWith('/') ? old + segment : old + '/' + segment; state.opaque = null; };
+        const text = () => {
+          if (state.opaque !== null) { if (state.scheme === null) runtime.throwJava('Ljava/lang/UnsupportedOperationException;', 'An opaque URI must have a scheme.'); return `${state.scheme}:${state.opaque}${state.fragment !== null ? '#' + state.fragment : ''}`; }
+          let path = state.path ?? ''; if (state.authority !== null && path.length && !path.startsWith('/')) path = '/' + path;
+          return `${state.scheme !== null ? state.scheme + ':' : ''}${state.authority !== null ? '//' + state.authority : ''}${path}${state.query !== null ? '?' + state.query : ''}${state.fragment !== null ? '#' + state.fragment : ''}`;
+        };
+        switch (name) {
+          case '<init>': return;
+          case 'scheme': state.scheme = value; return self;
+          case 'opaquePart': state.opaque = value === null ? null : encodeUri(value); return self;
+          case 'encodedOpaquePart': state.opaque = value; return self;
+          case 'authority': state.authority = value === null ? null : encodeUri(value); state.opaque = null; return self;
+          case 'encodedAuthority': state.authority = value; state.opaque = null; return self;
+          case 'path': state.path = value === null ? null : encodeUri(value, '/'); state.opaque = null; return self;
+          case 'encodedPath': state.path = value; state.opaque = null; return self;
+          case 'appendPath': appendSegment(encodeUri(value)); return self;
+          case 'appendEncodedPath': appendSegment(value); return self;
+          case 'query': state.query = value === null ? null : encodeUri(value); state.opaque = null; return self;
+          case 'encodedQuery': state.query = value; state.opaque = null; return self;
+          case 'appendQueryParameter': { const parameter = `${value === null ? 'null' : encodeUri(value)}=${args[2] === null ? 'null' : encodeUri(args[2])}`; state.query = state.query ? state.query + '&' + parameter : parameter; state.opaque = null; return self; }
+          case 'clearQuery': state.query = null; return self;
+          case 'fragment': state.fragment = value === null ? null : encodeUri(value); return self;
+          case 'encodedFragment': state.fragment = value; return self;
+          case 'build': return uri(runtime, text());
+          case 'toString': return text();
+        }
+      }
+      if (owner === URI && name === 'buildUpon') {
+        const parts = parseUriParts(textOf(runtime, args[0])), builder = runtime.makeObject(URI_BUILDER);
+        runtime.object(builder).uriBuilder = parts.hierarchical
+          ? { scheme: parts.scheme, opaque: null, authority: parts.authority, path: parts.path, query: parts.query, fragment: parts.fragment }
+          : { scheme: parts.scheme, opaque: parts.ssp, authority: null, path: null, query: null, fragment: parts.fragment };
+        return builder;
+      }
       if (owner === URI) {
         if (name === 'parse') { if (args[0] == null) runtime.throwJava('Ljava/lang/NullPointerException;', 'uriString'); return uri(runtime, args[0]); }
         if (name === 'encode') return args[0] == null ? null : encodeUri(args[0], args[1] ?? null);
