@@ -1,28 +1,28 @@
-import { loadAPK } from './apk-loader.js?v=c81d48011848';
-import { FrameworkProvider } from './framework-provider.js?v=c81d48011848';
-import { createRasterSender } from './raster-cache.js?v=c81d48011848';
-import { isFreedId } from './heap-gc.js?v=c81d48011848';
-import { dispatchPointer } from './pointer-input-host.js?v=c81d48011848';
-import { resolveDevice } from './device-profile.js?v=c81d48011848';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=c81d48011848';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=c81d48011848';
-import { SkiaProvider } from './skia-provider.js?v=c81d48011848';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=c81d48011848';
-import { disposeTextLayout } from './text-layout-native.js?v=c81d48011848';
-import { IcuBreakProvider } from './icu-break-provider.js?v=c81d48011848';
-import { SqliteProvider } from './sqlite-native.js?v=c81d48011848';
-import { TzdataProvider } from './java-time-native.js?v=c81d48011848';
-import { ZlibProvider } from './zip-native.js?v=c81d48011848';
-import { IcuConverterProvider } from './icu-converter-native.js?v=c81d48011848';
-import { disposeColorFilters } from './color-filter-native.js?v=c81d48011848';
-import { disposeRegex } from './regex-native.js?v=c81d48011848';
-import { disposeRenderNodes } from './rendernode-native.js?v=c81d48011848';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=c81d48011848';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=c81d48011848';
+import { loadAPK } from './apk-loader.js?v=94afba6d22ec';
+import { FrameworkProvider } from './framework-provider.js?v=94afba6d22ec';
+import { createRasterSender } from './raster-cache.js?v=94afba6d22ec';
+import { isFreedId } from './heap-gc.js?v=94afba6d22ec';
+import { dispatchPointer } from './pointer-input-host.js?v=94afba6d22ec';
+import { resolveDevice } from './device-profile.js?v=94afba6d22ec';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=94afba6d22ec';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=94afba6d22ec';
+import { SkiaProvider } from './skia-provider.js?v=94afba6d22ec';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=94afba6d22ec';
+import { disposeTextLayout } from './text-layout-native.js?v=94afba6d22ec';
+import { IcuBreakProvider } from './icu-break-provider.js?v=94afba6d22ec';
+import { SqliteProvider } from './sqlite-native.js?v=94afba6d22ec';
+import { TzdataProvider } from './java-time-native.js?v=94afba6d22ec';
+import { ZlibProvider } from './zip-native.js?v=94afba6d22ec';
+import { IcuConverterProvider } from './icu-converter-native.js?v=94afba6d22ec';
+import { disposeColorFilters } from './color-filter-native.js?v=94afba6d22ec';
+import { disposeRegex } from './regex-native.js?v=94afba6d22ec';
+import { disposeRenderNodes } from './rendernode-native.js?v=94afba6d22ec';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=94afba6d22ec';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=94afba6d22ec';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=c81d48011848';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=c81d48011848';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=c81d48011848';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=94afba6d22ec';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=94afba6d22ec';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=94afba6d22ec';
 
 let sharedSkiaProvider = null;
 let sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -35,7 +35,7 @@ let inventory = null;
 let activeRequestId = null;
 let busy = false;
 let eventTimer = null, lastEventMs = 0;
-function errorData(error) { return { name: error.name || 'Error', message: error.message || String(error), stack: error.stack, details: error.details, navigation: runtime?.platform?.navigationState?.(runtime), trace: Array.isArray(runtime?.trace) ? runtime.trace.slice(-512) : [] }; }
+function errorData(error) { return { name: error.name || 'Error', message: error.message || String(error), stack: error.stack, details: error.details, navigation: runtime?.platform?.navigationState?.(runtime), trace: Array.isArray(runtime?.trace) ? runtime.trace.slice(-512) : [], stubs: runtime ? [...(runtime.missingClasses ?? []), ...(runtime.missingReturns ?? []), ...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`) : [] }; }
 const rasterSender = createRasterSender();
 function currentSnapshot() {
   runtime.steps = 0; // A bounded inspection event, separate from the APK callback that just finished.

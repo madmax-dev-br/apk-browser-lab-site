@@ -1,6 +1,6 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=c81d48011848';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=c81d48011848';
-import { createDeviceView, createViewState } from './device-view.js?v=c81d48011848';
+import { APKWorkerClient } from './apk-worker-client.js?v=94afba6d22ec';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=94afba6d22ec';
+import { createDeviceView, createViewState } from './device-view.js?v=94afba6d22ec';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -42,6 +42,12 @@ function updateTrace(snapshot) {
   $('trace-count').textContent = `${state.trace.length} eventos`;
 }
 function hideError() { $('error-panel').hidden = true; }
+document.getElementById('error-copy')?.addEventListener('click', async event => {
+  const button = event.currentTarget, report = state.errorReport ?? $('error-message').textContent;
+  try { await navigator.clipboard.writeText(report); button.textContent = 'Diagnóstico copiado'; }
+  catch { $('error-detail').textContent = report; $('error-detail').hidden = false; $('error-diagnostics').hidden = false; $('error-diagnostics').open = true; getSelection()?.selectAllChildren($('error-detail')); button.textContent = 'Selecionado: copie com Cmd+C'; }
+  setTimeout(() => { button.textContent = 'Copiar diagnóstico'; }, 2500);
+});
 function showError(error, title = 'Tentativa de execução interrompida') {
   const inventory = state.mode === 'apk' ? state.inventory : null;
   const raw = error?.message || String(error);
@@ -53,6 +59,16 @@ function showError(error, title = 'Tentativa de execução interrompida') {
   if (error.details) details.push(typeof error.details === 'string' ? error.details : JSON.stringify(error.details, null, 2));
   if (error.trace?.length) details.push('Últimas instruções da VM:\n' + error.trace.slice(-40).join('\n'));
   $('error-detail').textContent = [...new Set(details)].join('\n');
+  // A short plain-text report for pasting into a chat: the cause, the innermost frames, the last trace lines and every stubbed API.
+  const frames = [...raw.matchAll(/(L[^\s:]+?;->[^\s]+?) \[([^\]]+)\] at PC (0x[\da-f]+)/gi)].map(([, frame, dex, pc]) => `  ${frame} [${dex}] @${pc}`);
+  const trace = error.trace ?? [], stubs = error.stubs?.length ? error.stubs : [...new Set(trace.filter(line => /^STUB-/.test(line)))];
+  state.errorReport = [
+    `APK Browser Lab ${document.querySelector('script[src*="app.js"]')?.src.split('v=')[1] ?? ''} · ${inventory?.packageName ?? state.fileName ?? 'APK'} · modo tolerante: ${$('tolerate-missing')?.value ?? 'off'}`,
+    `Erro: ${cause}`,
+    frames.length ? `Pilha (mais interna por último):\n${frames.slice(-12).join('\n')}` : '',
+    stubs.length ? `APIs com stub (${stubs.length}):\n${stubs.slice(0, 60).join('\n')}` : '',
+    trace.length ? `Últimas linhas do log:\n${trace.filter(line => !/^STUB-/.test(line)).slice(-15).join('\n')}` : '',
+  ].filter(Boolean).join('\n\n');
   $('error-detail').hidden = !details.length;
   $('error-diagnostics').hidden = !details.length;
   $('error-diagnostics').open = false;
