@@ -1,5 +1,5 @@
-import { createHostRegistry, parseSignature } from './host-contract.js?v=cfd2299f1410';
-import { JavaException } from './apk-runtime.js?v=cfd2299f1410';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=00979d36e5ab';
+import { JavaException } from './apk-runtime.js?v=00979d36e5ab';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).

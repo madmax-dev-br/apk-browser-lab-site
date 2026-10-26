@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=cfd2299f1410';
-import {getVectorGraphics} from './vector-native.js?v=cfd2299f1410';
-import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=cfd2299f1410';
-import { gcRoot } from './heap-gc.js?v=cfd2299f1410';
+import {APKError} from './apk-error.js?v=00979d36e5ab';
+import {getVectorGraphics} from './vector-native.js?v=00979d36e5ab';
+import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=00979d36e5ab';
+import { gcRoot } from './heap-gc.js?v=00979d36e5ab';
 const BITMAP='Landroid/graphics/Bitmap;',CONFIG='Landroid/graphics/Bitmap$Config;',SPACE='Landroid/graphics/ColorSpace;',NAMED='Landroid/graphics/ColorSpace$Named;',CANVAS='Landroid/graphics/Canvas;';
 // android.graphics.Bitmap.Config / ColorSpace.Named declaration order (API 28 + API 34 HLG/PQ appended).
 const CONFIGS=['ALPHA_8','RGB_565','ARGB_4444','ARGB_8888','RGBA_F16','HARDWARE'];
@@ -27,16 +27,16 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
   if(name!=='SRGB')fail(`ColorSpace.Named.${name} is not implemented; only sRGB has a Skia-backed Bitmap pipeline`);
   if(!spaces.has(name)){const ref=runtime.makeObject(SPACE);runtime.object(ref).colorSpaceName=name;spaces.set(name,ref);}return spaces.get(name);
  };
- const create=(width,height,config,hasAlpha,space)=>{
+ const create=(width,height,config,hasAlpha,space,{mutable=true,hardware=false}={})=>{
   if(!(width>0&&height>0))runtime.throwJava('Ljava/lang/IllegalArgumentException;','width and height must be > 0');
   if(config===null||config===0)runtime.throwJava('Ljava/lang/NullPointerException;','config is null');
   const configName=runtime.object(config).enumName;
-  if(configName!=='ARGB_8888'&&configName!=='ALPHA_8')fail(`Bitmap.Config.${configName} is not implemented; only ARGB_8888 and ALPHA_8 have a Skia-backed Bitmap`);
+  if(!hardware&&configName!=='ARGB_8888'&&configName!=='ALPHA_8')fail(`Bitmap.Config.${configName} is not implemented; only ARGB_8888 and ALPHA_8 have a Skia-backed Bitmap`);
   if(space&&runtime.object(space).colorSpaceName!=='SRGB')fail('Only sRGB Bitmap color spaces are implemented');
   if(width>4096||height>4096||width*height>4*1024*1024)fail('Bitmap extent exceeds4096px/4Mpixel VM limit');
   const graphics=getVectorGraphics(runtime),handle=graphics.createCanvas(),canvas=graphics.get(handle,'canvas');Object.assign(canvas,{width,height});
   const ref=runtime.makeObject(BITMAP),o=runtime.object(ref);
-  o.bitmap={width,height,config,hasAlpha,handle,recycled:false,mipMap:false,density:160,colorSpace:colorSpace('SRGB')};
+  o.bitmap={width,height,config,hasAlpha,handle,recycled:false,mipMap:false,density:160,colorSpace:colorSpace('SRGB'),mutable};
   runtime.storeField(o.fields,`${BITMAP}->mDensity:I`,160);
   return ref;
  };
@@ -63,7 +63,7 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
    if(field.owner===NAMED&&NAMES.includes(field.name))return{handled:true,value:enumValue(NAMED,NAMES,field.name)};
    return null;
   },
-  drawInto,
+  drawInto,create,live,enumValue,CONFIGS,matrixValues,rectF,recordNative,
   /** Pixels of a Bitmap for BitmapShader sampling: a snapshot raster plus whether the bitmap is coverage-only (ALPHA_8). */
   shaderSource(bitmapRef){
    const b=live(bitmapRef),graphics=getVectorGraphics(runtime),holder=b.canvasObject??=runtime.allocate(CANVAS);
@@ -85,7 +85,7 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
    if(owner===CANVAS){
     if(name==='throwIfCannotDraw'){if(state(args[1]).recycled)vm.throwJava('Ljava/lang/RuntimeException;','Canvas: trying to use a recycled bitmap');return;}
     if(name==='<init>'){
-     const b=live(args[1]);
+     const b=live(args[1]);if(b.mutable===false)vm.throwJava('Ljava/lang/IllegalStateException;','Immutable bitmap passed to Canvas constructor');
      const object=vm.object(args[0]);object.nativeCanvasHandle=b.handle;object.canvasBitmap=args[1];
      for(const[field,type,value]of[['mNativeCanvasWrapper','J',b.handle],['mDensity','I',0],['mScreenDensity','I',0]])vm.storeField(object.fields,`${CANVAS}->${field}:${type}`,value);
      object.canvasDensity=0;return;
@@ -106,7 +106,7 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
     case'getWidth':return b.width;case'getHeight':return b.height;case'getConfig':return b.config;case'hasAlpha':return b.hasAlpha?1:0;
     case'setHasAlpha':b.hasAlpha=!!args[1];return;case'getColorSpace':return b.colorSpace;case'isRecycled':return b.recycled?1:0;
     case'recycle':b.recycled=true;return;case'prepareToDraw':return;case'hasMipMap':return b.mipMap?1:0;case'setHasMipMap':b.mipMap=!!args[1];return;
-    case'isMutable':return 1;case'isPremultiplied':return 1;case'getDensity':return b.density;
+    case'isMutable':return b.mutable===false?0:1;case'isPremultiplied':return 1;case'getDensity':return b.density;
     case'getRowBytes':return b.width*(vm.object(b.config).enumName==='ALPHA_8'?1:4);
     case'getByteCount':case'getAllocationByteCount':return b.width*b.height*(vm.object(b.config).enumName==='ALPHA_8'?1:4);
     case'setDensity':b.density=args[1];vm.storeField(vm.object(args[0]).fields,`${BITMAP}->mDensity:I`,args[1]);return;

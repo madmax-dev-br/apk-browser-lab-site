@@ -1,7 +1,7 @@
-import {APKError} from './apk-runtime.js?v=cfd2299f1410';
-import {PathApproxProvider} from './path-approx-provider.js?v=cfd2299f1410';
-import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=cfd2299f1410';
-import {createFontFallback} from './font-fallback.js?v=cfd2299f1410';
+import {APKError} from './apk-runtime.js?v=00979d36e5ab';
+import {PathApproxProvider} from './path-approx-provider.js?v=00979d36e5ab';
+import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=00979d36e5ab';
+import {createFontFallback} from './font-fallback.js?v=00979d36e5ab';
 const MAX_WASM=16*1024*1024,MAX_FONT=4*1024*1024,MAX_MODULE=1024*1024;
 const hash=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
 async function read(fetchImpl,url,limit){
@@ -62,7 +62,7 @@ export class SkiaProvider{
   if(!this.fontReader&&node){const fs=await import('node:fs'),{fileURLToPath}=await import('node:url');readSync=(url,limit)=>{const bytes=new Uint8Array(fs.readFileSync(fileURLToPath(url)));if(bytes.length>limit)throw new APKError('Skia fallback font exceeds VM limit');return bytes;};}
   const fallback=createFontFallback({CK,baseURL:new URL('../../android-fonts/android-13.0.0_r1/',this.baseURL),readSync,robotoFiles:fonts.map(f=>({file:f.file,bytes:assets[f.file]})),selectTypeface});
   const pathApprox=await(this.pathApproxProvider??new PathApproxProvider({fetchImpl:this.fetch})).load();
-  const result={pathApprox,CanvasKit:CK,typeface,fontManager,selectTypeface,fallback,metadata:{...metadata,enabled:true,backend:'official-Skia-Wasm/CPU-MakeSurface',integrity:'verified-SHA-256',wasmTransport:node?'verified-local-file':'verified-Blob-URL',heapBytes:CK.HEAPU8.buffer.byteLength,font:'Roboto Regular',fontMatching:'original-Skia-FontMgr/nearest-installed-style',domRequired:false,webGLRequired:false,pathApproximation:pathApprox.metadata,textShaping:'Roboto simple glyph runs; other text is itemized through the Android 13 fallback chain (vendor/android-fonts) and shaped by SkParagraph/HarfBuzz; code points no chain font has fail explicitly'},createHost:runtime=>createSkiaCanvasHost(runtime,result),measureText:(text,state={})=>measureSkiaText(result,text,state),rasterizeCanvas:(runtime,graphics,receiver,width,height)=>rasterizeSkiaCanvas(runtime,result,graphics,receiver,width,height)};
+  const result={pathApprox,CanvasKit:CK,typeface,fontManager,selectTypeface,fallback,metadata:{...metadata,enabled:true,backend:'official-Skia-Wasm/CPU-MakeSurface',integrity:'verified-SHA-256',wasmTransport:node?'verified-local-file':'verified-Blob-URL',heapBytes:CK.HEAPU8.buffer.byteLength,font:'Roboto Regular',fontMatching:'original-Skia-FontMgr/nearest-installed-style',domRequired:false,webGLRequired:false,pathApproximation:pathApprox.metadata,textShaping:'Roboto simple glyph runs; other text is itemized through the Android 13 fallback chain (vendor/android-fonts) and shaped by SkParagraph/HarfBuzz; code points no chain font has fail explicitly'},createHost:runtime=>createSkiaCanvasHost(runtime,result),measureText:(text,state={})=>measureSkiaText(result,text,state),rasterizeCanvas:(runtime,graphics,receiver,width,height,options)=>rasterizeSkiaCanvas(runtime,result,graphics,receiver,width,height,options)};
   await onProgress?.({phase:'skia',completed:3,total:3,message:'Skia CPU rasterizer ready'});return result;
  }
 }

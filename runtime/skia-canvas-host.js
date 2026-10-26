@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=cfd2299f1410';
-import {getVectorGraphics} from './vector-native.js?v=cfd2299f1410';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=cfd2299f1410';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=cfd2299f1410';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=cfd2299f1410';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=cfd2299f1410';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=cfd2299f1410';
-import {createBitmapHost} from './bitmap-host.js?v=cfd2299f1410';
-import { gcRoot } from './heap-gc.js?v=cfd2299f1410';
+import {APKError} from './apk-runtime.js?v=00979d36e5ab';
+import {getVectorGraphics} from './vector-native.js?v=00979d36e5ab';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=00979d36e5ab';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=00979d36e5ab';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=00979d36e5ab';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=00979d36e5ab';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=00979d36e5ab';
+import {createBitmapHost} from './bitmap-host.js?v=00979d36e5ab';
+import { gcRoot } from './heap-gc.js?v=00979d36e5ab';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -68,7 +68,7 @@ function sourceVector(CK,canvas,graphics,handle,colorFilter=null){const tree=typ
   }else fail('Unsupported Skia vector node '+node.kind);seen.delete(pointer);
  };const alpha=new CK.Paint();alpha.setAlphaf(tree.alpha);if(colorFilter){const filter=makeSkiaColorFilter(CK,colorFilter);alpha.setColorFilter(filter);filter?.delete();}canvas.saveLayer(alpha);walk(tree.root);canvas.restore();alpha.delete();
 }
-export function rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height){
+export function rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,options={}){
  if(!(Number.isInteger(width)&&Number.isInteger(height)&&width>0&&height>0&&width<=4096&&height<=4096&&width*height<=4*1024*1024))fail('Skia raster extent exceeds4096px/4Mpixel VM limit');
  const CK=backend.CanvasKit,state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas'),surface=CK.MakeSurface(width,height);if(!surface)fail('Skia CPU surface allocation failed');const canvas=surface.getCanvas();canvas.clear(CK.TRANSPARENT);
  const activeNodes=new Set();let replayCount=0;
@@ -131,7 +131,10 @@ export function rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,heig
   flush();
  };
  try{replay(state.draws);
-  surface.flush();const image=surface.makeImageSnapshot();try{const png=image.encodeToBytes(CK.ImageFormat.PNG);if(!png)fail('Skia PNG encoding failed');let binary='';for(let at=0;at<png.length;at+=32768)binary+=String.fromCharCode(...png.subarray(at,at+32768));return {kind:'raster',dataURL:'data:image/png;base64,'+btoa(binary),width,height,drawCalls:state.draws.length,source:'official-Skia-Wasm/CPU',pngBytes:png.length};}finally{image.delete();}
+  surface.flush();const image=surface.makeImageSnapshot();
+  // options.pixels: the canvas as straight (unpremultiplied) sRGB RGBA8 bytes, for Bitmap.getPixel / compress.
+  if(options?.pixels){try{const pixels=image.readPixels(0,0,{width,height,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Unpremul,colorSpace:CK.ColorSpace.SRGB});if(!pixels)fail('Skia pixel read-back failed');return {kind:'pixels',width,height,pixels};}finally{image.delete();}}
+  try{const png=image.encodeToBytes(CK.ImageFormat.PNG);if(!png)fail('Skia PNG encoding failed');let binary='';for(let at=0;at<png.length;at+=32768)binary+=String.fromCharCode(...png.subarray(at,at+32768));return {kind:'raster',dataURL:'data:image/png;base64,'+btoa(binary),width,height,drawCalls:state.draws.length,source:'official-Skia-Wasm/CPU',pngBytes:png.length};}finally{image.delete();}
  }finally{surface.dispose();}
 }
 export function createSkiaCanvasHost(runtime,backend){
@@ -149,6 +152,10 @@ export function createSkiaCanvasHost(runtime,backend){
  add(PATH,['<init>()V',`<init>(${PATH})V`,'reset()V','rewind()V','moveTo(FF)V','rMoveTo(FF)V','lineTo(FF)V','rLineTo(FF)V','quadTo(FFFF)V','rQuadTo(FFFF)V','cubicTo(FFFFFF)V','rCubicTo(FFFFFF)V','close()V','isEmpty()Z','approximate(F)[F',`set(${PATH})V`,`addPath(${PATH})V`,'setFillType(Landroid/graphics/Path$FillType;)V','getFillType()Landroid/graphics/Path$FillType;']);
  add(PATH,['addRoundRect(FFFFFFLandroid/graphics/Path$Direction;)V']);
  add(PATH,['readOnlyNI()J','getNativeInstance()J']);
+ // Path geometry added in the Lottie/Glide round: shapes, arcs, offsets and transforms over CanvasKit's PathBuilder (SkPath::addRect/addOval/addCircle/addArc/arcTo/offset/transform).
+ const DIR='Landroid/graphics/Path$Direction;',RF='Landroid/graphics/RectF;',MATRIX='Landroid/graphics/Matrix;';
+ add(PATH,[`addRect(${RF}${DIR})V`,`addRect(FFFF${DIR})V`,`addOval(${RF}${DIR})V`,`addOval(FFFF${DIR})V`,`addCircle(FFF${DIR})V`,`addArc(${RF}FF)V`,'addArc(FFFFFF)V',`arcTo(${RF}FFZ)V`,`arcTo(${RF}FF)V`,'arcTo(FFFFFFZ)V',
+  'offset(FF)V',`offset(FF${PATH})V`,`transform(${MATRIX})V`,`transform(${MATRIX}${PATH})V`,`addPath(${PATH}${MATRIX})V`,`addPath(${PATH}FF)V`,`computeBounds(${RF}Z)V`,'incReserve(I)V','toggleInverseFillType()V','isInverseFillType()Z']);
  add(PATH,['addRoundRect(Landroid/graphics/RectF;[FLandroid/graphics/Path$Direction;)V']);
  add(CANVAS,[`drawPath(${PATH}Landroid/graphics/Paint;)V`,'drawCircle(FFFLandroid/graphics/Paint;)V','drawOval(FFFFLandroid/graphics/Paint;)V','drawRoundRect(FFFFFFLandroid/graphics/Paint;)V','drawColor(I)V','drawText(Ljava/lang/String;FFLandroid/graphics/Paint;)V','drawText(Ljava/lang/String;IIFFLandroid/graphics/Paint;)V','clipRect(FFFF)Z','clipRect(Landroid/graphics/Rect;)Z',`clipPath(${PATH})Z`]);
  add(CANVAS,['drawRect(Landroid/graphics/RectF;Landroid/graphics/Paint;)V','drawRoundRect(Landroid/graphics/RectF;FFLandroid/graphics/Paint;)V','drawOval(Landroid/graphics/RectF;Landroid/graphics/Paint;)V','saveLayer(FFFFLandroid/graphics/Paint;)I','save()I','restore()V','restoreToCount(I)V','getSaveCount()I']);
@@ -157,6 +164,13 @@ export function createSkiaCanvasHost(runtime,backend){
  add(CANVAS,['drawTextRun(Ljava/lang/CharSequence;IIIIFFZLandroid/graphics/Paint;)V','drawTextRun(Ljava/lang/String;IIIIFFZLandroid/graphics/Paint;)V','drawTextRun([CIIIIFFZLandroid/graphics/Paint;)V']);
  add(CANVAS,['clipRect(FFFFLandroid/graphics/Region$Op;)Z','clipRect(IIIILandroid/graphics/Region$Op;)Z','clipRect(Landroid/graphics/Rect;Landroid/graphics/Region$Op;)Z','clipRect(Landroid/graphics/RectF;Landroid/graphics/Region$Op;)Z',`clipPath(${PATH}Landroid/graphics/Region$Op;)Z`,'clipOutRect(FFFF)Z','clipOutRect(IIII)Z',`clipOutPath(${PATH})Z`]);
  add(CANVAS,['concat(Landroid/graphics/Matrix;)V','clipRect(IIII)Z','save(I)I']);
+ add(CANVAS,['clipRect(Landroid/graphics/RectF;)Z']);
+ // android.graphics.PathMeasure over CanvasKit's ContourMeasure (SkContourMeasureIter): the current contour of the path set with setPath, advanced by nextContour().
+ const PATH_MEASURE='Landroid/graphics/PathMeasure;',measures=new Map(),floatBitsOf=x=>{bits.setFloat32(0,x,true);return bits.getInt32(0,true);};
+ add(PATH_MEASURE,['<init>()V',`<init>(${PATH}Z)V`,`setPath(${PATH}Z)V`,'getLength()F','isClosed()Z','nextContour()Z','getPosTan(F[F[F)Z',`getSegment(FF${PATH}Z)Z`,'getMatrix(FLandroid/graphics/Matrix;I)Z']);
+ const releaseMeasure=state=>{state.contour?.delete();state.iter?.delete();state.shape?.delete();state.contour=state.iter=state.shape=null;};
+ const setMeasurePath=(state,pathRef,forceClosed)=>{releaseMeasure(state);if(!pathRef)return;state.shape=path(pathRef).builder.snapshot();state.iter=new CK.ContourMeasureIter(state.shape,!!forceClosed,1);state.contour=state.iter.next();};
+ const measure=(vm,ref)=>{const state=measures.get(ref.ref);if(!state)fail('PathMeasure used before construction');return state;};
  const rectF=ref=>finite(['left','top','right','bottom'].map(field=>number(runtime.object(ref).fields.get(`Landroid/graphics/RectF;->${field}:F`)??0)));
  const path=ref=>{const value=paths.get(ref?.ref);if(!value)fail('Path native state is unavailable');return value;};
  const snapshot=ref=>{const p=path(ref).builder.snapshot();try{return {commands:new Float32Array(p.toCmds()),fillType:p.getFillType().value};}finally{p.delete();}};
@@ -165,7 +179,7 @@ export function createSkiaCanvasHost(runtime,backend){
  let host;const bitmaps=createBitmapHost(runtime,{recordNative:(handle,command)=>host.recordNative(handle,command),rectF,matrixValues:getMatrixValues});
  host={
   bitmaps,
-  supports:key=>keys.has(key)||matrixHost.supports(key)||bitmaps.supports(key),canAllocate:type=>type===PATH||!!matrixHost.parent(type),parent:type=>matrixHost.parent(type)??bitmaps.parent(type)??(type===CANVAS?'Landroid/graphics/BaseCanvas;':type==='Landroid/graphics/BaseCanvas;'?'Ljava/lang/Object;':type===PATH||type===TYPEFACE?'Ljava/lang/Object;':null),
+  supports:key=>keys.has(key)||matrixHost.supports(key)||bitmaps.supports(key),canAllocate:type=>type===PATH||type===PATH_MEASURE||!!matrixHost.parent(type),parent:type=>matrixHost.parent(type)??bitmaps.parent(type)??(type===CANVAS?'Landroid/graphics/BaseCanvas;':type==='Landroid/graphics/BaseCanvas;'?'Ljava/lang/Object;':type===PATH||type===TYPEFACE||type===PATH_MEASURE?'Ljava/lang/Object;':null),
   interfaces:type=>matrixHost.interfaces?.(type)??[],
   resolveTypeface,
   parsePath(handle,text){const ref=pathHandles.get(handle);if(!ref)fail('Invalid or released VM SkPath token');const state=path(ref),shape=CK.Path.MakeFromSVGString(text);if(!shape)runtime.throwJava('Ljava/lang/IllegalArgumentException;','Invalid SVG pathData');try{const count=shape.countPoints(),old=state.builder.countPoints();if(count>100000||pathCells-old+count>1000000)fail('Parsed SkPath exceeds bounded geometry storage');const replacement=new CK.PathBuilder(shape);state.builder.delete();state.builder=replacement;pathCells=pathCells-old+count;}finally{shape.delete();}},
@@ -175,7 +189,7 @@ export function createSkiaCanvasHost(runtime,backend){
   measureRun(text,options={},state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaRun(backend,text,{...state,...options,weight:face.weight,italic:face.italic});},
   measureText(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaText(backend,text,{...state,nativeTypeface:face.face,weight:face.weight,italic:face.italic});},
   readStatic(vm,field){const bitmapStatic=bitmaps.readStatic(field);if(bitmapStatic)return bitmapStatic;if(field.owner===TYPEFACE&&['DEFAULT','DEFAULT_BOLD','SANS_SERIF'].includes(field.name))return{handled:true,value:makeTypeface('sans-serif',field.name==='DEFAULT_BOLD'?1:0)};return null;},
-  dispose(){for(const p of paths.values())p.builder.delete();paths.clear();pathHandles.clear();},
+  dispose(){for(const m of measures.values())releaseMeasure(m);measures.clear();for(const p of paths.values())p.builder.delete();paths.clear();pathHandles.clear();},
   invoke(vm,method,args){if(bitmaps.supports(method.owner+'->'+method.name+method.signature))return bitmaps.invoke(vm,method,args);if(matrixHost.supports(method.owner+'->'+method.name+method.signature))return matrixHost.invoke(vm,method,args);const name=method.name,receiver=args[0];
    if(method.owner===CANVAS&&name==='setCompatibilityVersion'){vm.canvasCompatibilityVersion=args[0]|0;vm.record(`CANVAS compatibility target=${vm.canvasCompatibilityVersion} [actual process graphics policy]`);return;}
    if(method.owner===TYPEFACE){
@@ -185,6 +199,37 @@ export function createSkiaCanvasHost(runtime,backend){
    }
    if(method.owner===PAINT){const state=getPaintState(vm,receiver);if(name==='getTypeface')return state.typefaceRef??null;const value=args[1]==null||args[1]===0?null:args[1];if(value)resolveTypeface(value);state.typefaceRef=value;return value;}
    if(method.owner===CANVAS&&name==='<init>'){const handle=args[1];getVectorGraphics(vm).get(handle,'canvas');const object=vm.object(receiver);object.nativeCanvasHandle=handle;for(const[field,type,value]of [['mNativeCanvasWrapper','J',handle],['mDensity','I',0],['mScreenDensity','I',0]])vm.storeField(object.fields,`${CANVAS}->${field}:${type}`,value);object.canvasDensity=0;return;}
+   if(method.owner===PATH_MEASURE){
+    if(name==='<init>'){const state={shape:null,iter:null,contour:null};measures.set(receiver.ref,state);if(args[1])setMeasurePath(state,args[1],args[2]);return;}
+    const state=measure(vm,receiver),contour=state.contour;
+    if(name==='setPath'){setMeasurePath(state,args[1],args[2]);return;}
+    if(name==='getLength')return floatBitsOf(contour?contour.length():0);
+    if(name==='isClosed')return contour&&contour.isClosed()?1:0;
+    if(name==='nextContour'){if(!state.iter)return 0;state.contour?.delete();state.contour=state.iter.next();return state.contour?1:0;}
+    if(name==='getPosTan'||name==='getMatrix'){
+      if(!contour)return 0;const distance=number(args[1]),length=contour.length();if(!(distance>=0&&distance<=length))return 0;
+      const pos=contour.getPosTan(distance);
+      if(name==='getPosTan'){
+        for(const [index,offset] of [[2,0],[3,2]]){const array=args[index];if(!array)continue;const target=vm.array(array);if(target.elements.length<2)vm.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','array.length < 2');target.elements[0]=floatBitsOf(pos[offset]);target.elements[1]=floatBitsOf(pos[offset+1]);}
+        return 1;
+      }
+      const flags=args[3],m=[1,0,0,0,1,0,0,0,1];
+      if(flags&2){m[0]=pos[2];m[1]=-pos[3];m[3]=pos[3];m[4]=pos[2];}
+      if(flags&1){m[2]=pos[0];m[5]=pos[1];}
+      const values=vm.newArray('[F',9);vm.array(values).elements=m.map(floatBitsOf);
+      vm.dispatch({owner:'Landroid/graphics/Matrix;',name:'setValues',parameters:['[F'],result:'V',signature:'([F)V'},[args[2],values],'virtual');return 1;
+    }
+    if(name==='getSegment'){
+      if(!contour)return 0;let start=number(args[1]),stop=number(args[2]);const length=contour.length();if(start<0)start=0;if(stop>length)stop=length;if(!(start<=stop))return 0;
+      const segment=contour.getSegment(start,stop,!!args[4]);if(!segment)return 0;
+      try{const target=path(args[3]).builder;
+        if(args[4]||target.countPoints()===0)target.addPath(segment);
+        else{const commands=segment.toCmds();let at=0;while(at<commands.length){const verb=commands[at++];const arity=[2,2,4,5,6,0][verb]??fail('Unknown path verb');const v=commands.slice(at,at+arity);at+=arity;if(verb===0)continue;if(verb===1)target.lineTo(...v);else if(verb===2)target.quadTo(...v);else if(verb===3)target.conicTo(...v);else if(verb===4)target.cubicTo(...v);else target.close();}}
+        pathCells+=segment.countPoints();return 1;
+      }finally{segment.delete();}
+    }
+    fail('Unknown PathMeasure operation '+name);
+   }
    if(method.owner===PATH){
     if(name==='<init>'){if(paths.size>=4096)fail('Skia Path limit exceeded');let builder;if(args[1]){const source=path(args[1]).builder.snapshot();builder=new CK.PathBuilder(source);source.delete();}else builder=new CK.PathBuilder();pathCells+=builder.countPoints();if(pathCells>1000000){builder.delete();fail('Aggregate Skia Path point limit exceeded');}const pathHandle=nextPathHandle++;paths.set(receiver.ref,{builder,handle:pathHandle});pathHandles.set(pathHandle,receiver);vm.storeField(vm.object(receiver).fields,`${PATH}->mNativePath:J`,pathHandle);vm.storeField(vm.object(receiver).fields,`${PATH}->isSimplePath:Z`,0);return;}
     const state=path(receiver),builder=state.builder;
@@ -203,6 +248,29 @@ export function createSkiaCanvasHost(runtime,backend){
       const direction=vm.object(args[3]).fields.get('Landroid/graphics/Path$Direction;->nativeInt:I');if(direction!==0&&direction!==1)fail('Path requires original Direction enum');
       const before=builder.countPoints();builder.addRRect(new Float32Array([...rectF(args[1]),...finite(radii.elements.slice(0,8).map(number))]),direction===1);
       pathCells+=builder.countPoints()-before;if(pathCells>1000000)fail('Aggregate Skia Path point limit exceeded');return;
+    }
+    {
+      const direction=ref=>{const index=vm.object(ref).fields.get(`${DIR}->nativeInt:I`);if(index!==0&&index!==1)fail('Path requires original Direction enum');return index===1;};
+      const grow=before=>{pathCells+=Math.max(0,builder.countPoints()-before);if(pathCells>1000000)fail('Aggregate Skia Path point limit exceeded');};
+      const before=builder.countPoints();
+      if(name==='addRect'){const r=method.parameters[0]===RF?rectF(args[1]):finite(args.slice(1,5).map(number));builder.addRect(r,direction(args.at(-1)));grow(before);return;}
+      if(name==='addOval'){const r=method.parameters[0]===RF?rectF(args[1]):finite(args.slice(1,5).map(number));builder.addOval(r,direction(args.at(-1)),1);grow(before);return;}
+      if(name==='addCircle'){const[x,y,r]=finite(args.slice(1,4).map(number));if(r<0)return;builder.addCircle(x,y,r,direction(args[4]));grow(before);return;}
+      if(name==='addArc'||name==='arcTo'){
+        const rectArg=method.parameters[0]===RF,r=rectArg?rectF(args[1]):finite(args.slice(1,5).map(number)),angles=finite((rectArg?args.slice(2,4):args.slice(5,7)).map(number)),forceMoveTo=name==='addArc'?true:method.parameters.at(-1)==='Z'?!!args.at(-1):false;
+        builder.arcToOval(r,angles[0],angles[1],forceMoveTo);grow(before);return;
+      }
+      if(name==='offset'||name==='transform'||(name==='addPath'&&method.parameters.length===2)){
+        const m=name==='offset'?[1,0,number(args[1]),0,1,number(args[2]),0,0,1]:finite(Array.from(getMatrixValues(vm,args[1])));
+        if(name==='addPath'){const source=path(args[1]).builder.snapshot();try{builder.addPath(source,getMatrixValues(vm,args[2]));}finally{source.delete();}grow(before);return;}
+        const destination=name==='offset'?args[3]:args[2];
+        if(destination){const source=builder.snapshot(),copy=new CK.PathBuilder(source);source.delete();copy.transform(m);const target=path(destination);target.builder.delete();target.builder=copy;}else builder.transform(m);
+        return;
+      }
+      if(name==='addPath'&&method.parameters[1]==='F'){const source=path(args[1]).builder.snapshot();try{builder.addPath(source,[1,0,number(args[2]),0,1,number(args[3]),0,0,1]);}finally{source.delete();}grow(before);return;}
+      if(name==='computeBounds'){const b=builder.getBounds(),target=vm.object(args[1]);['left','top','right','bottom'].forEach((field,i)=>vm.storeField(target.fields,`${RF}->${field}:F`,floatBitsOf(b[i])));return;}
+      if(name==='incReserve')return;
+      if(name==='toggleInverseFillType'||name==='isInverseFillType'){const shape=builder.snapshot(),index=shape.getFillType().value;shape.delete();if(name==='isInverseFillType')return index>=2?1:0;builder.setFillType([CK.FillType.InverseWinding,CK.FillType.InverseEvenOdd,CK.FillType.Winding,CK.FillType.EvenOdd][index]);return;}
     }
     if(builder.countPoints()>100000)fail('Skia Path point limit exceeded');if(name==='close'){builder.close();return;}
     const before=builder.countPoints(),values=finite(args.slice(1).map(number));if(typeof builder[name]!=='function')fail('Unsupported Path operation '+name);builder[name](...values);pathCells+=Math.max(0,builder.countPoints()-before);if(pathCells>1000000)fail('Aggregate Skia Path point limit exceeded');return;

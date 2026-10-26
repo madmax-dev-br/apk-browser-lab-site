@@ -1,6 +1,6 @@
-import { APKError } from './apk-runtime.js?v=cfd2299f1410';
-import { createWidgetStateHost } from './widget-state-host.js?v=cfd2299f1410';
-import { gcRoot } from './heap-gc.js?v=cfd2299f1410';
+import { APKError } from './apk-runtime.js?v=00979d36e5ab';
+import { createWidgetStateHost } from './widget-state-host.js?v=00979d36e5ab';
+import { gcRoot } from './heap-gc.js?v=00979d36e5ab';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', PARCELABLE = 'Landroid/os/Parcelable;';
 const SPARSE = 'Landroid/util/SparseArray;', ABS = 'Landroid/view/AbsSavedState;', BASE = 'Landroid/view/View$BaseSavedState;';

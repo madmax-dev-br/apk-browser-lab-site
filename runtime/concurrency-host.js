@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=cfd2299f1410';
-import { createHostRegistry } from './host-contract.js?v=cfd2299f1410';
-import { Blocked, VMThread } from './scheduler.js?v=cfd2299f1410';
-import { Invoke } from './interpreter.js?v=cfd2299f1410';
+import { APKError } from './apk-error.js?v=00979d36e5ab';
+import { createHostRegistry } from './host-contract.js?v=00979d36e5ab';
+import { Blocked, VMThread } from './scheduler.js?v=00979d36e5ab';
+import { Invoke } from './interpreter.js?v=00979d36e5ab';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -359,7 +359,10 @@ export function createConcurrencyHost(platform) {
   function retire(r, self, worker) {
     const p = pool(r, self), i = p.workers.indexOf(worker); if (i >= 0) p.workers.splice(i, 1);
     state(r, worker.thread).keepAlive = false; state(r, worker.thread).finished = true;
-    if (!p.shutdown && (p.queue.length > 0 || live(p) < p.core)) addWorker(r, self, null);
+    // ThreadPoolExecutor.processWorkerExit: a replacement is started only when fewer than `min` workers remain, min = allowCoreThreadTimeOut ? 0 : corePoolSize, raised to 1 while tasks are
+    // queued. (Replacing an expired core worker unconditionally spun an endless create/expire cycle on the virtual clock for pools with allowCoreThreadTimeOut(true).)
+    let min = p.allowCoreTimeout ? 0 : p.core; if (min === 0 && p.queue.length > 0) min = 1;
+    if (!p.shutdown && live(p) < min) addWorker(r, self, null);
     if (p.shutdown && !live(p)) vcall(r, self, TPE, 'terminated', [], 'V');
   }
   def(TPE, 'beforeExecute', `(${THREAD}${RUNNABLE})V`, () => {}); def(TPE, 'afterExecute', `(${RUNNABLE}${THROWABLE})V`, () => {}); def(TPE, 'terminated', '()V', () => {});
@@ -484,6 +487,52 @@ export function createConcurrencyHost(platform) {
     return block(r, { reason: 'CountDownLatch.await(timeout)', ready: () => l.count === 0, timeoutMs: Math.max(0, ms(r, t, u)), finish: () => { waitInterrupted(r); return l.count === 0 ? 1 : 0; } });
   });
 
+  // ---- Semaphore: permits are a counter; acquire parks until enough are available (fair semaphores grant in arrival order because parked threads are woken in order). -----------------
+  const SEMAPHORE = 'Ljava/util/concurrent/Semaphore;'; type(SEMAPHORE, OBJECT, ['Ljava/io/Serializable;'], { allocatable: true });
+  const sem = (r, ref) => r.object(ref).semaphore ?? throwNew(r, 'Ljava/lang/IllegalStateException;', 'Semaphore used before construction');
+  def(SEMAPHORE, '<init>', '(I)V', (r, _m, [self, permits]) => { r.object(self).semaphore = { permits, fair: false }; });
+  def(SEMAPHORE, '<init>', '(IZ)V', (r, _m, [self, permits, fair]) => { r.object(self).semaphore = { permits, fair: !!fair }; });
+  const acquireN = (r, self, n, { interruptible = true, timeoutMs = Infinity, timed = false } = {}) => {
+    if (n < 0) throwNew(r, 'Ljava/lang/IllegalArgumentException;'); const s = sem(r, self); if (interruptible) checkInterrupt(r);
+    const take = () => { s.permits -= n; return timed ? 1 : undefined; };
+    if (s.permits >= n) return take();
+    if (timed && timeoutMs <= 0) return 0;
+    return block(r, { reason: 'Semaphore.acquire', ready: () => s.permits >= n, timeoutMs, interruptible, finish: () => { if (interruptible) waitInterrupted(r); return s.permits >= n ? take() : timed ? 0 : undefined; } });
+  };
+  def(SEMAPHORE, 'acquire', '()V', (r, _m, [self]) => acquireN(r, self, 1)); def(SEMAPHORE, 'acquire', '(I)V', (r, _m, [self, n]) => acquireN(r, self, n));
+  def(SEMAPHORE, 'acquireUninterruptibly', '()V', (r, _m, [self]) => acquireN(r, self, 1, { interruptible: false })); def(SEMAPHORE, 'acquireUninterruptibly', '(I)V', (r, _m, [self, n]) => acquireN(r, self, n, { interruptible: false }));
+  def(SEMAPHORE, 'tryAcquire', '()Z', (r, _m, [self]) => { const s = sem(r, self); if (s.permits >= 1) { s.permits--; return 1; } return 0; });
+  def(SEMAPHORE, 'tryAcquire', '(I)Z', (r, _m, [self, n]) => { if (n < 0) throwNew(r, 'Ljava/lang/IllegalArgumentException;'); const s = sem(r, self); if (s.permits >= n) { s.permits -= n; return 1; } return 0; });
+  def(SEMAPHORE, 'tryAcquire', `(J${UNIT})Z`, (r, _m, [self, t, u]) => acquireN(r, self, 1, { timed: true, timeoutMs: Math.max(0, ms(r, t, u)) }));
+  def(SEMAPHORE, 'tryAcquire', `(IJ${UNIT})Z`, (r, _m, [self, n, t, u]) => acquireN(r, self, n, { timed: true, timeoutMs: Math.max(0, ms(r, t, u)) }));
+  def(SEMAPHORE, 'release', '()V', (r, _m, [self]) => { sem(r, self).permits++; }); def(SEMAPHORE, 'release', '(I)V', (r, _m, [self, n]) => { if (n < 0) throwNew(r, 'Ljava/lang/IllegalArgumentException;'); sem(r, self).permits += n; });
+  def(SEMAPHORE, 'availablePermits', '()I', (r, _m, [self]) => sem(r, self).permits); def(SEMAPHORE, 'isFair', '()Z', (r, _m, [self]) => sem(r, self).fair ? 1 : 0);
+  def(SEMAPHORE, 'drainPermits', '()I', (r, _m, [self]) => { const s = sem(r, self), n = s.permits; s.permits = 0; return n; });
+  def(SEMAPHORE, 'hasQueuedThreads', '()Z', () => 0); def(SEMAPHORE, 'getQueueLength', '()I', () => 0);
+
+  // ---- ReentrantLock.newCondition (AbstractQueuedSynchronizer.ConditionObject): await releases the lock fully, parks until signalled (or interrupted / timed out), then
+  // reacquires the lock with its previous hold count before returning. The lock state is the ReentrantLock bridge's (obj.lockState: owner thread, holds).
+  const CONDITION = 'Ljava/util/concurrent/locks/Condition;', CONDITION_OBJECT = 'Ljava/util/concurrent/locks/AbstractQueuedSynchronizer$ConditionObject;', LOCK_CLASS = 'Ljava/util/concurrent/locks/ReentrantLock;';
+  type(CONDITION_OBJECT, OBJECT, [CONDITION], { allocatable: true }); registry.parents.set(CONDITION, OBJECT); registry.interfaces.set(CONDITION, []);
+  def(LOCK_CLASS, 'newCondition', `()${CONDITION}`, (r, _m, [lock]) => { const c = r.allocate(CONDITION_OBJECT); r.object(c).condition = { lock: r.object(lock).lockState, waiters: [] }; return c; });
+  const conditionAwait = (r, self, { timeoutMs = Infinity, uninterruptible = false, result }) => {
+    const c = r.object(self).condition, thread = r.thread ?? r.scheduler.mainThread(), lock = c.lock;
+    if (lock.owner !== thread) throwNew(r, 'Ljava/lang/IllegalMonitorStateException;');
+    if (!uninterruptible && thread.interrupted) { thread.interrupted = false; throwNew(r, 'Ljava/lang/InterruptedException;'); }
+    const waiter = { signalled: false }, holds = lock.holds; c.waiters.push(waiter); lock.owner = null; lock.holds = 0;
+    const reacquire = outcome => lock.owner === null ? (lock.owner = thread, lock.holds = holds, outcome()) : new Blocked({ reason: 'Condition.await (reacquiring the lock)', ready: () => lock.owner === null, finish: () => reacquire(outcome) });
+    return new Blocked({ reason: 'Condition.await', ready: () => waiter.signalled, interruptible: !uninterruptible, deadline: timeoutMs === Infinity ? Infinity : platform.clock.now() + timeoutMs, finish: timedOut => {
+      const index = c.waiters.indexOf(waiter); if (index >= 0) c.waiters.splice(index, 1);
+      return reacquire(() => { if (!uninterruptible && !waiter.signalled && thread.interrupted) { thread.interrupted = false; throwNew(r, 'Ljava/lang/InterruptedException;'); } return result(waiter.signalled, timedOut); });
+    } });
+  };
+  def(CONDITION_OBJECT, 'await', '()V', (r, _m, [self]) => conditionAwait(r, self, { result: () => undefined }));
+  def(CONDITION_OBJECT, 'awaitUninterruptibly', '()V', (r, _m, [self]) => conditionAwait(r, self, { uninterruptible: true, result: () => undefined }));
+  def(CONDITION_OBJECT, 'await', `(J${UNIT})Z`, (r, _m, [self, t, u]) => conditionAwait(r, self, { timeoutMs: Math.max(0, ms(r, t, u)), result: signalled => signalled ? 1 : 0 }));
+  def(CONDITION_OBJECT, 'awaitNanos', '(J)J', (r, _m, [self, nanos]) => { const start = platform.clock.now(); return conditionAwait(r, self, { timeoutMs: Math.max(0, Number(nanos) / 1e6), result: () => nanos - BigInt(Math.round((platform.clock.now() - start) * 1e6)) }); });
+  def(CONDITION_OBJECT, 'signal', '()V', (r, _m, [self]) => { const c = r.object(self).condition; if (c.lock.owner !== (r.thread ?? r.scheduler.mainThread())) throwNew(r, 'Ljava/lang/IllegalMonitorStateException;'); const w = c.waiters.shift(); if (w) w.signalled = true; });
+  def(CONDITION_OBJECT, 'signalAll', '()V', (r, _m, [self]) => { const c = r.object(self).condition; if (c.lock.owner !== (r.thread ?? r.scheduler.mainThread())) throwNew(r, 'Ljava/lang/IllegalMonitorStateException;'); for (const w of c.waiters.splice(0)) w.signalled = true; });
+
   // ---- AtomicMarkableReference / AtomicStampedReference (a single thread runs at a time, so compare-and-set is a plain compare + assign) ------------------------
   for (const [owner, code, getter] of [['Ljava/util/concurrent/atomic/AtomicMarkableReference;', 'Z', 'isMarked'], ['Ljava/util/concurrent/atomic/AtomicStampedReference;', 'I', 'getStamp']]) {
     type(owner, OBJECT, [], { allocatable: true });
@@ -517,6 +566,14 @@ export function createConcurrencyHost(platform) {
     const looper = r.makeObject(LOOPER); Object.assign(r.object(looper), { looperQueue: [], thread, quitting: false, safeQuit: false });
     thread.looper = looper;
   };
+  // Activity.runOnUiThread (android-13.0.0_r1 Activity.java): run now when already on the UI thread, otherwise post to the main Looper's Handler.
+  def('Landroid/app/Activity;', 'runOnUiThread', `(${RUNNABLE})V`, (r, _m, [, action]) => {
+    if (action === null) throwNew(r, 'Ljava/lang/NullPointerException;');
+    if ((r.thread ?? r.scheduler.mainThread()) === r.scheduler.main) return vcall(r, action, RUNNABLE, 'run', [], 'V');
+    const handler = r.allocate(HANDLER_CLASS), looper = scall(r, LOOPER, 'getMainLooper', [], LOOPER);
+    r.dispatch({ owner: HANDLER_CLASS, name: '<init>', parameters: [LOOPER], result: 'V', signature: `(${LOOPER})V` }, [handler, looper], 'direct');
+    vcall(r, handler, HANDLER_CLASS, 'post', [RUNNABLE], 'Z', [action]);
+  });
   def(LOOPER, 'prepare', '()V', prepare, { static: true }); def(LOOPER, 'prepare', '(Z)V', prepare, { static: true });
   const dueFirst = looper => { const queue = looper.looperQueue; return queue.length && (queue[0].front || queue[0].when <= platform.clock.now()) ? queue[0] : null; };
   def(LOOPER, 'loop', '()V', r => {

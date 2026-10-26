@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=cfd2299f1410';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=cfd2299f1410';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=cfd2299f1410';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=cfd2299f1410';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=cfd2299f1410';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=cfd2299f1410';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=cfd2299f1410';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=cfd2299f1410';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=cfd2299f1410';
-import { APKError } from './apk-error.js?v=cfd2299f1410';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=cfd2299f1410';
-import { Scheduler, Blocked } from './scheduler.js?v=cfd2299f1410';
-import { bootClassLacksMember } from './boot-class-members.js?v=cfd2299f1410';
-export { APKError } from './apk-error.js?v=cfd2299f1410';
+import { VMClock } from './vm-clock.js?v=00979d36e5ab';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=00979d36e5ab';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=00979d36e5ab';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=00979d36e5ab';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=00979d36e5ab';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=00979d36e5ab';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=00979d36e5ab';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=00979d36e5ab';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=00979d36e5ab';
+import { APKError } from './apk-error.js?v=00979d36e5ab';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=00979d36e5ab';
+import { Scheduler, Blocked } from './scheduler.js?v=00979d36e5ab';
+import { bootClassLacksMember } from './boot-class-members.js?v=00979d36e5ab';
+export { APKError } from './apk-error.js?v=00979d36e5ab';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -186,10 +186,10 @@ export class DexFile {
     if(!offset)return [];const b=this.reader,count=b.u32(offset);if(count>100000)fail('Excessive DEX annotations');b.table(count,offset+4,4);const values=[];
     for(let i=0;i<count;i++){const p=b.u32(offset+4+i*4),visibility=b.u8(p);if(visibility>2)fail('Invalid DEX annotation visibility');if(visibility===visibilityFilter)values.push(this.encodedAnnotation({p:p+1}));}return values;
   }
-  memberAnnotations(member){
+  memberAnnotations(member,visibilityFilter=1){
     const definition=member.field??member.method,cls=this.classes.get(definition.owner);if(!cls||!cls.annotationsOffset)return [];
     if(!cls.annotationDirectories){const b=this.reader,p=cls.annotationsOffset,fields=b.u32(p+4),methods=b.u32(p+8),parameters=b.u32(p+12);if(fields>this.fields.length||methods>this.methods.length||parameters>this.methods.length)fail('Invalid DEX annotation directory');b.table(fields+methods+parameters,p+16,8);const directory=cls.annotationDirectories={fields:new Map(),methods:new Map()};for(const [size,begin,target,list]of [[fields,p+16,directory.fields,this.fields],[methods,p+16+fields*8,directory.methods,this.methods]])for(let i=0;i<size;i++){const at=begin+i*8,index=b.u32(at);if(index>=list.length||target.has(index))fail('Invalid/duplicate annotated member');target.set(index,b.u32(at+4));}}
-    const offset=(member.field?cls.annotationDirectories.fields:cls.annotationDirectories.methods).get(definition.index);return this.annotationSet(offset??0);
+    const offset=(member.field?cls.annotationDirectories.fields:cls.annotationDirectories.methods).get(definition.index);return this.annotationSet(offset??0,visibilityFilter);
   }
   encodedAnnotation(cursor,depth=0){
     if(depth>32)fail('DEX annotation nesting limit exceeded');
@@ -379,11 +379,12 @@ EXTERNAL_PARENTS.set('Ljava/lang/StringIndexOutOfBoundsException;','Ljava/lang/I
 EXTERNAL_PARENTS.set('Ljava/lang/NumberFormatException;','Ljava/lang/IllegalArgumentException;');
 EXTERNAL_PARENTS.set('Ljava/lang/SecurityException;','Ljava/lang/RuntimeException;');
 EXTERNAL_PARENTS.set('Ljava/lang/AssertionError;','Ljava/lang/Error;');
-EXTERNAL_PARENTS.set('Ljava/lang/ClassNotFoundException;', 'Ljava/lang/Exception;');
+EXTERNAL_PARENTS.set('Ljava/lang/ReflectiveOperationException;', 'Ljava/lang/Exception;');   // libcore: the six reflection checked exceptions share this parent (catch (ReflectiveOperationException) is common)
+EXTERNAL_PARENTS.set('Ljava/lang/ClassNotFoundException;', 'Ljava/lang/ReflectiveOperationException;');
 EXTERNAL_PARENTS.set('Ljava/lang/CloneNotSupportedException;', 'Ljava/lang/Exception;');
 EXTERNAL_PARENTS.set('Ljava/lang/InterruptedException;', 'Ljava/lang/Exception;');
-for (const name of ['NoSuchMethodException', 'NoSuchFieldException', 'InstantiationException', 'IllegalAccessException']) EXTERNAL_PARENTS.set(`Ljava/lang/${name};`, 'Ljava/lang/Exception;');
-EXTERNAL_PARENTS.set('Ljava/lang/reflect/InvocationTargetException;', 'Ljava/lang/Exception;');
+for (const name of ['NoSuchMethodException', 'NoSuchFieldException', 'InstantiationException', 'IllegalAccessException']) EXTERNAL_PARENTS.set(`Ljava/lang/${name};`, 'Ljava/lang/ReflectiveOperationException;');
+EXTERNAL_PARENTS.set('Ljava/lang/reflect/InvocationTargetException;', 'Ljava/lang/ReflectiveOperationException;');
 EXTERNAL_PARENTS.set('Ljava/util/ConcurrentModificationException;', 'Ljava/lang/RuntimeException;');
 EXTERNAL_PARENTS.set('Ljava/util/NoSuchElementException;', 'Ljava/lang/RuntimeException;');
 EXTERNAL_PARENTS.set('Ljava/lang/UnsupportedOperationException;', 'Ljava/lang/RuntimeException;');
@@ -657,7 +658,7 @@ addBridge('java/lang/ArrayIndexOutOfBoundsException',['<init>(I)V']);
 addBridge('java/lang/AssertionError', ['<init>()V', '<init>(Ljava/lang/Object;)V', '<init>(Ljava/lang/String;Ljava/lang/Throwable;)V']);
 // Further platform exception types with the four standard Throwable constructors (parents declared by their hosts or EXTERNAL_PARENTS above).
 for (const name of ['java/util/concurrent/ExecutionException', 'java/util/concurrent/TimeoutException', 'java/util/concurrent/CancellationException', 'java/util/concurrent/RejectedExecutionException', 'java/io/IOException', 'java/io/FileNotFoundException', 'java/io/EOFException', 'java/io/UnsupportedEncodingException', 'java/util/zip/ZipException', 'java/net/MalformedURLException', 'java/lang/SecurityException',
-  'java/lang/ClassNotFoundException', 'java/lang/NoSuchMethodException', 'java/lang/NoSuchFieldException', 'java/lang/InstantiationException', 'java/lang/IllegalAccessException', 'java/lang/InterruptedException', 'java/lang/CloneNotSupportedException',
+  'java/lang/ReflectiveOperationException', 'java/lang/ClassNotFoundException', 'java/lang/NoSuchMethodException', 'java/lang/NoSuchFieldException', 'java/lang/InstantiationException', 'java/lang/IllegalAccessException', 'java/lang/InterruptedException', 'java/lang/CloneNotSupportedException',
   'java/lang/NegativeArraySizeException', 'java/lang/ArrayStoreException', 'java/lang/StringIndexOutOfBoundsException', 'java/lang/NumberFormatException', 'java/lang/reflect/InvocationTargetException'])
   addBridge(name, ['<init>()V', '<init>(Ljava/lang/String;)V', '<init>(Ljava/lang/Throwable;)V', '<init>(Ljava/lang/String;Ljava/lang/Throwable;)V']);
 addBridge('java/lang/Throwable', ['getMessage()Ljava/lang/String;', 'getCause()Ljava/lang/Throwable;', 'toString()Ljava/lang/String;']);
@@ -758,7 +759,8 @@ addBridge('java/util/ArrayDeque', ['toArray()[Ljava/lang/Object;', '<init>(Ljava
   'offer(Ljava/lang/Object;)Z', 'offerFirst(Ljava/lang/Object;)Z', 'offerLast(Ljava/lang/Object;)Z', 'push(Ljava/lang/Object;)V',
   'pop()Ljava/lang/Object;', 'remove()Ljava/lang/Object;', 'removeFirst()Ljava/lang/Object;', 'removeLast()Ljava/lang/Object;',
   'poll()Ljava/lang/Object;', 'pollFirst()Ljava/lang/Object;', 'pollLast()Ljava/lang/Object;', 'getFirst()Ljava/lang/Object;', 'getLast()Ljava/lang/Object;',
-  'peek()Ljava/lang/Object;', 'peekFirst()Ljava/lang/Object;', 'peekLast()Ljava/lang/Object;', 'iterator()Ljava/util/Iterator;']);
+  'peek()Ljava/lang/Object;', 'peekFirst()Ljava/lang/Object;', 'peekLast()Ljava/lang/Object;', 'iterator()Ljava/util/Iterator;',
+  'element()Ljava/lang/Object;', 'contains(Ljava/lang/Object;)Z', 'remove(Ljava/lang/Object;)Z', 'removeFirstOccurrence(Ljava/lang/Object;)Z', 'removeLastOccurrence(Ljava/lang/Object;)Z', 'addAll(Ljava/util/Collection;)Z']);
 addBridge('android/util/Log', ['isLoggable(Ljava/lang/String;I)Z', 'println(ILjava/lang/String;Ljava/lang/String;)I', 'wtf(Ljava/lang/String;Ljava/lang/String;)I', 'wtf(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I', 'wtf(Ljava/lang/String;Ljava/lang/Throwable;)I', 'getStackTraceString(Ljava/lang/Throwable;)Ljava/lang/String;']);
 addBridge('android/util/Log', ['w(Ljava/lang/String;Ljava/lang/Throwable;)I']);
 for (const name of ['v', 'd', 'i', 'w', 'e']) addBridge('android/util/Log', [`${name}(Ljava/lang/String;Ljava/lang/String;)I`, `${name}(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I`]);
@@ -876,7 +878,7 @@ export class APKRuntime {
     // Official kotlinx.coroutines opt-in selects its original Main/Handler delay
     // implementation in this single-threaded web device; it is not a fake Thread.
     // Kotlin kotlinx.coroutines 1.8.1: core/jvm/src/DefaultExecutor.kt.
-    this.javaProperties = new Map([['java.vm.name','APK Browser DEX VM'],['os.name','APK Browser VM'],['file.separator','/'],['path.separator',':'],['line.separator','\n'],['kotlinx.coroutines.main.delay','true']]);
+    this.javaProperties = new Map([['java.vm.name','Dalvik'],['os.name','APK Browser VM'],['file.separator','/'],['path.separator',':'],['line.separator','\n'],['kotlinx.coroutines.main.delay','true']]);
     this.depth = 0; this.steps = 0; this.trace = []; this.activity = null; this.root = null; this.clicks = 0;
     this.initialized = new Map(); this.staticFields = new Map(); this.classObjects = new Map(); this.arrayCells = 0; this.initDepth = 0;
     this.collectionCells = 0;
@@ -884,7 +886,7 @@ export class APKRuntime {
     this.skia=skia;this.skiaHost=skia?.createHost?.(this)??null;
     this.icuBreakBackend=icuBreakBackend;this.sqliteBackend=sqliteBackend;this.tzdata=tzdata;this.zlibBackend=zlibBackend;this.icuConverterBackend=icuConverterBackend;
   }
-  parent(type) { return type?.startsWith('[') ? 'Ljava/lang/Object;' : this.classes.get(type)?.superclass ?? this.skiaHost?.parent?.(type) ?? this.platform?.parent?.(type) ?? EXTERNAL_PARENTS.get(type) ?? this.platform?.fallbackParent?.(type) ?? null; }
+  parent(type) { return type?.startsWith('[') ? 'Ljava/lang/Object;' : this.classes.get(type)?.superclass ?? this.skiaHost?.parent?.(type) ?? this.platform?.parent?.(type) ?? EXTERNAL_PARENTS.get(type) ?? this.platform?.fallbackParent?.(type) ?? (type === 'Ljava/lang/Object;' || type.length === 1 ? null : 'Ljava/lang/Object;'); }   // every reference type reaches Object (a host class declared without a parent, e.g. Resources$Theme, still answers Object.hashCode/equals)
   interfaces(type) { return this.classes.get(type)?.interfaces ?? [...new Set([...(EXTERNAL_INTERFACES.get(type) ?? []), ...(this.skiaHost?.interfaces?.(type) ?? []), ...(this.platform?.interfaces?.(type) ?? [])])]; }
   /** Memoized subtype test (the class graph only grows when more DEX files are loaded, which clears the memo). */
   isSubtype(child, ancestor) {
@@ -1043,14 +1045,23 @@ export class APKRuntime {
   }
   resolveFieldUncached(field) {
     let type = field.owner; const seen = new Set();
+    // JLS 8.3.3.1 / ART ClassLinker::ResolveField: the class itself, then its superinterfaces (interface constants such as Glide's Key.CHARSET are reached through a
+    // subclass reference), then the superclass chain.
+    const declaredIn = owner => {
+      const cls = this.classes.get(owner); if (!cls) return undefined;
+      let index = cls.fieldIndex;
+      if (index === undefined) { index = cls.fieldIndex = new Map(); for (const entry of [...cls.fields, ...cls.staticFields]) { const declared = cls.dex.fields[entry.index]; const key = declared.name + ':' + declared.type; if (!index.has(key)) index.set(key, declared); } }
+      return index.get(field.ntKey ??= field.name + ':' + field.type);
+    };
+    const inInterfaces = (owner, depth = 0) => {
+      if (depth > 32) return undefined;
+      for (const iface of this.interfaces(owner) ?? []) { const declared = declaredIn(iface) ?? inInterfaces(iface, depth + 1); if (declared !== undefined) return declared; }
+      return undefined;
+    };
     while (type && !seen.has(type)) {
-      seen.add(type); const cls = this.classes.get(type);
-      if (cls) {
-        let index = cls.fieldIndex;
-        if (index === undefined) { index = cls.fieldIndex = new Map(); for (const entry of [...cls.fields, ...cls.staticFields]) { const declared = cls.dex.fields[entry.index]; const key = declared.name + ':' + declared.type; if (!index.has(key)) index.set(key, declared); } }
-        const declared = index.get(field.ntKey ??= field.name + ':' + field.type);
-        if (declared !== undefined) return declared;
-      }
+      seen.add(type);
+      const declared = declaredIn(type) ?? (this.classes.has(type) ? inInterfaces(type) : undefined);
+      if (declared !== undefined) return declared;
       type = this.parent(type);
     }
     const external=this.platform?.resolveExternalField?.(this,field);
@@ -1344,6 +1355,7 @@ export class APKRuntime {
           }
           fail(`Annotation proxy operation/default is not implemented: ${methodKey(method)}`);
         }
+        if(proxy.proxyHandler!==undefined&&this.platform.reflection.forwarded(method))return this.platform.reflection.invokeProxy(this,method,args);   // java.lang.reflect.Proxy: every interface call (and hashCode/equals/toString) goes to the InvocationHandler
       }
       // Resolution (class chain walk, SHIM/platform lookup, interface defaults) is cached per (method reference, mode, receiver or caller class); loading more DEX files
       // (class loaders) clears the cache because a new class can change what a name resolves to.
@@ -2651,8 +2663,8 @@ export class APKRuntime {
         if(name==='getAnnotations'||name==='getDeclaredAnnotations'){const value=this.newArray('[Ljava/lang/annotation/Annotation;',annotations.length);this.array(value).elements=annotations.map(a=>this.annotationObject(a));return value;}
         const type=this.object(args[1]).classType;if(!type)fail('Annotation lookup requires a Class');const annotation=annotations.find(a=>a.type===type);return name==='isAnnotationPresent'?(annotation?1:0):annotation?this.annotationObject(annotation):null;
       }
-      if (name === 'equals') return this.javaEquals(args[0], args[1]) ? 1 : 0;
-      if (name === 'hashCode') return this.javaHash(args[0]);
+      if (name === 'equals') { const other = isNull(args[1]) ? null : this.object(args[1]).member; return other && other.kind === member.kind && (other.field?.key ?? other.method.key) === (member.field?.key ?? member.method.key) ? 1 : 0; }   // Member.equals: same declaring class, name and signature (javaEquals would re-enter this bridge)
+      if (name === 'hashCode') return stringHash(dottedName(owner)) ^ (member.kind === 'constructor' ? 0 : stringHash(member.field?.name ?? member.method.name));   // declaringClass.getName().hashCode() ^ getName().hashCode()
       if (name === 'getName') return member.kind === 'constructor' ? dottedName(owner) : member.field?.name ?? member.method.name;
       if (name === 'getDeclaringClass') return this.classObject(owner);
       if (name === 'getModifiers') return member.flags & 0xffff;
@@ -2709,9 +2721,18 @@ export class APKRuntime {
         this.reserveCollection(1); if (name.endsWith('First') || name === 'push') obj.list.unshift(args[1]); else obj.list.push(args[1]); this.bumpModCount(obj);
         return name.startsWith('offer') || name === 'add' ? 1 : undefined;
       }
+      if (name === 'contains') return obj.list.some(v => this.javaEquals(args[1], v)) ? 1 : 0;   // ArrayDeque.contains/remove(Object)/removeFirstOccurrence/removeLastOccurrence use equals(); null is never present
+      if (name === 'removeFirstOccurrence' || name === 'removeLastOccurrence' || (name === 'remove' && method.parameters.length === 1)) {
+        const at = isNull(args[1]) ? -1 : name === 'removeLastOccurrence' ? obj.list.findLastIndex(v => this.javaEquals(args[1], v)) : obj.list.findIndex(v => this.javaEquals(args[1], v));
+        if (at < 0) return 0; obj.list.splice(at, 1); this.reserveCollection(-1); this.bumpModCount(obj); return 1;
+      }
+      if (name === 'addAll') {
+        const incoming = this.collectionValues(this.object(args[1])).slice(); if (incoming.some(isNull)) this.throwJava('Ljava/lang/NullPointerException;', 'null deque element');
+        this.reserveCollection(incoming.length); obj.list.push(...incoming); this.bumpModCount(obj); return incoming.length ? 1 : 0;
+      }
       if (!obj.list.length) { if (name.startsWith('poll') || name.startsWith('peek')) return null; this.throwJava('Ljava/util/NoSuchElementException;', 'empty deque'); }
       const last = name.endsWith('Last'), value = obj.list[last ? obj.list.length - 1 : 0];
-      if (name.startsWith('peek') || name.startsWith('get')) return value;
+      if (name.startsWith('peek') || name.startsWith('get') || name === 'element') return value;
       if (last) obj.list.pop(); else obj.list.shift(); this.reserveCollection(-1); this.bumpModCount(obj); return value;
     }
     if (method.owner === 'Ljava/util/Collections$SynchronizedMap;') {
@@ -2763,7 +2784,10 @@ export class APKRuntime {
     if (method.owner === 'Ljava/util/Random;' || method.owner === 'Ljava/util/concurrent/ThreadLocalRandom;') {
       const mask = (1n << 48n) - 1n;
       if (name === '<init>') { obj.seed = (args.length > 1 ? wide(args[1]) : BigInt(Date.now())) ^ 0x5deece66dn; obj.seed &= mask; return undefined; }
-      const next = bits => { obj.seed = (obj.seed * 0x5deece66dn + 11n) & mask; return Number(obj.seed >> BigInt(48 - bits)); };
+      // java.security.SecureRandom inherits Random's derived methods (nextLong, nextInt, nextDouble...) on top of next(bits), which draws from the platform CSPRNG instead of the LCG.
+      const secure = this.isSubtype(obj.type, 'Ljava/security/SecureRandom;');
+      const secureBits = bits => { if (!globalThis.crypto?.getRandomValues) throw new APKError('WebCrypto secure randomness is unavailable; SecureRandom cannot fall back to Math.random', { kind: 'secure-random-unavailable' }); const word = globalThis.crypto.getRandomValues(new Uint32Array(1))[0]; return bits === 32 ? word : word >>> (32 - bits); };
+      const next = bits => { if (secure) return secureBits(bits); obj.seed = (obj.seed * 0x5deece66dn + 11n) & mask; return Number(obj.seed >> BigInt(48 - bits)); };
       if (method.owner === 'Ljava/util/Random;') {
         // java.util.Random (libcore android-13.0.0_r1), bit-exact LCG: Math.log/sqrt stand in for StrictMath in nextGaussian().
         if (name === 'setSeed') { obj.seed = (wide(args[1]) ^ 0x5deece66dn) & mask; obj.haveNextNextGaussian = false; return undefined; }

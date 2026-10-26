@@ -1,8 +1,9 @@
-import { APKError } from './apk-error.js?v=cfd2299f1410';
-import { createHostRegistry } from './host-contract.js?v=cfd2299f1410';
-import { resolveDevice } from './device-profile.js?v=cfd2299f1410';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=cfd2299f1410';
-import { gcRoot } from './heap-gc.js?v=cfd2299f1410';
+import { APKError } from './apk-error.js?v=00979d36e5ab';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=00979d36e5ab';
+import { createHostRegistry } from './host-contract.js?v=00979d36e5ab';
+import { resolveDevice } from './device-profile.js?v=00979d36e5ab';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=00979d36e5ab';
+import { gcRoot } from './heap-gc.js?v=00979d36e5ab';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -32,7 +33,7 @@ export function createDeviceStateHost(platform) {
   def(FILTER, 'addAction', `(${STRING})V`, (r, _m, [self, action]) => { const f = filterOf(r, self); if (!f.actions.includes(action)) f.actions.push(action); });
   def(FILTER, 'countActions', '()I', (r, _m, [self]) => filterOf(r, self).actions.length); def(FILTER, 'getAction', '(I)' + STRING, (r, _m, [self, i]) => filterOf(r, self).actions[i] ?? null);
   def(FILTER, 'hasAction', `(${STRING})Z`, (r, _m, [self, action]) => filterOf(r, self).actions.includes(action) ? 1 : 0);
-  for (const name of ['addCategory', 'addDataScheme', 'addDataType']) def(FILTER, name, `(${STRING})V`, () => {}); def(FILTER, 'setPriority', '(I)V', () => {});
+  defineIntentFilterMatching({ registry, def, filterOf, text: (r, v) => r.stringCharacters(v), call: (r, receiver, owner, name, parameters, result, args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...args], 'virtual'), INTENT, FILTER, STRING });   // categories, data and MIME matching (IntentFilter.java)
   const makeIntent = (r, action, extras = {}) => {
     const intent = r.makeObject(INTENT); platform.intentInvoke(r, { owner: INTENT, name: '<init>', parameters: [STRING] }, [intent, action]);
     for (const [key, [typeName, value]] of Object.entries(extras)) platform.put(r, intent, key, typeName, value); return intent;

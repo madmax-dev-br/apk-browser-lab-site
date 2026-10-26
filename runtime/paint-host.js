@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=cfd2299f1410';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=cfd2299f1410';
+import { APKError } from './apk-error.js?v=00979d36e5ab';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=00979d36e5ab';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -24,6 +24,7 @@ const keys = new Set([
   'getNativeInstance()J', 'getTextLocale()Ljava/util/Locale;', 'getTextLocales()Landroid/os/LocaleList;', 'setTextLocale(Ljava/util/Locale;)V', 'setTextLocales(Landroid/os/LocaleList;)V',
   'getBlendMode()Landroid/graphics/BlendMode;', 'setBlendMode(Landroid/graphics/BlendMode;)V',
   'getColor()I', 'setColor(I)V', 'getAlpha()I', 'setAlpha(I)V', 'getFlags()I', 'setFlags(I)V',
+  'clearShadowLayer()V', 'setShadowLayer(FFFI)V', 'hasShadowLayer()Z',
   'getHinting()I', 'setHinting(I)V', 'getStartHyphenEdit()I', 'getEndHyphenEdit()I', 'setStartHyphenEdit(I)V', 'setEndHyphenEdit(I)V',
   'getTextBounds(Ljava/lang/String;IILandroid/graphics/Rect;)V', 'getTextBounds([CIILandroid/graphics/Rect;)V', 'getTextBounds(Ljava/lang/CharSequence;IILandroid/graphics/Rect;)V',
   'getRunAdvance([CIIIIZI)F', 'getRunAdvance(Ljava/lang/CharSequence;IIIIZI)F',
@@ -179,6 +180,12 @@ export function createPaintHost() {
         }
         if (!method.parameters.length) return target;
         return integer ? values.descent - values.ascent + values.leading : rawFloat(Math.fround(values.descent - values.ascent) + values.leading);
+      }
+      if (name === 'clearShadowLayer') { paint.shadowLayer = null; return; }
+      if (name === 'hasShadowLayer') return paint.shadowLayer ? 1 : 0;
+      if (name === 'setShadowLayer') {   // radius 0 clears the layer (Paint.setShadowLayer); a real blurred shadow needs Skia's drop-shadow looper, which the recorded-command Canvas does not carry yet
+        if (!(float(args[1]) > 0)) { paint.shadowLayer = null; return; }
+        fail('Paint.setShadowLayer with a positive radius is not implemented (the Skia canvas model has no shadow-layer looper)');
       }
       if (name === 'getColor') return paint.color;
       if (name === 'setColor') { paint.color = args[1] | 0; return; }

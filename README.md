@@ -4,6 +4,6 @@ Build estático do APK Browser Lab: uma VM Dalvik em JavaScript que executa APKs
 
 Site: https://madmax-dev-br.github.io/apk-browser-lab-site/
 
-Este repositório contém só os arquivos publicados (build `cfd2299f1410`). Os avisos e licenças de terceiros estão em `THIRD_PARTY.md` e `licenses/`, e o código-fonte correspondente do framework AOSP está em `framework-aosp/source-bundle.zip`.
+Este repositório contém só os arquivos publicados (build `00979d36e5ab`). Os avisos e licenças de terceiros estão em `THIRD_PARTY.md` e `licenses/`, e o código-fonte correspondente do framework AOSP está em `framework-aosp/source-bundle.zip`.
 
 Prévia: `preview/` tem o código em andamento (build não verificado por completo; a validação do Compose estado ainda falha nele). A raiz continua sendo a última versão verificada.

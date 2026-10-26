@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=cfd2299f1410';
-import { getSolidPaint } from './paint-host.js?v=cfd2299f1410';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=cfd2299f1410';
+import { APKError } from './apk-error.js?v=00979d36e5ab';
+import { getSolidPaint } from './paint-host.js?v=00979d36e5ab';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=00979d36e5ab';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -76,9 +76,9 @@ export class VectorGraphics {
  captureVector(handle){const tree=this.get(handle,'tree'),active=new Set();let count=0;const capture=(pointer,depth=0)=>{if(depth>128||active.has(pointer)||++count>20000)problem('Cyclic/excessive vector draw snapshot');active.add(pointer);const node=this.get(pointer),copy={kind:node.kind,props:{...node.props},path:node.path??''};if(node.kind==='group')copy.children=node.children.map(child=>capture(child,depth+1));active.delete(pointer);return copy;};return {...tree,root:capture(tree.root)};}
  reserveDrawStorage(extra){let used=extra;for(const object of this.handles.values())if(object.kind==='canvas')for(const draw of object.draws){used+=(draw.svg?.length??0)+(draw.commands?.length??0)*4+(draw.text?.length??0);if(used>32*1024*1024)problem('Aggregate recorded graphics storage limit exceeded');}}
  resetCanvas(receiver,width=null,height=null){const canvas=this.get(this.runtime.object(receiver).nativeCanvasHandle,'canvas');canvas.draws.length=0;canvas.matrix=[1,0,0,1,0,0];canvas.stack.length=0;canvas.clips=[];if(width!==null)canvas.width=width;if(height!==null)canvas.height=height;}
- snapshotCanvas(receiver,width,height){
+ snapshotCanvas(receiver,width,height,options){
   if(!(width>0&&height>0&&width*height<=16*1024*1024))problem('Invalid canvas snapshot extent');
-  if(this.runtime.skia?.rasterizeCanvas)return this.runtime.skia.rasterizeCanvas(this.runtime,this,receiver,width,height);
+  if(this.runtime.skia?.rasterizeCanvas)return this.runtime.skia.rasterizeCanvas(this.runtime,this,receiver,width,height,options);
   const handle=this.runtime.object(receiver).nativeCanvasHandle,draws=this.get(handle,'canvas').draws;
   const body=draws.map(draw=>`<g transform="matrix(${draw.matrix.join(' ')})"><g transform="translate(${draw.x} ${draw.y})">${draw.svg}</g></g>`).join('');
   return {kind:'svg',svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${body}</svg>`,width,height,drawCalls:draws.length,source:'original-Drawable.draw/web-software-canvas'};

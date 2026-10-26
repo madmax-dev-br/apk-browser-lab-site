@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=cfd2299f1410';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=cfd2299f1410';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=cfd2299f1410';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=cfd2299f1410';
+import { APKError } from './apk-error.js?v=00979d36e5ab';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=00979d36e5ab';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=00979d36e5ab';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=00979d36e5ab';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -507,6 +507,43 @@ export function createAppServicesHost(platform) {
     return info;
   });
 
+  // ---- getReceiverInfo / queryIntentServices / queryBroadcastReceivers / resolveService over this app's manifest (the virtual device has one installed package) ----------------
+  // Matching uses the explicit component or package of the Intent, else the declared <action> names; <category>/<data> of a manifest filter are not recorded by the loader, so they cannot
+  // narrow a match (a component whose action matches is returned).
+  const ACTIVITY_INFO_TYPE = 'Landroid/content/pm/ActivityInfo;', RESOLVE_INFO = 'Landroid/content/pm/ResolveInfo;', INTENT_TYPE = 'Landroid/content/Intent;', COMPONENT_NAME = 'Landroid/content/ComponentName;';
+  type(RESOLVE_INFO, OBJECT, [], { allocatable: true });
+  for (const [name, ftype] of [['activityInfo', ACTIVITY_INFO_TYPE], ['serviceInfo', SERVICE_INFO], ['providerInfo', PROVIDER_INFO], ['priority', 'I'], ['preferredOrder', 'I'], ['match', 'I'], ['specificIndex', 'I'], ['isDefault', 'Z'], ['resolvePackageName', STRING], ['labelRes', 'I'], ['icon', 'I']]) registry.instanceField(RESOLVE_INFO, name, ftype, { reflect: true });
+  def(RESOLVE_INFO, '<init>', '()V', (r, _m, [self]) => { r.storeField(r.object(self).fields, `${RESOLVE_INFO}->specificIndex:I`, -1); });
+  const makeInfo = (r, detail, kind, withMeta) => {
+    if (kind === 'service') { const info = r.allocate(SERVICE_INFO), put = fillComponentInfo(r, info, detail, withMeta); put(SERVICE_INFO, 'permission', STRING, detail.permission); put(SERVICE_INFO, 'flags', 'I', 0); put(SERVICE_INFO, 'foregroundServiceType', 'I', Number(detail.foregroundServiceType) | 0); return info; }
+    const info = r.makeObject(ACTIVITY_INFO_TYPE), put = fillComponentInfo(r, info, detail, withMeta); put(ACTIVITY_INFO_TYPE, 'permission', STRING, detail.permission ?? null); put(ACTIVITY_INFO_TYPE, 'flags', 'I', 0); return info;
+  };
+  const matchingComponents = (r, intent, kind) => {
+    const call = (name, result) => r.dispatch({ owner: INTENT_TYPE, name, parameters: [], result, signature: `()${result}` }, [intent], 'virtual');
+    const component = call('getComponent', COMPONENT_NAME), wantedPackage = call('getPackage', STRING), action = call('getAction', STRING);
+    const details = (platform.manifest?.componentDetails ?? []).filter(d => d.kind === kind && !isFalse(d.enabled));
+    if (component !== null) { const c = r.object(component); return c.packageName === pkg() ? details.filter(d => d.name === c.className) : []; }
+    if (wantedPackage !== null && r.stringCharacters(wantedPackage) !== pkg()) return [];
+    return action === null ? [] : details.filter(d => d.actions?.includes(r.stringCharacters(action)));
+  };
+  const resolveInfos = (r, intent, kind, withMeta) => {
+    const list = newEmptyList(r);
+    for (const detail of matchingComponents(r, intent, kind)) {
+      const resolved = r.allocate(RESOLVE_INFO); r.dispatch({ owner: RESOLVE_INFO, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [resolved], 'direct');
+      r.storeField(r.object(resolved).fields, kind === 'service' ? `${RESOLVE_INFO}->serviceInfo:${SERVICE_INFO}` : `${RESOLVE_INFO}->activityInfo:${ACTIVITY_INFO_TYPE}`, makeInfo(r, detail, kind, withMeta));
+      r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, resolved], 'virtual');
+    }
+    return list;
+  };
+  def(PACKAGE_MANAGER, 'getReceiverInfo', `(${COMPONENT_NAME}I)${ACTIVITY_INFO_TYPE}`, (r, _m, [, component, flags]) => {
+    const c = r.object(component), detail = (platform.manifest?.componentDetails ?? []).find(p => p.kind === 'receiver' && p.name === c.className);
+    if (c.packageName !== pkg() || !detail) r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', `ComponentInfo{${c.packageName}/${c.className}}`);
+    return makeInfo(r, detail, 'receiver', (flags & 128) !== 0);
+  });
+  def(PACKAGE_MANAGER, 'queryIntentServices', `(${INTENT_TYPE}I)Ljava/util/List;`, (r, _m, [, intent, flags]) => resolveInfos(r, intent, 'service', (flags & 128) !== 0));
+  def(PACKAGE_MANAGER, 'queryBroadcastReceivers', `(${INTENT_TYPE}I)Ljava/util/List;`, (r, _m, [, intent, flags]) => resolveInfos(r, intent, 'receiver', (flags & 128) !== 0));
+  def(PACKAGE_MANAGER, 'resolveService', `(${INTENT_TYPE}I)${RESOLVE_INFO}`, (r, _m, [, intent, flags]) => { const list = resolveInfos(r, intent, 'service', (flags & 128) !== 0); return r.dispatch({ owner: 'Ljava/util/List;', name: 'isEmpty', parameters: [], result: 'Z', signature: '()Z' }, [list], 'virtual') ? null : r.dispatch({ owner: 'Ljava/util/List;', name: 'get', parameters: ['I'], result: OBJECT, signature: `(I)${OBJECT}` }, [list, 0], 'virtual'); });
+
   // ---- AssetManager over the APK's assets/ tree -----------------------------------------------------------------------------------------------
   const ASSETS = 'Landroid/content/res/AssetManager;'; type(ASSETS, OBJECT, ['Ljava/lang/AutoCloseable;'], { allocatable: true });
   const assetManager = r => platform.assetManager ??= r.allocate(ASSETS);
@@ -522,6 +559,37 @@ export function createAppServicesHost(platform) {
     const array = r.newArray('[Ljava/lang/String;', names.size); r.array(array).elements = [...names]; return array;
   });
   def(ASSETS, 'close', '()V', () => {});
+
+  // Context.getMainExecutor (API 28): ContextImpl hands out the main thread's HandlerExecutor; execute() posts to the main Looper and refuses when the post fails.
+  const HANDLER_EXECUTOR = 'Landroid/os/HandlerExecutor;', EXECUTOR = 'Ljava/util/concurrent/Executor;';
+  type(HANDLER_EXECUTOR, OBJECT, [EXECUTOR], { allocatable: true });
+  defContext('getMainExecutor', `()${EXECUTOR}`, r => {
+    if (!platform.mainExecutor) {
+      const looper = r.dispatch({ owner: 'Landroid/os/Looper;', name: 'getMainLooper', parameters: [], result: 'Landroid/os/Looper;', signature: '()Landroid/os/Looper;' }, [], 'static');
+      const handler = r.allocate('Landroid/os/Handler;'); r.dispatch({ owner: 'Landroid/os/Handler;', name: '<init>', parameters: ['Landroid/os/Looper;'], result: 'V', signature: '(Landroid/os/Looper;)V' }, [handler, looper], 'direct');
+      const executor = r.allocate(HANDLER_EXECUTOR); r.object(executor).handler = handler; platform.mainExecutor = executor;
+    }
+    return platform.mainExecutor;
+  });
+  def(HANDLER_EXECUTOR, 'execute', '(Ljava/lang/Runnable;)V', (r, _m, [self, command]) => {
+    const posted = r.dispatch({ owner: 'Landroid/os/Handler;', name: 'post', parameters: ['Ljava/lang/Runnable;'], result: 'Z', signature: '(Ljava/lang/Runnable;)Z' }, [r.object(self).handler, command], 'virtual');
+    if (!posted) r.throwJava('Ljava/util/concurrent/RejectedExecutionException;', `${r.typeOf(r.object(self).handler)} is shutting down`);
+  });
+  // Context.getColor (API 23): getResources().getColor(id, getTheme())
+  defContext('getColor', '(I)I', (r, _m, [context, id]) => {
+    const resources = r.dispatch({ owner: CONTEXT, name: 'getResources', parameters: [], result: 'Landroid/content/res/Resources;', signature: '()Landroid/content/res/Resources;' }, [context], 'virtual');
+    const theme = r.dispatch({ owner: CONTEXT, name: 'getTheme', parameters: [], result: 'Landroid/content/res/Resources$Theme;', signature: '()Landroid/content/res/Resources$Theme;' }, [context], 'virtual');
+    return r.dispatch({ owner: 'Landroid/content/res/Resources;', name: 'getColor', parameters: ['I', 'Landroid/content/res/Resources$Theme;'], result: 'I', signature: '(ILandroid/content/res/Resources$Theme;)I' }, [resources, id, theme], 'virtual');
+  });
+
+  // Resources.openRawResource: the APK file behind a res/raw (or any file-based) resource id, as ART's AssetManager serves it.
+  const rawEntry = (r, id) => {
+    let value = platform.resources.resolve(id >>> 0); while (value.resolved) value = value.resolved;
+    if (value.kind === 'unresolved' || typeof value.value !== 'string' || !r.apkEntries.has(value.value)) r.throwJava('Landroid/content/res/Resources$NotFoundException;', `Resource ID #0x${(id >>> 0).toString(16)}`);
+    return value.value;
+  };
+  def('Landroid/content/res/Resources;', 'openRawResource', '(I)Ljava/io/InputStream;', (r, _m, [, id]) => platform.javaIo.apkResourceStream(r, rawEntry(r, id)));
+  def('Landroid/content/res/Resources;', 'openRawResource', '(ILandroid/util/TypedValue;)Ljava/io/InputStream;', (r, _m, [, id]) => platform.javaIo.apkResourceStream(r, rawEntry(r, id)));
 
   // ---- android.content.pm.Signature / SigningInfo (AOSP semantics: a byte[] certificate, hex toCharsString, Arrays.hashCode) ----------------------
   const SIGNATURE = 'Landroid/content/pm/Signature;', SIGNATURES = '[Landroid/content/pm/Signature;', SIGNING_INFO = 'Landroid/content/pm/SigningInfo;';
@@ -565,6 +633,16 @@ export function createAppServicesHost(platform) {
 
   // The lab installs the APK itself: no store recorded it, so the installer package is null (what adb/sideloaded installs report).
   def(PACKAGE_MANAGER, 'checkPermission', `(${STRING}${STRING})I`, (r, _m, [, permission, name]) => { const permissionName = needPermission(r, permission); if (name === null) r.throwJava('Ljava/lang/NullPointerException;', null); return text(r, name) === pkg() && holdsPermission(r, permissionName) ? PERMISSION_GRANTED : PERMISSION_DENIED; });   // other packages are not installed on the virtual device
+  // PackageManager.getApplicationLabel / ApplicationInfo.loadLabel: nonLocalizedLabel, else the string behind labelRes, else the package name (ApplicationInfo.loadLabel in PackageItemInfo.java).
+  const loadLabel = (r, info) => {
+    const fields = r.object(info).fields, literal = fields.get(`${APPLICATION_INFO}->nonLocalizedLabel:Ljava/lang/CharSequence;`) ?? null, resource = fields.get(`${APPLICATION_INFO}->labelRes:I`) ?? 0;
+    if (literal !== null && literal !== 0) return literal;
+    if (resource) { try { const value = platform.resource(resource, ['string']).value; if (typeof value === 'string') return value; } catch { /* unresolvable label: fall through to the package name */ } }
+    return fields.get(`${APPLICATION_INFO}->packageName:Ljava/lang/String;`) ?? pkg();
+  };
+  def(PACKAGE_MANAGER, 'isInstantApp', '()Z', () => 0); def(PACKAGE_MANAGER, 'isInstantApp', `(${STRING})Z`, () => 0);   // an installed APK is never an instant app
+  def(PACKAGE_MANAGER, 'getApplicationLabel', `(${APPLICATION_INFO})Ljava/lang/CharSequence;`, (r, _m, [, info]) => { if (info === null) r.throwJava('Ljava/lang/NullPointerException;', null); return loadLabel(r, info); });
+  def(APPLICATION_INFO, 'loadLabel', `(${PACKAGE_MANAGER})Ljava/lang/CharSequence;`, (r, _m, [info]) => loadLabel(r, info));
   def(PACKAGE_MANAGER, 'getInstallerPackageName', `(${STRING})${STRING}`, (r, _m, [, name]) => { const n = text(r, name); if (n !== pkg()) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Unknown package: ' + n); return null; });
 
   // PackageManager.queryIntentContentProviders: the virtual device has one installed package (this app), no Play Services and no system font

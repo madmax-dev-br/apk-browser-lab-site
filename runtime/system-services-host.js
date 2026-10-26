@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=cfd2299f1410';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=cfd2299f1410';
+import { APKError } from './apk-error.js?v=00979d36e5ab';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=00979d36e5ab';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -38,6 +38,7 @@ export function createSystemServicesHost(platform) {
   def(THREAD_POLICY, 'toString', '()Ljava/lang/String;', (runtime, _m, [p]) => `StrictMode.ThreadPolicy{mask=${maskOf(runtime, p)}}`);
   // ThreadPolicy.LAX is a constant policy of mask 0 (static field; see readStatic).
   def(THREAD_BUILDER, '<init>', '()V', (runtime, _m, [b]) => { runtime.object(b).strictMask = state.threadPolicyMask; });
+  def(THREAD_BUILDER, '<init>', `(${THREAD_POLICY})V`, (runtime, _m, [b, p]) => { runtime.object(b).strictMask = maskOf(runtime, p); });   // Builder(ThreadPolicy): start from an existing policy's mask
   const builderBits = (name, bits, enable) => def(THREAD_BUILDER, name, `()${THREAD_BUILDER}`, (runtime, _m, [b]) => { const o = runtime.object(b); o.strictMask = enable ? o.strictMask | bits : o.strictMask & ~bits; return b; });
   builderBits('detectAll', ALL_THREAD_DETECT_BITS, true); builderBits('permitAll', ALL_THREAD_DETECT_BITS, false);
   builderBits('detectDiskReads', DETECT_THREAD_DISK_READ, true); builderBits('permitDiskReads', DETECT_THREAD_DISK_READ, false);
@@ -286,15 +287,59 @@ export function createSystemServicesHost(platform) {
   const levelOf = (r, name) => { const m = levelObjects.get(r) ?? levelObjects.set(r, new Map()).get(r); if (!m.has(name)) { const ref = r.allocate(LEVEL); r.object(ref).level = { name, value: levels[name] }; m.set(name, ref); } return m.get(name); };
   for (const name of Object.keys(levels)) registry.staticField(LEVEL, name, LEVEL, r => levelOf(r, name));
   def(LEVEL, 'intValue', '()I', (r, _m, [self]) => r.object(self).level.value); def(LEVEL, 'getName', '()Ljava/lang/String;', (r, _m, [self]) => r.object(self).level.name); def(LEVEL, 'toString', '()Ljava/lang/String;', (r, _m, [self]) => r.object(self).level.name);
-  def(LOGGER, 'getLogger', `(Ljava/lang/String;)${LOGGER}`, (r, _m, [name]) => {
-    const n = r.stringCharacters(name), table = loggers.get(r) ?? loggers.set(r, new Map()).get(r);
-    if (!table.has(n)) { const ref = r.allocate(LOGGER); r.object(ref).logger = { name: n, level: null }; table.set(n, ref); } return table.get(n);
-  }, { static: true });
-  const effective = (r, self) => r.object(self).logger.level ?? levels.INFO;
-  const emit = (r, self, levelRef, message, thrown) => {
-    const lv = r.object(levelRef).level; if (lv.value < effective(r, self) || effective(r, self) === levels.OFF) return;
-    r.record(`LOG ${lv.value >= 1000 ? 'E' : lv.value >= 900 ? 'W' : lv.value >= 800 ? 'I' : lv.value >= 500 ? 'D' : 'V'} ${r.object(self).logger.name}: ${message === null ? 'null' : r.stringCharacters(message)}${thrown ? ' [' + r.typeOf(thrown) + ']' : ''}`);
+  // Logger hierarchy (LogManager): a logger's parent is the nearest existing ancestor by dotted name, else the root logger ""; handlers run up the chain while
+  // useParentHandlers holds. The root's default handler is libcore's AndroidHandler, modelled by the "LOG" trace line (android.util.Log).
+  const HANDLER = 'Ljava/util/logging/Handler;', LOG_RECORD = 'Ljava/util/logging/LogRecord;';
+  registry.type(HANDLER, 'Ljava/lang/Object;', [], { allocatable: true }); registry.type(LOG_RECORD, 'Ljava/lang/Object;', [], { allocatable: true });
+  const loggerNamed = (r, n) => {
+    const table = loggers.get(r) ?? loggers.set(r, new Map()).get(r);
+    if (!table.has(n)) { const ref = r.allocate(LOGGER); r.object(ref).logger = { name: n, level: null, handlers: [], useParent: true, parent: undefined }; table.set(n, ref); } return table.get(n);
   };
+  def(LOGGER, 'getLogger', `(Ljava/lang/String;)${LOGGER}`, (r, _m, [name]) => loggerNamed(r, r.stringCharacters(name)), { static: true });
+  const lg = (r, self) => r.object(self).logger;
+  const parentOf = (r, self) => {
+    const l = lg(r, self); if (l.parent !== undefined) return l.parent; if (l.name === '') return null;
+    const table = loggers.get(r); for (let n = l.name; n.includes('.');) { n = n.slice(0, n.lastIndexOf('.')); if (table.has(n)) return table.get(n); }
+    return loggerNamed(r, '');
+  };
+  const effective = (r, self) => { for (let l = self; l !== null; l = parentOf(r, l)) { const v = lg(r, l).level; if (v !== null) return v; } return levels.INFO; };
+  const levelValue = (r, record) => r.object(r.object(record).record.level).level.value;
+  const emitRecord = (r, self, record) => {
+    const lv = levelValue(r, record); if (lv < effective(r, self) || effective(r, self) === levels.OFF) return;
+    for (let l = self; l !== null; l = parentOf(r, l)) {
+      for (const handler of [...lg(r, l).handlers]) if (lv >= (r.object(handler).handlerLevel ?? levels.ALL)) r.dispatch({ owner: HANDLER, name: 'publish', parameters: [LOG_RECORD], result: 'V', signature: `(${LOG_RECORD})V` }, [handler, record], 'virtual');
+      if (!lg(r, l).useParent) return;
+    }
+    const { message, thrown } = r.object(record).record;
+    r.record(`LOG ${lv >= 1000 ? 'E' : lv >= 900 ? 'W' : lv >= 800 ? 'I' : lv >= 500 ? 'D' : 'V'} ${lg(r, self).name}: ${message === null ? 'null' : r.stringCharacters(message)}${thrown ? ' [' + r.typeOf(thrown) + ']' : ''}`);
+  };
+  const newRecord = (r, level, message, thrown = null, loggerName = null, parameters = null) => { const ref = r.allocate(LOG_RECORD); r.object(ref).record = { level, message, thrown, loggerName, parameters, millis: BigInt(Math.trunc(platform.clock.now())) }; return ref; };
+  const emit = (r, self, levelRef, message, thrown, parameters = null) => {
+    if (r.object(levelRef).level.value < effective(r, self) || effective(r, self) === levels.OFF) return;
+    emitRecord(r, self, newRecord(r, levelRef, message, thrown, lg(r, self).name, parameters));
+  };
+  def(LOGGER, 'log', `(${LOG_RECORD})V`, (r, _m, [self, record]) => emitRecord(r, self, record));
+  def(LOGGER, 'log', `(${LEVEL}Ljava/lang/String;[Ljava/lang/Object;)V`, (r, _m, [self, level, msg, params]) => emit(r, self, level, msg, null, params));
+  def(LOGGER, 'addHandler', `(${HANDLER})V`, (r, _m, [self, handler]) => { if (handler === null) r.throwJava('Ljava/lang/NullPointerException;', null); lg(r, self).handlers.push(handler); });
+  def(LOGGER, 'removeHandler', `(${HANDLER})V`, (r, _m, [self, handler]) => { const l = lg(r, self), i = l.handlers.indexOf(handler); if (i >= 0) l.handlers.splice(i, 1); });
+  def(LOGGER, 'getHandlers', `()[${HANDLER}`, (r, _m, [self]) => { const array = r.newArray(`[${HANDLER}`, lg(r, self).handlers.length); r.array(array).elements = [...lg(r, self).handlers]; return array; });
+  def(LOGGER, 'getParent', `()${LOGGER}`, (r, _m, [self]) => parentOf(r, self));
+  def(LOGGER, 'setParent', `(${LOGGER})V`, (r, _m, [self, parent]) => { if (parent === null) r.throwJava('Ljava/lang/NullPointerException;', null); lg(r, self).parent = parent; });
+  def(LOGGER, 'getUseParentHandlers', '()Z', (r, _m, [self]) => lg(r, self).useParent ? 1 : 0);
+  // java.util.logging.Handler (abstract: publish/flush/close come from the app's subclass) and LogRecord.
+  const levelName = value => Object.keys(levels).find(k => levels[k] === value);
+  def(HANDLER, '<init>', '()V', () => {});
+  def(HANDLER, 'setLevel', `(${LEVEL})V`, (r, _m, [self, level]) => { if (level === null) r.throwJava('Ljava/lang/NullPointerException;', null); r.object(self).handlerLevel = r.object(level).level.value; });
+  def(HANDLER, 'getLevel', `()${LEVEL}`, (r, _m, [self]) => levelOf(r, levelName(r.object(self).handlerLevel ?? levels.ALL)));
+  def(HANDLER, 'isLoggable', `(${LOG_RECORD})Z`, (r, _m, [self, record]) => record !== null && levelValue(r, record) >= (r.object(self).handlerLevel ?? levels.ALL) ? 1 : 0);
+  for (const [name, type] of [['Formatter', 'Ljava/util/logging/Formatter;'], ['Filter', 'Ljava/util/logging/Filter;']]) {
+    def(HANDLER, 'set' + name, `(${type})V`, (r, _m, [self, value]) => { r.object(self)['handler' + name] = value; }); def(HANDLER, 'get' + name, `()${type}`, (r, _m, [self]) => r.object(self)['handler' + name] ?? null);
+  }
+  def(LOG_RECORD, '<init>', `(${LEVEL}Ljava/lang/String;)V`, (r, _m, [self, level, msg]) => { if (level === null) r.throwJava('Ljava/lang/NullPointerException;', null); r.object(self).record = { level, message: msg, thrown: null, loggerName: null, parameters: null, millis: BigInt(Math.trunc(platform.clock.now())) }; });
+  for (const [name, type, key] of [['Level', LEVEL, 'level'], ['Message', 'Ljava/lang/String;', 'message'], ['LoggerName', 'Ljava/lang/String;', 'loggerName'], ['Thrown', 'Ljava/lang/Throwable;', 'thrown'], ['Parameters', '[Ljava/lang/Object;', 'parameters']]) {
+    def(LOG_RECORD, 'get' + name, `()${type}`, (r, _m, [self]) => r.object(self).record[key]); def(LOG_RECORD, 'set' + name, `(${type})V`, (r, _m, [self, value]) => { r.object(self).record[key] = value; });
+  }
+  def(LOG_RECORD, 'getMillis', '()J', (r, _m, [self]) => r.object(self).record.millis);
   def(LOGGER, 'log', `(${LEVEL}Ljava/lang/String;)V`, (r, _m, [self, level, msg]) => emit(r, self, level, msg, null));
   def(LOGGER, 'log', `(${LEVEL}Ljava/lang/String;Ljava/lang/Throwable;)V`, (r, _m, [self, level, msg, t]) => emit(r, self, level, msg, t));
   def(LOGGER, 'log', `(${LEVEL}Ljava/lang/String;Ljava/lang/Object;)V`, (r, _m, [self, level, msg]) => emit(r, self, level, msg, null));
@@ -303,7 +348,7 @@ export function createSystemServicesHost(platform) {
   def(LOGGER, 'getName', '()Ljava/lang/String;', (r, _m, [self]) => r.object(self).logger.name);
   def(LOGGER, 'setLevel', `(${LEVEL})V`, (r, _m, [self, level]) => { r.object(self).logger.level = level === null ? null : r.object(level).level.value; });
   def(LOGGER, 'getLevel', `()${LEVEL}`, (r, _m, [self]) => { const v = r.object(self).logger.level; return v === null ? null : levelOf(r, Object.keys(levels).find(k => levels[k] === v)); });
-  def(LOGGER, 'setUseParentHandlers', '(Z)V', () => {});
+  def(LOGGER, 'setUseParentHandlers', '(Z)V', (r, _m, [self, value]) => { lg(r, self).useParent = !!value; });
 
   // ---- java.lang.System.getenv: environment of a zygote-forked Android 13 app process ----------------------------
   const ENV = { ANDROID_ROOT: '/system', ANDROID_DATA: '/data', ANDROID_STORAGE: '/storage', ANDROID_ASSETS: '/system/app', ANDROID_ART_ROOT: '/apex/com.android.art', ANDROID_I18N_ROOT: '/apex/com.android.i18n', ANDROID_TZDATA_ROOT: '/apex/com.android.tzdata', ANDROID_RUNTIME_ROOT: '/apex/com.android.runtime', EXTERNAL_STORAGE: '/sdcard', ASEC_MOUNTPOINT: '/mnt/asec', PATH: '/product/bin:/apex/com.android.runtime/bin:/system/bin:/system/xbin:/odm/bin:/vendor/bin:/vendor/xbin', ANDROID_BOOTLOGO: '1' };
