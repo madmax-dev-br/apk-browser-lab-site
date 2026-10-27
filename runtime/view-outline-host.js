@@ -1,4 +1,4 @@
-import {APKError} from './apk-runtime.js?v=79e2ded60c95';
+import {APKError} from './apk-runtime.js?v=d8da3b335496';
 const VIEW='Landroid/view/View;',PROVIDER='Landroid/view/ViewOutlineProvider;',OUTLINE='Landroid/graphics/Outline;',RECT='Landroid/graphics/Rect;',PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const keys=new Set(['setOutlineProvider('+PROVIDER+')V','getOutlineProvider()'+PROVIDER,'invalidateOutline()V','setClipToOutline(Z)V','getClipToOutline()Z','setClipBounds('+RECT+')V','getClipBounds()'+RECT,'getClipBounds('+RECT+')Z'].map(signature=>VIEW+'->'+signature));
 const bits=new DataView(new ArrayBuffer(4)),encode=value=>{bits.setFloat32(0,value,true);return bits.getInt32(0,true);},decode=value=>{bits.setInt32(0,value,true);return bits.getFloat32(0,true);};

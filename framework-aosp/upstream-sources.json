@@ -11205,5 +11205,95 @@
     "sha256": "d067f213bc7cf9358390a1efa0b6566327d031e2cee30d814cf593cf480fc82b",
     "bytes": 3699,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/content/pm/ShortcutInfo.java",
+    "localPath": "framework-aosp/upstream/android/content/pm/ShortcutInfo.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/pm/ShortcutInfo.java?format=TEXT",
+    "sha256": "e3e76ea6965420adde34f1f67167ddf183903f434a9c64e54c5326dd252fadf4",
+    "bytes": 88198,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/app/usage/StorageStats.java",
+    "localPath": "framework-aosp/upstream/android/app/usage/StorageStats.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/usage/StorageStats.java?format=TEXT",
+    "sha256": "7a5db65a56bcfd9c03be3ce32046c3b5e787f65459e2acc23ef69f071149a3f2",
+    "bytes": 4091,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/accounts/Account.java",
+    "localPath": "framework-aosp/upstream/android/accounts/Account.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/Account.java?format=TEXT",
+    "sha256": "912a5679ae83cb547ae9af9be40ae36cdf50e6d44e9245a80f9a31a23a1a83ed",
+    "bytes": 6146,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/widget/HorizontalScrollView.java",
+    "localPath": "framework-aosp/upstream/android/widget/HorizontalScrollView.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/HorizontalScrollView.java?format=TEXT",
+    "sha256": "afcb6a2dd15bbe2fa7795d03fee9c2e0763068b87ad675961864f91706d99273",
+    "bytes": 70917,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/AsyncTask.java",
+    "localPath": "framework-aosp/upstream/android/os/AsyncTask.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/AsyncTask.java?format=TEXT",
+    "sha256": "358b9cff5b1b7fb38d9b5e79c05f2a39713e16e5afdcb67730ce96d3be0edcb5",
+    "bytes": 32655,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/Properties.java",
+    "localPath": "framework-aosp/upstream/java/util/Properties.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/Properties.java?format=TEXT",
+    "sha256": "75720107e24c9a22c86836746988945eaf362d80e50955ca601dbdb0dcc7cb34",
+    "bytes": 50949,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/XMLUtils.java",
+    "localPath": "framework-aosp/upstream/java/util/XMLUtils.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/XMLUtils.java?format=TEXT",
+    "sha256": "9b83c2af4c2bc98367192a5a55f406111f94b9ebaf099b1adc764550604d71f4",
+    "bytes": 8078,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/CharSequence.java",
+    "localPath": "framework-aosp/upstream/java/lang/CharSequence.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/CharSequence.java?format=TEXT",
+    "sha256": "8b3a302f13b2689a062936079202194f8967ccf27b256da396d4f6c95cd4726a",
+    "bytes": 8969,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/ServiceConfigurationError.java",
+    "localPath": "framework-aosp/upstream/java/util/ServiceConfigurationError.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/ServiceConfigurationError.java?format=TEXT",
+    "sha256": "72eefa68ada402ce3ed297c4142f5becb42c1efa6484a6d8f93e39c1bc86722a",
+    "bytes": 2170,
+    "license": "Apache-2.0"
   }
 ]

@@ -1,5 +1,6 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=79e2ded60c95';
-import { APKError } from './apk-runtime.js?v=79e2ded60c95';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=d8da3b335496';
+import { APKError } from './apk-runtime.js?v=d8da3b335496';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=d8da3b335496';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -141,7 +142,27 @@ export class AndroidStyleBackend {
     const parser = this.platform.xmlHost.create(runtime, tree, id);
     return runtime.dispatch({ owner: COLOR, name: 'createFromXml', signature: '(Landroid/content/res/Resources;Lorg/xmlpull/v1/XmlPullParser;Landroid/content/res/Resources$Theme;)Landroid/content/res/ColorStateList;', parameters: [RESOURCES, 'Lorg/xmlpull/v1/XmlPullParser;', THEME], result: COLOR }, [this.resourceObject(runtime), parser, theme || null], 'static');
   }
+  /**
+   * Resources.loadDrawable for a drawable that is an image FILE of the APK (ResourcesImpl.loadDrawableForCookie): .png/.jpg/.webp/.gif/.bmp decode through BitmapFactory into a
+   * BitmapDrawable, and a PNG that carries the compiled 9-patch chunk (npTc) becomes a NinePatchDrawable. Both are at the device density: a bitmap qualified for another density
+   * (ResTable_config of the selected variant) is scaled by target/resource density, the 9-patch chunk with it (Res_png_9patch::scale). Null when `id` is not an image file.
+   */
+  loadFileDrawable(runtime, id) {
+    const codec = this.platform.bitmapCodec, file = id >>> 0 ? codec?.resourceFile(runtime, id) : null;
+    if (!file || !/\.(png|jpe?g|webp|gif|bmp)$/i.test(file.path)) return null;
+    const bytes = Uint8Array.from(runtime.apkReader(file.path)), defaults = codec.densityDefaults(file.density), scale = defaults.inDensity && defaults.inDensity !== defaults.inTargetDensity ? defaults.inTargetDensity / defaults.inDensity : 1;
+    if (hasNinePatchChunk(bytes)) {
+      const drawable = this.platform.drawableViewHost.createNinePatchDrawable(runtime, bytes, scale);
+      runtime.record(`RESOURCE drawable ${id >>> 0} NinePatchDrawable [${file.path}: compiled npTc chunk, density ${file.density || 160} -> 160]`); return drawable;
+    }
+    const bitmap = codec.decodeBytes(runtime, bytes, null, null, defaults);
+    if (bitmap === null) fail(`Resource ${file.path} could not be decoded as an image`, { resourceId: id, path: file.path });
+    const type = 'Landroid/graphics/drawable/BitmapDrawable;', drawable = runtime.allocate(type);
+    runtime.dispatch({ owner: type, name: '<init>', parameters: [RESOURCES, 'Landroid/graphics/Bitmap;'], result: 'V', signature: `(${RESOURCES}Landroid/graphics/Bitmap;)V` }, [drawable, this.resourceObject(runtime), bitmap], 'direct');
+    runtime.record(`RESOURCE drawable ${id >>> 0} BitmapDrawable [${file.path}, density ${file.density || 160} -> 160]`); return drawable;
+  }
   loadDrawable(runtime, id, theme, density = 0, suppliedValue = null) {
+    const fileDrawable = this.loadFileDrawable(runtime, id); if (fileDrawable !== null) return fileDrawable;
     if (density && density !== 160) fail(`Drawable density override ${density} requires qualified resource selection; this profile is density 160`, { resourceId: id });
     let value = suppliedValue ? { dataType: this.get(runtime, suppliedValue, VALUE, 'type', 'I'), rawData: this.get(runtime, suppliedValue, VALUE, 'data', 'I') } : this.platform.resources.resolve(id >>> 0); while (value.resolved) value = value.resolved;
     if (value.kind === 'unresolved') fail(value.reason, { resourceId: id });

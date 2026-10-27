@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=79e2ded60c95';
-import { APKError } from './apk-error.js?v=79e2ded60c95';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=79e2ded60c95';
+import { gcRoot } from './heap-gc.js?v=d8da3b335496';
+import { APKError } from './apk-error.js?v=d8da3b335496';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=d8da3b335496';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -389,6 +389,7 @@ export function createSystemServicesHost(platform) {
     registry.staticField(PROCESS, name, 'I', () => value);
   // Process.myProcessName() (API 33): the app's process name, android:process on <application> (":x" is package-private) or the package name.
   def(PROCESS, 'myProcessName', '()Ljava/lang/String;', () => { const process = platform.manifest?.application?.process, pkg = platform.packageName; return process ? (process.startsWith(':') ? pkg + process : process) : pkg; }, { static: true });
+  def(PROCESS, 'myUserHandle', '()Landroid/os/UserHandle;', r => r.dispatch({ owner: 'Landroid/os/UserHandle;', name: 'of', parameters: ['I'], result: 'Landroid/os/UserHandle;', signature: '(I)Landroid/os/UserHandle;' }, [0], 'static'), { static: true });   // the single user (0)
   def(PROCESS, 'is64Bit', '()Z', () => 0, { static: true }); // the VM's native word is wasm32 (Build.SUPPORTED_ABIS = wasm32), so VMRuntime.is64Bit() is false
   const processStart = platform.clock.now(); // the virtual process starts when the VM is created; uptime/elapsed clocks both count from VM creation (SystemClock bridge uses platform.clock.now())
   for (const name of ['getStartUptimeMillis', 'getStartElapsedRealtime', 'getStartRequestedUptimeMillis', 'getStartRequestedElapsedRealtime']) def(PROCESS, name, '()J', () => BigInt(Math.floor(processStart)), { static: true });

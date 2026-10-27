@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=79e2ded60c95';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=79e2ded60c95';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=79e2ded60c95';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=79e2ded60c95';
+import { APKError } from './apk-error.js?v=d8da3b335496';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=d8da3b335496';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=d8da3b335496';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=d8da3b335496';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -399,7 +399,48 @@ export function createAppServicesHost(platform) {
     return target < 33 || declared ? 1 : 0;
   });
   def(NOTIFICATION_MANAGER, 'getImportance', '()I', () => 3);   // IMPORTANCE_DEFAULT
-  def(NOTIFICATION_MANAGER, 'createNotificationChannel', `(${CHANNEL})V`, (r, _m, [, channel]) => { const id = channelId(r, channel); if (id !== null && !notificationState.channels.has(id)) notificationState.channels.set(id, channel); });
+  // NotificationManager channels and channel groups (NotificationManagerService / PreferencesHelper, android-13.0.0_r1): a channel may only name a group that exists; creating a channel
+  // that already exists updates its name and description (and its group when it has none), and lowers its importance; deleting a group deletes its channels.
+  const GROUP = 'Landroid/app/NotificationChannelGroup;', LIST_T = 'Ljava/util/List;';
+  notificationState.groups = gcRoot(new Map());
+  const vc = (r, receiver, owner, name, parameters, result, args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...args], 'virtual');
+  const channelGroupId = (r, channel) => { const g = vc(r, channel, CHANNEL, 'getGroup', [], STRING); return g === null ? null : r.stringCharacters(g); };
+  const groupId = (r, group) => { const id = vc(r, group, GROUP, 'getId', [], STRING); return id === null ? null : r.stringCharacters(id); };
+  const createChannel = (r, channel) => {
+    if (channel === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    const id = channelId(r, channel), group = channelGroupId(r, channel);
+    if (group !== null && !notificationState.groups.has(group)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'NotificationChannelGroup doesn\'t exist');
+    const existing = notificationState.channels.get(id);
+    if (existing === undefined) { notificationState.channels.set(id, channel); return; }
+    vc(r, existing, CHANNEL, 'setName', ['Ljava/lang/CharSequence;'], 'V', [vc(r, channel, CHANNEL, 'getName', [], 'Ljava/lang/CharSequence;')]);
+    vc(r, existing, CHANNEL, 'setDescription', [STRING], 'V', [vc(r, channel, CHANNEL, 'getDescription', [], STRING)]);
+    if (channelGroupId(r, existing) === null && group !== null) vc(r, existing, CHANNEL, 'setGroup', [STRING], 'V', [vc(r, channel, CHANNEL, 'getGroup', [], STRING)]);
+    const importance = vc(r, channel, CHANNEL, 'getImportance', [], 'I');   // an app may lower the importance of its own channel; raising it is the user's choice
+    if (importance < vc(r, existing, CHANNEL, 'getImportance', [], 'I')) vc(r, existing, CHANNEL, 'setImportance', ['I'], 'V', [importance]);
+  };
+  const listValues = (r, list) => { if (list === null) r.throwJava('Ljava/lang/NullPointerException;', null); return r.array(vc(r, list, LIST_T, 'toArray', [], '[Ljava/lang/Object;')).elements; };
+  const createGroup = (r, group) => {
+    if (group === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    const id = groupId(r, group), existing = notificationState.groups.get(id);
+    if (existing === undefined) { notificationState.groups.set(id, group); return; }
+    vc(r, existing, GROUP, 'setDescription', [STRING], 'V', [vc(r, group, GROUP, 'getDescription', [], STRING)]);
+    r.object(existing).channelGroup.name = r.object(group).channelGroup.name;
+  };
+  const withChannels = (r, group) => {
+    const id = groupId(r, group), list = newEmptyList(r);
+    for (const channel of notificationState.channels.values()) if (channelGroupId(r, channel) === id) r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, channel], 'virtual');
+    vc(r, group, GROUP, 'setChannels', [LIST_T], 'V', [list]); return group;
+  };
+  def(NOTIFICATION_MANAGER, 'createNotificationChannel', `(${CHANNEL})V`, (r, _m, [, channel]) => createChannel(r, channel));
+  def(NOTIFICATION_MANAGER, 'createNotificationChannels', `(${LIST_T})V`, (r, _m, [, channels]) => { for (const channel of listValues(r, channels)) createChannel(r, channel); });
+  def(NOTIFICATION_MANAGER, 'createNotificationChannelGroup', `(${GROUP})V`, (r, _m, [, group]) => createGroup(r, group));
+  def(NOTIFICATION_MANAGER, 'createNotificationChannelGroups', `(${LIST_T})V`, (r, _m, [, groups]) => { for (const group of listValues(r, groups)) createGroup(r, group); });
+  def(NOTIFICATION_MANAGER, 'getNotificationChannelGroups', `()${LIST_T}`, r => { const list = newEmptyList(r); for (const group of notificationState.groups.values()) r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, withChannels(r, group)], 'virtual'); return list; });
+  def(NOTIFICATION_MANAGER, 'getNotificationChannelGroup', `(${STRING})${GROUP}`, (r, _m, [, id]) => { const group = notificationState.groups.get(text(r, id)); return group === undefined ? null : withChannels(r, group); });
+  def(NOTIFICATION_MANAGER, 'deleteNotificationChannelGroup', `(${STRING})V`, (r, _m, [, id]) => {
+    const key = text(r, id); notificationState.groups.delete(key);
+    for (const [channelKey, channel] of [...notificationState.channels]) if (channelGroupId(r, channel) === key) notificationState.channels.delete(channelKey);
+  });
   def(NOTIFICATION_MANAGER, 'getNotificationChannel', `(${STRING})${CHANNEL}`, (r, _m, [, id]) => notificationState.channels.get(text(r, id)) ?? null);
   def(NOTIFICATION_MANAGER, 'getNotificationChannels', '()Ljava/util/List;', r => { const list = newEmptyList(r); for (const channel of notificationState.channels.values()) r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, channel], 'virtual'); return list; });
   def(NOTIFICATION_MANAGER, 'deleteNotificationChannel', `(${STRING})V`, (r, _m, [, id]) => { notificationState.channels.delete(text(r, id)); });
@@ -414,7 +455,7 @@ export function createAppServicesHost(platform) {
   // no launcher that pins shortcuts, so isRequestPinShortcutSupported/requestPinShortcut answer false; there are no manifest or pinned shortcuts.
   const SHORTCUT_MANAGER = service('shortcut', 'Landroid/content/pm/ShortcutManager;'), SHORTCUT_INFO = 'Landroid/content/pm/ShortcutInfo;', LIST = 'Ljava/util/List;';
   const MAX_SHORTCUTS = 15;   // ShortcutService.DEFAULT_MAX_SHORTCUTS_PER_APP
-  const shortcuts = { dynamic: gcRoot(new Map()), disabled: new Set(), used: [] };
+  const shortcuts = { dynamic: gcRoot(new Map()), disabled: new Set(), used: [], sequence: 0 };
   const shortcutCall = (r, receiver, name, signature, parameters, result, ...rest) => r.dispatch({ owner: r.typeOf(receiver), name, signature, parameters, result }, [receiver, ...rest], 'virtual');
   const javaItems = (r, list) => {
     if (list === null) r.throwJava('Ljava/lang/NullPointerException;', null);
@@ -422,34 +463,137 @@ export function createAppServicesHost(platform) {
     while (shortcutCall(r, iterator, 'hasNext', '()Z', [], 'Z')) { if (out.length > 4096) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Too many shortcuts'); out.push(shortcutCall(r, iterator, 'next', `()${OBJECT}`, [], OBJECT)); }
     return out;
   };
-  const shortcutId = (r, info) => { if (info === null) r.throwJava('Ljava/lang/NullPointerException;', null); return r.stringCharacters(shortcutCall(r, info, 'getId', `()${STRING}`, [], STRING)); };
+  // The service works on its own copies of the app's ShortcutInfo objects (the original class from the framework DEX) and follows ShortcutService / ShortcutPackage of
+  // android-13.0.0_r1: fillInDefaultActivity, assignImplicitRanks, fixUpIncomingShortcutInfo, enforceShortcutCountsBeforeOperation (per target Activity), addOrReplaceDynamicShortcut,
+  // the push eviction, updateShortcuts' copyNonNullFieldsFrom and adjustRanks' comparator (rank, rank-changed first, implicit rank, id). What the app reads back are clones
+  // (CLONE_REMOVE_FOR_CREATOR) in ArrayMap order, i.e. ascending String.hashCode of the ids.
+  const info = (r, ref, name, parameters, result, ...rest) => r.dispatch({ owner: SHORTCUT_INFO, name, parameters, result, signature: `(${parameters.join('')})${result}` }, r.argumentWords(parameters, rest, { receiver: ref }), 'virtual');
+  const constant = (r, name) => r.readStatic({ owner: SHORTCUT_INFO, name, type: 'I', key: `${SHORTCUT_INFO}->${name}:I` });
+  const idOf = (r, ref) => { if (ref === null) r.throwJava('Ljava/lang/NullPointerException;', 'Null shortcut detected'); return r.stringCharacters(info(r, ref, 'getId', [], STRING)); };
+  const shortcutId = idOf;
+  const componentText = (r, component) => component === null ? null : `${r.stringCharacters(r.dispatch({ owner: COMPONENT, name: 'getPackageName', parameters: [], result: STRING, signature: `()${STRING}` }, [component], 'virtual'))}/${r.stringCharacters(r.dispatch({ owner: COMPONENT, name: 'getClassName', parameters: [], result: STRING, signature: `()${STRING}` }, [component], 'virtual'))}`;
+  const mainActivities = () => new Set((platform.manifest?.activities ?? []).filter(activity => activity.launcher).map(activity => activity.name.replace(/^\./, `${platform.packageName}.`)));
+  const defaultActivity = r => {
+    if (!shortcuts.activity) { const name = r.launcherActivity; if (!name) return null; const component = r.allocate(COMPONENT); r.dispatch({ owner: COMPONENT, name: '<init>', parameters: [STRING, STRING], result: 'V', signature: `(${STRING}${STRING})V` }, [component, platform.packageName, name], 'direct'); shortcuts.activity = component; }
+    return shortcuts.activity;
+  };
+  const cloneOf = (r, ref, flags = 0) => info(r, ref, 'clone', ['I'], SHORTCUT_INFO, flags);
+  const now = r => BigInt(Math.floor(r.clock.wall?.() ?? 0));
+  const javaHash = value => { let h = 0; for (let i = 0; i < value.length; i++) h = (Math.imul(31, h) + value.charCodeAt(i)) | 0; return h; };
+  const isMain = (r, component) => component === null || mainActivities().has(r.stringCharacters(r.dispatch({ owner: COMPONENT, name: 'getClassName', parameters: [], result: STRING, signature: `()${STRING}` }, [component], 'virtual')));
+  /** ShortcutService.fixUpIncomingShortcutInfo */
+  const fixUp = (r, ref, forUpdate) => {
+    const activity = info(r, ref, 'getActivity', [], COMPONENT);
+    if (activity !== null) {
+      const pkg = r.stringCharacters(r.dispatch({ owner: COMPONENT, name: 'getPackageName', parameters: [], result: STRING, signature: `()${STRING}` }, [activity], 'virtual'));
+      if (pkg !== platform.packageName) r.throwJava('Ljava/lang/IllegalStateException;', `Cannot publish shortcut: activity ${componentText(r, activity)} does not belong to package ${platform.packageName}`);
+      if (!isMain(r, activity)) r.throwJava('Ljava/lang/IllegalStateException;', `Cannot publish shortcut: activity ${componentText(r, activity)} is not main activity`);
+    }
+    if (!forUpdate) {
+      info(r, ref, 'enforceMandatoryFields', ['Z'], 'V', 0);
+      if (info(r, ref, 'getActivity', [], COMPONENT) === null) r.throwJava('Ljava/lang/IllegalStateException;', 'Cannot publish shortcut: target activity is not set');
+    }
+    const icon = info(r, ref, 'getIcon', [], 'Landroid/graphics/drawable/Icon;');
+    if (icon !== null) r.dispatch({ owner: SHORTCUT_INFO, name: 'validateIcon', parameters: ['Landroid/graphics/drawable/Icon;'], result: 'Landroid/graphics/drawable/Icon;', signature: '(Landroid/graphics/drawable/Icon;)Landroid/graphics/drawable/Icon;' }, [icon], 'static');
+    info(r, ref, 'replaceFlags', ['I'], 'V', info(r, ref, 'getFlags', [], 'I') & constant(r, 'FLAG_LONG_LIVED'));
+  };
+  /** The app's list as the service's own copies, with the default Activity filled in (fillInDefaultActivity) and implicit ranks assigned (assignImplicitRanks). */
+  const prepare = (r, list, { defaults }) => {
+    const copies = javaItems(r, list).map(ref => { idOf(r, ref); return cloneOf(r, ref); });
+    if (defaults) for (let i = copies.length - 1; i >= 0; i--) if (info(r, copies[i], 'getActivity', [], COMPONENT) === null) {
+      const activity = defaultActivity(r); if (!activity) r.throwJava('Ljava/lang/IllegalStateException;', `Launcher activity not found for package ${platform.packageName}`);
+      info(r, copies[i], 'setActivity', [COMPONENT], 'V', activity);
+    }
+    return copies;
+  };
+  const clearAllImplicitRanks = r => { for (const entry of shortcuts.dynamic.values()) info(r, entry.info, 'clearImplicitRankAndRankChangedFlag', [], 'V'); };
+  const assignImplicitRanks = (r, copies) => { for (let i = copies.length - 1; i >= 0; i--) info(r, copies[i], 'setImplicitRank', ['I'], 'V', i); };
+  const OPERATION = { SET: 0, ADD: 1, UPDATE: 2 };
+  /** ShortcutPackage.enforceShortcutCountsBeforeOperation: no target Activity may end up with more than the maximum. */
+  const enforceCounts = (r, copies, operation) => {
+    const counts = new Map(), bump = (key, delta) => counts.set(key, (counts.get(key) ?? 0) + delta);
+    for (const entry of shortcuts.dynamic.values()) if (operation !== OPERATION.SET) bump(componentText(r, info(r, entry.info, 'getActivity', [], COMPONENT)), 1);
+    for (let i = copies.length - 1; i >= 0; i--) {
+      const activity = info(r, copies[i], 'getActivity', [], COMPONENT); if (activity === null) continue;
+      const original = shortcuts.dynamic.get(idOf(r, copies[i]));
+      if (!original) { if (operation !== OPERATION.UPDATE) bump(componentText(r, activity), 1); continue; }
+      if (operation !== OPERATION.SET) bump(componentText(r, info(r, original.info, 'getActivity', [], COMPONENT)), -1);
+      bump(componentText(r, activity), 1);
+    }
+    for (const count of counts.values()) if (count > MAX_SHORTCUTS) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Max number of dynamic shortcuts exceeded');
+  };
+  const addOrReplace = (r, id, copy) => {
+    info(r, copy, 'addFlags', ['I'], 'V', constant(r, 'FLAG_DYNAMIC')); info(r, copy, 'setTimestamp', ['J'], 'V', now(r));
+    shortcuts.dynamic.delete(id); shortcuts.dynamic.set(id, { info: copy });
+  };
+  /** ShortcutPackage.adjustRanks */
+  const adjustRanks = r => {
+    const byActivity = new Map();
+    for (const [id, entry] of shortcuts.dynamic) {
+      const key = componentText(r, info(r, entry.info, 'getActivity', [], COMPONENT)), view = { id, info: entry.info, rank: info(r, entry.info, 'getRank', [], 'I'), changed: info(r, entry.info, 'isRankChanged', [], 'Z') === 1, implicit: info(r, entry.info, 'getImplicitRank', [], 'I') };
+      (byActivity.get(key) ?? byActivity.set(key, []).get(key)).push(view);
+    }
+    for (const list of byActivity.values()) {
+      list.sort((a, b) => a.rank - b.rank || (a.changed === b.changed ? 0 : a.changed ? -1 : 1) || a.implicit - b.implicit || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      list.forEach((view, index) => { if (view.rank !== index) { info(r, view.info, 'setTimestamp', ['J'], 'V', now(r)); info(r, view.info, 'setRank', ['I'], 'V', index); } });
+    }
+  };
+  const dynamicList = r => listOf(r, [...shortcuts.dynamic.entries()].sort((a, b) => javaHash(a[0]) - javaHash(b[0])).map(([, entry]) => cloneOf(r, entry.info, constant(r, 'CLONE_REMOVE_FOR_CREATOR'))));
   const listOf = (r, values) => { const list = newEmptyList(r); for (const value of values) r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, value], 'virtual'); return list; };
-  const checkCount = (r, count) => { if (count > MAX_SHORTCUTS) r.throwJava('Ljava/lang/IllegalArgumentException;', `Max number of dynamic shortcuts exceeded`); };
   const ids = (r, list) => javaItems(r, list).map(id => text(r, id));
+  // ShortcutManager.FLAG_MATCH_MANIFEST = 1, FLAG_MATCH_DYNAMIC = 2, FLAG_MATCH_PINNED = 4, FLAG_MATCH_CACHED = 8
   def(SHORTCUT_MANAGER, 'getMaxShortcutCountPerActivity', '()I', () => MAX_SHORTCUTS);
   def(SHORTCUT_MANAGER, 'isRateLimitingActive', '()Z', () => 0);
+  def(SHORTCUT_MANAGER, 'getRemainingCallCount', '()I', () => 10);
   def(SHORTCUT_MANAGER, 'isRequestPinShortcutSupported', '()Z', () => 0);
-  def(SHORTCUT_MANAGER, 'requestPinShortcut', `(${SHORTCUT_INFO}Landroid/content/IntentSender;)Z`, (r, _m, [, info]) => { shortcutId(r, info); return 0; });
-  def(SHORTCUT_MANAGER, 'getDynamicShortcuts', `()${LIST}`, r => listOf(r, shortcuts.dynamic.values()));
+  def(SHORTCUT_MANAGER, 'requestPinShortcut', `(${SHORTCUT_INFO}Landroid/content/IntentSender;)Z`, (r, _m, [, ref]) => { shortcutId(r, ref); return 0; });
+  def(SHORTCUT_MANAGER, 'createShortcutResultIntent', `(${SHORTCUT_INFO})Landroid/content/Intent;`, () => { throw new APKError('ShortcutManager.createShortcutResultIntent needs a launcher result path that the virtual device does not have', { kind: 'unsupported-shortcut-result' }); });
+  def(SHORTCUT_MANAGER, 'getDynamicShortcuts', `()${LIST}`, r => dynamicList(r));
   def(SHORTCUT_MANAGER, 'getManifestShortcuts', `()${LIST}`, r => listOf(r, []));
   def(SHORTCUT_MANAGER, 'getPinnedShortcuts', `()${LIST}`, r => listOf(r, []));
-  def(SHORTCUT_MANAGER, 'getShortcuts', `(I)${LIST}`, (r, _m, [, flags]) => listOf(r, flags & 1 ? shortcuts.dynamic.values() : []));   // FLAG_MATCH_DYNAMIC = 1
-  def(SHORTCUT_MANAGER, 'setDynamicShortcuts', `(${LIST})Z`, (r, _m, [, list]) => { const items = javaItems(r, list); checkCount(r, items.length); shortcuts.dynamic.clear(); for (const info of items) shortcuts.dynamic.set(shortcutId(r, info), info); return 1; });
+  def(SHORTCUT_MANAGER, 'getShortcuts', `(I)${LIST}`, (r, _m, [, flags]) => (flags & 2) ? dynamicList(r) : listOf(r, []));
+  def(SHORTCUT_MANAGER, 'setDynamicShortcuts', `(${LIST})Z`, (r, _m, [, list]) => {
+    const copies = prepare(r, list, { defaults: true });
+    enforceCounts(r, copies, OPERATION.SET); clearAllImplicitRanks(r); assignImplicitRanks(r, copies);
+    for (const copy of copies) fixUp(r, copy, false);
+    shortcuts.dynamic.clear(); for (const copy of copies) addOrReplace(r, idOf(r, copy), copy);
+    adjustRanks(r); return 1;
+  });
   def(SHORTCUT_MANAGER, 'addDynamicShortcuts', `(${LIST})Z`, (r, _m, [, list]) => {
-    const items = javaItems(r, list), next = new Map(shortcuts.dynamic); for (const info of items) next.set(shortcutId(r, info), info);
-    checkCount(r, next.size); shortcuts.dynamic.clear(); for (const [id, info] of next) shortcuts.dynamic.set(id, info); return 1;
+    const copies = prepare(r, list, { defaults: true });
+    enforceCounts(r, copies, OPERATION.ADD); clearAllImplicitRanks(r); assignImplicitRanks(r, copies);
+    for (const copy of copies) { fixUp(r, copy, false); info(r, copy, 'setRankChanged', [], 'V'); addOrReplace(r, idOf(r, copy), copy); }
+    adjustRanks(r); return 1;
   });
-  def(SHORTCUT_MANAGER, 'pushDynamicShortcut', `(${SHORTCUT_INFO})V`, (r, _m, [, info]) => {
-    const id = shortcutId(r, info); shortcuts.dynamic.delete(id);
-    if (shortcuts.dynamic.size >= MAX_SHORTCUTS) shortcuts.dynamic.delete(shortcuts.dynamic.keys().next().value);   // the service drops the lowest-ranked shortcut
-    shortcuts.dynamic.set(id, info);
+  def(SHORTCUT_MANAGER, 'pushDynamicShortcut', `(${SHORTCUT_INFO})V`, (r, _m, [, ref]) => {
+    const [copy] = prepare(r, listOf(r, [ref]), { defaults: true }), id = idOf(r, copy);
+    if (info(r, copy, 'hasRank', [], 'Z') !== 1) info(r, copy, 'setRank', ['I'], 'V', 0);
+    clearAllImplicitRanks(r); info(r, copy, 'setImplicitRank', ['I'], 'V', 0);
+    fixUp(r, copy, false); info(r, copy, 'setRankChanged', [], 'V');
+    if (info(r, copy, 'isEnabled', [], 'Z') !== 1) r.throwJava('Ljava/lang/IllegalArgumentException;', 'pushDynamicShortcuts() cannot publish disabled shortcuts');
+    if (!shortcuts.dynamic.has(id)) {
+      const key = componentText(r, info(r, copy, 'getActivity', [], COMPONENT)), same = [...shortcuts.dynamic.entries()].filter(([, entry]) => componentText(r, info(r, entry.info, 'getActivity', [], COMPONENT)) === key);
+      if (same.length === MAX_SHORTCUTS) { same.sort((a, b) => info(r, a[1].info, 'getRank', [], 'I') - info(r, b[1].info, 'getRank', [], 'I')); shortcuts.dynamic.delete(same[MAX_SHORTCUTS - 1][0]); }   // the lowest-ranked one makes room
+    }
+    addOrReplace(r, id, copy); adjustRanks(r);
+    if (shortcuts.used.length < 256) shortcuts.used.push(id);
   });
-  def(SHORTCUT_MANAGER, 'updateShortcuts', `(${LIST})Z`, (r, _m, [, list]) => { for (const info of javaItems(r, list)) { const id = shortcutId(r, info); if (shortcuts.dynamic.has(id)) shortcuts.dynamic.set(id, info); } return 1; });
-  def(SHORTCUT_MANAGER, 'removeDynamicShortcuts', `(${LIST})V`, (r, _m, [, list]) => { for (const id of ids(r, list)) shortcuts.dynamic.delete(id); });
-  def(SHORTCUT_MANAGER, 'removeLongLivedShortcuts', `(${LIST})V`, (r, _m, [, list]) => { for (const id of ids(r, list)) shortcuts.dynamic.delete(id); });
+  def(SHORTCUT_MANAGER, 'updateShortcuts', `(${LIST})Z`, (r, _m, [, list]) => {
+    const copies = prepare(r, list, { defaults: false });
+    enforceCounts(r, copies, OPERATION.UPDATE); clearAllImplicitRanks(r); assignImplicitRanks(r, copies);
+    for (const source of copies) {
+      fixUp(r, source, true);
+      const target = shortcuts.dynamic.get(idOf(r, source)); if (!target) continue;
+      if (info(r, source, 'hasRank', [], 'Z') === 1) { info(r, target.info, 'setRankChanged', [], 'V'); info(r, target.info, 'setImplicitRank', ['I'], 'V', info(r, source, 'getImplicitRank', [], 'I')); }
+      info(r, target.info, 'copyNonNullFieldsFrom', [SHORTCUT_INFO], 'V', source); info(r, target.info, 'setTimestamp', ['J'], 'V', now(r));
+    }
+    adjustRanks(r); return 1;
+  });
+  def(SHORTCUT_MANAGER, 'removeDynamicShortcuts', `(${LIST})V`, (r, _m, [, list]) => { for (const id of ids(r, list)) shortcuts.dynamic.delete(id); adjustRanks(r); });
+  def(SHORTCUT_MANAGER, 'removeLongLivedShortcuts', `(${LIST})V`, (r, _m, [, list]) => { for (const id of ids(r, list)) shortcuts.dynamic.delete(id); adjustRanks(r); });
   def(SHORTCUT_MANAGER, 'removeAllDynamicShortcuts', '()V', () => { shortcuts.dynamic.clear(); });
-  def(SHORTCUT_MANAGER, 'disableShortcuts', `(${LIST})V`, (r, _m, [, list]) => { for (const id of ids(r, list)) { shortcuts.dynamic.delete(id); shortcuts.disabled.add(id); } });
-  def(SHORTCUT_MANAGER, 'disableShortcuts', `(${LIST}Ljava/lang/CharSequence;)V`, (r, _m, [, list]) => { for (const id of ids(r, list)) { shortcuts.dynamic.delete(id); shortcuts.disabled.add(id); } });
+  def(SHORTCUT_MANAGER, 'disableShortcuts', `(${LIST})V`, (r, _m, [, list]) => { for (const id of ids(r, list)) { shortcuts.dynamic.delete(id); shortcuts.disabled.add(id); } adjustRanks(r); });
+  def(SHORTCUT_MANAGER, 'disableShortcuts', `(${LIST}Ljava/lang/CharSequence;)V`, (r, _m, [, list]) => { for (const id of ids(r, list)) { shortcuts.dynamic.delete(id); shortcuts.disabled.add(id); } adjustRanks(r); });
   def(SHORTCUT_MANAGER, 'enableShortcuts', `(${LIST})V`, (r, _m, [, list]) => { for (const id of ids(r, list)) shortcuts.disabled.delete(id); });
   def(SHORTCUT_MANAGER, 'reportShortcutUsed', `(${STRING})V`, (r, _m, [, id]) => { const value = text(r, id); if (shortcuts.used.length < 256) shortcuts.used.push(value); r.record(`SHORTCUT used ${value}`); });
 
@@ -731,6 +875,7 @@ export function createAppServicesHost(platform) {
    * ordered by initOrder descending (manifest order among equals); each is instantiated, attachInfo()'d (which runs onCreate) with the Application
    * as Context. A provider failure aborts startup as RuntimeException("Unable to get provider ...") does on a device.
    */
+  const installedProviders = gcRoot(new Map());   // ActivityThread.mProviderMap keeps every installed provider alive for the life of the process
   function installContentProviders(runtime) {
     const details = (platform.manifest?.providerDetails ?? []).filter(p => !isFalse(p.enabled) && providerProcess(p) === processName());
     details.sort((a, b) => (Number(b.initOrder) | 0) - (Number(a.initOrder) | 0) || a.order - b.order);
@@ -739,7 +884,7 @@ export function createAppServicesHost(platform) {
     for (const detail of details) {
       const className = 'L' + detail.name.replaceAll('.', '/') + ';';
       if (!runtime.classes.has(className) || !runtime.isSubtype(className, CP)) throw new APKError(`Unable to get provider ${detail.name}: class not found or not a ContentProvider`, { kind: 'provider-class' });
-      const instance = runtime.allocate(className);
+      const instance = runtime.allocate(className); installedProviders.set(detail.name, instance);
       runtime.dispatch({ owner: className, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [instance], 'direct');
       runtime.record(`PROVIDERS attachInfo ${detail.name} (initOrder ${Number(detail.initOrder) | 0})`);
       runtime.dispatch({ owner: CP, name: 'attachInfo', parameters: [CONTEXT, PROVIDER_INFO], result: 'V', signature: `(${CONTEXT}${PROVIDER_INFO})V` }, [instance, platform.application, makeProviderInfo(runtime, detail, true)], 'virtual');

@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=79e2ded60c95';
-import { createHostRegistry } from './host-contract.js?v=79e2ded60c95';
-import { Blocked, VMThread } from './scheduler.js?v=79e2ded60c95';
-import { Invoke } from './interpreter.js?v=79e2ded60c95';
-import { GC_ROOTS } from './heap-gc.js?v=79e2ded60c95';
+import { APKError } from './apk-error.js?v=d8da3b335496';
+import { createHostRegistry } from './host-contract.js?v=d8da3b335496';
+import { Blocked, VMThread } from './scheduler.js?v=d8da3b335496';
+import { Invoke } from './interpreter.js?v=d8da3b335496';
+import { GC_ROOTS } from './heap-gc.js?v=d8da3b335496';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -70,7 +70,17 @@ export function createConcurrencyHost(platform) {
     if (running && running !== r.scheduler.main && running.javaObject) return running.javaObject;
     return current ?? mainThread(r);
   };
-  const init = (r, self, target, name) => { const st = state(r, self); st.target = target ?? null; if (name !== undefined && name !== null) st.name = r.stringCharacters(name); };
+  // A new Thread inherits the creating thread's InheritableThreadLocal values, each through childValue() (Thread.init -> ThreadLocal.createInheritedMap).
+  const inheritLocals = (r, child) => {
+    if (!r.inheritableLocals?.size) return;
+    const parent = currentThread(r);
+    for (const local of [...r.inheritableLocals]) {
+      let values; try { values = r.object(local).threadLocalValues; } catch { r.inheritableLocals.delete(local); continue; }
+      if (!values?.has(parent.ref)) continue;
+      values.set(child.ref, r.dispatch({ owner: r.typeOf(local), name: 'childValue', parameters: [OBJECT], result: OBJECT, signature: `(${OBJECT})${OBJECT}` }, [local, values.get(parent.ref)], 'virtual'));
+    }
+  };
+  const init = (r, self, target, name) => { const st = state(r, self); st.target = target ?? null; if (name !== undefined && name !== null) st.name = r.stringCharacters(name); inheritLocals(r, self); };
   def(THREAD, '<init>', '()V', (r, _m, [self]) => init(r, self, null));
   def(THREAD, '<init>', `(${RUNNABLE})V`, (r, _m, [self, t]) => init(r, self, t));
   def(THREAD, '<init>', `(${RUNNABLE}${STRING})V`, (r, _m, [self, t, n]) => init(r, self, t, n ?? r.throwJava('Ljava/lang/NullPointerException;', 'name == null')));
@@ -264,6 +274,13 @@ export function createConcurrencyHost(platform) {
     else if (owner.endsWith('SynchronousQueue;')) def(owner, '<init>', '(Z)V', (r, _m, [self]) => { r.object(self).bqueue = make(null); });
     else if (priority) { def(owner, '<init>', '(I)V', (r, _m, [self]) => { r.object(self).bqueue = make(null); }); def(owner, '<init>', '(ILjava/util/Comparator;)V', (r, _m, [self, , c]) => { r.object(self).bqueue = make(c); }); }
     else if (!owner.includes('Concurrent')) def(owner, '<init>', '(I)V', (r, _m, [self, n]) => { if (n <= 0) throwNew(r, 'Ljava/lang/IllegalArgumentException;'); r.object(self).bqueue = { items: [], capacity: n }; });
+    if (capacity === Infinity || owner.includes('ConcurrentLinkedQueue') || priority) {   // X(Collection): the elements in iteration order, null elements refused
+      def(owner, '<init>', `(${COLLECTION})V`, (r, _m, [self, source]) => {
+        if (source === null) throwNew(r, 'Ljava/lang/NullPointerException;');
+        const queue = r.object(self).bqueue = make(null);
+        for (const item of r.array(vcall(r, source, COLLECTION, 'toArray', [], '[Ljava/lang/Object;', [])).elements) { if (item === null) throwNew(r, 'Ljava/lang/NullPointerException;'); insert(r, queue, item); }
+      });
+    }
   }
   for (const owner of Object.keys(queueTypes)) {
     const offer = (r, _m, [self, item]) => { if (item === null) throwNew(r, 'Ljava/lang/NullPointerException;'); const queue = q(r, self); if (queue.items.length >= queue.capacity) return 0; insert(r, queue, item); return 1; };
@@ -289,21 +306,41 @@ export function createConcurrencyHost(platform) {
       return again();
     });
     def(owner, 'remove', `()${OBJECT}`, (r, _m, [self]) => q(r, self).items.length ? q(r, self).items.shift() : throwNew(r, 'Ljava/util/NoSuchElementException;'));
-    def(owner, 'remove', `(${OBJECT})Z`, (r, _m, [self, item]) => { const queue = q(r, self), i = queue.items.findIndex(x => sameRef(x, item)); if (i < 0) return 0; queue.items.splice(i, 1); return 1; });
+    def(owner, 'remove', `(${OBJECT})Z`, (r, _m, [self, item]) => { if (item === null) return 0; const queue = q(r, self), i = queue.items.findIndex(x => sameRef(x, item) || r.javaEquals(item, x)); if (i < 0) return 0; queue.items.splice(i, 1); return 1; });
     def(owner, 'peek', `()${OBJECT}`, (r, _m, [self]) => q(r, self).items[0] ?? null);
     def(owner, 'element', `()${OBJECT}`, (r, _m, [self]) => q(r, self).items[0] ?? throwNew(r, 'Ljava/util/NoSuchElementException;'));
     def(owner, 'size', '()I', (r, _m, [self]) => q(r, self).items.length);
     def(owner, 'isEmpty', '()Z', (r, _m, [self]) => q(r, self).items.length ? 0 : 1);
     def(owner, 'clear', '()V', (r, _m, [self]) => { q(r, self).items.length = 0; });
-    def(owner, 'contains', `(${OBJECT})Z`, (r, _m, [self, item]) => q(r, self).items.some(x => sameRef(x, item)) ? 1 : 0);
+    def(owner, 'contains', `(${OBJECT})Z`, (r, _m, [self, item]) => item !== null && q(r, self).items.some(x => sameRef(x, item) || r.javaEquals(item, x)) ? 1 : 0);
     def(owner, 'remainingCapacity', '()I', (r, _m, [self]) => { const queue = q(r, self); return queue.capacity === Infinity ? 2147483647 : queue.capacity - queue.items.length; });
-    def(owner, 'drainTo', `(${COLLECTION})I`, (r, _m, [self, target]) => { const queue = q(r, self), n = queue.items.length; for (const item of queue.items.splice(0)) vcall(r, target, COLLECTION, 'add', [OBJECT], 'Z', [item]); return n; });
+    // drainTo(c[, max]): up to max elements in queue order into c (NPE for null, IAE for the queue itself, 0 for max <= 0); an element c refuses to add stays in the queue.
+    const drain = (r, self, target, max) => {
+      if (target === null || target === 0 || target === undefined) throwNew(r, 'Ljava/lang/NullPointerException;'); if (target.ref === self.ref) throwNew(r, 'Ljava/lang/IllegalArgumentException;');
+      const queue = q(r, self); let n = 0;
+      while (n < max && queue.items.length) { const item = queue.items[0]; vcall(r, target, COLLECTION, 'add', [OBJECT], 'Z', [item]); queue.items.shift(); n++; }
+      return n;
+    };
+    def(owner, 'drainTo', `(${COLLECTION})I`, (r, _m, [self, target]) => drain(r, self, target, Infinity));
+    def(owner, 'drainTo', `(${COLLECTION}I)I`, (r, _m, [self, target, max]) => drain(r, self, target, max));
+    def(owner, 'offer', `(${OBJECT}J${UNIT})Z`, (r, _m, [self, item, t, unit]) => {
+      if (item === null) throwNew(r, 'Ljava/lang/NullPointerException;'); const queue = q(r, self);
+      checkInterrupt(r);
+      if (queue.items.length < queue.capacity) { insert(r, queue, item); return 1; }
+      const millis = Number(vcall(r, unit, UNIT, 'toMillis', ['J'], 'J', [t]));
+      return block(r, { reason: 'BlockingQueue.offer(timeout)', ready: () => queue.items.length < queue.capacity, timeoutMs: Math.max(0, millis), finish: () => { waitInterrupted(r); if (queue.items.length < queue.capacity) { insert(r, queue, item); return 1; } return 0; } });
+    });
     def(owner, 'toArray', '()[Ljava/lang/Object;', (r, _m, [self]) => { const items = q(r, self).items, array = r.newArray('[Ljava/lang/Object;', items.length); r.array(array).elements = items.slice(); return array; });
-    def(owner, 'iterator', '()Ljava/util/Iterator;', (r, _m, [self]) => { const ref = r.allocate('Ljava/util/concurrent/QueueIterator;'); r.object(ref).iteration = { items: q(r, self).items.slice(), index: 0 }; return ref; });
+    def(owner, 'iterator', '()Ljava/util/Iterator;', (r, _m, [self]) => { const ref = r.allocate('Ljava/util/concurrent/QueueIterator;'); r.object(ref).iteration = { items: q(r, self).items.slice(), index: 0, queue: q(r, self), last: -1 }; return ref; });
   }
   type('Ljava/util/concurrent/QueueIterator;', OBJECT, ['Ljava/util/Iterator;'], { allocatable: true });
   def('Ljava/util/concurrent/QueueIterator;', 'hasNext', '()Z', (r, _m, [self]) => { const it = r.object(self).iteration; return it.index < it.items.length ? 1 : 0; });
-  def('Ljava/util/concurrent/QueueIterator;', 'next', `()${OBJECT}`, (r, _m, [self]) => { const it = r.object(self).iteration; if (it.index >= it.items.length) throwNew(r, 'Ljava/util/NoSuchElementException;'); return it.items[it.index++]; });
+  def('Ljava/util/concurrent/QueueIterator;', 'next', `()${OBJECT}`, (r, _m, [self]) => { const it = r.object(self).iteration; if (it.index >= it.items.length) throwNew(r, 'Ljava/util/NoSuchElementException;'); it.last = it.index; return it.items[it.index++]; });
+  // Iterator.remove: the element last returned leaves the live queue (a concurrent consumer may already have taken it, which is not an error).
+  def('Ljava/util/concurrent/QueueIterator;', 'remove', '()V', (r, _m, [self]) => {
+    const it = r.object(self).iteration; if (it.last < 0) throwNew(r, 'Ljava/lang/IllegalStateException;');
+    const item = it.items[it.last]; it.last = -1; const at = it.queue.items.findIndex(x => sameRef(x, item)); if (at >= 0) it.queue.items.splice(at, 1);
+  });
 
   // ---- ThreadFactory / ThreadPoolExecutor ------------------------------------------------------------------------------------------------------
   type(FACTORY, OBJECT); registry.interfaces.set(FACTORY, []); type(HANDLER, OBJECT); registry.interfaces.set(HANDLER, []);
@@ -534,8 +571,8 @@ export function createConcurrencyHost(platform) {
     const c = r.object(self).condition, thread = r.thread ?? r.scheduler.mainThread(), lock = c.lock;
     if (lock.owner !== thread) throwNew(r, 'Ljava/lang/IllegalMonitorStateException;');
     if (!uninterruptible && thread.interrupted) { thread.interrupted = false; throwNew(r, 'Ljava/lang/InterruptedException;'); }
-    const waiter = { signalled: false }, holds = lock.holds; c.waiters.push(waiter); lock.owner = null; lock.holds = 0;
-    const reacquire = outcome => lock.owner === null ? (lock.owner = thread, lock.holds = holds, outcome()) : new Blocked({ reason: 'Condition.await (reacquiring the lock)', ready: () => lock.owner === null, finish: () => reacquire(outcome) });
+    const waiter = { signalled: false, thread }, holds = lock.holds; c.waiters.push(waiter); lock.owner = null; lock.holds = 0;
+    const reacquire = outcome => { if (lock.owner === null) { lock.owner = thread; lock.holds = holds; return outcome(); } const blocked = new Blocked({ reason: 'Condition.await (reacquiring the lock)', ready: () => lock.owner === null, finish: () => reacquire(outcome) }); blocked.lockState = lock; return blocked; };
     return new Blocked({ reason: 'Condition.await', ready: () => waiter.signalled, interruptible: !uninterruptible, deadline: timeoutMs === Infinity ? Infinity : platform.clock.now() + timeoutMs, finish: timedOut => {
       const index = c.waiters.indexOf(waiter); if (index >= 0) c.waiters.splice(index, 1);
       return reacquire(() => { if (!uninterruptible && !waiter.signalled && thread.interrupted) { thread.interrupted = false; throwNew(r, 'Ljava/lang/InterruptedException;'); } return result(waiter.signalled, timedOut); });
@@ -547,6 +584,27 @@ export function createConcurrencyHost(platform) {
   def(CONDITION_OBJECT, 'awaitNanos', '(J)J', (r, _m, [self, nanos]) => { const start = platform.clock.now(); return conditionAwait(r, self, { timeoutMs: Math.max(0, Number(nanos) / 1e6), result: () => nanos - BigInt(Math.round((platform.clock.now() - start) * 1e6)) }); });
   def(CONDITION_OBJECT, 'signal', '()V', (r, _m, [self]) => { const c = r.object(self).condition; if (c.lock.owner !== (r.thread ?? r.scheduler.mainThread())) throwNew(r, 'Ljava/lang/IllegalMonitorStateException;'); const w = c.waiters.shift(); if (w) w.signalled = true; });
   def(CONDITION_OBJECT, 'signalAll', '()V', (r, _m, [self]) => { const c = r.object(self).condition; if (c.lock.owner !== (r.thread ?? r.scheduler.mainThread())) throwNew(r, 'Ljava/lang/IllegalMonitorStateException;'); for (const w of c.waiters.splice(0)) w.signalled = true; });
+
+  // ReentrantLock monitoring (AbstractQueuedSynchronizer): the owner, and the threads parked for the lock (blocked on lock() or re-acquiring after Condition.await) and on a Condition.
+  const lockStateOf = (r, ref) => r.object(ref).lockState ?? throwNew(r, 'Ljava/lang/IllegalStateException;', 'ReentrantLock used before constructor');
+  const threadObject = (r, thread) => thread.javaObject ?? (r.mainThread ??= r.makeObject('Ljava/lang/Thread;'));
+  const lockQueue = (r, lock) => r.scheduler.threads.filter(thread => thread.state === 'blocked' && thread.blocked?.lockState === lock);
+  const threadList = (r, threads) => { const list = r.allocate('Ljava/util/ArrayList;'); r.dispatch({ owner: 'Ljava/util/ArrayList;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [list], 'direct'); for (const thread of threads) vcall(r, list, 'Ljava/util/ArrayList;', 'add', [OBJECT], 'Z', [threadObject(r, thread)]); return list; };
+  const conditionOf = (r, lock, condition) => {
+    if (condition === null) throwNew(r, 'Ljava/lang/NullPointerException;');
+    const c = r.object(condition).condition; if (!c) throwNew(r, 'Ljava/lang/IllegalArgumentException;', 'not owner');
+    if (c.lock !== lock) throwNew(r, 'Ljava/lang/IllegalArgumentException;', 'not owner');
+    if (lock.owner !== (r.thread ?? r.scheduler.mainThread())) throwNew(r, 'Ljava/lang/IllegalMonitorStateException;');
+    return c;
+  };
+  def(LOCK_CLASS, 'getOwner', '()Ljava/lang/Thread;', (r, _m, [self]) => { const lock = lockStateOf(r, self); return lock.owner === null ? null : threadObject(r, lock.owner); });
+  def(LOCK_CLASS, 'getQueueLength', '()I', (r, _m, [self]) => lockQueue(r, lockStateOf(r, self)).length);
+  def(LOCK_CLASS, 'hasQueuedThreads', '()Z', (r, _m, [self]) => lockQueue(r, lockStateOf(r, self)).length ? 1 : 0);
+  def(LOCK_CLASS, 'hasQueuedThread', '(Ljava/lang/Thread;)Z', (r, _m, [self, thread]) => { if (thread === null) throwNew(r, 'Ljava/lang/NullPointerException;'); return lockQueue(r, lockStateOf(r, self)).some(t => threadObject(r, t).ref === thread.ref) ? 1 : 0; });
+  def(LOCK_CLASS, 'getQueuedThreads', `()${COLLECTION}`, (r, _m, [self]) => threadList(r, lockQueue(r, lockStateOf(r, self))));
+  def(LOCK_CLASS, 'hasWaiters', `(${CONDITION})Z`, (r, _m, [self, condition]) => conditionOf(r, lockStateOf(r, self), condition).waiters.length ? 1 : 0);
+  def(LOCK_CLASS, 'getWaitQueueLength', `(${CONDITION})I`, (r, _m, [self, condition]) => conditionOf(r, lockStateOf(r, self), condition).waiters.length);
+  def(LOCK_CLASS, 'getWaitingThreads', `(${CONDITION})${COLLECTION}`, (r, _m, [self, condition]) => threadList(r, conditionOf(r, lockStateOf(r, self), condition).waiters.map(waiter => waiter.thread)));
 
   // ---- AtomicMarkableReference / AtomicStampedReference (a single thread runs at a time, so compare-and-set is a plain compare + assign) ------------------------
   for (const [owner, code, getter] of [['Ljava/util/concurrent/atomic/AtomicMarkableReference;', 'Z', 'isMarked'], ['Ljava/util/concurrent/atomic/AtomicStampedReference;', 'I', 'getStamp']]) {

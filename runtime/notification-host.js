@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=79e2ded60c95';
-import { createHostRegistry } from './host-contract.js?v=79e2ded60c95';
+import { APKError } from './apk-error.js?v=d8da3b335496';
+import { createHostRegistry } from './host-contract.js?v=d8da3b335496';
 
 // android.app.Notification, Notification.Builder / Action / BigTextStyle / BigPictureStyle / InboxStyle, NotificationChannel and android.graphics.drawable.Icon (android-13.0.0_r1).
 // None of these is in the framework DEX. The Builder is a recorder, exactly as in Notification.java: every setter stores a value and build() writes the public fields of
@@ -24,9 +24,9 @@ export function createNotificationHost(platform) {
   const registry = createHostRegistry(), { def, type } = registry;
   const call = (r, receiver, owner, name, parameters, result, args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...args], 'virtual');
   const text = (r, v) => v === null ? null : r.stringCharacters(v);
-  for (const owner of [NOTIFICATION, BUILDER, ACTION, ACTION_BUILDER, STYLE, BIG_TEXT, BIG_PICTURE, INBOX, CHANNEL, ICON]) type(owner, OBJECT, [], { allocatable: true });
+  for (const owner of [NOTIFICATION, BUILDER, ACTION, ACTION_BUILDER, STYLE, BIG_TEXT, BIG_PICTURE, INBOX, CHANNEL, 'Landroid/app/NotificationChannelGroup;', ICON]) type(owner, OBJECT, [], { allocatable: true });
   for (const style of [BIG_TEXT, BIG_PICTURE, INBOX]) type(style, STYLE, [], { allocatable: true });
-  registry.interfaces.set(NOTIFICATION, ['Landroid/os/Parcelable;']); registry.interfaces.set(CHANNEL, ['Landroid/os/Parcelable;']); registry.interfaces.set(ICON, ['Landroid/os/Parcelable;']);
+  registry.interfaces.set(NOTIFICATION, ['Landroid/os/Parcelable;']); registry.interfaces.set(CHANNEL, ['Landroid/os/Parcelable;']); registry.interfaces.set('Landroid/app/NotificationChannelGroup;', ['Landroid/os/Parcelable;']); registry.interfaces.set(ICON, ['Landroid/os/Parcelable;']);
   for (const [name, value] of Object.entries(EXTRAS)) registry.staticField(NOTIFICATION, name, STRING, () => value);
   for (const [name, value] of Object.entries(CATEGORIES)) registry.staticField(NOTIFICATION, name, STRING, () => value);
   for (const [name, value] of Object.entries(FLAGS)) registry.staticField(NOTIFICATION, name, 'I', () => value);
@@ -67,6 +67,19 @@ export function createNotificationHost(platform) {
   def(CHANNEL, 'enableLights', '(Z)V', (r, _m, [self, v]) => { channel(r, self).lights = !!v; }); def(CHANNEL, 'shouldShowLights', '()Z', (r, _m, [self]) => channel(r, self).lights ? 1 : 0);
   def(CHANNEL, 'enableVibration', '(Z)V', (r, _m, [self, v]) => { channel(r, self).vibration = !!v; }); def(CHANNEL, 'shouldVibrate', '()Z', (r, _m, [self]) => channel(r, self).vibration ? 1 : 0);
   def(CHANNEL, 'setSound', `(${URI}Landroid/media/AudioAttributes;)V`, (r, _m, [self, uri]) => { channel(r, self).sound = uri; }); def(CHANNEL, 'getSound', `()${URI}`, (r, _m, [self]) => channel(r, self).sound);
+
+  // ---- NotificationChannelGroup (frameworks/base NotificationChannelGroup.java) -----------------------------------------------------------------------
+  const GROUP = 'Landroid/app/NotificationChannelGroup;', LIST = 'Ljava/util/List;';
+  const group = (r, ref) => r.object(ref).channelGroup ?? r.throwJava('Ljava/lang/IllegalStateException;', 'NotificationChannelGroup used before construction');
+  const trimmed = (r, value) => value === null ? null : r.stringCharacters(value).slice(0, 40);   // getTrimmedString: ids and names are cut to MAX_TEXT_LENGTH (1000) -- ids to 40 chars in Channel/Group
+  def(GROUP, '<init>', `(${STRING}${CHARS})V`, (r, _m, [self, id, name]) => { r.object(self).channelGroup = { id: id === null ? null : r.stringCharacters(id).slice(0, 1000), name: name === null ? null : r.javaString(name).slice(0, 1000), description: null, blocked: false, channels: null }; });
+  def(GROUP, 'getId', `()${STRING}`, (r, _m, [self]) => group(r, self).id); def(GROUP, 'getName', `()${CHARS}`, (r, _m, [self]) => group(r, self).name);
+  def(GROUP, 'getDescription', `()${STRING}`, (r, _m, [self]) => group(r, self).description); def(GROUP, 'setDescription', `(${STRING})V`, (r, _m, [self, v]) => { group(r, self).description = v === null ? null : r.stringCharacters(v).slice(0, 1000); });
+  def(GROUP, 'isBlocked', '()Z', (r, _m, [self]) => group(r, self).blocked ? 1 : 0);
+  def(GROUP, 'getChannels', `()${LIST}`, (r, _m, [self]) => group(r, self).channels ?? r.dispatch({ owner: 'Ljava/util/Collections;', name: 'emptyList', parameters: [], result: LIST, signature: `()${LIST}` }, [], 'static'));
+  def(GROUP, 'setChannels', `(${LIST})V`, (r, _m, [self, channels]) => { group(r, self).channels = channels; });
+  def(GROUP, 'toString', `()${STRING}`, (r, _m, [self]) => { const g = group(r, self); return `NotificationChannelGroup{mId='${g.id}', mName=${g.name === null ? 'null' : g.name}, mDescription=${g.description === null ? 'null' : '(' + g.description.length + ')'}, mBlocked=${g.blocked}}`; });
+  void trimmed;
 
   // ---- Notification, Action ---------------------------------------------------------------------------------------------------------------------------
   const fieldKey = (name, t) => `${NOTIFICATION}->${name}:${t}`;

@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=79e2ded60c95';
-import { APKError } from './apk-error.js?v=79e2ded60c95';
-import { createHostRegistry } from './host-contract.js?v=79e2ded60c95';
-import { getVectorGraphics } from './vector-native.js?v=79e2ded60c95';
+import { gcRoot } from './heap-gc.js?v=d8da3b335496';
+import { APKError } from './apk-error.js?v=d8da3b335496';
+import { createHostRegistry } from './host-contract.js?v=d8da3b335496';
+import { getVectorGraphics } from './vector-native.js?v=d8da3b335496';
 
 // android.graphics.BitmapFactory (+ Options), Bitmap.CompressFormat and the Bitmap operations on top of the recorded-canvas Bitmap of bitmap-host.js: decoding PNG/JPEG/GIF/WebP/BMP
 // with the official Skia codecs (CanvasKit), inSampleSize / density scaling / inJustDecodeBounds / inBitmap reuse as in frameworks/base BitmapFactory.cpp, pixel access
@@ -140,15 +140,17 @@ export function createBitmapCodecHost(platform) {
   // Resources: the density of a drawable file comes from its resource directory qualifier (aapt2 stores it in the entry's config; the TypedValue carries it).
   const DPI = { ldpi: 120, mdpi: 160, tvdpi: 213, hdpi: 240, xhdpi: 320, xxhdpi: 480, xxxhdpi: 640 };
   const densityOfPath = path => { const dir = path.split('/').slice(-2, -1)[0] ?? ''; for (const q of dir.split('-')) if (q === 'nodpi') return DENSITY_NONE; else if (DPI[q]) return DPI[q]; return 0; };
-  const resourcePath = (r, id) => {
+  /** The file entry a resource id selects on this device: { path, density } -- density from the selected variant's ResTable_config (u16 at byte 14: 0 = unqualified = mdpi, 0xffff = nodpi), else from the directory qualifier. */
+  const resourceFile = (r, id) => {
     let value = platform.resources.resolve(id >>> 0); while (value.resolved) value = value.resolved;
     if (value.kind === 'unresolved' || typeof value.value !== 'string' || !r.apkEntries.has(value.value)) return null;
-    return value.value;
+    const bytes = value.config?.bytes, qualified = bytes && bytes.length >= 16 ? bytes[14] | (bytes[15] << 8) : 0;
+    return { path: value.value, density: qualified || densityOfPath(value.value) };
   };
+  const densityDefaults = density => ({ inDensity: density === 0 ? DENSITY_DEFAULT : density === DENSITY_NONE ? 0 : density, inTargetDensity: DENSITY_DEFAULT });
   const decodeResource = (r, resourceId, options) => {
-    const path = resourcePath(r, resourceId); if (path === null) return null;
-    const density = densityOfPath(path), defaults = { inDensity: density === 0 ? DENSITY_DEFAULT : density === DENSITY_NONE ? 0 : density, inTargetDensity: DENSITY_DEFAULT };
-    return decode(r, Uint8Array.from(r.apkReader(path)), options, null, defaults);
+    const file = resourceFile(r, resourceId); if (file === null) return null;
+    return decode(r, Uint8Array.from(r.apkReader(file.path)), options, null, densityDefaults(file.density));
   };
   def(FACTORY, 'decodeResource', `(${RESOURCES}I${OPTIONS})${BITMAP}`, (r, _m, [, id, options]) => decodeResource(r, id, options), { static: true });
   def(FACTORY, 'decodeResource', `(${RESOURCES}I)${BITMAP}`, (r, _m, [, id]) => decodeResource(r, id, null), { static: true });
@@ -288,5 +290,5 @@ export function createBitmapCodecHost(platform) {
   def(BITMAP, 'setHeight', '(I)V', (r, _m, [self, height]) => { const s = state(r, self); const canvas = getVectorGraphics(r).get(s.handle, 'canvas'); canvas.draws.length = 0; canvas.height = height; s.height = height; });
   def(BITMAP, 'getNinePatchChunk', '()[B', () => null);
   def(BITMAP, 'setConfig', `(${CONFIG})V`, (r, _m, [self, config]) => { const s = state(r, self); if (config !== null && r.object(config).enumName !== 'ARGB_8888') fail('Bitmap.setConfig is only implemented for ARGB_8888'); });
-  return { ...registry, interfaces: registry.interfacesOf };
+  return { ...registry, interfaces: registry.interfacesOf, resourceFile, densityDefaults, decodeBytes: decode, DENSITY_DEFAULT, DENSITY_NONE };
 }

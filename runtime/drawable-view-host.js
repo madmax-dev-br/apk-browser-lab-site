@@ -1,13 +1,13 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=79e2ded60c95';
-import { APKError } from './apk-runtime.js?v=79e2ded60c95';
-import { getVectorGraphics } from './vector-native.js?v=79e2ded60c95';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=79e2ded60c95';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=79e2ded60c95';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=d8da3b335496';
+import { APKError } from './apk-runtime.js?v=d8da3b335496';
+import { getVectorGraphics } from './vector-native.js?v=d8da3b335496';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=d8da3b335496';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=d8da3b335496';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
 add(IMAGE, ['setImageState([IZ)V', 'onCreateDrawableState(I)[I', 'drawableStateChanged()V', '<init>(Landroid/content/Context;)V', '<init>(Landroid/content/Context;Landroid/util/AttributeSet;)V', '<init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V', '<init>(Landroid/content/Context;Landroid/util/AttributeSet;II)V', 'setImageResource(I)V', 'setImageDrawable(Landroid/graphics/drawable/Drawable;)V', 'getDrawable()Landroid/graphics/drawable/Drawable;', 'setImageAlpha(I)V', 'setAlpha(I)V']);
-add(VIEW, ['getDrawableState()[I', 'onCreateDrawableState(I)[I', 'mergeDrawableStates([I[I)[I', 'refreshDrawableState()V', 'drawableStateChanged()V', 'setForeground(Landroid/graphics/drawable/Drawable;)V', 'getForeground()Landroid/graphics/drawable/Drawable;', 'invalidate()V', 'setBackground(Landroid/graphics/drawable/Drawable;)V', 'setBackgroundDrawable(Landroid/graphics/drawable/Drawable;)V', 'setBackgroundResource(I)V', 'getBackground()Landroid/graphics/drawable/Drawable;', 'invalidateDrawable(Landroid/graphics/drawable/Drawable;)V', 'verifyDrawable(Landroid/graphics/drawable/Drawable;)Z', 'setContentDescription(Ljava/lang/CharSequence;)V', 'getContentDescription()Ljava/lang/CharSequence;']);
+add(VIEW, ['getDrawableState()[I', 'onCreateDrawableState(I)[I', 'mergeDrawableStates([I[I)[I', 'refreshDrawableState()V', 'drawableStateChanged()V', 'setForeground(Landroid/graphics/drawable/Drawable;)V', 'getForeground()Landroid/graphics/drawable/Drawable;', 'invalidate()V', 'postInvalidate()V', 'postInvalidateOnAnimation()V', 'setBackground(Landroid/graphics/drawable/Drawable;)V', 'setBackgroundDrawable(Landroid/graphics/drawable/Drawable;)V', 'setBackgroundResource(I)V', 'getBackground()Landroid/graphics/drawable/Drawable;', 'invalidateDrawable(Landroid/graphics/drawable/Drawable;)V', 'verifyDrawable(Landroid/graphics/drawable/Drawable;)Z', 'setContentDescription(Ljava/lang/CharSequence;)V', 'getContentDescription()Ljava/lang/CharSequence;']);
 add(VIEW, ['scheduleDrawable(Landroid/graphics/drawable/Drawable;Ljava/lang/Runnable;J)V', 'unscheduleDrawable(Landroid/graphics/drawable/Drawable;Ljava/lang/Runnable;)V', 'unscheduleDrawable(Landroid/graphics/drawable/Drawable;)V']);
 add(VIEW, ['setPressed(Z)V', 'isPressed()Z', 'setStateListAnimator(Landroid/animation/StateListAnimator;)V', 'getStateListAnimator()Landroid/animation/StateListAnimator;', 'jumpDrawablesToCurrentState()V']);
 add(COMPOUND,[`setButtonDrawable(${DRAWABLE})V`,'setButtonDrawable(I)V',`getButtonDrawable()${DRAWABLE}`,`setButtonTintList(${TINT})V`,`getButtonTintList()${TINT}`,`setButtonTintMode(${MODE})V`,`getButtonTintMode()${MODE}`,`setButtonTintBlendMode(${BLEND})V`,`getButtonTintBlendMode()${BLEND}`,'getCompoundPaddingLeft()I','getCompoundPaddingRight()I']);
@@ -151,6 +151,7 @@ export function createDrawableViewHost(platform) {
       else if(reference.kind!=='null')fail('XML foreground requires a real color or Drawable resource');
       return setDrawable(runtime,receiver,'foregroundDrawable',drawable);
     },
+    createNinePatchDrawable: (runtime, bytes, scale) => ninePatch.create(runtime, bytes, scale),
     supports: key => keys.has(key) || ninePatch.supports(key) || switchHost.supports(key), canAllocate: type => type === IMAGE || ninePatch.canAllocate(type),
     parent: type => type === IMAGE ? VIEW : ninePatch.parent(type),
     interfaces: type => type === VIEW || type === IMAGE ? ['Landroid/graphics/drawable/Drawable$Callback;'] : [],
@@ -214,7 +215,7 @@ export function createDrawableViewHost(platform) {
         return;
       }
       if (name === 'jumpDrawablesToCurrentState') { for (const drawable of [view.backgroundDrawable, view.foregroundDrawable, view.buttonDrawable]) if (drawable) dispatch(runtime, DRAWABLE, 'jumpToCurrentState', [], 'V', drawable); if (view.stateListAnimator) dispatch(runtime, 'Landroid/animation/StateListAnimator;', 'jumpToCurrentState', [], 'V', view.stateListAnimator); switchHost.jump(runtime, args[0]); return; }
-      if (name === 'invalidate') return platform.requestDraw(runtime, args[0]);
+      if (name === 'invalidate' || name === 'postInvalidate' || name === 'postInvalidateOnAnimation') return platform.requestDraw(runtime, args[0]);   // a draw request is coalesced with the next frame
       if (name === 'setForeground') return setDrawable(runtime,args[0],'foregroundDrawable',args[1]);
       if (name === 'getForeground') return view.foregroundDrawable || null;
       if (name === 'getDrawable') return view.imageDrawable || null;

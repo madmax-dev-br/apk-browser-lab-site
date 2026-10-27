@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=79e2ded60c95';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=79e2ded60c95';
+import { APKError } from './apk-runtime.js?v=d8da3b335496';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=d8da3b335496';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -14,7 +14,6 @@ for(const signature of ['getWindowToken()Landroid/os/IBinder;','getApplicationWi
 for(const signature of ['hasFocusable()Z','hasExplicitFocusable()Z','getDisplay()Landroid/view/Display;','isInTouchMode()Z','isFocused()Z','hasFocus()Z','findFocus()Landroid/view/View;','clearFocus()V','requestFocus()Z','requestFocus(I)Z','requestFocus(ILandroid/graphics/Rect;)Z','requestFocusFromTouch()Z','isFocusable()Z','isFocusableInTouchMode()Z','setFocusable(Z)V','setFocusable(I)V','setFocusableInTouchMode(Z)V','setOnFocusChangeListener(Landroid/view/View$OnFocusChangeListener;)V','getOnFocusChangeListener()Landroid/view/View$OnFocusChangeListener;','onFocusChanged(ZILandroid/graphics/Rect;)V'])keys.add(VIEW+'->'+signature);
 for(const signature of ['getFocusedChild()Landroid/view/View;','setDescendantFocusability(I)V','getDescendantFocusability()I'])keys.add('Landroid/view/ViewGroup;->'+signature);
 for(const signature of ['getInstance()Landroid/view/Choreographer;','postFrameCallback(Landroid/view/Choreographer$FrameCallback;)V','postFrameCallbackDelayed(Landroid/view/Choreographer$FrameCallback;J)V','removeFrameCallback(Landroid/view/Choreographer$FrameCallback;)V','postCallback(ILjava/lang/Runnable;Ljava/lang/Object;)V','postCallbackDelayed(ILjava/lang/Runnable;Ljava/lang/Object;J)V','removeCallbacks(ILjava/lang/Runnable;Ljava/lang/Object;)V','getFrameTimeNanos()J','getFrameTime()J','getFrameIntervalNanos()J'])keys.add(CHOREOGRAPHER+'->'+signature);
-for(const signature of ['getDisplayId()I','getRefreshRate()F','isValid()Z','getRotation()I','getName()Ljava/lang/String;'])keys.add(DISPLAY+'->'+signature);
 const floatView=new DataView(new ArrayBuffer(4));const floatBits=value=>{floatView.setFloat32(0,value,true);return floatView.getInt32(0,true);};
 for(const signature of ['getFrameDelay()J','setFrameDelay(J)V'])keys.add(CHOREOGRAPHER+'->'+signature);
 const error=message=>{throw new APKError(message,{kind:'window-frame-unsupported'});};
@@ -106,7 +105,7 @@ export function createViewWindowHost(platform){
     // AOSP View's process-wide 24-bit ID space; this VM has one Java thread.
     const value=platform.nextGeneratedViewId??1;platform.nextGeneratedViewId=value===0x00ffffff?1:value+1;return value;
    }
-   if(method.owner===DISPLAY){const info=runtime.object(receiver).virtualDisplay;if(!info)error('Display is not the configured virtual display');if(name==='getDisplayId')return info.id;if(name==='getRefreshRate')return floatBits(info.refreshRate);if(name==='isValid')return info.valid?1:0;if(name==='getRotation')return info.rotation;if(name==='getName')return info.name;error('Unsupported Display API '+name);}
+
 
    if(method.owner===CHOREOGRAPHER){
     if(name==='getFrameDelay')return legacyFrameDelay;
@@ -124,7 +123,7 @@ export function createViewWindowHost(platform){
    const view=runtime.object(receiver);
    if(name==='findOnBackInvokedDispatcher'){const frame=frameOf(runtime,receiver);return frame?platform.backDispatcher.forOwner(runtime,frame.activity):null;}   // View.findOnBackInvokedDispatcher: the dispatcher of the window the View is attached to, null when detached
    if(name==='isHardwareAccelerated')return 0; // This window draws through the verified Skia CPU surface, with no HWUI/GPU window.
-   if(name==='getDisplay'){if(!isAttached(runtime,receiver))return null;if(!display){display=runtime.makeObject(DISPLAY);runtime.object(display).virtualDisplay={id:0,refreshRate:60,rotation:0,valid:true,name:'APK Web virtual display 0'};runtime.record('DISPLAY 0 @60Hz [declared web-device profile; no Android host telemetry]');}return display;}
+   if(name==='getDisplay'){if(!isAttached(runtime,receiver))return null;return platform.displayHost.get(runtime);}
    if(name==='isInTouchMode')return isAttached(runtime,receiver)&&inTouchMode?1:0;
    if(name==='hasFocusable'||name==='hasExplicitFocusable')return hasFocusable(runtime,receiver,name==='hasExplicitFocusable');
    if(name==='getFocusedChild'){for(const child of view.children??[])if(findFocus(runtime,child))return child;return null;}

@@ -508,10 +508,14 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 3891320,
-  "sha256": "a6b4627d1870a79e9decf3a1e0a61d5485637d87154cc12bb79670258a5dc0b8",
-  "classCount": 2781,
+  "bytes": 4006372,
+  "sha256": "2effd1ff50c8d673e5c52f6c55bcd65bd3df8efe843edd02d43e6b76807800b4",
+  "classCount": 2846,
   "classes": [
+    "Landroid/os/Parcelable$Creator;",
+    "Landroid/accounts/Account$1;",
+    "Landroid/os/Parcelable;",
+    "Landroid/accounts/Account;",
     "Landroid/animation/AnimationHandler$$ExternalSyntheticLambda0;",
     "Landroid/animation/AnimationHandler$1;",
     "Landroid/animation/AnimationHandler$2;",
@@ -587,15 +591,15 @@
     "Landroid/app/Dialog$ListenersHandler;",
     "Landroid/view/KeyEvent$Callback;",
     "Landroid/app/Dialog;",
+    "Landroid/app/usage/StorageStats$1;",
+    "Landroid/app/usage/StorageStats;",
     "Landroid/compat/Compatibility$BehaviorChangeDelegate;",
     "Landroid/compat/Compatibility$1;",
     "Landroid/compat/Compatibility$ChangeConfig;",
     "Landroid/compat/Compatibility$OverrideCallbacks;",
     "Landroid/compat/Compatibility;",
-    "Landroid/os/Parcelable$Creator;",
     "Landroid/content/ClipData$1;",
     "Landroid/content/ClipData$Item;",
-    "Landroid/os/Parcelable;",
     "Landroid/content/ClipData;",
     "Landroid/content/ClipDescription$1;",
     "Landroid/content/ClipDescription$ClassificationStatus;",
@@ -618,6 +622,15 @@
     "Landroid/content/pm/ActivityInfo$SizeChangesSupportMode;",
     "Landroid/content/pm/ActivityInfo$WindowLayout;",
     "Landroid/content/pm/ActivityInfo;",
+    "Ljava/util/function/BiConsumer;",
+    "Landroid/content/pm/ShortcutInfo$$ExternalSyntheticLambda0;",
+    "Landroid/content/pm/ShortcutInfo$1;",
+    "Landroid/content/pm/ShortcutInfo$Builder;",
+    "Landroid/content/pm/ShortcutInfo$CloneFlags;",
+    "Landroid/content/pm/ShortcutInfo$DisabledReason;",
+    "Landroid/content/pm/ShortcutInfo$ShortcutFlags;",
+    "Landroid/content/pm/ShortcutInfo$Surface;",
+    "Landroid/content/pm/ShortcutInfo;",
     "Landroid/content/res/ColorStateList$1;",
     "Landroid/content/res/ColorStateList$ColorStateListFactory;",
     "Landroid/content/res/ComplexColor;",
@@ -928,6 +941,17 @@
     "Landroid/location/Location$BearingDistanceCache;",
     "Landroid/location/Location$Format;",
     "Landroid/location/Location;",
+    "Landroid/os/AsyncTask$1;",
+    "Landroid/os/AsyncTask$2;",
+    "Landroid/os/AsyncTask$WorkerRunnable;",
+    "Landroid/os/AsyncTask$3;",
+    "Landroid/os/AsyncTask$4;",
+    "Landroid/os/AsyncTask$AsyncTaskResult;",
+    "Landroid/os/AsyncTask$InternalHandler;",
+    "Landroid/os/AsyncTask$SerialExecutor$1;",
+    "Landroid/os/AsyncTask$SerialExecutor;",
+    "Landroid/os/AsyncTask$Status;",
+    "Landroid/os/AsyncTask;",
     "Landroid/os/BadParcelableException;",
     "Landroid/os/BadTypeParcelableException;",
     "Landroid/os/CancellationSignal$1;",
@@ -1014,6 +1038,7 @@
     "Landroid/text/BoringLayout;",
     "Landroid/text/CharacterAlgorithms;",
     "Landroid/text/Editable$Factory;",
+    "Ljava/lang/CharSequence;",
     "Landroid/text/GetChars;",
     "Landroid/text/Spanned;",
     "Landroid/text/Spannable;",
@@ -1391,7 +1416,6 @@
     "Lcom/android/internal/util/FastMath;",
     "Lcom/android/internal/util/FunctionalUtils$$ExternalSyntheticLambda0;",
     "Lcom/android/internal/util/FunctionalUtils$RemoteExceptionIgnoringConsumer;",
-    "Ljava/util/function/BiConsumer;",
     "Lcom/android/internal/util/FunctionalUtils$ThrowingBiConsumer;",
     "Lcom/android/internal/util/FunctionalUtils$ThrowingBiFunction;",
     "Lcom/android/internal/util/FunctionalUtils$ThrowingChecked2Consumer;",
@@ -1467,6 +1491,43 @@
     "Ldev/apkweb/net/MainThreadPolicy;",
     "Ldev/apkweb/net/NetBridge;",
     "Ldev/apkweb/os/BundleHidden;",
+    "Ldev/apkweb/pm/PmHidden;",
+    "Ldev/apkweb/util/ArraysOps;",
+    "Ldev/apkweb/util/AtomicBooleanOps;",
+    "Ldev/apkweb/util/AtomicIntegerOps;",
+    "Ldev/apkweb/util/AtomicLongOps;",
+    "Ldev/apkweb/util/AtomicReferenceArrayOps;",
+    "Ldev/apkweb/util/AtomicReferenceOps$$ExternalSyntheticBackportWithForwarding0;",
+    "Ldev/apkweb/util/AtomicReferenceOps;",
+    "Ldev/apkweb/util/BooleanOps;",
+    "Ldev/apkweb/util/BoxOps;",
+    "Ldev/apkweb/util/CaseInsensitiveOrder;",
+    "Ldev/apkweb/util/CharacterOps;",
+    "Ldev/apkweb/util/ChmOps;",
+    "Ldev/apkweb/util/CollectionOps$DescendingIterator;",
+    "Ljava/util/ListIterator;",
+    "Ldev/apkweb/util/CollectionOps$SnapshotIterator;",
+    "Ljava/util/AbstractCollection;",
+    "Ljava/util/List;",
+    "Ljava/util/AbstractList;",
+    "Ljava/util/RandomAccess;",
+    "Ldev/apkweb/util/CollectionOps$SubList;",
+    "Ldev/apkweb/util/CollectionOps;",
+    "Ldev/apkweb/util/IntegerOps;",
+    "Ldev/apkweb/util/LongOps;",
+    "Ldev/apkweb/util/MathOps;",
+    "Ljava/util/function/DoubleSupplier;",
+    "Ldev/apkweb/util/RandomOps$$ExternalSyntheticLambda0;",
+    "Ldev/apkweb/util/RandomOps$$ExternalSyntheticLambda1;",
+    "Ljava/util/function/IntSupplier;",
+    "Ldev/apkweb/util/RandomOps$$ExternalSyntheticLambda2;",
+    "Ldev/apkweb/util/RandomOps$$ExternalSyntheticLambda3;",
+    "Ljava/util/function/LongSupplier;",
+    "Ldev/apkweb/util/RandomOps$$ExternalSyntheticLambda4;",
+    "Ldev/apkweb/util/RandomOps$$ExternalSyntheticLambda5;",
+    "Ldev/apkweb/util/RandomOps;",
+    "Ldev/apkweb/util/StringBuilderOps;",
+    "Ldev/apkweb/util/StringOps;",
     "Ldev/apkweb/view/ViewAnimationHost;",
     "Ldev/apkweb/view/ViewHidden;",
     "Ldev/apkweb/view/WindowAnimationHost;",
@@ -1545,6 +1606,12 @@
     "Ljava/io/UnsupportedEncodingException;",
     "Ljava/io/Writer$1$$ExternalSyntheticBackport0;",
     "Ljava/io/Writer$1;",
+    "Ljava/lang/CharSequence$$ExternalSyntheticLambda0;",
+    "Ljava/lang/CharSequence$$ExternalSyntheticLambda1;",
+    "Ljava/util/PrimitiveIterator;",
+    "Ljava/util/PrimitiveIterator$OfInt;",
+    "Ljava/lang/CharSequence$1CharIterator;",
+    "Ljava/lang/CharSequence$1CodePointIterator;",
     "Ljava/lang/FindBugsSuppressWarnings;",
     "Ljava/lang/Number;",
     "Ljava/lang/ref/Reference;",
@@ -2060,16 +2127,11 @@
     "Ljava/time/zone/ZoneOffsetTransitionRule;",
     "Ljava/time/zone/ZoneRules;",
     "Ljava/time/zone/ZoneRulesException;",
-    "Ljava/util/AbstractCollection;",
     "Ljava/util/AbstractList$1;",
     "Ljava/util/AbstractList$Itr;",
-    "Ljava/util/ListIterator;",
     "Ljava/util/AbstractList$ListItr;",
     "Ljava/util/AbstractList$RandomAccessSpliterator;",
-    "Ljava/util/List;",
-    "Ljava/util/AbstractList;",
     "Ljava/util/AbstractList$SubList;",
-    "Ljava/util/RandomAccess;",
     "Ljava/util/AbstractList$RandomAccessSubList;",
     "Ljava/util/AbstractList$SubList$1;",
     "Ljava/util/AbstractMap$1$1;",
@@ -2287,18 +2349,19 @@
     "Ljava/util/OptionalInt;",
     "Ljava/util/OptionalLong;",
     "Ljava/util/PrimitiveIterator$OfDouble$$ExternalSyntheticLambda0;",
-    "Ljava/util/PrimitiveIterator;",
     "Ljava/util/PrimitiveIterator$OfDouble;",
     "Ljava/util/PrimitiveIterator$OfInt$$ExternalSyntheticLambda0;",
-    "Ljava/util/PrimitiveIterator$OfInt;",
     "Ljava/util/PrimitiveIterator$OfLong$$ExternalSyntheticLambda0;",
     "Ljava/util/PrimitiveIterator$OfLong;",
     "Ljava/util/PriorityQueue$1;",
     "Ljava/util/PriorityQueue$Itr;",
     "Ljava/util/PriorityQueue$PriorityQueueSpliterator;",
     "Ljava/util/PriorityQueue;",
+    "Ljava/util/Properties$LineReader;",
+    "Ljava/util/Properties;",
     "Ljava/util/RegularEnumSet$EnumSetIterator;",
     "Ljava/util/RegularEnumSet;",
+    "Ljava/util/ServiceConfigurationError;",
     "Ljava/util/ServiceLoader$1;",
     "Ljava/util/ServiceLoader$LazyIterator;",
     "Ljava/util/ServiceLoader;",
@@ -2377,7 +2440,13 @@
     "Ljava/util/Vector$ListItr;",
     "Ljava/util/Vector$VectorSpliterator;",
     "Ljava/util/Vector;",
+    "Ljava/util/XMLUtils$1;",
+    "Ljava/util/XMLUtils$EH;",
+    "Ljava/util/XMLUtils$Resolver;",
+    "Ljava/util/XMLUtils;",
     "Ljava/util/concurrent/AbstractExecutorService;",
+    "Ljava/util/concurrent/atomic/AtomicIntegerArray;",
+    "Ljava/util/concurrent/atomic/AtomicLongArray;",
     "Ljava/util/function/BiConsumer$$ExternalSyntheticLambda0;",
     "Ljava/util/function/BiFunction$$ExternalSyntheticLambda0;",
     "Ljava/util/function/BiPredicate;",
@@ -2396,7 +2465,6 @@
     "Ljava/util/function/DoublePredicate$$ExternalSyntheticLambda0;",
     "Ljava/util/function/DoublePredicate$$ExternalSyntheticLambda1;",
     "Ljava/util/function/DoublePredicate$$ExternalSyntheticLambda2;",
-    "Ljava/util/function/DoubleSupplier;",
     "Ljava/util/function/DoubleToIntFunction;",
     "Ljava/util/function/DoubleToLongFunction;",
     "Ljava/util/function/DoubleUnaryOperator;",
@@ -2412,7 +2480,6 @@
     "Ljava/util/function/IntPredicate$$ExternalSyntheticLambda0;",
     "Ljava/util/function/IntPredicate$$ExternalSyntheticLambda1;",
     "Ljava/util/function/IntPredicate$$ExternalSyntheticLambda2;",
-    "Ljava/util/function/IntSupplier;",
     "Ljava/util/function/IntToDoubleFunction;",
     "Ljava/util/function/IntToLongFunction;",
     "Ljava/util/function/IntUnaryOperator;",
@@ -2425,7 +2492,6 @@
     "Ljava/util/function/LongPredicate$$ExternalSyntheticLambda0;",
     "Ljava/util/function/LongPredicate$$ExternalSyntheticLambda1;",
     "Ljava/util/function/LongPredicate$$ExternalSyntheticLambda2;",
-    "Ljava/util/function/LongSupplier;",
     "Ljava/util/function/LongToDoubleFunction;",
     "Ljava/util/function/LongToIntFunction;",
     "Ljava/util/function/LongUnaryOperator;",
@@ -2729,7 +2795,6 @@
     "Ljava/util/stream/LongPipeline$9;",
     "Ljava/util/stream/LongPipeline$Head;",
     "Ljava/util/stream/LongPipeline$StatefulOp;",
-    "Ljava/util/stream/LongStream$$ExternalSyntheticBackport0;",
     "Ljava/util/stream/LongStream$1;",
     "Ljava/util/stream/LongStream$Builder;",
     "Ljava/util/stream/MatchOps$$ExternalSyntheticLambda0;",
@@ -3613,6 +3678,9 @@
       "ScrollView": [
         "fillViewport"
       ],
+      "HorizontalScrollView": [
+        "fillViewport"
+      ],
       "EdgeEffect": [
         "colorEdgeEffect"
       ],
@@ -3731,6 +3799,7 @@
       "AnimationDrawable": {},
       "AnimationDrawableItem": {},
       "ScrollView": {},
+      "HorizontalScrollView": {},
       "EdgeEffect": {},
       "AnimatedVectorDrawable": {},
       "AnimatedVectorDrawableTarget": {},
@@ -3753,8 +3822,8 @@
     "resourceProfilePath": "assets/framework-resources/framework-resources.json",
     "resourceProfileSha256": "158aaa38c505a747927941fcf26839225ca5864e06c1ad0bf3cc04afe3b57487",
     "aapt2": "$ANDROID_SDK/build-tools/36.1.0/aapt2",
-    "inputXmlSha256": "0d51843103cbd561b43820e9d137a4630657c878fd604438174a4afb1e2da0db",
-    "generatedRJavaSha256": "d591097206e0b6f42dd94a343edaa17e8292bb208eac2ceb5ad78fe5dbfa82d3",
+    "inputXmlSha256": "af4c8ed3018a3e6b89425fadc3742c89174997e308576612a64d2a7ba1e53704",
+    "generatedRJavaSha256": "9767a72a932f2af6d25bf15cced45fad5c4b1f738d9acee8d42430eb092ab14f",
     "adaptations": [
       "All styleable memberships are copied from complete selected original AOSP13 declare-styleable elements.",
       "AAPT2 independently verifies every public ID and numeric array/index ordering against the actual runtime ARSC profile.",
@@ -14981,6 +15050,86 @@
       "sha256": "d067f213bc7cf9358390a1efa0b6566327d031e2cee30d814cf593cf480fc82b",
       "bytes": 3699,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/content/pm/ShortcutInfo.java",
+      "localPath": "framework-aosp/upstream/android/content/pm/ShortcutInfo.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/pm/ShortcutInfo.java?format=TEXT",
+      "sha256": "e3e76ea6965420adde34f1f67167ddf183903f434a9c64e54c5326dd252fadf4",
+      "bytes": 88198,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/app/usage/StorageStats.java",
+      "localPath": "framework-aosp/upstream/android/app/usage/StorageStats.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/usage/StorageStats.java?format=TEXT",
+      "sha256": "7a5db65a56bcfd9c03be3ce32046c3b5e787f65459e2acc23ef69f071149a3f2",
+      "bytes": 4091,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/accounts/Account.java",
+      "localPath": "framework-aosp/upstream/android/accounts/Account.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/Account.java?format=TEXT",
+      "sha256": "912a5679ae83cb547ae9af9be40ae36cdf50e6d44e9245a80f9a31a23a1a83ed",
+      "bytes": 6146,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/AsyncTask.java",
+      "localPath": "framework-aosp/upstream/android/os/AsyncTask.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/AsyncTask.java?format=TEXT",
+      "sha256": "358b9cff5b1b7fb38d9b5e79c05f2a39713e16e5afdcb67730ce96d3be0edcb5",
+      "bytes": 32655,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/Properties.java",
+      "localPath": "framework-aosp/upstream/java/util/Properties.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/Properties.java?format=TEXT",
+      "sha256": "75720107e24c9a22c86836746988945eaf362d80e50955ca601dbdb0dcc7cb34",
+      "bytes": 50949,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/XMLUtils.java",
+      "localPath": "framework-aosp/upstream/java/util/XMLUtils.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/XMLUtils.java?format=TEXT",
+      "sha256": "9b83c2af4c2bc98367192a5a55f406111f94b9ebaf099b1adc764550604d71f4",
+      "bytes": 8078,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/lang/CharSequence.java",
+      "localPath": "framework-aosp/upstream/java/lang/CharSequence.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/CharSequence.java?format=TEXT",
+      "sha256": "8b3a302f13b2689a062936079202194f8967ccf27b256da396d4f6c95cd4726a",
+      "bytes": 8969,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/ServiceConfigurationError.java",
+      "localPath": "framework-aosp/upstream/java/util/ServiceConfigurationError.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/ServiceConfigurationError.java?format=TEXT",
+      "sha256": "72eefa68ada402ce3ed297c4142f5becb42c1efa6484a6d8f93e39c1bc86722a",
+      "bytes": 2170,
+      "license": "Apache-2.0"
     }
   ],
   "algorithmPatches": [],
@@ -15111,6 +15260,18 @@
         "kind": "java9-anonymous-diamond-to-explicit-type-argument",
         "inputSha256": "ffbc18eeb48a265b0e360bdd7373fd609f3e617f971f161caf3d3df047da2561",
         "outputSha256": "877027f10333c5cd0a40a161b61df2172f635c53b2663200f63f7d649aabe7cf"
+      },
+      {
+        "path": "android/content/pm/ShortcutInfo.java",
+        "kind": "hidden-members-to-lab-helper-and-explicit-unsupported",
+        "inputSha256": "e3e76ea6965420adde34f1f67167ddf183903f434a9c64e54c5326dd252fadf4",
+        "outputSha256": "0bd4263bea4800379cbdc3490f816df88140b47e28b9ca2f0a91a7caa39a5112"
+      },
+      {
+        "path": "android/accounts/Account.java",
+        "kind": "binder-account-access-note-removed",
+        "inputSha256": "912a5679ae83cb547ae9af9be40ae36cdf50e6d44e9245a80f9a31a23a1a83ed",
+        "outputSha256": "8e13ad9dee879d430ec67849f4f8cb37a9fd5a18fb0a7fee448be5abdc159b3d"
       }
     ],
     "labAuthored": [
@@ -15172,7 +15333,83 @@
       },
       {
         "path": "framework-aosp/lab-java/dev/apkweb/os/BundleHidden.java",
-        "sha256": "dc6b74a66d42e4252e7a6f063101cc9623800748a40c2162ce0edb5048b6178c"
+        "sha256": "9ebf33d15978a4c11d916379f804c455363c6bd4b9f4efa010375b8d9e23a8bf"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/pm/PmHidden.java",
+        "sha256": "167332621f54edd765e5f7b9af993582e1f368b16591b13fb3039fd8dbafe9f4"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/ArraysOps.java",
+        "sha256": "8aff7aaab095233eb13450889846009181b154240133f4f30e79a2cc9c8d1794"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/AtomicBooleanOps.java",
+        "sha256": "96053aa67f7aa07c8c5c3b601f14f12dff49b9e99ff5ba4d31e658b41b39fcdf"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/AtomicIntegerOps.java",
+        "sha256": "5ea763327287d1eabda1717c97f3cec242f9764af1575277be32cfd25349b4e4"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/AtomicLongOps.java",
+        "sha256": "8b2466513159a31e81cf8d09081b17bdc94eca3df04d20ec350eb8c90ceafddc"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/AtomicReferenceArrayOps.java",
+        "sha256": "46abb11fc4cfbfb0630b9ce6927b422428b9e9a2709a5e0581333bb3bdfad472"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/AtomicReferenceOps.java",
+        "sha256": "bd951892d47c0d6b6a615392dee08bbf77e06fbba061d26b5cc365b6a7cc0f23"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/BooleanOps.java",
+        "sha256": "581b4d2b7901235d481c7586d9f6ebb748785fe0788759f323fb9e7e87bd70ed"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/BoxOps.java",
+        "sha256": "ea8c6de6898b6fed374fba2bfbfef51298f2a624b41ef1d0129dcaa30b0b1455"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/CaseInsensitiveOrder.java",
+        "sha256": "c75c9ace917a6d6a00c6bb2147d980760d68541693d7ea405b53c4cf2b7a9e6a"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/CharacterOps.java",
+        "sha256": "d5e9649689b9a669c29e3788130c797519d2e9e86d8031d388c4dd68f25f87a0"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/ChmOps.java",
+        "sha256": "8fac9d9e2179083366c80ad3268ef0dee3aef63b1fcdb0f0bc7cee2284efc58d"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/CollectionOps.java",
+        "sha256": "81c98061d748b8902b53303955b9b1bfbcae55a90761a340d515db89eafbbc3d"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/IntegerOps.java",
+        "sha256": "90d13f05a84e1dc7baf1318ec548643b35b99a541ed4c6af35a0858ab077f6c9"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/LongOps.java",
+        "sha256": "3b2561c457784e722863c7e12fef43154dfd59113d79202333e3df2a41d5456b"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/MathOps.java",
+        "sha256": "b0e9fbf1c1dc60dac8392bec2eeb088f2a413071befdec59b9887a38d4c6d7ee"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/RandomOps.java",
+        "sha256": "4d168264543fd7a175afc5059c2b93d8a5b28d5a62dde8504e67affe9f2910d9"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/StringBuilderOps.java",
+        "sha256": "22a269c372d18d13c885f4b43a493fea30194fd73bc1b43954c17df1afaf9617"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/StringOps.java",
+        "sha256": "3ebf76b73cbb22a51e1f854562e1e12fa9223ee99ec2f2faee0a6a8500b743b7"
       },
       {
         "path": "framework-aosp/lab-java/dev/apkweb/view/ViewHidden.java",
@@ -15185,6 +15422,14 @@
       {
         "path": "framework-aosp/lab-java/java/time/zone/IcuZoneRulesProvider.java",
         "sha256": "446070704bbed38d8236ad71e8d1c62cbad0c8758a52e37d7661f8051a57394d"
+      },
+      {
+        "path": "framework-aosp/lab-java/java/util/concurrent/atomic/AtomicIntegerArray.java",
+        "sha256": "99c5a19f8ef847725b0f113e713276885405ca7dd70c257386ec1922e390023c"
+      },
+      {
+        "path": "framework-aosp/lab-java/java/util/concurrent/atomic/AtomicLongArray.java",
+        "sha256": "0d23f75ffe6b95c2f9dc726dc4f6a00879c1cd7644791c09e684c63cdac643a7"
       },
       {
         "path": "framework-aosp/lab-java/sun/misc/SharedSecrets.java",
@@ -16622,8 +16867,8 @@
   "generatedSources": [
     {
       "localPath": "framework-aosp/generated/com/android/internal/R.java",
-      "sha256": "d591097206e0b6f42dd94a343edaa17e8292bb208eac2ceb5ad78fe5dbfa82d3",
-      "bytes": 662932,
+      "sha256": "9767a72a932f2af6d25bf15cced45fad5c4b1f738d9acee8d42430eb092ab14f",
+      "bytes": 663058,
       "role": "AAPT2 generated framework resource attribute data"
     }
   ],

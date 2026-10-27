@@ -4,13 +4,17 @@
   "enabledByDefault": false,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "sha256": "bf5f3a451d1a8d956c361fd8f9027e6df68315209818ceec828d9774bbee4597",
-  "bytes": 51740,
+  "sha256": "68dc27cf7b992d2927de709aa383925eda599df4824aea2169c4ddf3bb5e381a",
+  "bytes": 65564,
   "classes": [
+    "Landroid/R$styleable;",
     "Landroid/view/Gravity$GravityFlags;",
     "Landroid/view/Gravity;",
     "Landroid/widget/FrameLayout$LayoutParams;",
     "Landroid/widget/FrameLayout;",
+    "Landroid/widget/HorizontalScrollView$SavedState$1;",
+    "Landroid/widget/HorizontalScrollView$SavedState;",
+    "Landroid/widget/HorizontalScrollView;",
     "Landroid/widget/LinearLayout$DividerMode;",
     "Landroid/widget/LinearLayout$LayoutParams;",
     "Landroid/widget/LinearLayout$OrientationMode;",
@@ -19,7 +23,7 @@
     "Landroid/widget/ScrollView$SavedState;",
     "Landroid/widget/ScrollView;"
   ],
-  "classCount": 11,
+  "classCount": 15,
   "algorithmPatches": [],
   "compiledSources": [
     {
@@ -64,9 +68,19 @@
       "bytes": 75415,
       "localPath": "framework-aosp/upstream/android/widget/ScrollView.java",
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/HorizontalScrollView.java",
+      "localPath": "framework-aosp/upstream/android/widget/HorizontalScrollView.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/HorizontalScrollView.java?format=TEXT",
+      "sha256": "afcb6a2dd15bbe2fa7795d03fee9c2e0763068b87ad675961864f91706d99273",
+      "bytes": 70917,
+      "license": "Apache-2.0"
     }
   ],
-  "requiresDefaultFrameworkSha256": "a6b4627d1870a79e9decf3a1e0a61d5485637d87154cc12bb79670258a5dc0b8",
+  "requiresDefaultFrameworkSha256": "2effd1ff50c8d673e5c52f6c55bcd65bd3df8efe843edd02d43e6b76807800b4",
   "compileOnlyDeclarationsPackaged": false,
   "scrollViewMetadata": {
     "schemaVersion": 1,
@@ -75,7 +89,7 @@
       {
         "SDKClass": "android/view/View.class",
         "sdkClassSha256": "c8bb036fbf7a0f4081074d12d909812e8337309178d9474e1edd330ae97abc75",
-        "metadataSha256": "adecebe40bb8b3678b081fad5d4868645e84cd3798f6b59e1f3f8ba8c889f16c"
+        "metadataSha256": "febfee9e26116c5d97c60d19c3108c09d2db3f9f7de79101db0ade888b984fa5"
       },
       {
         "SDKClass": "android/view/ViewGroup.class",
@@ -113,6 +127,11 @@
         "invalidateParentIfNeeded",
         "()V",
         4
+      ],
+      [
+        "isLayoutRtl",
+        "()Z",
+        1
       ],
       [
         "performAccessibilityActionInternal",

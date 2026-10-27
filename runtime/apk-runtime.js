@@ -1,18 +1,19 @@
-import { VMClock } from './vm-clock.js?v=79e2ded60c95';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=79e2ded60c95';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=79e2ded60c95';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=79e2ded60c95';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=79e2ded60c95';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=79e2ded60c95';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=79e2ded60c95';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=79e2ded60c95';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=79e2ded60c95';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=79e2ded60c95';
-import { APKError } from './apk-error.js?v=79e2ded60c95';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=79e2ded60c95';
-import { Scheduler, Blocked } from './scheduler.js?v=79e2ded60c95';
-import { bootClassLacksMember } from './boot-class-members.js?v=79e2ded60c95';
-export { APKError } from './apk-error.js?v=79e2ded60c95';
+import { VMClock } from './vm-clock.js?v=d8da3b335496';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=d8da3b335496';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=d8da3b335496';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=d8da3b335496';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=d8da3b335496';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=d8da3b335496';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=d8da3b335496';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=d8da3b335496';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=d8da3b335496';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=d8da3b335496';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=d8da3b335496';
+import { APKError } from './apk-error.js?v=d8da3b335496';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=d8da3b335496';
+import { Scheduler, Blocked } from './scheduler.js?v=d8da3b335496';
+import { bootClassLacksMember } from './boot-class-members.js?v=d8da3b335496';
+export { APKError } from './apk-error.js?v=d8da3b335496';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -264,7 +265,7 @@ export class DexProgram {
       if (bootBytes > 128 * 1024 * 1024) fail('Framework DEX layer exceeds 128 MiB');
       this.bootFiles.push({ filename, dex }); this.bootDexes.add(dex);
       for (const [name, cls] of dex.classes) {
-        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|dev\/apkweb\/(?:net|view|os)\/|com\/(?:android\/(?:internal|icu|okhttp)|sun\/nio\/file)\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security\/(?:action|util)|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
+        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|dev\/apkweb\/(?:net|view|os|pm|util)\/|com\/(?:android\/(?:internal|icu|okhttp)|sun\/nio\/file)\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security\/(?:action|util)|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
         if (this.bootClasses.has(name)) fail(`Duplicate framework class: ${name}`);
         this.bootClasses.set(name, cls);
       }
@@ -436,16 +437,14 @@ addBridge('java/lang/Integer', ['getInteger(Ljava/lang/String;)Ljava/lang/Intege
 addBridge('java/lang/Boolean', ['getBoolean(Ljava/lang/String;)Z']);
 addBridge('java/lang/Math', ['min(JJ)J','max(JJ)J','abs(J)J']);
 for (const key of ICU_BREAK_KEYS) SHIMS.add(key);
-addBridge('java/lang/Math',['copySign(DD)D','copySign(FF)F','nextAfter(DD)D','ulp(D)D','IEEEremainder(DD)D','cosh(D)D','expm1(D)D','log1p(D)D','pow(DD)D','log(D)D','exp(D)D','sqrt(D)D','hypot(DD)D','cos(D)D','sin(D)D','rint(D)D','ceil(D)D','floor(D)D','signum(D)D','signum(F)F','round(F)I','round(D)J']);
+addBridge('java/lang/Math',['copySign(DD)D','copySign(FF)F','nextAfter(DD)D','ulp(D)D','IEEEremainder(DD)D','cosh(D)D','sinh(D)D','tanh(D)D','expm1(D)D','log1p(D)D','pow(DD)D','log(D)D','exp(D)D','sqrt(D)D','hypot(DD)D','cos(D)D','sin(D)D','rint(D)D','ceil(D)D','floor(D)D','signum(D)D','signum(F)F','round(F)I','round(D)J']);
 for(const type of ['F','D'])addBridge('java/lang/Math',[`min(${type}${type})${type}`,`max(${type}${type})${type}`,`abs(${type})${type}`]);
 EXTERNAL_PARENTS.set('Ljava/util/concurrent/CancellationException;', 'Ljava/lang/IllegalStateException;');
 addBridge('java/util/concurrent/CancellationException',['<init>()V','<init>(Ljava/lang/String;)V']);
 addBridge('java/util/Locale',['hashCode()I']);
-EXTERNAL_PARENTS.set('Ljava/util/Properties;', 'Ljava/util/Hashtable;');
 EXTERNAL_PARENTS.set('Ljava/util/Hashtable;', 'Ljava/util/Dictionary;');
 EXTERNAL_PARENTS.set('Ljava/util/Dictionary;', 'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set('Ljava/util/Hashtable;', ['Ljava/util/Map;', 'Ljava/lang/Cloneable;', 'Ljava/io/Serializable;']);
-addBridge('java/util/Properties',['<init>()V','getProperty(Ljava/lang/String;)Ljava/lang/String;','getProperty(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;','setProperty(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;']);
 addBridge('java/security/AccessController',['doPrivileged(Ljava/security/PrivilegedAction;)Ljava/lang/Object;','doPrivileged(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;','doPrivileged(Ljava/security/PrivilegedAction;Ljava/security/AccessControlContext;)Ljava/lang/Object;','doPrivileged(Ljava/security/PrivilegedExceptionAction;Ljava/security/AccessControlContext;)Ljava/lang/Object;']);
 addBridge('java/lang/System',['getSecurityManager()Ljava/lang/SecurityManager;']);
 addBridge('libcore/util/NativeAllocationRegistry',['createMalloced(Ljava/lang/ClassLoader;J)Llibcore/util/NativeAllocationRegistry;','registerNativeAllocation(Ljava/lang/Object;J)Ljava/lang/Runnable;']);
@@ -523,6 +522,7 @@ const BOX_TYPES = { Z: 'Ljava/lang/Boolean;', B: 'Ljava/lang/Byte;', S: 'Ljava/l
 for (const [type, owner] of Object.entries(BOX_TYPES)) {
   if (!EXTERNAL_PARENTS.has(owner)) EXTERNAL_PARENTS.set(owner, type === 'C' || type === 'Z' ? 'Ljava/lang/Object;' : 'Ljava/lang/Number;');
   EXTERNAL_INTERFACES.set(owner,['Ljava/lang/Comparable;','Ljava/io/Serializable;']);
+  if (type !== 'C') addBridge(owner.slice(1,-1),['<init>(Ljava/lang/String;)V']);
   addBridge(owner.slice(1,-1),[`<init>(${type})V`,`compareTo(${owner})I`,'compareTo(Ljava/lang/Object;)I','hashCode()I','equals(Ljava/lang/Object;)Z']);
   if (type !== 'I' && type !== 'Z') addBridge(owner.slice(1, -1), [`valueOf(${type})${owner}`]);
   addBridge(owner.slice(1, -1), [`${type === 'C' ? 'char' : type === 'Z' ? 'boolean' : { B: 'byte', S: 'short', I: 'int', J: 'long', F: 'float', D: 'double' }[type]}Value()${type}`]);
@@ -532,7 +532,7 @@ EXTERNAL_INTERFACES.set('Ljava/lang/AbstractStringBuilder;',['Ljava/lang/Appenda
 for(const builder of ['StringBuilder','StringBuffer']){
  EXTERNAL_PARENTS.set(`Ljava/lang/${builder};`,'Ljava/lang/AbstractStringBuilder;');
  EXTERNAL_INTERFACES.set(`Ljava/lang/${builder};`,['Ljava/io/Serializable;','Ljava/lang/CharSequence;']);
- addBridge('java/lang/'+builder, ['<init>()V', '<init>(Ljava/lang/String;)V', '<init>(I)V', 'toString()Ljava/lang/String;', 'length()I', 'charAt(I)C', 'subSequence(II)Ljava/lang/CharSequence;']);
+ addBridge('java/lang/'+builder, ['<init>()V', '<init>(Ljava/lang/String;)V', '<init>(Ljava/lang/CharSequence;)V', '<init>(I)V', 'toString()Ljava/lang/String;', 'length()I', 'charAt(I)C', 'subSequence(II)Ljava/lang/CharSequence;']);
  addBridge('java/lang/'+builder, [`append([CII)Ljava/lang/${builder};`, `append([C)Ljava/lang/${builder};`]);
  addBridge('java/lang/'+builder, [`append(Ljava/lang/CharSequence;II)Ljava/lang/${builder};`]);
  // The synthetic covariant bridges javac emits for Appendable (what an Appendable.append call resolves to).
@@ -548,13 +548,14 @@ for (const type of ['Ljava/lang/String;', 'Ljava/lang/Object;', 'Ljava/lang/Char
   addBridge('java/lang/StringBuffer', [`append(${type})Ljava/lang/StringBuffer;`]);
   addBridge('java/lang/String', [`valueOf(${type})Ljava/lang/String;`]);
 }
+addBridge('java/lang/Character',['isAlphabetic(I)Z','isIdeographic(I)Z','isMirrored(C)Z','isMirrored(I)Z','isUnicodeIdentifierStart(C)Z','isUnicodeIdentifierStart(I)Z','isUnicodeIdentifierPart(C)Z','isUnicodeIdentifierPart(I)Z','getNumericValue(C)I','getNumericValue(I)I','getName(I)Ljava/lang/String;']);
 addBridge('java/lang/Character',['isWhitespace(C)Z','isWhitespace(I)Z','isSpaceChar(C)Z','isSpaceChar(I)Z']);
 addBridge('android/graphics/Canvas',['setCompatibilityVersion(I)V']);
 addBridge('java/lang/System',['logW(Ljava/lang/String;)V','logW(Ljava/lang/String;Ljava/lang/Throwable;)V','lineSeparator()Ljava/lang/String;']);
 addBridge('java/lang/Character',['isSurrogate(C)Z','isSurrogatePair(CC)Z','toTitleCase(C)C','toTitleCase(I)I','getType(C)I','getType(I)I','codePointBefore(Ljava/lang/CharSequence;I)I']);
 addBridge('java/lang/Character',['getDirectionality(C)B','getDirectionality(I)B','charCount(I)I','codePointAt(Ljava/lang/CharSequence;I)I','isHighSurrogate(C)Z','isLowSurrogate(C)Z','toCodePoint(CC)I','toUpperCase(C)C','toUpperCase(I)I','toLowerCase(C)C','toLowerCase(I)I','isDigit(C)Z','isDigit(I)Z','isLetter(C)Z','isLetter(I)Z','isLetterOrDigit(C)Z','isLetterOrDigit(I)Z','isUpperCase(C)Z','isUpperCase(I)Z','isLowerCase(C)Z','isLowerCase(I)Z','digit(CI)I','digit(II)I','forDigit(II)C']);
 addBridge('java/lang/String',['getBytes()[B','getBytes(Ljava/lang/String;)[B','getBytes(Ljava/nio/charset/Charset;)[B','<init>([B)V','<init>([BII)V','<init>([BI)V','<init>([BIII)V','<init>([BLjava/lang/String;)V','<init>([BLjava/nio/charset/Charset;)V','<init>([BIILjava/lang/String;)V','<init>([BIILjava/nio/charset/Charset;)V']);
-addBridge('java/lang/String',['<init>()V','<init>([C)V','<init>([CII)V','<init>(Ljava/lang/String;)V','getChars(II[CI)V','toCharArray()[C']);
+addBridge('java/lang/String',['<init>()V','<init>([C)V','<init>([CII)V','<init>(Ljava/lang/String;)V','<init>(Ljava/lang/StringBuffer;)V','<init>(Ljava/lang/StringBuilder;)V','<init>([III)V','getChars(II[CI)V','toCharArray()[C']);
 addBridge('java/lang/String', ['length()I', 'isEmpty()Z', 'charAt(I)C', 'equals(Ljava/lang/Object;)Z', 'hashCode()I',
   'toString()Ljava/lang/String;', 'substring(I)Ljava/lang/String;', 'substring(II)Ljava/lang/String;',
   'startsWith(Ljava/lang/String;)Z', 'endsWith(Ljava/lang/String;)Z', 'indexOf(Ljava/lang/String;)I', 'indexOf(I)I',
@@ -662,7 +663,7 @@ addBridge('android/os/Looper', ['getMainLooper()Landroid/os/Looper;', 'myLooper(
 // ContextImpl.getMainLooper() returns the process main thread's Looper for every Context (Activity, Application, Service, wrappers).
 addBridge('android/content/Context', ['getMainLooper()Landroid/os/Looper;']);
 addBridge('android/content/ContextWrapper', ['getMainLooper()Landroid/os/Looper;']);
-addBridge('android/os/SystemClock', ['uptimeMillis()J', 'elapsedRealtime()J', 'elapsedRealtimeNanos()J']);
+addBridge('android/os/SystemClock', ['uptimeMillis()J', 'elapsedRealtime()J', 'elapsedRealtimeNanos()J', 'uptimeNanos()J', 'currentThreadTimeMillis()J', 'sleep(J)V']);
 for (const name of ['Throwable', 'Error', 'LinkageError', 'UnsatisfiedLinkError', 'Exception', 'RuntimeException', 'NullPointerException',
   'IllegalArgumentException', 'IllegalStateException', 'IllegalMonitorStateException', 'ClassCastException', 'IndexOutOfBoundsException',
   'ArrayIndexOutOfBoundsException', 'ArithmeticException', 'UnsupportedOperationException']) {
@@ -705,12 +706,14 @@ for (const [name, parent] of Object.entries({
 const SET_TYPES = ['java/util/HashSet', 'java/util/LinkedHashSet', 'java/util/concurrent/CopyOnWriteArraySet', 'java/util/Collections$SingletonSet'];
 for (const owner of SET_TYPES) {
   EXTERNAL_PARENTS.set(`L${owner};`, owner==='java/util/LinkedHashSet'?'Ljava/util/HashSet;':'Ljava/util/AbstractSet;'); EXTERNAL_INTERFACES.set(`L${owner};`, ['Ljava/util/Set;', 'Ljava/util/Collection;', 'Ljava/lang/Iterable;']);
-  if (owner.endsWith('HashSet') && !owner.includes('concurrent')) addBridge(owner, ['<init>(Ljava/util/Collection;)V']);
+  if (owner.endsWith('HashSet') || owner.endsWith('CopyOnWriteArraySet')) addBridge(owner, ['<init>(Ljava/util/Collection;)V']);
+  if (owner.endsWith('HashSet')) addBridge(owner, ['<init>(IF)V']);
   addBridge(owner, ['<init>()V', '<init>(I)V', 'add(Ljava/lang/Object;)Z', 'remove(Ljava/lang/Object;)Z', 'contains(Ljava/lang/Object;)Z', 'size()I', 'isEmpty()Z', 'clear()V', 'iterator()Ljava/util/Iterator;']);
 }
 EXTERNAL_PARENTS.set('Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set('Ljava/util/concurrent/CopyOnWriteArrayList;', ['Ljava/util/List;', 'Ljava/util/Collection;', 'Ljava/lang/Iterable;']);
 for (const key of [...SHIMS]) if (key.startsWith('Ljava/util/ArrayList;->')) SHIMS.add(key.replace('Ljava/util/ArrayList;', 'Ljava/util/concurrent/CopyOnWriteArrayList;'));
+addBridge('java/util/concurrent/CopyOnWriteArrayList', ['<init>([Ljava/lang/Object;)V']);
 EXTERNAL_PARENTS.set('Ljava/util/Vector;', 'Ljava/util/AbstractList;');
 EXTERNAL_PARENTS.set('Ljava/util/Stack;', 'Ljava/util/Vector;');
 EXTERNAL_INTERFACES.set('Ljava/util/Vector;', ['Ljava/util/List;', 'Ljava/util/Collection;', 'Ljava/lang/Iterable;']);
@@ -728,9 +731,11 @@ addBridge('java/nio/ByteBuffer', ['wrap([B)Ljava/nio/ByteBuffer;', 'wrap([BII)Lj
 for (const owner of ['java/nio/Buffer', 'java/nio/ByteBuffer']) addBridge(owner, ['position()I','limit()I','capacity()I','remaining()I','hasRemaining()Z',`position(I)L${owner};`,`limit(I)L${owner};`,`clear()L${owner};`,`flip()L${owner};`,`rewind()L${owner};`]);
 for (const [suffix,type] of [['','B'],['Int','I'],['Float','F'],['Long','J'],['Double','D']]) addBridge('java/nio/ByteBuffer', [`get${suffix}()${type}`,`get${suffix}(I)${type}`,`put${suffix}(${type})Ljava/nio/ByteBuffer;`,`put${suffix}(I${type})Ljava/nio/ByteBuffer;`]);
 EXTERNAL_PARENTS.set('Ljava/lang/ThreadLocal;', 'Ljava/lang/Object;');
+EXTERNAL_PARENTS.set('Ljava/lang/InheritableThreadLocal;', 'Ljava/lang/ThreadLocal;');
+addBridge('java/lang/InheritableThreadLocal', ['<init>()V', 'childValue(Ljava/lang/Object;)Ljava/lang/Object;']);
 addBridge('java/lang/ThreadLocal', ['<init>()V', 'get()Ljava/lang/Object;', 'set(Ljava/lang/Object;)V', 'remove()V', 'initialValue()Ljava/lang/Object;', 'withInitial(Ljava/util/function/Supplier;)Ljava/lang/ThreadLocal;']);
 EXTERNAL_PARENTS.set('Ljava/util/Random;', 'Ljava/lang/Object;');
-addBridge('java/util/Random', ['<init>()V', '<init>(J)V', 'nextInt()I', 'nextInt(I)I', 'nextLong()J', 'nextBoolean()Z', 'setSeed(J)V', 'nextBytes([B)V', 'nextDouble()D', 'nextFloat()F', 'nextGaussian()D']);
+addBridge('java/util/Random', ['<init>()V', '<init>(J)V', 'nextInt()I', 'nextInt(I)I', 'nextLong()J', 'nextBoolean()Z', 'setSeed(J)V', 'nextBytes([B)V', 'nextDouble()D', 'nextFloat()F', 'nextGaussian()D', 'next(I)I']);
 EXTERNAL_PARENTS.set('Ljava/util/concurrent/ThreadLocalRandom;', 'Ljava/util/Random;');
 addBridge('java/util/concurrent/ThreadLocalRandom', ['current()Ljava/util/concurrent/ThreadLocalRandom;', 'nextInt(II)I']);
 const TIME_UNITS = ['NANOSECONDS', 'MICROSECONDS', 'MILLISECONDS', 'SECONDS', 'MINUTES', 'HOURS', 'DAYS'];
@@ -868,6 +873,27 @@ class Heap {
 /** Returned by a chunk of APKRuntime.bridge() when none of its branches applies to the call. */
 const BRIDGE_NEXT = Symbol('bridge-next');
 const OBJECT_INIT_KEY = 'Ljava/lang/Object;-><init>()V';
+
+/**
+ * JDK methods that the bridged host classes (SHIMS: collections, atomics, String, Math, Random...) do not implement natively are written in Java (framework-aosp/lab-java/dev/apkweb/util)
+ * with the semantics of libcore android-13.0.0_r1, over the public API the host class does serve. A helper type lists static methods: for an instance method of the owner the helper
+ * takes the receiver as its first parameter (`name(LOwner;<params>)ret`); a static method of the owner has the identical descriptor. Resolution consults the helpers of each class on
+ * the receiver's chain before it falls to bridges or interface defaults, so a helper can also stand in for a non-atomic Map/Collection default. Helpers hold no static state: they run
+ * without class initialisation.
+ */
+const UTIL = 'Ldev/apkweb/util/';
+const LAB_HELPERS = new Map([
+  ['Ljava/util/concurrent/ConcurrentHashMap;', [`${UTIL}ChmOps;`]],
+  ['Ljava/util/concurrent/atomic/AtomicInteger;', [`${UTIL}AtomicIntegerOps;`]], ['Ljava/util/concurrent/atomic/AtomicLong;', [`${UTIL}AtomicLongOps;`]],
+  ['Ljava/util/concurrent/atomic/AtomicBoolean;', [`${UTIL}AtomicBooleanOps;`]], ['Ljava/util/concurrent/atomic/AtomicReference;', [`${UTIL}AtomicReferenceOps;`]],
+  ['Ljava/util/concurrent/atomic/AtomicReferenceArray;', [`${UTIL}AtomicReferenceArrayOps;`]],
+  ['Ljava/util/Arrays;', [`${UTIL}ArraysOps;`]],
+  ['Ljava/lang/String;', [`${UTIL}StringOps;`]], ['Ljava/lang/Integer;', [`${UTIL}IntegerOps;`]], ['Ljava/lang/Long;', [`${UTIL}LongOps;`]], ['Ljava/lang/Boolean;', [`${UTIL}BooleanOps;`]],
+  ['Ljava/lang/Math;', [`${UTIL}MathOps;`]], ['Ljava/lang/Character;', [`${UTIL}CharacterOps;`]], ['Ljava/lang/StringBuilder;', [`${UTIL}StringBuilderOps;`]], ['Ljava/lang/StringBuffer;', [`${UTIL}StringBuilderOps;`]],
+  ['Ljava/util/Random;', [`${UTIL}RandomOps;`]], ['Ljava/util/concurrent/ThreadLocalRandom;', [`${UTIL}RandomOps;`]],
+  ['Ljava/util/ArrayDeque;', [`${UTIL}CollectionOps;`]], ['Ljava/util/concurrent/ConcurrentLinkedQueue;', [`${UTIL}CollectionOps;`]], ['Ljava/util/concurrent/LinkedBlockingQueue;', [`${UTIL}CollectionOps;`]],
+  ['Ljava/util/concurrent/CopyOnWriteArrayList;', [`${UTIL}CollectionOps;`]],
+]);
 
 export class APKRuntime {
   constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 10000000, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off' } = {}) {
@@ -1189,6 +1215,9 @@ export class APKRuntime {
       const value = this.makeObject(field.owner); this.object(value).boxed = field.name === 'TRUE' ? 1 : 0;
       this.storeField(this.staticFields, field.key, value); return value;
     }
+    if (field.owner === 'Ljava/lang/String;' && field.name === 'CASE_INSENSITIVE_ORDER') {
+      const value = this.allocate('Ldev/apkweb/util/CaseInsensitiveOrder;'); this.storeField(this.staticFields, field.key, value); return value;
+    }
     fail(`Unsupported external static field: ${field.key}`);
   }
   writeStatic(reference, value) {
@@ -1288,18 +1317,19 @@ export class APKRuntime {
   }
   allocate(type) {
     if (!this.classes.has(type) && !['Landroid/widget/LinearLayout;', 'Landroid/widget/TextView;', 'Landroid/widget/Button;', 'Ljava/lang/Object;',
-      'Ljava/lang/StringBuilder;', 'Ljava/util/Properties;', 'Ljava/lang/String;', 'Ljava/lang/Integer;', 'Ljava/lang/Boolean;'].includes(type)
+      'Ljava/lang/StringBuilder;', 'Ljava/lang/String;', 'Ljava/lang/Integer;', 'Ljava/lang/Boolean;'].includes(type)
       && type!=='Ljava/lang/StringBuffer;'
       && !Object.values(BOX_TYPES).includes(type)
       && !/^Ljava\/util\/concurrent\/atomic\/Atomic(Reference|Integer|Long|Boolean|ReferenceArray);$/.test(type)
       && !/^Ljava\/util\/(HashMap|WeakHashMap|LinkedHashMap|ArrayList|Vector|Stack);$/.test(type)
       && !/^Ljava\/lang\/ref\/(WeakReference|SoftReference);$/.test(type)
       && !SET_TYPES.some(owner => type === `L${owner};`)
-      && !['Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/concurrent/ConcurrentHashMap;', 'Ljava/lang/ThreadLocal;', 'Ljava/util/Random;', 'Ljava/security/SecureRandom;', 'Ljava/util/ArrayDeque;', 'Landroid/os/Handler;'].includes(type)
+      && !['Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/concurrent/ConcurrentHashMap;', 'Ljava/lang/ThreadLocal;', 'Ljava/lang/InheritableThreadLocal;', 'Ljava/util/Random;', 'Ljava/security/SecureRandom;', 'Ljava/util/ArrayDeque;', 'Landroid/os/Handler;'].includes(type)
       && ![REENTRANT_LOCK, RW_LOCK, RW_LOCK.slice(0, -1) + '$ReadLock;', RW_LOCK.slice(0, -1) + '$WriteLock;'].includes(type)
       && !this.skiaHost?.canAllocate?.(type) && !this.platform?.canAllocate?.(type)
       && !this.isSubtype(type, 'Ljava/lang/Throwable;')) {
       // Tolerant mode 'all': a platform class the lab lacks becomes an opaque object whose every call is a traced stub.
+      const widget = this.platform?.unimplementedWidgetMessage?.(type, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' });
       if (this.tolerateMissing !== 'all') fail(`Unsupported allocation: ${type}`);
       const count = (this.missingClasses.get(type) ?? 0) + 1; this.missingClasses.set(type, count);
       if (count === 1) this.record(`STUB-CLASS ${type}`);
@@ -1492,6 +1522,13 @@ export class APKRuntime {
       return this.execute(definition.method, definition.code, args);
     } finally { this.depth--; }
   }
+  /** The static Java helper (LAB_HELPERS) that implements `method` for `owner`, or null. */
+  labHelper(helpers, owner, method, mode) {
+    if (method.name === '<init>' || method.name === '<clinit>') return null;
+    const key = mode === 'static' ? method.name + method.signature : `${method.name}(${owner}${method.signature.slice(1)}`;
+    for (const helper of helpers) { const definition = this.classes.get(helper)?.methods.get(key); if (definition?.code && (definition.flags & 8)) return definition; }
+    return null;
+  }
   /** Finds what an invoke runs: a class-chain definition (DEX body or native), a SHIM/platform bridge, or a Java 8 interface default; throws when nothing implements it. */
   resolveInvoke(method, args, mode, callerOwner) {
     let owner = mode === 'virtual' ? this.typeOf(args[0]) : mode === 'super' && callerOwner
@@ -1500,6 +1537,8 @@ export class APKRuntime {
     while (owner) {
       if (seen.has(owner) || seen.size >= 64) fail('Invalid class hierarchy');
       seen.add(owner);
+      const labHelpers = LAB_HELPERS.get(owner);
+      if (labHelpers !== undefined) { const helper = this.labHelper(labHelpers, owner, method, mode); if (helper !== null) return { kind: 'default', defaultMethod: helper }; }
       const cls = this.classes.get(owner), definition = cls?.methods.get(method.nameSig ??= method.name + method.signature);
       const selected = { ...method, owner }, key = methodKey(selected);
       // Packaged Kotlin/Java library bytecode always takes precedence over a bridge fallback -- except a method of an interface reached through a host-typed receiver (a host
@@ -1519,6 +1558,7 @@ export class APKRuntime {
     // Java 8 default methods: after the class chain, a concrete method inherited from a (super)interface of the receiver's class.
     const defaultMethod = this.findInterfaceDefault(mode === 'virtual' ? this.typeOf(args[0]) : method.owner, method);
     if (defaultMethod?.code) return { kind: 'default', defaultMethod };
+    if (method.name === '<init>') { const widget = this.platform?.unimplementedWidgetMessage?.(method.owner, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' }); }   // never a stubbed constructor: a half-working View
     if (this.toleratesMissing(method)) return { kind: 'missing-stub', key: methodKey(method), result: method.result };
     fail(`Unsupported API/method: ${methodKey(method)}`);
   }
@@ -1540,6 +1580,8 @@ export class APKRuntime {
     if (this.dex.classes.has(owner) && !this.dex.bootClasses?.has(owner)) return 'apk';
     while (owner && !seen.has(owner) && seen.size < 64) {
       seen.add(owner);
+      const labHelpers = LAB_HELPERS.get(owner);
+      if (labHelpers !== undefined && (this.labHelper(labHelpers, owner, method, 'virtual') !== null || this.labHelper(labHelpers, owner, method, 'static') !== null)) return 'framework-dex';
       const cls = this.classes.get(owner), definition = cls?.methods.get(method.name + method.signature);
       if (definition) return definition.flags & 0x100 ? (this.nativeBindings.has(definition.method.key) ? 'framework-native' : null) : definition.flags & 0x400 ? 'interface' : 'framework-dex';
       const key = `${owner}->${method.name}${method.signature}`;
@@ -1659,6 +1701,7 @@ export class APKRuntime {
   externalObjectMethod(type,name,parameters,result){
     const signature=`(${parameters.join('')})${result}`,seen=new Set();while(type&&type!=='Ljava/lang/Object;'){
       if(seen.has(type)||seen.size>=128)fail('Invalid external object hierarchy');seen.add(type);const key=`${type}->${name}${signature}`;
+      const labHelpers=LAB_HELPERS.get(type);if(labHelpers!==undefined&&this.labHelper(labHelpers,type,{name,signature},'virtual')!==null)return {owner:type,name,parameters,result,signature};
       if(SHIMS.has(key)||this.platform?.supports?.(key)||this.skiaHost?.supports?.(key))return {owner:type,name,parameters,result,signature};type=this.parent(type);
     }return null;
   }
@@ -1952,12 +1995,6 @@ export class APKRuntime {
       if(name==='notify'){const waiter=waiters.find(w=>!w.notified);if(waiter)waiter.notified=true;}else for(const waiter of waiters)waiter.notified=true;
       return;
     }
-    if(method.owner==='Ljava/util/Properties;'){
-      const object=this.object(args[0]);if(name==='<init>'){object.properties=new Map();return;}
-      if(!object.properties)fail('Properties used before its constructor');if(isNull(args[1]))this.throwJava('Ljava/lang/NullPointerException;','Null property key');
-      if(name==='setProperty'){if(isNull(args[2]))this.throwJava('Ljava/lang/NullPointerException;','Null property value');const before=object.properties.get(args[1])??null;if(!object.properties.has(args[1]))this.reserveCollection(1);object.properties.set(args[1],args[2]);return before;}
-      return object.properties.get(args[1])??args[2]??null;
-    }
     if(method.owner==='Ljava/security/AccessController;'&&name==='doPrivileged'){
       // No SecurityManager exists, so the action simply runs; a PrivilegedExceptionAction wraps its checked exceptions in PrivilegedActionException (as AccessController does).
       const checked=method.parameters[0]==='Ljava/security/PrivilegedExceptionAction;';
@@ -1981,6 +2018,17 @@ export class APKRuntime {
       // Java's single-code-point case mapping is 1:1 (UnicodeData simple mapping); expansions such as U+00DF stay unchanged.
       const cp=int(args[0]),source=cp>=0&&cp<=0x10ffff?String.fromCodePoint(cp):'',mapped=name==='toUpperCase'?source.toUpperCase():source.toLowerCase();
       return source&&[...mapped].length===1?mapped.codePointAt(0):cp;
+    }
+    if(method.owner==='Ljava/lang/Character;'&&['isAlphabetic','isIdeographic','isMirrored','isUnicodeIdentifierStart','isUnicodeIdentifierPart','getNumericValue','getName'].includes(name)){
+      // Unicode properties (UCD binary properties via the JS engine's tables); Character.getNumericValue from the pinned UnicodeData Numeric_Value field.
+      const cp=method.parameters[0]==='C'?int(args[0])&0xffff:int(args[0]),valid=cp>=0&&cp<=0x10ffff,ch=valid?String.fromCodePoint(cp):'',test=re=>valid&&re.test(ch)?1:0;
+      if(name==='isAlphabetic')return test(/^\p{Alphabetic}$/u);if(name==='isIdeographic')return test(/^\p{Ideographic}$/u);if(name==='isMirrored')return test(/^\p{Bidi_Mirrored}$/u);
+      if(name==='isUnicodeIdentifierStart')return test(/^\p{ID_Start}$/u);
+      if(name==='isUnicodeIdentifierPart')return valid&&(/^\p{ID_Continue}$/u.test(ch)||(cp<=8)||(cp>=0xe&&cp<=0x1b)||(cp>=0x7f&&cp<=0x9f)||/^\p{Cf}$/u.test(ch))?1:0;
+      if(name==='getName'){if(!valid)this.throwJava('Ljava/lang/IllegalArgumentException;',`Not a valid Unicode code point: 0x${(cp>>>0).toString(16).toUpperCase()}`);this.throwJava('Ljava/lang/UnsupportedOperationException;','Character.getName needs the ICU character-name data (unames), which the lab does not ship');}
+      if(!valid)return -1;
+      if((cp>=0x61&&cp<=0x7a))return cp-0x61+10;if(cp>=0x41&&cp<=0x5a)return cp-0x41+10;if(cp>=0xff41&&cp<=0xff5a)return cp-0xff41+10;if(cp>=0xff21&&cp<=0xff3a)return cp-0xff21+10;
+      return unicodeNumericValue(cp)??-1;
     }
     if(method.owner==='Ljava/lang/Character;'&&['isDigit','isLetter','isLetterOrDigit','isUpperCase','isLowerCase','digit','forDigit'].includes(name)){
       // Unicode general-category predicates, as java.lang.Character defines them (Nd, L*, Lu, Ll).
@@ -2424,7 +2472,7 @@ export class APKRuntime {
       }
       if(name==='ulp'&&method.parameters[0]==='D'){const x=Math.abs(doubleNumber(args[0]));if(!Number.isFinite(x))return doubleBits(Number.isNaN(x)?NaN:Infinity);const view=new DataView(new ArrayBuffer(8));view.setFloat64(0,x);const bits=view.getBigUint64(0);if(x===Number.MAX_VALUE)return doubleBits(2**971);view.setBigUint64(0,bits+1n);return doubleBits(view.getFloat64(0)-x);}
       if(name==='IEEEremainder'){const x=doubleNumber(args[0]),y=doubleNumber(args[1]);if(Number.isNaN(x)||Number.isNaN(y)||!Number.isFinite(x)||y===0)return doubleBits(NaN);if(!Number.isFinite(y))return doubleBits(x);const q=x/y;let n=Math.round(q);if(Math.abs(q-Math.trunc(q))===0.5)n=2*Math.round(q/2);const r=x-n*y;return doubleBits(r===0?(x<0?-0:0):r);}
-      if(['cosh','expm1','log1p'].includes(name))return doubleBits(Math[name](doubleNumber(args[0])));
+      if(['cosh','sinh','tanh','expm1','log1p'].includes(name))return doubleBits(Math[name](doubleNumber(args[0])));
       if(name==='hypot')return doubleBits(Math.hypot(doubleNumber(args[0]),doubleNumber(args[1])));
       if(name==='signum'){const decode=method.parameters[0]==='F'?floatNumber:doubleNumber,encode=method.result==='F'?floatBits:doubleBits,n=decode(args[0]);return Number.isNaN(n)||n===0?args[0]:encode(n<0?-1:1);}
       if(name==='round'){
@@ -2550,7 +2598,20 @@ export class APKRuntime {
     // The main thread's Looper is the platform event queue; any other thread has one only after Looper.prepare() (HandlerThread does that) -- see concurrency-host.js.
     if (method.owner === 'Landroid/os/Looper;' && name === 'myLooper') return this.thread === null || this.thread === this.scheduler.main ? (this.mainLooper ??= this.makeObject('Landroid/os/Looper;')) : (this.thread.looper ?? null);
     if (method.owner === 'Landroid/os/Looper;' && name === 'isCurrentThread') return this.thread === null || this.thread === this.scheduler.main ? 1 : (this.thread.looper ? 1 : 0);
-    if (method.owner === 'Landroid/os/SystemClock;') return name === 'elapsedRealtimeNanos' ? this.clock.nanos() : BigInt(Math.floor(this.clock.now()));
+    if (method.owner === 'Landroid/os/SystemClock;') {
+      if (name === 'sleep') {   // SystemClock.sleep: Thread.sleep that swallows InterruptedException, finishing the wait and restoring the interrupt flag
+        const until = this.clock.now() + Number(wide(args[0])); let interrupted = false;
+        for (;;) {
+          const remaining = Math.ceil(until - this.clock.now()); if (remaining <= 0) break;
+          try { this.dispatch({ owner: 'Ljava/lang/Thread;', name: 'sleep', parameters: ['J'], result: 'V', signature: '(J)V' }, this.argumentWords(['J'], [BigInt(remaining)], {}), 'static'); }
+          catch (error) { if (error?.name === 'JavaException' && this.typeOf(error.value) === 'Ljava/lang/InterruptedException;') interrupted = true; else throw error; }
+        }
+        if (interrupted) this.dispatch({ owner: 'Ljava/lang/Thread;', name: 'interrupt', parameters: [], result: 'V', signature: '()V' }, [this.dispatch({ owner: 'Ljava/lang/Thread;', name: 'currentThread', parameters: [], result: 'Ljava/lang/Thread;', signature: '()Ljava/lang/Thread;' }, [], 'static')], 'virtual');
+        return undefined;
+      }
+      // The VM has one clock and no per-thread CPU accounting: thread time is bounded by (and reported as) the uptime of the VM clock.
+      return name === 'elapsedRealtimeNanos' || name === 'uptimeNanos' ? this.clock.nanos() : BigInt(Math.floor(this.clock.now()));
+    }
     if (method.owner === 'Ljava/util/concurrent/ThreadLocalRandom;' && name === 'current') {
       if (!this.threadRandom) { this.threadRandom = this.makeObject(method.owner); this.object(this.threadRandom).seed = (BigInt(Date.now()) ^ 0x5deece66dn) & ((1n << 48n) - 1n); }
       return this.threadRandom;
@@ -2600,6 +2661,11 @@ export class APKRuntime {
     const primitiveBoxType = Object.keys(BOX_TYPES).find(type => BOX_TYPES[type] === method.owner);
     if(primitiveBoxType&&!staticCall&&name==='<init>'){
       const object=this.object(args[0]);if(object.boxed!==undefined)fail('Primitive wrapper constructor cannot run twice');
+      if(method.parameters[0]==='Ljava/lang/String;'){   // Integer(String) etc: parse exactly as the matching parseXxx(String) would
+        const parser={Z:null,B:'parseByte',S:'parseShort',I:'parseInt',J:'parseLong',F:'parseFloat',D:'parseDouble'}[primitiveBoxType];
+        if(parser===null){const text=isNull(args[1])?null:this.stringCharacters(args[1]);object.boxed=text!==null&&/^[tT][rR][uU][eE]$/.test(text)?1:0;object.primitiveType='Z';return;}
+        const result=primitiveBoxType;object.boxed=narrow(this.dispatch({owner:method.owner,name:parser,parameters:['Ljava/lang/String;'],result,signature:`(Ljava/lang/String;)${result}`},[args[1]],'static'),primitiveBoxType);object.primitiveType=primitiveBoxType;return;
+      }
       object.boxed=narrow(args[1],primitiveBoxType);object.primitiveType=primitiveBoxType;return;
     }
     if(primitiveBoxType&&!staticCall&&name==='hashCode')return this.boxedHash(this.object(args[0]));
@@ -2637,6 +2703,15 @@ export class APKRuntime {
       if(name==='<init>'){
         const object=this.object(args[0]);if(object.stringValue!==undefined)fail('String constructor cannot run twice');let text='';
         if(method.parameters[0]==='Ljava/lang/String;')text=this.stringCharacters(args[1]);
+        else if(method.parameters[0]==='Ljava/lang/StringBuffer;'||method.parameters[0]==='Ljava/lang/StringBuilder;'){if(isNull(args[1]))this.throwJava('Ljava/lang/NullPointerException;',null);text=this.object(args[1]).builder??'';}
+        else if(method.parameters[0]==='[I'){   // String(int[] codePoints, int offset, int count)
+          if(isNull(args[1]))this.throwJava('Ljava/lang/NullPointerException;','codePoints == null');
+          const source=this.array(args[1]),offset=int(args[2]),count=int(args[3]),length=source.elements.length;
+          if(offset<0)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','offset '+offset+', count '+count+', length '+length);
+          if(count<=0){if(count<0)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','offset '+offset+', count '+count+', length '+length);if(offset<=length)text='';else this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','offset '+offset+', count '+count+', length '+length);}
+          else{if(offset>length-count)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','offset '+offset+', count '+count+', length '+length);
+            for(let i=offset;i<offset+count;i++){const cp=source.elements[i]|0;if(cp<0||cp>0x10ffff)this.throwJava('Ljava/lang/IllegalArgumentException;',String(cp));text+=String.fromCodePoint(cp);}}
+        }
         else if(method.parameters[0]==='[C'){const source=this.array(args[1]);if(source.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','String constructor requires char[]');const from=method.parameters.length===3?int(args[2]):0,count=method.parameters.length===3?int(args[3]):source.elements.length;if(from<0||count<0||from>source.elements.length-count)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String char array range');text=utf16String(source.elements.slice(from,from+count));}
         else if(method.parameters[0]==='[B'&&method.parameters[method.parameters.length-1]==='I'&&(method.parameters.length===2||method.parameters.length===4)){
           // Deprecated String(byte[] ascii, int hibyte[, offset, count]): each char is (hibyte << 8) | (byte & 0xff).
@@ -2787,10 +2862,10 @@ export class APKRuntime {
       if(name==='tryLock'&&(!timed||wide(args[1])<=0n))return 0;
       // Contended: park until the owner releases (a timed tryLock gives up at its deadline).
       const deadline=timed?this.platform.clock.now()+Number(wide(args[1])*this.object(args[2]).nanoFactor/1000000n):Infinity;
-      const wait=()=>new Blocked({reason:'ReentrantLock',ready:()=>state.owner===null,deadline,interruptible,finish:timedOut=>{
+      const wait=()=>{const blocked=new Blocked({reason:'ReentrantLock',ready:()=>state.owner===null,deadline,interruptible,finish:timedOut=>{
         if(interruptible&&thread.interrupted){thread.interrupted=false;this.throwJava('Ljava/lang/InterruptedException;',null);}
         if(state.owner===null||state.owner===thread)return acquire();
-        return timedOut?0:wait();}});
+        return timedOut?0:wait();}});blocked.lockState=state;return blocked;};   // lockState: the queue getQueueLength/getQueuedThreads report
       return wait();
     }
     if (method.owner === RW_LOCK) {
@@ -2981,6 +3056,10 @@ export class APKRuntime {
       if (name === 'getAndSet') { this.storeField(target.fields, field.key, args[2]); return current; }
       if (name === 'compareAndSet' || name === 'weakCompareAndSet') { const same = equal(current, args[2]); if (same) this.storeField(target.fields, field.key, args[3]); return same ? 1 : 0; }
     }
+    if (method.owner === 'Ljava/lang/InheritableThreadLocal;') {   // the values a new Thread inherits are copied at its creation (concurrency-host.js, inheritLocals)
+      if (name === '<init>') { (this.inheritableLocals ??= new Set()).add(args[0]); return undefined; }
+      return args[1];   // childValue: the parent's value
+    }
     if (method.owner === 'Ljava/lang/ThreadLocal;') {
       // Values are per Thread (cooperative threads of src/concurrency-host.js each have their own slot); withInitial() = SuppliedThreadLocal.
       const thread = this.platform?.concurrency?.currentThread(this) ?? null; // the cooperative scheduler's running thread (no VM call, so no trace noise)
@@ -3001,7 +3080,11 @@ export class APKRuntime {
       // java.security.SecureRandom inherits Random's derived methods (nextLong, nextInt, nextDouble...) on top of next(bits), which draws from the platform CSPRNG instead of the LCG.
       const secure = this.isSubtype(obj.type, 'Ljava/security/SecureRandom;');
       const secureBits = bits => { if (!globalThis.crypto?.getRandomValues) throw new APKError('WebCrypto secure randomness is unavailable; SecureRandom cannot fall back to Math.random', { kind: 'secure-random-unavailable' }); const word = globalThis.crypto.getRandomValues(new Uint32Array(1))[0]; return bits === 32 ? word : word >>> (32 - bits); };
-      const next = bits => { if (secure) return secureBits(bits); obj.seed = (obj.seed * 0x5deece66dn + 11n) & mask; return Number(obj.seed >> BigInt(48 - bits)); };
+      const rawNext = bits => { if (secure) return secureBits(bits); obj.seed = (obj.seed * 0x5deece66dn + 11n) & mask; return Number(obj.seed >> BigInt(48 - bits)); };
+      // A subclass that overrides the protected next(int) drives every derived draw (nextInt, nextLong, nextDouble...) through it, as in libcore; super.next(bits) reaches the generator below.
+      if (obj.userNext === undefined) { obj.userNext = false; for (let t = obj.type; t && t !== 'Ljava/util/Random;' && t !== 'Ljava/security/SecureRandom;' && t !== 'Ljava/util/concurrent/ThreadLocalRandom;'; t = this.parent(t)) if (this.classes.get(t)?.methods.has('next(I)I')) { obj.userNext = true; break; } }
+      const next = bits => obj.userNext ? int(this.dispatch({ owner: obj.type, name: 'next', parameters: ['I'], result: 'I', signature: '(I)I' }, [args[0], bits], 'virtual')) : rawNext(bits);
+      if (name === 'next') return rawNext(int(args[1])) | 0;
       if (method.owner === 'Ljava/util/Random;') {
         // java.util.Random (libcore android-13.0.0_r1), bit-exact LCG: Math.log/sqrt stand in for StrictMath in nextGaussian().
         if (name === 'setSeed') { obj.seed = (wide(args[1]) ^ 0x5deece66dn) & mask; obj.haveNextNextGaussian = false; return undefined; }
@@ -3055,6 +3138,10 @@ export class APKRuntime {
     if (SET_TYPES.some(owner => method.owner === `L${owner};`)) {
       if (name === '<init>') {
         obj.set = []; obj.setHashes = []; obj.modCount = 0;
+        if (method.parameters[0] === 'I') {   // HashSet(int[, float]) -> new HashMap(initialCapacity, loadFactor)
+          if (int(args[1]) < 0) this.throwJava('Ljava/lang/IllegalArgumentException;', 'Illegal initial capacity: ' + int(args[1]));
+          if (method.parameters.length === 2) { const loadFactor = floatNumber(args[2]); if (loadFactor <= 0 || Number.isNaN(loadFactor)) this.throwJava('Ljava/lang/IllegalArgumentException;', 'Illegal load factor: ' + this.javaString(args[2], 'F')); }
+        }
         if (method.parameters[0] === 'Ljava/util/Collection;') { // AOSP HashSet(Collection) = addAll, de-duplicating with hashCode/equals
           if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', 'Attempt to invoke interface method on a null Collection');
           for (const value of this.collectionValues(this.object(args[1])).slice()) { const hash = this.javaHash(value); if (obj.set.some((existing, i) => obj.setHashes[i] === hash && this.javaEquals(value, existing))) continue; if (obj.set.length >= 1000000) fail('Set size limit exceeded'); this.reserveCollection(1); obj.set.push(value); obj.setHashes.push(hash); }
@@ -3217,7 +3304,8 @@ export class APKRuntime {
     }
     if (['Ljava/util/ArrayList;', 'Ljava/util/Vector;', 'Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/Collection;', 'Ljava/util/Set;', 'Ljava/util/Arrays$ArrayList;'].includes(method.owner)) {
       if (name === '<init>') {
-        obj.list = method.parameters[0] === 'Ljava/util/Collection;' ? this.collectionValues(this.object(args[1])).slice() : [];
+        if (method.parameters[0] === '[Ljava/lang/Object;') { if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', null); obj.list = this.array(args[1]).elements.slice(); }   // CopyOnWriteArrayList(E[])
+        else obj.list = method.parameters[0] === 'Ljava/util/Collection;' ? this.collectionValues(this.object(args[1])).slice() : [];
         if (method.parameters[0] === 'I' && int(args[1]) < 0) this.throwJava('Ljava/lang/IllegalArgumentException;', 'Illegal Capacity');
         this.reserveCollection(obj.list.length); obj.modCount = 0; return undefined;
       }
@@ -3347,7 +3435,15 @@ export class APKRuntime {
   bridgeC3(method, args, staticCall, key, name) {
     const obj = this.object(args[0]);
     if (method.owner === 'Ljava/lang/StringBuilder;'||method.owner==='Ljava/lang/StringBuffer;') {
-      if (name === '<init>') { if (method.parameters[0] === 'I' && int(args[1]) < 0) this.throwJava('Ljava/lang/IllegalArgumentException;', 'negative StringBuilder capacity'); obj.builder = typeof args[1] === 'string' ? args[1] : ''; return undefined; }
+      if (name === '<init>') {
+        if (method.parameters[0] === 'I' && int(args[1]) < 0) this.throwJava('Ljava/lang/IllegalArgumentException;', 'negative StringBuilder capacity');
+        if (method.parameters[0] === 'Ljava/lang/CharSequence;') {   // StringBuilder(CharSequence): the sequence's text (NPE for null)
+          if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', null);
+          obj.builder = typeof args[1] === 'string' ? args[1] : this.stringCharacters(this.dispatch({ owner: 'Ljava/lang/Object;', name: 'toString', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [args[1]], 'virtual'));
+          return undefined;
+        }
+        obj.builder = typeof args[1] === 'string' ? args[1] : ''; return undefined;
+      }
       if(name==='append'&&method.parameters[0]==='[C'){
         const array=this.array(args[1]);if(array.type!=='[C')fail('Expected char array');
         const start=method.parameters.length===1?0:int(args[2]),count=method.parameters.length===1?array.elements.length:int(args[3]);
