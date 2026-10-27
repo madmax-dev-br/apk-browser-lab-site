@@ -381,6 +381,21 @@
       },
       "sizeBytes": 9822027,
       "available": true
+    },
+    {
+      "id": "rn-hello",
+      "file": "rn-hello.apk",
+      "title": "React Native 0.79.4 · fixture pública (experimental)",
+      "description": "Contador, TextInput, ScrollView, Image e fetch em React Native 0.79.4 puro (New Architecture, Hermes, bundle embutido). Fixture pública para o trabalho do React Native; ainda não executa: para em SoLoader.loadLibrary(\"reactnative\") porque libreactnative ainda não existe para Wasm.",
+      "tags": [
+        "React Native",
+        "Hermes",
+        "Experimental"
+      ],
+      "advanced": false,
+      "executionValidated": false,
+      "sizeBytes": 16801416,
+      "available": true
     }
   ]
 }

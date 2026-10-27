@@ -1,7 +1,7 @@
 // android.content.IntentFilter matching: a port of android-13.0.0_r1 IntentFilter.java (+ PatternMatcher and IntentFilter.AuthorityEntry) over the filter state that device-state-host.js keeps
 // per IntentFilter object ({ actions, categories, schemes, authorities, paths, types, priority }). Covers actions, categories, data schemes, authorities (host with leading-* wildcard,
 // port), paths (literal, prefix, simple glob), MIME types with "type/*" and "*" wildcards, and the match() / matchData() result codes. Advanced-glob paths (API 31) are refused explicitly.
-import { APKError } from './apk-error.js?v=7fd72513c4ea';
+import { APKError } from './apk-error.js?v=87d26d81015e';
 export const MATCH = { CATEGORY_MASK: 0x0fff0000, ADJUSTMENT_MASK: 0x0000ffff, ADJUSTMENT_NORMAL: 0x8000, CATEGORY_EMPTY: 0x0100000, CATEGORY_SCHEME: 0x0200000, CATEGORY_SCHEME_SPECIFIC_PART: 0x0580000, CATEGORY_HOST: 0x0300000, CATEGORY_PORT: 0x0400000,
   CATEGORY_PATH: 0x0500000, CATEGORY_TYPE: 0x0600000, NO_MATCH_TYPE: -1, NO_MATCH_DATA: -2, NO_MATCH_ACTION: -3, NO_MATCH_CATEGORY: -4 };
 

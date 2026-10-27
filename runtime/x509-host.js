@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=7fd72513c4ea';
-import { createHostRegistry } from './host-contract.js?v=7fd72513c4ea';
+import { APKError } from './apk-error.js?v=87d26d81015e';
+import { createHostRegistry } from './host-contract.js?v=87d26d81015e';
 
 // X.509 certificates for apps that inspect their own signing certificate or pin a server's: java.security.cert.CertificateFactory ("X.509", DER or PEM input), X509Certificate
 // (subject/issuer, serial, validity, algorithms, public key, basic constraints, key usage, encoded form), javax.security.auth.x500.X500Principal (RFC 2253 / RFC 1779 / canonical
