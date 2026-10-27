@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=eb9e6b7c0103';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=eb9e6b7c0103';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=eb9e6b7c0103';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=eb9e6b7c0103';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=eb9e6b7c0103';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=eb9e6b7c0103';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=eb9e6b7c0103';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=eb9e6b7c0103';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=eb9e6b7c0103';
-import { APKError } from './apk-error.js?v=eb9e6b7c0103';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=eb9e6b7c0103';
-import { Scheduler, Blocked } from './scheduler.js?v=eb9e6b7c0103';
-import { bootClassLacksMember } from './boot-class-members.js?v=eb9e6b7c0103';
-export { APKError } from './apk-error.js?v=eb9e6b7c0103';
+import { VMClock } from './vm-clock.js?v=92e35e57822f';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=92e35e57822f';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=92e35e57822f';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=92e35e57822f';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=92e35e57822f';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=92e35e57822f';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=92e35e57822f';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=92e35e57822f';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=92e35e57822f';
+import { APKError } from './apk-error.js?v=92e35e57822f';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=92e35e57822f';
+import { Scheduler, Blocked } from './scheduler.js?v=92e35e57822f';
+import { bootClassLacksMember } from './boot-class-members.js?v=92e35e57822f';
+export { APKError } from './apk-error.js?v=92e35e57822f';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -605,6 +605,15 @@ EXTERNAL_INTERFACES.set('Ljava/util/concurrent/ConcurrentMap;', ['Ljava/util/Map
 addBridge('java/util/concurrent/ConcurrentHashMap', ['<init>(IFI)V', 'putIfAbsent(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;',
   'remove(Ljava/lang/Object;Ljava/lang/Object;)Z', 'replace(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;',
   'replace(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Z', 'mappingCount()J', 'containsValue(Ljava/lang/Object;)Z']);
+// ConcurrentHashMap.KeySetView (newKeySet, keySet(), keySet(mappedValue)): a live key view over the map, with add() only when a mapped value is set.
+const CHM_KEY_SET = 'Ljava/util/concurrent/ConcurrentHashMap$KeySetView;';
+EXTERNAL_PARENTS.set(CHM_KEY_SET, 'Ljava/lang/Object;');
+EXTERNAL_INTERFACES.set(CHM_KEY_SET, ['Ljava/util/Set;', 'Ljava/util/Collection;', 'Ljava/lang/Iterable;', 'Ljava/io/Serializable;']);
+addBridge('java/util/concurrent/ConcurrentHashMap', [`newKeySet()${CHM_KEY_SET}`, `newKeySet(I)${CHM_KEY_SET}`, `keySet()${CHM_KEY_SET}`, `keySet(Ljava/lang/Object;)${CHM_KEY_SET}`]);
+addBridge('java/util/concurrent/ConcurrentHashMap$KeySetView', ['add(Ljava/lang/Object;)Z', 'addAll(Ljava/util/Collection;)Z', 'remove(Ljava/lang/Object;)Z', 'contains(Ljava/lang/Object;)Z',
+  'containsAll(Ljava/util/Collection;)Z', 'removeAll(Ljava/util/Collection;)Z', 'retainAll(Ljava/util/Collection;)Z', 'size()I', 'isEmpty()Z', 'clear()V', 'iterator()Ljava/util/Iterator;',
+  'toArray()[Ljava/lang/Object;', 'toArray([Ljava/lang/Object;)[Ljava/lang/Object;', 'getMap()Ljava/util/concurrent/ConcurrentHashMap;', 'getMappedValue()Ljava/lang/Object;',
+  'toString()Ljava/lang/String;', 'equals(Ljava/lang/Object;)Z', 'hashCode()I']);
 for (const name of ['AbstractMap', 'AbstractList', 'AbstractCollection', 'AbstractSet']) {
   EXTERNAL_PARENTS.set(`Ljava/util/${name};`, ['AbstractList', 'AbstractSet'].includes(name) ? 'Ljava/util/AbstractCollection;' : 'Ljava/lang/Object;');
   addBridge(`java/util/${name}`, ['<init>()V']);
@@ -1919,6 +1928,7 @@ export class APKRuntime {
     return this.bridgeC3(method, args, staticCall, key, name);
   }
   bridgeA0(method, args, staticCall, key, name) {
+    if (method.owner === CHM_KEY_SET || (method.owner === 'Ljava/util/concurrent/ConcurrentHashMap;' && (name === 'newKeySet' || method.result === CHM_KEY_SET))) return this.concurrentKeySet(method, args, staticCall, name);
     if(method.owner==='Landroid/content/res/Configuration;'&&name==='isLayoutSizeAtLeast'){
       const size=(this.object(args[0]).fields.get('Landroid/content/res/Configuration;->screenLayout:I')??0)&0x0f;return size!==0&&size>=int(args[1])?1:0;
     }
@@ -2088,6 +2098,68 @@ export class APKRuntime {
       if (owner === 'Ljava/lang/Short;') { if (name === 'reverseBytes') return (((a & 0xff) << 8) | ((a >> 8) & 0xff)) << 16 >> 16; if (name === 'toUnsignedInt') return a & 0xffff; return (a << 16 >> 16) - (int(args[1]) << 16 >> 16); }
       if (owner === 'Ljava/lang/Character;') return ((a & 0xff) << 8) | ((a >> 8) & 0xff);
       if (name === 'toUnsignedLong') return BigInt(a & 0xff); if (name === 'toUnsignedInt') return a & 0xff; return (a << 24 >> 24) - (int(args[1]) << 24 >> 24);
+    }
+    return BRIDGE_NEXT;
+  }
+  /** ConcurrentHashMap.KeySetView (libcore ConcurrentHashMap.java): every operation goes through the backing map, so null keys throw as the map does. */
+  concurrentKeySet(method, args, staticCall, name) {
+    const MAP = 'Ljava/util/concurrent/ConcurrentHashMap;', O = 'Ljava/lang/Object;', Z = 'Z';
+    const call = (receiver, owner, callName, signature, parameters, result, ...rest) => this.dispatch({ owner, name: callName, signature, parameters, result }, [receiver, ...rest], 'virtual');
+    const view = (map, mapped) => { const value = this.makeObject(CHM_KEY_SET), state = this.object(value); state.mapSource = map; state.viewKind = 'keys'; state.mappedValue = mapped; return value; };
+    if (method.owner === MAP) {
+      if (name === 'newKeySet') {
+        if (method.parameters.length && int(args[0]) < 0) this.throwJava('Ljava/lang/IllegalArgumentException;');
+        const map = this.makeObject(MAP); call(map, MAP, '<init>', '()V', [], 'V');
+        return view(map, this.readStatic({ owner: 'Ljava/lang/Boolean;', name: 'TRUE', type: 'Ljava/lang/Boolean;' }));
+      }
+      if (method.parameters.length && isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;');
+      return view(args[0], method.parameters.length ? args[1] : null);
+    }
+    const self = this.object(args[0]), map = self.mapSource;
+    const has = item => int(call(map, MAP, 'containsKey', `(${O})Z`, [O], Z, item)) !== 0;
+    const removeKey = item => !isNull(call(map, MAP, 'remove', `(${O})${O}`, [O], O, item));
+    const addKey = item => { if (isNull(self.mappedValue)) this.throwJava('Ljava/lang/UnsupportedOperationException;'); return isNull(call(map, MAP, 'putIfAbsent', `(${O}${O})${O}`, [O, O], O, item, self.mappedValue)); };
+    const keys = () => [...this.object(map).map.values()].map(entry => entry.key);
+    const elementsOf = collection => {
+      if (isNull(collection)) this.throwJava('Ljava/lang/NullPointerException;');
+      const type = this.typeOf(collection), iterator = call(collection, type, 'iterator', '()Ljava/util/Iterator;', [], 'Ljava/util/Iterator;'), out = [];
+      while (int(call(iterator, this.typeOf(iterator), 'hasNext', '()Z', [], Z))) { if (out.length >= 1000000) fail('Collection iteration limit exceeded'); out.push(call(iterator, this.typeOf(iterator), 'next', `()${O}`, [], O)); }
+      return out;
+    };
+    switch (name) {
+      case 'getMap': return map;
+      case 'getMappedValue': return self.mappedValue ?? null;
+      case 'size': return this.object(map).map.size;
+      case 'isEmpty': return this.object(map).map.size ? 0 : 1;
+      case 'contains': return has(args[1]) ? 1 : 0;
+      case 'remove': return removeKey(args[1]) ? 1 : 0;
+      case 'add': return addKey(args[1]) ? 1 : 0;
+      case 'clear': call(map, MAP, 'clear', '()V', [], 'V'); return undefined;
+      case 'addAll': { let changed = false; for (const item of elementsOf(args[1])) changed = addKey(item) || changed; return changed ? 1 : 0; }
+      case 'containsAll': return elementsOf(args[1]).every(has) ? 1 : 0;
+      case 'removeAll': { let changed = false; for (const item of elementsOf(args[1])) changed = removeKey(item) || changed; return changed ? 1 : 0; }
+      case 'retainAll': {
+        const keep = elementsOf(args[1]); let changed = false;
+        for (const item of keys()) if (!keep.some(other => this.javaEquals(item, other))) changed = removeKey(item) || changed;
+        return changed ? 1 : 0;
+      }
+      case 'iterator': { const keySet = this.makeObject('Ljava/util/Set;'), state = this.object(keySet); state.mapSource = map; state.viewKind = 'keys'; return call(keySet, 'Ljava/util/Set;', 'iterator', '()Ljava/util/Iterator;', [], 'Ljava/util/Iterator;'); }
+      case 'toArray': {
+        const items = keys();
+        if (!method.parameters.length) { const array = this.newArray('[Ljava/lang/Object;', items.length); this.object(array).elements = items; return array; }
+        if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;');
+        const target = this.array(args[1]);
+        if (target.elements.length >= items.length) { items.forEach((item, index) => { target.elements[index] = item; }); if (target.elements.length > items.length) target.elements[items.length] = null; return args[1]; }
+        const array = this.newArray(this.typeOf(args[1]), items.length); this.object(array).elements = items; return array;
+      }
+      case 'toString': return `[${keys().map(item => equal(item, args[0]) ? '(this Collection)' : this.javaString(item)).join(', ')}]`;
+      case 'hashCode': return keys().reduce((sum, item) => (sum + (isNull(item) ? 0 : this.javaHash(item))) | 0, 0);
+      case 'equals': {
+        if (equal(args[0], args[1])) return 1;
+        if (isNull(args[1]) || typeof args[1] === 'string' || !this.isSubtype(this.typeOf(args[1]), 'Ljava/util/Set;')) return 0;
+        const other = elementsOf(args[1]);
+        return other.length === this.object(map).map.size && other.every(has) ? 1 : 0;
+      }
     }
     return BRIDGE_NEXT;
   }

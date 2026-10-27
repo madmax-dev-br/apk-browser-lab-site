@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=eb9e6b7c0103';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=eb9e6b7c0103';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=eb9e6b7c0103';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=eb9e6b7c0103';
+import { APKError } from './apk-error.js?v=92e35e57822f';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=92e35e57822f';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=92e35e57822f';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=92e35e57822f';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -409,6 +409,49 @@ export function createAppServicesHost(platform) {
   def(NOTIFICATION_MANAGER, 'cancel', '(I)V', (_r, _m, [, id]) => { notificationState.posted.delete(`:${id}`); });
   def(NOTIFICATION_MANAGER, 'cancel', `(${STRING}I)V`, (r, _m, [, tag, id]) => { notificationState.posted.delete(`${tag === null ? '' : r.stringCharacters(tag)}:${id}`); });
   def(NOTIFICATION_MANAGER, 'cancelAll', '()V', () => { notificationState.posted.clear(); });
+
+  // ShortcutManager (ShortcutManager.java / ShortcutService, API 25+): per-app dynamic shortcut store with the service's limits. The virtual device has
+  // no launcher that pins shortcuts, so isRequestPinShortcutSupported/requestPinShortcut answer false; there are no manifest or pinned shortcuts.
+  const SHORTCUT_MANAGER = service('shortcut', 'Landroid/content/pm/ShortcutManager;'), SHORTCUT_INFO = 'Landroid/content/pm/ShortcutInfo;', LIST = 'Ljava/util/List;';
+  const MAX_SHORTCUTS = 15;   // ShortcutService.DEFAULT_MAX_SHORTCUTS_PER_APP
+  const shortcuts = { dynamic: gcRoot(new Map()), disabled: new Set(), used: [] };
+  const shortcutCall = (r, receiver, name, signature, parameters, result, ...rest) => r.dispatch({ owner: r.typeOf(receiver), name, signature, parameters, result }, [receiver, ...rest], 'virtual');
+  const javaItems = (r, list) => {
+    if (list === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    const iterator = shortcutCall(r, list, 'iterator', '()Ljava/util/Iterator;', [], 'Ljava/util/Iterator;'), out = [];
+    while (shortcutCall(r, iterator, 'hasNext', '()Z', [], 'Z')) { if (out.length > 4096) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Too many shortcuts'); out.push(shortcutCall(r, iterator, 'next', `()${OBJECT}`, [], OBJECT)); }
+    return out;
+  };
+  const shortcutId = (r, info) => { if (info === null) r.throwJava('Ljava/lang/NullPointerException;', null); return r.stringCharacters(shortcutCall(r, info, 'getId', `()${STRING}`, [], STRING)); };
+  const listOf = (r, values) => { const list = newEmptyList(r); for (const value of values) r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, value], 'virtual'); return list; };
+  const checkCount = (r, count) => { if (count > MAX_SHORTCUTS) r.throwJava('Ljava/lang/IllegalArgumentException;', `Max number of dynamic shortcuts exceeded`); };
+  const ids = (r, list) => javaItems(r, list).map(id => text(r, id));
+  def(SHORTCUT_MANAGER, 'getMaxShortcutCountPerActivity', '()I', () => MAX_SHORTCUTS);
+  def(SHORTCUT_MANAGER, 'isRateLimitingActive', '()Z', () => 0);
+  def(SHORTCUT_MANAGER, 'isRequestPinShortcutSupported', '()Z', () => 0);
+  def(SHORTCUT_MANAGER, 'requestPinShortcut', `(${SHORTCUT_INFO}Landroid/content/IntentSender;)Z`, (r, _m, [, info]) => { shortcutId(r, info); return 0; });
+  def(SHORTCUT_MANAGER, 'getDynamicShortcuts', `()${LIST}`, r => listOf(r, shortcuts.dynamic.values()));
+  def(SHORTCUT_MANAGER, 'getManifestShortcuts', `()${LIST}`, r => listOf(r, []));
+  def(SHORTCUT_MANAGER, 'getPinnedShortcuts', `()${LIST}`, r => listOf(r, []));
+  def(SHORTCUT_MANAGER, 'getShortcuts', `(I)${LIST}`, (r, _m, [, flags]) => listOf(r, flags & 1 ? shortcuts.dynamic.values() : []));   // FLAG_MATCH_DYNAMIC = 1
+  def(SHORTCUT_MANAGER, 'setDynamicShortcuts', `(${LIST})Z`, (r, _m, [, list]) => { const items = javaItems(r, list); checkCount(r, items.length); shortcuts.dynamic.clear(); for (const info of items) shortcuts.dynamic.set(shortcutId(r, info), info); return 1; });
+  def(SHORTCUT_MANAGER, 'addDynamicShortcuts', `(${LIST})Z`, (r, _m, [, list]) => {
+    const items = javaItems(r, list), next = new Map(shortcuts.dynamic); for (const info of items) next.set(shortcutId(r, info), info);
+    checkCount(r, next.size); shortcuts.dynamic.clear(); for (const [id, info] of next) shortcuts.dynamic.set(id, info); return 1;
+  });
+  def(SHORTCUT_MANAGER, 'pushDynamicShortcut', `(${SHORTCUT_INFO})V`, (r, _m, [, info]) => {
+    const id = shortcutId(r, info); shortcuts.dynamic.delete(id);
+    if (shortcuts.dynamic.size >= MAX_SHORTCUTS) shortcuts.dynamic.delete(shortcuts.dynamic.keys().next().value);   // the service drops the lowest-ranked shortcut
+    shortcuts.dynamic.set(id, info);
+  });
+  def(SHORTCUT_MANAGER, 'updateShortcuts', `(${LIST})Z`, (r, _m, [, list]) => { for (const info of javaItems(r, list)) { const id = shortcutId(r, info); if (shortcuts.dynamic.has(id)) shortcuts.dynamic.set(id, info); } return 1; });
+  def(SHORTCUT_MANAGER, 'removeDynamicShortcuts', `(${LIST})V`, (r, _m, [, list]) => { for (const id of ids(r, list)) shortcuts.dynamic.delete(id); });
+  def(SHORTCUT_MANAGER, 'removeLongLivedShortcuts', `(${LIST})V`, (r, _m, [, list]) => { for (const id of ids(r, list)) shortcuts.dynamic.delete(id); });
+  def(SHORTCUT_MANAGER, 'removeAllDynamicShortcuts', '()V', () => { shortcuts.dynamic.clear(); });
+  def(SHORTCUT_MANAGER, 'disableShortcuts', `(${LIST})V`, (r, _m, [, list]) => { for (const id of ids(r, list)) { shortcuts.dynamic.delete(id); shortcuts.disabled.add(id); } });
+  def(SHORTCUT_MANAGER, 'disableShortcuts', `(${LIST}Ljava/lang/CharSequence;)V`, (r, _m, [, list]) => { for (const id of ids(r, list)) { shortcuts.dynamic.delete(id); shortcuts.disabled.add(id); } });
+  def(SHORTCUT_MANAGER, 'enableShortcuts', `(${LIST})V`, (r, _m, [, list]) => { for (const id of ids(r, list)) shortcuts.disabled.delete(id); });
+  def(SHORTCUT_MANAGER, 'reportShortcutUsed', `(${STRING})V`, (r, _m, [, id]) => { const value = text(r, id); if (shortcuts.used.length < 256) shortcuts.used.push(value); r.record(`SHORTCUT used ${value}`); });
 
   // ActivityManager: the virtual device runs exactly this app's process, in the foreground; memory figures are the VM's declared device (4 GiB RAM, 256 MiB app heap).
   const ACTIVITY_MANAGER = service('activity', 'Landroid/app/ActivityManager;'), PROC_INFO = 'Landroid/app/ActivityManager$RunningAppProcessInfo;', MEM_INFO = 'Landroid/app/ActivityManager$MemoryInfo;';
