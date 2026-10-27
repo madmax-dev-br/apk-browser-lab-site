@@ -163,7 +163,7 @@
       "id": "compose-state",
       "file": "compose-state-debug.apk",
       "title": "Compose · estado e formulários",
-      "description": "Material 3 com lista, filtro, formulário, diálogo e mudanças de estado em uma interface Android Compose real.",
+      "description": "Material 3 com lista, filtro, formulário, diálogo e mudanças de estado em uma interface Android Compose real. Executado e validado no navegador (fluxos completos, entrada real, comparação visual com capturas do Android).",
       "tags": [
         "Compose",
         "Material 3",
@@ -177,6 +177,21 @@
           "dev.apkweb.fixtures.state.MainActivity"
         ]
       },
+      "executionValidated": true,
+      "validation": {
+        "evidence": "evidence/validation/compose-state.json",
+        "generatedAt": "2026-10-27T04:17:11.848Z",
+        "verdict": true,
+        "criteria": {
+          "flowsNode": true,
+          "diagnostics": true,
+          "layoutSanity": true,
+          "parity": true,
+          "flowsBrowser": true,
+          "realTaps": true,
+          "strict": true
+        }
+      },
       "sizeBytes": 9388660,
       "available": true
     },
@@ -184,7 +199,7 @@
       "id": "compose-navigation",
       "file": "compose-navigation-debug.apk",
       "title": "Compose · navegação e Activities",
-      "description": "Fluxo lista → detalhe → editar com Navigation Compose, SettingsActivity e retorno de resultado via Activity Result.",
+      "description": "Fluxo lista → detalhe → editar com Navigation Compose, SettingsActivity e retorno de resultado via Activity Result. Executado e validado no navegador (fluxos completos, entrada real, comparação visual com capturas do Android).",
       "tags": [
         "Navigation Compose",
         "Activities",
@@ -198,6 +213,21 @@
           "dev.apkweb.fixtures.navigation.MainActivity",
           "dev.apkweb.fixtures.navigation.SettingsActivity"
         ]
+      },
+      "executionValidated": true,
+      "validation": {
+        "evidence": "evidence/validation/compose-navigation.json",
+        "generatedAt": "2026-10-27T03:50:30.692Z",
+        "verdict": true,
+        "criteria": {
+          "flowsNode": true,
+          "diagnostics": true,
+          "layoutSanity": true,
+          "parity": true,
+          "flowsBrowser": true,
+          "realTaps": true,
+          "strict": true
+        }
       },
       "sizeBytes": 9761987,
       "available": true
@@ -229,7 +259,7 @@
       "id": "hybrid-navigation",
       "file": "hybrid-navigation-debug.apk",
       "title": "Híbrido · Views e Compose",
-      "description": "NavHostFragment com navegação XML, ComposeView e AndroidView, combinando interfaces e várias Activities.",
+      "description": "NavHostFragment com navegação XML, ComposeView e AndroidView, combinando interfaces e várias Activities. Executado e validado no navegador (fluxos completos, entrada real, comparação visual com capturas do Android).",
       "tags": [
         "ComposeView",
         "AndroidView",
@@ -243,6 +273,21 @@
           "dev.apkweb.hybrid.MainActivity",
           "dev.apkweb.hybrid.ReviewActivity"
         ]
+      },
+      "executionValidated": true,
+      "validation": {
+        "evidence": "evidence/validation/hybrid-navigation.json",
+        "generatedAt": "2026-10-27T03:55:16.321Z",
+        "verdict": true,
+        "criteria": {
+          "flowsNode": true,
+          "diagnostics": true,
+          "layoutSanity": true,
+          "parity": true,
+          "flowsBrowser": true,
+          "realTaps": true,
+          "strict": true
+        }
       },
       "sizeBytes": 10385581,
       "available": true
@@ -266,14 +311,14 @@
       "id": "xml-projects",
       "file": "xml-projects-debug.apk",
       "title": "Projetos · XML, Fragments e três Activities",
-      "description": "Lista RecyclerView com busca e filtros, formulário condicional com validação, rascunho após recriar, confirmação e revisão via Activity Result. Tentativa experimental: a execução na web ainda não passou todos os critérios de validação.",
+      "description": "Lista RecyclerView com busca e filtros, formulário condicional com validação, rascunho após recriar, confirmação e revisão via Activity Result. Executado e validado no navegador (fluxos completos, entrada real, comparação visual com capturas do Android).",
       "tags": [
         "Navigation XML",
         "SavedStateHandle + recriação",
         "Review / Help Activities"
       ],
       "advanced": true,
-      "executionValidated": false,
+      "executionValidated": true,
       "expected": {
         "packageName": "dev.apkweb.projects",
         "launcherActivity": "dev.apkweb.projects.MainActivity",
@@ -285,14 +330,14 @@
       },
       "validation": {
         "evidence": "evidence/validation/xml-projects.json",
-        "generatedAt": "2026-10-26T15:02:26.330Z",
-        "verdict": false,
+        "generatedAt": "2026-10-27T04:04:16.495Z",
+        "verdict": true,
         "criteria": {
-          "flowsNode": false,
-          "diagnostics": false,
-          "layoutSanity": false,
+          "flowsNode": true,
+          "diagnostics": true,
+          "layoutSanity": true,
           "parity": true,
-          "flowsBrowser": false,
+          "flowsBrowser": true,
           "realTaps": true,
           "strict": true
         }
@@ -304,14 +349,14 @@
       "id": "compose-approvals",
       "file": "compose-approvals-debug.apk",
       "title": "Aprovações · Compose e orçamento",
-      "description": "Material 3 com lista, pesquisa, filtros, resumo, edição validada e diálogo de aprovação. Navigation Compose, estado restaurável e BudgetActivity com retorno de resultado. A execução Android Compose na web ainda está em desenvolvimento.",
+      "description": "Material 3 com lista, pesquisa, filtros, resumo, edição validada e diálogo de aprovação. Navigation Compose, estado restaurável e BudgetActivity com retorno de resultado. Executado e validado no navegador (fluxos completos, entrada real, comparação visual com capturas do Android).",
       "tags": [
         "Compose + Material 3",
         "Navigation + SavedState",
         "BudgetActivity"
       ],
       "advanced": true,
-      "executionValidated": false,
+      "executionValidated": true,
       "expected": {
         "packageName": "dev.apkweb.approvals",
         "launcherActivity": "dev.apkweb.approvals.MainActivity",
@@ -319,6 +364,20 @@
           "dev.apkweb.approvals.MainActivity",
           "dev.apkweb.approvals.BudgetActivity"
         ]
+      },
+      "validation": {
+        "evidence": "evidence/validation/compose-approvals.json",
+        "generatedAt": "2026-10-27T03:56:43.192Z",
+        "verdict": true,
+        "criteria": {
+          "flowsNode": true,
+          "diagnostics": true,
+          "layoutSanity": true,
+          "parity": true,
+          "flowsBrowser": true,
+          "realTaps": true,
+          "strict": true
+        }
       },
       "sizeBytes": 9822027,
       "available": true

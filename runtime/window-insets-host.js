@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=58b0147dafd8';
-import { gcRoot } from './heap-gc.js?v=58b0147dafd8';
+import { APKError } from './apk-runtime.js?v=33d211b8a989';
+import { gcRoot } from './heap-gc.js?v=33d211b8a989';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', INSETS = 'Landroid/view/WindowInsets;', RECT = 'Landroid/graphics/Rect;';
 const LISTENER = 'Landroid/view/View$OnApplyWindowInsetsListener;';
@@ -14,6 +14,7 @@ for (const signature of [
   'makeOptionalFitsSystemWindows()V', 'makeFrameworkOptionalFitsSystemWindows()V', 'isFrameworkOptionalFitsSystemWindows()Z',
 ]) keys.add(VIEW + '->' + signature);
 keys.add(`${VIEW}->getViewRootImpl()${ROOT_IMPL}`);
+keys.add(`${VIEW}->getWindowVisibleDisplayFrame(${RECT})V`);
 keys.add(GROUP + `->dispatchApplyWindowInsets(${INSETS})${INSETS}`);
 const call = (runtime, receiver, owner, name, parameters = [], result = 'V', values = [], mode = 'virtual') => runtime.dispatch(
   { owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...values], mode);
@@ -137,6 +138,13 @@ export function createWindowInsetsHost(platform) {
       if (name === 'getViewRootImpl') {
         const key = `${VIEW}->mAttachInfo:${ATTACH_INFO}`, info = view.fields.has(key) ? view.fields.get(key) : attachment(runtime, receiver);
         return info ? runtime.object(info).fields.get(`${ATTACH_INFO}->mViewRootImpl:${ROOT_IMPL}`) : null;
+      }
+      if (name === 'getWindowVisibleDisplayFrame') {
+        // View.getWindowVisibleDisplayFrame: the window's display frame (the whole display of this full-screen web window, 160 dpi so dp == px) plus its visible insets.
+        if (args[1] === null || args[1] === 0) runtime.throwJava('Ljava/lang/NullPointerException;', null);
+        const device = platform.device, fields = attached(runtime, receiver) ? runtime.object(runtime.object(runtime.object(receiver).fields.get(`${VIEW}->mAttachInfo:${ATTACH_INFO}`) ?? attachment(runtime, receiver)).fields.get(`${ATTACH_INFO}->mVisibleInsets:${RECT}`)).fields : null;
+        const inset = side => fields?.get(`${RECT}->${side}:I`) ?? 0;
+        call(runtime, args[1], RECT, 'set', ['I', 'I', 'I', 'I'], 'V', [inset('left'), inset('top'), device.widthDp - inset('right'), device.heightDp - inset('bottom')]); return;
       }
       if (name === 'setOnApplyWindowInsetsListener') { view.windowInsetsListener = args[1] || null; return; }
       if (name === 'requestApplyInsets' || name === 'requestFitSystemWindows') return schedule(runtime, receiver);

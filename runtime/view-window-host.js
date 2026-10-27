@@ -1,12 +1,12 @@
-import { APKError } from './apk-runtime.js?v=58b0147dafd8';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=58b0147dafd8';
+import { APKError } from './apk-runtime.js?v=33d211b8a989';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=33d211b8a989';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
 const nullish=x=>x===null||x===0||x===undefined;
 const same=(a,b)=>a?.ref!==undefined&&a.ref===b?.ref;
 const keys=new Set();
-keys.add(VIEW+'->isHardwareAccelerated()Z');
+keys.add(VIEW+'->isHardwareAccelerated()Z');keys.add(VIEW+'->findOnBackInvokedDispatcher()Landroid/window/OnBackInvokedDispatcher;');
 keys.add(VIEW+'->generateViewId()I');
 // Legacy View.startAnimation/setAnimation are not implemented (they fail as unsupported), so mCurrentAnimation is always null: clearAnimation() is then the original no-op and getAnimation() is null.
 keys.add(VIEW+'->clearAnimation()V');keys.add(VIEW+'->getAnimation()Landroid/view/animation/Animation;');
@@ -122,6 +122,7 @@ export function createViewWindowHost(platform){
     error(`Unsupported Choreographer operation ${name}`);
    }
    const view=runtime.object(receiver);
+   if(name==='findOnBackInvokedDispatcher'){const frame=frameOf(runtime,receiver);return frame?platform.backDispatcher.forOwner(runtime,frame.activity):null;}   // View.findOnBackInvokedDispatcher: the dispatcher of the window the View is attached to, null when detached
    if(name==='isHardwareAccelerated')return 0; // This window draws through the verified Skia CPU surface, with no HWUI/GPU window.
    if(name==='getDisplay'){if(!isAttached(runtime,receiver))return null;if(!display){display=runtime.makeObject(DISPLAY);runtime.object(display).virtualDisplay={id:0,refreshRate:60,rotation:0,valid:true,name:'APK Web virtual display 0'};runtime.record('DISPLAY 0 @60Hz [declared web-device profile; no Android host telemetry]');}return display;}
    if(name==='isInTouchMode')return isAttached(runtime,receiver)&&inTouchMode?1:0;

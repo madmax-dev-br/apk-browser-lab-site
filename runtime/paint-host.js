@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=58b0147dafd8';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=58b0147dafd8';
+import { APKError } from './apk-error.js?v=33d211b8a989';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=33d211b8a989';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -28,6 +28,7 @@ const keys = new Set([
   'getHinting()I', 'setHinting(I)V', 'getStartHyphenEdit()I', 'getEndHyphenEdit()I', 'setStartHyphenEdit(I)V', 'setEndHyphenEdit(I)V',
   'getTextBounds(Ljava/lang/String;IILandroid/graphics/Rect;)V', 'getTextBounds([CIILandroid/graphics/Rect;)V', 'getTextBounds(Ljava/lang/CharSequence;IILandroid/graphics/Rect;)V',
   'getRunAdvance([CIIIIZI)F', 'getRunAdvance(Ljava/lang/CharSequence;IIIIZI)F',
+  'getTextRunCursor([CIIZII)I', 'getTextRunCursor(Ljava/lang/CharSequence;IIZII)I', 'getTextRunCursor(Ljava/lang/String;IIZII)I',
   'getStrokeWidth()F', 'setStrokeWidth(F)V', 'getStrokeMiter()F', 'setStrokeMiter(F)V',
   `getColorFilter()${FILTER}`, `setColorFilter(${FILTER})${FILTER}`,
   `getXfermode()${XFERMODE}`, `setXfermode(${XFERMODE})${XFERMODE}`,
@@ -122,6 +123,30 @@ export function createPaintHost() {
         if(!runtime.skiaHost?.textBounds)fail('Paint text bounds requires the verified Skia glyph backend');
         const box=runtime.skiaHost.textBounds(content,paint);['left','top','right','bottom'].forEach((field,index)=>runtime.storeField(target.fields,`Landroid/graphics/Rect;->${field}:I`,box[index]));
         runtime.record('HOST Paint.getTextBounds [SkParagraph shaped glyph positions / original Skia Font bounds]');return;
+      }
+      if(name==='getTextRunCursor'){
+        // Paint.getTextRunCursor -> Minikin GraphemeBreak::getTextRunCursor: the nearest grapheme-cluster boundary of the context in the requested direction. Boundaries come from the
+        // original ICU4C character break rules (the Wasm ICU host); Minikin's extra ligature tailoring (it consults the shaped advances) is not applied.
+        if(nullish(args[1]))runtime.throwJava('Ljava/lang/NullPointerException;',null);
+        const kind=method.parameters[0];
+        let contextStart=args[2],contextEnd=kind==='[C'?args[2]+args[3]:args[3];const offset=args[5],option=args[6];
+        const length=kind==='[C'?runtime.array(args[1]).elements.length:typeof args[1]==='string'?args[1].length:runtime.dispatch({owner:runtime.typeOf(args[1]),name:'length',parameters:[],result:'I',signature:'()I'},[args[1]],'virtual');
+        if(((contextStart|contextEnd|offset|(contextEnd-contextStart)|(offset-contextStart)|(contextEnd-offset)|(length-contextEnd)|option)<0)||option>4)runtime.throwJava('Ljava/lang/IndexOutOfBoundsException;',null);
+        if(!runtime.icuBreakBackend?.breaks)fail('Paint.getTextRunCursor requires the original ICU grapheme-break Wasm host');
+        if(contextEnd-contextStart>65536)fail('Cursor context exceeds 65536 UTF16 units');
+        let content;
+        if(kind==='[C')content=String.fromCharCode(...runtime.array(args[1]).elements.slice(contextStart,contextEnd).map(v=>v&0xffff));
+        else if(typeof args[1]==='string')content=args[1].slice(contextStart,contextEnd);
+        else{const buffer=runtime.newArray('[C',contextEnd-contextStart);runtime.dispatch({owner:'Landroid/text/TextUtils;',name:'getChars',parameters:['Ljava/lang/CharSequence;','I','I','[C','I'],result:'V',signature:'(Ljava/lang/CharSequence;II[CI)V'},[args[1],contextStart,contextEnd,buffer,0],'static');content=String.fromCharCode(...runtime.array(buffer).elements.map(v=>v&0xffff));}
+        const count=content.length,boundaries=new Set(runtime.icuBreakBackend.breaks(content,'en_US','character')),isBreak=at=>at<=0||at>=count||boundaries.has(at);
+        let at=offset-contextStart,result;
+        switch(option){
+          case 0:if(at<count)at++;case 1:while(!isBreak(at))at++;result=at;break;     // AFTER, AT_OR_AFTER
+          case 2:if(at>0)at--;case 3:while(!isBreak(at))at--;result=at;break;         // BEFORE, AT_OR_BEFORE
+          default:result=isBreak(at)?at:-1;                                           // AT
+        }
+        runtime.record('HOST Paint.getTextRunCursor [original ICU4C grapheme boundaries]');
+        return result===-1?-1:result+contextStart;
       }
       if(name==='getRunAdvance'){
         if(nullish(args[1]))runtime.throwJava('Ljava/lang/IllegalArgumentException;','text cannot be null');

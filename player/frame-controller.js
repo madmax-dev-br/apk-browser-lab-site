@@ -1,8 +1,8 @@
 // Message-driven controller of one player frame. DOM-free: the VM client, the shared device view and the postMessage sink are injected, so the
 // same code runs in the real frame (frame.js) and in the headless smoke test.
-import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES } from './protocol.js?v=58b0147dafd8';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=58b0147dafd8';
-import { sanitizeSettings } from '../device-settings.js?v=58b0147dafd8';
+import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES } from './protocol.js?v=33d211b8a989';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=33d211b8a989';
+import { sanitizeSettings } from '../device-settings.js?v=33d211b8a989';
 export function createFrameController({ vm, state, deviceState, post, fetchImpl = globalThis.fetch?.bind(globalThis), hooks = {} }) {
   let view = null, source = null, config = {}, lastActivity = null, destroyed = false, chain = Promise.resolve(), inflight = 0, oomSeen = 0, lastStubs = { void: [], returns: [], classes: [] }, packageName = '', tolerateRunning = 'off'; const dropped = [];
   const send = (type, payload) => post(envelope(type, payload));
@@ -90,6 +90,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
       if (message.config.tolerateMissing !== undefined && state.runtime === vm && state.apkRunning && tolerate() !== tolerateRunning) rejected.push(`tolerateMissing (applies at the next launch: restart() the player; running with ${tolerateRunning})`);
       if (state.runtime !== vm || !state.apkRunning) { send('config-applied', { config: effective(), rejected, live: false, outcome: null }); return; }
       try {
+        for (let waited = 0; vm.pending && waited < 5000; waited += 25) await new Promise(resolve => setTimeout(resolve, 25));   // the VM serves one request at a time: let an in-flight scheduled event or input finish first
         const { outcome, snapshot } = await vm.setDevice(settings); if (snapshot) view.renderSnapshot(snapshot);
         send('config-applied', { config: effective(), rejected, live: true, outcome: outcome ? { changed: outcome.changed | 0, relaunched: outcome.relaunched | 0, delivered: outcome.delivered | 0 } : null });
       } catch (error) { fail(error, 'config'); }

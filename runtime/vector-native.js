@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=58b0147dafd8';
-import { getSolidPaint } from './paint-host.js?v=58b0147dafd8';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=58b0147dafd8';
+import { APKError } from './apk-error.js?v=33d211b8a989';
+import { getSolidPaint } from './paint-host.js?v=33d211b8a989';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=33d211b8a989';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -140,7 +140,7 @@ export function createVectorNativeBindings(){
 
 /** Software Canvas system boundary; drawable algorithms still execute their boot DEX. */
 export function createVectorCanvasHost(){
- const owner='Landroid/graphics/Canvas;',keys=new Set(['<init>()V','getNativeCanvasWrapper()J','isHardwareAccelerated()Z','save()I','restore()V','restoreToCount(I)V','getSaveCount()I','translate(FF)V','scale(FF)V','rotate(F)V','getDensity()I','setDensity(I)V','drawRect(Landroid/graphics/Rect;Landroid/graphics/Paint;)V','drawRect(FFFFLandroid/graphics/Paint;)V'].map(s=>owner+'->'+s));
+ const owner='Landroid/graphics/Canvas;',keys=new Set(['<init>()V','getNativeCanvasWrapper()J','isHardwareAccelerated()Z','save()I','restore()V','restoreToCount(I)V','getSaveCount()I','translate(FF)V','scale(FF)V','rotate(F)V','skew(FF)V','getDensity()I','setDensity(I)V','drawRect(Landroid/graphics/Rect;Landroid/graphics/Paint;)V','drawRect(FFFFLandroid/graphics/Paint;)V'].map(s=>owner+'->'+s));
  return {
   supports:key=>keys.has(key),canAllocate:type=>type===owner,parent:type=>type===owner?'Ljava/lang/Object;':null,
   invoke(runtime,method,args){
@@ -171,6 +171,7 @@ export function createVectorCanvasHost(){
    const matrix=canvas.matrix,[a,b,c,d,e,f]=matrix,x=finite(f32(args[1])),y=method.parameters.length>1?finite(f32(args[2])):0;
    if(name==='translate'){matrix[4]=a*x+c*y+e;matrix[5]=b*x+d*y+f;return;}
    if(name==='scale'){matrix[0]=a*x;matrix[1]=b*x;matrix[2]=c*y;matrix[3]=d*y;return;}
+   if(name==='skew'){matrix[0]=a+c*y;matrix[1]=b+d*y;matrix[2]=a*x+c;matrix[3]=b*x+d;return;}   // M x [1 sx 0; sy 1 0]: Canvas.skew(sx, sy)
    if(name==='rotate'){const radians=x*Math.PI/180,s=Math.sin(radians),cos=Math.cos(radians);matrix[0]=a*cos+c*s;matrix[1]=b*cos+d*s;matrix[2]=c*cos-a*s;matrix[3]=d*cos-b*s;return;}
    problem(`Unsupported Canvas operation ${name}`);
   },

@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=58b0147dafd8';
-import { Blocked, QUANTUM } from './scheduler.js?v=58b0147dafd8';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=58b0147dafd8';
+import { APKError } from './apk-error.js?v=33d211b8a989';
+import { Blocked, QUANTUM } from './scheduler.js?v=33d211b8a989';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=33d211b8a989';
 
 // Frame-based DEX interpreter.
 //
@@ -50,8 +50,20 @@ function prepare(rt, method, code) {
   // Code units are little-endian 16-bit words; a view avoids copying when the code item is 2-byte aligned (always, in a well-formed DEX, unless the input buffer is offset oddly).
   const units = (byteStart & 1) === 0 && LITTLE_ENDIAN ? new Uint16Array(reader.bytes.buffer, byteStart, code.units) : Uint16Array.from({ length: code.units }, (_, i) => reader.view.getUint16(code.offset + i * 2, true));
   const origin = rt.methodOrigin(method);
-  const prog = { dex, units, refs: new Array(code.units), tries: null, stats: rt.executionByOrigin[origin], key: method.key, filename: dex.filename ?? 'DEX', calls: 0, loops: 0, fn: null, method, code };
+  const prog = { dex, units, refs: new Array(code.units), tries: null, stats: rt.executionByOrigin[origin], key: method.key, filename: dex.filename ?? 'DEX', calls: 0, loops: 0, fn: null, method, code, getter: detectGetter(code, units) };
   progs.set(rt, prog); return prog;
+}
+
+/**
+ * A trivial getter -- `iget* vA, p0, field; return* vA` on a method taking only the receiver -- is described by its iget opcode (and null otherwise). The invoke instruction runs such a callee
+ * without creating a frame (see the cached-call path in runLoop) when every precondition of the ordinary path holds, and keeps all of its bookkeeping.
+ */
+function detectGetter(code, units) {
+  if (code.units !== 3 || code.incoming !== 1 || code.tries) return null;
+  const w0 = units[0], op0 = w0 & 255, destination = (w0 >> 8) & 15, objectRegister = w0 >> 12, w2 = units[2], op2 = w2 & 255;
+  if (op0 < 0x52 || op0 > 0x58 || op0 === 0x53 || (op2 !== 0x0f && op2 !== 0x11) || (op0 === 0x54) !== (op2 === 0x11)) return null;
+  if (objectRegister !== code.registers - 1 || destination !== (w2 >> 8)) return null;
+  return op0;
 }
 
 /** Creates the frame for a call and, when the method has been called twice, compiles it (see baseline-compiler.js). */
@@ -71,7 +83,7 @@ function makeInvokeSite(dex, u, pc, op, a, hi) {
   const argc = range ? a : hi;
   if (!range && hi > 5) fail('Invalid invoke register count');
   if (argc !== wordCount(target.parameters) + (mode === 'static' ? 0 : 1)) fail('Invalid invoke argument shape');
-  return { target, mode, virtual: mode === 'virtual', isStatic: mode === 'static', argc, first: range ? u[pc + 2] : -1, definition: null, type: null, callee: null, calleeProg: null, initialized: false, bridge: null, bridgeEpoch: -1, bridgeType: null };
+  return { target, mode, virtual: mode === 'virtual', isStatic: mode === 'static', argc, first: range ? u[pc + 2] : -1, definition: null, type: null, callee: null, calleeProg: null, poly: null, initialized: false, bridge: null, bridgeEpoch: -1, bridgeType: null };
 }
 function fieldSiteFor(rt, reference, type) {
   if (!reference || !rt.isSubtype(type, reference.owner)) fail('Invalid field/receiver');
@@ -284,9 +296,10 @@ function runLoop(rt, owner, base) {
   const sched = rt.scheduler;
   let thread = owner, frames = null, f = null, regs = null, prog = null, u = null, dex = null, stats = null, pc = 0, start = 0, returnValue, returning = false;
   let need = owner === null, quantum = QUANTUM, ran = false, input = null;
-  const max = rt.maxInstructionsPerEvent;
+  const max = rt.maxInstructionsPerEvent, heapList = rt.heap.list, fastCalls = rt.fastCallPaths !== false; let probe = rt.instructionProbe;
   if (owner !== null) { frames = owner.frames; f = frames[frames.length - 1]; regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc; start = pc; }
   for (;;) {
+    probe = rt.instructionProbe;
     try {
       // ---- host steps and thread drivers: advance them until a Java frame is on top again, the thread blocks, or a value/error reaches a DEX frame
       while (input !== null) {
@@ -345,15 +358,12 @@ function runLoop(rt, owner, base) {
         if (++rt.steps > max) fail(`Instruction budget (${max}/event) exceeded`);
         stats.instructions++;
         const w = u[pc], op = w & 255, a = w >> 8, lo = a & 15, hi = a >> 4;
-        if (rt.instructionProbe) rt.instructionProbe(f.method, dex, pc, op, probeWord(u, pc));
+        if (probe) probe(f.method, dex, pc, op, probeWord(u, pc));
         switch (op) {
           case 0x00: if (w) fail('Attempted to execute a DEX data payload'); pc++; break;
           case 0x01: case 0x07: regs[lo] = regs[hi]; pc++; break;
           case 0x02: case 0x08: regs[a] = regs[u[pc + 1]]; pc += 2; break;
           case 0x03: case 0x09: regs[u[pc + 1]] = regs[u[pc + 2]]; pc += 3; break;
-          case 0x04: { if (regs[hi + 1] !== WIDE_HIGH) fail(`Invalid wide high register v${hi + 1}`); regs[lo] = wide(regs[hi]); regs[lo + 1] = WIDE_HIGH; pc++; break; }
-          case 0x05: { const s = u[pc + 1]; if (regs[s + 1] !== WIDE_HIGH) fail(`Invalid wide high register v${s + 1}`); regs[a] = wide(regs[s]); regs[a + 1] = WIDE_HIGH; pc += 2; break; }
-          case 0x06: { const d = u[pc + 1], s = u[pc + 2]; if (regs[s + 1] !== WIDE_HIGH) fail(`Invalid wide high register v${s + 1}`); regs[d] = wide(regs[s]); regs[d + 1] = WIDE_HIGH; pc += 3; break; }
           case 0x0a: case 0x0c: if (f.result === undefined) fail('move-result without result'); regs[a] = f.result; f.result = undefined; pc++; break;
           case 0x0b: if (typeof f.result !== 'bigint') fail('move-result-wide without wide result'); regs[a] = BigInt.asIntN(64, f.result); regs[a + 1] = WIDE_HIGH; f.result = undefined; pc++; break;
           case 0x0d: if (!f.pendingException) fail('move-exception without caught exception'); regs[a] = f.pendingException; f.pendingException = null; pc++; break;
@@ -365,16 +375,11 @@ function runLoop(rt, owner, base) {
           case 0x13: regs[a] = (u[pc + 1] << 16) >> 16; pc += 2; break;
           case 0x14: regs[a] = u[pc + 1] | (u[pc + 2] << 16); pc += 3; break;
           case 0x15: regs[a] = u[pc + 1] << 16; pc += 2; break;
-          case 0x16: regs[a] = BigInt((u[pc + 1] << 16) >> 16); regs[a + 1] = WIDE_HIGH; pc += 2; break;
-          case 0x17: regs[a] = BigInt(u[pc + 1] | (u[pc + 2] << 16)); regs[a + 1] = WIDE_HIGH; pc += 3; break;
-          case 0x18: regs[a] = BigInt.asIntN(64, BigInt(u[pc + 1]) | BigInt(u[pc + 2]) << 16n | BigInt(u[pc + 3]) << 32n | BigInt(u[pc + 4]) << 48n); regs[a + 1] = WIDE_HIGH; pc += 5; break;
-          case 0x19: regs[a] = BigInt.asIntN(64, BigInt(u[pc + 1]) << 48n); regs[a + 1] = WIDE_HIGH; pc += 2; break;
           case 0x1a: case 0x1b: {
             const index = op === 0x1a ? u[pc + 1] : u[pc + 1] + u[pc + 2] * 65536;
             if (index >= dex.strings.length) fail('Invalid string index');
             regs[a] = dex.strings[index]; pc += op === 0x1a ? 2 : 3; break;
           }
-          case 0x1c: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid class type'); regs[a] = rt.classObject(type); pc += 2; break; }
           case 0x1d: case 0x1e: {
             const value = regs[a]; if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'null monitor');
             if (op === 0x1d) {
@@ -392,60 +397,12 @@ function runLoop(rt, owner, base) {
           }
           case 0x20: { const type = dex.types[u[pc + 1]], value = regs[hi]; if (!type) fail('Invalid instanceof type'); regs[lo] = !isNull(value) && rt.isSubtype(rt.typeOf(value), type) ? 1 : 0; pc += 2; break; }
           case 0x21: regs[lo] = rt.array(regs[hi]).elements.length; pc++; break;
-          case 0x22: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid allocation type'); regs[a] = rt.allocate(type); pc += 2; break; }
+          case 0x22: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid allocation type'); if (rt.initialized.get(type)?.status !== 'initialized') { const gate = rt.initStep(type); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } regs[a] = rt.allocate(type); pc += 2; break; }
           case 0x23: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid array type'); regs[lo] = rt.newArray(type, int(regs[hi])); pc += 2; break; }
-          case 0x24: case 0x25: {
-            const type = dex.types[u[pc + 1]]; if (!type?.startsWith('[') || ['J', 'D'].includes(type.slice(1))) fail('Invalid filled-new-array type');
-            const registers = invokeRegisters(u, pc, regs, op, a, lo, hi), value = rt.newArray(type, registers.length), array = rt.object(value);
-            for (let i = 0; i < registers.length; i++) { const entry = regs[registers[i]]; rt.checkArrayValue(array, entry); array.elements[i] = narrow(entry, type.slice(1)); }
-            f.result = value; pc += 3; break;
-          }
-          case 0x26: {
-            const array = rt.array(regs[a]), payload = pc + (u[pc + 1] | (u[pc + 2] << 16)), tag = u[payload], width = u[payload + 1];
-            const size = u[payload + 2] + u[payload + 3] * 65536;
-            const expected = { Z: 1, B: 1, C: 2, S: 2, I: 4, F: 4, J: 8, D: 8 }[array.type.slice(1)];
-            if (tag !== 0x0300 || !expected || width !== expected || size > array.elements.length || payload + 4 + Math.ceil(size * width / 2) > f.code.units) fail('Malformed fill-array-data payload');
-            const type = array.type.slice(1);
-            for (let i = 0; i < size; i++) {
-              const p = payload + 4 + (i * width >> 1);
-              let value;
-              if (width === 1) value = (i & 1) ? u[p] >> 8 : u[p] & 255;
-              else if (width === 2) value = u[p];
-              else if (width === 4) value = (u[p] | (u[p + 1] << 16)) | 0;
-              else value = BigInt.asIntN(64, BigInt(u[p] | (u[p + 1] << 16)) & 0xffffffffn | BigInt(u[p + 2] | (u[p + 3] << 16)) << 32n);
-              array.elements[i] = narrow(value, type);
-            }
-            pc += 3; break;
-          }
           case 0x27: { const value = regs[a]; if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'throw null'); throw new JavaException(value, rt.object(value).message ?? rt.typeOf(value), rt.object(value).exceptionDetails); }
           case 0x28: { const target = pc + ((a << 24) >> 24); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && --quantum <= 0) { quantum = QUANTUM; if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
           case 0x29: { const target = pc + ((u[pc + 1] << 16) >> 16); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && --quantum <= 0) { quantum = QUANTUM; if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
           case 0x2a: { const target = pc + (u[pc + 1] | (u[pc + 2] << 16)); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && --quantum <= 0) { quantum = QUANTUM; if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
-          case 0x2b: case 0x2c: {
-            const value = int(regs[a]), payload = pc + (u[pc + 1] | (u[pc + 2] << 16)), expected = op === 0x2b ? 0x0100 : 0x0200;
-            if (u[payload] !== expected) fail('Malformed switch payload');
-            const size = u[payload + 1]; if (size > 65535) fail('Switch size exceeds limit');
-            let target = null;
-            if (op === 0x2b) { const index = value - (u[payload + 2] | (u[payload + 3] << 16)); if (index >= 0 && index < size) { const at = payload + 4 + index * 2; target = u[at] | (u[at + 1] << 16); } }
-            else {
-              let low = 0, high = size - 1;
-              while (low <= high) {
-                const middle = (low + high) >>> 1, keyAt = payload + 2 + middle * 2, key = u[keyAt] | (u[keyAt + 1] << 16);
-                if (key === value) { const at = payload + 2 + size * 2 + middle * 2; target = u[at] | (u[at + 1] << 16); break; }
-                if (key < value) low = middle + 1; else high = middle - 1;
-              }
-            }
-            if (target === null) pc += 3; else { const t = pc + target; if (t < 0 || t >= f.code.units) fail('Branch target outside method'); pc = t; }
-            break;
-          }
-          case 0x2d: case 0x2e: case 0x2f: case 0x30: case 0x31: {
-            const packed = u[pc + 1], left = packed & 255, right = packed >> 8;
-            let x, y;
-            if (op === 0x31) { x = H.getWide(regs, left); y = H.getWide(regs, right); }
-            else if (op <= 0x2e) { x = floatNumber(regs[left]); y = floatNumber(regs[right]); }
-            else { x = doubleNumber(H.getWide(regs, left)); y = doubleNumber(H.getWide(regs, right)); }
-            regs[a] = Number.isNaN(x) || Number.isNaN(y) ? (op === 0x2e || op === 0x30 ? 1 : -1) : x < y ? -1 : x > y ? 1 : 0; pc += 2; break;
-          }
           case 0x32: case 0x33: case 0x34: case 0x35: case 0x36: case 0x37: {
             const x = regs[lo], y = regs[hi];
             const match = op === 0x32 ? (x === y || equal(x, y)) : op === 0x33 ? (x !== y && !equal(x, y)) : op === 0x34 ? x < y : op === 0x35 ? x >= y : op === 0x36 ? x > y : x <= y;
@@ -459,29 +416,34 @@ function runLoop(rt, owner, base) {
             break;
           }
           case 0x44: case 0x45: case 0x46: case 0x47: case 0x48: case 0x49: case 0x4a: {
-            const packed = u[pc + 1], index = regs[packed >> 8], array = rt.array(regs[packed & 255], index), variant = op - 0x44, e = array.elements[index];
+            const packed = u[pc + 1], index = regs[packed >> 8], arrayRef = regs[packed & 255]; let array; if (arrayRef !== null && typeof arrayRef === 'object') array = heapList[arrayRef.ref];
+            if (array === undefined || array.elements === undefined || !(index >= 0 && index < array.elements.length)) array = rt.array(arrayRef, index);
+            const variant = op - 0x44, e = array.elements[index];
             if (variant === 1) { regs[a] = e; regs[a + 1] = WIDE_HIGH; } else regs[a] = variant === 3 ? e & 1 : variant === 4 ? (e << 24) >> 24 : variant === 5 ? e & 65535 : variant === 6 ? (e << 16) >> 16 : e;
             pc += 2; break;
           }
           case 0x4b: case 0x4c: case 0x4d: case 0x4e: case 0x4f: case 0x50: case 0x51: {
-            const packed = u[pc + 1], index = regs[packed >> 8], array = rt.array(regs[packed & 255], index), variant = op - 0x4b, v = regs[a];
+            const packed = u[pc + 1], index = regs[packed >> 8], arrayRef = regs[packed & 255]; let array; if (arrayRef !== null && typeof arrayRef === 'object') array = heapList[arrayRef.ref];
+            if (array === undefined || array.elements === undefined || !(index >= 0 && index < array.elements.length)) array = rt.array(arrayRef, index);
+            const variant = op - 0x4b, v = regs[a];
             const value = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
             if (variant === 2) rt.checkArrayValue(array, value);
             array.elements[index] = value;
             pc += 2; break;
           }
           case 0x52: case 0x53: case 0x54: case 0x55: case 0x56: case 0x57: case 0x58: {
-            const obj = rt.object(regs[hi]);
+            const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList[objectRef.ref]; if (obj === undefined) obj = rt.object(objectRef);
             let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = prog.refs[pc] = fieldSiteFor(rt, dex.fields[u[pc + 1]], obj.type);
             let v = obj.fields.get(site.key); if (v === undefined) v = site.def;
             const variant = op - 0x52;
-            if (variant === 1) { regs[lo] = v; regs[lo + 1] = WIDE_HIGH; } else regs[lo] = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
+            if (variant === 0 || variant === 2) regs[lo] = v;
+            else if (variant === 1) { regs[lo] = v; regs[lo + 1] = WIDE_HIGH; } else regs[lo] = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : (v << 16) >> 16;
             pc += 2; break;
           }
           case 0x59: case 0x5a: case 0x5b: case 0x5c: case 0x5d: case 0x5e: case 0x5f: {
-            const obj = rt.object(regs[hi]);
+            const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList[objectRef.ref]; if (obj === undefined) obj = rt.object(objectRef);
             let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = prog.refs[pc] = fieldSiteFor(rt, dex.fields[u[pc + 1]], obj.type);
-            const variant = op - 0x59, v = regs[lo], value = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
+            const variant = op - 0x59, v = regs[lo], value = variant <= 2 ? v : variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : (v << 16) >> 16;
             const fields = obj.fields; if (fields.has(site.key)) fields.set(site.key, value); else rt.storeField(fields, site.key, value);
             pc += 2; break;
           }
@@ -489,7 +451,7 @@ function runLoop(rt, owner, base) {
             const reference = dex.fields[u[pc + 1]]; if (!reference) fail('Invalid static field index');
             let site = prog.refs[pc], v;
             if (site !== undefined && site.ready) { v = rt.staticFields.get(site.key); if (v === undefined) v = rt.readStatic(reference); }
-            else { v = rt.readStatic(reference); const field = rt.resolveField(reference); prog.refs[pc] = { ready: rt.initialized.get(field.owner)?.status === 'initialized' && rt.staticFields.has(field.key), key: field.key }; }
+            else { const field = rt.resolveField(reference); if (rt.initialized.get(field.owner)?.status !== 'initialized') { const gate = rt.initStep(field.owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } v = rt.readStatic(reference); prog.refs[pc] = { ready: rt.initialized.get(field.owner)?.status === 'initialized' && rt.staticFields.has(field.key), key: field.key }; }
             const variant = op - 0x60;
             if (variant === 1) { regs[a] = v; regs[a + 1] = WIDE_HIGH; } else regs[a] = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
             pc += 2; break;
@@ -499,7 +461,7 @@ function runLoop(rt, owner, base) {
             const variant = op - 0x67, v = regs[a], value = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
             const site = prog.refs[pc];
             if (site !== undefined && site.ready && rt.staticFields.has(site.key)) rt.staticFields.set(site.key, value);
-            else { rt.writeStatic(reference, value); const field = rt.resolveField(reference); prog.refs[pc] = { ready: rt.initialized.get(field.owner)?.status === 'initialized' && rt.staticFields.has(field.key), key: field.key }; }
+            else { const field = rt.resolveField(reference); if (rt.initialized.get(field.owner)?.status !== 'initialized') { const gate = rt.initStep(field.owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.writeStatic(reference, value); prog.refs[pc] = { ready: rt.initialized.get(field.owner)?.status === 'initialized' && rt.staticFields.has(field.key), key: field.key }; }
             pc += 2; break;
           }
           case 0x6e: case 0x6f: case 0x70: case 0x71: case 0x72:
@@ -507,29 +469,56 @@ function runLoop(rt, owner, base) {
             let site = prog.refs[pc]; if (site === undefined) site = prog.refs[pc] = makeInvokeSite(dex, u, pc, op, a, hi);
             // Inline cache: the DEX callee a call site resolved to is remembered (per receiver class for virtual calls) and entered without going through dispatch().
             // The callee's register file is filled straight from this frame's registers; no argument array is built on a hit.
-            const cached = site.callee;
+            let cached = site.callee, calleeProg = site.calleeProg;
             if (cached !== null) {
               let hit = true;
               if (site.virtual) {
                 const receiver = regs[site.first >= 0 ? site.first : u[pc + 2] & 15];
-                hit = (receiver !== null && typeof receiver === 'object' ? (rt.heap.list[receiver.ref]?.type ?? rt.typeOf(receiver)) : rt.typeOf(receiver)) === site.type;
+                const receiverType = receiver !== null && typeof receiver === 'object' ? (rt.heap.list[receiver.ref]?.type ?? rt.typeOf(receiver)) : rt.typeOf(receiver);
+                if (receiverType !== site.type) {
+                  // Polymorphic inline cache: the other receiver classes this site has resolved to a DEX body (the first one stays in site.callee, which compiled code reads).
+                  hit = false; const poly = site.poly;
+                  if (poly !== null) { const entry = poly.get(receiverType); if (entry !== undefined) { cached = entry.callee; calleeProg = entry.prog; hit = true; } }
+                }
               }
               if (hit) {
                 rt.callStats.cached++;
-                if (site.isStatic && !site.initialized) { rt.initialize(cached.method.owner); site.initialized = rt.initialized.get(cached.method.owner)?.status === 'initialized'; }
-                rt.recordMethod(cached.method);
+                if (site.isStatic && !site.initialized) { { const gate = rt.initStep(cached.method.owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } site.initialized = rt.initialized.get(cached.method.owner)?.status === 'initialized'; }
+                // APKRuntime.recordMethod / record, inlined for the steady state (counters known, trace ring past its fixed head): per-method counters, evidence row, ring entry.
+                const calleeMethod = cached.method, info = calleeMethod.recordInfo, ring = rt.traceRing;
+                if (!fastCalls || info === undefined || rt.traceMuted || ring == null || ring.head.length < 128) rt.recordMethod(calleeMethod);
+                else {
+                  info.stats.methods++; const evidence = info.evidence; if (evidence !== undefined && evidence.calls < Number.MAX_SAFE_INTEGER) evidence.calls++;
+                  if (ring.length === 384) { ring.tail[ring.start] = info.entry; ring.start = ring.start === 383 ? 0 : ring.start + 1; rt.traceDropped = (rt.traceDropped ?? 0) + 1; }
+                  else ring.tail[(ring.start + ring.length++) % 384] = info.entry;
+                }
                 if (frames.length + rt.depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
-                const calleeCode = cached.code, calleeProg = site.calleeProg, argc = site.argc, nregs = calleeCode.registers, nr = new Array(nregs), at = nregs - argc;
+                const calleeCode = cached.code, argc = site.argc, nregs = calleeCode.registers, nr = new Array(nregs), at = nregs - argc;
                 if (site.first >= 0) { const first = site.first; for (let j = 0; j < argc; j++) nr[at + j] = regs[first + j]; }
                 else { const packed = u[pc + 2]; switch (argc) { case 5: nr[at + 4] = regs[lo]; case 4: nr[at + 3] = regs[(packed >> 12) & 15]; case 3: nr[at + 2] = regs[(packed >> 8) & 15]; case 2: nr[at + 1] = regs[(packed >> 4) & 15]; case 1: nr[at] = regs[packed & 15]; } }
                 f.pc = pc + 3; f.callPc = start; if (frames.length + rt.depth + 1 > rt.peakCallDepth) rt.peakCallDepth = frames.length + rt.depth + 1;
                 if (++calleeProg.calls === rt.jitThreshold) compileHot(rt, calleeProg);
+                const getter = calleeProg.getter;
+                if (getter !== null && fastCalls && quantum > 1 && rt.steps + 2 <= max && !probe) {
+                  // Frameless trivial getter: the two instructions the callee would run (iget, return) are executed here, with their effects on the instruction budget and counters.
+                  const receiver = regs[site.first >= 0 ? site.first : u[pc + 2] & 15]; let target; if (receiver !== null && typeof receiver === 'object') target = heapList[receiver.ref];
+                  if (target !== undefined) {
+                    const fieldSite = calleeProg.refs[0];
+                    if (fieldSite !== undefined && fieldSite.type === target.type) {
+                      let v = target.fields.get(fieldSite.key); if (v === undefined) v = fieldSite.def;
+                      if (getter === 0x55) v &= 1; else if (getter === 0x56) v = (v << 24) >> 24; else if (getter === 0x57) v &= 65535; else if (getter === 0x58) v = (v << 16) >> 16;
+                      rt.steps += 2; calleeProg.stats.instructions += 2; quantum--;
+                      f.result = getter === 0x54 && (v === 0 || v === null) ? null : v; pc += 3; break;
+                    }
+                  }
+                }
                 f = new Frame(cached.method, calleeCode, nr, calleeProg); frames.push(f);
                 regs = nr; prog = calleeProg; u = prog.units; dex = prog.dex; stats = prog.stats; pc = 0;
                 if (--quantum <= 0) { quantum = QUANTUM; if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = 0; need = true; break inner; } }
                 break;
               }
             }
+            if (site.isStatic && !site.initialized) { const owner = rt.staticOwner(site.target); if (rt.initialized.get(owner)?.status !== 'initialized') { const gate = rt.initStep(owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } else site.initialized = true; }
             const argc = site.argc, args = new Array(argc);
             if (site.first >= 0) { const first = site.first; for (let j = 0; j < argc; j++) args[j] = regs[first + j]; }
             else { const packed = u[pc + 2]; switch (argc) { case 5: args[4] = regs[lo]; case 4: args[3] = regs[(packed >> 12) & 15]; case 3: args[2] = regs[(packed >> 8) & 15]; case 2: args[1] = regs[(packed >> 4) & 15]; case 1: args[0] = regs[packed & 15]; } }
@@ -550,7 +539,10 @@ function runLoop(rt, owner, base) {
             }
             if (outcome instanceof PendingCall) {
               if (outcome.definition !== null && !(site.virtual && typeof args[0] !== 'string' && rt.object(args[0]).annotationValues)) {
-                site.callee = outcome.definition; site.type = site.virtual ? rt.typeOf(args[0]) : null; site.calleeProg = prepare(rt, outcome.method, outcome.code);
+                if (fastCalls && site.callee !== null && site.virtual) {
+                  const type = rt.typeOf(args[0]), poly = site.poly ??= new Map();
+                  if (type !== site.type && poly.size < 16) poly.set(type, { callee: outcome.definition, prog: prepare(rt, outcome.method, outcome.code) });
+                } else { site.callee = outcome.definition; site.type = site.virtual ? rt.typeOf(args[0]) : null; site.calleeProg = prepare(rt, outcome.method, outcome.code); }
               }
               if (frames.length + rt.depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
               if (outcome.args.length !== outcome.code.incoming) fail(`Argument/register mismatch: ${outcome.method.key}`);
@@ -570,46 +562,30 @@ function runLoop(rt, owner, base) {
             }
             f.result = outcome; pc += 3; break;
           }
-          case 0x7b: regs[lo] = (-int(regs[hi])) | 0; pc++; break;
-          case 0x7c: regs[lo] = ~int(regs[hi]); pc++; break;
-          case 0x7d: H.putWide(regs, lo, -H.getWide(regs, hi)); pc++; break;
-          case 0x7e: H.putWide(regs, lo, ~H.getWide(regs, hi)); pc++; break;
-          case 0x7f: regs[lo] = floatBits(-floatNumber(regs[hi])); pc++; break;
-          case 0x80: H.putWide(regs, lo, doubleBits(-doubleNumber(H.getWide(regs, hi)))); pc++; break;
-          case 0x81: H.putWide(regs, lo, BigInt(int(regs[hi]))); pc++; break;
-          case 0x82: regs[lo] = floatBits(int(regs[hi])); pc++; break;
-          case 0x83: H.putWide(regs, lo, doubleBits(int(regs[hi]))); pc++; break;
-          case 0x84: regs[lo] = Number(BigInt.asIntN(32, H.getWide(regs, hi))); pc++; break;
-          case 0x85: regs[lo] = floatBits(Number(H.getWide(regs, hi))); pc++; break;
-          case 0x86: H.putWide(regs, lo, doubleBits(Number(H.getWide(regs, hi)))); pc++; break;
-          case 0x87: regs[lo] = javaInt(floatNumber(regs[hi])); pc++; break;
-          case 0x88: H.putWide(regs, lo, javaLong(floatNumber(regs[hi]))); pc++; break;
-          case 0x89: H.putWide(regs, lo, doubleBits(floatNumber(regs[hi]))); pc++; break;
-          case 0x8a: regs[lo] = javaInt(doubleNumber(H.getWide(regs, hi))); pc++; break;
-          case 0x8b: H.putWide(regs, lo, javaLong(doubleNumber(H.getWide(regs, hi)))); pc++; break;
-          case 0x8c: regs[lo] = floatBits(doubleNumber(H.getWide(regs, hi))); pc++; break;
-          case 0x8d: regs[lo] = signed8(int(regs[hi])); pc++; break;
-          case 0x8e: regs[lo] = int(regs[hi]) & 65535; pc++; break;
-          case 0x8f: regs[lo] = signed16(int(regs[hi])); pc++; break;
-          default: {
-            if (op >= 0x90 && op <= 0xcf) {
-              const two = op >= 0xb0, relative = op - (two ? 0xb0 : 0x90);
-              const group = relative < 11 ? 0 : relative < 22 ? 1 : relative < 27 ? 2 : 3;
-              const operation = relative - (group === 0 ? 0 : group === 1 ? 11 : group === 2 ? 22 : 27);
-              const packed = two ? 0 : u[pc + 1], destination = two ? lo : a, left = two ? lo : packed & 255, right = two ? hi : packed >> 8;
-              const wideLeft = group === 1 || group === 3, wideRight = group === 3 || (group === 1 && operation < 8);
-              const x = wideLeft ? H.getWide(regs, left) : regs[left], y = wideRight ? H.getWide(regs, right) : regs[right];
-              const value = numericBinary(group, operation, x, y);
-              if (wideLeft) H.putWide(regs, destination, value); else regs[destination] = value;
-              pc += two ? 1 : 2;
-            } else if (op >= 0xd0 && op <= 0xd7) {
-              const x = int(regs[hi]), y = (u[pc + 1] << 16) >> 16, operation = op - 0xd0;
-              regs[lo] = operation === 1 ? (y - x) | 0 : arithmetic(operation, x, y); pc += 2;
-            } else if (op >= 0xd8 && op <= 0xe2) {
-              const packed = u[pc + 1], x = int(regs[packed & 255]), y = ((packed >> 8) << 24) >> 24, operation = op - 0xd8;
-              regs[a] = operation === 1 ? (y - x) | 0 : arithmetic(operation, x, y); pc += 2;
-            } else fail(`Unsupported opcode 0x${op.toString(16).padStart(2, '0')}`);
+          // 32-bit integer arithmetic (the common forms; long, float and double arithmetic is in stepRare): operands are validated as before, add/sub/mul are inline.
+          case 0x90: case 0x91: case 0x92: case 0x93: case 0x94: case 0x95: case 0x96: case 0x97: case 0x98: case 0x99: case 0x9a: {
+            const packed = u[pc + 1]; let x = regs[packed & 255], y = regs[packed >> 8];
+            if (typeof x !== 'number' || (x | 0) !== x) x = int(x);
+            if (typeof y !== 'number' || (y | 0) !== y) y = int(y);
+            const o = op - 0x90; regs[a] = o === 0 ? (x + y) | 0 : o === 1 ? (x - y) | 0 : o === 2 ? Math.imul(x, y) : arithmetic(o, x, y); pc += 2; break;
           }
+          case 0xb0: case 0xb1: case 0xb2: case 0xb3: case 0xb4: case 0xb5: case 0xb6: case 0xb7: case 0xb8: case 0xb9: case 0xba: {
+            let x = regs[lo], y = regs[hi];
+            if (typeof x !== 'number' || (x | 0) !== x) x = int(x);
+            if (typeof y !== 'number' || (y | 0) !== y) y = int(y);
+            const o = op - 0xb0; regs[lo] = o === 0 ? (x + y) | 0 : o === 1 ? (x - y) | 0 : o === 2 ? Math.imul(x, y) : arithmetic(o, x, y); pc++; break;
+          }
+          case 0xd0: case 0xd1: case 0xd2: case 0xd3: case 0xd4: case 0xd5: case 0xd6: case 0xd7: {
+            let x = regs[hi]; if (typeof x !== 'number' || (x | 0) !== x) x = int(x);
+            const y = (u[pc + 1] << 16) >> 16, o = op - 0xd0;
+            regs[lo] = o === 0 ? (x + y) | 0 : o === 1 ? (y - x) | 0 : o === 2 ? Math.imul(x, y) : arithmetic(o, x, y); pc += 2; break;
+          }
+          case 0xd8: case 0xd9: case 0xda: case 0xdb: case 0xdc: case 0xdd: case 0xde: case 0xdf: case 0xe0: case 0xe1: case 0xe2: {
+            const packed = u[pc + 1]; let x = regs[packed & 255]; if (typeof x !== 'number' || (x | 0) !== x) x = int(x);
+            const y = ((packed >> 8) << 24) >> 24, o = op - 0xd8;
+            regs[a] = o === 0 ? (x + y) | 0 : o === 1 ? (y - x) | 0 : o === 2 ? Math.imul(x, y) : arithmetic(o, x, y); pc += 2; break;
+          }
+          default: pc = stepRare(rt, f, regs, u, dex, pc, op, a, lo, hi); break;
         }
        }
         if (returning) {
@@ -654,6 +630,110 @@ function runLoop(rt, owner, base) {
       }
     }
   }
+}
+
+/** Opcodes that are rare or large (wide moves/constants, filled arrays, switches, comparisons, conversions, wide and mixed arithmetic), kept out of runLoop so its bytecode, register file and
+ *  deoptimization surface stay small. Executes the instruction at `pc` and returns the next pc; it neither blocks nor switches frames. */
+function stepRare(rt, f, regs, u, dex, pc, op, a, lo, hi) {
+  switch (op) {
+      case 0x04: { if (regs[hi + 1] !== WIDE_HIGH) fail(`Invalid wide high register v${hi + 1}`); regs[lo] = wide(regs[hi]); regs[lo + 1] = WIDE_HIGH; pc++; break; }
+      case 0x05: { const s = u[pc + 1]; if (regs[s + 1] !== WIDE_HIGH) fail(`Invalid wide high register v${s + 1}`); regs[a] = wide(regs[s]); regs[a + 1] = WIDE_HIGH; pc += 2; break; }
+      case 0x06: { const d = u[pc + 1], s = u[pc + 2]; if (regs[s + 1] !== WIDE_HIGH) fail(`Invalid wide high register v${s + 1}`); regs[d] = wide(regs[s]); regs[d + 1] = WIDE_HIGH; pc += 3; break; }
+      case 0x16: regs[a] = BigInt((u[pc + 1] << 16) >> 16); regs[a + 1] = WIDE_HIGH; pc += 2; break;
+      case 0x17: regs[a] = BigInt(u[pc + 1] | (u[pc + 2] << 16)); regs[a + 1] = WIDE_HIGH; pc += 3; break;
+      case 0x18: regs[a] = BigInt.asIntN(64, BigInt(u[pc + 1]) | BigInt(u[pc + 2]) << 16n | BigInt(u[pc + 3]) << 32n | BigInt(u[pc + 4]) << 48n); regs[a + 1] = WIDE_HIGH; pc += 5; break;
+      case 0x19: regs[a] = BigInt.asIntN(64, BigInt(u[pc + 1]) << 48n); regs[a + 1] = WIDE_HIGH; pc += 2; break;
+      case 0x1c: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid class type'); regs[a] = rt.classObject(type); pc += 2; break; }
+      case 0x24: case 0x25: {
+        const type = dex.types[u[pc + 1]]; if (!type?.startsWith('[') || ['J', 'D'].includes(type.slice(1))) fail('Invalid filled-new-array type');
+        const registers = invokeRegisters(u, pc, regs, op, a, lo, hi), value = rt.newArray(type, registers.length), array = rt.object(value);
+        for (let i = 0; i < registers.length; i++) { const entry = regs[registers[i]]; rt.checkArrayValue(array, entry); array.elements[i] = narrow(entry, type.slice(1)); }
+        f.result = value; pc += 3; break;
+      }
+      case 0x26: {
+        const array = rt.array(regs[a]), payload = pc + (u[pc + 1] | (u[pc + 2] << 16)), tag = u[payload], width = u[payload + 1];
+        const size = u[payload + 2] + u[payload + 3] * 65536;
+        const expected = { Z: 1, B: 1, C: 2, S: 2, I: 4, F: 4, J: 8, D: 8 }[array.type.slice(1)];
+        if (tag !== 0x0300 || !expected || width !== expected || size > array.elements.length || payload + 4 + Math.ceil(size * width / 2) > f.code.units) fail('Malformed fill-array-data payload');
+        const type = array.type.slice(1);
+        for (let i = 0; i < size; i++) {
+          const p = payload + 4 + (i * width >> 1);
+          let value;
+          if (width === 1) value = (i & 1) ? u[p] >> 8 : u[p] & 255;
+          else if (width === 2) value = u[p];
+          else if (width === 4) value = (u[p] | (u[p + 1] << 16)) | 0;
+          else value = BigInt.asIntN(64, BigInt(u[p] | (u[p + 1] << 16)) & 0xffffffffn | BigInt(u[p + 2] | (u[p + 3] << 16)) << 32n);
+          array.elements[i] = narrow(value, type);
+        }
+        pc += 3; break;
+      }
+      case 0x2b: case 0x2c: {
+        const value = int(regs[a]), payload = pc + (u[pc + 1] | (u[pc + 2] << 16)), expected = op === 0x2b ? 0x0100 : 0x0200;
+        if (u[payload] !== expected) fail('Malformed switch payload');
+        const size = u[payload + 1]; if (size > 65535) fail('Switch size exceeds limit');
+        let target = null;
+        if (op === 0x2b) { const index = value - (u[payload + 2] | (u[payload + 3] << 16)); if (index >= 0 && index < size) { const at = payload + 4 + index * 2; target = u[at] | (u[at + 1] << 16); } }
+        else {
+          let low = 0, high = size - 1;
+          while (low <= high) {
+            const middle = (low + high) >>> 1, keyAt = payload + 2 + middle * 2, key = u[keyAt] | (u[keyAt + 1] << 16);
+            if (key === value) { const at = payload + 2 + size * 2 + middle * 2; target = u[at] | (u[at + 1] << 16); break; }
+            if (key < value) low = middle + 1; else high = middle - 1;
+          }
+        }
+        if (target === null) pc += 3; else { const t = pc + target; if (t < 0 || t >= f.code.units) fail('Branch target outside method'); pc = t; }
+        break;
+      }
+      case 0x2d: case 0x2e: case 0x2f: case 0x30: case 0x31: {
+        const packed = u[pc + 1], left = packed & 255, right = packed >> 8;
+        let x, y;
+        if (op === 0x31) { x = H.getWide(regs, left); y = H.getWide(regs, right); }
+        else if (op <= 0x2e) { x = floatNumber(regs[left]); y = floatNumber(regs[right]); }
+        else { x = doubleNumber(H.getWide(regs, left)); y = doubleNumber(H.getWide(regs, right)); }
+        regs[a] = Number.isNaN(x) || Number.isNaN(y) ? (op === 0x2e || op === 0x30 ? 1 : -1) : x < y ? -1 : x > y ? 1 : 0; pc += 2; break;
+      }
+      case 0x7b: regs[lo] = (-int(regs[hi])) | 0; pc++; break;
+      case 0x7c: regs[lo] = ~int(regs[hi]); pc++; break;
+      case 0x7d: H.putWide(regs, lo, -H.getWide(regs, hi)); pc++; break;
+      case 0x7e: H.putWide(regs, lo, ~H.getWide(regs, hi)); pc++; break;
+      case 0x7f: regs[lo] = floatBits(-floatNumber(regs[hi])); pc++; break;
+      case 0x80: H.putWide(regs, lo, doubleBits(-doubleNumber(H.getWide(regs, hi)))); pc++; break;
+      case 0x81: H.putWide(regs, lo, BigInt(int(regs[hi]))); pc++; break;
+      case 0x82: regs[lo] = floatBits(int(regs[hi])); pc++; break;
+      case 0x83: H.putWide(regs, lo, doubleBits(int(regs[hi]))); pc++; break;
+      case 0x84: regs[lo] = Number(BigInt.asIntN(32, H.getWide(regs, hi))); pc++; break;
+      case 0x85: regs[lo] = floatBits(Number(H.getWide(regs, hi))); pc++; break;
+      case 0x86: H.putWide(regs, lo, doubleBits(Number(H.getWide(regs, hi)))); pc++; break;
+      case 0x87: regs[lo] = javaInt(floatNumber(regs[hi])); pc++; break;
+      case 0x88: H.putWide(regs, lo, javaLong(floatNumber(regs[hi]))); pc++; break;
+      case 0x89: H.putWide(regs, lo, doubleBits(floatNumber(regs[hi]))); pc++; break;
+      case 0x8a: regs[lo] = javaInt(doubleNumber(H.getWide(regs, hi))); pc++; break;
+      case 0x8b: H.putWide(regs, lo, javaLong(doubleNumber(H.getWide(regs, hi)))); pc++; break;
+      case 0x8c: regs[lo] = floatBits(doubleNumber(H.getWide(regs, hi))); pc++; break;
+      case 0x8d: regs[lo] = signed8(int(regs[hi])); pc++; break;
+      case 0x8e: regs[lo] = int(regs[hi]) & 65535; pc++; break;
+      case 0x8f: regs[lo] = signed16(int(regs[hi])); pc++; break;
+    default: {
+        if (op >= 0x90 && op <= 0xcf) {
+          const two = op >= 0xb0, relative = op - (two ? 0xb0 : 0x90);
+          const group = relative < 11 ? 0 : relative < 22 ? 1 : relative < 27 ? 2 : 3;
+          const operation = relative - (group === 0 ? 0 : group === 1 ? 11 : group === 2 ? 22 : 27);
+          const packed = two ? 0 : u[pc + 1], destination = two ? lo : a, left = two ? lo : packed & 255, right = two ? hi : packed >> 8;
+          const wideLeft = group === 1 || group === 3, wideRight = group === 3 || (group === 1 && operation < 8);
+          const x = wideLeft ? H.getWide(regs, left) : regs[left], y = wideRight ? H.getWide(regs, right) : regs[right];
+          const value = numericBinary(group, operation, x, y);
+          if (wideLeft) H.putWide(regs, destination, value); else regs[destination] = value;
+          pc += two ? 1 : 2;
+        } else if (op >= 0xd0 && op <= 0xd7) {
+          const x = int(regs[hi]), y = (u[pc + 1] << 16) >> 16, operation = op - 0xd0;
+          regs[lo] = operation === 1 ? (y - x) | 0 : arithmetic(operation, x, y); pc += 2;
+        } else if (op >= 0xd8 && op <= 0xe2) {
+          const packed = u[pc + 1], x = int(regs[packed & 255]), y = ((packed >> 8) << 24) >> 24, operation = op - 0xd8;
+          regs[a] = operation === 1 ? (y - x) | 0 : arithmetic(operation, x, y); pc += 2;
+        } else fail(`Unsupported opcode 0x${op.toString(16).padStart(2, '0')}`);
+      }
+  }
+  return pc;
 }
 
 // Closures live outside runLoop: a function that creates closures over its locals keeps them in a heap context, which slows every instruction.

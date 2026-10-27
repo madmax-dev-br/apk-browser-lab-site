@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=58b0147dafd8';
-import { getVectorGraphics } from './vector-native.js?v=58b0147dafd8';
-import { gcRoot } from './heap-gc.js?v=58b0147dafd8';
+import { APKError } from './apk-error.js?v=33d211b8a989';
+import { getVectorGraphics } from './vector-native.js?v=33d211b8a989';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=33d211b8a989';
 
 // The RenderThread animation system behind android.graphics.animation.RenderNodeAnimator (hwui BaseRenderNodeAnimator / CanvasPropertyPrimitiveAnimator /
 // CanvasPropertyPaintAnimator / RenderPropertyAnimator and the NativeInterpolatorFactory interpolators). The original Java (RenderNodeAnimator, FallbackLUTInterpolator,
@@ -40,7 +40,7 @@ export function createRenderThreadAnimators(platform) {
   const graphics = runtime => getVectorGraphics(runtime);
   // Animator tokens live in the shared VM graphics-handle table, whose VirtualRefBasePtr.nIncStrong / nDecStrong natives (vector-native.js) own the reference counting.
   let current = null;
-  const create = (kind, fields) => { const g = graphics(current); const id = g.create('rtAnimator', { animatorKind: kind, state: 'prepare', duration: 300, delay: 0, interpolator: INTERPOLATORS.linear(), startValue: null, listener: null, target: null, startTime: null, from: 0, ...fields }); animators.set(id, true); return id; };
+  const create = (kind, fields) => { const g = graphics(current); const id = g.create('rtAnimator', { animatorKind: kind, state: 'prepare', duration: 300, delay: 0, interpolator: INTERPOLATORS.linear(), startValue: null, listenerRef: null, target: null, startTime: null, from: 0, ...fields }); animators.set(id, true); return id; };
   const get = id => { const a = graphics(current).get(BigInt(id), 'rtAnimator'); a.id = BigInt(id); return a; };
   const newInterpolator = fn => { const id = next++; interpolators.set(id, fn); return id; };
   // ---- the property each animator writes -----------------------------------------------------------------------------------------------------------------
@@ -63,7 +63,7 @@ export function createRenderThreadAnimators(platform) {
   // ---- frame stepping ------------------------------------------------------------------------------------------------------------------------------------
   const finish = (runtime, a) => {
     a.state = 'finished'; running--;
-    if (a.listener) runtime.dispatch({ owner: ANIMATOR, name: 'callOnFinished', signature: `(${ANIMATOR})V`, parameters: [ANIMATOR], result: 'V' }, [a.listener], 'static');
+    if (a.listenerRef) runtime.dispatch({ owner: ANIMATOR, name: 'callOnFinished', signature: `(${ANIMATOR})V`, parameters: [ANIMATOR], result: 'V' }, [a.listenerRef], 'static');
   };
   const live = id => { try { return get(id); } catch { animators.delete(id); return null; } };
   const step = (runtime, frameTimeMs) => {
@@ -92,7 +92,7 @@ export function createRenderThreadAnimators(platform) {
   add(ANIMATOR, 'nSetStartDelay', ['J', 'J'], 'V', (r, [id, ms]) => { get(id).delay = Number(ms); });
   add(ANIMATOR, 'nSetInterpolator', ['J', 'J'], 'V', (r, [id, handle]) => { const fn = interpolators.get(BigInt(handle)); if (!fn) fail('Invalid native interpolator token'); get(id).interpolator = fn; });
   add(ANIMATOR, 'nSetAllowRunningAsync', ['J', 'Z'], 'V', (r, [id]) => { get(id); });
-  add(ANIMATOR, 'nSetListener', ['J', ANIMATOR], 'V', (r, [id, listener]) => { get(id).listener = listener; });
+  add(ANIMATOR, 'nSetListener', ['J', ANIMATOR], 'V', (r, [id, listener]) => { current = r; get(id).listenerRef = listener; });
   add(ANIMATOR, 'nStart', ['J'], 'V', (r, [id]) => { const a = get(id); if (a.state !== 'prepare') return; a.state = 'running'; running++; requestFrame(r); });
   add(ANIMATOR, 'nEnd', ['J'], 'V', (r, [id]) => { const a = get(id); if (a.state === 'running') { write(r, a, a.finalValue); finish(r, a); platform.redrawAll?.(r); } });
   add(NODE, 'nAddAnimator', ['J', 'J'], 'V', (r, [node, id]) => { const a = get(id); platform.rtNodeState(r, node); a.target = node; });
@@ -110,5 +110,8 @@ export function createRenderThreadAnimators(platform) {
   fa('createCycleInterpolator', ['F'], 'J', (r, [f]) => newInterpolator(INTERPOLATORS.cycle(f)));
   fa('createPathInterpolator', ['[F', '[F'], 'J', (r, [x, y]) => newInterpolator(INTERPOLATORS.path(r.array(x).elements.map(decode), r.array(y).elements.map(decode))));
   fa('createLutInterpolator', ['[F'], 'J', (r, [values]) => newInterpolator(INTERPOLATORS.lut(r.array(values).elements.map(decode))));
-  return { bindings: [...bindings], table: bindings, runningCount: () => running };
+  // hwui's RenderPropertyAnimator keeps a global reference to the Java RenderNodeAnimator until it has finished: the animator tokens live in the graphics-handle table (not a GC
+  // root), so their listeners are rooted here.
+  const roots = visit => { if (current === null) return; for (const entry of graphics(current).handles.values()) if (entry.kind === 'rtAnimator' && entry.listenerRef) visit(entry.listenerRef); };
+  return { bindings: [...bindings], table: bindings, runningCount: () => running, [GC_ROOTS]: roots };
 }

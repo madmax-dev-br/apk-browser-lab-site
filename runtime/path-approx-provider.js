@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=58b0147dafd8';
+import { APKError } from './apk-runtime.js?v=33d211b8a989';
 const LIMIT=1024*1024;
 const defaultAssetURL=()=>new URL('../framework-aosp/native-path-approx/path-approx.wasm'+new URL(import.meta.url).search,import.meta.url);
 const digest=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(n=>n.toString(16).padStart(2,'0')).join('');

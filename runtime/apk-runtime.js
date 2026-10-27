@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=58b0147dafd8';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=58b0147dafd8';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=58b0147dafd8';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=58b0147dafd8';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=58b0147dafd8';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=58b0147dafd8';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=58b0147dafd8';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=58b0147dafd8';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=58b0147dafd8';
-import { APKError } from './apk-error.js?v=58b0147dafd8';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=58b0147dafd8';
-import { Scheduler, Blocked } from './scheduler.js?v=58b0147dafd8';
-import { bootClassLacksMember } from './boot-class-members.js?v=58b0147dafd8';
-export { APKError } from './apk-error.js?v=58b0147dafd8';
+import { VMClock } from './vm-clock.js?v=33d211b8a989';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=33d211b8a989';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=33d211b8a989';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=33d211b8a989';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=33d211b8a989';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=33d211b8a989';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=33d211b8a989';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=33d211b8a989';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=33d211b8a989';
+import { APKError } from './apk-error.js?v=33d211b8a989';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=33d211b8a989';
+import { Scheduler, Blocked } from './scheduler.js?v=33d211b8a989';
+import { bootClassLacksMember } from './boot-class-members.js?v=33d211b8a989';
+export { APKError } from './apk-error.js?v=33d211b8a989';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -263,7 +263,7 @@ export class DexProgram {
       if (bootBytes > 128 * 1024 * 1024) fail('Framework DEX layer exceeds 128 MiB');
       this.bootFiles.push({ filename, dex }); this.bootDexes.add(dex);
       for (const [name, cls] of dex.classes) {
-        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|dev\/apkweb\/(?:net|view|os)\/|com\/android\/(?:internal|icu|okhttp)\/|jdk\/(?:internal\/(?:util|misc|math)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch)|security\/(?:action|util)|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
+        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|dev\/apkweb\/(?:net|view|os)\/|com\/(?:android\/(?:internal|icu|okhttp)|sun\/nio\/file)\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security\/(?:action|util)|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
         if (this.bootClasses.has(name)) fail(`Duplicate framework class: ${name}`);
         this.bootClasses.set(name, cls);
       }
@@ -569,7 +569,7 @@ addBridge('java/lang/Runtime', ['getRuntime()Ljava/lang/Runtime;', 'loadLibrary(
 addBridge('java/lang/Enum', ['<init>(Ljava/lang/String;I)V', 'name()Ljava/lang/String;', 'ordinal()I', 'toString()Ljava/lang/String;']);
 addBridge('java/lang/Enum', ['valueOf(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum;', 'compareTo(Ljava/lang/Enum;)I', 'compareTo(Ljava/lang/Object;)I', 'getDeclaringClass()Ljava/lang/Class;']);
 addBridge('java/lang/Integer', ['valueOf(I)Ljava/lang/Integer;', 'intValue()I', 'parseInt(Ljava/lang/String;)I', 'parseInt(Ljava/lang/String;I)I']);
-addBridge('java/lang/Boolean', ['parseBoolean(Ljava/lang/String;)Z', 'valueOf(Z)Ljava/lang/Boolean;', 'booleanValue()Z']);
+addBridge('java/lang/Boolean', ['parseBoolean(Ljava/lang/String;)Z','valueOf(Ljava/lang/String;)Ljava/lang/Boolean;', 'valueOf(Z)Ljava/lang/Boolean;', 'booleanValue()Z']);
 addBridge('java/lang/Math', ['min(II)I', 'max(II)I', 'abs(I)I']);
 addBridge('android/text/TextUtils', ['isEmpty(Ljava/lang/CharSequence;)Z', 'equals(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Z']);
 for (const [name, type] of [['AtomicReference', 'Ljava/lang/Object;'], ['AtomicInteger', 'I'], ['AtomicLong', 'J'], ['AtomicBoolean', 'Z']]) {
@@ -852,6 +852,10 @@ class Heap {
   *values() { for (const record of this.list) if (record !== undefined) yield record; }
 }
 
+/** Returned by a chunk of APKRuntime.bridge() when none of its branches applies to the call. */
+const BRIDGE_NEXT = Symbol('bridge-next');
+const OBJECT_INIT_KEY = 'Ljava/lang/Object;-><init>()V';
+
 export class APKRuntime {
   constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 10000000, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off' } = {}) {
     if (!Number.isInteger(maxCallDepth) || maxCallDepth < 16 || maxCallDepth > 100000) fail('VM maxCallDepth must be an integer from 16 to 100000');
@@ -884,7 +888,7 @@ export class APKRuntime {
     this.depth = 0; this.steps = 0; this.trace = []; this.activity = null; this.root = null; this.clicks = 0;
     this.initialized = new Map(); this.staticFields = new Map(); this.classObjects = new Map(); this.arrayCells = 0; this.initDepth = 0;
     this.collectionCells = 0;
-    this.nativeArrays = new Map(); this.nextNativeArrayHandle = 0x100000000n; this.nativeRanges = []; this.nestedRuns = 0; this.maxNestedRuns = 160; this.scheduler = new Scheduler(this); this.callStats = { cached: 0, dispatched: 0, bridged: 0 }; this.lastBridge = null; this.lastBridgeDepth = -1; this.jit = true; this.jitThreshold = JIT_THRESHOLD; this.jitLoops = JIT_LOOPS; this.jitCompiled = 0; this.jitInstructions = 0; this.q = 20000; this.jitDepth = 0; this.thread = null; this.multiThreaded = false; this.monitors = new Map();
+    this.nativeArrays = new Map(); this.nextNativeArrayHandle = 0x100000000n; this.nativeRanges = []; this.nestedRuns = 0; this.maxNestedRuns = 160; this.scheduler = new Scheduler(this); this.callStats = { cached: 0, dispatched: 0, bridged: 0 }; this.lastBridge = null; this.lastBridgeDepth = -1; this.jit = true; this.fastCallPaths = true; this.jitThreshold = JIT_THRESHOLD; this.jitLoops = JIT_LOOPS; this.jitCompiled = 0; this.jitInstructions = 0; this.q = 20000; this.jitDepth = 0; this.thread = null; this.multiThreaded = false; this.monitors = new Map();
     this.skia=skia;this.skiaHost=skia?.createHost?.(this)??null;
     this.icuBreakBackend=icuBreakBackend;this.sqliteBackend=sqliteBackend;this.tzdata=tzdata;this.zlibBackend=zlibBackend;this.icuConverterBackend=icuConverterBackend;
   }
@@ -977,46 +981,115 @@ export class APKRuntime {
     if (isNull(value)) this.throwJava('Ljava/lang/NullPointerException;', 'null object reference');
     fail('Null or invalid object reference');
   }
+  /**
+   * Class initialization (JLS 12.4.2). The nested form for host callers: it completes the interpreter-frame protocol of initStep() synchronously, waiting (and letting other
+   * green threads run) while another thread initializes the class.
+   */
   initialize(type) {
     const state = this.initialized.get(type);
-    if (state?.status === 'failed') throw state.error;
-    if (state) return; // Single thread: recursive requests see prepared fields of the initializing class.
-    const cls = this.classes.get(type);
-    if (!cls) return;
-    if (++this.initDepth > 128) { this.initDepth--; fail('Class initialization depth limit exceeded'); }
-    this.initialized.set(type, { status: 'initializing' });
-    try {
-      for (const entry of cls.staticFields) {
-        const field = cls.dex.fields[entry.index]; this.storeField(this.staticFields, field.key, defaultValue(field.type));
+    if (state?.status === 'initialized') return;
+    for (let step; (step = this.initStep(type)) !== undefined;) this.finishHostStep(step);
+  }
+  /**
+   * Returns undefined when `type` is usable by the current thread now (initialized, or being initialized by this very thread), a Blocked(retry) while another thread
+   * initializes it or a class it needs, or an Invoke chain that runs the pending <clinit> methods as ordinary interpreter frames. A class whose initializer failed is erroneous:
+   * every later use throws NoClassDefFoundError. The first failure surfaces as the Error itself or an ExceptionInInitializerError wrapping a non-Error throwable.
+   */
+  initStep(type) {
+    const thread = currentThread(this), state = this.initialized.get(type);
+    if (state !== undefined) {
+      if (state.status === 'initialized') return undefined;
+      if (state.status === 'failed') this.throwErroneous(type, state);
+      return state.thread === thread ? undefined : this.initWait(type);
+    }
+    if (!this.classes.has(type)) return undefined;
+    const order = [], visiting = new Set();
+    const visit = (t, depth = 0) => {
+      const s = this.initialized.get(t);
+      if (s !== undefined) {
+        if (s.status === 'initialized') return undefined;
+        if (s.status === 'failed') this.throwErroneous(t, s);
+        return s.thread === thread ? undefined : this.initWait(t);
       }
-      if (cls.staticValuesOffset) {
-        const cursor = { p: cls.staticValuesOffset }, count = cls.dex.reader.uleb(cursor);
-        if (count > cls.staticFields.length) fail(`Invalid encoded static values in ${type}`);
-        for (let i = 0; i < count; i++) {
-          const field = cls.dex.fields[cls.staticFields[i].index];
-          this.staticFields.set(field.key, this.materialize(cls.dex.encodedValue(cursor), field.type));
-        }
-      }
-      if (cls.superclass && !(cls.flags & 0x200)) this.initialize(cls.superclass);
-      if (!(cls.flags & 0x200)) {
+      const c = this.classes.get(t); if (!c || visiting.has(t)) return undefined;
+      if (depth > 128) fail('Class initialization depth limit exceeded');
+      visiting.add(t);
+      if (!(c.flags & 0x200)) {
+        if (c.superclass) { const wait = visit(c.superclass, depth + 1); if (wait) return wait; }
         const seen = new Set();
-        const defaults = (type, depth = 0) => {
-          if (seen.has(type)) return; if (depth > 64 || seen.size >= 512) fail('Default interface initialization limit exceeded'); seen.add(type);
-          const iface = this.classes.get(type); if (!iface) return;
-          for (const parent of iface.interfaces) defaults(parent, depth + 1);
-          if ([...iface.methods.values()].some(def => def.method.name !== '<clinit>' && !(def.flags & (0x8 | 0x400 | 0x2)) && def.code)) this.initialize(type);
+        const defaults = (it, d = 0) => {
+          if (seen.has(it)) return undefined; if (d > 64 || seen.size >= 512) fail('Default interface initialization limit exceeded'); seen.add(it);
+          const iface = this.classes.get(it); if (!iface) return undefined;
+          for (const parent of iface.interfaces) { const wait = defaults(parent, d + 1); if (wait) return wait; }
+          if ([...iface.methods.values()].some(def => def.method.name !== '<clinit>' && !(def.flags & (0x8 | 0x400 | 0x2)) && def.code)) return visit(it, depth + 1);
+          return undefined;
         };
-        for (const type of cls.interfaces) defaults(type);
+        for (const it of c.interfaces) { const wait = defaults(it); if (wait) return wait; }
       }
-      const initializer = cls.methods.get('<clinit>()V');
-      if (initializer) {
-        if (!initializer.code) fail(`Missing class initializer code: ${type}`);
-        this.recordMethod(initializer.method);
-        this.execute(initializer.method, initializer.code, []);
+      order.push(t); return undefined;
+    };
+    const wait = visit(type); if (wait) return wait;
+    if (order.length === 0) return undefined;
+    if (++this.initDepth > 128) { this.initDepth--; fail('Class initialization depth limit exceeded'); }
+    let released = false;
+    const release = () => { if (!released) { released = true; this.initDepth--; } };
+    for (const t of order) this.initialized.set(t, { status: 'initializing', thread });
+    try { for (const t of order) this.prepareStatics(this.classes.get(t), t); }
+    catch (error) { throw this.initFailed(order, 0, error, release); }
+    const next = i => {
+      for (; i < order.length; i++) {
+        const t = order[i], initializer = this.classes.get(t).methods.get('<clinit>()V');
+        if (!initializer) { this.initialized.set(t, { status: 'initialized' }); continue; }
+        if (!initializer.code) fail(`Missing class initializer code: ${t}`);
+        const index = i;
+        return new Invoke(initializer.method, [], 'static', () => { this.initialized.set(t, { status: 'initialized' }); return next(index + 1); },
+          error => { throw this.initFailed(order, index, error, release); });
       }
-      this.initialized.set(type, { status: 'initialized' });
-    } catch (error) { this.initialized.set(type, { status: 'failed', error }); throw error; }
-    finally { this.initDepth--; }
+      release(); return undefined;
+    };
+    try { return next(0); } catch (error) { throw this.initFailed(order, 0, error, release); }
+  }
+  /** The class whose method a static call resolves to (the named class or the nearest superclass declaring it). */
+  staticOwner(target) {
+    const key = target.name + target.signature; let type = target.owner;
+    for (;;) { const cls = this.classes.get(type); if (!cls) return target.owner; if (cls.methods.has(key)) return type; if (!cls.superclass) return target.owner; type = cls.superclass; }
+  }
+  initWait(type) { return new Blocked({ ready: () => this.initialized.get(type)?.status !== 'initializing', retry: true, reason: `class initialization of ${type}` }); }
+  prepareStatics(cls, type) {
+    for (const entry of cls.staticFields) {
+      const field = cls.dex.fields[entry.index]; this.storeField(this.staticFields, field.key, defaultValue(field.type));
+    }
+    if (cls.staticValuesOffset) {
+      const cursor = { p: cls.staticValuesOffset }, count = cls.dex.reader.uleb(cursor);
+      if (count > cls.staticFields.length) fail(`Invalid encoded static values in ${type}`);
+      for (let i = 0; i < count; i++) {
+        const field = cls.dex.fields[cls.staticFields[i].index];
+        this.staticFields.set(field.key, this.materialize(cls.dex.encodedValue(cursor), field.type));
+      }
+    }
+  }
+  /** <clinit> number `index` of `order` threw: it and the classes that need it become erroneous, independent ones start over. Returns what to throw. */
+  initFailed(order, index, error, release) {
+    release();
+    let thrown = error;
+    if (error instanceof JavaException && !this.isSubtype(this.typeOf(error.value), 'Ljava/lang/Error;')) {
+      const wrapper = this.makeObject('Ljava/lang/ExceptionInInitializerError;'), obj = this.object(wrapper);
+      obj.cause = error.value; obj.causeInitialized = true; obj.message = null; obj.stack = this.captureStack();
+      thrown = new JavaException(wrapper, error.message, error.details);
+    }
+    const failedType = order[index], value = thrown instanceof JavaException ? thrown.value : null;
+    for (let i = index; i < order.length; i++) {
+      const t = order[i];
+      if (i === index || this.isSubtype(t, failedType)) this.initialized.set(t, { status: 'failed', value, error: thrown });
+      else if (this.initialized.get(t)?.status === 'initializing') this.initialized.delete(t);
+    }
+    return thrown;
+  }
+  throwErroneous(type, state) {
+    const message = `Could not initialize class ${type.slice(1, -1).replaceAll('/', '.')}`;
+    const value = this.makeObject('Ljava/lang/NoClassDefFoundError;'), obj = this.object(value);
+    obj.message = message; obj.cause = state.value ?? null; obj.causeInitialized = true; obj.stack = this.captureStack();
+    throw new JavaException(value, message);
   }
   materialize(value, type) {
     if (!value || typeof value !== 'object' || !value.encoded) return value;
@@ -1411,9 +1484,10 @@ export class APKRuntime {
       if (seen.has(owner) || seen.size >= 64) fail('Invalid class hierarchy');
       seen.add(owner);
       const cls = this.classes.get(owner), definition = cls?.methods.get(method.nameSig ??= method.name + method.signature);
-      // Packaged Kotlin/Java library bytecode always takes precedence over a bridge fallback.
-      if (definition) return { kind: 'definition', definition };
       const selected = { ...method, owner }, key = methodKey(selected);
+      // Packaged Kotlin/Java library bytecode always takes precedence over a bridge fallback -- except a method of an interface reached through a host-typed receiver (a host
+      // iterator whose runtime type is the java.util.Iterator interface itself, a class chain never contains interfaces otherwise): the host serves that call.
+      if (definition && !(cls.flags & 0x200 && (SHIMS.has(key) || this.platform?.supports?.(key)))) return { kind: 'definition', definition };
       if (SHIMS.has(key) || this.skiaHost?.supports?.(key) || this.platform?.supports?.(key)) {
         // A loaded Java class is authoritative about its declared methods.
         // Search its real superclass methods before using a legacy bridge for
@@ -1542,7 +1616,7 @@ export class APKRuntime {
     const obj = this.object(value);
     if(obj.type==='Ljava/lang/String;')return this.stringCharacters(value);
     if (obj.type === 'Ljava/lang/StringBuilder;'||obj.type==='Ljava/lang/StringBuffer;') return obj.builder ?? '';
-    if (obj.boxed !== undefined) return obj.primitiveType === 'F' || obj.primitiveType === 'D' ? this.javaString(obj.boxed, obj.primitiveType) : obj.type === 'Ljava/lang/Boolean;' ? (obj.boxed ? 'true' : 'false') : String(obj.boxed);
+    if (obj.boxed !== undefined) return obj.primitiveType === 'F' || obj.primitiveType === 'D' ? this.javaString(obj.boxed, obj.primitiveType) : obj.type === 'Ljava/lang/Boolean;' ? (obj.boxed ? 'true' : 'false') : obj.type === 'Ljava/lang/Character;' ? String.fromCharCode(Number(obj.boxed) & 0xffff) : String(obj.boxed);
     const method=this.objectOverride(obj.type,'toString()Ljava/lang/String;')??this.externalObjectMethod(obj.type,'toString',[],'Ljava/lang/String;');
     if(method){const text=this.dispatch(method,[value],'virtual');return isNull(text)?'null':this.stringCharacters(text);}
     return `${obj.type.startsWith('[') ? obj.type.replaceAll('/', '.') : dottedName(obj.type)}@${obj.id.toString(16)}`;
@@ -1795,17 +1869,39 @@ export class APKRuntime {
     return words;
   }
   bridge(method, words, mode, knownKey, resolution) {
+    // Object.<init>() on a live object does nothing: no registry, Skia or platform bridge claims it and the generic tail only validates the receiver.
+    if (knownKey === OBJECT_INIT_KEY && words.length === 1 && this.fastCallPaths !== false) {
+      const receiver = words[0];
+      if (receiver !== null && typeof receiver === 'object' && this.heap.list[receiver.ref] !== undefined && (this.objectInitIsPlain ??= !(this.skiaHost?.supports?.(OBJECT_INIT_KEY) || this.platform?.supports?.(OBJECT_INIT_KEY) || ICU_BREAK_KEYS.has(OBJECT_INIT_KEY)))) return undefined;
+    }
     const staticCall = mode === 'static', args = this.hostArguments(method, words, mode);
     const key = knownKey ?? methodKey(method), name = method.name;
     if(key==='Landroid/graphics/Canvas;->setCompatibilityVersion(I)V'){this.canvasCompatibilityVersion=int(args[0]);return;}
     if(ICU_BREAK_KEYS.has(key))return invokeICUBreak(this,method,args);
-    const charsetRegistry=charsetRegistryCreation(this,method,args)??charsetRegistryRegistration(this,method,args);if(charsetRegistry)return charsetRegistry.value;
-    const nodeRegistry=renderNodeRegistryBridge(this,method,args);if(nodeRegistry)return nodeRegistry.value;
-    const regexRegistry=regexRegistryBridge(this,method,args);if(regexRegistry)return regexRegistry.value;
-    const colorRegistry=colorFilterRegistryBridge(this,method,args);if(colorRegistry)return colorRegistry.value;
-    const textRegistry=textLayoutRegistryBridge(this,method,args);if(textRegistry)return textRegistry.value;
+    // The NativeAllocationRegistry bridges below only ever claim these four method names (each starts by testing the name), so every other call skips them.
+    if(name==='createMalloced'||name==='registerNativeAllocation'||name==='run'||name==='<init>'){
+      const charsetRegistry=charsetRegistryCreation(this,method,args)??charsetRegistryRegistration(this,method,args);if(charsetRegistry)return charsetRegistry.value;
+      const nodeRegistry=renderNodeRegistryBridge(this,method,args);if(nodeRegistry)return nodeRegistry.value;
+      const regexRegistry=regexRegistryBridge(this,method,args);if(regexRegistry)return regexRegistry.value;
+      const colorRegistry=colorFilterRegistryBridge(this,method,args);if(colorRegistry)return colorRegistry.value;
+      const textRegistry=textLayoutRegistryBridge(this,method,args);if(textRegistry)return textRegistry.value;
+    }
     if(this.skiaHost?.supports?.(key))return this.skiaHost.invoke(this,method,args,mode);
     if ((resolution === undefined ? this.platform?.supports?.(key) : (resolution.platformSupports ??= !!this.platform?.supports?.(key)))) return this.platform.invoke(this, method, args, mode);
+    // The former single if-chain is split into consecutive chunks (each returns BRIDGE_NEXT when none of its branches applies): V8 refuses to optimize a function this large,
+    // which left every bridged call in the bytecode interpreter.
+    let result;
+    result = this.bridgeA0(method, args, staticCall, key, name); if (result !== BRIDGE_NEXT) return result;
+    result = this.bridgeA1(method, args, staticCall, key, name); if (result !== BRIDGE_NEXT) return result;
+    result = this.bridgeA2(method, args, staticCall, key, name); if (result !== BRIDGE_NEXT) return result;
+    result = this.bridgeA3(method, args, staticCall, key, name); if (result !== BRIDGE_NEXT) return result;
+    result = this.bridgeB0(method, args, staticCall, key, name); if (result !== BRIDGE_NEXT) return result;
+    result = this.bridgeC0(method, args, staticCall, key, name); if (result !== BRIDGE_NEXT) return result;
+    result = this.bridgeC1(method, args, staticCall, key, name); if (result !== BRIDGE_NEXT) return result;
+    result = this.bridgeC2(method, args, staticCall, key, name); if (result !== BRIDGE_NEXT) return result;
+    return this.bridgeC3(method, args, staticCall, key, name);
+  }
+  bridgeA0(method, args, staticCall, key, name) {
     if(method.owner==='Landroid/content/res/Configuration;'&&name==='isLayoutSizeAtLeast'){
       const size=(this.object(args[0]).fields.get('Landroid/content/res/Configuration;->screenLayout:I')??0)&0x0f;return size!==0&&size>=int(args[1])?1:0;
     }
@@ -1976,6 +2072,9 @@ export class APKRuntime {
       if (owner === 'Ljava/lang/Character;') return ((a & 0xff) << 8) | ((a >> 8) & 0xff);
       if (name === 'toUnsignedLong') return BigInt(a & 0xff); if (name === 'toUnsignedInt') return a & 0xff; return (a << 24 >> 24) - (int(args[1]) << 24 >> 24);
     }
+    return BRIDGE_NEXT;
+  }
+  bridgeA1(method, args, staticCall, key, name) {
     if (method.owner === 'Ljava/lang/Integer;' && name === 'bitCount') { let n=int(args[0])>>>0,count=0;while(n){n&=n-1;count++;}return count; }
     if (method.owner === 'Ljava/lang/Integer;' && name === 'numberOfLeadingZeros') return Math.clz32(int(args[0]));
     if(method.owner==='Ljava/lang/Integer;'&&name==='numberOfTrailingZeros'){const n=int(args[0]);return n===0?32:31-Math.clz32(n&-n);}
@@ -2164,6 +2263,9 @@ export class APKRuntime {
       if(!indexed)buffer.bufferPosition+=width;
       if(writing)return args[0];return width===8?data.getBigInt64(0,little):width===4?data.getInt32(0,little):width===2?(suffix==='Char'?data.getUint16(0,little):data.getInt16(0,little)):data.getInt8(0);
     }
+    return BRIDGE_NEXT;
+  }
+  bridgeA2(method, args, staticCall, key, name) {
     if (method.owner === 'Ljava/util/concurrent/TimeUnit;' && staticCall) {
       const constant = name => this.readStatic({ owner: method.owner, name, type: method.owner, key: `${method.owner}->${name}:${method.owner}` });
       if (name === 'values') { const array = this.newArray(`[${method.owner}`, TIME_UNITS.length); this.object(array).elements = TIME_UNITS.map(constant); return array; }
@@ -2324,6 +2426,9 @@ export class APKRuntime {
       for (let i = 0; i < Math.min(length, source.elements.length - from); i++){const value=source.elements[from+i];this.checkArrayValue(target,value);target.elements[i]=value;}
       return result;
     }
+    return BRIDGE_NEXT;
+  }
+  bridgeA3(method, args, staticCall, key, name) {
     if (method.owner === 'Ljava/util/Collections;') {
       if(name==='singleton'){const value=this.makeObject('Ljava/util/Collections$SingletonSet;'),object=this.object(value);this.reserveCollection(1);Object.assign(object,{set:[args[0]],setHashes:[this.javaHash(args[0])],modCount:0,readOnly:true});return value;}
       if (name === 'synchronizedMap') { this.object(args[0]); const value = this.makeObject('Ljava/util/Collections$SynchronizedMap;'); this.object(value).delegate = args[0]; return value; }
@@ -2393,7 +2498,11 @@ export class APKRuntime {
     if (method.owner === 'Ljava/lang/Class;' && name === 'forName') {
       return this.resolveClass(args[0], args.length === 1 || !!args[1], args.length === 3 ? (isNull(args[2]) ? 'boot' : args[2]) : undefined); // explicit null = the boot loader
     }
+    if(method.owner==='Ljava/lang/Boolean;'&&name==='valueOf'&&method.parameters[0]==='Ljava/lang/String;'){const text=isNull(args[0])?null:this.stringCharacters(args[0]),flag=text!==null&&/^[tT][rR][uU][eE]$/.test(text)?'TRUE':'FALSE';return this.readStatic({owner:'Ljava/lang/Boolean;',name:flag,type:'Ljava/lang/Boolean;',key:`Ljava/lang/Boolean;->${flag}:Ljava/lang/Boolean;`});}
     if(method.owner==='Ljava/lang/Boolean;'&&name==='parseBoolean'){const text=isNull(args[0])?null:this.stringCharacters(args[0]);return text!==null&&/^[tT][rR][uU][eE]$/.test(text)?1:0;}
+    return BRIDGE_NEXT;
+  }
+  bridgeB0(method, args, staticCall, key, name) {
     const primitiveBoxType = Object.keys(BOX_TYPES).find(type => BOX_TYPES[type] === method.owner);
     if(primitiveBoxType&&!staticCall&&name==='<init>'){
       const object=this.object(args[0]);if(object.boxed!==undefined)fail('Primitive wrapper constructor cannot run twice');
@@ -2564,6 +2673,10 @@ export class APKRuntime {
         Object.assign(target, original, { id: value.ref, fields: new Map(original.fields), children: [...original.children] }); return value;
       }
     }
+    return BRIDGE_NEXT;
+  }
+  bridgeC0(method, args, staticCall, key, name) {
+    const primitiveBoxType = Object.keys(BOX_TYPES).find(type => BOX_TYPES[type] === method.owner);
     const obj = this.object(args[0]);
     if (!this.isSubtype(obj.type, method.owner)) fail(`Receiver does not match ${methodKey(method)}`);
     if(method.owner===REENTRANT_LOCK){
@@ -2738,6 +2851,10 @@ export class APKRuntime {
       if (name.startsWith('peek') || name.startsWith('get') || name === 'element') return value;
       if (last) obj.list.pop(); else obj.list.shift(); this.reserveCollection(-1); this.bumpModCount(obj); return value;
     }
+    return BRIDGE_NEXT;
+  }
+  bridgeC1(method, args, staticCall, key, name) {
+    const obj = this.object(args[0]);
     if (method.owner === 'Ljava/util/Collections$SynchronizedMap;') {
       this.monitorEnter(args[0]);
       try { return this.dispatch({ ...method, owner: this.typeOf(obj.delegate) }, [obj.delegate, ...words.slice(1)], 'virtual'); }
@@ -2946,6 +3063,10 @@ export class APKRuntime {
         return oldValue;
       }
     }
+    return BRIDGE_NEXT;
+  }
+  bridgeC2(method, args, staticCall, key, name) {
+    const obj = this.object(args[0]);
     if (method.owner === 'Ljava/util/Iterator;') {
       if (obj.virtualList) {
         const list = this.object(obj.virtualList);
@@ -3127,6 +3248,10 @@ export class APKRuntime {
       if(name==='cast'){if(!isNull(args[1])&&!this.isSubtype(this.typeOf(args[1]),type))this.throwJava('Ljava/lang/ClassCastException;',`Cannot cast ${this.typeOf(args[1])} to ${type}`);return args[1];}
       if (name === 'desiredAssertionStatus') return 0;
     }
+    return BRIDGE_NEXT;
+  }
+  bridgeC3(method, args, staticCall, key, name) {
+    const obj = this.object(args[0]);
     if (method.owner === 'Ljava/lang/StringBuilder;'||method.owner==='Ljava/lang/StringBuffer;') {
       if (name === '<init>') { if (method.parameters[0] === 'I' && int(args[1]) < 0) this.throwJava('Ljava/lang/IllegalArgumentException;', 'negative StringBuilder capacity'); obj.builder = typeof args[1] === 'string' ? args[1] : ''; return undefined; }
       if(name==='append'&&method.parameters[0]==='[C'){

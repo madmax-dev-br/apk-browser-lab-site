@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=58b0147dafd8';
-import { throwNew } from './java-throw.js?v=58b0147dafd8';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=58b0147dafd8';
-import { networkOf, isIpLiteral } from './network-native.js?v=58b0147dafd8';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=58b0147dafd8';
+import { APKError } from './apk-error.js?v=33d211b8a989';
+import { throwNew } from './java-throw.js?v=33d211b8a989';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=33d211b8a989';
+import { networkOf, isIpLiteral } from './network-native.js?v=33d211b8a989';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=33d211b8a989';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -493,6 +493,139 @@ export function createLibcoreIoNativeBindings() {
       const from = Number(address - mapping.address); if (from < -mapping.length || from >= mapping.length) continue;
       const start = Math.max(0, from), end = Math.min(mapping.length, from + Number(length)); if (start < end) writeBack(runtime, mapping, start, end);
     }
+  });
+
+  // ---- sun.nio.fs (java.nio.file's Unix provider: UnixNativeDispatcher, LinuxNativeDispatcher, UnixCopyFile) over the same VirtualFileSystem and descriptor table.
+  // Paths arrive as NUL-terminated byte strings in the VM's native arena (NativeBuffer); failures are sun.nio.fs.UnixException(errno) like UnixNativeDispatcher.c. The virtual
+  // filesystem has no symbolic or hard links, no openat family, no extended attributes and no mount table: those report the errno a kernel without them reports.
+  const UND = 'Lsun/nio/fs/UnixNativeDispatcher;', LND = 'Lsun/nio/fs/LinuxNativeDispatcher;', UFA = 'Lsun/nio/fs/UnixFileAttributes;', UFSA = 'Lsun/nio/fs/UnixFileStoreAttributes;', UEX = 'Lsun/nio/fs/UnixException;', UCF = 'Lsun/nio/fs/UnixCopyFile;';
+  const nioFail = (runtime, name) => runtime.throwJavaReference(construct(runtime, UEX, ['I'], [ERRNO_BY_NAME(name)]), `UnixException ${name}`);
+  /** Runs a libcore-style operation (which raises android.system.ErrnoException) and re-raises its errno as a UnixException. */
+  const unixOp = (runtime, operation) => {
+    try { return operation(); }
+    catch (error) {
+      if (error?.name === 'JavaException' && runtime.typeOf(error.value) === 'Landroid/system/ErrnoException;') {
+        const errno = runtime.object(error.value).fields.get('Landroid/system/ErrnoException;->errno:I');
+        runtime.throwJavaReference(construct(runtime, UEX, ['I'], [errno]), `UnixException ${errno}`);
+      }
+      throw error;
+    }
+  };
+  const cstring = (runtime, address) => {
+    let at = BigInt(address); const bytes = [];
+    for (;;) { const [byte] = readNativeBytes(runtime, at++, 1); if (byte === 0) break; bytes.push(byte); if (bytes.length > 4096) nioFail(runtime, 'ENAMETOOLONG'); }
+    return decoder.decode(Uint8Array.from(bytes));
+  };
+  const byteArray = (runtime, bytes) => { const array = runtime.newArray('[B', bytes.length); runtime.object(array).elements = Array.from(bytes, v => (v << 24) >> 24); return array; };
+  const nioFind = (runtime, address) => { const fs = files(runtime), found = lookup(fs, cstring(runtime, address)); if (!found.node) nioFail(runtime, found.error); return { fs, ...found }; };
+  const setAttributes = (runtime, attrs, node, std = false) => {
+    const uid = runtime.platform.virtualProcess.uid, object = runtime.object(attrs), set = (name, type, value) => runtime.storeField(object.fields, `${UFA}->${name}:${type}`, value);
+    const seconds = BigInt(Math.floor(node.mtime / 1000)), nanos = BigInt((node.mtime % 1000) * 1_000_000), size = node.type === 'file' ? node.size : 0;
+    set('st_mode', 'I', std ? C.S_IFCHR | 0o620 : modeOf(runtime, node)); set('st_ino', 'J', BigInt(inode(node))); set('st_dev', 'J', 0xfd00n); set('st_rdev', 'J', 0n);
+    set('st_nlink', 'I', node.type === 'dir' ? 2 : 1); set('st_uid', 'I', uid); set('st_gid', 'I', uid); set('st_size', 'J', BigInt(size));
+    for (const kind of ['atime', 'mtime', 'ctime']) { set(`st_${kind}_sec`, 'J', seconds); set(`st_${kind}_nsec`, 'J', nanos); }
+  };
+  const statInto = (runtime, address, attrs) => { const { node } = nioFind(runtime, address); setAttributes(runtime, attrs, node); };
+  const nioTable = runtime => state(runtime).nio ??= { dirs: new Map(), next: 1n };
+  const dirEntry = (runtime, handle) => nioTable(runtime).dirs.get(BigInt(handle)) ?? nioFail(runtime, 'EBADF');
+  const descriptor = (runtime, number) => state(runtime).table.get(number)?.desc ?? nioFail(runtime, 'EBADF');
+  const nativeIo = (runtime, number, address, count, reading) => {
+    const desc = descriptor(runtime, number), fs = files(runtime);
+    if (desc.kind === 'dir') nioFail(runtime, 'EISDIR');
+    if (reading ? !readable(desc) : !writable(desc)) nioFail(runtime, 'EBADF');
+    if (desc.kind === 'std') { if (reading) return 0; stdLog(runtime, desc, readNativeBytes(runtime, address, count)); return count; }
+    const node = desc.node;
+    if (reading) {
+      if (desc.offset >= node.size || count === 0) return 0;
+      const length = Math.min(count, node.size - desc.offset), chunk = new Uint8Array(length); fs.readAt(node, desc.offset, chunk, 0, length);
+      writeNativeBytes(runtime, address, chunk); desc.offset += length; return length;
+    }
+    const bytes = readNativeBytes(runtime, address, count), at = desc.append ? node.size : desc.offset;
+    try { fs.writeAt(node, at, bytes, 0, count); } catch (error) { if (error instanceof RangeError) nioFail(runtime, 'EFBIG'); throw error; }
+    desc.offset = at + count; return count;
+  };
+  add(UND, 'init()I', () => 0);                                          // no openat / futimes / birthtime: the provider takes its path-based fallbacks
+  add(UND, 'getcwd()[B', runtime => byteArray(runtime, new TextEncoder().encode('/')));
+  add(UND, 'strerror(I)[B', (runtime, [errno]) => byteArray(runtime, new TextEncoder().encode(STRERROR[errno] ?? `Unknown error ${errno}`)));
+  add(UND, 'dup(I)I', (runtime, [number]) => { const number2 = allocateFd(runtime, descriptor(runtime, number)); if (number2 < 0) nioFail(runtime, 'EMFILE'); return number2; });
+  add(UND, 'open0(JII)I', (runtime, [address, flags, mode]) => unixOp(runtime, () => open(runtime, cstring(runtime, address), flags, mode)));
+  add(UND, 'openat0(IJII)I', runtime => nioFail(runtime, 'ENOSYS'));
+  add(UND, 'close(I)V', (runtime, [number]) => { if (state(runtime).table.has(number)) release(runtime, number); });
+  add(UND, 'fopen0(JJ)J', runtime => nioFail(runtime, 'ENOENT'));
+  add(UND, 'fclose(J)V', () => undefined);
+  add(UND, 'link0(JJ)V', runtime => nioFail(runtime, 'EPERM'));
+  add(UND, 'symlink0(JJ)V', runtime => nioFail(runtime, 'EPERM'));
+  add(UND, 'mknod0(JIJ)V', runtime => nioFail(runtime, 'EPERM'));
+  add(UND, 'unlink0(J)V', (runtime, [address]) => { const { fs, node, path } = nioFind(runtime, address); if (node.type === 'dir') nioFail(runtime, 'EISDIR'); const code = fs.delete(path); if (code !== 'ok') nioFail(runtime, code); });
+  add(UND, 'unlinkat0(IJI)V', runtime => nioFail(runtime, 'ENOSYS'));
+  add(UND, 'rmdir0(J)V', (runtime, [address]) => { const { fs, node, path } = nioFind(runtime, address); if (node.type !== 'dir') nioFail(runtime, 'ENOTDIR'); const code = fs.delete(path); if (code !== 'ok') nioFail(runtime, code); });
+  add(UND, 'rename0(JJ)V', (runtime, [from, to]) => {
+    const { fs, node, path } = nioFind(runtime, from), target = lookup(fs, cstring(runtime, to));
+    if (target.node && target.node.type === 'dir' && node.type !== 'dir') nioFail(runtime, 'EISDIR');
+    if (target.node && target.node.type !== 'dir' && node.type === 'dir') nioFail(runtime, 'ENOTDIR');
+    if (target.error === 'ENOTDIR') nioFail(runtime, 'ENOTDIR');
+    const code = fs.rename(path, target.path); if (code !== 'ok') nioFail(runtime, code);
+  });
+  add(UND, 'renameat0(IJIJ)V', runtime => nioFail(runtime, 'ENOSYS'));
+  add(UND, 'mkdir0(JI)V', (runtime, [address, mode]) => {
+    const fs = files(runtime), found = lookup(fs, cstring(runtime, address));
+    if (found.node) nioFail(runtime, 'EEXIST'); if (found.error === 'ENOTDIR') nioFail(runtime, 'ENOTDIR');
+    const code = fs.mkdir(found.path); if (code !== 'ok') nioFail(runtime, code);
+    fs.nodes.get(found.path).mode = mode & ~state(runtime).umask & 0o7777;
+  });
+  add(UND, 'readlink0(J)[B', (runtime, [address]) => { nioFind(runtime, address); nioFail(runtime, 'EINVAL'); });          // exists, but no path is a symbolic link
+  add(UND, 'realpath0(J)[B', (runtime, [address]) => byteArray(runtime, new TextEncoder().encode(nioFind(runtime, address).path)));
+  add(UND, 'stat0(JLsun/nio/fs/UnixFileAttributes;)V', (runtime, [address, attrs]) => statInto(runtime, address, attrs));
+  add(UND, 'lstat0(JLsun/nio/fs/UnixFileAttributes;)V', (runtime, [address, attrs]) => statInto(runtime, address, attrs));
+  add(UND, 'fstat(ILsun/nio/fs/UnixFileAttributes;)V', (runtime, [number, attrs]) => { const desc = descriptor(runtime, number); setAttributes(runtime, attrs, desc.kind === 'std' ? { type: 'file', size: 0, mtime: runtime.platform.clock.wall?.() ?? 0, mode: 0o620 } : desc.node, desc.kind === 'std'); });
+  add(UND, 'fstatat0(IJILsun/nio/fs/UnixFileAttributes;)V', runtime => nioFail(runtime, 'ENOSYS'));
+  for (const name of ['chown0', 'lchown0']) add(UND, `${name}(JII)V`, (runtime, [address]) => { nioFind(runtime, address); });
+  add(UND, 'fchown(III)V', (runtime, [number]) => { descriptor(runtime, number); });
+  add(UND, 'chmod0(JI)V', (runtime, [address, mode]) => { const { fs, node, path } = nioFind(runtime, address); if (fs.isReadOnly(path)) nioFail(runtime, 'EPERM'); node.mode = mode & 0o7777; });
+  add(UND, 'fchmod(II)V', (runtime, [number, mode]) => { const desc = descriptor(runtime, number); if (desc.kind === 'std') nioFail(runtime, 'EINVAL'); desc.node.mode = mode & 0o7777; });
+  add(UND, 'utimes0(JJJ)V', (runtime, [address, , modified]) => { const { fs, node, path } = nioFind(runtime, address); if (fs.isReadOnly(path)) nioFail(runtime, 'EPERM'); node.mtime = Number(modified) / 1000; });
+  add(UND, 'futimes(IJJ)V', (runtime, [number, , modified]) => { const desc = descriptor(runtime, number); if (desc.kind === 'std') nioFail(runtime, 'EINVAL'); desc.node.mtime = Number(modified) / 1000; });
+  add(UND, 'opendir0(J)J', (runtime, [address]) => {
+    const { fs, node, path } = nioFind(runtime, address); if (node.type !== 'dir') nioFail(runtime, 'ENOTDIR');
+    const table = nioTable(runtime), handle = table.next++; table.dirs.set(handle, { names: fs.list(path) ?? [], index: 0 }); return handle;
+  });
+  add(UND, 'fdopendir(I)J', runtime => nioFail(runtime, 'ENOSYS'));
+  add(UND, 'closedir(J)V', (runtime, [handle]) => { if (!nioTable(runtime).dirs.delete(BigInt(handle))) nioFail(runtime, 'EBADF'); });
+  add(UND, 'readdir(J)[B', (runtime, [handle]) => { const dir = dirEntry(runtime, handle); return dir.index < dir.names.length ? byteArray(runtime, new TextEncoder().encode(dir.names[dir.index++])) : null; });
+  add(UND, 'read(IJI)I', (runtime, [number, address, count]) => nativeIo(runtime, number, address, count, true));
+  add(UND, 'write(IJI)I', (runtime, [number, address, count]) => nativeIo(runtime, number, address, count, false));
+  add(UND, 'access0(JI)V', (runtime, [address, mode]) => {
+    const { fs, node, path } = nioFind(runtime, address), owner = node.mode >> 6;
+    if (((mode & 4) && !(owner & 4)) || ((mode & 2) && (!(owner & 2) || fs.isReadOnly(path))) || ((mode & 1) && !(owner & 1))) nioFail(runtime, 'EACCES');
+  });
+  const principal = (runtime, id) => new TextEncoder().encode(id >= 10000 ? `u0_a${id - 10000}` : id === 0 ? 'root' : id === 1000 ? 'system' : String(id));
+  add(UND, 'getpwuid(I)[B', (runtime, [id]) => byteArray(runtime, principal(runtime, id)));
+  add(UND, 'getgrgid(I)[B', (runtime, [id]) => byteArray(runtime, principal(runtime, id)));
+  const idOf = (runtime, address) => { const name = cstring(runtime, address), uid = runtime.platform.virtualProcess.uid; return name === decoder.decode(principal(runtime, uid)) ? uid : name === 'root' ? 0 : name === 'system' ? 1000 : -1; };
+  add(UND, 'getpwnam0(J)I', (runtime, [address]) => idOf(runtime, address));
+  add(UND, 'getgrnam0(J)I', (runtime, [address]) => idOf(runtime, address));
+  add(UND, 'statvfs0(JLsun/nio/fs/UnixFileStoreAttributes;)V', (runtime, [address, attrs]) => {
+    nioFind(runtime, address);
+    const object = runtime.object(attrs), set = (name, value) => runtime.storeField(object.fields, `${UFSA}->${name}:J`, value);   // the emulated 8 GiB data volume of StatFs (~70 % free)
+    set('f_frsize', 4096n); set('f_blocks', 2097152n); set('f_bfree', 1468006n); set('f_bavail', 1468006n);
+  });
+  const pathconf = (runtime, name) => name === 3 ? 255n : name === 4 ? 4096n : name === 5 ? 4096n : nioFail(runtime, 'EINVAL');   // _PC_NAME_MAX, _PC_PATH_MAX, _PC_PIPE_BUF
+  add(UND, 'pathconf0(JI)J', (runtime, [address, name]) => { nioFind(runtime, address); return pathconf(runtime, name); });
+  add(UND, 'fpathconf(II)J', (runtime, [number, name]) => { descriptor(runtime, number); return pathconf(runtime, name); });
+  add(LND, 'init()V', () => undefined);
+  add(LND, 'setmntent0(JJ)J', () => 1n);                                // an empty mount table: FileSystem.getFileStores() has nothing to list
+  add(LND, 'getmntent(JLsun/nio/fs/UnixMountEntry;)I', () => 0);
+  add(LND, 'endmntent(J)V', () => undefined);
+  add(LND, 'fgetxattr0(IJJI)I', runtime => nioFail(runtime, 'EOPNOTSUPP'));
+  add(LND, 'fsetxattr0(IJJI)V', runtime => nioFail(runtime, 'EOPNOTSUPP'));
+  add(LND, 'fremovexattr0(IJ)V', runtime => nioFail(runtime, 'EOPNOTSUPP'));
+  add(LND, 'flistxattr(IJI)I', runtime => nioFail(runtime, 'EOPNOTSUPP'));
+  add(UCF, 'transfer(IIJ)V', (runtime, [to, from]) => {                // UnixCopyFile.transfer: copy the rest of `from` into `to`
+    const source = descriptor(runtime, from), target = descriptor(runtime, to), fs = files(runtime);
+    if (source.kind !== 'file' || target.kind !== 'file') nioFail(runtime, 'EBADF');
+    const length = Math.max(0, source.node.size - source.offset), chunk = new Uint8Array(length); fs.readAt(source.node, source.offset, chunk, 0, length);
+    try { fs.writeAt(target.node, target.append ? target.node.size : target.offset, chunk, 0, length); } catch (error) { if (error instanceof RangeError) nioFail(runtime, 'EFBIG'); throw error; }
+    source.offset += length; target.offset += length;
   });
   return bindings;
 }

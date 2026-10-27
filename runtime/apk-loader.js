@@ -1,12 +1,12 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=58b0147dafd8';
-import { inspectELF } from './native-inspector.js?v=58b0147dafd8';
-import { inflateRaw } from './inflate.js?v=58b0147dafd8';
-import { resolveDevice } from './device-profile.js?v=58b0147dafd8';
-import { resourceProfileFor } from './device-configuration.js?v=58b0147dafd8';
-import { JniBridge } from './jni-host.js?v=58b0147dafd8';
-import { AndroidResources } from './android-resources.js?v=58b0147dafd8';
-import { AndroidPlatform } from './android-platform.js?v=58b0147dafd8';
-import { FrameworkProvider } from './framework-provider.js?v=58b0147dafd8';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=33d211b8a989';
+import { inspectELF } from './native-inspector.js?v=33d211b8a989';
+import { inflateRaw } from './inflate.js?v=33d211b8a989';
+import { resolveDevice } from './device-profile.js?v=33d211b8a989';
+import { resourceProfileFor } from './device-configuration.js?v=33d211b8a989';
+import { JniBridge } from './jni-host.js?v=33d211b8a989';
+import { AndroidResources } from './android-resources.js?v=33d211b8a989';
+import { AndroidPlatform } from './android-platform.js?v=33d211b8a989';
+import { FrameworkProvider } from './framework-provider.js?v=33d211b8a989';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -570,6 +570,8 @@ export async function loadAPK(arrayBuffer, options = {}) {
     nativeLibraries: nativeLibraryDetails, resources: resources.environment, nativeBindings: framework?.nativeBindings, skia,
     platform: new AndroidPlatform({ device: options.device, resources: resources.environment,
       applicationName: manifest.applicationName, packageName: manifest.packageName, manifest, apkBytes: arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer) }) });
+  // Canvas raster cache (src/skia-canvas-host.js): on by default; `rasterCache: false` switches it off for A/B comparison, `rasterCacheVerify: true` re-rasters every hit and fails on a difference.
+  runtime.rasterCacheDisabled = options.rasterCache === false; runtime.rasterCacheVerify = options.rasterCacheVerify === true;
   runtime.platform.resourceSelector = resourceConfiguration ?? null; // live device changes re-select resources through the same original ResTable_config matcher
   if (options.nativeLibraryProvider) runtime.jni = new JniBridge(runtime, options.nativeLibraryProvider, runtime.platform);
   if (!manifest.activities.length) manifest.activities = runtime.activities().map(type => ({ name: dottedName(type), descriptor: type, launcher: false }));

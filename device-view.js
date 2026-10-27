@@ -1,6 +1,6 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { isTrustedRasterURL } from './raster-cache.js?v=58b0147dafd8';
+import { isTrustedRasterURL } from './raster-cache.js?v=33d211b8a989';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -310,7 +310,7 @@ function queueComposeAction(ownerViewId, nodeId, action, args = []) {
   else { reportAPKError(new Error('A fila de ações Compose excedeu 128 eventos; reabra o APK.'), 'Fila de acessibilidade interrompida'); return; }
   flushPendingInputs();
 }
-const POINTER_CLICKS_DEFAULT = false;   // flip to true once a press ripple draws without error under real MotionEvents (see docs/VALIDATION.md)
+const POINTER_CLICKS_DEFAULT = true;   // taps reach the app as real MotionEvents (the press ripple animates under them); ?pointerClicks=semantic on the player frame selects the OnClick path
   const pointerClicks = () => deviceState.pointerClicks ?? POINTER_CLICKS_DEFAULT;   // ?pointerClicks=real|semantic on the player frame overrides it (validation runs both)
 /** Mouse/touch/pen on a Compose view -> VM pointer samples (real MotionEvents). Overlay controls are descendants, so their events bubble here too. */
 function bindPointerInput(host, owner) {

@@ -1,6 +1,6 @@
-import {APKError} from './apk-error.js?v=58b0147dafd8';
-import {getPaintStateByHandle} from './paint-host.js?v=58b0147dafd8';
-import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=58b0147dafd8';
+import {APKError} from './apk-error.js?v=33d211b8a989';
+import {getPaintStateByHandle} from './paint-host.js?v=33d211b8a989';
+import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=33d211b8a989';
 
 const MT='Landroid/graphics/text/MeasuredText;',BUILDER=MT.slice(0,-1)+'$Builder;',LB='Landroid/graphics/text/LineBreaker;';
 const REG='Llibcore/util/NativeAllocationRegistry;';
