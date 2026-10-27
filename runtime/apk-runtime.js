@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=87d26d81015e';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=87d26d81015e';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=87d26d81015e';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=87d26d81015e';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=87d26d81015e';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=87d26d81015e';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=87d26d81015e';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=87d26d81015e';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=87d26d81015e';
-import { APKError } from './apk-error.js?v=87d26d81015e';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=87d26d81015e';
-import { Scheduler, Blocked } from './scheduler.js?v=87d26d81015e';
-import { bootClassLacksMember } from './boot-class-members.js?v=87d26d81015e';
-export { APKError } from './apk-error.js?v=87d26d81015e';
+import { VMClock } from './vm-clock.js?v=eb9e6b7c0103';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=eb9e6b7c0103';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=eb9e6b7c0103';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=eb9e6b7c0103';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=eb9e6b7c0103';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=eb9e6b7c0103';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=eb9e6b7c0103';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=eb9e6b7c0103';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=eb9e6b7c0103';
+import { APKError } from './apk-error.js?v=eb9e6b7c0103';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=eb9e6b7c0103';
+import { Scheduler, Blocked } from './scheduler.js?v=eb9e6b7c0103';
+import { bootClassLacksMember } from './boot-class-members.js?v=eb9e6b7c0103';
+export { APKError } from './apk-error.js?v=eb9e6b7c0103';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -389,6 +389,9 @@ EXTERNAL_PARENTS.set('Ljava/util/ConcurrentModificationException;', 'Ljava/lang/
 EXTERNAL_PARENTS.set('Ljava/util/NoSuchElementException;', 'Ljava/lang/RuntimeException;');
 EXTERNAL_PARENTS.set('Ljava/lang/UnsupportedOperationException;', 'Ljava/lang/RuntimeException;');
 // Exported for the bridge audit test (tests/bridge-return-types.test.mjs).
+// Native libraries tolerant mode never stubs: obfuscated hash-named libraries (typical of protection layers) and known protection,
+// anti-fraud, attestation and payment-security names. They need their original binary (APK-REAL-TASKS task 14) or stay a hard stop.
+export const PROTECTED_NATIVE_LIBRARY = /^(?:[0-9a-f]{4,6}|.*(?:guard|protect|shield|tamper|tmxprofiling|threatmetrix|toolchecker|rootbeer|promon|appdome|arxan|jiagu|secneo|bangcle|ijiami|softpos|payment|attest|integrity).*)$/i;
 export const SHIMS = new Set([
   'Ljava/lang/Object;-><init>()V', 'Landroid/app/Activity;-><init>()V',
   'Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V',
@@ -865,7 +868,7 @@ export class APKRuntime {
     // boolean/byte/short/char/int/long/float/double methods with 0/false; 'all' also answers object methods with null. Every stubbed call is counted and traced (STUB-VOID / STUB-RETURN), so the run
     // doubles as the to-do list of missing bridges; a run that stubbed anything is never treated as validated. The default stays strict.
     if (!['off', 'void', 'primitives', 'all'].includes(tolerateMissing)) fail('VM tolerateMissing must be off, void, primitives or all');
-    this.tolerateMissing = tolerateMissing; this.missingVoid = new Map(); this.missingReturns = new Map(); this.missingClasses = new Map();
+    this.tolerateMissing = tolerateMissing; this.missingVoid = new Map(); this.missingReturns = new Map(); this.missingClasses = new Map(); this.missingLibraries = new Map(); this.refusedProtectedLibrary = null;
     this.maxCallDepth = maxCallDepth; this.peakCallDepth = 0;
     if (!Number.isInteger(maxInstructionsPerEvent) || maxInstructionsPerEvent < 1000 || maxInstructionsPerEvent > 20000000) fail('VM maxInstructionsPerEvent must be an integer from 1000 to 20000000');
     this.maxInstructionsPerEvent = maxInstructionsPerEvent;
@@ -966,7 +969,7 @@ export class APKRuntime {
   }
   executionSnapshot() {
     return { framework: { ...(this.dex.frameworkSummary ?? { dexFiles: [], classes: 0, bytes: 0, shadowedAPKClasses: [], policy: 'no-boot-layer' }) },
-      missingVoid: [...this.missingVoid].map(([key, count]) => ({ key, count })), missingReturns: [...this.missingReturns].map(([key, count]) => ({ key, count })), missingClasses: [...this.missingClasses].map(([key, count]) => ({ key, count })), executionByOrigin: { apk: { ...this.executionByOrigin.apk }, framework: { ...this.executionByOrigin.framework }, host: { ...this.executionByOrigin.host } }, callDepth: { limit: this.maxCallDepth, peak: this.peakCallDepth }, heapBudget: { oomCount: this.oomCount ?? 0, objects: this.heap.size, limit: this.maxHeapObjects, arrayCells: this.arrayCells, fieldSlots: this.fieldSlots, collectionCells: this.collectionCells, garbageCollection: !!this.gcEnabled, collections: this.gcStats?.collections ?? 0, freedObjects: this.gcStats?.freed ?? 0, peakLiveAfterCollection: this.gcStats?.peakLiveAfterGc ?? 0 }, instructionBudget: { limit: this.maxInstructionsPerEvent, currentEvent: this.steps }, unicodeCaseBackend: this.unicodeCaseBackend ?? null, methodEvidenceSummary:{uniqueMethods:this.methodEvidence?.size??0,truncated:!!this.methodEvidenceTruncated} };
+      missingVoid: [...this.missingVoid].map(([key, count]) => ({ key, count })), missingReturns: [...this.missingReturns].map(([key, count]) => ({ key, count })), missingClasses: [...this.missingClasses].map(([key, count]) => ({ key, count })), missingLibraries: [...this.missingLibraries].map(([key, count]) => ({ key, count })), executionByOrigin: { apk: { ...this.executionByOrigin.apk }, framework: { ...this.executionByOrigin.framework }, host: { ...this.executionByOrigin.host } }, callDepth: { limit: this.maxCallDepth, peak: this.peakCallDepth }, heapBudget: { oomCount: this.oomCount ?? 0, objects: this.heap.size, limit: this.maxHeapObjects, arrayCells: this.arrayCells, fieldSlots: this.fieldSlots, collectionCells: this.collectionCells, garbageCollection: !!this.gcEnabled, collections: this.gcStats?.collections ?? 0, freedObjects: this.gcStats?.freed ?? 0, peakLiveAfterCollection: this.gcStats?.peakLiveAfterGc ?? 0 }, instructionBudget: { limit: this.maxInstructionsPerEvent, currentEvent: this.steps }, unicodeCaseBackend: this.unicodeCaseBackend ?? null, methodEvidenceSummary:{uniqueMethods:this.methodEvidence?.size??0,truncated:!!this.methodEvidenceTruncated} };
   }
   compactArguments(method, words, mode) {
     const staticCall = mode === 'static';
@@ -1461,6 +1464,7 @@ export class APKRuntime {
           // APK `native` methods can only be satisfied by a library the JNI bridge loaded (RegisterNatives or Java_ symbol rules); framework natives never are.
           const jniBinding = this.methodOrigin(definition.method) !== 'framework' ? this.jni?.bindingFor(definition.method) : null;
           if (jniBinding) { this.executionByOrigin.host.calls++; this.record(`JNI ${definition.method.key} -> ${jniBinding.symbol}`); return this.jni.invoke(jniBinding, definition.method, this.hostArguments(definition.method, args, mode), mode); }
+          if (this.tolerateMissing === 'all' && this.missingLibraries.size && !this.refusedProtectedLibrary) return this.noteMissingStub(definition.method.key, definition.method.result);
           this.nativeRequired(definition.method.key);
         }
         this.executionByOrigin.host.calls++;
@@ -1543,6 +1547,19 @@ export class APKRuntime {
       queue.push(...this.interfaces(iface));
     }
     return null;
+  }
+  /**
+   * Tolerant mode 'all': a native library the lab cannot supply (a name or a path) is logged and treated as loaded, and its unbound natives then
+   * return defaults. Libraries that look like app protection, anti-fraud or payment security are never stubbed: their genuine failure stands,
+   * and once one was refused no APK native is stubbed for the rest of the run. Returns true when the load was stubbed.
+   */
+  stubNativeLibrary(request) {
+    if (this.tolerateMissing !== 'all') return false;
+    const library = request.split('/').pop().replace(/^lib/, '').replace(/\.so$/, '');
+    if (PROTECTED_NATIVE_LIBRARY.test(library)) { this.refusedProtectedLibrary ??= library; return false; }
+    const count = (this.missingLibraries.get(library) ?? 0) + 1; this.missingLibraries.set(library, count);
+    if (count === 1) this.record(`STUB-LIB lib${library}.so (no wasm32 module; its natives return defaults)`);
+    return true;
   }
   nativeRequired(method, requestedLibrary = null) {
     const libraries = this.nativeLibraries.map(value => typeof value === 'string' ? value : value.path ?? value.name ?? value.basename ?? 'unknown');
@@ -2288,6 +2305,7 @@ export class APKRuntime {
       if (name === 'loadLibrary' && text.includes('/')) this.throwJava('Ljava/lang/UnsatisfiedLinkError;', 'Directory separator should not appear in library name: ' + text);
       // A lab-supplied WebAssembly module (never APK bytes) satisfies the request through the JNI bridge; otherwise the genuine failure below stands.
       if (this.jni && (name === 'load' ? this.jni.loadPath(text) : this.jni.loadLibrary(text))) return undefined;
+      if (this.stubNativeLibrary(text)) return undefined;
       this.nativeRequired(key, text);
     }
     if (method.owner === 'Ljava/lang/System;') {

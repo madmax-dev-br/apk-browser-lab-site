@@ -1,7 +1,8 @@
-import { APKError } from './apk-error.js?v=87d26d81015e';
-import { createHostRegistry } from './host-contract.js?v=87d26d81015e';
-import { Blocked, VMThread } from './scheduler.js?v=87d26d81015e';
-import { Invoke } from './interpreter.js?v=87d26d81015e';
+import { APKError } from './apk-error.js?v=eb9e6b7c0103';
+import { createHostRegistry } from './host-contract.js?v=eb9e6b7c0103';
+import { Blocked, VMThread } from './scheduler.js?v=eb9e6b7c0103';
+import { Invoke } from './interpreter.js?v=eb9e6b7c0103';
+import { GC_ROOTS } from './heap-gc.js?v=eb9e6b7c0103';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -110,6 +111,20 @@ export function createConcurrencyHost(platform) {
   def(THREAD, 'setName', `(${STRING})V`, (r, _m, [self, n]) => { state(r, self).name = n === null ? throwNew(r, 'Ljava/lang/NullPointerException;', 'name == null') : r.stringCharacters(n); });
   def(THREAD, 'getId', '()J', (r, _m, [self]) => state(r, self).id); def(THREAD, 'threadId', '()J', (r, _m, [self]) => state(r, self).id);
   def(THREAD, 'isAlive', '()Z', (r, _m, [self]) => { const st = state(r, self); return st.started && !st.finished ? 1 : 0; });
+  // Runtime.addShutdownHook/removeShutdownHook (libcore ApplicationShutdownHooks): same argument checks; hooks are held (GC-rooted) but never
+  // started, because this VM has no process exit. Android itself does not promise to run them when an app process is killed.
+  const RUNTIME = 'Ljava/lang/Runtime;', shutdownHooks = new Map();
+  def(RUNTIME, 'addShutdownHook', `(${THREAD})V`, (r, _m, [, hook]) => {
+    if (hook === null) throwNew(r, 'Ljava/lang/NullPointerException;', 'hook');
+    const st = state(r, hook);
+    if (st.started) throwNew(r, 'Ljava/lang/IllegalArgumentException;', 'Hook already running');
+    if (shutdownHooks.has(hook.ref)) throwNew(r, 'Ljava/lang/IllegalArgumentException;', 'Hook previously registered');
+    shutdownHooks.set(hook.ref, hook); r.record(`RUNTIME shutdown hook registered: ${st.name} (held; this VM has no process exit to run it)`);
+  });
+  def(RUNTIME, 'removeShutdownHook', `(${THREAD})Z`, (r, _m, [, hook]) => {
+    if (hook === null) throwNew(r, 'Ljava/lang/NullPointerException;', 'hook');
+    return shutdownHooks.delete(hook.ref) ? 1 : 0;
+  });
   def(THREAD, 'isDaemon', '()Z', (r, _m, [self]) => state(r, self).daemon ? 1 : 0);
   def(THREAD, 'setDaemon', '(Z)V', (r, _m, [self, d]) => { const st = state(r, self); if (st.started && !st.finished) throwNew(r, 'Ljava/lang/IllegalThreadStateException;'); st.daemon = !!d; });
   def(THREAD, 'getPriority', '()I', (r, _m, [self]) => state(r, self).priority);
@@ -595,5 +610,5 @@ export function createConcurrencyHost(platform) {
   def(LOOPER, 'quit', '()V', (r, _m, [self]) => { const state = r.object(self); if (state === r.object(r.mainLooper ?? self) && !state.looperQueue) r.throwJava('Ljava/lang/IllegalStateException;', 'Main thread not allowed to quit.'); state.quitting = true; state.safeQuit = false; for (const event of state.looperQueue) { const message = r.object(event.message); message.inUse = false; message.recycled = true; } state.looperQueue.length = 0; platform.onExternalActivity?.(); });
   def(LOOPER, 'quitSafely', '()V', (r, _m, [self]) => { const state = r.object(self); if (!state.looperQueue) r.throwJava('Ljava/lang/IllegalStateException;', 'Main thread not allowed to quit.'); state.quitting = true; state.safeQuit = true; platform.onExternalActivity?.(); });
   def(LOOPER, 'getQueue', '()Landroid/os/MessageQueue;', () => { throw new APKError('Looper.getQueue(): MessageQueue is not modelled (use Handler.hasMessages / removeCallbacks)', { kind: 'messagequeue-unsupported' }); });
-  return { ...registry, interfaces: registry.interfacesOf, helpUntil, currentThread, mainThread };
+  return { ...registry, interfaces: registry.interfacesOf, helpUntil, currentThread, mainThread, [GC_ROOTS](visit) { for (const hook of shutdownHooks.values()) visit(hook); } };
 }

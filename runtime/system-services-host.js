@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=87d26d81015e';
-import { APKError } from './apk-error.js?v=87d26d81015e';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=87d26d81015e';
+import { gcRoot } from './heap-gc.js?v=eb9e6b7c0103';
+import { APKError } from './apk-error.js?v=eb9e6b7c0103';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=eb9e6b7c0103';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -372,6 +372,7 @@ export function createSystemServicesHost(platform) {
     const path = r.stringCharacters(filename);
     try {
       if (r.jni?.loadPath(path, 'Runtime.nativeLoad')) return null;
+      if (r.stubNativeLibrary(path)) return null;
       return `dlopen failed: library "${path}" is not a native library of this device (no wasm32 module is registered for it)`;
     } catch (error) {
       if (error?.value && r.isSubtype(r.typeOf(error.value), 'Ljava/lang/UnsatisfiedLinkError;')) return r.object(error.value).message ?? 'dlopen failed';
