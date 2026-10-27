@@ -396,6 +396,38 @@
       "executionValidated": false,
       "sizeBytes": 16801416,
       "available": true
+    },
+    {
+      "id": "sqlcipher-probe",
+      "file": "sqlcipher-probe.apk",
+      "title": "SQLCipher · net.zetetic:sqlcipher-android 4.19.1 (experimental)",
+      "description": "System.loadLibrary(\"sqlcipher\") atendido por um módulo Wasm compilado das fontes oficiais do SQLCipher (4.19.0) e do JNI oficial do sqlcipher-android 4.19.1, com LibTomCrypt. Abre um banco criptografado com senha, cria tabela, insere e consulta, fecha e reabre, falha com senha errada e mostra PRAGMA cipher_version. O arquivo fica no armazenamento do app (IndexedDB): reinicie a página e execute de novo para ler o banco da execução anterior.",
+      "tags": [
+        "SQLCipher",
+        "JNI",
+        "Wasm",
+        "Experimental"
+      ],
+      "advanced": false,
+      "executionValidated": false,
+      "sizeBytes": 3041822,
+      "available": true
+    },
+    {
+      "id": "sqlcipher-legacy-probe",
+      "file": "sqlcipher-legacy-probe.apk",
+      "title": "SQLCipher legado · net.zetetic:android-database-sqlcipher 4.5.4 (experimental)",
+      "description": "O mesmo roteiro com o artefato legado (net.sqlcipher.*), cuja versão o laboratório lê de net.sqlcipher.BuildConfig no DEX do próprio APK. Módulo Wasm do JNI oficial android-database-sqlcipher 4.5.4 sobre o núcleo SQLCipher 4.5.4, com LibTomCrypt (o AAR oficial usa OpenSSL; o formato em disco é o mesmo SQLCipher 4).",
+      "tags": [
+        "SQLCipher",
+        "JNI",
+        "Wasm",
+        "Experimental"
+      ],
+      "advanced": false,
+      "executionValidated": false,
+      "sizeBytes": 4546039,
+      "available": true
     }
   ]
 }

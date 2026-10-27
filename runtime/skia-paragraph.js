@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=4c3f3e1e13b1';
+import { APKError } from './apk-runtime.js?v=0c9f1b0d2456';
 
 const fail = message => { throw new APKError(message, { kind: 'skia-paragraph-unsupported' }); };
 const fontWeightOf = (CK, weight) => { if(!Number.isInteger(weight)||weight<0||weight>1000)fail('Font weight must be in [0,1000]'); return Object.values(CK.FontWeight).find(value=>value?.value===weight)??{value:weight}; };

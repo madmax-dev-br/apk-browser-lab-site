@@ -1,11 +1,11 @@
-import { APKError } from './apk-error.js?v=4c3f3e1e13b1';
-import { JavaException } from './apk-runtime.js?v=4c3f3e1e13b1';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=4c3f3e1e13b1';
-import { buildElfDescriptor } from './native-descriptor.js?v=4c3f3e1e13b1';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=4c3f3e1e13b1';
-import { NativeLinker, LinkError } from './native-linker.js?v=4c3f3e1e13b1';
-import { hostFunction } from './wasm-host-function.js?v=4c3f3e1e13b1';
-import { parseWasm } from './wasm-dylink.js?v=4c3f3e1e13b1';
+import { APKError } from './apk-error.js?v=0c9f1b0d2456';
+import { JavaException } from './apk-runtime.js?v=0c9f1b0d2456';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=0c9f1b0d2456';
+import { buildElfDescriptor } from './native-descriptor.js?v=0c9f1b0d2456';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=0c9f1b0d2456';
+import { NativeLinker, LinkError } from './native-linker.js?v=0c9f1b0d2456';
+import { hostFunction } from './wasm-host-function.js?v=0c9f1b0d2456';
+import { parseWasm } from './wasm-dylink.js?v=0c9f1b0d2456';
 
 // JNI -> WebAssembly bridge.
 //
@@ -39,8 +39,9 @@ export const BASE_SONAME = 'libc++_shared.so';
 
 /** Lab-controlled registry of WebAssembly native libraries. `add` verifies the pinned SHA-256 before compiling; there is no API that accepts APK bytes. */
 export class NativeLibraryProvider {
-  constructor({ abi = 'wasm32' } = {}) { this.abi = abi; this.modules = new Map(); }
-  async add({ soname, wasm, sha256, needed = null, provenance = null }) {
+  constructor({ abi = 'wasm32' } = {}) { this.abi = abi; this.modules = new Map(); this.unavailable = new Map(); }
+  /** `hostImports(bridge, soname)` may supply imports the linker does not (a library's own host module, e.g. apkweb_sqlcipher): { module: { name: fn } }. Lab code only, never from an APK. */
+  async add({ soname, wasm, sha256, needed = null, provenance = null, hostImports = null }) {
     if (!/^lib[\w.+-]+\.so$/.test(soname)) throw new APKError(`Invalid native library name ${soname}`);
     if (!/^[0-9a-f]{64}$/i.test(sha256 ?? '')) throw new APKError(`Native library ${soname} needs a pinned SHA-256`);
     const bytes = wasm instanceof Uint8Array ? wasm : new Uint8Array(wasm);
@@ -52,11 +53,14 @@ export class NativeLibraryProvider {
     if (needed && JSON.stringify(needed) !== JSON.stringify(parsed.dylink.needed)) throw new APKError(`Native library ${soname}: provenance DT_NEEDED ${JSON.stringify(needed)} differs from the module's ${JSON.stringify(parsed.dylink.needed)}`, { kind: 'native-library-format' });
     needed = parsed.dylink.needed;
     const module = await WebAssembly.compile(bytes);
-    this.modules.set(soname, { soname, abi: this.abi, bytes, sha256: actual, module, needed, provenance, descriptor: buildElfDescriptor({ soname, needed, wasmSha256: actual }) });
+    this.unavailable.delete(soname);
+    this.modules.set(soname, { soname, abi: this.abi, bytes, sha256: actual, module, needed, provenance, hostImports, descriptor: buildElfDescriptor({ soname, needed, wasmSha256: actual }) });
     return this;
   }
   has(soname) { return this.modules.has(soname); }
   get(soname) { return this.modules.get(soname) ?? null; }
+  /** The lab knows this library is needed but has no matching build: loading it raises this explicit UnsatisfiedLinkError instead of the generic JNI-required one. */
+  markUnavailable(soname, { message, details = {} }) { this.unavailable.set(soname, { message, details }); return this; }
 }
 
 const ENOSYS = 38, EBADF = 8;
@@ -78,12 +82,17 @@ export class JniBridge {
 
   // ---- loading ---------------------------------------------------------------------------------------------------------------------------
   /** System.loadLibrary(name): returns false when the provider has no such library (caller keeps the genuine UnsatisfiedLinkError path). */
-  loadLibrary(name) { const soname = `lib${name}.so`; return this.provider.has(soname) ? (this.#load(soname, 'System.loadLibrary'), true) : false; }
+  loadLibrary(name) { const soname = `lib${name}.so`; this.#requireAvailable(soname); return this.provider.has(soname) ? (this.#load(soname, 'System.loadLibrary'), true) : false; }
+  #requireAvailable(soname) {
+    const missing = this.provider.unavailable?.get(soname); if (!missing || this.provider.has(soname)) return;
+    this.runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', missing.message, missing.details);
+  }
   /** System.load(path) / Runtime.nativeLoad: the file must exist in the virtual filesystem and be a provider module. */
   loadPath(path, via = 'System.load') {
     const soname = path.slice(path.lastIndexOf('/') + 1), fs = this.platform.javaIo.fs();
     if (!path.startsWith('/')) this.runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', `Expected absolute path to library: ${path}`);
     if (!fs.stat(path)) this.runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: library "${path}" not found`);
+    this.#requireAvailable(soname);
     if (!this.provider.has(soname)) return false;
     this.#load(soname, via); return true;
   }
@@ -120,6 +129,9 @@ export class JniBridge {
   /** Functions the linker cannot take from a library: WASI, the few Emscripten runtime hooks, and syscalls (which report ENOSYS: there is no kernel). */
   #hostImport(module, name, soname) {
     const r = this.runtime, memory = () => this.linker.memory.buffer;
+    // a library's own host module (entry.hostImports), created once per library and bound to the shared process memory
+    const owned = this.provider.get(soname)?.hostImports;
+    if (owned) { const own = (this.hostImportsOf ??= new Map()).get(soname) ?? (this.hostImportsOf.set(soname, owned(this, soname)), this.hostImportsOf.get(soname)); if (own[module]?.[name]) return own[module][name]; }
     if (module === 'wasi_snapshot_preview1') {
       const table = {
         proc_exit: code => { throw new APKError(`${soname} called exit(${code})`, { kind: 'native-exit', code }); },

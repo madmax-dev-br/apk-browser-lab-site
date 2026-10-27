@@ -1,5 +1,5 @@
-import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=4c3f3e1e13b1';
-import { APKError } from './apk-error.js?v=4c3f3e1e13b1';
+import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=0c9f1b0d2456';
+import { APKError } from './apk-error.js?v=0c9f1b0d2456';
 
 // java.security.Security / Provider and java.net.IDN for libraries that probe the platform at launch (OkHttp's Platform.get(), Conscrypt checks, host name
 // normalisation). Contracts: java.security.Security, java.security.Provider (android-13.0.0_r1 libcore) and java.net.IDN (ToASCII/ToUnicode of RFC 3490).
