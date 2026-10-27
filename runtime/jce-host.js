@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=fd59ee7c3d79';
-import { createHostRegistry } from './host-contract.js?v=fd59ee7c3d79';
-import { DIGESTS } from './crypto-host.js?v=fd59ee7c3d79';
+import { APKError } from './apk-error.js?v=9b98a94b8ae7';
+import { createHostRegistry } from './host-contract.js?v=9b98a94b8ae7';
+import { DIGESTS } from './crypto-host.js?v=9b98a94b8ae7';
 
 // javax.crypto (Cipher, Mac, KeyGenerator, SecretKeyFactory, the key/parameter specs) and the Android Keystore surface (KeyStore "AndroidKeyStore", KeyGenParameterSpec, KeyProperties),
 // in synchronous pure JavaScript (the VM is synchronous, WebCrypto is not). Algorithms: AES (128/192/256) in ECB, CBC, CTR and GCM with PKCS5/PKCS7 or no padding, HMAC over

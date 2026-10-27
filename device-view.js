@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=fd59ee7c3d79';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=fd59ee7c3d79';
-import { isTrustedRasterURL } from './raster-cache.js?v=fd59ee7c3d79';
+import { updateWebViewSlot } from './webview-slot.js?v=9b98a94b8ae7';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=9b98a94b8ae7';
+import { isTrustedRasterURL } from './raster-cache.js?v=9b98a94b8ae7';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -33,7 +33,7 @@ function bindVM(vm) {
     runtimeFrames.pending = snapshot; if (!runtimeFrames.requested) { runtimeFrames.requested = true; nextFrame(() => flushRuntimeSnapshot(vm)); }
   };
   vm.onRuntimeError = error => { if (state.runtime === vm) reportAPKError(error, 'Callback assíncrono interrompido'); };
-  if (ctx.webViews !== false) { webviews?.reset(); webviews = createWebViewManager({ send: event => vm.webViewEvent?.(event) }); vm.onWebView = message => { if (state.runtime === vm) webviews.handle(message); }; }
+  if (ctx.webViews !== false) { webviews?.close(); webviews = createWebViewManager({ send: event => vm.webViewEvent?.(event) }); vm.onWebView = message => { if (state.runtime === vm) webviews.handle(message); }; }
 }
 function reconcileChildren(parent, children) {
   children.forEach((child, index) => { if (parent.children[index] !== child) parent.insertBefore(child, parent.children[index] || null); });

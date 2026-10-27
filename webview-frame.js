@@ -7,8 +7,11 @@
 // own origin or a srcdoc is an opaque origin that cannot touch the lab's DOM, Worker or storage. Scripts run only when the app enabled JavaScript. The frame gets no
 // permissions policy features (`allow=""`), no referrer, and no ambient credentials where the browser supports `credentialless`.
 
+import { bridgeMarkup, injectIntoHead } from './webview-bridge.js?v=9b98a94b8ae7';
+
 export const FRAME_SANDBOX = Object.freeze({ scripts: 'allow-scripts', forms: 'allow-forms' });
 export const FRAME_ATTRIBUTES = Object.freeze({ allow: '', referrerpolicy: 'no-referrer', loading: 'eager', 'aria-label': 'WebView' });
+const GRACE_MS = 1500;
 const FORBIDDEN_TOKENS = ['allow-same-origin', 'allow-top-navigation', 'allow-top-navigation-by-user-activation', 'allow-popups', 'allow-popups-to-escape-sandbox', 'allow-modals', 'allow-downloads', 'allow-pointer-lock', 'allow-presentation', 'allow-orientation-lock', 'allow-storage-access-by-user-activation'];
 
 /** The `sandbox` value for a frame; JavaScript only when the app's WebSettings enabled it. */
@@ -58,7 +61,7 @@ export function withBase(html, base) {
  *   handle(message)  a Worker message (op: 'load' | 'stop' | 'destroy')
  *   sweep(liveIds)   destroys the frames of WebViews that left the snapshot
  */
-export function createWebViewManager({ send, labOrigin = globalThis.location?.origin ?? '', document: doc = globalThis.document, timers = globalThis, fetch: fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
+export function createWebViewManager({ send, labOrigin = globalThis.location?.origin ?? '', document: doc = globalThis.document, timers = globalThis, fetch: fetchImpl = globalThis.fetch?.bind(globalThis), win = globalThis, MessageChannel: Channel = globalThis.MessageChannel } = {}) {
   const frames = new Map();   // id -> { id, element, iframe, form, loadId, timer }
   const slots = new Map();    // id -> element
   const queued = new Map();   // id -> messages that arrived before the element existed
@@ -67,6 +70,9 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
   const dispose = frame => {
     if (!frame) return;
     timers.clearTimeout(frame.timer); frame.timer = null;
+    timers.clearTimeout(frame.grace); frame.grace = null;
+    try { frame.port?.close?.(); } catch { /* already closed */ }
+    frame.port = null; frame.bridge = null; frame.counts = null;
     frame.iframe?.remove?.(); frame.form?.remove?.(); frame.iframe = null; frame.form = null;
   };
   const fail = (frame, code, description) => { timers.clearTimeout(frame.timer); frame.timer = null; send({ type: 'webview-event', id: frame.id, loadId: frame.loadId, event: 'error', code, description }); };
@@ -110,9 +116,17 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
       if (frame.iframe !== iframe || frame.loadId !== message.loadId) return;
       timers.clearTimeout(frame.timer); frame.timer = null;
       send({ type: 'webview-event', id, loadId: message.loadId, event: 'finished' });
+      // a document that was given a bridge connects to it while it loads, usually before the load event: if it has not by now, give it a moment, then say it never will
+      if (frame.bridge && !frame.port) frame.grace = timers.setTimeout(() => { if (frame.iframe === iframe && !frame.port) send({ type: 'webview-event', id, loadId: message.loadId, event: 'bridge-failed' }); }, GRACE_MS);
     });
-    frame.iframe = iframe;
-    if ('srcdoc' in source) iframe.setAttribute('srcdoc', source.srcdoc); else if ('src' in source) iframe.setAttribute('src', source.src);
+    if (message.bridge) listen();
+    frame.iframe = iframe; frame.bridge = null; frame.counts = { console: 0, js: 0, dialog: 0, navigate: 0, title: 0, popup: 0 };
+    if ('srcdoc' in source) {
+      let document_ = source.srcdoc;
+      // a document the lab hands to the frame itself gets the page bridge and the network policy in front of it (src/webview-bridge.js); an opaque one cannot
+      if (message.bridge) { frame.bridge = message.javascript ? { ...message.bridge, loadId: message.loadId } : null; document_ = injectIntoHead(document_, bridgeMarkup({ csp: message.bridge.csp, config: { ...message.bridge.config, loadId: message.loadId }, javascript: !!message.javascript })); }
+      iframe.setAttribute('srcdoc', document_);
+    } else if ('src' in source) iframe.setAttribute('src', source.src);
     element.append(iframe);
     if (source.form) {   // postUrl: a form posted into the frame (the body of a POST cannot be set on an iframe's src)
       const form = doc.createElement('form');
@@ -122,6 +136,53 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
       element.append(form); frame.form = form; form.submit();
     }
     frame.timer = timers.setTimeout(() => { if (frame.loadId === message.loadId && frame.iframe === iframe) fail(frame, -8, 'net::ERR_TIMED_OUT (no load event from the WebView frame)'); }, message.timeoutMs ?? 30000);
+  }
+
+  // ---- the page bridge: a frame says hello, the page answers with one end of a MessageChannel, everything after that travels over the port ------------------------------------------
+  const str = (value, max) => (typeof value === 'string' ? value.slice(0, max) : '');
+  const LIMITS = { console: 1000, js: 5000, dialog: 100, navigate: 200, title: 200, popup: 20 };
+  const count = (frame, kind) => (frame.counts[kind] = (frame.counts[kind] ?? 0) + 1) <= LIMITS[kind];
+  /** What a frame may say, validated and bounded: anything else is dropped. The Worker validates again; nothing here is trusted because it came through a port. */
+  function forward(frame, data) {
+    if (!data || typeof data !== 'object' || frame.port === null) return;
+    const base = { type: 'webview-event', id: frame.id, loadId: frame.loadId };
+    switch (data.t) {
+      case 'ready': send({ ...base, event: 'bridge-ready', title: str(data.title, 1024) }); break;
+      case 'console': if (count(frame, 'console') && ['log', 'info', 'warn', 'error', 'debug'].includes(data.level)) send({ ...base, event: 'console', level: data.level, text: str(data.text, 4096), source: str(data.source, 2048), line: Number.isSafeInteger(data.line) && data.line >= 0 ? data.line : 0 }); break;
+      case 'title': if (count(frame, 'title')) send({ ...base, event: 'title', title: str(data.title, 1024) }); break;
+      case 'dialog': if (count(frame, 'dialog') && ['alert', 'confirm', 'prompt'].includes(data.kind)) send({ ...base, event: 'dialog', kind: data.kind, text: str(data.text, 4096) }); break;
+      case 'popup': if (count(frame, 'popup')) send({ ...base, event: 'popup', url: str(data.url, 8192) }); break;
+      case 'js': {
+        if (!count(frame, 'js') || typeof data.name !== 'string' || typeof data.method !== 'string' || !Array.isArray(data.args) || data.args.length > 32) break;
+        const args = data.args.map(value => (typeof value === 'string' ? value.slice(0, 4096) : typeof value === 'number' || typeof value === 'boolean' ? value : null));
+        send({ ...base, event: 'js', name: data.name.slice(0, 64), method: data.method.slice(0, 128), args });
+        break;
+      }
+      case 'navigate': if (count(frame, 'navigate') && typeof data.url === 'string' && data.url.length <= 8192 && (data.method === 'GET' || data.method === 'POST')) send({ ...base, event: 'navigate', url: data.url, method: data.method, body: data.method === 'POST' ? str(data.body, 65536) : null, gesture: data.gesture === true }); break;
+      case 'eval-result': if (Number.isSafeInteger(data.evalId) && typeof data.ok === 'boolean') send({ ...base, event: 'eval-result', evalId: data.evalId, ok: data.ok, json: data.ok ? str(data.json, 1048576) : null }); break;
+      default: break;
+    }
+  }
+  function onWindowMessage(event) {
+    const data = event.data;
+    if (!data || data.apkwebBridge !== 'hello') return;
+    for (const frame of frames.values()) {
+      // only the current document of a frame whose load carried a bridge, once: source, load id and state must all match
+      if (!frame.iframe || !frame.bridge || frame.port || event.source !== frame.iframe.contentWindow || data.loadId !== frame.loadId) continue;
+      const channel = new Channel();
+      frame.port = channel.port1; channel.port1.onmessage = e => forward(frame, e.data);
+      event.source.postMessage({ apkwebBridge: 'port', loadId: frame.loadId }, '*', [channel.port2]);
+      return;
+    }
+  }
+  let listening = false;   // the window listener exists only while a document with a bridge may say hello
+  const listen = () => { if (!listening) { listening = true; win.addEventListener?.('message', onWindowMessage); } };
+  function evaluate(message) {
+    const frame = frames.get(message.id);
+    if (!frame || !frame.port || frame.loadId !== message.loadId || typeof message.script !== 'string' || !Number.isSafeInteger(message.evalId)) {
+      send({ type: 'webview-event', id: message.id, loadId: message.loadId, event: 'eval-result', evalId: message.evalId, ok: false, json: null }); return;
+    }
+    frame.port.postMessage({ t: 'eval', evalId: message.evalId, script: message.script });
   }
   return {
     frames,
@@ -134,6 +195,7 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
     handle(message) {
       if (!message || message.type !== 'webview' || !Number.isSafeInteger(message.id)) return;
       if (message.op === 'load') load(message.id, message);
+      else if (message.op === 'eval') evaluate(message);
       else if (message.op === 'stop') { const frame = frames.get(message.id); if (frame) { dispose(frame); frame.loadId = -1; } queued.delete(message.id); }
       else if (message.op === 'destroy') { dispose(frames.get(message.id)); frames.delete(message.id); queued.delete(message.id); slots.delete(message.id); }
     },
@@ -141,6 +203,8 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
       for (const id of [...slots.keys()]) if (!liveIds.has(id)) slots.delete(id);
     },
     reset() { for (const frame of frames.values()) dispose(frame); frames.clear(); slots.clear(); queued.clear(); },
+    /** Stops listening to the window (the manager is replaced when a new VM is bound). */
+    close() { if (listening) { listening = false; win.removeEventListener?.('message', onWindowMessage); } for (const frame of frames.values()) dispose(frame); frames.clear(); slots.clear(); queued.clear(); },
   };
 }
 

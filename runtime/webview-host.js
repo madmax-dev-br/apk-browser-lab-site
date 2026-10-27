@@ -1,6 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=fd59ee7c3d79';
-import { createHostRegistry } from './host-contract.js?v=fd59ee7c3d79';
-import { APKError } from './apk-error.js?v=fd59ee7c3d79';
+import { gcRoot } from './heap-gc.js?v=9b98a94b8ae7';
+import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=9b98a94b8ae7';
+import { isInterfaceName } from './webview-bridge.js?v=9b98a94b8ae7';
+import { APKError } from './apk-error.js?v=9b98a94b8ae7';
 
 // android.webkit.WebView and its public companions for the browser VM (design: docs/APK-REAL-TASKS.md, task 33).
 //
@@ -237,7 +238,8 @@ export function createWebViewHost(platform) {
   empty(CHROME, 'onJsPrompt', [WEBVIEW, STRING, STRING, STRING, JS_PROMPT], 'Z', 0);
   empty(CHROME, 'onGeolocationPermissionsShowPrompt', [STRING, 'Landroid/webkit/GeolocationPermissions$Callback;']); empty(CHROME, 'onGeolocationPermissionsHidePrompt', []);
   empty(CHROME, 'onPermissionRequest', ['Landroid/webkit/PermissionRequest;']); empty(CHROME, 'onPermissionRequestCanceled', ['Landroid/webkit/PermissionRequest;']);
-  empty(CHROME, 'onConsoleMessage', [CONSOLE], 'Z', 0); empty(CHROME, 'onConsoleMessage', [STRING, 'I', STRING]);
+  def(CHROME, 'onConsoleMessage', `(${CONSOLE})Z`, (r, _m, [self, message]) => { const o = r.object(message); call(r, self, CHROME, 'onConsoleMessage', [STRING, 'I', STRING], 'V', [o.message, o.line, o.source]); return 0; });   // AOSP: the old overload, then "not handled"
+  empty(CHROME, 'onConsoleMessage', [STRING, 'I', STRING]);
   empty(CHROME, 'getDefaultVideoPoster', [], BITMAP, null); empty(CHROME, 'getVideoLoadingProgressView', [], VIEW, null);
   empty(CHROME, 'getVisitedHistory', [CALLBACK]); empty(CHROME, 'onShowFileChooser', [WEBVIEW, CALLBACK, 'Landroid/webkit/WebChromeClient$FileChooserParams;'], 'Z', 0);
 
@@ -276,6 +278,58 @@ export function createWebViewHost(platform) {
   def(STORAGE, 'deleteOrigin', `(${STRING})V`, () => undefined);
   type(JS_INTERFACE, 'Ljava/lang/Object;');
 
+  // ---- @JavascriptInterface objects (phase 2: the bridge calls them asynchronously; return values wait for the synchronous bridge of phase 3) -----------------------------------
+  /** The public instance methods of `object` that a page may call: annotated with @JavascriptInterface (every public method below targetSdk 17, as Android). */
+  const interfaceMethods = (r, object) => {
+    const out = [], seen = new Set(), annotatedOnly = (platform.targetSdk ?? 34) >= 17;
+    for (let type = r.object(object).type; type && type !== OBJECT && r.classes.has(type); type = r.parent(type)) {
+      for (const [key, def] of r.classes.get(type).methods) {
+        if (seen.has(key) || (def.flags & 0x1) === 0 || (def.flags & 0x8) !== 0 || def.method.name === '<init>' || def.method.name === '<clinit>') continue;
+        seen.add(key);
+        const annotated = def.method.dex ? def.method.dex.memberAnnotations({ method: def.method }).some(a => a.type === JS_INTERFACE) : false;
+        if (annotated || !annotatedOnly) out.push(def.method);
+      }
+    }
+    return out;
+  };
+  /** { name: [method names] } for the interfaces registered on a WebView: what the page bridge defines on `window`. */
+  const interfaceDescriptors = (r, state) => {
+    const out = {};
+    for (const [name, object] of state.interfaces) if (isInterfaceName(name)) out[name] = [...new Set(interfaceMethods(r, object).map(m => m.name))].sort();
+    return out;
+  };
+  const coerce = (type, value) => {
+    switch (type) {
+      case 'Z': return value === true || (typeof value === 'number' && value !== 0) || (typeof value === 'string' && value !== '' && value !== 'false') ? 1 : 0;
+      case 'B': case 'S': case 'I': return Number.isFinite(Number(value)) ? Math.trunc(Number(value)) | 0 : 0;
+      case 'C': return typeof value === 'string' ? (value.charCodeAt(0) || 0) : Math.trunc(Number(value) || 0) & 0xffff;
+      case 'J': return BigInt.asIntN(64, BigInt(Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : 0));
+      case 'F': return floatBits(Number(value) || 0);
+      case 'D': return doubleBits(Number(value) || 0);
+      case STRING: return value === null || value === undefined ? null : String(value);
+      default: return null;   // JS objects are not passed into Java (Android: null)
+    }
+  };
+  /**
+   * Calls `name(args)` of the interface `object` the way the bridge does: by name and argument count among the annotated public methods, arguments converted to the parameter
+   * types (numbers truncated, booleans, strings; objects become null). Returns { called, result } (result is the Java return type's descriptor), never throws into the VM:
+   * a Java exception is reported to the caller as { error }.
+   */
+  const invokeInterface = (r, object, method, args) => {
+    const candidates = interfaceMethods(r, object).filter(m => m.name === method && m.parameters.length === args.length);
+    if (!candidates.length) return { called: false };
+    const target = candidates[0];
+    try { r.dispatch(target, r.argumentWords(target.parameters, target.parameters.map((p, i) => coerce(p, args[i])), { receiver: object }), 'virtual'); }
+    catch (error) { if (error?.name === 'JavaException') return { called: true, result: target.result, error: r.object(error.value).type }; throw error; }
+    return { called: true, result: target.result };
+  };
+  const consoleMessage = (r, text, source, line, name) => {
+    const ref = r.allocate(CONSOLE);
+    r.dispatch({ owner: CONSOLE, name: '<init>', parameters: [STRING, STRING, 'I', LEVEL], result: 'V', signature: `(${STRING}${STRING}I${LEVEL})V` }, [ref, text, source, line, levelValue(r, name)], 'direct');
+    return ref;
+  };
+  const jsResult = (r, prompt = false) => { const ref = r.allocate(prompt ? JS_PROMPT : JS_RESULT); return ref; };
+
   return {
     ...registry, interfaces: registry.interfacesOf,
     /** The platform's view kind for a WebView (device-view.js renders it as an iframe slot). */
@@ -286,6 +340,6 @@ export function createWebViewHost(platform) {
       return { webviewId: s.id, url: s.url, loading: s.loading, progress: s.progress, canGoBack: s.index > 0, canGoForward: s.index >= 0 && s.index < s.history.length - 1, javascript: !!s.settings && !!r.object(s.settings).values.get('JavaScriptEnabled'), backend: !!backend() };
     },
     /** For the backend (phase 1): state access and the Android callbacks it triggers. */
-    internals: { stateOf, postMain, clientCall, chromeCall, requestObject, errorObject, pushHistory, failLoad, settingsOf, setting, levelValue, uriOf, historyItem, unavailable, staticCall, call },
+    internals: { interfaceDescriptors, interfaceMethods, invokeInterface, consoleMessage, jsResult, stateOf, postMain, clientCall, chromeCall, requestObject, errorObject, pushHistory, failLoad, settingsOf, setting, levelValue, uriOf, historyItem, unavailable, staticCall, call },
   };
 }

@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=fd59ee7c3d79';
-import { gcRoot } from './heap-gc.js?v=fd59ee7c3d79';
+import { createHostRegistry } from './host-contract.js?v=9b98a94b8ae7';
+import { gcRoot } from './heap-gc.js?v=9b98a94b8ae7';
 
 // java.text.Normalizer and Normalizer.Form (android-13.0.0_r1 libcore): Android delegates to ICU4J's Normalizer2 instances (NFC, NFD, NFKC, NFKD). The JavaScript engine's
 // String.prototype.normalize implements the same Unicode normalization algorithms (UAX #15), so the four forms are answered by it; an unpaired surrogate passes through unchanged
