@@ -1,11 +1,11 @@
-import { APKError } from './apk-error.js?v=751a2d13ee0f';
-import { JavaException } from './apk-runtime.js?v=751a2d13ee0f';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=751a2d13ee0f';
-import { buildElfDescriptor } from './native-descriptor.js?v=751a2d13ee0f';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=751a2d13ee0f';
-import { NativeLinker, LinkError } from './native-linker.js?v=751a2d13ee0f';
-import { hostFunction } from './wasm-host-function.js?v=751a2d13ee0f';
-import { parseWasm } from './wasm-dylink.js?v=751a2d13ee0f';
+import { APKError } from './apk-error.js?v=f1c4bcc7c53e';
+import { JavaException } from './apk-runtime.js?v=f1c4bcc7c53e';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=f1c4bcc7c53e';
+import { buildElfDescriptor } from './native-descriptor.js?v=f1c4bcc7c53e';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=f1c4bcc7c53e';
+import { NativeLinker, LinkError } from './native-linker.js?v=f1c4bcc7c53e';
+import { hostFunction } from './wasm-host-function.js?v=f1c4bcc7c53e';
+import { parseWasm } from './wasm-dylink.js?v=f1c4bcc7c53e';
 
 // JNI -> WebAssembly bridge.
 //
@@ -495,11 +495,11 @@ export class JniBridge {
       const type = self.#classType(cls), v = view();
       for (let i = 0; i < count; i++) {
         const name = cString(v.getUint32(methods + i * 12, true)), signature = cString(v.getUint32(methods + i * 12 + 4, true)), index = v.getUint32(methods + i * 12 + 8, true);
-        const info = self.#findMethod(type, name, signature), def = r.classes.get(type)?.methods.get(name + signature);
+        // ART's RegisterNatives finds the method in the class or, through FindVirtualMethod, in a superclass (reanimated registers NativeProxyCommon.installJSIBindings on NativeProxy); the binding belongs to the declaring class
+        const info = self.#findMethod(type, name, signature), owner = info && !info.host ? info.owner : type, def = r.classes.get(owner)?.methods.get(name + signature);
         if (!def || !(def.flags & 0x100)) { self.#throwNew('Ljava/lang/NoSuchMethodError;', name); return JNI_ERR; }
         const fn = lib.table.get(index); if (typeof fn !== 'function') { self.#throwNew('Ljava/lang/NoSuchMethodError;', `${name}: null function pointer`); return JNI_ERR; }
-        self.registered.set(`${type}->${name}${signature}`, { lib, fn, symbol: `<RegisterNatives ${name}${signature}>` });
-        void info;
+        self.registered.set(`${owner}->${name}${signature}`, { lib, fn, symbol: `<RegisterNatives ${name}${signature}>` });
       }
       return JNI_OK;
     };

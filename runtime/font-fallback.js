@@ -1,5 +1,5 @@
-import {APKError} from './apk-runtime.js?v=751a2d13ee0f';
-import {DIGESTS} from './crypto-host.js?v=751a2d13ee0f';
+import {APKError} from './apk-runtime.js?v=f1c4bcc7c53e';
+import {DIGESTS} from './crypto-host.js?v=f1c4bcc7c53e';
 
 /** Android font fallback (Minikin FontCollection) over the vendored Android 13 fallback chain.
  *
