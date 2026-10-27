@@ -1,4 +1,4 @@
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=9b98a94b8ae7';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=d50f2f368405';
 
 // The classic View touch pipeline: View.dispatchTouchEvent / onTouchEvent, ViewGroup.dispatchTouchEvent / onInterceptTouchEvent / requestDisallowInterceptTouchEvent and
 // View.setOnTouchListener, following android-13.0.0_r1 View.java and ViewGroup.java for a single pointer (the browser delivers one pointer per gesture). A real MotionEvent
@@ -34,7 +34,7 @@ export function createViewTouchHost(platform) {
     return px >= 0 && py >= 0 && px < width && py < height ? { x: px, y: py } : null;
   };
   const orderedChildren = (r, group) => {
-    const children = [...(r.object(group).children ?? [])];
+    const children = platform.viewGroupApi.drawOrder(r, group);   // buildTouchDispatchChildList: custom children drawing order first, then by Z
     const z = child => num(r, child, 'getElevation') + num(r, child, 'getTranslationZ');
     const keyed = children.map((child, index) => ({ child, index, z: z(child) })); if (keyed.some(item => item.z !== 0)) keyed.sort((a, b) => a.z - b.z || a.index - b.index);   // buildOrderedChildList: stable by Z
     return keyed.map(item => item.child).reverse();

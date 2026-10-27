@@ -1,8 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=9b98a94b8ae7';
 
-// java.security.MessageDigest with synchronous pure-JS MD5, SHA-1, SHA-224/256 and SHA-384/512 (WebCrypto is asynchronous and the VM is synchronous).
-// Contract: java.security.MessageDigest (android-13.0.0_r1). Other Security providers (Cipher, Mac, Signature, KeyStore) are not implemented.
-const MD = 'Ljava/security/MessageDigest;', STRING = 'Ljava/lang/String;', BYTES = '[B', OBJECT = 'Ljava/lang/Object;';
+// Synchronous pure-JS MD5, SHA-1, SHA-2 digests for the lab's own hosts (the Settings secure-ID hash, SerialVersionUID-style class digests, font-fallback cache keys): host code cannot wait for
+// WebCrypto. The java.security API itself -- MessageDigest and every other algorithm an app can name -- is the original libcore + Conscrypt over BoringSSL (src/jca-host.js, framework-aosp/jca-sources.txt).
 const rotl = (x, n) => (x << n) | (x >>> (32 - n)), rotr = (x, n) => (x >>> n) | (x << (32 - n));
 
 function md5(data) {
@@ -64,30 +62,3 @@ function sha512(data, is384) {
   const out = new DataView(new ArrayBuffer(64)); H.forEach((v, i) => out.setBigUint64(i * 8, v, false)); return new Uint8Array(out.buffer, 0, is384 ? 48 : 64);
 }
 export const DIGESTS = { 'MD5': { fn: md5, length: 16 }, 'SHA-1': { fn: sha1, length: 20 }, 'SHA-224': { fn: d => sha256(d, true), length: 28 }, 'SHA-256': { fn: d => sha256(d, false), length: 32 }, 'SHA-384': { fn: d => sha512(d, true), length: 48 }, 'SHA-512': { fn: d => sha512(d, false), length: 64 } };
-const ALIASES = { 'SHA': 'SHA-1', 'SHA1': 'SHA-1', 'SHA256': 'SHA-256', 'SHA384': 'SHA-384', 'SHA512': 'SHA-512', 'SHA224': 'SHA-224' };
-
-export function createCryptoHost() {
-  const registry = createHostRegistry(), { def, type } = registry;
-  type('Ljava/security/GeneralSecurityException;', 'Ljava/lang/Exception;'); type('Ljava/security/NoSuchAlgorithmException;', 'Ljava/security/GeneralSecurityException;');
-  type(MD, OBJECT, [], { allocatable: true });
-  const st = (r, ref) => r.object(ref).digest ?? r.throwJava('Ljava/lang/IllegalStateException;', 'MessageDigest used before getInstance');
-  def(MD, 'getInstance', `(${STRING})${MD}`, (r, _m, [name]) => {
-    if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'algorithm == null');
-    const requested = r.stringCharacters(name), canonical = Object.keys(DIGESTS).find(k => k.toLowerCase() === (ALIASES[requested.toUpperCase()] ?? requested).toLowerCase());
-    if (!canonical) r.throwJava('Ljava/security/NoSuchAlgorithmException;', `${requested} MessageDigest not available`);
-    const ref = r.allocate(MD); r.object(ref).digest = { algorithm: canonical, chunks: [], size: 0 }; return ref;
-  }, { static: true });
-  const feed = (r, self, bytes) => { const d = st(r, self); d.chunks.push(bytes); d.size += bytes.length; };
-  const slice = (r, ref, offset, length) => { const a = r.array(ref).elements; if (offset < 0 || length < 0 || offset + length > a.length) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Bad arguments'); return Uint8Array.from(a.slice(offset, offset + length), v => v & 255); };
-  def(MD, 'update', '(B)V', (r, _m, [self, b]) => feed(r, self, Uint8Array.of(b & 255)));
-  def(MD, 'update', `(${BYTES})V`, (r, _m, [self, a]) => feed(r, self, slice(r, a, 0, r.array(a).elements.length)));
-  def(MD, 'update', `(${BYTES}II)V`, (r, _m, [self, a, o, l]) => feed(r, self, slice(r, a, o, l)));
-  const finish = (r, self) => { const d = st(r, self), all = new Uint8Array(d.size); let at = 0; for (const c of d.chunks) { all.set(c, at); at += c.length; } d.chunks = []; d.size = 0; const out = DIGESTS[d.algorithm].fn(all), array = r.newArray(BYTES, out.length); r.array(array).elements = Array.from(out, v => (v << 24) >> 24); return array; };
-  def(MD, 'digest', `()${BYTES}`, (r, _m, [self]) => finish(r, self));
-  def(MD, 'digest', `(${BYTES})${BYTES}`, (r, _m, [self, a]) => { feed(r, self, slice(r, a, 0, r.array(a).elements.length)); return finish(r, self); });
-  def(MD, 'reset', '()V', (r, _m, [self]) => { const d = st(r, self); d.chunks = []; d.size = 0; });
-  def(MD, 'getAlgorithm', `()${STRING}`, (r, _m, [self]) => st(r, self).algorithm);
-  def(MD, 'getDigestLength', '()I', (r, _m, [self]) => DIGESTS[st(r, self).algorithm].length);
-  def(MD, 'isEqual', `(${BYTES}${BYTES})Z`, (r, _m, [a, b]) => { if (a === b) return 1; if (a === null || b === null) return 0; const x = r.array(a).elements, y = r.array(b).elements; if (x.length !== y.length) return 0; let diff = 0; for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i]; return diff === 0 ? 1 : 0; }, { static: true });
-  return { ...registry, interfaces: registry.interfacesOf };
-}

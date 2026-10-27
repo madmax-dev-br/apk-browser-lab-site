@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=9b98a94b8ae7';
-import { APKError } from './apk-error.js?v=9b98a94b8ae7';
-import { VirtualFileSystem, normalizePath } from './virtual-fs.js?v=9b98a94b8ae7';
+import { createHostRegistry } from './host-contract.js?v=d50f2f368405';
+import { APKError } from './apk-error.js?v=d50f2f368405';
+import { VirtualFileSystem, normalizePath } from './virtual-fs.js?v=d50f2f368405';
 
 // The app's virtual filesystem owner and the little java.io glue the platform still needs. java.io itself (File, the byte/char streams, FileDescriptor, RandomAccessFile,
 // UnixFileSystem) is the original Android 13 libcore in framework.dex; its syscalls land in src/libcore-io-native.js over the VirtualFileSystem created here.
@@ -91,5 +91,5 @@ export function createJavaIoHost(platform) {
     def(STATFS, `get${name}`, '()I', () => value); def(STATFS, `get${name}Long`, '()J', () => BigInt(value));
   }
   def(STATFS, 'getTotalBytes', '()J', () => BigInt(BLOCK) * BigInt(BLOCKS)); def(STATFS, 'getFreeBytes', '()J', () => BigInt(BLOCK) * BigInt(FREE)); def(STATFS, 'getAvailableBytes', '()J', () => BigInt(BLOCK) * BigInt(AVAILABLE));
-  return { ...registry, readStatic: (runtime, field) => field.owner === SYSTEM && ['in', 'out', 'err'].includes(field.name) ? { handled: true, value: stdio(runtime, field.name) } : registry.readStatic(runtime, field), interfaces: registry.interfacesOf, fs, makeFile, apkResourceURL: entryURL, apkResourceStream: (r, entry) => apkEntryStream(r, entry) };
+  return { ...registry, readStatic: (runtime, field) => field.owner === SYSTEM && ['in', 'out', 'err'].includes(field.name) ? { handled: true, value: stdio(runtime, field.name) } : registry.readStatic(runtime, field), interfaces: registry.interfacesOf, fs, makeFile, apkResourceURL: entryURL, apkResourceStream: (r, entry) => apkEntryStream(r, entry), bytesStream: byteStream };
 }

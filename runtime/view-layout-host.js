@@ -1,6 +1,6 @@
-import { APKError } from './apk-runtime.js?v=9b98a94b8ae7';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=9b98a94b8ae7';
-import { gcRoot } from './heap-gc.js?v=9b98a94b8ae7';
+import { APKError } from './apk-runtime.js?v=d50f2f368405';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=d50f2f368405';
+import { gcRoot } from './heap-gc.js?v=d50f2f368405';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -77,14 +77,8 @@ export function createViewLayoutHost(platform) {
   };
   // ProgressBar.onMeasure: clamp the (host-less) drawable extent to the style's minWidth/maxWidth/minHeight/maxHeight, add padding.
   const progressMeasure = (runtime, receiver, wSpec, hSpec) => {
-    const view = runtime.object(receiver), padding = view.padding || {}, table = platform.resources?.frameworkTable;
-    if (!table) fail('ProgressBar measurement needs the framework style table');
-    const names = ['minWidth', 'maxWidth', 'minHeight', 'maxHeight'], ids = runtime.newArray('[I', 4); runtime.object(ids).elements = names.map(name => table.findId('attr/' + name));
-    const attrs = view.appliedNode ? runtime.makeObject('Lapkweb/bridge/AttributeSet;') : null; if (attrs) runtime.object(attrs).node = view.appliedNode;
-    const defStyle = view.defStyleAttr || table.findId(view.progressStyle === 'horizontal' ? 'attr/progressBarStyleHorizontal' : 'attr/progressBarStyle');
-    const array = platform.styleBackend.obtain(runtime, platform.styleBackend.theme(runtime, view.context), attrs, ids, defStyle), TA = 'Landroid/content/res/TypedArray;';
-    let limits; try { limits = names.map((_, index) => call(runtime, array, TA, 'getDimensionPixelSize', '(II)I', [index, index % 2 ? 0x7fffffff : 24])); } finally { call(runtime, array, TA, 'recycle', '()V'); }
-    const [minW, maxW, minH, maxH] = limits, dw = Math.max(minW, Math.min(maxW, 0)) + (padding.left || 0) + (padding.right || 0), dh = Math.max(minH, Math.min(maxH, 0)) + (padding.top || 0) + (padding.bottom || 0);
+    const view = runtime.object(receiver), padding = view.padding || {};
+    const [minW, maxW, minH, maxH] = platform.progressBarApi.limits(runtime, receiver), dw = Math.max(minW, Math.min(maxW, 0)) + (padding.left || 0) + (padding.right || 0), dh = Math.max(minH, Math.min(maxH, 0)) + (padding.top || 0) + (padding.bottom || 0);
     measured(runtime, receiver, algorithm(runtime, ALGORITHMS, 'resolveSizeAndState', '(III)I', [dw, wSpec, 0]), algorithm(runtime, ALGORITHMS, 'resolveSizeAndState', '(III)I', [dh, hSpec, 0]));
   };
   const nativeTextMeasure = (runtime, receiver, wSpec, hSpec) => {
@@ -226,6 +220,7 @@ export function createViewLayoutHost(platform) {
       if (name === 'onLayout') { for (const native of ['FrameLayout', 'LinearLayout', 'ScrollView']) if (runtime.isSubtype(view.type, `Landroid/widget/${native};`) && !runtime.classes.get(`Landroid/widget/${native};`)?.methods.has('onLayout(ZIIII)V')) fail(`Original ${native}.onLayout is not installed`); return; }
       if (name === 'onSizeChanged') return; // Original View base callback bodies are empty.
       if (name === 'layout') {
+        if (runtime.isSubtype(view.type, GROUP) && platform.viewGroupApi.layoutSuppressed(runtime, receiver)) return;   // ViewGroup.layout while suppressLayout(true)
         if (view.measureBeforeLayout) { call(runtime, receiver, VIEW, 'onMeasure', '(II)V', [view.oldWidthSpec, view.oldHeightSpec]); view.measureBeforeLayout = false; }
         const next = { left: args[1], top: args[2], right: args[3], bottom: args[4] }, old = view.bounds || { left: 0, top: 0, right: 0, bottom: 0 }; if (next.right < next.left || next.bottom < next.top) fail('Invalid negative View bounds');
         const changed = Object.keys(next).some(key => old[key] !== next[key]); view.bounds = next; for (const [name, value] of Object.entries(next)) store(runtime, receiver, 'm' + name[0].toUpperCase() + name.slice(1), value);

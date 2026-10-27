@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=9b98a94b8ae7';
-import { parseWasm, WASM_SYMBOL_BINDING_WEAK } from './wasm-dylink.js?v=9b98a94b8ae7';
-import { hostFunction, indirectStub } from './wasm-host-function.js?v=9b98a94b8ae7';
+import { APKError } from './apk-error.js?v=d50f2f368405';
+import { parseWasm, WASM_SYMBOL_BINDING_WEAK } from './wasm-dylink.js?v=d50f2f368405';
+import { hostFunction, indirectStub } from './wasm-host-function.js?v=d50f2f368405';
 
 // The lab's dynamic linker for wasm32 native libraries: one linear memory, one function table, one stack pointer and one C++ exception tag per
 // process, shared by every library -- the same arrangement Android's linker gives a process, which is what lets libreactnative, libfbjni, libjsi
@@ -35,8 +35,8 @@ export class NativeLinker {
    * @param {number} [options.stackBytes] size of the single native stack
    * @param {number} [options.initialPages] [options.maxPages] linear-memory limits in 64 KiB pages
    */
-  constructor({ hostImport = () => undefined, base = 'libc++_shared.so', stackBytes = 8 << 20, initialPages = 512, maxPages = 32768 } = {}) {
-    this.hostImport = hostImport; this.baseSoname = base; this.stackBytes = stackBytes;
+  constructor({ hostImport = () => undefined, override = () => undefined, base = 'libc++_shared.so', stackBytes = 8 << 20, initialPages = 512, maxPages = 32768 } = {}) {
+    this.hostImport = hostImport; this.override = override; this.baseSoname = base; this.stackBytes = stackBytes;
     this.memory = new WebAssembly.Memory({ initial: initialPages, maximum: maxPages });
     this.table = new WebAssembly.Table({ element: 'anyfunc', initial: 1 }); // slot 0 stays null
     this.stackPointer = new WebAssembly.Global({ value: 'i32', mutable: true }, 0);
@@ -187,6 +187,8 @@ export class NativeLinker {
 
   /** Function imports: a loaded dependency's export when there is one, else a host import, else a stub filled after instantiation (own export) or failing when called. */
   #bindFunction(lib, name, type, stubs) {
+    // the lab may replace a function for the libraries that import it (never for the base module itself): file-backed mmap and friends, which musl cannot do over the VM's files
+    if (lib.soname !== this.baseSoname) { const replacement = this.override(name, lib.soname, type); if (replacement) return replacement; }
     for (const dep of lib.scope) { const s = dep.symbols.get(name); if (s?.kind === 'function') return s.fn; }
     const host = this.hostImport('env', name, lib.soname); if (host) return host;
     const slot = this.table.length; this.table.grow(1);

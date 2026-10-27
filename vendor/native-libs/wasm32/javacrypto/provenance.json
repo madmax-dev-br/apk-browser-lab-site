@@ -1,0 +1,103 @@
+{
+ "schemaVersion": 1,
+ "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 3.1.74 (1092ec30a3fb1d46b1782ff1b4db5094d3d06ae5)",
+ "build": "scripts/build-javacrypto.sh",
+ "scope": "Lab-built wasm32 modules of Android's public-key / TLS native layer, from the official AOSP sources at android-13.0.0_r1. Never derived from an APK or from a device binary.",
+ "sources": {
+  "boringssl": {
+   "project": "platform/external/boringssl",
+   "tag": "android-13.0.0_r1",
+   "commit": "8e53732cc1f8491dd242e52048bcf40d162e43a0",
+   "built": "sources.bp libcrypto_sources + libcrypto_bcm_sources (libcrypto.so), libssl_sources (libssl.so); portable C, OPENSSL_NO_ASM"
+  },
+  "conscrypt": {
+   "project": "platform/external/conscrypt",
+   "tag": "android-13.0.0_r1",
+   "commit": "3832167e0316aa5ba7ffb921a10c6ba4df0f2b2f",
+   "built": "common/src/jni/main/cpp/**/*.cc (libjavacrypto.so), -DJNI_JARJAR_PREFIX=com/android/ as Android.bp"
+  }
+ },
+ "flags": "-DBORINGSSL_SHARED_LIBRARY -DBORINGSSL_ANDROID_SYSTEM -DOPENSSL_SMALL -DBORINGSSL_IMPLEMENTATION -fvisibility=hidden -O2 -fPIC (Android.bp boringssl_flags/defaults)",
+ "linkFlags": "-O2 -sSIDE_MODULE=1 -sWASM_BIGINT=1 -fwasm-exceptions -Wl,--gc-sections; DT_NEEDED rewritten to the Android order",
+ "labGlue": [
+  "scripts/wasm/javacrypto/apkweb-sysrand.c (the operating-system entropy layer of crypto/fipsmodule/rand, replacing urandom.c: crypto.getRandomValues through apkweb_javacrypto.random_fill)",
+  "scripts/wasm/javacrypto/include/log/log.h (ALOG over the lab liblog.so)",
+  "scripts/wasm/javacrypto/patch-native-crypto.py (NativeCrypto_HMAC_Init_ex takes the long EVP_MD pointer as jlong, not jobject: a 32-bit-ABI signature fix, behaviour unchanged)"
+ ],
+ "entropy": "Every random byte BoringSSL draws (RAND_bytes, key generation, blinding, nonces) comes from CRYPTO_sysrand -> apkweb_javacrypto.random_fill -> crypto.getRandomValues. The import throws when WebCrypto is unavailable; there is no clock- or counter-derived fallback.",
+ "deviations": [
+  "the FIPS-validated libcrypto of the device (BORINGSSL_FIPS, bcm module integrity check) is not built: wasm has no module-in-place integrity check; the algorithms are the same BoringSSL sources",
+  "portable C implementations (OPENSSL_NO_ASM) instead of the arm64/x86_64 assembly",
+  "crypto/fipsmodule/rand/urandom.c is replaced by apkweb-sysrand.c in a build-local copy of bcm.c (entropy source only)",
+  "single-threaded wasm: BoringSSL locks are the libc stubs of the shared base module"
+ ],
+ "licenses": {
+  "boringssl": "OpenSSL/SSLeay, ISC, MIT, BSD (licenses/boringssl-NOTICE)",
+  "conscrypt": "Apache-2.0 (licenses/conscrypt-NOTICE)"
+ },
+ "libraries": {
+  "libcrypto.so": {
+   "soname": "libcrypto.so",
+   "abi": "wasm32",
+   "file": "libcrypto.wasm",
+   "bytes": 973930,
+   "sha256": "1c298e597c35a586a7551b2d28fa6b9c6c7f4a5d798ad43875b658d61b982dcb",
+   "needed": [
+    "libc++_shared.so"
+   ],
+   "upstream": "https://android.googlesource.com/platform/external/boringssl",
+   "tag": "android-13.0.0_r1",
+   "commit": "8e53732cc1f8491dd242e52048bcf40d162e43a0"
+  },
+  "libssl.so": {
+   "soname": "libssl.so",
+   "abi": "wasm32",
+   "file": "libssl.wasm",
+   "bytes": 265809,
+   "sha256": "5e3df75a8f1d630c833bbaaf4f5d43c860ee1820e94015dc57e29d31458adc85",
+   "needed": [
+    "libcrypto.so",
+    "libc++_shared.so"
+   ],
+   "upstream": "https://android.googlesource.com/platform/external/boringssl",
+   "tag": "android-13.0.0_r1",
+   "commit": "8e53732cc1f8491dd242e52048bcf40d162e43a0"
+  },
+  "libjavacrypto.so": {
+   "soname": "libjavacrypto.so",
+   "abi": "wasm32",
+   "file": "libjavacrypto.wasm",
+   "bytes": 231240,
+   "sha256": "4e4c56308ee1a9d4153df12b696e1be2a18b7ba4571cb35c2f3d005d87da5ea0",
+   "needed": [
+    "libcrypto.so",
+    "libssl.so",
+    "liblog.so",
+    "libc++_shared.so"
+   ],
+   "upstream": "https://android.googlesource.com/platform/external/conscrypt",
+   "tag": "android-13.0.0_r1",
+   "commit": "3832167e0316aa5ba7ffb921a10c6ba4df0f2b2f"
+  },
+  "libc++_shared.so": {
+   "soname": "libc++_shared.so",
+   "abi": "wasm32",
+   "file": "../libc++_shared.wasm",
+   "bytes": 3028054,
+   "sha256": "d8d768e17df43fb4d20d15b19c0f735afc8a891b0d03e8482bcc4f0362a2ba1a",
+   "needed": [],
+   "shared": true
+  },
+  "liblog.so": {
+   "soname": "liblog.so",
+   "abi": "wasm32",
+   "file": "../liblog.wasm",
+   "bytes": 1383,
+   "sha256": "deae6a3baa2afd50f32ab7478dbbed251aa6bb25f0c5292fb144262ab640ad4b",
+   "needed": [
+    "libc++_shared.so"
+   ],
+   "shared": true
+  }
+ }
+}

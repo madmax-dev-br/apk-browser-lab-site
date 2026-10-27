@@ -1,8 +1,8 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=9b98a94b8ae7';
-import { APKError } from './apk-runtime.js?v=9b98a94b8ae7';
-import { getVectorGraphics } from './vector-native.js?v=9b98a94b8ae7';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=9b98a94b8ae7';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=9b98a94b8ae7';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=d50f2f368405';
+import { APKError } from './apk-runtime.js?v=d50f2f368405';
+import { getVectorGraphics } from './vector-native.js?v=d50f2f368405';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=d50f2f368405';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=d50f2f368405';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -192,7 +192,7 @@ export function createDrawableViewHost(platform) {
         const result = runtime.newArray('[I', states.length + args[1] + extra.length); runtime.object(result).elements.splice(0, states.length, ...states);
         if (extra.length) return this.invoke(runtime, { owner: VIEW, name: 'mergeDrawableStates' }, [result, view.imageState]); return result;
       }
-      if (name === 'refreshDrawableState') { view.drawableStateDirty = true; return dispatch(runtime, runtime.isSubtype(view.type, IMAGE) ? IMAGE : VIEW, 'drawableStateChanged', [], 'V', args[0]); }
+      if (name === 'refreshDrawableState') { view.drawableStateDirty = true; dispatch(runtime, runtime.isSubtype(view.type, IMAGE) ? IMAGE : VIEW, 'drawableStateChanged', [], 'V', args[0]); const parent = view.parent; if (parent && runtime.isSubtype(runtime.object(parent).type, 'Landroid/view/ViewGroup;')) dispatch(runtime, 'Landroid/view/ViewGroup;', 'childDrawableStateChanged', [VIEW], 'V', parent, [args[0]]); return; }   // View.refreshDrawableState tells the parent
       if (name === 'drawableStateChanged') {
         for (const drawable of [view.backgroundDrawable, view.foregroundDrawable, view.buttonDrawable, ...(method.owner === IMAGE ? [view.imageDrawable] : [])]) if (drawable && dispatch(runtime, DRAWABLE, 'isStateful', [], 'Z', drawable)) { prepareCpuAnimatedVector(runtime,drawable);const state = dispatch(runtime, VIEW, 'getDrawableState', [], '[I', args[0]); dispatch(runtime, DRAWABLE, 'setState', ['[I'], 'Z', drawable, [state]); }
         switchHost.stateChanged(runtime, args[0]);

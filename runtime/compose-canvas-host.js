@@ -1,6 +1,6 @@
-import {APKError} from './apk-runtime.js?v=9b98a94b8ae7';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=9b98a94b8ae7';
-import {getVectorGraphics} from './vector-native.js?v=9b98a94b8ae7';
+import {APKError} from './apk-runtime.js?v=d50f2f368405';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=d50f2f368405';
+import {getVectorGraphics} from './vector-native.js?v=d50f2f368405';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -196,7 +196,10 @@ export function createComposeCanvasHost(platform){
         const save=canvas(r,target,'save',[],'I'),[w,h]=dimensions(view),padding=view.padding??{};
         try{
           if(view.clipToPadding!==false&&Object.values(padding).some(value=>value>0))canvas(r,target,'clipRect',['F','F','F','F'],'Z',[raw(padding.left??0),raw(padding.top??0),raw(w-(padding.right??0)),raw(h-(padding.bottom??0))]);
-          for(const child of view.children??[])drawChild(r,receiver,target,child);
+          platform.viewGroupApi.beforeDispatchDraw(r,receiver);
+          for(const child of platform.viewGroupApi.drawOrder(r,receiver))drawChild(r,receiver,target,child);
+          for(const child of platform.viewGroupApi.disappearing(r,receiver))drawChild(r,receiver,target,child);
+          platform.viewGroupApi.afterDispatchDraw(r,receiver);
         }finally{canvas(r,target,'restoreToCount',['I'],'V',[save]);}
         return;
       }

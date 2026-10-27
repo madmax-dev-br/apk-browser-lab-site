@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=9b98a94b8ae7';
-import { APKError } from './apk-error.js?v=9b98a94b8ae7';
+import { createHostRegistry } from './host-contract.js?v=d50f2f368405';
+import { APKError } from './apk-error.js?v=d50f2f368405';
 
 // Public android.view.View API (API 33) that the platform View model did not carry, with the semantics of android-13.0.0_r1 View.java. Grouped by topic below; state lives on the
 // View's host object (`r.object(view)`), the same place the other view hosts keep theirs.
@@ -1036,7 +1036,7 @@ export function createViewApiHost(platform) {
   /** ViewGroup.drawChild for a child with an Animation: initialise it on its first frame, ask it for this frame's Transformation, finish it (listener, onAnimationEnd, clearAnimation unless fillAfter)
    *  when it is over, and keep the parent redrawing every frame while it runs. Returns { matrix, alpha } to apply to the child's canvas, or null. */
   registry.legacyAnimation = (r, parentRef, childRef) => {
-    const child = r.object(childRef), animation = child.currentAnimation; if (nullish(animation)) return null;
+    const child = r.object(childRef), animation = child.currentAnimation; if (nullish(animation)) return platform.viewGroupApi.staticTransformation(r, parentRef, childRef);
     const time = currentAnimationTime(r), d = dimension(r, childRef), p = dimension(r, parentRef);
     if (!flag(call(r, animation, ANIMATION, 'isInitialized', [], 'Z'))) {
       call(r, animation, ANIMATION, 'initialize', ['I', 'I', 'I', 'I'], 'V', [d.width, d.height, p.width, p.height]);
@@ -1049,10 +1049,11 @@ export function createViewApiHost(platform) {
     const type = call(r, transformation, TRANSFORMATION, 'getTransformationType', [], 'I');
     const result = { matrix: flag(call(r, animation, ANIMATION, 'willChangeTransformationMatrix', [], 'Z')) ? call(r, transformation, TRANSFORMATION, 'getMatrix', [], MATRIX) : null,
       alpha: (type & 1) !== 0 ? i2f(call(r, transformation, TRANSFORMATION, 'getAlpha', [], 'F')) : 1 };   // TYPE_ALPHA = 1
-    if (more) platform.requestDraw?.(r, parentRef, 16);
+    if (more) { platform.viewGroupApi.noteMoreAnimation(r, parentRef); platform.requestDraw?.(r, parentRef, 16); }
     else {
       if (!flag(call(r, animation, ANIMATION, 'getFillAfter', [], 'Z'))) viewCall(r, childRef, 'clearAnimation');
       if (child.animationStarted) { child.animationStarted = false; viewCall(r, childRef, 'onAnimationEnd'); }
+      platform.viewGroupApi.finishAnimatingView(r, parentRef, childRef);   // a removed child that was only kept to finish this animation is detached now
       platform.requestDraw?.(r, parentRef);   // one more frame after the animation is done
     }
     return result;

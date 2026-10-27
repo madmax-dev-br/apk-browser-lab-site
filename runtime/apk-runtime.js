@@ -1,20 +1,20 @@
-import { VMClock } from './vm-clock.js?v=9b98a94b8ae7';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=9b98a94b8ae7';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=9b98a94b8ae7';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=9b98a94b8ae7';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=9b98a94b8ae7';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=9b98a94b8ae7';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=9b98a94b8ae7';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=9b98a94b8ae7';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=9b98a94b8ae7';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=9b98a94b8ae7';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=9b98a94b8ae7';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=9b98a94b8ae7';
-import { APKError } from './apk-error.js?v=9b98a94b8ae7';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=9b98a94b8ae7';
-import { Scheduler, Blocked } from './scheduler.js?v=9b98a94b8ae7';
-import { bootClassLacksMember } from './boot-class-members.js?v=9b98a94b8ae7';
-export { APKError } from './apk-error.js?v=9b98a94b8ae7';
+import { VMClock } from './vm-clock.js?v=d50f2f368405';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=d50f2f368405';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=d50f2f368405';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=d50f2f368405';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=d50f2f368405';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=d50f2f368405';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=d50f2f368405';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=d50f2f368405';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=d50f2f368405';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=d50f2f368405';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=d50f2f368405';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=d50f2f368405';
+import { APKError } from './apk-error.js?v=d50f2f368405';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=d50f2f368405';
+import { Scheduler, Blocked } from './scheduler.js?v=d50f2f368405';
+import { bootClassLacksMember } from './boot-class-members.js?v=d50f2f368405';
+export { APKError } from './apk-error.js?v=d50f2f368405';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -266,7 +266,7 @@ export class DexProgram {
       if (bootBytes > 128 * 1024 * 1024) fail('Framework DEX layer exceeds 128 MiB');
       this.bootFiles.push({ filename, dex }); this.bootDexes.add(dex);
       for (const [name, cls] of dex.classes) {
-        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|dev\/apkweb\/(?:media|net|view|os|pm|util)\/|com\/(?:android\/(?:internal|icu|okhttp)|sun\/nio\/file)\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security\/(?:action|util)|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
+        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore)\/|com\/(?:android\/(?:internal|icu|okhttp|org\/(?:conscrypt|bouncycastle))|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
         if (this.bootClasses.has(name)) fail(`Duplicate framework class: ${name}`);
         this.bootClasses.set(name, cls);
       }
@@ -469,8 +469,6 @@ addBridge('java/lang/Float', ['toString(F)Ljava/lang/String;', 'valueOf(Ljava/la
 addBridge('java/lang/Float', ['parseFloat(Ljava/lang/String;)F', 'intBitsToFloat(I)F', 'floatToRawIntBits(F)I', 'floatToIntBits(F)I']);
 addBridge('java/lang/String',['regionMatches(ILjava/lang/String;II)Z','regionMatches(ZILjava/lang/String;II)Z','compareTo(Ljava/lang/Object;)I']);
 addBridge('java/lang/String',['toLowerCase(Ljava/util/Locale;)Ljava/lang/String;','toUpperCase(Ljava/util/Locale;)Ljava/lang/String;']);
-EXTERNAL_PARENTS.set('Ljava/security/SecureRandom;', 'Ljava/util/Random;');
-addBridge('java/security/SecureRandom', ['<init>()V', 'nextBytes([B)V']);
 addBridge('java/lang/Long', ['toHexString(J)Ljava/lang/String;','decode(Ljava/lang/String;)Ljava/lang/Long;']);
 addBridge('java/util/Arrays',['copyOf([Ljava/lang/Object;ILjava/lang/Class;)[Ljava/lang/Object;','copyOfRange([Ljava/lang/Object;IILjava/lang/Class;)[Ljava/lang/Object;']);
 for(const owner of ['Collection','Set','List','ArrayList','Vector','concurrent/CopyOnWriteArrayList'])addBridge('java/util/'+owner,['toArray([Ljava/lang/Object;)[Ljava/lang/Object;','toArray()[Ljava/lang/Object;']);
@@ -484,7 +482,7 @@ addBridge('java/lang/Class', ['getName()Ljava/lang/String;', 'getSimpleName()Lja
   'desiredAssertionStatus()Z', 'isEnum()Z', 'getEnumConstants()[Ljava/lang/Object;']);
 addBridge('java/lang/Class',['getAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','getDeclaredAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','isAnnotationPresent(Ljava/lang/Class;)Z','getAnnotations()[Ljava/lang/annotation/Annotation;','getDeclaredAnnotations()[Ljava/lang/annotation/Annotation;']);
 addBridge('java/lang/Class', ['getCanonicalName()Ljava/lang/String;', 'getDeclaringClass()Ljava/lang/Class;', 'getEnclosingClass()Ljava/lang/Class;',
-  'getResource(Ljava/lang/String;)Ljava/net/URL;','getResourceAsStream(Ljava/lang/String;)Ljava/io/InputStream;','getEnclosingMethod()Ljava/lang/reflect/Method;', 'getEnclosingConstructor()Ljava/lang/reflect/Constructor;', 'isAnonymousClass()Z', 'isLocalClass()Z', 'isMemberClass()Z', 'getInterfaces()[Ljava/lang/Class;', 'getModifiers()I', 'getClassLoader()Ljava/lang/ClassLoader;']);
+  'getResource(Ljava/lang/String;)Ljava/net/URL;','getResourceAsStream(Ljava/lang/String;)Ljava/io/InputStream;','getProtectionDomain()Ljava/security/ProtectionDomain;','getEnclosingMethod()Ljava/lang/reflect/Method;', 'getEnclosingConstructor()Ljava/lang/reflect/Constructor;', 'isAnonymousClass()Z', 'isLocalClass()Z', 'isMemberClass()Z', 'getInterfaces()[Ljava/lang/Class;', 'getModifiers()I', 'getClassLoader()Ljava/lang/ClassLoader;']);
 addBridge('java/lang/Class', ['newInstance()Ljava/lang/Object;', 'getDeclaredConstructor([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;',
   'cast(Ljava/lang/Object;)Ljava/lang/Object;',
   'asSubclass(Ljava/lang/Class;)Ljava/lang/Class;',
@@ -1326,7 +1324,7 @@ export class APKRuntime {
       && !/^Ljava\/util\/(HashMap|WeakHashMap|LinkedHashMap|ArrayList|Vector|Stack);$/.test(type)
       && !/^Ljava\/lang\/ref\/(WeakReference|SoftReference);$/.test(type)
       && !SET_TYPES.some(owner => type === `L${owner};`)
-      && !['Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/concurrent/ConcurrentHashMap;', 'Ljava/lang/ThreadLocal;', 'Ljava/lang/InheritableThreadLocal;', 'Ljava/util/Random;', 'Ljava/security/SecureRandom;', 'Ljava/util/ArrayDeque;', 'Landroid/os/Handler;'].includes(type)
+      && !['Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/concurrent/ConcurrentHashMap;', 'Ljava/lang/ThreadLocal;', 'Ljava/lang/InheritableThreadLocal;', 'Ljava/util/Random;', 'Ljava/util/ArrayDeque;', 'Landroid/os/Handler;'].includes(type)
       && ![REENTRANT_LOCK, RW_LOCK, RW_LOCK.slice(0, -1) + '$ReadLock;', RW_LOCK.slice(0, -1) + '$WriteLock;'].includes(type)
       && !this.skiaHost?.canAllocate?.(type) && !this.platform?.canAllocate?.(type)
       && !this.isSubtype(type, 'Ljava/lang/Throwable;'));
@@ -1510,8 +1508,8 @@ export class APKRuntime {
         // curated host binding. APK native methods always retain the JNI failure path.
         const binding = this.methodOrigin(definition.method) === 'framework' ? this.nativeBindings.get(definition.method.key) : null;
         if (!binding) {
-          // APK `native` methods can only be satisfied by a library the JNI bridge loaded (RegisterNatives or Java_ symbol rules); framework natives never are.
-          const jniBinding = this.methodOrigin(definition.method) !== 'framework' ? this.jni?.bindingFor(definition.method) : null;
+          // APK `native` methods can only be satisfied by a library the JNI bridge loaded (RegisterNatives or Java_ symbol rules); framework natives never are, except the platform libraries the lab supplies for its own framework classes (JniBridge.servesFramework: Conscrypt's NativeCrypto).
+          const jniBinding = this.methodOrigin(definition.method) !== 'framework' || this.jni?.servesFramework(definition.method.owner) ? this.jni?.bindingFor(definition.method) : null;
           if (jniBinding) { this.executionByOrigin.host.calls++; this.record(`JNI ${definition.method.key} -> ${jniBinding.symbol}`); return this.jni.invoke(jniBinding, definition.method, this.hostArguments(definition.method, args, mode), mode); }
           if (this.tolerateMissing === 'all' && this.missingLibraries.size && !this.refusedProtectedLibrary) return this.noteMissingStub(definition.method.key, definition.method.result);
           this.nativeRequired(definition.method.key);
@@ -2124,15 +2122,6 @@ export class APKRuntime {
       for(const length of dimensions)if(length<0)this.throwJava('Ljava/lang/NegativeArraySizeException;','negative reflected array dimension');
       let nodes=1,totalArrays=0,totalCells=0;for(const length of dimensions){if(nodes===0)break;totalArrays+=nodes;totalCells+=nodes*length;if(length>1000000||totalCells+this.arrayCells>4000000||totalArrays+this.heap.size>this.maxHeapObjects)fail('Reflected multi-array allocation exceeds VM heap limits');nodes*=length;}
       const allocate=depth=>{const value=this.newArray('['.repeat(dimensions.length-depth)+component,dimensions[depth]);if(depth+1<dimensions.length){const values=this.array(value).elements;for(let i=0;i<values.length;i++)values[i]=allocate(depth+1);}return value;};return allocate(0);
-    }
-    if(method.owner==='Ljava/security/SecureRandom;'){
-      const receiver=this.object(args[0]);
-      if(name==='<init>'){receiver.secureRandom=true;return;}
-      if(!receiver.secureRandom)fail('SecureRandom used before constructor');
-      const array=this.array(args[1]);if(array.type!=='[B')this.throwJava('Ljava/lang/IllegalArgumentException;','SecureRandom requires byte[]');
-      if(!globalThis.crypto?.getRandomValues)throw new APKError('WebCrypto secure randomness is unavailable; SecureRandom cannot fall back to Math.random',{kind:'secure-random-unavailable'});
-      for(let start=0;start<array.elements.length;start+=65536){const bytes=globalThis.crypto.getRandomValues(new Uint8Array(Math.min(65536,array.elements.length-start)));for(let i=0;i<bytes.length;i++)array.elements[start+i]=(bytes[i]<<24)>>24;}
-      return;
     }
     if(staticCall&&['Ljava/lang/Integer;','Ljava/lang/Long;'].includes(method.owner)&&['toString','toHexString','toOctalString','toBinaryString','toUnsignedString'].includes(name)){
       let radix=name==='toHexString'?16:name==='toOctalString'?8:name==='toBinaryString'?2:method.parameters.length===2?int(args[1]):10;if(radix<2||radix>36)radix=10;
@@ -3117,12 +3106,10 @@ export class APKRuntime {
     if (method.owner === 'Ljava/util/Random;' || method.owner === 'Ljava/util/concurrent/ThreadLocalRandom;') {
       const mask = (1n << 48n) - 1n;
       if (name === '<init>') { obj.seed = (args.length > 1 ? wide(args[1]) : BigInt(Date.now())) ^ 0x5deece66dn; obj.seed &= mask; return undefined; }
-      // java.security.SecureRandom inherits Random's derived methods (nextLong, nextInt, nextDouble...) on top of next(bits), which draws from the platform CSPRNG instead of the LCG.
-      const secure = this.isSubtype(obj.type, 'Ljava/security/SecureRandom;');
-      const secureBits = bits => { if (!globalThis.crypto?.getRandomValues) throw new APKError('WebCrypto secure randomness is unavailable; SecureRandom cannot fall back to Math.random', { kind: 'secure-random-unavailable' }); const word = globalThis.crypto.getRandomValues(new Uint32Array(1))[0]; return bits === 32 ? word : word >>> (32 - bits); };
-      const rawNext = bits => { if (secure) return secureBits(bits); obj.seed = (obj.seed * 0x5deece66dn + 11n) & mask; return Number(obj.seed >> BigInt(48 - bits)); };
+      // java.security.SecureRandom is the original libcore class in the framework DEX: its next(int) override (nextBytes over the SPI, i.e. Conscrypt's RAND_bytes over crypto.getRandomValues) drives Random's derived methods.
+      const rawNext = bits => { obj.seed = (obj.seed * 0x5deece66dn + 11n) & mask; return Number(obj.seed >> BigInt(48 - bits)); };
       // A subclass that overrides the protected next(int) drives every derived draw (nextInt, nextLong, nextDouble...) through it, as in libcore; super.next(bits) reaches the generator below.
-      if (obj.userNext === undefined) { obj.userNext = false; for (let t = obj.type; t && t !== 'Ljava/util/Random;' && t !== 'Ljava/security/SecureRandom;' && t !== 'Ljava/util/concurrent/ThreadLocalRandom;'; t = this.parent(t)) if (this.classes.get(t)?.methods.has('next(I)I')) { obj.userNext = true; break; } }
+      if (obj.userNext === undefined) { obj.userNext = false; for (let t = obj.type; t && t !== 'Ljava/util/Random;' && t !== 'Ljava/util/concurrent/ThreadLocalRandom;'; t = this.parent(t)) if (this.classes.get(t)?.methods.has('next(I)I')) { obj.userNext = true; break; } }
       const next = bits => obj.userNext ? int(this.dispatch({ owner: obj.type, name: 'next', parameters: ['I'], result: 'I', signature: '(I)I' }, [args[0], bits], 'virtual')) : rawNext(bits);
       if (name === 'next') return rawNext(int(args[1])) | 0;
       if (method.owner === 'Ljava/util/Random;') {
@@ -3432,13 +3419,26 @@ export class APKRuntime {
       if (name === 'getName' || name === 'getSimpleName' || name === 'getCanonicalName') return this.className(type, name === 'getSimpleName' ? 'simple' : name === 'getCanonicalName' ? 'canonical' : 'binary');
       if (name === 'getModifiers') return this.classNesting(type).modifiers ?? this.classes.get(type)?.flags ?? (EXTERNAL_INTERFACE_NAMES.has(type)?0x601:1);
       if (name === 'getDeclaringClass' || name === 'getEnclosingClass') { const info = this.classNesting(type), enclosing = name === 'getDeclaringClass' ? info.declaringClass : info.enclosingClass ?? info.declaringClass; return enclosing ? this.classObject(enclosing) : null; }
+      if (name === 'getProtectionDomain') {
+        // ART's Class.getProtectionDomain: every class has the one all-permissions domain without a code source (java.lang.Class.allPermDomain), which is what the provider
+        // verification of javax.crypto.JceSecurity reads (no code source: nothing to verify).
+        if (!this.allPermDomain) {
+          const pd = this.allocate('Ljava/security/ProtectionDomain;');
+          this.dispatch({ owner: 'Ljava/security/ProtectionDomain;', name: '<init>', parameters: ['Ljava/security/CodeSource;', 'Ljava/security/PermissionCollection;'], result: 'V', signature: '(Ljava/security/CodeSource;Ljava/security/PermissionCollection;)V' }, [pd, null, null], 'direct');
+          this.allPermDomain = pd; (this.hostStaticValues ??= []).push(pd);
+        }
+        return this.allPermDomain;
+      }
       if (name === 'getResource' || name === 'getResourceAsStream') {
         // Class.getResource: absolute names drop the leading '/', relative ones are resolved against the class package (java.lang.Class.resolveName);
         // the class loader then looks the entry up in the APK archive. A present entry would need a jar: URL / stream, which this VM does not have.
         if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', null);
         const requested = this.stringCharacters(args[1]), pkg = type.startsWith('L') ? type.slice(1, type.lastIndexOf('/') + 1) : '';
         const entry = requested.startsWith('/') ? requested.slice(1) : pkg + requested;
-        if (!this.apkEntries.has(entry)) return null;
+        if (!this.apkEntries.has(entry)) {   // resource files of the framework's own classes (java/security/security.properties), served for classes of the boot DEX only
+          const own = this.classes.get(type), bytes = own && this.dex.bootDexes?.has(own.dex) && name === 'getResourceAsStream' ? this.platform.frameworkResource?.(entry) : null;
+          return bytes ? this.platform.javaIo.bytesStream(this, bytes) : null;
+        }
         return name === 'getResource' ? this.platform.javaIo.apkResourceURL(this, entry) : this.platform.javaIo.apkResourceStream(this, entry);
       }
       if (name === 'getEnclosingMethod' || name === 'getEnclosingConstructor') {

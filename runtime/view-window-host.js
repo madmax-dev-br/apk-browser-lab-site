@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=9b98a94b8ae7';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=9b98a94b8ae7';
+import { APKError } from './apk-runtime.js?v=d50f2f368405';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=d50f2f368405';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -49,7 +49,7 @@ export function createViewWindowHost(platform){
     const key=focusKey(runtime,receiver),old=focusedWindows.get(key);if(view.focused){focusedWindows.set(key,receiver);return 1;}
     if(old&&!same(old,receiver)){runtime.object(old).focused=false;focusedWindows.delete(key);notifyFocus(runtime,old,false,direction,rect);if(focusedWindows.has(key))return view.focused?1:0;}
     focusedWindows.set(key,receiver);view.focused=true;notifyFocus(runtime,receiver,true,direction,rect);return view.focused?1:0;};
-   const children=()=>{const entries=direction&2?view.children??[]:[...(view.children??[])].reverse();for(const child of entries)if(runtime.dispatch({owner:runtime.object(child).type,name:'requestFocus',signature:'(ILandroid/graphics/Rect;)Z',parameters:['I','Landroid/graphics/Rect;'],result:'Z'},[child,direction,rect],'virtual'))return 1;return 0;};
+   const children=()=>runtime.isSubtype(view.type,'Landroid/view/ViewGroup;')&&runtime.dispatch({owner:'Landroid/view/ViewGroup;',name:'onRequestFocusInDescendants',signature:'(ILandroid/graphics/Rect;)Z',parameters:['I','Landroid/graphics/Rect;'],result:'Z'},[receiver,direction,rect],'virtual')?1:0;
    const descendants=view.descendantFocusability??0x20000;
    if(descendants===0x60000)return own();if(descendants===0x40000)return children()||own();return own()||children();
   }finally{focusDepth--;}

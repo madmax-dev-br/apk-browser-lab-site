@@ -1,6 +1,6 @@
 // Persistence of an app's private data across page reloads, the way app data survives a process restart on a phone.
 //
-// What is persisted: the app's own directories in the VirtualFileSystem (src/virtual-fs.js): the credential-protected data dir /data/user/0/<pkg> (shared_prefs, databases,
+// What is persisted: the app's own directories in the VirtualFileSystem (src/virtual-fs.js) -- and its keys of the Android Keystore under /data/misc/keystore/user_0/<pkg> -- the credential-protected data dir /data/user/0/<pkg> (shared_prefs, databases,
 // files, cache, ...), the device-protected /data/user_de/0/<pkg>, and the app-specific external dir /storage/emulated/0/Android/data/<pkg>. `code_cache` is not persisted
 // (ART recreates it). The installed APK, /system and the shared external storage are never stored.
 //
@@ -23,7 +23,8 @@ export const DEFAULT_LIMIT_BYTES = 64 * 1024 * 1024;
 export const DEFAULT_DEBOUNCE_MS = 1500;
 const EXCLUDED_NAMES = new Set(['code_cache']);
 
-export const dataRoots = packageName => [`/data/user/0/${packageName}`, `/data/user_de/0/${packageName}`, `/storage/emulated/0/Android/data/${packageName}`];
+// + the app's keys of the Android Keystore (the software Keystore 2 service keeps them in /data/misc/keystore, which keystore2's own database survives a reboot in, like the app data)
+export const dataRoots = packageName => [`/data/user/0/${packageName}`, `/data/user_de/0/${packageName}`, `/storage/emulated/0/Android/data/${packageName}`, `/data/misc/keystore/user_0/${packageName}`];
 
 const hex = bytes => [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
 /** Storage key of an app: package name + SHA-256 over its signing certificates (DER), or `unsigned`. */

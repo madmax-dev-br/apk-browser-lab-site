@@ -1,14 +1,15 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=9b98a94b8ae7';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=9b98a94b8ae7';
-import { inspectELF } from './native-inspector.js?v=9b98a94b8ae7';
-import { inflateRaw } from './inflate.js?v=9b98a94b8ae7';
-import { resolveDevice } from './device-profile.js?v=9b98a94b8ae7';
-import { resourceProfileFor } from './device-configuration.js?v=9b98a94b8ae7';
-import { JniBridge } from './jni-host.js?v=9b98a94b8ae7';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=9b98a94b8ae7';
-import { AndroidResources } from './android-resources.js?v=9b98a94b8ae7';
-import { AndroidPlatform } from './android-platform.js?v=9b98a94b8ae7';
-import { FrameworkProvider } from './framework-provider.js?v=9b98a94b8ae7';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=d50f2f368405';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=d50f2f368405';
+import { inspectELF } from './native-inspector.js?v=d50f2f368405';
+import { inflateRaw } from './inflate.js?v=d50f2f368405';
+import { resolveDevice } from './device-profile.js?v=d50f2f368405';
+import { resourceProfileFor } from './device-configuration.js?v=d50f2f368405';
+import { JniBridge } from './jni-host.js?v=d50f2f368405';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=d50f2f368405';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=d50f2f368405';
+import { AndroidResources } from './android-resources.js?v=d50f2f368405';
+import { AndroidPlatform } from './android-platform.js?v=d50f2f368405';
+import { FrameworkProvider } from './framework-provider.js?v=d50f2f368405';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -565,6 +566,8 @@ export async function loadAPK(arrayBuffer, options = {}) {
     const sqlcipher=await options.sqlcipherProvider.prepare(program, { base: nativeLibraryProvider });
     if(sqlcipher){nativeLibraryProvider=await nativeProviderWithSqlcipher(nativeLibraryProvider,sqlcipher);warnings.push(...sqlcipher.notes);}
   }
+  // Conscrypt's native layer (libjavacrypto/libssl/libcrypto, built from AOSP's own sources) belongs to the platform: every app's JNI bridge can link it; the bytes are fetched only when a class loads the library.
+  {const javacrypto=options.javacryptoProvider??getDefaultJavacryptoProvider();if(javacrypto)nativeLibraryProvider=javacrypto.compose(nativeLibraryProvider);}
   // IANA tz database (AOSP tzdata2022a compiled to java.time ZoneRules) for the original java.time sources; loaded when the app can reach java.time.
   let tzdata=options.tzdata??null;
   if(!tzdata&&options.tzdataProvider&&program.types.some(type=>type.startsWith('Ljava/time/')||['Ljava/util/Date;','Ljava/util/TimeZone;','Ljava/util/GregorianCalendar;'].includes(type))){

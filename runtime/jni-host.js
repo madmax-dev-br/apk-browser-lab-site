@@ -1,14 +1,15 @@
-import { APKError } from './apk-error.js?v=9b98a94b8ae7';
-import { JavaException } from './apk-runtime.js?v=9b98a94b8ae7';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=9b98a94b8ae7';
-import { buildElfDescriptor } from './native-descriptor.js?v=9b98a94b8ae7';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=9b98a94b8ae7';
-import { NativeLinker, LinkError } from './native-linker.js?v=9b98a94b8ae7';
-import { hostFunction } from './wasm-host-function.js?v=9b98a94b8ae7';
-import { parseWasm } from './wasm-dylink.js?v=9b98a94b8ae7';
-import { formatVersion } from './rn-version.js?v=9b98a94b8ae7';
-import { registerWasmMemory } from './unsafe-native.js?v=9b98a94b8ae7';
-import { writeSkPath } from './skia-path-layout.js?v=9b98a94b8ae7';
+import { APKError } from './apk-error.js?v=d50f2f368405';
+import { JavaException } from './apk-runtime.js?v=d50f2f368405';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=d50f2f368405';
+import { buildElfDescriptor } from './native-descriptor.js?v=d50f2f368405';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=d50f2f368405';
+import { NativeLinker, LinkError } from './native-linker.js?v=d50f2f368405';
+import { hostFunction } from './wasm-host-function.js?v=d50f2f368405';
+import { parseWasm } from './wasm-dylink.js?v=d50f2f368405';
+import { formatVersion } from './rn-version.js?v=d50f2f368405';
+import { registerWasmMemory } from './unsafe-native.js?v=d50f2f368405';
+import { writeSkPath } from './skia-path-layout.js?v=d50f2f368405';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=d50f2f368405';
 
 // JNI -> WebAssembly bridge.
 //
@@ -77,10 +78,10 @@ export class JniBridge {
     this.locals = new Map(); this.globals = new Map(); this.frames = []; this.nextLocal = 1; this.nextGlobal = 1; this.nextWeak = 1;
     this.methodIds = [null]; this.fieldIds = [null]; this.methodIdByKey = new Map(); this.fieldIdByKey = new Map();
     this.pending = null; this.callerLoader = null;
-    // The provider's modules appear in the app's native library directory, so File.exists / findLibrary / SoLoader directory sources see them.
+    // The provider's modules appear in the app's native library directory (except `platform` ones -- the lab's own libraries for framework classes, e.g. Conscrypt's, which live in the system, not in the app), so File.exists / findLibrary / SoLoader directory sources see them.
     const fs = platform.javaIo.fs();
     fs.mkdirs(`${fs.codePath}/lib/wasm32`); fs.readOnly.add(`${fs.codePath}/lib`);
-    for (const [soname, entry] of provider.modules) if (this.#provides(soname)) fs.mount(`${fs.codePath}/lib/wasm32/${soname}`, entry.descriptor); // ELF descriptor (SONAME/DT_NEEDED of the wasm module), not machine code
+    for (const [soname, entry] of provider.modules) if (this.#provides(soname) && !entry.platform) fs.mount(`${fs.codePath}/lib/wasm32/${soname}`, entry.descriptor); // ELF descriptor (SONAME/DT_NEEDED of the wasm module), not machine code
   }
 
   // ---- loading ---------------------------------------------------------------------------------------------------------------------------
@@ -147,7 +148,7 @@ export class JniBridge {
     if (this.proc) return this.proc;
     const r = this.runtime;
     if (!this.provider.has(BASE_SONAME)) r.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: the native library provider has no ${BASE_SONAME} (libc/libc++ base module)`, { kind: 'native-library-base' });
-    const linker = new NativeLinker({ base: BASE_SONAME, hostImport: (module, name, soname) => this.#hostImport(module, name, soname) });
+    const linker = new NativeLinker({ base: BASE_SONAME, hostImport: (module, name, soname) => this.#hostImport(module, name, soname), override: (name, soname, type) => this.#override(name, soname, type) });
     for (const [soname, entry] of this.provider.modules) if (this.#provides(soname)) linker.register(soname, { needed: entry.needed, load: () => ({ module: entry.module, bytes: entry.bytes }) }); // entry.module/bytes may be fetched on first use
     this.linker = linker;
     try { linker.load(BASE_SONAME); } catch (error) { this.linker = null; r.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: ${BASE_SONAME}: ${error.message}`, { kind: 'native-library-instantiate' }); }
@@ -174,6 +175,14 @@ export class JniBridge {
     lib.loaded = true;
   }
   /** Functions the linker cannot take from a library: WASI, the few Emscripten runtime hooks, and syscalls (which report ENOSYS: there is no kernel). */
+  /** Lab implementations of libc functions a library imports (src/native-file-syscalls.js): file-backed mmap/munmap/msync/mprotect and ftruncate over the VM's file system. */
+  #override(name, soname, type) {
+    const wanted = SYSCALLS[name]; if (!wanted || !type) return undefined;
+    if (wanted.params.join() !== type.params.join() || wanted.result !== (type.results[0] ?? null)) return undefined;   // a different signature is not the libc function
+    this.fileSyscalls ??= createFileSyscalls({ runtime: this.runtime, memory: this.linker.memory, base: new Proxy({}, { get: (_target, key) => this.linker.symbol(BASE_SONAME, key)?.fn }) });
+    const implementation = this.fileSyscalls.implementations[name];
+    return hostFunction(type.params, type.results[0] ?? null, (...args) => implementation(...args));
+  }
   #hostImport(module, name, soname) {
     const r = this.runtime, memory = () => this.linker.memory.buffer;
     // a library's own host module (entry.hostImports), created once per library and bound to the shared process memory
@@ -206,6 +215,7 @@ export class JniBridge {
       // Emscripten runtime hooks of the base module. There is no stack unwinder in WebAssembly, so _Unwind_Backtrace reports an empty stack.
       if (name === 'emscripten_notify_memory_growth') return () => {};
       if (name === '_Unwind_Backtrace') return () => 5; // _URC_END_OF_STACK: no frames are available
+      if (name === '_dlopen_js' || name === '_dlsym_js') return () => 0; // dlopen/dlsym from native code: no library is loadable by name at run time (the process links its libraries up front), so they fail, as dlopen of a missing library does (Conscrypt probes libandroidio.so this way)
       if (name.startsWith('__syscall_')) return () => -ENOSYS; // an honest "function not implemented", never a made-up success
     }
     return undefined;
@@ -274,6 +284,8 @@ export class JniBridge {
   }
 
   // ---- native method binding and invocation ---------------------------------------------------------------------------------------------
+  /** Framework (boot DEX) classes whose `native` methods bind to the lab's platform libraries: the original Conscrypt classes over libjavacrypto.so (src/javacrypto-native.js). */
+  servesFramework(owner) { return owner.startsWith('Lcom/android/org/conscrypt/'); }
   bindingFor(method) {
     const key = `${sanitizeAlias(method.owner)}->${method.name}${method.signature}`, registered = this.registered.get(key) ?? this.registered.get(`${method.owner}->${method.name}${method.signature}`);
     if (registered) return registered;
@@ -313,7 +325,7 @@ export class JniBridge {
       case 'B': return (raw << 24) >> 24;
       case 'S': return (raw << 16) >> 16;
       case 'C': return raw & 0xffff;
-      case 'I': return raw | 0;
+      case 'I': return typeof raw === 'bigint' ? Number(BigInt.asIntN(32, raw)) : raw | 0;   // a native that returns jlong where Java declares int (androidx datastore): the caller reads the low 32 bits, as from a 64-bit register
       case 'J': return BigInt.asIntN(64, raw);
       case 'F': return floatBits(raw);
       case 'D': return doubleBits(raw);
@@ -456,7 +468,7 @@ export class JniBridge {
     };
     const toVM = (type, raw) => {
       switch (type) {
-        case 'Z': return raw & 255 ? 1 : 0; case 'B': return (raw << 24) >> 24; case 'S': return (raw << 16) >> 16; case 'C': return raw & 0xffff; case 'I': return raw | 0;
+        case 'Z': return raw & 255 ? 1 : 0; case 'B': return (raw << 24) >> 24; case 'S': return (raw << 16) >> 16; case 'C': return raw & 0xffff; case 'I': return typeof raw === 'bigint' ? Number(BigInt.asIntN(32, raw)) : raw | 0;
         case 'J': return BigInt.asIntN(64, BigInt(raw)); case 'F': return floatBits(raw); case 'D': return doubleBits(raw); default: return self.#value(raw);
       }
     };
