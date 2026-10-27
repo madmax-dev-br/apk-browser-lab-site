@@ -1,13 +1,13 @@
-import { APKError } from './apk-error.js?v=7268006482d0';
-import { JavaException } from './apk-runtime.js?v=7268006482d0';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=7268006482d0';
-import { buildElfDescriptor } from './native-descriptor.js?v=7268006482d0';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=7268006482d0';
-import { NativeLinker, LinkError } from './native-linker.js?v=7268006482d0';
-import { hostFunction } from './wasm-host-function.js?v=7268006482d0';
-import { parseWasm } from './wasm-dylink.js?v=7268006482d0';
-import { formatVersion } from './rn-version.js?v=7268006482d0';
-import { registerWasmMemory } from './unsafe-native.js?v=7268006482d0';
+import { APKError } from './apk-error.js?v=6531d427a542';
+import { JavaException } from './apk-runtime.js?v=6531d427a542';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=6531d427a542';
+import { buildElfDescriptor } from './native-descriptor.js?v=6531d427a542';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=6531d427a542';
+import { NativeLinker, LinkError } from './native-linker.js?v=6531d427a542';
+import { hostFunction } from './wasm-host-function.js?v=6531d427a542';
+import { parseWasm } from './wasm-dylink.js?v=6531d427a542';
+import { formatVersion } from './rn-version.js?v=6531d427a542';
+import { registerWasmMemory } from './unsafe-native.js?v=6531d427a542';
 
 // JNI -> WebAssembly bridge.
 //
@@ -104,6 +104,14 @@ export class JniBridge {
     if (need?.hermesBytecodeVersion && hermes != null && hermes !== need.hermesBytecodeVersion) {
       fail(`Hermes bytecode version ${need.hermesBytecodeVersion} (the Hermes of React Native ${need.reactNative ?? '?'}), but this app's JS bundle is Hermes bytecode version ${hermes}. Build the Hermes release that produces version ${hermes}`, { neededHermesBytecodeVersion: hermes });
     }
+    const ax = need?.androidx;
+    if (ax) {   // an open-source androidx library: the app's artifact version comes from META-INF/<artifact>.version
+      const have = this.runtime.androidxVersions?.[ax.artifact] ?? null;
+      if (!have || !ax.versions.includes(have)) {
+        const known = ax.versions.join(', ');
+        fail(`${ax.artifact} ${known}, ${have ? `but this app ships ${ax.artifact} ${have}` : `but the lab could not read this app's ${ax.artifact} version (no ${ax.versionFile})`}. To serve it, check that the native sources of that release are the ones in scripts/wasm/androidx-libs.json, add the version there and build it (scripts/build-native-libs.sh androidx)`, { neededAndroidx: `${ax.artifact} ${have ?? '(versão não identificada)'}`, labAndroidx: `${ax.artifact} ${known}` });
+      }
+    }
     for (const dep of entry.needed ?? []) this.#requireVersions(dep, seen, probe);
   }
   /**
@@ -115,7 +123,7 @@ export class JniBridge {
     try { this.#requireVersions(soname, new Set(), true); }
     catch (error) {
       if (!error?.probe) throw error;
-      const d = error.details; return { status: 'version-gated', needs: d.neededReactNative ? `React Native ${d.neededReactNative}` : d.neededHermesBytecodeVersion ? `Hermes bytecode ${d.neededHermesBytecodeVersion}` : `React Native ${d.labReactNative} (versão do app não identificada)` };
+      const d = error.details; return { status: 'version-gated', needs: d.neededAndroidx ? d.neededAndroidx : d.neededReactNative ? `React Native ${d.neededReactNative}` : d.neededHermesBytecodeVersion ? `Hermes bytecode ${d.neededHermesBytecodeVersion}` : `React Native ${d.labReactNative} (versão do app não identificada)` };
     }
     return { status: 'available' };
   }
@@ -170,6 +178,7 @@ export class JniBridge {
     // a library's own host module (entry.hostImports), created once per library and bound to the shared process memory
     const owned = this.provider.get(soname)?.hostImports;
     if (owned) { const own = (this.hostImportsOf ??= new Map()).get(soname) ?? (this.hostImportsOf.set(soname, owned(this, soname)), this.hostImportsOf.get(soname)); if (own[module]?.[name]) return own[module][name]; }
+    if (module === 'apkweb_android' && name === 'api_level') return () => r.apiLevel;   // android_get_device_api_level() of lab-built libraries (scripts/wasm/androidx/api-level-compat.c)
     if (module === 'wasi_snapshot_preview1') {
       const table = {
         proc_exit: code => { throw new APKError(`${soname} called exit(${code})`, { kind: 'native-exit', code }); },

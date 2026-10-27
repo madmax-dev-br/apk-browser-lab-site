@@ -10,6 +10,8 @@
 // The report holds ONLY framework/JDK names and counts (and the native library file names the user asked for): app class names, method names and strings never
 // enter it, so it can be pasted into a chat. DOM-free and process-free: it runs in the Worker and in Node.
 
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=6531d427a542';
+
 const FRAMEWORK = /^L(android|java|javax|dalvik|libcore|sun|org\/(json|xml|w3c))\//;
 const SDK_INT_FIELD = 'Landroid/os/Build$VERSION;->SDK_INT:I';
 const API_HOLDER = /(^|[$\/])Api\d+(Impl)?;?$|\$Api\d+/;
@@ -44,7 +46,7 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
   const perDex = new Map();   // dex -> { methodCounts: Map(idx -> [direct, sdk, unknown]), typeCounts: Map(`${kind}:${idx}` -> [..]) , sdkFields: Set }
   const dexState = dex => {
     let state = perDex.get(dex);
-    if (!state) { const sdkFields = new Set(); dex.fields.forEach((f, i) => { if (f.key === SDK_INT_FIELD) sdkFields.add(i); }); perDex.set(dex, state = { methodCounts: new Map(), typeCounts: new Map(), sdkFields }); }
+    if (!state) { const sdkFields = new Set(); dex.fields.forEach((f, i) => { if (f.key === SDK_INT_FIELD) sdkFields.add(i); }); perDex.set(dex, state = { methodCounts: new Map(), typeCounts: new Map(), sdkFields, nonVirtual: new Set() }); }
     return state;
   };
   let scannedMethods = 0, interfaceSites = 0;
@@ -69,7 +71,7 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
         }
         if (op >= 0x60 && op <= 0x6d) { if (sdkAt < 0 && state.sdkFields.has(view.getUint16(base + (i + 1) * 2, true))) sdkAt = i; }
         else if (op === 0x72 || op === 0x78) interfaceSites++;   // invoke-interface dispatches on the receiver's class, not on the named interface: not assessable statically
-        else if ((op >= 0x6e && op <= 0x71) || (op >= 0x74 && op <= 0x77)) local.push([0, view.getUint16(base + (i + 1) * 2, true), i]);
+        else if ((op >= 0x6e && op <= 0x71) || (op >= 0x74 && op <= 0x77)) { const idx = view.getUint16(base + (i + 1) * 2, true); if (op !== 0x6e && op !== 0x74) state.nonVirtual.add(idx); local.push([0, idx, i]); }
         else if (op === 0x22 || op === 0x1c) local.push([op, view.getUint16(base + (i + 1) * 2, true), i]);   // check-cast/instance-of compare types and resolve no class
         i += WIDTH[op];
       }
@@ -114,7 +116,7 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
     try { return runtime.methodAvailability({ ...ref, owner }) ? null : owner; } catch { return null; }
   };
   const byClass = new Map();   // framework class -> { methods: Map(key -> entry), classSites: [0,0,0], missingClass }
-  let referenced = 0, rejectedRefs = 0, omitted = 0;
+  let referenced = 0, rejectedRefs = 0, omitted = 0, resolvedOnSubclass = 0;
   const entry = owner => { let e = byClass.get(owner); if (!e) byClass.set(owner, e = { methods: new Map(), sites: [0, 0, 0], classSites: [0, 0, 0], kinds: new Set(), missingClass: false }); return e; };
   for (const [dex, state] of perDex) {
     if (cancelled()) return null;
@@ -122,6 +124,8 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
       const ref = dex.methods[idx]; if (!ref) continue;
       referenced++;
       const owner = rejected(ref); if (!owner) continue;
+      // a virtual call on a base class dispatches on the receiver: a concrete framework subclass that provides the method makes it runnable (DateFormat.format -> SimpleDateFormat)
+      if (!state.nonVirtual.has(idx) && framework(owner) && runtime.virtualProvider?.(owner, ref.name, ref.signature)) { resolvedOnSubclass++; continue; }
       rejectedRefs++;
       if (!framework(owner)) { omitted++; continue; }
       const e = entry(owner), key = ref.name + ref.signature;
@@ -151,7 +155,7 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
   // ---- native libraries
   const native = await nativeTable(runtime, archive, nativeLibraries);
   return {
-    schema: 1, estimate: 'upper-bound', scannedClasses: appClasses.size, scannedMethods, interfaceSitesSkipped: interfaceSites, referencedFrameworkMethods: referenced, rejectedMethods: rejectedRefs - omitted,
+    schema: 1, estimate: 'upper-bound', scannedClasses: appClasses.size, scannedMethods, interfaceSitesSkipped: interfaceSites, resolvedOnSubclass, referencedFrameworkMethods: referenced, rejectedMethods: rejectedRefs - omitted,
     rejectedClasses: classes.filter(c => c.missingClass).length, omittedNonFramework: omitted, classes, native,
   };
 }
@@ -173,7 +177,8 @@ async function nativeTable(runtime, archive, nativeLibraries) {
   const out = [];
   for (const [soname, where] of [...bySoname].sort((a, b) => a[0].localeCompare(b[0]))) {
     let status = runtime.jni?.libraryStatus?.(soname) ?? { status: 'missing' };
-    if (status.status === 'missing' && archive) {
+    if (status.status === 'missing' && PROTECTED_NATIVE_LIBRARY.test(soname.replace(/^lib/, '').replace(/\.so$/, ''))) status = { status: 'protected' };   // the rule tolerant mode uses (protected-native.js)
+    else if (status.status === 'missing' && archive) {
       const abi = where.includes('arm64-v8a') ? 'arm64-v8a' : where[0], path = `lib/${abi}/${soname}`;
       try { if (archive.entries.has(path) && isPacked(await archive.extractPrefix(path, 4096))) status = { status: 'protected' }; } catch { /* unreadable: stays missing */ }
     }
@@ -207,7 +212,8 @@ export function formatApiGapReport(report, { topClasses = 20, topMethods = 3, to
   }
   if (report.classes.length > topClasses) lines.push(`... +${report.classes.length - topClasses} classes`);
   if (report.omittedNonFramework) lines.push(`(${report.omittedNonFramework} referências fora do framework/JDK omitidas)`);
-  const libs = report.native ?? [];
+  const rank = { protected: 0, 'version-gated': 1, missing: 2, available: 3 };   // what needs attention first, so a bounded table never hides it
+  const libs = [...(report.native ?? [])].sort((x, y) => (rank[x.status] ?? 4) - (rank[y.status] ?? 4) || x.name.localeCompare(y.name));
   if (libs.length) {
     lines.push('Bibliotecas nativas do APK (estado no laboratório):');
     for (const lib of libs.slice(0, topNative)) lines.push(`- ${lib.name} [${lib.abis.join(',')}]: ${STATUS[lib.status] ?? lib.status}${lib.needs ? ` (precisa de ${lib.needs})` : ''}`);

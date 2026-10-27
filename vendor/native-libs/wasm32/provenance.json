@@ -358,6 +358,79 @@
       ],
       "apkSha256": "cff0c355aef64b259003ea70dee76ce7882058b8ecca1fd4be960aadab80e0a3",
       "scope": "Wellhub 10.22.1 only: the version is the one identified from that APK (docs/WELLHUB-NATIVE-VERSIONS.md); another app may ship another version of the same soname."
+    },
+    "libdatastore_shared_counter.so": {
+      "soname": "libdatastore_shared_counter.so",
+      "abi": "wasm32",
+      "file": "libdatastore_shared_counter.wasm",
+      "bytes": 1208,
+      "sha256": "43858f7c210e9f2fa2dced14bd383ba9df7cb2dc510deef2b8c537a7047d3857",
+      "needed": [
+        "libc++_shared.so"
+      ],
+      "upstream": "https://android.googlesource.com/platform/frameworks/support",
+      "tag": "androidx-datastore-release",
+      "commit": "06837925dd21d67d1a6576f6f1456a58d0e2dcf8",
+      "license": "licenses/androidx-Apache-2.0.txt",
+      "sources": [
+        "datastore/datastore-core/src/androidMain/cpp/shared_counter.cc",
+        "datastore/datastore-core/src/androidMain/cpp/jni/androidx_datastore_core_SharedCounter.cc"
+      ],
+      "ports": [],
+      "requires": {
+        "androidx": {
+          "artifact": "androidx.datastore_datastore-core",
+          "versionFile": "META-INF/androidx.datastore_datastore-core.version",
+          "versions": [
+            "1.1.0",
+            "1.1.1",
+            "1.1.2",
+            "1.1.3",
+            "1.1.4",
+            "1.1.5",
+            "1.1.6",
+            "1.1.7",
+            "1.1.8",
+            "1.2.1",
+            "1.3.0"
+          ]
+        }
+      }
+    },
+    "libandroidx.graphics.path.so": {
+      "soname": "libandroidx.graphics.path.so",
+      "abi": "wasm32",
+      "file": "libandroidx.graphics.path.wasm",
+      "bytes": 4577,
+      "sha256": "3f0eef880fe4bba2b7b55f3fd5c5b22beb9390c89ced25cc682cca996cf49616",
+      "needed": [
+        "libc++_shared.so"
+      ],
+      "upstream": "https://android.googlesource.com/platform/frameworks/support",
+      "tag": "androidx-graphics-release",
+      "commit": "b918bbebc30736abad7e4d2058208129afc24367",
+      "license": "licenses/androidx-Apache-2.0.txt",
+      "sources": [
+        "graphics/graphics-path/src/main/cpp/Conic.cpp",
+        "graphics/graphics-path/src/main/cpp/PathIterator.cpp",
+        "graphics/graphics-path/src/main/cpp/pathway.cpp"
+      ],
+      "ports": [
+        "scripts/wasm/androidx/api-level-compat.c",
+        "scripts/wasm/ports/include/android/api-level.h",
+        "scripts/wasm/ports/include/lab-bionic.h"
+      ],
+      "requires": {
+        "androidx": {
+          "artifact": "androidx.graphics_graphics-path",
+          "versionFile": "META-INF/androidx.graphics_graphics-path.version",
+          "versions": [
+            "1.0.0",
+            "1.0.1",
+            "1.1.0"
+          ]
+        }
+      }
     }
   }
 }

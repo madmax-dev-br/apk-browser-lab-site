@@ -1,19 +1,20 @@
-import { VMClock } from './vm-clock.js?v=7268006482d0';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=7268006482d0';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=7268006482d0';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=7268006482d0';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=7268006482d0';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=7268006482d0';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=7268006482d0';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=7268006482d0';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=7268006482d0';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=7268006482d0';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=7268006482d0';
-import { APKError } from './apk-error.js?v=7268006482d0';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=7268006482d0';
-import { Scheduler, Blocked } from './scheduler.js?v=7268006482d0';
-import { bootClassLacksMember } from './boot-class-members.js?v=7268006482d0';
-export { APKError } from './apk-error.js?v=7268006482d0';
+import { VMClock } from './vm-clock.js?v=6531d427a542';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=6531d427a542';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=6531d427a542';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=6531d427a542';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=6531d427a542';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=6531d427a542';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=6531d427a542';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=6531d427a542';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=6531d427a542';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=6531d427a542';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=6531d427a542';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=6531d427a542';
+import { APKError } from './apk-error.js?v=6531d427a542';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=6531d427a542';
+import { Scheduler, Blocked } from './scheduler.js?v=6531d427a542';
+import { bootClassLacksMember } from './boot-class-members.js?v=6531d427a542';
+export { APKError } from './apk-error.js?v=6531d427a542';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -393,7 +394,7 @@ EXTERNAL_PARENTS.set('Ljava/lang/UnsupportedOperationException;', 'Ljava/lang/Ru
 // Exported for the bridge audit test (tests/bridge-return-types.test.mjs).
 // Native libraries tolerant mode never stubs: obfuscated hash-named libraries (typical of protection layers) and known protection,
 // anti-fraud, attestation and payment-security names. They need their original binary (APK-REAL-TASKS task 14) or stay a hard stop.
-export const PROTECTED_NATIVE_LIBRARY = /^(?:[0-9a-f]{4,6}|.*(?:guard|protect|shield|tamper|tmxprofiling|threatmetrix|toolchecker|rootbeer|promon|appdome|arxan|jiagu|secneo|bangcle|ijiami|softpos|payment|attest|integrity).*)$/i;
+export { PROTECTED_NATIVE_LIBRARY };
 export const SHIMS = new Set([
   'Ljava/lang/Object;-><init>()V', 'Landroid/app/Activity;-><init>()V',
   'Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V',
@@ -1573,6 +1574,36 @@ export class APKRuntime {
     const value = result === 'V' ? undefined : result === 'J' || result === 'D' ? 0n : result.length === 1 ? 0 : null;
     if (count === 1) this.record(result === 'V' ? `STUB-VOID ${key}` : `STUB-RETURN ${key} -> ${value === null ? 'null' : String(value).replace('n', '')}`);
     return value;
+  }
+  /**
+   * For a virtual call on a base (often abstract) framework class whose method the class itself lacks: a concrete subclass the VM can resolve that provides it, or null.
+   * dispatch() resolves virtual calls on the receiver's class, so `DateFormat.format(Object)` runs when the receiver is a SimpleDateFormat even though DateFormat itself is
+   * not a class here. Used by the static API-gap scan. Candidates: framework classes, host-provided helper classes and bridged owners.
+   */
+  virtualProvider(owner, name, signature) {
+    const epoch = this.dex.dynamicFiles?.length ?? 0;
+    if (!this.descendantIndex || this.descendantIndex.epoch !== epoch) {
+      const types = new Set(this.classes.keys());
+      for (const type of LAB_HELPERS.keys()) types.add(type);
+      for (const key of SHIMS) { const at = key.indexOf('->'); if (at > 0) types.add(key.slice(0, at)); }
+      for (const host of this.platform?.contractHosts ?? []) for (const type of host.parents?.keys?.() ?? []) types.add(type);   // host-provided classes (SimpleDateFormat, ...)
+      const children = new Map();
+      for (const type of types) { const parent = this.parent(type); if (parent) { if (!children.has(parent)) children.set(parent, []); children.get(parent).push(type); } }
+      this.descendantIndex = { epoch, children };
+    }
+    const queue = [owner], seen = new Set(queue);
+    while (queue.length && seen.size < 2000) {
+      const type = queue.shift();
+      for (const child of this.descendantIndex.children.get(type) ?? []) {
+        if (seen.has(child)) continue;
+        seen.add(child); queue.push(child);
+        if (((this.classes.get(child)?.flags ?? 0) & 0x600) === 0) {   // concrete: neither abstract nor interface
+          const available = this.methodAvailability({ owner: child, name, signature });
+          if (available && available !== 'interface') return child;
+        }
+      }
+    }
+    return null;
   }
   /**
    * Static availability of a referenced method, mirroring dispatch(): 'framework-dex' (AOSP DEX body), 'framework-native' (native with approved binding),

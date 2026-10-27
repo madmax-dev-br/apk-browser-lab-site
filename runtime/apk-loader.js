@@ -1,14 +1,14 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=7268006482d0';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=7268006482d0';
-import { inspectELF } from './native-inspector.js?v=7268006482d0';
-import { inflateRaw } from './inflate.js?v=7268006482d0';
-import { resolveDevice } from './device-profile.js?v=7268006482d0';
-import { resourceProfileFor } from './device-configuration.js?v=7268006482d0';
-import { JniBridge } from './jni-host.js?v=7268006482d0';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=7268006482d0';
-import { AndroidResources } from './android-resources.js?v=7268006482d0';
-import { AndroidPlatform } from './android-platform.js?v=7268006482d0';
-import { FrameworkProvider } from './framework-provider.js?v=7268006482d0';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=6531d427a542';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=6531d427a542';
+import { inspectELF } from './native-inspector.js?v=6531d427a542';
+import { inflateRaw } from './inflate.js?v=6531d427a542';
+import { resolveDevice } from './device-profile.js?v=6531d427a542';
+import { resourceProfileFor } from './device-configuration.js?v=6531d427a542';
+import { JniBridge } from './jni-host.js?v=6531d427a542';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=6531d427a542';
+import { AndroidResources } from './android-resources.js?v=6531d427a542';
+import { AndroidPlatform } from './android-platform.js?v=6531d427a542';
+import { FrameworkProvider } from './framework-provider.js?v=6531d427a542';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -600,6 +600,13 @@ export async function loadAPK(arrayBuffer, options = {}) {
   if (nativeLibraryProvider && [...nativeLibraryProvider.modules.values()].some(entry => entry.apkSha256)) {
     // libraries scoped to one APK (its own generated native code) are offered only to that APK: compared by the SHA-256 of the file
     runtime.apkSha256 = [...new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer)))].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  if (nativeLibraryProvider) {   // open-source androidx libraries are served by artifact version: META-INF/androidx.<group>_<artifact>.version holds just the version string
+    runtime.androidxVersions = Object.create(null);
+    for (const name of archive.entries.keys()) {
+      const m = /^META-INF\/(androidx\.[\w.-]+?)\.version$/.exec(name); if (!m) continue;
+      try { const text = new TextDecoder().decode(archive.extractSync(name, 256)).trim(); if (/^[\w.+-]{1,40}$/.test(text)) runtime.androidxVersions[m[1]] = text; } catch { /* unreadable entry: that artifact stays unidentified */ }
+    }
   }
   if (nativeLibraryProvider) { // the lab's React Native libraries are built for one RN version: record the app's (from its DEX) and Hermes bytecode version (from its bundle) for the provider's gate
     runtime.reactNativeVersion = detectReactNativeVersion(runtime); runtime.hermesBytecodeVersion = await detectHermesBytecodeVersion(archive);
