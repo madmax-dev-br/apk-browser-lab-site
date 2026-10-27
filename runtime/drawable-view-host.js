@@ -1,8 +1,8 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=33d211b8a989';
-import { APKError } from './apk-runtime.js?v=33d211b8a989';
-import { getVectorGraphics } from './vector-native.js?v=33d211b8a989';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=33d211b8a989';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=33d211b8a989';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=7fd72513c4ea';
+import { APKError } from './apk-runtime.js?v=7fd72513c4ea';
+import { getVectorGraphics } from './vector-native.js?v=7fd72513c4ea';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=7fd72513c4ea';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=7fd72513c4ea';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
