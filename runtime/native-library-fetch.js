@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=f1c4bcc7c53e';
-import { buildElfDescriptor } from './native-descriptor.js?v=f1c4bcc7c53e';
-import { sha256Hex } from './sha256-sync.js?v=f1c4bcc7c53e';
+import { APKError } from './apk-error.js?v=79e2ded60c95';
+import { buildElfDescriptor } from './native-descriptor.js?v=79e2ded60c95';
+import { sha256Hex } from './sha256-sync.js?v=79e2ded60c95';
 
 // Browser-side provider of the lab's wasm32 native libraries (vendor/native-libs/wasm32, published next to the page by scripts/build-web.mjs).
 //
@@ -44,7 +44,7 @@ export class LazyNativeLibraryProvider {
       bytes = fetched; module = new WebAssembly.Module(fetched); provider.fetched.push(lib.soname);
     };
     return {
-      soname: lib.soname, abi: this.abi, sha256: lib.sha256, needed: lib.needed, provenance: lib, apkSha256: lib.apkSha256 ?? null,
+      soname: lib.soname, abi: this.abi, sha256: lib.sha256, needed: lib.needed, provenance: lib, apkSha256: lib.apkSha256 ?? null, requires: lib.requires ?? null,
       descriptor: buildElfDescriptor({ soname: lib.soname, needed: lib.needed, wasmSha256: lib.sha256 }),
       get bytes() { load(); return bytes; }, get module() { load(); return module; },
     };

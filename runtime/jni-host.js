@@ -1,11 +1,12 @@
-import { APKError } from './apk-error.js?v=f1c4bcc7c53e';
-import { JavaException } from './apk-runtime.js?v=f1c4bcc7c53e';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=f1c4bcc7c53e';
-import { buildElfDescriptor } from './native-descriptor.js?v=f1c4bcc7c53e';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=f1c4bcc7c53e';
-import { NativeLinker, LinkError } from './native-linker.js?v=f1c4bcc7c53e';
-import { hostFunction } from './wasm-host-function.js?v=f1c4bcc7c53e';
-import { parseWasm } from './wasm-dylink.js?v=f1c4bcc7c53e';
+import { APKError } from './apk-error.js?v=79e2ded60c95';
+import { JavaException } from './apk-runtime.js?v=79e2ded60c95';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=79e2ded60c95';
+import { buildElfDescriptor } from './native-descriptor.js?v=79e2ded60c95';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=79e2ded60c95';
+import { NativeLinker, LinkError } from './native-linker.js?v=79e2ded60c95';
+import { hostFunction } from './wasm-host-function.js?v=79e2ded60c95';
+import { parseWasm } from './wasm-dylink.js?v=79e2ded60c95';
+import { formatVersion } from './rn-version.js?v=79e2ded60c95';
 
 // JNI -> WebAssembly bridge.
 //
@@ -54,7 +55,7 @@ export class NativeLibraryProvider {
     needed = parsed.dylink.needed;
     const module = await WebAssembly.compile(bytes);
     this.unavailable.delete(soname);
-    this.modules.set(soname, { soname, abi: this.abi, bytes, sha256: actual, module, needed, provenance, hostImports, apkSha256, descriptor: buildElfDescriptor({ soname, needed, wasmSha256: actual }) });
+    this.modules.set(soname, { soname, abi: this.abi, bytes, sha256: actual, module, needed, provenance, hostImports, apkSha256, requires: provenance?.requires ?? null, descriptor: buildElfDescriptor({ soname, needed, wasmSha256: actual }) });
     return this;
   }
   has(soname) { return this.modules.has(soname); }
@@ -82,9 +83,28 @@ export class JniBridge {
 
   // ---- loading ---------------------------------------------------------------------------------------------------------------------------
   /** System.loadLibrary(name): returns false when the provider has no such library (caller keeps the genuine UnsatisfiedLinkError path). */
-  loadLibrary(name) { const soname = `lib${name}.so`; this.#requireAvailable(soname); return this.#provides(soname) ? (this.#load(soname, 'System.loadLibrary'), true) : false; }
+  loadLibrary(name) { const soname = `lib${name}.so`; this.#requireAvailable(soname); this.#requireVersions(soname); return this.#provides(soname) ? (this.#load(soname, 'System.loadLibrary'), true) : false; }
   /** A library is offered to this app when the provider has it and it is not scoped to a different APK (an app's own generated libraries, e.g. libappmodules.so, belong to that app only). */
   #provides(soname) { const entry = this.provider.get(soname); return !!entry && (!entry.apkSha256 || entry.apkSha256 === this.runtime.apkSha256); }
+  /**
+   * Libraries built from a specific React Native release (`requires` in the provenance: reactNative "0.79.4", hermesBytecodeVersion 96) are handed only to an app
+   * built with that release: the app's version is read from its DEX (ReactNativeVersion) and its Hermes bundle header. Anything else, or an app whose version
+   * cannot be read, gets an explicit UnsatisfiedLinkError that names the version to build, never a library of another version. Checked for the library and its
+   * whole DT_NEEDED closure.
+   */
+  #requireVersions(soname, seen = new Set()) {
+    if (seen.has(soname)) return; seen.add(soname);
+    const entry = this.provider.get(soname); if (!entry) return;
+    const need = entry.requires, app = this.runtime.reactNativeVersion, appText = formatVersion(app), hermes = this.runtime.hermesBytecodeVersion;
+    const fail = (why, details) => this.runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: library "${soname}" is built by the lab for ${why}`, { kind: 'native-library-unavailable', soname, labReactNative: need?.reactNative ?? null, appReactNative: appText, appHermesBytecodeVersion: hermes ?? null, ...details });
+    if (need?.reactNative && appText !== need.reactNative) {
+      fail(`React Native ${need.reactNative}, ${appText ? `but this app ships React Native ${appText}` : 'but the lab could not read this app\'s React Native version from its DEX'}. To serve it, add React Native ${appText ?? '<the app\'s version>'} to scripts/wasm/rn-versions.json and build it (scripts/build-native-libs.sh)`, { neededReactNative: appText });
+    }
+    if (need?.hermesBytecodeVersion && hermes != null && hermes !== need.hermesBytecodeVersion) {
+      fail(`Hermes bytecode version ${need.hermesBytecodeVersion} (the Hermes of React Native ${need.reactNative ?? '?'}), but this app's JS bundle is Hermes bytecode version ${hermes}. Build the Hermes release that produces version ${hermes}`, { neededHermesBytecodeVersion: hermes });
+    }
+    for (const dep of entry.needed ?? []) this.#requireVersions(dep, seen);
+  }
   #requireAvailable(soname) {
     const missing = this.provider.unavailable?.get(soname); if (!missing || this.provider.has(soname)) return;
     this.runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', missing.message, missing.details);
@@ -96,6 +116,7 @@ export class JniBridge {
     if (!fs.stat(path)) this.runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: library "${path}" not found`);
     this.#requireAvailable(soname);
     if (!this.#provides(soname)) return false;
+    this.#requireVersions(soname);
     this.#load(soname, via); return true;
   }
   /** The process: one linear memory + function table for every library, and the JNIEnv/JavaVM built in it. Created on first use. */

@@ -47,7 +47,10 @@
       ],
       "ports": [
         "scripts/wasm/fbjni-compat.cpp: pthread_getname_np (single main thread) and lyra::detail::getExceptionTraceHolder with std::rethrow_exception instead of the Bionic cxa_throw interposer"
-      ]
+      ],
+      "requires": {
+        "reactNative": "0.79.4"
+      }
     },
     "libjsi.so": {
       "soname": "libjsi.so",
@@ -73,7 +76,10 @@
         "scripts/wasm/ports/include/sys/endian.h (musl <endian.h>) and android/{log,asset_manager,asset_manager_jni}.h (declarations of the public NDK API)",
         "scripts/wasm/prepare-rn-deps.py: double-conversion utils.h architecture list gains __wasm__; fmt base.h disables consteval under Emscripten (clang 20 cannot constant-evaluate FMT_STRING of fmt 11.0.2); boost has no asm (header-only)",
         "-Wno-error on the compile line (RN builds with -Wall -Werror under NDK clang 18; Emscripten's clang 20 warns about more)"
-      ]
+      ],
+      "requires": {
+        "reactNative": "0.79.4"
+      }
     },
     "liblog.so": {
       "soname": "liblog.so",
@@ -145,7 +151,10 @@
         "scripts/wasm/prepare-rn-deps.py: double-conversion utils.h architecture list gains __wasm__; fmt base.h disables consteval under Emscripten (clang 20 cannot constant-evaluate FMT_STRING of fmt 11.0.2); boost has no asm (header-only)",
         "-Wno-error on the compile line (RN builds with -Wall -Werror under NDK clang 18; Emscripten's clang 20 warns about more)",
         "scripts/wasm/ports/oscompat-wasm.cpp: facebook::react::oscompat::getCurrentProcessId/getCurrentThreadId (ReactCommon/oscompat compiles only for __linux__/__ANDROID__)"
-      ]
+      ],
+      "requires": {
+        "reactNative": "0.79.4"
+      }
     },
     "libhermes.so": {
       "soname": "libhermes.so",
@@ -170,7 +179,11 @@
         "scripts/wasm/build-hermes.sh: Emscripten toolchain, SHARED libraries enabled (scripts/wasm/shared-libs.cmake), DT_NEEDED written by scripts/wasm/lab-link.mjs",
         "HERMESVM_ALLOW_CONCURRENT_GC=OFF (no threads in the module; Android's libhermes runs Hades with a background thread), HERMESVM_ALLOW_INLINE_ASM=OFF, HERMES_CHECK_NATIVE_STACK=OFF (same options as the isolated proof, hermes-proof/)",
         "fbjni as CMake package for find_package(fbjni) pointing at the lab libfbjni.so; scripts/wasm/ports/include/lab-bionic.h force-included; -Wno-error and -fwasm-exceptions appended through EMCC_CFLAGS"
-      ]
+      ],
+      "requires": {
+        "reactNative": "0.79.4",
+        "hermesBytecodeVersion": 96
+      }
     },
     "libhermestooling.so": {
       "soname": "libhermestooling.so",
@@ -201,7 +214,10 @@
         "scripts/wasm/ports/include/sys/endian.h (musl <endian.h>) and android/{log,asset_manager,asset_manager_jni}.h (declarations of the public NDK API)",
         "scripts/wasm/prepare-rn-deps.py: double-conversion utils.h architecture list gains __wasm__; fmt base.h disables consteval under Emscripten (clang 20 cannot constant-evaluate FMT_STRING of fmt 11.0.2); boost has no asm (header-only)",
         "-Wno-error on the compile line (RN builds with -Wall -Werror under NDK clang 18; Emscripten's clang 20 warns about more)"
-      ]
+      ],
+      "requires": {
+        "reactNative": "0.79.4"
+      }
     },
     "libappmodules.so": {
       "soname": "libappmodules.so",
