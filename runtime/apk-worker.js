@@ -1,32 +1,33 @@
-import { loadAPK } from './apk-loader.js?v=d8da3b335496';
-import { FrameworkProvider } from './framework-provider.js?v=d8da3b335496';
-import { createRasterSender } from './raster-cache.js?v=d8da3b335496';
-import { isFreedId } from './heap-gc.js?v=d8da3b335496';
-import { dispatchPointer } from './pointer-input-host.js?v=d8da3b335496';
-import { resolveDevice } from './device-profile.js?v=d8da3b335496';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=d8da3b335496';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=d8da3b335496';
-import { SkiaProvider } from './skia-provider.js?v=d8da3b335496';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=d8da3b335496';
-import { disposeTextLayout } from './text-layout-native.js?v=d8da3b335496';
-import { IcuBreakProvider } from './icu-break-provider.js?v=d8da3b335496';
-import { SqliteProvider } from './sqlite-native.js?v=d8da3b335496';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=d8da3b335496';
-import { TzdataProvider } from './java-time-native.js?v=d8da3b335496';
-import { ZlibProvider } from './zip-native.js?v=d8da3b335496';
-import { IcuConverterProvider } from './icu-converter-native.js?v=d8da3b335496';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=d8da3b335496';
-import { disposeColorFilters } from './color-filter-native.js?v=d8da3b335496';
-import { disposeRegex } from './regex-native.js?v=d8da3b335496';
-import { disposeRenderNodes } from './rendernode-native.js?v=d8da3b335496';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=d8da3b335496';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=d8da3b335496';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=d8da3b335496';
+import { loadAPK } from './apk-loader.js?v=36ea061c5c9d';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=36ea061c5c9d';
+import { FrameworkProvider } from './framework-provider.js?v=36ea061c5c9d';
+import { createRasterSender } from './raster-cache.js?v=36ea061c5c9d';
+import { isFreedId } from './heap-gc.js?v=36ea061c5c9d';
+import { dispatchPointer } from './pointer-input-host.js?v=36ea061c5c9d';
+import { resolveDevice } from './device-profile.js?v=36ea061c5c9d';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=36ea061c5c9d';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=36ea061c5c9d';
+import { SkiaProvider } from './skia-provider.js?v=36ea061c5c9d';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=36ea061c5c9d';
+import { disposeTextLayout } from './text-layout-native.js?v=36ea061c5c9d';
+import { IcuBreakProvider } from './icu-break-provider.js?v=36ea061c5c9d';
+import { SqliteProvider } from './sqlite-native.js?v=36ea061c5c9d';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=36ea061c5c9d';
+import { TzdataProvider } from './java-time-native.js?v=36ea061c5c9d';
+import { ZlibProvider } from './zip-native.js?v=36ea061c5c9d';
+import { IcuConverterProvider } from './icu-converter-native.js?v=36ea061c5c9d';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=36ea061c5c9d';
+import { disposeColorFilters } from './color-filter-native.js?v=36ea061c5c9d';
+import { disposeRegex } from './regex-native.js?v=36ea061c5c9d';
+import { disposeRenderNodes } from './rendernode-native.js?v=36ea061c5c9d';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=36ea061c5c9d';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=36ea061c5c9d';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=36ea061c5c9d';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=d8da3b335496';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=d8da3b335496';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=d8da3b335496';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'd8da3b335496';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=36ea061c5c9d';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=36ea061c5c9d';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=36ea061c5c9d';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '36ea061c5c9d';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -36,7 +37,7 @@ let runtime = null;
 let appData = null, appDataInfo = null;   // per-app private data persistence (src/app-data-store.js): the live persistence object (null when disabled) and the last status
 let composeSemantics = null;
 let inspectNativeLibraries = null;
-let inventory = null;
+let inventory = null, archive = null;
 let activeRequestId = null;
 let busy = false;
 let eventTimer = null, lastEventMs = 0;
@@ -78,6 +79,18 @@ function scheduleEvents() {
     finally { busy = false; if (succeeded) scheduleEvents(); }
   }, Math.min(2147483647, Math.max(0, delay)));
 }
+// The static API-gap estimate (src/api-gap-scan.js) runs once per opened APK, after its first launch attempt (successful or not), in slices that yield to the event loop so
+// VM events and page requests are served in between. Read-only on the VM; its result only feeds "Copiar diagnóstico". A failure here never reaches the run.
+function startApiGapScan() {
+  const target = runtime; if (!target || !inventory || target.apiGapScanStarted) return;
+  target.apiGapScanStarted = true;
+  setTimeout(async () => {
+    try {
+      const report = await scanApiGaps(target, { archive, nativeLibraries: inventory.nativeByABI, yieldFn: () => new Promise(resolve => setTimeout(resolve, 0)), cancelled: () => runtime !== target });
+      if (report && runtime === target) self.postMessage({ type: 'api-gaps', report: compactApiGapReport(report) });
+    } catch { /* an estimate: nothing to report */ }
+  }, 0);
+}
 self.onmessage = async ({ data }) => {
   if (!data || !Number.isSafeInteger(data.requestId)) return;
   const { requestId, type } = data;
@@ -104,7 +117,7 @@ self.onmessage = async ({ data }) => {
       // Lab-built wasm32 native libraries (libreactnative, Hermes, ...): provenance now, each module only when the app's SoLoader links it
       const nativeLibraryProvider = NATIVE_LIBS_URL ? (sharedNativeLibraryProvider ??= await LazyNativeLibraryProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
       const result = await loadAPK(data.buffer, { nativeLibraryProvider, device: resolveDevice(data.device || {}), tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
-      runtime = result.runtime; inventory = result.inventory; inspectNativeLibraries = result.inspectNativeLibraries;
+      runtime = result.runtime; archive = result.archive; inventory = result.inventory; inspectNativeLibraries = result.inspectNativeLibraries;
       if (self.location?.origin) runtime.javaProperties.set('apkweb.origin', self.location.origin);   // the page origin (same as this worker's): lets sample apps address documents the lab serves itself
       runtime.platform.onExternalActivity = () => { if (!busy) scheduleEvents(); };   // network exchanges finishing wake the event pump
       composeSemantics = createComposeSemanticsDriver(runtime);
@@ -177,5 +190,5 @@ self.onmessage = async ({ data }) => {
     succeeded = true;
   } catch (error) {
     send({ type: 'error', error: errorData(error) });
-  } finally { busy = false; if (succeeded) scheduleEvents(); }
+  } finally { busy = false; if (succeeded) scheduleEvents(); if (type === 'launch') startApiGapScan(); }
 };

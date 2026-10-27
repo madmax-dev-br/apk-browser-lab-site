@@ -1,19 +1,19 @@
-import { VMClock } from './vm-clock.js?v=d8da3b335496';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=d8da3b335496';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=d8da3b335496';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=d8da3b335496';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=d8da3b335496';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=d8da3b335496';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=d8da3b335496';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=d8da3b335496';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=d8da3b335496';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=d8da3b335496';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=d8da3b335496';
-import { APKError } from './apk-error.js?v=d8da3b335496';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=d8da3b335496';
-import { Scheduler, Blocked } from './scheduler.js?v=d8da3b335496';
-import { bootClassLacksMember } from './boot-class-members.js?v=d8da3b335496';
-export { APKError } from './apk-error.js?v=d8da3b335496';
+import { VMClock } from './vm-clock.js?v=36ea061c5c9d';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=36ea061c5c9d';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=36ea061c5c9d';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=36ea061c5c9d';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=36ea061c5c9d';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=36ea061c5c9d';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=36ea061c5c9d';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=36ea061c5c9d';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=36ea061c5c9d';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=36ea061c5c9d';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=36ea061c5c9d';
+import { APKError } from './apk-error.js?v=36ea061c5c9d';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=36ea061c5c9d';
+import { Scheduler, Blocked } from './scheduler.js?v=36ea061c5c9d';
+import { bootClassLacksMember } from './boot-class-members.js?v=36ea061c5c9d';
+export { APKError } from './apk-error.js?v=36ea061c5c9d';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1315,8 +1315,9 @@ export class APKRuntime {
     if (!value) throw new APKError('Unknown VM array handle; it is not a native memory address', { kind: 'invalid-vm-array-handle', handle: String(handle) });
     return this.array(value);
   }
-  allocate(type) {
-    if (!this.classes.has(type) && !['Landroid/widget/LinearLayout;', 'Landroid/widget/TextView;', 'Landroid/widget/Button;', 'Ljava/lang/Object;',
+  /** Would allocate(type) succeed without tolerant mode? (a class the VM has, a host-provided one, or a Throwable). Also used by the static API-gap scan. */
+  allocatable(type) {
+    return !(!this.classes.has(type) && !['Landroid/widget/LinearLayout;', 'Landroid/widget/TextView;', 'Landroid/widget/Button;', 'Ljava/lang/Object;',
       'Ljava/lang/StringBuilder;', 'Ljava/lang/String;', 'Ljava/lang/Integer;', 'Ljava/lang/Boolean;'].includes(type)
       && type!=='Ljava/lang/StringBuffer;'
       && !Object.values(BOX_TYPES).includes(type)
@@ -1327,7 +1328,10 @@ export class APKRuntime {
       && !['Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/concurrent/ConcurrentHashMap;', 'Ljava/lang/ThreadLocal;', 'Ljava/lang/InheritableThreadLocal;', 'Ljava/util/Random;', 'Ljava/security/SecureRandom;', 'Ljava/util/ArrayDeque;', 'Landroid/os/Handler;'].includes(type)
       && ![REENTRANT_LOCK, RW_LOCK, RW_LOCK.slice(0, -1) + '$ReadLock;', RW_LOCK.slice(0, -1) + '$WriteLock;'].includes(type)
       && !this.skiaHost?.canAllocate?.(type) && !this.platform?.canAllocate?.(type)
-      && !this.isSubtype(type, 'Ljava/lang/Throwable;')) {
+      && !this.isSubtype(type, 'Ljava/lang/Throwable;'));
+  }
+  allocate(type) {
+    if (this.allocatable(type) === false) {
       // Tolerant mode 'all': a platform class the lab lacks becomes an opaque object whose every call is a traced stub.
       const widget = this.platform?.unimplementedWidgetMessage?.(type, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' });
       if (this.tolerateMissing !== 'all') fail(`Unsupported allocation: ${type}`);
@@ -1782,6 +1786,10 @@ export class APKRuntime {
     }
     fail('Expected Java collection');
   }
+  /** Would Class.forName / resolveClass accept this (component) type? Static scans use it without side effects. */
+  classResolvable(component) {
+    return !(!this.classes.has(component) && !BRIDGE_OWNERS.has(component) && !EXTERNAL_PARENTS.has(component) && !EXTERNAL_INTERFACE_NAMES.has(component) && !EXTERNAL_INTERFACES.has(component) && component.length !== 1 && !['Ljava/lang/Object;', 'Ljava/lang/CharSequence;'].includes(component) && !this.skiaHost?.parent?.(component) && !this.platform?.parent?.(component) && !this.platform?.fallbackParent?.(component));
+  }
   resolveClass(name, initialize = false, loader = undefined) {
     if (typeof name !== 'string') this.throwJava('Ljava/lang/NullPointerException;', 'null class name');
     let type = name.startsWith('[') ? name.replaceAll('.', '/') : descriptor(name);
@@ -1792,7 +1800,7 @@ export class APKRuntime {
       if (mapped === false) this.throwJava('Ljava/lang/ClassNotFoundException;', name);
       if (mapped !== component) { type = type.slice(0, type.length - component.length) + mapped; component = mapped; }
     }
-    if (!this.classes.has(component) && !BRIDGE_OWNERS.has(component) && !EXTERNAL_PARENTS.has(component) && !EXTERNAL_INTERFACE_NAMES.has(component) && !EXTERNAL_INTERFACES.has(component) && component.length !== 1 && !['Ljava/lang/Object;', 'Ljava/lang/CharSequence;'].includes(component) && !this.skiaHost?.parent?.(component) && !this.platform?.parent?.(component) && !this.platform?.fallbackParent?.(component)) this.throwJava('Ljava/lang/ClassNotFoundException;', name);
+    if (!this.classResolvable(component)) this.throwJava('Ljava/lang/ClassNotFoundException;', name);
     if (initialize && !type.startsWith('[')) this.initialize(type);
     return this.classObject(type);
   }

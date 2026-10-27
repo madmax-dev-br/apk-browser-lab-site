@@ -1,14 +1,14 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=d8da3b335496';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=d8da3b335496';
-import { inspectELF } from './native-inspector.js?v=d8da3b335496';
-import { inflateRaw } from './inflate.js?v=d8da3b335496';
-import { resolveDevice } from './device-profile.js?v=d8da3b335496';
-import { resourceProfileFor } from './device-configuration.js?v=d8da3b335496';
-import { JniBridge } from './jni-host.js?v=d8da3b335496';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=d8da3b335496';
-import { AndroidResources } from './android-resources.js?v=d8da3b335496';
-import { AndroidPlatform } from './android-platform.js?v=d8da3b335496';
-import { FrameworkProvider } from './framework-provider.js?v=d8da3b335496';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=36ea061c5c9d';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=36ea061c5c9d';
+import { inspectELF } from './native-inspector.js?v=36ea061c5c9d';
+import { inflateRaw } from './inflate.js?v=36ea061c5c9d';
+import { resolveDevice } from './device-profile.js?v=36ea061c5c9d';
+import { resourceProfileFor } from './device-configuration.js?v=36ea061c5c9d';
+import { JniBridge } from './jni-host.js?v=36ea061c5c9d';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=36ea061c5c9d';
+import { AndroidResources } from './android-resources.js?v=36ea061c5c9d';
+import { AndroidPlatform } from './android-platform.js?v=36ea061c5c9d';
+import { FrameworkProvider } from './framework-provider.js?v=36ea061c5c9d';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -655,5 +655,5 @@ export async function loadAPK(arrayBuffer, options = {}) {
   await report('complete', dexFiles.length, dexFiles.length, undefined, `Loaded ${dexFiles.length} DEX files and ${program.classes.size} classes`);
   let signingCertificates;   // read on first PackageManager request: the APK's signer certificates
   runtime.apkSigningCertificates = () => signingCertificates ??= apkSigningCertificates(archive);
-  return { runtime, inventory, inspectNativeLibraries };
+  return { runtime, inventory, inspectNativeLibraries, archive };
 }

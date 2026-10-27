@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=d8da3b335496';
+import { APKError } from './apk-runtime.js?v=36ea061c5c9d';
 const WINDOW_CONFIG = 'Landroid/app/WindowConfiguration;', RECT = 'Landroid/graphics/Rect;', MANAGER = 'Landroid/view/IWindowManager;';
 const keys = new Set(['Landroid/view/WindowManagerGlobal;->getWindowManagerService()Landroid/view/IWindowManager;', `${MANAGER}->hasNavigationBar(I)Z`, `${WINDOW_CONFIG}->getMaxBounds()Landroid/graphics/Rect;`, `${WINDOW_CONFIG}->getBounds()Landroid/graphics/Rect;`, 'Landroid/app/AppGlobals;->getIntCoreSetting(Ljava/lang/String;I)I']);
 for (const owner of ['Landroid/content/Context;', 'Landroid/content/ContextWrapper;', 'Landroid/app/Application;', 'Landroid/app/Activity;']) keys.add(owner + '->getDisplayId()I');

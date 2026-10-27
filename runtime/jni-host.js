@@ -1,12 +1,13 @@
-import { APKError } from './apk-error.js?v=d8da3b335496';
-import { JavaException } from './apk-runtime.js?v=d8da3b335496';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=d8da3b335496';
-import { buildElfDescriptor } from './native-descriptor.js?v=d8da3b335496';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=d8da3b335496';
-import { NativeLinker, LinkError } from './native-linker.js?v=d8da3b335496';
-import { hostFunction } from './wasm-host-function.js?v=d8da3b335496';
-import { parseWasm } from './wasm-dylink.js?v=d8da3b335496';
-import { formatVersion } from './rn-version.js?v=d8da3b335496';
+import { APKError } from './apk-error.js?v=36ea061c5c9d';
+import { JavaException } from './apk-runtime.js?v=36ea061c5c9d';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=36ea061c5c9d';
+import { buildElfDescriptor } from './native-descriptor.js?v=36ea061c5c9d';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=36ea061c5c9d';
+import { NativeLinker, LinkError } from './native-linker.js?v=36ea061c5c9d';
+import { hostFunction } from './wasm-host-function.js?v=36ea061c5c9d';
+import { parseWasm } from './wasm-dylink.js?v=36ea061c5c9d';
+import { formatVersion } from './rn-version.js?v=36ea061c5c9d';
+import { registerWasmMemory } from './unsafe-native.js?v=36ea061c5c9d';
 
 // JNI -> WebAssembly bridge.
 //
@@ -92,18 +93,31 @@ export class JniBridge {
    * cannot be read, gets an explicit UnsatisfiedLinkError that names the version to build, never a library of another version. Checked for the library and its
    * whole DT_NEEDED closure.
    */
-  #requireVersions(soname, seen = new Set()) {
+  #requireVersions(soname, seen = new Set(), probe = false) {
     if (seen.has(soname)) return; seen.add(soname);
     const entry = this.provider.get(soname); if (!entry) return;
     const need = entry.requires, app = this.runtime.reactNativeVersion, appText = formatVersion(app), hermes = this.runtime.hermesBytecodeVersion;
-    const fail = (why, details) => this.runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: library "${soname}" is built by the lab for ${why}`, { kind: 'native-library-unavailable', soname, labReactNative: need?.reactNative ?? null, appReactNative: appText, appHermesBytecodeVersion: hermes ?? null, ...details });
+    const fail = (why, details) => probe ? (() => { throw { probe: true, details: { ...details, why } }; })() : this.runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: library "${soname}" is built by the lab for ${why}`, { kind: 'native-library-unavailable', soname, labReactNative: need?.reactNative ?? null, appReactNative: appText, appHermesBytecodeVersion: hermes ?? null, ...details });
     if (need?.reactNative && appText !== need.reactNative) {
       fail(`React Native ${need.reactNative}, ${appText ? `but this app ships React Native ${appText}` : 'but the lab could not read this app\'s React Native version from its DEX'}. To serve it, add React Native ${appText ?? '<the app\'s version>'} to scripts/wasm/rn-versions.json and build it (scripts/build-native-libs.sh)`, { neededReactNative: appText });
     }
     if (need?.hermesBytecodeVersion && hermes != null && hermes !== need.hermesBytecodeVersion) {
       fail(`Hermes bytecode version ${need.hermesBytecodeVersion} (the Hermes of React Native ${need.reactNative ?? '?'}), but this app's JS bundle is Hermes bytecode version ${hermes}. Build the Hermes release that produces version ${hermes}`, { neededHermesBytecodeVersion: hermes });
     }
-    for (const dep of entry.needed ?? []) this.#requireVersions(dep, seen);
+    for (const dep of entry.needed ?? []) this.#requireVersions(dep, seen, probe);
+  }
+  /**
+   * What the lab can do for a library an app packages, without loading it: { status: 'available' | 'version-gated' | 'missing', needs }. `needs` names the release to build
+   * for a version gate. Used by the static API-gap report (src/api-gap-scan.js).
+   */
+  libraryStatus(soname) {
+    if (!this.provider.get(soname) || !this.#provides(soname)) return { status: 'missing' };
+    try { this.#requireVersions(soname, new Set(), true); }
+    catch (error) {
+      if (!error?.probe) throw error;
+      const d = error.details; return { status: 'version-gated', needs: d.neededReactNative ? `React Native ${d.neededReactNative}` : d.neededHermesBytecodeVersion ? `Hermes bytecode ${d.neededHermesBytecodeVersion}` : `React Native ${d.labReactNative} (versão do app não identificada)` };
+    }
+    return { status: 'available' };
   }
   #requireAvailable(soname) {
     const missing = this.provider.unavailable?.get(soname); if (!missing || this.provider.has(soname)) return;
@@ -128,6 +142,7 @@ export class JniBridge {
     for (const [soname, entry] of this.provider.modules) if (this.#provides(soname)) linker.register(soname, { needed: entry.needed, load: () => ({ module: entry.module, bytes: entry.bytes }) }); // entry.module/bytes may be fetched on first use
     this.linker = linker;
     try { linker.load(BASE_SONAME); } catch (error) { this.linker = null; r.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: ${BASE_SONAME}: ${error.message}`, { kind: 'native-library-instantiate' }); }
+    registerWasmMemory(this.runtime, linker.memory);
     this.proc = { memory: linker.memory, table: linker.table, malloc: linker.malloc, free: linker.free, allocations: new Map(), envPtr: 0, vmPtr: 0 };
     this.#installEnv(this.proc);
     return this.proc;
@@ -477,6 +492,23 @@ export class JniBridge {
 
     // -- arrays
     h.GetArrayLength = (_env, a) => arrayOf(a).elements.length;
+    // -- direct buffers (ART semantics): NewDirectByteBuffer calls DirectByteBuffer(long, int) like ART; the buffer's address is a wasm32 pointer, which libcore's Memory/Unsafe
+    //    natives resolve against the live process memory (unsafe-native.js registerWasmMemory), so reads and writes through the ByteBuffer hit the library's memory and survive memory.grow.
+    const DIRECT = 'Ljava/nio/DirectByteBuffer;', BUFFER = 'Ljava/nio/Buffer;';
+    h.NewDirectByteBuffer = (_env, address, capacity) => {
+      if (capacity < 0n || capacity > 0x7fffffffn) { self.#throwNew('Ljava/lang/IllegalArgumentException;', `negative or too large capacity: ${capacity}`); return 0; }
+      r.resolveClass('java.nio.DirectByteBuffer', false);   // ART looks the class up the same way (boot class path)
+      const object = r.allocate(DIRECT);
+      r.dispatch({ owner: DIRECT, name: '<init>', parameters: ['J', 'I'], result: 'V', signature: '(JI)V' }, r.argumentWords(['J', 'I'], [BigInt(address >>> 0), Number(capacity)], { receiver: object }), 'direct');
+      return self.#local(object);
+    };
+    const directBuffer = handle => {   // the Buffer object when it is a direct java.nio.Buffer, else null
+      const v = self.#value(handle); if (v === null) return null;
+      const object = r.object(v); if (!r.isSubtype(object.type, BUFFER)) return null;
+      return r.dispatch({ owner: BUFFER, name: 'isDirect', parameters: [], result: 'Z', signature: '()Z' }, r.argumentWords([], [], { receiver: v }), 'virtual') ? object : null;
+    };
+    h.GetDirectBufferAddress = (_env, buf) => { const object = directBuffer(buf); return object ? Number(BigInt.asUintN(32, BigInt(object.fields.get('Ljava/nio/Buffer;->address:J') ?? 0n))) : 0; };
+    h.GetDirectBufferCapacity = (_env, buf) => { const object = directBuffer(buf); return object ? BigInt(object.fields.get('Ljava/nio/Buffer;->capacity:I') ?? 0) : -1n; };
     h.NewObjectArray = (_env, length, cls, init) => {
       if (length < 0) { self.#throwNew('Ljava/lang/NegativeArraySizeException;', String(length)); return 0; }
       const array = r.newArray(`[${self.#classType(cls)}`, length), fill = self.#value(init); if (fill !== null) r.array(array).elements.fill(fill); return self.#local(array);

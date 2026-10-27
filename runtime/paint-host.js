@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=d8da3b335496';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=d8da3b335496';
+import { APKError } from './apk-error.js?v=36ea061c5c9d';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=36ea061c5c9d';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';

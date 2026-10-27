@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=d8da3b335496';
+import { APKError } from './apk-error.js?v=36ea061c5c9d';
 
 // The VM's raw-memory model and the natives that expose it to the original libcore classes:
 //   sun.misc.Unsafe / jdk.internal.misc.Unsafe     (get/put/compareAndSwap on (Object, offset) and on native addresses)
@@ -14,6 +14,7 @@ import { APKError } from './apk-error.js?v=d8da3b335496';
 const ARRAY_BASE = { '[Z': 12, '[B': 12, '[C': 12, '[S': 12, '[I': 12, '[F': 12, '[J': 16, '[D': 16 };
 const ELEMENT_SIZE = { Z: 1, B: 1, C: 2, S: 2, I: 4, F: 4, J: 8, D: 8 };
 const REFERENCE_BASE = 12, REFERENCE_SIZE = 4;
+const WASM_LIMIT = 0x100000000n;   // addresses below 4 GiB are wasm32 pointers; pinned arrays start at 4 GiB, the arena at 16 GiB
 const ARENA_BASE = 0x400000000n, ARENA_LIMIT = 0x7ffffff00n, PAGE = 4096;
 const fieldView = new DataView(new ArrayBuffer(8));
 const fail = (message, kind = 'unsafe-boundary') => { throw new APKError(message, { kind }); };
@@ -103,6 +104,12 @@ function locate(runtime, address, count) {
     if (at + count > memory.arena.length) fail(`Native access beyond the arena: ${address} (+${count})`, 'native-memory-fault');
     return { arena: memory, at };
   }
+  const wasm = runtime.nativeMemory?.wasm;
+  if (wasm && address > 0n && address < WASM_LIMIT) {   // the process's wasm linear memory (NewDirectByteBuffer): live view of whatever the memory is now, so memory.grow never leaves a stale buffer
+    const at = Number(address);
+    if (at + count > wasm.buffer.byteLength) fail(`Native access beyond the wasm memory: 0x${address.toString(16)} (+${count})`, 'native-memory-fault');
+    return { wasm, at };
+  }
   const range = runtime.nativeAddressRange(address);
   if (!range) fail(`Native memory fault: address 0x${address.toString(16)} is not mapped`, 'native-memory-fault');
   const info = arrayInfo(runtime, range.value), offset = Number(address - range.base) + info.base;
@@ -110,14 +117,18 @@ function locate(runtime, address, count) {
 }
 function readNative(runtime, address, count) {
   const spot = locate(runtime, address, count);
+  if (spot.wasm) return new Uint8Array(spot.wasm.buffer).slice(spot.at, spot.at + count);
   return spot.arena ? spot.arena.arena.slice(spot.at, spot.at + count) : readArray(spot.info, spot.offset, count);
 }
 function writeNative(runtime, address, bytes) {
   const spot = locate(runtime, address, bytes.length);
-  if (spot.arena) spot.arena.arena.set(bytes, spot.at); else writeArray(spot.info, spot.offset, bytes);
+  if (spot.wasm) new Uint8Array(spot.wasm.buffer).set(bytes, spot.at);
+  else if (spot.arena) spot.arena.arena.set(bytes, spot.at); else writeArray(spot.info, spot.offset, bytes);
 }
 
 // ---- object fields --------------------------------------------------------------------------------------------------------------------------------
+/** Registers the process's wasm linear memory as native memory: addresses below 4 GiB then read and write it directly (direct ByteBuffers made by JNI NewDirectByteBuffer). */
+export function registerWasmMemory(runtime, memory) { state(runtime).wasm = memory; }
 /** Reads `count` bytes at a native address (arena or pinned array); used by natives that take a raw address, e.g. CRC32.updateByteBuffer. */
 export function readNativeBytes(runtime, address, count) { return readNative(runtime, BigInt(address), count); }
 /** Writes bytes at a native address (arena or pinned array); the counterpart of readNativeBytes for natives that fill a direct buffer. */

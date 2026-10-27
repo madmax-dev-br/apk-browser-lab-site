@@ -1,6 +1,6 @@
-import { createRasterReceiver } from './raster-cache.js?v=d8da3b335496';
+import { createRasterReceiver } from './raster-cache.js?v=36ea061c5c9d';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=d8da3b335496', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 30000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=36ea061c5c9d', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 30000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -18,6 +18,7 @@ export class APKWorkerClient {
       // Every snapshot, delivered or not, passes the raster cache in order so Worker and page LRUs stay identical.
       if (data?.snapshot) { try { this.rasters.resolve(data.snapshot); } catch (error) { this.cancel(error); return; } }
       if (data?.type === 'app-data') { this.appData = data.status; this.onAppData?.(data.status); return; }
+      if (data?.type === 'api-gaps') { this.apiGaps = data.report ?? null; this.onApiGaps?.(this.apiGaps); return; }   // static estimate, posted once after a launch; never part of a request
       if (data?.type === 'runtime-busy') { this.onRuntimeBusy?.(true); return; }
       if (data?.type === 'runtime-idle') { this.onRuntimeBusy?.(false); return; }
       if (data?.type === 'runtime-event') { this.onRuntimeSnapshot?.(data.snapshot); return; }
@@ -55,7 +56,7 @@ export class APKWorkerClient {
     });
   }
   async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', keepData = true, clearData = false } = {}) {
-    this.cancel(); this.rasters.reset();
+    this.cancel(); this.rasters.reset(); this.apiGaps = null;
     const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, keepData, clearData }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
     this.appData = response.appData ?? null;
     return { inventory: response.inventory, appData: this.appData };

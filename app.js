@@ -1,7 +1,8 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=d8da3b335496';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=d8da3b335496';
-import { createDeviceView, createViewState } from './device-view.js?v=d8da3b335496';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=d8da3b335496';
+import { APKWorkerClient } from './apk-worker-client.js?v=36ea061c5c9d';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=36ea061c5c9d';
+import { createDeviceView, createViewState } from './device-view.js?v=36ea061c5c9d';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=36ea061c5c9d';
+import { formatApiGapReport } from './api-gap-scan.js?v=36ea061c5c9d';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -45,7 +46,7 @@ function updateTrace(snapshot) {
 }
 function hideError() { $('error-panel').hidden = true; }
 document.getElementById('error-copy')?.addEventListener('click', async event => {
-  const button = event.currentTarget, report = state.errorReport ?? $('error-message').textContent;
+  const button = event.currentTarget, report = (state.errorReport ?? $('error-message').textContent) + (state.apiGaps ? '\n\n' + formatApiGapReport(state.apiGaps) : '');   // the static API estimate may arrive after the error was shown
   try { await navigator.clipboard.writeText(report); button.textContent = 'Diagnóstico copiado'; }
   catch { $('error-detail').textContent = report; $('error-detail').hidden = false; $('error-diagnostics').hidden = false; $('error-diagnostics').open = true; getSelection()?.selectAllChildren($('error-detail')); button.textContent = 'Selecionado: copie com Cmd+C'; }
   setTimeout(() => { button.textContent = 'Copiar diagnóstico'; }, 2500);
@@ -105,7 +106,7 @@ function onWorkerProgress(progress = {}) {
   if (state.mode === 'apk') setStatus(message);
 }
 function cancelOperation() {
-  ++state.operation; state.abortController?.abort(); apkVM.cancel();
+  ++state.operation; state.abortController?.abort(); apkVM.cancel(); state.apiGaps = null;
   state.viewSession++; state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear(); state.runtime = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true; state.lastAPKError = null;
   clearInterval(state.operationTimer); $('operation-panel').hidden = true;
   $('android-device').hidden = true; $('empty-preview').hidden = state.mode !== 'apk';
@@ -121,6 +122,7 @@ function showAppData(info) {
     : info.error ? `Dados do app: erro ao gravar (${info.error}) · ${used}` : info.overLimit ? `Dados do app acima do limite: a gravação foi recusada e o último estado salvo foi mantido · ${used}` : `Dados do app guardados: ${used}${info.restoredFiles ? ` · ${info.restoredFiles} restaurado(s)` : ''}`;
 }
 apkVM.onAppData = showAppData;
+apkVM.onApiGaps = report => { state.apiGaps = report; };
 try { if (localStorage.getItem('apkweb.keepAppData') === '0') $('keep-app-data').checked = false; } catch { /* storage may be blocked */ }
 $('keep-app-data')?.addEventListener('change', () => { try { localStorage.setItem('apkweb.keepAppData', $('keep-app-data').checked ? '1' : '0'); } catch { /* ignore */ } setStatus($('keep-app-data').checked ? 'Os dados do app serão mantidos a partir da próxima abertura do APK.' : 'Os dados do app não serão lidos nem gravados a partir da próxima abertura do APK.'); });
 $('clear-app-data')?.addEventListener('click', async () => {
@@ -243,6 +245,7 @@ async function importSource(source, autoRun = false) {
     if (token !== state.operation) return;
     if (buffer.byteLength > 1024 * 1024 * 1024) throw new Error('O APK excede o limite de 1 GiB.');
     $('file-size').textContent = `${formatSize(buffer.byteLength)} · processado no navegador`;
+    state.apiGaps = null;
     const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceState.settings, tolerateMissing: $('tolerate-missing')?.value ?? 'off', keepData: $('keep-app-data')?.checked !== false }); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
     state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);

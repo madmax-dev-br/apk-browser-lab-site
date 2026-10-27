@@ -7,9 +7,9 @@ export const causeOf = raw => String(raw ?? '').replace(FRAME_PREFIX, '');
 export const stubsOf = error => (error?.stubs?.length ? error.stubs : [...new Set((error?.trace ?? []).filter(line => /^STUB-/.test(line)))]);
 /**
  * buildDiagnosticReport({ error, product, packageName, tolerateMissing, build }) -> { cause, text }
- * `error` is the Worker error (message, trace, stubs) or any Error. `stubs` overrides the error's own list (the player passes the live snapshot lists).
+ * `apiGaps` is the already formatted static API-gap section (src/api-gap-scan.js formatApiGapReport), appended last. `error` is the Worker error (message, trace, stubs) or any Error. `stubs` overrides the error's own list (the player passes the live snapshot lists).
  */
-export function buildDiagnosticReport({ error, product = 'APK Browser Lab', packageName = 'APK', tolerateMissing = 'off', build = '', stubs = null }) {
+export function buildDiagnosticReport({ error, product = 'APK Browser Lab', packageName = 'APK', tolerateMissing = 'off', build = '', stubs = null, apiGaps = null }) {
   const raw = error?.message || String(error), cause = causeOf(raw);
   const frames = [...raw.matchAll(/(L[^\s:]+?;->[^\s]+?) \[([^\]]+)\] at PC (0x[\da-f]+)/gi)].map(([, frame, dex, pc]) => `  ${frame} [${dex}] @${pc}`);
   const trace = error?.trace ?? [], list = stubs ?? stubsOf(error);
@@ -19,6 +19,7 @@ export function buildDiagnosticReport({ error, product = 'APK Browser Lab', pack
     frames.length ? `Pilha (mais interna por último):\n${frames.slice(-12).join('\n')}` : '',
     list.length ? `APIs com stub (${list.length}):\n${list.slice(0, 60).join('\n')}` : '',
     trace.length ? `Últimas linhas do log:\n${trace.filter(line => !/^STUB-/.test(line)).slice(-15).join('\n')}` : '',
+    apiGaps || '',
   ].filter(Boolean).join('\n\n');
   return { cause, text };
 }
