@@ -1,13 +1,13 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=0c9f1b0d2456';
-import { inspectELF } from './native-inspector.js?v=0c9f1b0d2456';
-import { inflateRaw } from './inflate.js?v=0c9f1b0d2456';
-import { resolveDevice } from './device-profile.js?v=0c9f1b0d2456';
-import { resourceProfileFor } from './device-configuration.js?v=0c9f1b0d2456';
-import { JniBridge } from './jni-host.js?v=0c9f1b0d2456';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=0c9f1b0d2456';
-import { AndroidResources } from './android-resources.js?v=0c9f1b0d2456';
-import { AndroidPlatform } from './android-platform.js?v=0c9f1b0d2456';
-import { FrameworkProvider } from './framework-provider.js?v=0c9f1b0d2456';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=751a2d13ee0f';
+import { inspectELF } from './native-inspector.js?v=751a2d13ee0f';
+import { inflateRaw } from './inflate.js?v=751a2d13ee0f';
+import { resolveDevice } from './device-profile.js?v=751a2d13ee0f';
+import { resourceProfileFor } from './device-configuration.js?v=751a2d13ee0f';
+import { JniBridge } from './jni-host.js?v=751a2d13ee0f';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=751a2d13ee0f';
+import { AndroidResources } from './android-resources.js?v=751a2d13ee0f';
+import { AndroidPlatform } from './android-platform.js?v=751a2d13ee0f';
+import { FrameworkProvider } from './framework-provider.js?v=751a2d13ee0f';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -546,7 +546,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // UnsatisfiedLinkError that names the artifact and version still to be built (src/sqlcipher-native.js). Nothing is ever taken from the APK's native libraries.
   let nativeLibraryProvider=options.nativeLibraryProvider??null;
   if(options.sqlcipherProvider){
-    const sqlcipher=await options.sqlcipherProvider.prepare(program);
+    const sqlcipher=await options.sqlcipherProvider.prepare(program, { base: nativeLibraryProvider });
     if(sqlcipher){nativeLibraryProvider=await nativeProviderWithSqlcipher(nativeLibraryProvider,sqlcipher);warnings.push(...sqlcipher.notes);}
   }
   // IANA tz database (AOSP tzdata2022a compiled to java.time ZoneRules) for the original java.time sources; loaded when the app can reach java.time.
@@ -581,6 +581,10 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // Canvas raster cache (src/skia-canvas-host.js): on by default; `rasterCache: false` switches it off for A/B comparison, `rasterCacheVerify: true` re-rasters every hit and fails on a difference.
   runtime.rasterCacheDisabled = options.rasterCache === false; runtime.rasterCacheVerify = options.rasterCacheVerify === true;
   runtime.platform.resourceSelector = resourceConfiguration ?? null; // live device changes re-select resources through the same original ResTable_config matcher
+  if (nativeLibraryProvider && [...nativeLibraryProvider.modules.values()].some(entry => entry.apkSha256)) {
+    // libraries scoped to one APK (its own generated native code) are offered only to that APK: compared by the SHA-256 of the file
+    runtime.apkSha256 = [...new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer)))].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
   if (nativeLibraryProvider) runtime.jni = new JniBridge(runtime, nativeLibraryProvider, runtime.platform);
   if (!manifest.activities.length) manifest.activities = runtime.activities().map(type => ({ name: dottedName(type), descriptor: type, launcher: false }));
   const kotlin = program.types.some(t => t.startsWith('Lkotlin/'));

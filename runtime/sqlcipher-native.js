@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=0c9f1b0d2456';
-import { NativeLibraryProvider, BASE_SONAME } from './jni-host.js?v=0c9f1b0d2456';
+import { APKError } from './apk-error.js?v=751a2d13ee0f';
+import { NativeLibraryProvider, BASE_SONAME } from './jni-host.js?v=751a2d13ee0f';
 
 // SQLCipher for Android: System.loadLibrary("sqlcipher").
 //
@@ -106,7 +106,8 @@ export class SqlcipherProvider {
     return this.index;
   }
   /** { detections, entries, unavailable, notes }: entries become NativeLibraryProvider modules, unavailable maps soname -> explicit UnsatisfiedLinkError details. */
-  async prepare(program) {
+  /** `base` (optional): the caller's NativeLibraryProvider. When it already supplies libc++_shared.so the base module is not fetched here; its SHA-256 must be the one this index records. */
+  async prepare(program, { base: callerProvider = null } = {}) {
     const detections = detectSqlcipher(program); if (!detections.length) return null;
     const result = { detections: [], entries: [], unavailable: new Map(), notes: [] };
     try {
@@ -121,7 +122,9 @@ export class SqlcipherProvider {
         result.entries.push({ soname: SQLCIPHER_SONAME, wasm: await promise, sha256: build.sha256, hostImports: sqlcipherHostImports,
           provenance: { id: build.id, artifact: build.artifact, versions: build.versions, selectedBy: selection.via, detectedVersion: detection.version, upstream: build.upstream } });
         result.unavailable.delete(SQLCIPHER_SONAME);
-        result.base ??= { build, promise: this.readBase(index) };
+        const supplied = callerProvider?.get?.(BASE_SONAME);
+        if (supplied && index.base && supplied.sha256 !== index.base.sha256) throw new APKError(`the base module ${BASE_SONAME} supplied by the caller (${supplied.sha256}) is not the one this SQLCipher build links against (${index.base.sha256})`, { kind: 'sqlcipher-asset' });
+        if (!supplied) result.base ??= { build, promise: this.readBase(index) };
         result.notes.push(`SQLCipher ${detection.artifact} ${detection.version ?? '(version not recorded in the DEX)'} is served by the lab module ${build.id} (${build.bytes} bytes wasm32, chosen by ${selection.via}).`);
       }
     } catch (error) { // the lab's own assets could not be read: still an explicit UnsatisfiedLinkError at loadLibrary, never a silent skip

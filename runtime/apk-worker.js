@@ -1,34 +1,36 @@
-import { loadAPK } from './apk-loader.js?v=0c9f1b0d2456';
-import { FrameworkProvider } from './framework-provider.js?v=0c9f1b0d2456';
-import { createRasterSender } from './raster-cache.js?v=0c9f1b0d2456';
-import { isFreedId } from './heap-gc.js?v=0c9f1b0d2456';
-import { dispatchPointer } from './pointer-input-host.js?v=0c9f1b0d2456';
-import { resolveDevice } from './device-profile.js?v=0c9f1b0d2456';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=0c9f1b0d2456';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=0c9f1b0d2456';
-import { SkiaProvider } from './skia-provider.js?v=0c9f1b0d2456';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=0c9f1b0d2456';
-import { disposeTextLayout } from './text-layout-native.js?v=0c9f1b0d2456';
-import { IcuBreakProvider } from './icu-break-provider.js?v=0c9f1b0d2456';
-import { SqliteProvider } from './sqlite-native.js?v=0c9f1b0d2456';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=0c9f1b0d2456';
-import { TzdataProvider } from './java-time-native.js?v=0c9f1b0d2456';
-import { ZlibProvider } from './zip-native.js?v=0c9f1b0d2456';
-import { IcuConverterProvider } from './icu-converter-native.js?v=0c9f1b0d2456';
-import { disposeColorFilters } from './color-filter-native.js?v=0c9f1b0d2456';
-import { disposeRegex } from './regex-native.js?v=0c9f1b0d2456';
-import { disposeRenderNodes } from './rendernode-native.js?v=0c9f1b0d2456';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=0c9f1b0d2456';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=0c9f1b0d2456';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=0c9f1b0d2456';
+import { loadAPK } from './apk-loader.js?v=751a2d13ee0f';
+import { FrameworkProvider } from './framework-provider.js?v=751a2d13ee0f';
+import { createRasterSender } from './raster-cache.js?v=751a2d13ee0f';
+import { isFreedId } from './heap-gc.js?v=751a2d13ee0f';
+import { dispatchPointer } from './pointer-input-host.js?v=751a2d13ee0f';
+import { resolveDevice } from './device-profile.js?v=751a2d13ee0f';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=751a2d13ee0f';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=751a2d13ee0f';
+import { SkiaProvider } from './skia-provider.js?v=751a2d13ee0f';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=751a2d13ee0f';
+import { disposeTextLayout } from './text-layout-native.js?v=751a2d13ee0f';
+import { IcuBreakProvider } from './icu-break-provider.js?v=751a2d13ee0f';
+import { SqliteProvider } from './sqlite-native.js?v=751a2d13ee0f';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=751a2d13ee0f';
+import { TzdataProvider } from './java-time-native.js?v=751a2d13ee0f';
+import { ZlibProvider } from './zip-native.js?v=751a2d13ee0f';
+import { IcuConverterProvider } from './icu-converter-native.js?v=751a2d13ee0f';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=751a2d13ee0f';
+import { disposeColorFilters } from './color-filter-native.js?v=751a2d13ee0f';
+import { disposeRegex } from './regex-native.js?v=751a2d13ee0f';
+import { disposeRenderNodes } from './rendernode-native.js?v=751a2d13ee0f';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=751a2d13ee0f';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=751a2d13ee0f';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=751a2d13ee0f';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=0c9f1b0d2456';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=0c9f1b0d2456';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=0c9f1b0d2456';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=751a2d13ee0f';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=751a2d13ee0f';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=751a2d13ee0f';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '751a2d13ee0f';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
-let sharedLayoutProvider = null;
+let sharedLayoutProvider = null, sharedNativeLibraryProvider = null;
 let sharedConfigurationProvider = null;
 let runtime = null;
 let appData = null, appDataInfo = null;   // per-app private data persistence (src/app-data-store.js): the live persistence object (null when disabled) and the last status
@@ -99,7 +101,9 @@ self.onmessage = async ({ data }) => {
       const icuBreakProvider = sharedICUBreakProvider ??= new IcuBreakProvider();
       const sqliteProvider = sharedSqliteProvider ??= new SqliteProvider(), tzdataProvider = sharedTzdataProvider ??= new TzdataProvider(), zlibProvider = sharedZlibProvider ??= new ZlibProvider(), icuConverterProvider = sharedIcuConverterProvider ??= new IcuConverterProvider();
       // The browser product lays every APK's Views out in the VM (original AOSP LinearLayout/FrameLayout/ScrollView + Skia text), never with page CSS.
-      const result = await loadAPK(data.buffer, { device: resolveDevice(data.device || {}), tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
+      // Lab-built wasm32 native libraries (libreactnative, Hermes, ...): provenance now, each module only when the app's SoLoader links it
+      const nativeLibraryProvider = NATIVE_LIBS_URL ? (sharedNativeLibraryProvider ??= await LazyNativeLibraryProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
+      const result = await loadAPK(data.buffer, { nativeLibraryProvider, device: resolveDevice(data.device || {}), tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
       runtime = result.runtime; inventory = result.inventory; inspectNativeLibraries = result.inspectNativeLibraries;
       if (self.location?.origin) runtime.javaProperties.set('apkweb.origin', self.location.origin);   // the page origin (same as this worker's): lets sample apps address documents the lab serves itself
       runtime.platform.onExternalActivity = () => { if (!busy) scheduleEvents(); };   // network exchanges finishing wake the event pump

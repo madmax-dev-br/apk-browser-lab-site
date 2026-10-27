@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=0c9f1b0d2456';
-import { parseWasm, WASM_SYMBOL_BINDING_WEAK } from './wasm-dylink.js?v=0c9f1b0d2456';
-import { hostFunction, indirectStub } from './wasm-host-function.js?v=0c9f1b0d2456';
+import { APKError } from './apk-error.js?v=751a2d13ee0f';
+import { parseWasm, WASM_SYMBOL_BINDING_WEAK } from './wasm-dylink.js?v=751a2d13ee0f';
+import { hostFunction, indirectStub } from './wasm-host-function.js?v=751a2d13ee0f';
 
 // The lab's dynamic linker for wasm32 native libraries: one linear memory, one function table, one stack pointer and one C++ exception tag per
 // process, shared by every library -- the same arrangement Android's linker gives a process, which is what lets libreactnative, libfbjni, libjsi
@@ -51,17 +51,27 @@ export class NativeLinker {
   }
 
   /** Makes a library available under `soname`. `wasm` is the module (compiled) and `bytes` its binary (for the dylink.0 section). */
-  register(soname, { module, bytes }) {
+  register(soname, { module = null, bytes = null, needed = null, load = null }) {
+    // Lazy form: `load()` returns { module, bytes } the first time the library is actually linked (the browser fetches the module then); `needed` is
+    // the DT_NEEDED the provenance records, checked against the module's own dylink.0 when it arrives.
+    const entry = { soname, module, parsed: null, needed, load };
+    if (!load) this.#realize(entry, { module, bytes });
+    this.registry.set(soname, entry);
+  }
+  #realize(entry, loaded = null) {
+    if (entry.parsed) return;
+    const { module, bytes } = loaded ?? entry.load();
     const parsed = parseWasm(bytes);
-    if (!parsed.dylink) throw new LinkError(`${soname} is not a relocatable module (no dylink.0 section)`, { soname });
-    this.registry.set(soname, { soname, module, parsed });
+    if (!parsed.dylink) throw new LinkError(`${entry.soname} is not a relocatable module (no dylink.0 section)`, { soname: entry.soname });
+    if (entry.needed && JSON.stringify(entry.needed) !== JSON.stringify(parsed.dylink.needed)) throw new LinkError(`${entry.soname}: DT_NEEDED ${JSON.stringify(parsed.dylink.needed)} differs from the provenance ${JSON.stringify(entry.needed)}`, { soname: entry.soname });
+    entry.module = module; entry.parsed = parsed;
   }
   /** `alias` resolves to `target` (libc.so, libm.so, libdl.so and libstdc++.so are all provided by the one base module). */
   registerAlias(alias, target) { this.registry.set(alias, { alias: target }); }
   has(soname) { return this.registry.has(soname); }
   canonical(soname) { let entry = this.registry.get(soname), guard = 0; while (entry?.alias && guard++ < 8) { soname = entry.alias; entry = this.registry.get(soname); } return entry ? soname : null; }
   /** Libraries (by canonical soname) the given soname needs, from its dylink.0 DT_NEEDED list. */
-  neededOf(soname) { const canonical = this.canonical(soname); return canonical ? this.registry.get(canonical).parsed.dylink.needed : []; }
+  neededOf(soname) { const canonical = this.canonical(soname), entry = canonical && this.registry.get(canonical); return entry ? (entry.needed ?? entry.parsed.dylink.needed) : []; }
 
   view() { return new DataView(this.memory.buffer); }
   bytes() { return new Uint8Array(this.memory.buffer); }
@@ -77,6 +87,7 @@ export class NativeLinker {
     this.loading.add(canonical);
     try {
       const entry = this.registry.get(canonical), deps = [];
+      this.#realize(entry);
       for (const need of entry.parsed.dylink.needed) { const dep = this.canonical(need); if (!dep) throw new LinkError(`library "${need}" needed by "${canonical}" not found`, { soname: canonical, needed: need }); deps.push(this.load(dep)); }
       return this.#link(entry, deps);
     } finally { this.loading.delete(canonical); }

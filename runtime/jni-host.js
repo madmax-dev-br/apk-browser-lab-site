@@ -1,11 +1,11 @@
-import { APKError } from './apk-error.js?v=0c9f1b0d2456';
-import { JavaException } from './apk-runtime.js?v=0c9f1b0d2456';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=0c9f1b0d2456';
-import { buildElfDescriptor } from './native-descriptor.js?v=0c9f1b0d2456';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=0c9f1b0d2456';
-import { NativeLinker, LinkError } from './native-linker.js?v=0c9f1b0d2456';
-import { hostFunction } from './wasm-host-function.js?v=0c9f1b0d2456';
-import { parseWasm } from './wasm-dylink.js?v=0c9f1b0d2456';
+import { APKError } from './apk-error.js?v=751a2d13ee0f';
+import { JavaException } from './apk-runtime.js?v=751a2d13ee0f';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=751a2d13ee0f';
+import { buildElfDescriptor } from './native-descriptor.js?v=751a2d13ee0f';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=751a2d13ee0f';
+import { NativeLinker, LinkError } from './native-linker.js?v=751a2d13ee0f';
+import { hostFunction } from './wasm-host-function.js?v=751a2d13ee0f';
+import { parseWasm } from './wasm-dylink.js?v=751a2d13ee0f';
 
 // JNI -> WebAssembly bridge.
 //
@@ -41,7 +41,7 @@ export const BASE_SONAME = 'libc++_shared.so';
 export class NativeLibraryProvider {
   constructor({ abi = 'wasm32' } = {}) { this.abi = abi; this.modules = new Map(); this.unavailable = new Map(); }
   /** `hostImports(bridge, soname)` may supply imports the linker does not (a library's own host module, e.g. apkweb_sqlcipher): { module: { name: fn } }. Lab code only, never from an APK. */
-  async add({ soname, wasm, sha256, needed = null, provenance = null, hostImports = null }) {
+  async add({ soname, wasm, sha256, needed = null, provenance = null, hostImports = null, apkSha256 = null }) {
     if (!/^lib[\w.+-]+\.so$/.test(soname)) throw new APKError(`Invalid native library name ${soname}`);
     if (!/^[0-9a-f]{64}$/i.test(sha256 ?? '')) throw new APKError(`Native library ${soname} needs a pinned SHA-256`);
     const bytes = wasm instanceof Uint8Array ? wasm : new Uint8Array(wasm);
@@ -54,7 +54,7 @@ export class NativeLibraryProvider {
     needed = parsed.dylink.needed;
     const module = await WebAssembly.compile(bytes);
     this.unavailable.delete(soname);
-    this.modules.set(soname, { soname, abi: this.abi, bytes, sha256: actual, module, needed, provenance, hostImports, descriptor: buildElfDescriptor({ soname, needed, wasmSha256: actual }) });
+    this.modules.set(soname, { soname, abi: this.abi, bytes, sha256: actual, module, needed, provenance, hostImports, apkSha256, descriptor: buildElfDescriptor({ soname, needed, wasmSha256: actual }) });
     return this;
   }
   has(soname) { return this.modules.has(soname); }
@@ -77,12 +77,14 @@ export class JniBridge {
     // The provider's modules appear in the app's native library directory, so File.exists / findLibrary / SoLoader directory sources see them.
     const fs = platform.javaIo.fs();
     fs.mkdirs(`${fs.codePath}/lib/wasm32`); fs.readOnly.add(`${fs.codePath}/lib`);
-    for (const [soname, entry] of provider.modules) fs.mount(`${fs.codePath}/lib/wasm32/${soname}`, entry.descriptor); // ELF descriptor (SONAME/DT_NEEDED of the wasm module), not machine code
+    for (const [soname, entry] of provider.modules) if (this.#provides(soname)) fs.mount(`${fs.codePath}/lib/wasm32/${soname}`, entry.descriptor); // ELF descriptor (SONAME/DT_NEEDED of the wasm module), not machine code
   }
 
   // ---- loading ---------------------------------------------------------------------------------------------------------------------------
   /** System.loadLibrary(name): returns false when the provider has no such library (caller keeps the genuine UnsatisfiedLinkError path). */
-  loadLibrary(name) { const soname = `lib${name}.so`; this.#requireAvailable(soname); return this.provider.has(soname) ? (this.#load(soname, 'System.loadLibrary'), true) : false; }
+  loadLibrary(name) { const soname = `lib${name}.so`; this.#requireAvailable(soname); return this.#provides(soname) ? (this.#load(soname, 'System.loadLibrary'), true) : false; }
+  /** A library is offered to this app when the provider has it and it is not scoped to a different APK (an app's own generated libraries, e.g. libappmodules.so, belong to that app only). */
+  #provides(soname) { const entry = this.provider.get(soname); return !!entry && (!entry.apkSha256 || entry.apkSha256 === this.runtime.apkSha256); }
   #requireAvailable(soname) {
     const missing = this.provider.unavailable?.get(soname); if (!missing || this.provider.has(soname)) return;
     this.runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', missing.message, missing.details);
@@ -93,7 +95,7 @@ export class JniBridge {
     if (!path.startsWith('/')) this.runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', `Expected absolute path to library: ${path}`);
     if (!fs.stat(path)) this.runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: library "${path}" not found`);
     this.#requireAvailable(soname);
-    if (!this.provider.has(soname)) return false;
+    if (!this.#provides(soname)) return false;
     this.#load(soname, via); return true;
   }
   /** The process: one linear memory + function table for every library, and the JNIEnv/JavaVM built in it. Created on first use. */
@@ -102,7 +104,7 @@ export class JniBridge {
     const r = this.runtime;
     if (!this.provider.has(BASE_SONAME)) r.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: the native library provider has no ${BASE_SONAME} (libc/libc++ base module)`, { kind: 'native-library-base' });
     const linker = new NativeLinker({ base: BASE_SONAME, hostImport: (module, name, soname) => this.#hostImport(module, name, soname) });
-    for (const [soname, entry] of this.provider.modules) linker.register(soname, { module: entry.module, bytes: entry.bytes });
+    for (const [soname, entry] of this.provider.modules) if (this.#provides(soname)) linker.register(soname, { needed: entry.needed, load: () => ({ module: entry.module, bytes: entry.bytes }) }); // entry.module/bytes may be fetched on first use
     this.linker = linker;
     try { linker.load(BASE_SONAME); } catch (error) { this.linker = null; r.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: ${BASE_SONAME}: ${error.message}`, { kind: 'native-library-instantiate' }); }
     this.proc = { memory: linker.memory, table: linker.table, malloc: linker.malloc, free: linker.free, allocations: new Map(), envPtr: 0, vmPtr: 0 };

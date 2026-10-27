@@ -1,17 +1,18 @@
-import { VMClock } from './vm-clock.js?v=0c9f1b0d2456';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=0c9f1b0d2456';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=0c9f1b0d2456';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=0c9f1b0d2456';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=0c9f1b0d2456';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=0c9f1b0d2456';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=0c9f1b0d2456';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=0c9f1b0d2456';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=0c9f1b0d2456';
-import { APKError } from './apk-error.js?v=0c9f1b0d2456';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=0c9f1b0d2456';
-import { Scheduler, Blocked } from './scheduler.js?v=0c9f1b0d2456';
-import { bootClassLacksMember } from './boot-class-members.js?v=0c9f1b0d2456';
-export { APKError } from './apk-error.js?v=0c9f1b0d2456';
+import { VMClock } from './vm-clock.js?v=751a2d13ee0f';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=751a2d13ee0f';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=751a2d13ee0f';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=751a2d13ee0f';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=751a2d13ee0f';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=751a2d13ee0f';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=751a2d13ee0f';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=751a2d13ee0f';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=751a2d13ee0f';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=751a2d13ee0f';
+import { APKError } from './apk-error.js?v=751a2d13ee0f';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=751a2d13ee0f';
+import { Scheduler, Blocked } from './scheduler.js?v=751a2d13ee0f';
+import { bootClassLacksMember } from './boot-class-members.js?v=751a2d13ee0f';
+export { APKError } from './apk-error.js?v=751a2d13ee0f';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1436,6 +1437,9 @@ export class APKRuntime {
         const proxy=this.object(args[0]);if(proxy.annotationValues){
           this.record(`ANNOTATION ${methodKey(method)} [DEX metadata]`);
           if(method.name==='annotationType'&&method.signature==='()Ljava/lang/Class;')return this.classObject(proxy.type);
+          if(method.name==='hashCode'&&method.signature==='()I')return annotationHash(this,proxy);
+          if(method.name==='equals'&&method.signature==='(Ljava/lang/Object;)Z')return annotationEquals(this,proxy,args[1])?1:0;
+          if(method.name==='toString'&&method.signature==='()Ljava/lang/String;')return annotationToString(this,proxy);
           if(method.parameters.length===0){
             if(proxy.annotationValues.has(method.name))return this.materialize(proxy.annotationValues.get(method.name),method.result);
             const defaults=this.classAnnotations(proxy.type,2).find(a=>a.type==='Ldalvik/annotation/AnnotationDefault;')?.values.get('value');
@@ -1674,7 +1678,7 @@ export class APKRuntime {
   javaHash(value) {
     if (isNull(value)) return 0;
     if (typeof value === 'string') return stringHash(value);
-    const obj = this.object(value);if(obj.annotationValues)throw new APKError('Annotation value hashing is not implemented by this reflection adapter',{kind:'unsupported-annotation-proxy',type:obj.type});const method = this.objectOverride(obj.type, 'hashCode()I');
+    const obj = this.object(value);if(obj.annotationValues)return annotationHash(this,obj);const method = this.objectOverride(obj.type, 'hashCode()I');
     if (method) return int(this.dispatch(method, [value], 'virtual'));
     const external=this.externalObjectMethod(obj.type,'hashCode',[],'I');if(external)return int(this.dispatch(external,[value],'virtual'));
     if (obj.member) { const member = obj.member, owner = member.field?.owner ?? member.method.owner; return stringHash(dottedName(owner)) ^ (member.kind === 'constructor' ? 0 : stringHash(member.field?.name ?? member.method.name)); }
@@ -1688,7 +1692,7 @@ export class APKRuntime {
     const obj = this.object(a), method = this.objectOverride(obj.type, 'equals(Ljava/lang/Object;)Z');
     if (method) return int(this.dispatch(method, [a, b], 'virtual')) !== 0;
     if(typeof b==='string')return obj.type==='Ljava/lang/String;'&&this.stringCharacters(a)===b;
-    if(obj.annotationValues){if(!this.isSubtype(this.typeOf(b),obj.type))return false;throw new APKError('Annotation value equality is not implemented by this reflection adapter',{kind:'unsupported-annotation-proxy',type:obj.type});}
+    if(obj.annotationValues)return annotationEquals(this,obj,b);
     const external=this.externalObjectMethod(obj.type,'equals',['Ljava/lang/Object;'],'Z');if(external)return !!this.dispatch(external,[a,b],'virtual');
     const other = this.object(b);
     if (obj.member || other.member) {
