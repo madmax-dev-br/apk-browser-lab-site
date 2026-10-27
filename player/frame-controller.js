@@ -1,9 +1,9 @@
 // Message-driven controller of one player frame. DOM-free: the VM client, the shared device view and the postMessage sink are injected, so the
 // same code runs in the real frame (frame.js) and in the headless smoke test.
-import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES } from './protocol.js?v=6ef17e472569';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=6ef17e472569';
-import { formatApiGapReport } from '../api-gap-scan.js?v=6ef17e472569';
-import { sanitizeSettings } from '../device-settings.js?v=6ef17e472569';
+import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES } from './protocol.js?v=64078a5322f4';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=64078a5322f4';
+import { formatApiGapReport } from '../api-gap-scan.js?v=64078a5322f4';
+import { sanitizeSettings } from '../device-settings.js?v=64078a5322f4';
 export function createFrameController({ vm, state, deviceState, post, fetchImpl = globalThis.fetch?.bind(globalThis), hooks = {} }) {
   let view = null, source = null, config = {}, lastActivity = null, destroyed = false, chain = Promise.resolve(), inflight = 0, oomSeen = 0, lastStubs = { void: [], returns: [], classes: [] }, packageName = '', tolerateRunning = 'off'; const dropped = [];
   const send = (type, payload) => post(envelope(type, payload));
@@ -63,7 +63,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     const token = operations.beginOperation();
     try {
       const keep = buffer.slice(0); source.bytes = keep;
-      const result = await vm.load(buffer, { device: deviceState.settings, tolerateMissing: tolerateRunning, keepData: source.keepData, clearData: !!dataOptions.clearData }); if (token !== state.operation) return;
+      const result = await vm.load(buffer, { device: deviceState.settings, tolerateMissing: tolerateRunning, webview: config.webview === 'on', keepData: source.keepData, clearData: !!dataOptions.clearData }); if (token !== state.operation) return;
       dataKey = null; reportData(result.appData);
       state.runtime = vm; state.inventory = result.inventory; packageName = String(result.inventory?.packageName || '');
       const snapshot = await vm.launch(activity || undefined); if (token !== state.operation) return;

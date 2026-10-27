@@ -428,6 +428,21 @@
       "executionValidated": false,
       "sizeBytes": 4546039,
       "available": true
+    },
+    {
+      "id": "webview-probe",
+      "file": "webview-probe.apk",
+      "title": "WebView · carregamento, histórico e callbacks",
+      "description": "Uma Activity com um android.webkit.WebView e botões para loadData, loadDataWithBaseURL, loadUrl, postUrl, voltar, avançar, recarregar, parar e evaluateJavascript. A linha de status mostra os callbacks do WebViewClient e do WebChromeClient recebidos. Fixture genérica do laboratório.",
+      "tags": [
+        "WebView",
+        "WebViewClient",
+        "Histórico"
+      ],
+      "advanced": false,
+      "executionValidated": false,
+      "sizeBytes": 12691,
+      "available": true
     }
   ]
 }

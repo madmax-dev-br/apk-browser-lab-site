@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>WebView probe</title>
+<style>body{font:16px/1.4 sans-serif;margin:16px;color:#1f2937;background:#fff}h1{font-size:20px;margin:0 0 8px}a{color:#1d4ed8}</style></head>
+<body>
+<h1 id="heading">Página do laboratório</h1>
+<p id="origin-note">Este documento é servido pelo próprio laboratório, dentro de um iframe com sandbox sem allow-same-origin.</p>
+<p><a id="next" href="second.html">segunda página</a></p>
+<script>document.title = 'WebView probe (script ativo)'; document.getElementById('origin-note').dataset.script = 'ran';</script>
+</body>
+</html>

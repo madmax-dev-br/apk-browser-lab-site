@@ -1,33 +1,34 @@
-import { loadAPK } from './apk-loader.js?v=6ef17e472569';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=6ef17e472569';
-import { FrameworkProvider } from './framework-provider.js?v=6ef17e472569';
-import { createRasterSender } from './raster-cache.js?v=6ef17e472569';
-import { isFreedId } from './heap-gc.js?v=6ef17e472569';
-import { dispatchPointer } from './pointer-input-host.js?v=6ef17e472569';
-import { resolveDevice } from './device-profile.js?v=6ef17e472569';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=6ef17e472569';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=6ef17e472569';
-import { SkiaProvider } from './skia-provider.js?v=6ef17e472569';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=6ef17e472569';
-import { disposeTextLayout } from './text-layout-native.js?v=6ef17e472569';
-import { IcuBreakProvider } from './icu-break-provider.js?v=6ef17e472569';
-import { SqliteProvider } from './sqlite-native.js?v=6ef17e472569';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=6ef17e472569';
-import { TzdataProvider } from './java-time-native.js?v=6ef17e472569';
-import { ZlibProvider } from './zip-native.js?v=6ef17e472569';
-import { IcuConverterProvider } from './icu-converter-native.js?v=6ef17e472569';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=6ef17e472569';
-import { disposeColorFilters } from './color-filter-native.js?v=6ef17e472569';
-import { disposeRegex } from './regex-native.js?v=6ef17e472569';
-import { disposeRenderNodes } from './rendernode-native.js?v=6ef17e472569';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=6ef17e472569';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=6ef17e472569';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=6ef17e472569';
+import { loadAPK } from './apk-loader.js?v=64078a5322f4';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=64078a5322f4';
+import { createWebViewBackend } from './webview-backend.js?v=64078a5322f4';
+import { FrameworkProvider } from './framework-provider.js?v=64078a5322f4';
+import { createRasterSender } from './raster-cache.js?v=64078a5322f4';
+import { isFreedId } from './heap-gc.js?v=64078a5322f4';
+import { dispatchPointer } from './pointer-input-host.js?v=64078a5322f4';
+import { resolveDevice } from './device-profile.js?v=64078a5322f4';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=64078a5322f4';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=64078a5322f4';
+import { SkiaProvider } from './skia-provider.js?v=64078a5322f4';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=64078a5322f4';
+import { disposeTextLayout } from './text-layout-native.js?v=64078a5322f4';
+import { IcuBreakProvider } from './icu-break-provider.js?v=64078a5322f4';
+import { SqliteProvider } from './sqlite-native.js?v=64078a5322f4';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=64078a5322f4';
+import { TzdataProvider } from './java-time-native.js?v=64078a5322f4';
+import { ZlibProvider } from './zip-native.js?v=64078a5322f4';
+import { IcuConverterProvider } from './icu-converter-native.js?v=64078a5322f4';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=64078a5322f4';
+import { disposeColorFilters } from './color-filter-native.js?v=64078a5322f4';
+import { disposeRegex } from './regex-native.js?v=64078a5322f4';
+import { disposeRenderNodes } from './rendernode-native.js?v=64078a5322f4';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=64078a5322f4';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=64078a5322f4';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=64078a5322f4';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=6ef17e472569';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=6ef17e472569';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=6ef17e472569';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '6ef17e472569';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=64078a5322f4';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=64078a5322f4';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=64078a5322f4';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '64078a5322f4';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -95,6 +96,7 @@ self.onmessage = async ({ data }) => {
   if (!data || !Number.isSafeInteger(data.requestId)) return;
   const { requestId, type } = data;
   const send = (message) => self.postMessage({ requestId, ...message });
+  if (type === 'webview-event') { try { runtime?.platform?.webViewBackend?.handleEvent(runtime, data); } finally { scheduleEvents(); } return; }   // an iframe finished or failed: only queues VM tasks
   if (type === 'app-data-flush') { appData?.syncPoint('page-hide'); return; }   // the page is being hidden/closed: store now, even while the VM is busy (no reply)
   if (busy) { send({ type: 'error', error: { name: 'ProtocolError', message: 'A VM já está processando outra operação.' } }); return; }
   busy = true; activeRequestId = requestId; let succeeded = false; clearTimeout(eventTimer);
@@ -117,7 +119,9 @@ self.onmessage = async ({ data }) => {
       // Lab-built wasm32 native libraries (libreactnative, Hermes, ...): provenance now, each module only when the app's SoLoader links it
       const nativeLibraryProvider = NATIVE_LIBS_URL ? (sharedNativeLibraryProvider ??= await LazyNativeLibraryProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
       const result = await loadAPK(data.buffer, { nativeLibraryProvider, device: resolveDevice(data.device || {}), tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
-      runtime = result.runtime; archive = result.archive; inventory = result.inventory; inspectNativeLibraries = result.inspectNativeLibraries;
+      runtime = result.runtime; archive = result.archive; inventory = result.inventory;
+      // WebView content lives in iframes of the page: without a page that wants them (the embedded player's default) the WebView has no backend and fails explicitly
+      if (data.webview !== false) runtime.platform.webViewBackend = createWebViewBackend({ platform: runtime.platform, post: message => self.postMessage(message), labOrigin: self.location?.origin ?? '' }); inspectNativeLibraries = result.inspectNativeLibraries;
       if (self.location?.origin) runtime.javaProperties.set('apkweb.origin', self.location.origin);   // the page origin (same as this worker's): lets sample apps address documents the lab serves itself
       runtime.platform.onExternalActivity = () => { if (!busy) scheduleEvents(); };   // network exchanges finishing wake the event pump
       composeSemantics = createComposeSemanticsDriver(runtime);

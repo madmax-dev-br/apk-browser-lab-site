@@ -1,6 +1,6 @@
-import { createRasterReceiver } from './raster-cache.js?v=6ef17e472569';
+import { createRasterReceiver } from './raster-cache.js?v=64078a5322f4';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=6ef17e472569', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 30000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=64078a5322f4', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 30000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -18,6 +18,7 @@ export class APKWorkerClient {
       // Every snapshot, delivered or not, passes the raster cache in order so Worker and page LRUs stay identical.
       if (data?.snapshot) { try { this.rasters.resolve(data.snapshot); } catch (error) { this.cancel(error); return; } }
       if (data?.type === 'app-data') { this.appData = data.status; this.onAppData?.(data.status); return; }
+      if (data?.type === 'webview') { this.onWebView?.(data); return; }   // a WebView command for the page's iframes (src/webview-frame.js)
       if (data?.type === 'api-gaps') { this.apiGaps = data.report ?? null; this.onApiGaps?.(this.apiGaps); return; }   // static estimate, posted once after a launch; never part of a request
       if (data?.type === 'runtime-busy') { this.onRuntimeBusy?.(true); return; }
       if (data?.type === 'runtime-idle') { this.onRuntimeBusy?.(false); return; }
@@ -55,15 +56,17 @@ export class APKWorkerClient {
       catch (error) { this.cancel(error); }
     });
   }
-  async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', keepData = true, clearData = false } = {}) {
+  async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', keepData = true, clearData = false, webview = true } = {}) {
     this.cancel(); this.rasters.reset(); this.apiGaps = null;
-    const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, keepData, clearData }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
+    const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, keepData, clearData, webview }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
     this.appData = response.appData ?? null;
     return { inventory: response.inventory, appData: this.appData };
   }
   /** Settings > Apps > Clear storage for the loaded app: wipes its stored data; the caller restarts the app. Resolves with the new usage status. */
   async clearAppData() { const response = await this.request('app-data-clear', {}, { timeoutMs: this.eventTimeoutMs }); this.appData = response.appData ?? null; return this.appData; }
   /** Fire-and-forget: ask the Worker to store the app data now (page hidden or closing). Works while the VM is busy. */
+  /** An event from a WebView iframe (loaded, failed) for the Worker's backend; fire and forget. */
+  webViewEvent(event) { try { this.worker?.postMessage({ ...event, requestId: ++this.sequence }); } catch { /* worker already gone */ } }
   flushAppData() { try { this.worker?.postMessage({ type: 'app-data-flush', requestId: ++this.sequence }); } catch { /* worker already gone */ } }
   async launch(activity, { onProgress } = {}) {
     return (await this.request('launch', { activity }, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot;

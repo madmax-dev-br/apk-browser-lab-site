@@ -1,20 +1,20 @@
-import { VMClock } from './vm-clock.js?v=6ef17e472569';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=6ef17e472569';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=6ef17e472569';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=6ef17e472569';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=6ef17e472569';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=6ef17e472569';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=6ef17e472569';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=6ef17e472569';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=6ef17e472569';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=6ef17e472569';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=6ef17e472569';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=6ef17e472569';
-import { APKError } from './apk-error.js?v=6ef17e472569';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=6ef17e472569';
-import { Scheduler, Blocked } from './scheduler.js?v=6ef17e472569';
-import { bootClassLacksMember } from './boot-class-members.js?v=6ef17e472569';
-export { APKError } from './apk-error.js?v=6ef17e472569';
+import { VMClock } from './vm-clock.js?v=64078a5322f4';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=64078a5322f4';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=64078a5322f4';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=64078a5322f4';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=64078a5322f4';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=64078a5322f4';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=64078a5322f4';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=64078a5322f4';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=64078a5322f4';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=64078a5322f4';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=64078a5322f4';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=64078a5322f4';
+import { APKError } from './apk-error.js?v=64078a5322f4';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=64078a5322f4';
+import { Scheduler, Blocked } from './scheduler.js?v=64078a5322f4';
+import { bootClassLacksMember } from './boot-class-members.js?v=64078a5322f4';
+export { APKError } from './apk-error.js?v=64078a5322f4';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1421,6 +1421,7 @@ export class APKRuntime {
         switchWidget: this.platform?.drawableViewHost?.switchWidget?.(this, value)?.bounds ?? null, progressTint: v.progressTint ?? null, fillViewport: !!(v.fields.get('Landroid/widget/ScrollView;->mFillViewport:Z') ?? v.fillViewport), progressStyle: v.progressStyle ?? null,
         scrollX: v.fields.get('Landroid/view/View;->mScrollX:I') ?? 0, scrollY: v.fields.get('Landroid/view/View;->mScrollY:I') ?? 0,
         drawableSVG: v.drawableSVG ?? null,
+        webview: this.platform?.webView?.nodeState?.(this, v) ?? null,
         buttonSVG: v.buttonSVG ?? null, buttonBounds: v.buttonBounds ?? null, compoundPadding: v.compoundPadding ?? null,
         foregroundSVG: v.foregroundSVG ?? null,
         foregroundBounds: v.foregroundBounds ?? null,

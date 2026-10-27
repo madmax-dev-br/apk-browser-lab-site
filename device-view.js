@@ -1,6 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { isTrustedRasterURL } from './raster-cache.js?v=6ef17e472569';
+import { updateWebViewSlot } from './webview-slot.js?v=64078a5322f4';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=64078a5322f4';
+import { isTrustedRasterURL } from './raster-cache.js?v=64078a5322f4';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -13,6 +15,7 @@ export function createDeviceView(ctx) {
 const { $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, notifyParent, hooks = {} } = ctx, clickView = id => ctx.clickView(id);
 // VM timer events (animations, handlers) can arrive faster than the display refreshes: only the newest is rendered, once per frame. An RPC result
 // (renderSnapshot called directly) is always newer than a queued event, so renderSnapshot clears the queue.
+let webviews = null;   // the page side of the WebViews of the bound VM (src/webview-frame.js); null when the host disables WebView
 const runtimeFrames = { pending: null, requested: false, vmBusy: false, coalesced: 0, rendered: 0 };
 const nextFrame = globalThis.requestAnimationFrame ? callback => globalThis.requestAnimationFrame(callback) : callback => setTimeout(callback, 16);
 function flushRuntimeSnapshot(vm) {
@@ -30,6 +33,7 @@ function bindVM(vm) {
     runtimeFrames.pending = snapshot; if (!runtimeFrames.requested) { runtimeFrames.requested = true; nextFrame(() => flushRuntimeSnapshot(vm)); }
   };
   vm.onRuntimeError = error => { if (state.runtime === vm) reportAPKError(error, 'Callback assíncrono interrompido'); };
+  if (ctx.webViews !== false) { webviews?.reset(); webviews = createWebViewManager({ send: event => vm.webViewEvent?.(event) }); vm.onWebView = message => { if (state.runtime === vm) webviews.handle(message); }; }
 }
 function reconcileChildren(parent, children) {
   children.forEach((child, index) => { if (parent.children[index] !== child) parent.insertBefore(child, parent.children[index] || null); });
@@ -168,7 +172,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
     else if (kind === 'input') { element = document.createElement('input'); element.type = 'text'; for (const event of ['focus', 'blur']) element.addEventListener(event, () => { if (session !== state.viewSession) return; if (state.pendingFocus.length >= 128) { reportAPKError(new Error('A fila de foco excedeu 128 eventos; reabra o APK.'), 'Fila de foco interrompida'); return; } state.pendingFocus.push({ id: view.id, focused: event === 'focus' }); flushPendingInputs(); }); element.addEventListener('input', () => { if (session !== state.viewSession) return; state.pendingInputs.set(view.id, element.value); flushPendingInputs(); }); }
     else if (kind === 'check') { element = document.createElement('label'); element._control = document.createElement('input'); element._control.type = 'checkbox'; element._label = document.createElement('span'); element.append(element._control, element._label); element._control.addEventListener('change', () => { if (element._session === state.viewSession) checkView(view.id, element._control.checked); }); }
     else if (kind === 'progress') element = document.createElement('progress');
-    else if (['linear', 'frame', 'scroll', 'text', 'image', 'group', 'view'].includes(kind)) { element = document.createElement('div'); if (kind === 'text' || kind === 'image' || kind === 'view') { element.addEventListener('click', () => { if (element._session === state.viewSession && element.dataset.clickable === 'true') clickView(view.id); }); element.addEventListener('keydown', (event) => { if (element._session === state.viewSession && element.dataset.clickable === 'true' && ['Enter', ' '].includes(event.key)) { event.preventDefault(); clickView(view.id); } }); } }
+    else if (['linear', 'frame', 'scroll', 'text', 'image', 'group', 'view', 'webview'].includes(kind)) { element = document.createElement('div'); if (kind === 'text' || kind === 'image' || kind === 'view') { element.addEventListener('click', () => { if (element._session === state.viewSession && element.dataset.clickable === 'true') clickView(view.id); }); element.addEventListener('keydown', (event) => { if (element._session === state.viewSession && element.dataset.clickable === 'true' && ['Enter', ' '].includes(event.key)) { event.preventDefault(); clickView(view.id); } }); } }
     else throw new Error(`Tipo de interface não suportado pelo renderizador: ${view.type || kind}.`);
     // Touch/pointer down presses the View (drawable state + StateListAnimator elevation); up/cancel/leave releases it.
     if (kind === 'button' || kind === 'check') for (const [event, pressed] of [['pointerdown', true], ['pointerup', false], ['pointercancel', false], ['pointerleave', false]]) element.addEventListener(event, () => {
@@ -200,6 +204,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (kind === 'image') { element.setAttribute('role', view.clickable ? 'button' : 'img'); element.setAttribute('aria-label', view.contentDescription || 'Imagem do APK'); }
   if (kind === 'input') { if (!(focused && (state.pendingInputs.has(view.id) || state.inputInFlight === view.id)) && element.value !== (view.text ?? '')) element.value = view.text ?? ''; element.readOnly = !!view.readOnly; element.placeholder = view.hint || ''; element.setAttribute('aria-label', view.contentDescription || view.hint || `Campo ${view.androidId || view.id}`); element.disabled = view.enabled === false; element.inputMode = (view.inputType & 15) === 2 ? 'decimal' : 'text'; }
   if (kind === 'check') { element._control.checked = !!view.checked; element._control.disabled = view.enabled === false; element._control.setAttribute('aria-label', view.text || 'Opção'); element._label.textContent = view.text || ''; element.classList.toggle('android-switch', view.type?.includes('/Switch;') && !view.switchWidget); element.classList.toggle('android-switch-vm', !!view.switchWidget); }
+  if (kind === 'webview') updateWebViewSlot(element, view.webview, { manager: webviews });
   if (kind === 'progress') { element.max = view.max ?? 100; if (view.indeterminate) element.removeAttribute('value'); else element.value = view.progress || 0; }
   element.style.cssText = '';
   // ViewGroup.clipChildren clips each child's RenderNode to its own bounds.
@@ -210,7 +215,8 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (kind === 'linear') element.style.flexDirection = view.orientation === 'horizontal' ? 'row' : 'column';
   if (view.laidOut && view.bounds) { element.style.width = `${view.bounds.right - view.bounds.left}px`; element.style.height = `${view.bounds.bottom - view.bounds.top}px`; if (parentLaidOut) { element.style.position = 'absolute'; element.style.left = `${view.bounds.left}px`; element.style.top = `${view.bounds.top}px`; } }
   if (Number.isFinite(view.textLineHeight) && view.textLineHeight > 0) { element.style.lineHeight = `${view.textLineHeight}px`; element.style.fontFamily = 'AndroidSkiaRoboto, AndroidRoboto, sans-serif'; element.style.fontKerning = 'none'; }
-  if (view.laidOut && ['group', 'frame', 'linear', 'scroll'].includes(kind)) element.style.position = parentLaidOut ? 'absolute' : 'relative';
+  if (view.laidOut && ['group', 'frame', 'linear', 'scroll', 'webview'].includes(kind)) element.style.position = parentLaidOut ? 'absolute' : 'relative';
+  if (kind === 'webview') { if (!element.style.position) element.style.position = 'relative'; element.style.overflow = 'hidden'; }   // the iframe fills the View's box and is clipped to it
   if (Number.isFinite(view.textSize) && view.textSize > 0) element.style.fontSize = `${Math.min(200, view.textSize)}px`;
   if (view.padding) element.style.padding = `${view.padding.top || 0}px ${view.padding.right || 0}px ${view.padding.bottom || 0}px ${view.padding.left || 0}px`;
   // A VM-drawn Switch (thumb/track rasterized with the background) reserves its width through TextView compound padding; the native input only receives input.
@@ -532,6 +538,7 @@ function renderSnapshot(snapshot) {
   liveShadowKeys = new Set();
   reconcileChildren($('android-content'), snapshot.views.filter(view => !view.windowSurface).map(view => createView(view)));
   renderWindowSurfaces(surfaces);
+  webviews?.sweep(webViewIds(snapshot.views));
   renderSystemBars(snapshot.systemBars);
   // PhoneWindow background from the Activity theme (android:windowBackground, resolved by the VM through the real theme).
   { const content = $('android-content'), background = snapshot.views.find(view => !view.windowSurface)?.windowBackground; content.style.background = ''; content.style.backgroundColor = '#fff'; content.style.backgroundImage = '';
@@ -548,5 +555,5 @@ function renderSnapshot(snapshot) {
   updateTrace(snapshot);
   notifyParent('apk-lab-snapshot', { activityName: snapshot.activityName, texts: snapshot.texts, counters: snapshot.counters });
 }
-return { renderSnapshot, createView, queueComposeAction, flushPendingInputs, bindVM, runtimeFrames, renderSystemBars, updateSystemBarIcons, fitDevice, startClock };
+return { resetWebViews: () => webviews?.reset(), renderSnapshot, createView, queueComposeAction, flushPendingInputs, bindVM, runtimeFrames, renderSystemBars, updateSystemBarIcons, fitDevice, startClock };
 }

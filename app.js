@@ -1,8 +1,8 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=6ef17e472569';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=6ef17e472569';
-import { createDeviceView, createViewState } from './device-view.js?v=6ef17e472569';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=6ef17e472569';
-import { formatApiGapReport } from './api-gap-scan.js?v=6ef17e472569';
+import { APKWorkerClient } from './apk-worker-client.js?v=64078a5322f4';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=64078a5322f4';
+import { createDeviceView, createViewState } from './device-view.js?v=64078a5322f4';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=64078a5322f4';
+import { formatApiGapReport } from './api-gap-scan.js?v=64078a5322f4';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -44,6 +44,7 @@ function updateTrace(snapshot) {
   $('trace-output').textContent = state.trace.join('\n') || 'Nenhum evento registrado.';
   $('trace-count').textContent = `${state.trace.length} eventos`;
 }
+function resetWebViews() { try { deviceView.resetWebViews?.(); } catch { /* the device view is not created yet: no WebView exists either */ } }
 function hideError() { $('error-panel').hidden = true; }
 document.getElementById('error-copy')?.addEventListener('click', async event => {
   const button = event.currentTarget, report = (state.errorReport ?? $('error-message').textContent) + (state.apiGaps ? '\n\n' + formatApiGapReport(state.apiGaps) : '');   // the static API estimate may arrive after the error was shown
@@ -107,7 +108,7 @@ function onWorkerProgress(progress = {}) {
 }
 function cancelOperation() {
   ++state.operation; state.abortController?.abort(); apkVM.cancel(); state.apiGaps = null;
-  state.viewSession++; state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear(); state.runtime = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true; state.lastAPKError = null;
+  state.viewSession++; resetWebViews(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear(); state.runtime = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true; state.lastAPKError = null;
   clearInterval(state.operationTimer); $('operation-panel').hidden = true;
   $('android-device').hidden = true; $('empty-preview').hidden = state.mode !== 'apk';
   setBusy(false);
@@ -222,7 +223,7 @@ async function inspectSelectedNative() {
 }
 async function importSource(source, autoRun = false) {
   if (state.busy) return;
-  state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.viewSession++; for (const id of ['android-content', 'android-window-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
+  state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
   switchMode('apk'); hideError(); state.runtime = null; state.inventory = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true;
   $('empty-preview').querySelector('h2').textContent = 'Seu aplicativo começa aqui.'; $('empty-preview').querySelector('p').innerHTML = 'Selecione um APK e clique em Executar.<br>Ou rode a demonstração para testar.';
   const token = beginOperation('Lendo o arquivo APK…');

@@ -1,12 +1,12 @@
 // Versioned host <-> frame message schema and the <apk-player> configuration model. No DOM: shared by the host script, the frame and the tests.
-import { sanitizeSettings } from '../device-settings.js?v=6ef17e472569';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=6ef17e472569';
+import { sanitizeSettings } from '../device-settings.js?v=64078a5322f4';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=64078a5322f4';
 export const PROTOCOL = 'apk-player';
 export const VERSION = 1;
 export const MAX_APK_BYTES = 1024 * 1024 * 1024;
 /** Public config keys (camelCase) <-> element attributes (kebab-case). The values go through the lab's own sanitizer (device-settings.js). */
-export const CONFIG_KEYS = Object.freeze(['device', 'orientation', 'locale', 'theme', 'fontScale', 'animatorScale', 'hour24', 'timeZone', 'battery', 'charging', 'connectivity', 'navigation', 'statusBarHeight', 'allowedHosts', 'proxyUrl', 'tolerateMissing']);
-export const ATTRIBUTES = Object.freeze({ device: 'device', orientation: 'orientation', locale: 'locale', theme: 'theme', 'font-scale': 'fontScale', 'animator-scale': 'animatorScale', 'hour-24': 'hour24', 'time-zone': 'timeZone', battery: 'battery', charging: 'charging', connectivity: 'connectivity', navigation: 'navigation', 'status-bar-height': 'statusBarHeight', 'allowed-hosts': 'allowedHosts', 'proxy-url': 'proxyUrl', 'tolerate-missing': 'tolerateMissing' });
+export const CONFIG_KEYS = Object.freeze(['device', 'orientation', 'locale', 'theme', 'fontScale', 'animatorScale', 'hour24', 'timeZone', 'battery', 'charging', 'connectivity', 'navigation', 'statusBarHeight', 'allowedHosts', 'proxyUrl', 'tolerateMissing', 'webview']);
+export const ATTRIBUTES = Object.freeze({ device: 'device', orientation: 'orientation', locale: 'locale', theme: 'theme', 'font-scale': 'fontScale', 'animator-scale': 'animatorScale', 'hour-24': 'hour24', 'time-zone': 'timeZone', battery: 'battery', charging: 'charging', connectivity: 'connectivity', navigation: 'navigation', 'status-bar-height': 'statusBarHeight', 'allowed-hosts': 'allowedHosts', 'proxy-url': 'proxyUrl', 'tolerate-missing': 'tolerateMissing', webview: 'webview' });
 /** Missing-API policy of the VM (apk-runtime tolerateMissing). 'off' (the player default) stops at the first unsupported API; embedders opt in to stubs. Applies at the next launch. */
 export const TOLERATE_MISSING = Object.freeze(['off', 'void', 'primitives', 'all']);
 const bool = value => value === true || value === 'true' || value === '' || value === '1' ? true : value === false || value === 'false' || value === '0' ? false : undefined;
@@ -19,6 +19,7 @@ export function parseConfig(input = {}) {
     if (key === 'fontScale' || key === 'animatorScale' || key === 'battery' || key === 'statusBarHeight') { const number = Number(raw); if (Number.isFinite(number)) config[key] = number; else rejected.push(key); }
     else if (key === 'allowedHosts') { if (Array.isArray(raw) && raw.every(item => typeof item === 'string')) config[key] = raw.slice(); else if (typeof raw === 'string') config[key] = raw.split(/[\s,]+/).filter(Boolean); else rejected.push(key); }
     else if (key === 'hour24' || key === 'charging') { const value = bool(raw); if (value === undefined) rejected.push(key); else config[key] = value; }
+    else if (key === 'webview') { if (raw === 'on' || raw === 'off') config[key] = raw; else rejected.push(key); }   // android.webkit.WebView content in sandboxed iframes: off unless the embedder opts in
     else if (key === 'tolerateMissing') { if (TOLERATE_MISSING.includes(raw)) config[key] = raw; else rejected.push(key); }
     else if (typeof raw === 'string') config[key] = raw;
     else rejected.push(key);
