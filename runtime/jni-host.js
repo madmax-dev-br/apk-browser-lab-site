@@ -1,13 +1,14 @@
-import { APKError } from './apk-error.js?v=6531d427a542';
-import { JavaException } from './apk-runtime.js?v=6531d427a542';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=6531d427a542';
-import { buildElfDescriptor } from './native-descriptor.js?v=6531d427a542';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=6531d427a542';
-import { NativeLinker, LinkError } from './native-linker.js?v=6531d427a542';
-import { hostFunction } from './wasm-host-function.js?v=6531d427a542';
-import { parseWasm } from './wasm-dylink.js?v=6531d427a542';
-import { formatVersion } from './rn-version.js?v=6531d427a542';
-import { registerWasmMemory } from './unsafe-native.js?v=6531d427a542';
+import { APKError } from './apk-error.js?v=6ef17e472569';
+import { JavaException } from './apk-runtime.js?v=6ef17e472569';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=6ef17e472569';
+import { buildElfDescriptor } from './native-descriptor.js?v=6ef17e472569';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=6ef17e472569';
+import { NativeLinker, LinkError } from './native-linker.js?v=6ef17e472569';
+import { hostFunction } from './wasm-host-function.js?v=6ef17e472569';
+import { parseWasm } from './wasm-dylink.js?v=6ef17e472569';
+import { formatVersion } from './rn-version.js?v=6ef17e472569';
+import { registerWasmMemory } from './unsafe-native.js?v=6ef17e472569';
+import { writeSkPath } from './skia-path-layout.js?v=6ef17e472569';
 
 // JNI -> WebAssembly bridge.
 //
@@ -335,8 +336,31 @@ export class JniBridge {
   }
   #methodId(info) { let id = this.methodIdByKey.get(info.key); if (!id) { id = this.methodIds.length; this.methodIds.push(info); this.methodIdByKey.set(info.key, id); } return id; }
   #fieldId(info) { const key = info.key + (info.static ? '#s' : ''); let id = this.fieldIdByKey.get(key); if (!id) { id = this.fieldIds.length; this.fieldIds.push(info); this.fieldIdByKey.set(key, id); } return id; }
+  /**
+   * android.graphics.Path.mNativePath (J): on Android the address of the Path's SkPath, which native libraries read directly (androidx graphics-path). The lab's Path is a CanvasKit
+   * path owned by the Skia host, so this field is virtual: each read returns the address of an SkPath mirror of the Path's current contents in the process memory,
+   * written with the layout of the Skia the lab's API level ships (src/skia-path-layout.js) and rebuilt when the Path changed.
+   */
+  #nativePathAddress(value) {
+    const r = this.runtime, host = r.skiaHost;
+    if (!host?.pathSnapshot) throw new APKError('android.graphics.Path.mNativePath is not available: the Skia host is not loaded', { kind: 'native-path-unavailable' });
+    const { commands, fillType } = host.pathSnapshot(value), key = value.ref ?? value;
+    const cache = this.nativePaths ??= new Map(), entry = cache.get(key);
+    const same = entry && entry.fillType === fillType && entry.commands.length === commands.length && entry.commands.every((v, i) => Object.is(v, commands[i]));
+    if (same) { cache.delete(key); cache.set(key, entry); return entry.address; }   // most recently used last
+    this.#process();
+    let written;
+    try { written = writeSkPath({ memory: this.proc.memory, malloc: this.proc.malloc }, commands, { apiLevel: r.apiLevel, fillType }); }
+    catch (error) { throw new APKError(`Cannot mirror the Path for native code: ${error.message}`, { kind: 'native-path-unsupported', apiLevel: r.apiLevel }); }
+    // the previous generation stays allocated (an iterator created before the edit may still be reading it); the one before it is released
+    for (const block of entry?.older ?? []) this.proc.free(block);
+    cache.delete(key); cache.set(key, { commands: Float32Array.from(commands), fillType, address: written.address, blocks: written.blocks, older: entry?.blocks ?? [] });
+    while (cache.size > 512) { const [oldKey, old] = cache.entries().next().value; for (const block of [...old.blocks, ...old.older]) this.proc.free(block); cache.delete(oldKey); }
+    return written.address;
+  }
   #findField(type, name, signature, isStatic) {
     const r = this.runtime, seen = new Set(), queue = [type];
+    if (type === 'Landroid/graphics/Path;' && name === 'mNativePath' && signature === 'J' && !isStatic && r.skiaHost?.pathSnapshot) return { owner: type, name, type: signature, key: `${type}->mNativePath:J`, static: false, nativePath: true };
     while (queue.length) {
       const owner = queue.shift(); if (!owner || seen.has(owner)) continue; seen.add(owner);
       const cls = r.classes.get(owner); if (!cls) continue;
@@ -471,7 +495,7 @@ export class JniBridge {
     // -- fields
     const fieldRef = id => { const f = self.fieldIds[id]; if (!f) throw new APKError('Invalid jfieldID', { kind: 'jni-invalid-reference' }); return f; };
     for (const [name, code] of callTypes.slice(0, 9)) {
-      h[`Get${name}Field`] = (_env, obj, id) => { const f = fieldRef(id), o = r.object(self.#value(obj)), stored = o.fields.get(f.key); return toJNI(code, stored === undefined ? defaultFor(f.type) : stored); };
+      h[`Get${name}Field`] = (_env, obj, id) => { const f = fieldRef(id); if (f.nativePath) return toJNI(code, BigInt(self.#nativePathAddress(self.#value(obj)))); const o = r.object(self.#value(obj)), stored = o.fields.get(f.key); return toJNI(code, stored === undefined ? defaultFor(f.type) : stored); };
       h[`Set${name}Field`] = (_env, obj, id, value) => { const f = fieldRef(id); r.storeField(r.object(self.#value(obj)).fields, f.key, toVM(code, value)); };
       h[`GetStatic${name}Field`] = (_env, _cls, id) => { const f = fieldRef(id); return toJNI(code, r.readStatic({ owner: f.owner, name: f.name, type: f.type, key: f.key })); };
       h[`SetStatic${name}Field`] = (_env, _cls, id, value) => { const f = fieldRef(id); r.writeStatic({ owner: f.owner, name: f.name, type: f.type, key: f.key }, toVM(code, value)); };
@@ -556,7 +580,7 @@ export class JniBridge {
     h.RegisterNatives = (_env, cls, methods, count) => {
       const type = self.#classType(cls), v = view();
       for (let i = 0; i < count; i++) {
-        const name = cString(v.getUint32(methods + i * 12, true)), signature = cString(v.getUint32(methods + i * 12 + 4, true)), index = v.getUint32(methods + i * 12 + 8, true);
+        const name = cString(v.getUint32(methods + i * 12, true)), signature = cString(v.getUint32(methods + i * 12 + 4, true)).replace(/^[!]/, ''), index = v.getUint32(methods + i * 12 + 8, true);
         // ART's RegisterNatives finds the method in the class or, through FindVirtualMethod, in a superclass (reanimated registers NativeProxyCommon.installJSIBindings on NativeProxy); the binding belongs to the declaring class
         const info = self.#findMethod(type, name, signature), owner = info && !info.host ? info.owner : type, def = r.classes.get(owner)?.methods.get(name + signature);
         if (!def || !(def.flags & 0x100)) { self.#throwNew('Ljava/lang/NoSuchMethodError;', name); return JNI_ERR; }

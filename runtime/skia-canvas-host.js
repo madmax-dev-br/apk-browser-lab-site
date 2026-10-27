@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=6531d427a542';
-import {getVectorGraphics} from './vector-native.js?v=6531d427a542';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=6531d427a542';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=6531d427a542';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=6531d427a542';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=6531d427a542';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=6531d427a542';
-import {createBitmapHost} from './bitmap-host.js?v=6531d427a542';
-import { gcRoot } from './heap-gc.js?v=6531d427a542';
+import {APKError} from './apk-runtime.js?v=6ef17e472569';
+import {getVectorGraphics} from './vector-native.js?v=6ef17e472569';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=6ef17e472569';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=6ef17e472569';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=6ef17e472569';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=6ef17e472569';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=6ef17e472569';
+import {createBitmapHost} from './bitmap-host.js?v=6ef17e472569';
+import { gcRoot } from './heap-gc.js?v=6ef17e472569';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -303,6 +303,8 @@ export function createSkiaCanvasHost(runtime,backend){
   interfaces:type=>matrixHost.interfaces?.(type)??[],
   resolveTypeface,customTypeface,
   parsePath(handle,text){const ref=pathHandles.get(handle);if(!ref)fail('Invalid or released VM SkPath token');const state=path(ref),shape=CK.Path.MakeFromSVGString(text);if(!shape)runtime.throwJava('Ljava/lang/IllegalArgumentException;','Invalid SVG pathData');try{const count=shape.countPoints(),old=state.builder.countPoints();if(count>100000||pathCells-old+count>1000000)fail('Parsed SkPath exceeds bounded geometry storage');const replacement=new CK.PathBuilder(shape);state.builder.delete();state.builder=replacement;pathCells=pathCells-old+count;}finally{shape.delete();}},
+  /** The commands and fill type of the Path object `ref` (what JNI code sees through Path.mNativePath: src/skia-path-layout.js). */
+  pathSnapshot(ref){return snapshot(ref);},
   pathByHandle(handle){const ref=pathHandles.get(handle);if(!ref)fail('Invalid or released VM SkPath token');return snapshot(ref);},
   recordNative(handle,command){const graphics=getVectorGraphics(runtime),state=graphics.get(handle,'canvas');let rasterBytes=command.raster?.dataURL?.length??0;for(const value of graphics.handles.values())if(value.kind==='canvas')for(const draw of value.draws){rasterBytes+=draw.raster?.dataURL?.length??0;if(rasterBytes>32*1024*1024)fail('Recorded Canvas rasters exceed32MiB');}getVectorGraphics(runtime).reserveDrawStorage((command.commands?.length??0)*4+(command.text?.length??0));if(state.draws.length>=1024)fail('Skia command limit exceeded');state.draws.push({kind:'skia',...command,matrix:state.matrix.slice(),clips:(state.clips??[]).slice()});},
   textBounds(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaTextBounds(backend,text,{...state,weight:face.weight,italic:face.italic});},
