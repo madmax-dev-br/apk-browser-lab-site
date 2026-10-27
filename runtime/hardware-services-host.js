@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=92e35e57822f';
-import { createHostRegistry } from './host-contract.js?v=92e35e57822f';
-import { GC_ROOTS } from './heap-gc.js?v=92e35e57822f';
+import { gcRoot } from './heap-gc.js?v=4c3f3e1e13b1';
+import { createHostRegistry } from './host-contract.js?v=4c3f3e1e13b1';
+import { GC_ROOTS } from './heap-gc.js?v=4c3f3e1e13b1';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
 // contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes, and an AlarmManager that
@@ -113,6 +113,13 @@ export function createHardwareServicesHost(platform) {
   def(SENSOR, 'getDefaultSensor', '(I)Landroid/hardware/Sensor;', () => null);
   def(SENSOR, 'getSensorList', '(I)Ljava/util/List;', r => emptyList(r));
   def(SENSOR, 'unregisterListener', '(Landroid/hardware/SensorEventListener;)V', () => {});
+  def(SENSOR, 'unregisterListener', '(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;)V', () => {});
+  // SystemSensorManager.registerListenerImpl: a null listener or sensor is refused with false. This device has no sensors, so no Sensor
+  // object can come from it and every registration is refused the same way; no events are ever delivered.
+  for (const signature of ['(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;I)Z', '(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;II)Z',
+    '(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;ILandroid/os/Handler;)Z', '(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;IILandroid/os/Handler;)Z'])
+    def(SENSOR, 'registerListener', signature, (r) => { r.record('SENSOR registerListener refused: the virtual device has no sensors'); return 0; });
+  def(SENSOR, 'flush', '(Landroid/hardware/SensorEventListener;)Z', () => 0);
 
   // ---- UiModeManager: follows the Dispositivo panel's dark-theme switch -----------------------------------------------------------------------------------------
   const UI_MODE = service('uimode', 'Landroid/app/UiModeManager;');

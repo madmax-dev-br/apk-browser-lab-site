@@ -1,5 +1,5 @@
-import { createHostRegistry, floatBits } from './host-contract.js?v=92e35e57822f';
-import { DIGESTS } from './crypto-host.js?v=92e35e57822f';
+import { createHostRegistry, floatBits } from './host-contract.js?v=4c3f3e1e13b1';
+import { DIGESTS } from './crypto-host.js?v=4c3f3e1e13b1';
 
 // android.provider.Settings.Secure / Global / System as an app (not a system app) sees them: reads of the keys a stock Android 13 device exposes, taken from the virtual device
 // (font scale, animation scale, 24-hour clock, airplane mode follow the Dispositivo panel), ANDROID_ID derived per (package, device) like Android 8+'s per-app-signing-key value,
@@ -45,5 +45,7 @@ export function createSettingsHost(platform) {
   }, { static: true });
   def(SYSTEM, 'canWrite', `(${CONTEXT})Z`, () => 0, { static: true });
   def(SETTINGS, 'canDrawOverlays', `(${CONTEXT})Z`, () => 0, { static: true });
-  return { ...registry, interfaces: registry.interfacesOf };
+  // Settings.Global values live in content-resolver-host's writable store; these are the stock values it falls back to.
+  const globalDefault = key => { const table = tables[GLOBAL](null); return Object.hasOwn(table, key) ? table[key] : undefined; };
+  return { ...registry, interfaces: registry.interfacesOf, globalDefault };
 }

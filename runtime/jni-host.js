@@ -1,58 +1,56 @@
-import { APKError } from './apk-error.js?v=92e35e57822f';
-import { JavaException } from './apk-runtime.js?v=92e35e57822f';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=92e35e57822f';
-import { buildElfDescriptor } from './native-descriptor.js?v=92e35e57822f';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=92e35e57822f';
+import { APKError } from './apk-error.js?v=4c3f3e1e13b1';
+import { JavaException } from './apk-runtime.js?v=4c3f3e1e13b1';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=4c3f3e1e13b1';
+import { buildElfDescriptor } from './native-descriptor.js?v=4c3f3e1e13b1';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=4c3f3e1e13b1';
+import { NativeLinker, LinkError } from './native-linker.js?v=4c3f3e1e13b1';
+import { hostFunction } from './wasm-host-function.js?v=4c3f3e1e13b1';
+import { parseWasm } from './wasm-dylink.js?v=4c3f3e1e13b1';
 
 // JNI -> WebAssembly bridge.
 //
 // Native library provider: the *lab* supplies verified WebAssembly modules per (library name, ABI "wasm32"); nothing is ever taken from an APK.
+// The modules are relocatable shared libraries in the WebAssembly dynamic-linking convention and are linked by NativeLinker (src/native-linker.js)
+// into ONE linear memory and ONE function table per process, the way Android's linker places .so files in one address space; libc/libc++/libc++abi
+// are a single base module (libc++_shared.so) shared by all of them, so C++ objects, RTTI, exceptions and jsi::Runtime pointers cross library borders.
 // System.loadLibrary(name) / System.load(path) / Runtime.nativeLoad resolve the file name against the app's virtual lib directory, where the
-// provider's modules are mounted, then:
-//   1. instantiate the module (imports are limited to a small WASI subset; anything else is an explicit failure),
-//   2. build a JNIEnv/JavaVM in the module's linear memory: JNIEnv* -> { functions* } with the 235 JNINativeInterface_ slots, each slot a table
-//      entry whose body is a JS function over the VM heap (signatures generated from jni.h, scripts/generate-jni-table.py),
-//   3. call JNI_OnLoad(JavaVM*, NULL) and require a supported version,
+// provider's modules are mounted as ELF descriptors (SONAME + DT_NEEDED, so SoLoader loads dependencies first, in order), then:
+//   1. link the library and its DT_NEEDED closure (symbols resolved across libraries in DT_NEEDED order; unresolved ones fail explicitly),
+//   2. the first time, build the process JNIEnv/JavaVM in the shared memory: JNIEnv* -> { functions* } with the 235 JNINativeInterface_ slots, each
+//      slot a table entry whose body is a JS function over the VM heap (signatures generated from jni.h, scripts/generate-jni-table.py),
+//   3. call that library's own JNI_OnLoad(JavaVM*, NULL) (once per library, only for libraries the app loads itself, as ART does) and require a
+//      supported version,
 //   4. bind `native` Java methods through RegisterNatives or the Java_<class>_<method>[__<signature>] export naming rules.
 // A native method with no binding still raises UnsatisfiedLinkError; a JNI function this bridge has not implemented fails with a JNI-specific
 // APKError. Handles: local refs live for the duration of a native call (frames), global/weak refs until deleted (no GC, so weak == strong).
 //
-// ABI: wasm32; jint=i32, jlong=i64 (BigInt in JS), jfloat=f32, jdouble=f64, pointers and jobject/jmethodID/jfieldID handles = i32. The module must
-// export memory, malloc and free, and may export __indirect_function_table (required: JNI slots are installed by growing it) and _initialize.
+// ABI: wasm32; jint=i32, jlong=i64 (BigInt in JS), jfloat=f32, jdouble=f64, pointers and jobject/jmethodID/jfieldID handles = i32. The base module
+// provides memory management (malloc/free) for the bridge.
 
 const JNI_OK = 0, JNI_ERR = -1, JNI_EVERSION = -3;
 const VERSIONS = new Set([0x10001, 0x10002, 0x10004, 0x10006, 0x10008]);
 const GLOBAL_BASE = 0x40000000, WEAK_BASE = 0x60000000;
 const PRIMITIVES = [['Boolean', 'Z', 1], ['Byte', 'B', 1], ['Char', 'C', 2], ['Short', 'S', 2], ['Int', 'I', 4], ['Long', 'J', 8], ['Float', 'F', 4], ['Double', 'D', 8]];
-const WASM_TYPE = { i32: 0x7f, i64: 0x7e, f32: 0x7d, f64: 0x7c };
-const LEB = n => { const out = []; do { let b = n & 0x7f; n >>>= 7; if (n) b |= 0x80; out.push(b); } while (n); return out; };
-
-const wrapperModules = new Map();
-/** A real wasm function that forwards to `fn`, usable as a table entry (the same technique Emscripten's addFunction uses). */
-function hostFunction(params, result, fn) {
-  const key = params.join(',') + '>' + (result ?? '');
-  let module = wrapperModules.get(key);
-  if (!module) {
-    const type = [0x60, ...LEB(params.length), ...params.map(p => WASM_TYPE[p]), ...LEB(result ? 1 : 0), ...(result ? [WASM_TYPE[result]] : [])];
-    const section = (id, payload) => [id, ...LEB(payload.length), ...payload];
-    const bytes = [0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, ...section(1, [1, ...type]), ...section(2, [1, 1, 0x65, 1, 0x66, 0, 0]), ...section(7, [1, 1, 0x66, 0, 0])];
-    module = new WebAssembly.Module(Uint8Array.from(bytes)); wrapperModules.set(key, module);
-  }
-  return new WebAssembly.Instance(module, { e: { f: fn } }).exports.f;
-}
-
 const mangle = text => { let out = ''; for (const ch of text) { if (ch === '/') out += '_'; else if (ch === '_') out += '_1'; else if (ch === ';') out += '_2'; else if (ch === '[') out += '_3'; else if (/[A-Za-z0-9]/.test(ch)) out += ch; else out += '_0' + ch.charCodeAt(0).toString(16).padStart(4, '0'); } return out; };
 const sanitizeAlias = type => type.replace(/\$\$ldr\d+;$/, ';');
+
+/** Soname of the base module: Emscripten's musl libc + LLVM libc++/libc++abi/libunwind, the one C/C++ runtime every native library shares. */
+export const BASE_SONAME = 'libc++_shared.so';
 
 /** Lab-controlled registry of WebAssembly native libraries. `add` verifies the pinned SHA-256 before compiling; there is no API that accepts APK bytes. */
 export class NativeLibraryProvider {
   constructor({ abi = 'wasm32' } = {}) { this.abi = abi; this.modules = new Map(); }
-  async add({ soname, wasm, sha256, needed = [], provenance = null }) {
+  async add({ soname, wasm, sha256, needed = null, provenance = null }) {
     if (!/^lib[\w.+-]+\.so$/.test(soname)) throw new APKError(`Invalid native library name ${soname}`);
     if (!/^[0-9a-f]{64}$/i.test(sha256 ?? '')) throw new APKError(`Native library ${soname} needs a pinned SHA-256`);
     const bytes = wasm instanceof Uint8Array ? wasm : new Uint8Array(wasm);
     const actual = [...new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');
     if (actual !== sha256.toLowerCase()) throw new APKError(`Native library ${soname} does not match its pinned SHA-256 (expected ${sha256}, got ${actual})`, { kind: 'native-library-hash-mismatch' });
+    const parsed = parseWasm(bytes);
+    if (!parsed.dylink) throw new APKError(`Native library ${soname} is not a relocatable wasm32 shared library (no dylink.0 section)`, { kind: 'native-library-format' });
+    // DT_NEEDED is what the module's own dylink.0 section says (link order); a provenance record that disagrees is stale
+    if (needed && JSON.stringify(needed) !== JSON.stringify(parsed.dylink.needed)) throw new APKError(`Native library ${soname}: provenance DT_NEEDED ${JSON.stringify(needed)} differs from the module's ${JSON.stringify(parsed.dylink.needed)}`, { kind: 'native-library-format' });
+    needed = parsed.dylink.needed;
     const module = await WebAssembly.compile(bytes);
     this.modules.set(soname, { soname, abi: this.abi, bytes, sha256: actual, module, needed, provenance, descriptor: buildElfDescriptor({ soname, needed, wasmSha256: actual }) });
     return this;
@@ -61,11 +59,14 @@ export class NativeLibraryProvider {
   get(soname) { return this.modules.get(soname) ?? null; }
 }
 
+const ENOSYS = 38, EBADF = 8;
+
 export class JniBridge {
   constructor(runtime, provider, platform) {
     this.runtime = runtime; this.provider = provider; this.platform = platform;
-    this.libraries = new Map(); // soname -> library context
-    this.registered = new Map(); // "Lowner;->name(sig)" -> { lib, index }
+    this.libraries = new Map(); // soname -> linked library, for the libraries the app loaded with System.load*/loadLibrary (their JNI_OnLoad ran, natives bind to them)
+    this.linker = null; this.proc = null; // the process-wide linker and JNIEnv/JavaVM are created by the first load
+    this.registered = new Map(); // "Lowner;->name(sig)" -> { lib, fn, symbol }
     this.locals = new Map(); this.globals = new Map(); this.frames = []; this.nextLocal = 1; this.nextGlobal = 1; this.nextWeak = 1;
     this.methodIds = [null]; this.fieldIds = [null]; this.methodIdByKey = new Map(); this.fieldIdByKey = new Map();
     this.pending = null; this.callerLoader = null;
@@ -86,57 +87,68 @@ export class JniBridge {
     if (!this.provider.has(soname)) return false;
     this.#load(soname, via); return true;
   }
+  /** The process: one linear memory + function table for every library, and the JNIEnv/JavaVM built in it. Created on first use. */
+  #process() {
+    if (this.proc) return this.proc;
+    const r = this.runtime;
+    if (!this.provider.has(BASE_SONAME)) r.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: the native library provider has no ${BASE_SONAME} (libc/libc++ base module)`, { kind: 'native-library-base' });
+    const linker = new NativeLinker({ base: BASE_SONAME, hostImport: (module, name, soname) => this.#hostImport(module, name, soname) });
+    for (const [soname, entry] of this.provider.modules) linker.register(soname, { module: entry.module, bytes: entry.bytes });
+    this.linker = linker;
+    try { linker.load(BASE_SONAME); } catch (error) { this.linker = null; r.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: ${BASE_SONAME}: ${error.message}`, { kind: 'native-library-instantiate' }); }
+    this.proc = { memory: linker.memory, table: linker.table, malloc: linker.malloc, free: linker.free, allocations: new Map(), envPtr: 0, vmPtr: 0 };
+    this.#installEnv(this.proc);
+    return this.proc;
+  }
   #load(soname, via) {
     const r = this.runtime;
     if (this.libraries.has(soname)) return;
-    const entry = this.provider.get(soname);
-    let instance;
-    try {
-      const imports = {};
-      for (const { module, name, kind } of WebAssembly.Module.imports(entry.module)) {
-        if (kind !== 'function') throw new APKError(`${soname} imports ${module}.${name} (${kind}); only function imports are supported`, { kind: 'native-library-import' });
-        (imports[module] ??= {})[name] = this.#systemImport(soname, module, name);
-      }
-      instance = new WebAssembly.Instance(entry.module, imports);
-    } catch (error) { r.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: ${soname}: ${error.message}`, { kind: 'native-library-instantiate' }); }
-    const exports = instance.exports, need = name => exports[name] ?? r.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: ${soname} does not export ${name}`);
-    const lib = { soname, instance, exports, memory: need('memory'), table: need('__indirect_function_table'), malloc: need('malloc'), free: need('free'), allocations: new Map() };
-    exports._initialize?.();
+    const entry = this.provider.get(soname), proc = this.#process();
+    let lib;
+    try { lib = this.linker.load(soname); }
+    catch (error) { if (error instanceof JavaException) throw error; r.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: ${soname}: ${error.message}`, { kind: error instanceof LinkError ? 'native-library-link' : 'native-library-instantiate' }); }
     lib.via = via; this.libraries.set(soname, lib);
-    this.#installEnv(lib);
-    r.record(`JNI loaded ${soname} (${entry.bytes.length} bytes wasm32, sha256 ${entry.sha256.slice(0, 12)}…)`);
-    const onLoad = exports.JNI_OnLoad ?? exports._JNI_OnLoad;
-    if (onLoad) {
-      const version = this.#enter(null, () => Number(onLoad(lib.vmPtr, 0)), 'JNI_OnLoad');
-      if (!VERSIONS.has(version)) { this.libraries.delete(soname); r.throwJava('Ljava/lang/UnsatisfiedLinkError;', `JNI_ERR returned from JNI_OnLoad in "${soname}" (version 0x${(version >>> 0).toString(16)})`); }
+    r.record(`JNI loaded ${soname} (${entry.bytes.length} bytes wasm32, sha256 ${entry.sha256.slice(0, 12)}…${lib.deps.length ? `, needs ${lib.deps.map(d => d.soname).join(' ')}` : ''})`);
+    const onLoad = lib.exports.JNI_OnLoad;
+    if (onLoad && !lib.jniDone) {
+      lib.jniDone = true;
+      const version = this.#enter(null, () => Number(onLoad(proc.vmPtr, 0)), 'JNI_OnLoad');
+      if (!VERSIONS.has(version)) { this.libraries.delete(soname); lib.jniDone = false; r.throwJava('Ljava/lang/UnsatisfiedLinkError;', `JNI_ERR returned from JNI_OnLoad in "${soname}" (version 0x${(version >>> 0).toString(16)})`); }
     }
     lib.loaded = true;
   }
-  #systemImport(soname, module, name) {
-    const r = this.runtime;
+  /** Functions the linker cannot take from a library: WASI, the few Emscripten runtime hooks, and syscalls (which report ENOSYS: there is no kernel). */
+  #hostImport(module, name, soname) {
+    const r = this.runtime, memory = () => this.linker.memory.buffer;
     if (module === 'wasi_snapshot_preview1') {
-      const lib = () => this.libraries.get(soname);
       const table = {
         proc_exit: code => { throw new APKError(`${soname} called exit(${code})`, { kind: 'native-exit', code }); },
-        environ_sizes_get: (count, size) => { const v = new DataView(lib().memory.buffer); v.setUint32(count, 0, true); v.setUint32(size, 0, true); return 0; },
-        environ_get: () => 0, args_sizes_get: (count, size) => { const v = new DataView(lib().memory.buffer); v.setUint32(count, 0, true); v.setUint32(size, 0, true); return 0; }, args_get: () => 0,
-        clock_time_get: (_id, _precision, out) => { new DataView(lib().memory.buffer).setBigUint64(out, BigInt(Math.round(performance.now() * 1e6)), true); return 0; },
-        fd_close: () => 0, fd_seek: () => 70, fd_fdstat_get: () => 8,
+        environ_sizes_get: (count, size) => { const v = new DataView(memory()); v.setUint32(count, 0, true); v.setUint32(size, 0, true); return 0; },
+        environ_get: () => 0, args_sizes_get: (count, size) => { const v = new DataView(memory()); v.setUint32(count, 0, true); v.setUint32(size, 0, true); return 0; }, args_get: () => 0,
+        clock_time_get: (_id, _precision, out) => { new DataView(memory()).setBigUint64(out, BigInt(Math.round(performance.now() * 1e6)), true); return 0; },
+        clock_res_get: (_id, out) => { new DataView(memory()).setBigUint64(out, 1000n, true); return 0; },
+        random_get: (ptr, length) => { for (let done = 0; done < length; done += 65536) globalThis.crypto.getRandomValues(new Uint8Array(memory(), ptr + done, Math.min(65536, length - done))); return 0; },
+        fd_close: () => 0, fd_seek: () => 70, fd_fdstat_get: () => EBADF, fd_read: () => EBADF, fd_sync: () => EBADF,
         fd_write: (fd, iovs, count, written) => { // stdout/stderr are routed to the VM trace; other descriptors do not exist
-          if (fd !== 1 && fd !== 2) return 8;
-          const v = new DataView(lib().memory.buffer), bytes = new Uint8Array(lib().memory.buffer); let total = 0, text = '';
+          if (fd !== 1 && fd !== 2) return EBADF;
+          const v = new DataView(memory()), bytes = new Uint8Array(memory()); let total = 0, text = '';
           for (let i = 0; i < count; i++) { const at = v.getUint32(iovs + i * 8, true), len = v.getUint32(iovs + i * 8 + 4, true); text += new TextDecoder().decode(bytes.subarray(at, at + len)); total += len; }
-          v.setUint32(written, total, true); r.record(`LOG ${fd === 1 ? 'I' : 'E'} native(${soname}): ${text.trimEnd()}`); return 0;
+          v.setUint32(written, total, true); r.record(`LOG ${fd === 1 ? 'I' : 'E'} native: ${text.trimEnd()}`); return 0;
         },
       };
-      if (table[name]) return table[name];
+      return table[name];
+    }
+    if (module === 'GOT.func') { // functions whose *address* the base takes
+      if (name === 'emscripten_console_trace') return hostFunction(['i32'], null, ptr => { const b = new Uint8Array(memory()); let end = ptr; while (b[end]) end++; r.record(`LOG E native: ${decodeModifiedUtf8(b.subarray(ptr, end))}`); });
+      return undefined;
     }
     if (module === 'env') {
-      // Emscripten runtime hooks of a STANDALONE_WASM module. There is no stack unwinder in WebAssembly, so _Unwind_Backtrace reports an empty stack.
+      // Emscripten runtime hooks of the base module. There is no stack unwinder in WebAssembly, so _Unwind_Backtrace reports an empty stack.
       if (name === 'emscripten_notify_memory_growth') return () => {};
       if (name === '_Unwind_Backtrace') return () => 5; // _URC_END_OF_STACK: no frames are available
+      if (name.startsWith('__syscall_')) return () => -ENOSYS; // an honest "function not implemented", never a made-up success
     }
-    return () => { throw new APKError(`${soname} called unsupported host import ${module}.${name}`, { kind: 'native-library-import' }); };
+    return undefined;
   }
 
   // ---- JNIEnv / JavaVM -------------------------------------------------------------------------------------------------------------------
@@ -168,6 +180,7 @@ export class JniBridge {
     view().setUint32(vmPtr, invokePtr, true);
     Object.assign(lib, { envPtr, vmPtr });
   }
+
   /** Runs a JNI function body; Java exceptions raised by callbacks become the pending exception (JNI semantics), everything else propagates. */
   #guard(name, body) {
     try { return body(); }
@@ -217,7 +230,7 @@ export class JniBridge {
     const r = this.runtime, isStatic = mode === 'static';
     const parameters = method.parameters;
     return this.#enter(method, () => {
-      const wasmArgs = [binding.lib.envPtr, this.#local(isStatic ? r.classObject(method.owner) : args[0])];
+      const wasmArgs = [this.proc.envPtr, this.#local(isStatic ? r.classObject(method.owner) : args[0])];
       parameters.forEach((type, i) => wasmArgs.push(this.#toWasm(type, args[(isStatic ? 0 : 1) + i])));
       let result = binding.fn(...wasmArgs);
       if (this.pending !== null) { const exception = this.pending; this.pending = null; throw new JavaException(exception, r.object(exception).message ?? null, r.object(exception).exceptionDetails ?? null); }

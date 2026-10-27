@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=92e35e57822f';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=92e35e57822f';
+import { APKError } from './apk-runtime.js?v=4c3f3e1e13b1';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=4c3f3e1e13b1';
 const RESOLVER = 'Landroid/content/ContentResolver;', URI = 'Landroid/net/Uri;', GLOBAL = 'Landroid/provider/Settings$Global;', OBSERVER = 'Landroid/database/ContentObserver;';
 const fail = message => { throw new APKError(message, { kind: 'virtual-content-provider-unsupported' }); };
 const keys = new Set();
@@ -11,7 +11,8 @@ add(URI_BUILDER, ['<init>()V', 'build()Landroid/net/Uri;', 'toString()Ljava/lang
   'appendQueryParameter(Ljava/lang/String;Ljava/lang/String;)Landroid/net/Uri$Builder;']);
 add('Landroid/net/Uri;', ['buildUpon()Landroid/net/Uri$Builder;']);
 for (const owner of ['Landroid/content/Context;', 'Landroid/content/ContextWrapper;', 'Landroid/app/Application;', 'Landroid/app/Activity;']) add(owner, ['getContentResolver()Landroid/content/ContentResolver;']);
-add(GLOBAL, ['getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;', 'getFloat(Landroid/content/ContentResolver;Ljava/lang/String;F)F', 'putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z', 'putFloat(Landroid/content/ContentResolver;Ljava/lang/String;F)Z', 'getUriFor(Ljava/lang/String;)Landroid/net/Uri;']);
+add(GLOBAL, ['getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I', 'getInt(Landroid/content/ContentResolver;Ljava/lang/String;)I', 'getLong(Landroid/content/ContentResolver;Ljava/lang/String;J)J', 'getLong(Landroid/content/ContentResolver;Ljava/lang/String;)J', 'getFloat(Landroid/content/ContentResolver;Ljava/lang/String;)F',
+  'getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;', 'getFloat(Landroid/content/ContentResolver;Ljava/lang/String;F)F', 'putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z', 'putFloat(Landroid/content/ContentResolver;Ljava/lang/String;F)Z', 'getUriFor(Ljava/lang/String;)Landroid/net/Uri;']);
 add(RESOLVER, ['registerContentObserver(Landroid/net/Uri;ZLandroid/database/ContentObserver;)V', 'unregisterContentObserver(Landroid/database/ContentObserver;)V', 'notifyChange(Landroid/net/Uri;Landroid/database/ContentObserver;)V', 'notifyChange(Landroid/net/Uri;Landroid/database/ContentObserver;Z)V']);
 add('Landroid/os/Binder;', ['getCallingUid()I']);
 add('Landroid/os/Process;', ['myUid()I', 'myPid()I']);
@@ -86,8 +87,8 @@ const number = value => { const view = new DataView(new ArrayBuffer(4)); view.se
 export function createContentResolverHost(platform) {
   let resolver = null; const observers = gcRoot([]), stored = new Map();
   // Virtual-device settings owned by the "Dispositivo" state are read live from it; an APK write overrides until the device value changes.
-  const settings = { get size() { return stored.size; }, has: key => stored.has(key) || key === 'animator_duration_scale',
-    get: key => stored.has(key) ? stored.get(key) : key === 'animator_duration_scale' ? String(platform.device?.animatorScale ?? 1) : key === 'time_12_24' ? (platform.device?.hour24 === false ? '12' : '24') : undefined,
+  const settings = { get size() { return stored.size; }, has: key => stored.has(key) || key === 'animator_duration_scale' || platform.settings?.globalDefault?.(key) !== undefined,
+    get: key => stored.has(key) ? stored.get(key) : key === 'animator_duration_scale' ? String(platform.device?.animatorScale ?? 1) : key === 'time_12_24' ? (platform.device?.hour24 === false ? '12' : '24') : platform.settings?.globalDefault?.(key),
     set: (key, value) => stored.set(key, value), delete: key => stored.delete(key) };
   const uri = (runtime, text) => { if (typeof text !== 'string' || text.length > 8192) fail('URI requires a bounded string'); const value = runtime.makeObject(URI); runtime.object(value).uriText = text; return value; };
   const textOf = (runtime, value) => { const text = runtime.object(value).uriText; if (typeof text !== 'string') fail('Unknown URI object representation'); return text; };
@@ -208,6 +209,19 @@ export function createContentResolverHost(platform) {
         if (args[0]?.ref !== resolver?.ref) fail('Settings.Global requires this VM ContentResolver');
         const key = args[1]; if (typeof key !== 'string' || key.length > 1024) fail('Invalid Settings key');
         if (name === 'getString') return settings.get(key) ?? null;
+        // Settings.Global.getInt/getLong (Settings.java): a missing or unparsable value gives the default, or SettingNotFoundException without one.
+        if (name === 'getInt' || name === 'getLong') {
+          const value = settings.get(key), long = name === 'getLong', parsed = typeof value === 'string' && /^[+-]?\d+$/.test(value.trim()) ? BigInt(value.trim()) : null;
+          const fits = parsed !== null && (long ? parsed >= -(1n << 63n) && parsed < (1n << 63n) : parsed >= -(1n << 31n) && parsed < (1n << 31n));
+          if (fits) return long ? parsed : Number(parsed);
+          if (args.length === 3) return args[2];
+          runtime.throwJava('Landroid/provider/Settings$SettingNotFoundException;', key);
+        }
+        if (name === 'getFloat' && args.length === 2) {
+          const value = settings.get(key); if (value == null) runtime.throwJava('Landroid/provider/Settings$SettingNotFoundException;', key);
+          try { return runtime.dispatch({ owner: 'Ljava/lang/Float;', name: 'parseFloat', signature: '(Ljava/lang/String;)F', parameters: ['Ljava/lang/String;'], result: 'F' }, [value], 'static'); }
+          catch (error) { if (error?.name === 'JavaException') runtime.throwJava('Landroid/provider/Settings$SettingNotFoundException;', key); throw error; }
+        }
         if (name === 'getFloat') { const value = settings.get(key); if (value == null) return args[2]; try { return runtime.dispatch({ owner: 'Ljava/lang/Float;', name: 'parseFloat', signature: '(Ljava/lang/String;)F', parameters: ['Ljava/lang/String;'], result: 'F' }, [value], 'static'); } catch (error) { if (error.name === 'JavaException' && error.value && runtime.isSubtype(runtime.object(error.value).type, 'Ljava/lang/NumberFormatException;')) return args[2]; throw error; } }
         const value = name === 'putFloat' ? String(number(args[2])) : args[2];
         if (value !== null && (typeof value !== 'string' || value.length > 16384)) fail('Invalid Settings string value');

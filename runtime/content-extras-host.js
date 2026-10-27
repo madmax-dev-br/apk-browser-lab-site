@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=92e35e57822f';
+import { createHostRegistry } from './host-contract.js?v=4c3f3e1e13b1';
 
 // Small pure-Java platform classes that are not in the framework DEX. android.content.UriMatcher, a line-for-line port of android-13.0.0_r1 frameworks/base/core/java/android/content/UriMatcher.java (a tree of authority/path tokens with
 // "#" (digits) and "*" (any text) wildcards), and android.webkit.MimeTypeMap (android-13.0.0_r1), which delegates to the original libcore MimeMap that is in the framework DEX.
@@ -46,6 +46,10 @@ export function createContentExtrasHost() {
     return current.code;
   });
   registry.staticField(MATCHER, 'NO_MATCH', 'I', () => NO_MATCH);
+
+  // ---- android.webkit.WebView.setWebContentsDebuggingEnabled: a process-wide flag (WebViewFactory provider static); the lab has no WebView
+  // renderer to attach DevTools to, so the flag is only recorded.
+  def('Landroid/webkit/WebView;', 'setWebContentsDebuggingEnabled', '(Z)V', (r, _m, [enabled]) => { if (r.platform) r.platform.webContentsDebugging = !!enabled; r.record(`WEBVIEW setWebContentsDebuggingEnabled(${!!enabled})`); }, { static: true });
 
   // ---- android.webkit.MimeTypeMap ---------------------------------------------------------------------------------------------------------
   const MIME = 'Landroid/webkit/MimeTypeMap;', MIME_MAP = 'Llibcore/content/type/MimeMap;';
