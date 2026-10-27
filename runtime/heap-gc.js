@@ -39,6 +39,19 @@ function tombstone(id, type) {
   return new Proxy(base, { get(target, key) { if (key in target || typeof key === 'symbol') return target[key]; throw new Error(log(`GC audit: freed object #${id} (${type}) was used (${String(key)})`)); }, set() { throw new Error(log(`GC audit: freed object #${id} (${type}) was written`)); } });
 }
 
+/** Tests that keep Java references in JavaScript locals across event boundaries pin them (they are roots), like a static field would. */
+export const pin = (runtime, value) => { (runtime.gcPins ??= new Set()).add(value); return value; };
+/**
+ * Models "the test holds what it created or was handed": pins every object the test allocates itself (makeObject/allocate called outside any Java dispatch) and every
+ * reference a top-level dispatch returns. Everything the VM creates on its own stays collectible, so the audit still covers app and platform state.
+ */
+export function pinAll(runtime) {
+  const make = runtime.makeObject.bind(runtime), dispatch = runtime.dispatch.bind(runtime);
+  runtime.makeObject = type => { const value = make(type); if (!runtime.depth && !runtime.pinSuspended) pin(runtime, value); return value; };
+  runtime.dispatch = (...args) => { const top = !runtime.depth; const value = dispatch(...args); if (top && value !== null && typeof value === 'object' && typeof value.ref === 'number') pin(runtime, value); return value; };
+  return runtime;
+}
+
 /** True when `id` once named a heap object that has since been collected (a stale id from the page, a pending event...). */
 export function isFreedId(runtime, id) { return Number.isSafeInteger(id) && id > 0 && id < runtime.nextId && runtime.heap.list[id] === undefined; }
 
@@ -47,7 +60,7 @@ function quiescent(runtime) {
   if (runtime.nestedRuns) return 'nested-run';
   if (runtime.initDepth) return 'class-initializer-running';
   const scheduler = runtime.scheduler;
-  if (scheduler) for (const thread of scheduler.threads) if (thread.nestedDepth > 0) return 'host-wait-in-flight';
+  if (scheduler) { if (scheduler.waitingNested?.size) return 'host-wait-in-flight'; for (const thread of scheduler.threads) if (thread.nestedDepth > 0 || thread.nestedBlock) return 'host-wait-in-flight'; }   // Scheduler.resolveNested: a host call (a native, a class initializer) is parked on the JS stack and may hold raw ids
   if (runtime.thread?.frames?.length) return 'main-thread-running';
   return null;
 }
@@ -149,6 +162,9 @@ export function maybeCollect(runtime, options = {}) {
   const audit = options.audit ?? globalThis.process?.env?.APKWEB_GC_AUDIT === '1';
   if (!audit && !runtime.gcEnabled) return { collected: false, reason: 'disabled', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // opt-in until the audit suites are clean
   const threshold = options.threshold ?? Math.floor(runtime.maxHeapObjects * 0.5);
+  // Audit mode collects after every event that allocated at least APKWEB_GC_AUDIT_MIN (default 200) objects: a collection scans the whole live graph (~100 ms), and an event that allocates fewer
+  // objects cannot have dropped a root; skipping them keeps full-suite audits to minutes instead of hours.
+  if (audit && runtime.nextId - (runtime.gcLastNextId ?? 0) < Number(globalThis.process?.env?.APKWEB_GC_AUDIT_MIN ?? 200)) return { collected: false, reason: 'audit-small-event', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };
   if (!audit && runtime.gcLastNextId === runtime.nextId) return { collected: false, reason: 'nothing-allocated', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // no allocation since the last collection: nothing new can be garbage
   // Hysteresis: after a collection the next one waits until the heap grew by 25% of the limit (a heap that is legitimately large must not be re-scanned on every event).
   if (!audit && runtime.heap.size < Math.max(threshold, runtime.gcNextAt ?? 0)) return { collected: false, reason: 'below-threshold', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };

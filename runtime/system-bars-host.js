@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=00979d36e5ab';
-import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=00979d36e5ab';
+import { APKError } from './apk-error.js?v=58b0147dafd8';
+import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=58b0147dafd8';
 // SystemUI of the virtual device: status bar, navigation bar (gesture handle or 3 buttons) and the window policy PhoneWindow/DecorView apply to the app:
 // edge-to-edge (targetSdk >= 35 unless windowOptOutEdgeToEdgeEnforcement, Window.setDecorFitsSystemWindows(false), SYSTEM_UI_FLAG_LAYOUT_*),
 // bar colors/appearance (theme + Window setters + WindowInsetsController + SYSTEM_UI_FLAG_LIGHT_*), hiding (FLAG_FULLSCREEN, SYSTEM_UI_FLAG_FULLSCREEN/HIDE_NAVIGATION,
@@ -10,7 +10,7 @@ const keys = new Set(), add = (owner, signatures) => signatures.forEach(signatur
 add(WINDOW, ['setStatusBarColor(I)V', 'getStatusBarColor()I', 'setNavigationBarColor(I)V', 'getNavigationBarColor()I', 'setNavigationBarDividerColor(I)V', 'getNavigationBarDividerColor()I', 'setDecorFitsSystemWindows(Z)V',
   'addFlags(I)V', 'clearFlags(I)V', 'setFlags(II)V', 'setNavigationBarContrastEnforced(Z)V', 'isNavigationBarContrastEnforced()Z', 'setStatusBarContrastEnforced(Z)V', 'isStatusBarContrastEnforced()Z', 'getInsetsController()Landroid/view/WindowInsetsController;']);
 add(VIEW, ['setSystemUiVisibility(I)V', 'getSystemUiVisibility()I', 'getWindowSystemUiVisibility()I', 'getWindowInsetsController()Landroid/view/WindowInsetsController;']);
-add(CONTROLLER, ['setSystemBarsAppearance(II)V', 'getSystemBarsAppearance()I', 'hide(I)V', 'show(I)V', 'setSystemBarsBehavior(I)V', 'getSystemBarsBehavior()I']);
+add(CONTROLLER, ['setSystemBarsAppearance(II)V', 'getSystemBarsAppearance()I', 'hide(I)V', 'show(I)V', 'addOnControllableInsetsChangedListener(Landroid/view/WindowInsetsController$OnControllableInsetsChangedListener;)V', 'removeOnControllableInsetsChangedListener(Landroid/view/WindowInsetsController$OnControllableInsetsChangedListener;)V', 'setSystemBarsBehavior(I)V', 'getSystemBarsBehavior()I']);
 const FLAG = { FULLSCREEN: 0x400, LAYOUT_NO_LIMITS: 0x200, TRANSLUCENT_STATUS: 0x04000000, TRANSLUCENT_NAVIGATION: 0x08000000, DRAWS_SYSTEM_BAR_BACKGROUNDS: 0x80000000 | 0 };
 const UI = { LOW_PROFILE: 1, HIDE_NAVIGATION: 2, FULLSCREEN: 4, LAYOUT_STABLE: 0x100, LAYOUT_HIDE_NAVIGATION: 0x200, LAYOUT_FULLSCREEN: 0x400, IMMERSIVE: 0x800, IMMERSIVE_STICKY: 0x1000, LIGHT_STATUS_BAR: 0x2000, LIGHT_NAVIGATION_BAR: 0x10 };
 const APPEARANCE = { LIGHT_STATUS_BARS: 8, LIGHT_NAVIGATION_BARS: 16 }, TYPES = { statusBars: 1, navigationBars: 2, captionBar: 4, ime: 8, systemGestures: 16, mandatorySystemGestures: 32, tappableElement: 64, displayCutout: 128 };
@@ -115,6 +115,13 @@ export function createSystemBarsHost(platform) {
         if (name === 'setSystemBarsAppearance') { const [, appearance, mask] = args; if (mask & APPEARANCE.LIGHT_STATUS_BARS) bars.lightStatus = !!(appearance & APPEARANCE.LIGHT_STATUS_BARS); if (mask & APPEARANCE.LIGHT_NAVIGATION_BARS) bars.lightNav = !!(appearance & APPEARANCE.LIGHT_NAVIGATION_BARS); changed(r, frame, false); return; }
         if (name === 'getSystemBarsAppearance') return (bars.lightStatus ? APPEARANCE.LIGHT_STATUS_BARS : 0) | (bars.lightNav ? APPEARANCE.LIGHT_NAVIGATION_BARS : 0);
         if (name === 'hide' || name === 'show') { const hide = name === 'hide'; if (args[1] & TYPES.statusBars) bars.hideStatus = hide; if (args[1] & TYPES.navigationBars) bars.hideNav = hide; changed(r, frame); return; }
+        if (name === 'addOnControllableInsetsChangedListener') {
+          // InsetsController: a new listener is told the types the window can control right away. The virtual window controls the two system bars (statusBars | navigationBars).
+          const listener = args[1]; if (listener === null) r.throwJava('Ljava/lang/NullPointerException;', 'Attempt to invoke interface method on a null object reference');
+          (bars.controllableListeners ??= []).push(listener);
+          r.dispatch({ owner: r.object(listener).type, name: 'onControllableInsetsChanged', signature: `(${CONTROLLER}I)V`, parameters: [CONTROLLER, 'I'], result: 'V' }, [listener, receiver, TYPES.statusBars | TYPES.navigationBars], 'virtual'); return;
+        }
+        if (name === 'removeOnControllableInsetsChangedListener') { const list = bars.controllableListeners ?? [], index = list.findIndex(x => x?.ref === args[1]?.ref); if (index >= 0) list.splice(index, 1); return; }
         if (name === 'setSystemBarsBehavior') { bars.behavior = args[1]; return; }
         return bars.behavior;
       }

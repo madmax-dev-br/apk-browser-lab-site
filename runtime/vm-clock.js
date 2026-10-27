@@ -3,9 +3,17 @@
 // time. Every clock the app can observe (System.currentTimeMillis/nanoTime, SystemClock, Date, java.time.Clock, Handler/Looper deadlines) reads this clock, so the skipped
 // interval is visible to the app exactly as if it had slept. Real time keeps flowing as well; skipping only ever adds to it.
 export class VMClock {
-  constructor() { this.skew = 0; }
-  /** Monotonic milliseconds (performance.now() timeline). */
-  now() { return performance.now() + this.skew; }
+  constructor() { this.skew = 0; this.frozenAt = null; this.reads = 0; }
+  /** Monotonic milliseconds (performance.now() timeline). While a Choreographer frame is dispatched (freeze/thaw) the clock is the frame's start time, advanced one microsecond
+   *  per read and never past real time: a simulated device runs a frame's callbacks in no time, so work that checks "how much of this frame is left"
+   *  (Compose's prefetch scheduler against the vsync deadline) sees the budget a fast device would, not the host interpreter's slowness. A spin on nanoTime still ends. */
+  now() {
+    if (this.frozenAt === null) return performance.now() + this.skew;
+    this.reads++; return Math.min(performance.now(), this.frozenAt + this.reads * 0.001) + this.skew;
+  }
+  /** Starts an event: time stands still (apart from per-read ticks) until thaw(). Nested calls keep the outer start. */
+  freeze() { if (this.frozenAt === null) { this.frozenAt = performance.now(); this.reads = 0; return true; } return false; }
+  thaw() { this.frozenAt = null; this.reads = 0; }
   /** Wall-clock milliseconds since the epoch. */
   wall() { return Date.now() + this.skew; }
   /** Monotonic nanoseconds as a BigInt. */

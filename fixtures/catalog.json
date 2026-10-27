@@ -266,7 +266,7 @@
       "id": "xml-projects",
       "file": "xml-projects-debug.apk",
       "title": "Projetos · XML, Fragments e três Activities",
-      "description": "Lista RecyclerView com busca e filtros, formulário condicional com validação, rascunho após recriar, confirmação e revisão via Activity Result. Fluxos completos validados no Android; compatibilidade web em desenvolvimento.",
+      "description": "Lista RecyclerView com busca e filtros, formulário condicional com validação, rascunho após recriar, confirmação e revisão via Activity Result. Tentativa experimental: a execução na web ainda não passou todos os critérios de validação.",
       "tags": [
         "Navigation XML",
         "SavedStateHandle + recriação",
@@ -282,6 +282,20 @@
           "dev.apkweb.projects.ReviewActivity",
           "dev.apkweb.projects.HelpActivity"
         ]
+      },
+      "validation": {
+        "evidence": "evidence/validation/xml-projects.json",
+        "generatedAt": "2026-10-26T15:02:26.330Z",
+        "verdict": false,
+        "criteria": {
+          "flowsNode": false,
+          "diagnostics": false,
+          "layoutSanity": false,
+          "parity": true,
+          "flowsBrowser": false,
+          "realTaps": true,
+          "strict": true
+        }
       },
       "sizeBytes": 4372611,
       "available": true

@@ -1,31 +1,32 @@
-import { APKError, DexFile } from './apk-runtime.js?v=00979d36e5ab';
-import { createVectorNativeBindings } from './vector-native.js?v=00979d36e5ab';
-import { createMatrixNativeBindings } from './matrix-native.js?v=00979d36e5ab';
-import { createCharsetNativeBindings } from './charset-native.js?v=00979d36e5ab';
-import { createSqliteNativeBindings } from './sqlite-native.js?v=00979d36e5ab';
-import { createJavaTimeNativeBindings } from './java-time-native.js?v=00979d36e5ab';
-import { createMathNativeBindings } from './math-native.js?v=00979d36e5ab';
-import { createUnsafeNativeBindings } from './unsafe-native.js?v=00979d36e5ab';
-import { createZipNativeBindings } from './zip-native.js?v=00979d36e5ab';
-import { createLibcoreIoNativeBindings } from './libcore-io-native.js?v=00979d36e5ab';
-import { createNetworkNativeBindings } from './network-native.js?v=00979d36e5ab';
-import { createParcelNativeBindings } from './parcel-native.js?v=00979d36e5ab';
-import { createInputNativeBindings } from './input-native.js?v=00979d36e5ab';
-import { createViewHiddenNativeBindings } from './view-hidden-native.js?v=00979d36e5ab';
-import { createRegionNativeBindings } from './region-native.js?v=00979d36e5ab';
-import { createIcuConverterNativeBindings } from './icu-converter-native.js?v=00979d36e5ab';
-import { createTextLayoutNativeBindings } from './text-layout-native.js?v=00979d36e5ab';
-import { createColorFilterNativeBindings } from './color-filter-native.js?v=00979d36e5ab';
-import { createRenderNodeNativeBindings } from './rendernode-native.js?v=00979d36e5ab';
-import { createAnimatedVectorNativeBindings } from './animated-vector-native.js?v=00979d36e5ab';
-import { createRegexNativeBindings } from './regex-native.js?v=00979d36e5ab';
+import { APKError, DexFile } from './apk-runtime.js?v=58b0147dafd8';
+import { createVectorNativeBindings } from './vector-native.js?v=58b0147dafd8';
+import { createMatrixNativeBindings } from './matrix-native.js?v=58b0147dafd8';
+import { createCharsetNativeBindings } from './charset-native.js?v=58b0147dafd8';
+import { createSqliteNativeBindings } from './sqlite-native.js?v=58b0147dafd8';
+import { createJavaTimeNativeBindings } from './java-time-native.js?v=58b0147dafd8';
+import { createMathNativeBindings } from './math-native.js?v=58b0147dafd8';
+import { createUnsafeNativeBindings } from './unsafe-native.js?v=58b0147dafd8';
+import { createZipNativeBindings } from './zip-native.js?v=58b0147dafd8';
+import { createLibcoreIoNativeBindings } from './libcore-io-native.js?v=58b0147dafd8';
+import { createNetworkNativeBindings } from './network-native.js?v=58b0147dafd8';
+import { createParcelNativeBindings } from './parcel-native.js?v=58b0147dafd8';
+import { createInputNativeBindings } from './input-native.js?v=58b0147dafd8';
+import { createViewHiddenNativeBindings } from './view-hidden-native.js?v=58b0147dafd8';
+import { createRegionNativeBindings } from './region-native.js?v=58b0147dafd8';
+import { createRenderThreadAnimators } from './rt-animators.js?v=58b0147dafd8';
+import { createIcuConverterNativeBindings } from './icu-converter-native.js?v=58b0147dafd8';
+import { createTextLayoutNativeBindings } from './text-layout-native.js?v=58b0147dafd8';
+import { createColorFilterNativeBindings } from './color-filter-native.js?v=58b0147dafd8';
+import { createRenderNodeNativeBindings } from './rendernode-native.js?v=58b0147dafd8';
+import { createAnimatedVectorNativeBindings } from './animated-vector-native.js?v=58b0147dafd8';
+import { createRegexNativeBindings } from './regex-native.js?v=58b0147dafd8';
 
 const MAX_FRAMEWORK_BYTES = 64 * 1024 * 1024;
 const NATIVE_GET_INT = 'Landroid/os/SystemProperties;->native_get_int(Ljava/lang/String;I)I';
 
 /** Explicit VM system properties. These describe the web device model, never host telemetry. */
 export function createFrameworkNativeBindings({ properties = {}, onBoundary = null } = {}) {
-  const state = properties instanceof Map ? new Map(properties) : new Map(Object.entries({ 'ro.sf.lcd_density': '160', ...properties }));
+  const state = properties instanceof Map ? new Map(properties) : new Map(Object.entries({ 'ro.sf.lcd_density': '160', 'build.version.extensions.r': '3', 'build.version.extensions.s': '3', 'build.version.extensions.t': '3', ...properties }))   /* SDK extension levels of an android-13 device */;
   const bindings = new Map([[NATIVE_GET_INT, (runtime, args, method) => {
     const [key, fallback] = args;
     if (typeof key !== 'string' || !Number.isInteger(fallback)) throw new APKError('Invalid SystemProperties native_get_int arguments');
@@ -89,6 +90,7 @@ export function createFrameworkNativeBindings({ properties = {}, onBoundary = nu
   bindings.set('Landroid/os/Trace;->nativeGetEnabledTags()J', runtime => {
     runtime.record('TRACE enabled tags=0 [web-device profiling disabled]'); return 0n;
   });
+  for (const [key] of createRenderThreadAnimators(null).bindings) bindings.set(key, (runtime, args) => runtime.platform.rtAnimators.table.get(key)(runtime, args));   // RenderNodeAnimator / native interpolators: the engine is per platform
   for (const [key, binding] of [...createVectorNativeBindings(), ...createMatrixNativeBindings(), ...createCharsetNativeBindings(), ...createTextLayoutNativeBindings(), ...createColorFilterNativeBindings(), ...createRenderNodeNativeBindings(), ...createRegexNativeBindings(), ...createNetworkNativeBindings(), ...createParcelNativeBindings(), ...createInputNativeBindings(), ...createViewHiddenNativeBindings(), ...createRegionNativeBindings(), ...createAnimatedVectorNativeBindings(), ...createSqliteNativeBindings(), ...createJavaTimeNativeBindings(), ...createMathNativeBindings(), ...createUnsafeNativeBindings(), ...createZipNativeBindings(), ...createLibcoreIoNativeBindings(), ...createIcuConverterNativeBindings()]) bindings.set(key, binding);
   return bindings;
 }

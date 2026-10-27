@@ -1,5 +1,6 @@
-import { APKError } from './apk-error.js?v=00979d36e5ab';
-import { createHostRegistry } from './host-contract.js?v=00979d36e5ab';
+import { gcRoot } from './heap-gc.js?v=58b0147dafd8';
+import { APKError } from './apk-error.js?v=58b0147dafd8';
+import { createHostRegistry } from './host-contract.js?v=58b0147dafd8';
 
 // Generic-type reflection and java.lang.reflect.Proxy for the libraries that wire themselves up with reflection at launch (Retrofit, Gson, Moshi, Koin, Dagger,
 // Room, WorkManager). Contracts: java.lang.Class / java.lang.reflect.{Method,Constructor,Field,Proxy,Type,ParameterizedType,TypeVariable,WildcardType,GenericArrayType}
@@ -155,7 +156,7 @@ export function createReflectionHost(platform) {
   /** The TypeVariable `name` as seen from `scope` ({ cls, member?, memberRef?, formals? }): method type parameters first, then the class and the classes enclosing it. */
   const typeVariables = new WeakMap();
   const variable = (r, name, scope) => {
-    const table = typeVariables.get(r) ?? typeVariables.set(r, new Map()).get(r);
+    const table = typeVariables.get(r) ?? typeVariables.set(r, gcRoot(new Map())).get(r);
     const make = (key, formal, declScope, decl) => { if (!table.has(key)) { const ref = r.allocate(TV); r.object(ref).tv = { name, bounds: formal.bounds, scope: declScope, decl }; table.set(key, ref); } return table.get(key); };
     if (scope.memberFormals) { const formal = scope.memberFormals.find(f => f.name === name); if (formal) return make(`${scope.member.method.key}|${name}`, formal, scope, scope.memberRef); }
     for (let t = scope.cls, depth = 0; t && depth < 16; t = enclosingOf(r, t), depth++) {
@@ -265,7 +266,7 @@ export function createReflectionHost(platform) {
     for (const t of types) if (!(r.classes.get(t)?.flags & 0x200) && !(r.interfaces(t).length || ['Ljava/lang/Runnable;', 'Ljava/util/concurrent/Callable;'].includes(t))) {
       const known = r.classes.get(t); if (known || t.length === 1 || t.startsWith('[')) r.throwJava('Ljava/lang/IllegalArgumentException;', `${r.className(t, 'binary')} is not an interface`);
     }
-    const table = proxyClasses.get(r) ?? proxyClasses.set(r, new Map()).get(r), key = types.join(','); let name = table.get(key);
+    const table = proxyClasses.get(r) ?? proxyClasses.set(r, gcRoot(new Map())).get(r), key = types.join(','); let name = table.get(key);
     if (!name) { name = `L$Proxy${table.size};`; table.set(key, name); type(name, PROXY, types, { allocatable: true }); }
     const ref = r.allocate(name); const o = r.object(ref); o.proxyHandler = handler; o.proxyInterfaces = types; return ref;
   }, { static: true });

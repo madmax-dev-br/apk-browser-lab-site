@@ -1,5 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=00979d36e5ab';
-import { GC_ROOTS } from './heap-gc.js?v=00979d36e5ab';
+import { gcRoot } from './heap-gc.js?v=58b0147dafd8';
+import { createHostRegistry } from './host-contract.js?v=58b0147dafd8';
+import { GC_ROOTS } from './heap-gc.js?v=58b0147dafd8';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
 // contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes, and an AlarmManager that
@@ -12,7 +13,7 @@ export function createHardwareServicesHost(platform) {
   const service = (name, classType, hostType = classType.replace(/;$/, '') + 'Impl;') => { services.set(name, hostType); byClass.set(classType, name); type(classType, OBJECT, [], { allocatable: false }); type(hostType, classType, [], { allocatable: true }); return hostType; };
   const getService = (r, name) => {
     const hostType = services.get(name); if (!hostType) return null;
-    const cache = objects.get(r) ?? objects.set(r, new Map()).get(r);
+    const cache = objects.get(r) ?? objects.set(r, gcRoot(new Map())).get(r);
     if (!cache.has(name)) cache.set(name, r.allocate(hostType));
     return cache.get(name);
   };
@@ -33,6 +34,9 @@ export function createHardwareServicesHost(platform) {
   const VIBRATOR = service('vibrator', 'Landroid/os/Vibrator;'), EFFECT = 'Landroid/os/VibrationEffect;';
   type(EFFECT, OBJECT, [], { allocatable: true });
   def(VIBRATOR, 'hasVibrator', '()Z', () => 0); def(VIBRATOR, 'hasAmplitudeControl', '()Z', () => 0); def(VIBRATOR, 'cancel', '()V', () => {});
+  // API 30+ capability queries Compose's HapticDefaults and apps make: a device without a vibration motor supports no primitives and no effects (EFFECT_SUPPORT_NO = 2).
+  def(VIBRATOR, 'hasFrequencyControl', '()Z', () => 0); def(VIBRATOR, 'isVibrating', '()Z', () => 0); def(VIBRATOR, 'getId', '()I', () => 0);
+  def(VIBRATOR, 'areAllPrimitivesSupported', '([I)Z', () => 0); def(VIBRATOR, 'areAllEffectsSupported', '([I)I', () => 2);
   for (const signature of ['(J)V', '([JI)V', `(${EFFECT})V`, `(${EFFECT}Landroid/media/AudioAttributes;)V`, '(JLandroid/media/AudioAttributes;)V', '([JILandroid/media/AudioAttributes;)V']) def(VIBRATOR, 'vibrate', signature, () => {});
   def(EFFECT, 'createOneShot', `(JI)${EFFECT}`, (r, _m, [, ms, amplitude]) => { if (BigInt(ms) <= 0n) r.throwJava('Ljava/lang/IllegalArgumentException;', 'timing must be positive'); if (amplitude === 0 || amplitude < -1 || amplitude > 255) r.throwJava('Ljava/lang/IllegalArgumentException;', 'amplitude must either be DEFAULT_AMPLITUDE, or between 1 and 255 inclusive (amplitude=' + amplitude + ')'); return r.allocate(EFFECT); }, { static: true });
   for (const signature of [`([JI)${EFFECT}`, `([J[II)${EFFECT}`, `(I)${EFFECT}`]) def(EFFECT, signature.startsWith('(I') ? 'createPredefined' : 'createWaveform', signature, r => r.allocate(EFFECT), { static: true });

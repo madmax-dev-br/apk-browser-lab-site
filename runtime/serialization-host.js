@@ -1,6 +1,7 @@
-import { APKError } from './apk-error.js?v=00979d36e5ab';
-import { createHostRegistry, floatBits } from './host-contract.js?v=00979d36e5ab';
-import { DIGESTS } from './crypto-host.js?v=00979d36e5ab';
+import { gcRoot } from './heap-gc.js?v=58b0147dafd8';
+import { APKError } from './apk-error.js?v=58b0147dafd8';
+import { createHostRegistry, floatBits } from './host-contract.js?v=58b0147dafd8';
+import { DIGESTS } from './crypto-host.js?v=58b0147dafd8';
 
 // java.io.ObjectOutputStream / ObjectInputStream: the Java Object Serialization Stream Protocol (JDK 8 ObjectStreamConstants, protocol version 5) for the types a VM app
 // serializes through Parcel.writeSerializable, Bundle/Intent extras, WorkManager's Data, caches and Externalizable models: String, boxed primitives, primitive and reference
@@ -107,7 +108,7 @@ export function createSerializationHost(platform) {
   const isEnumClass = (r, t) => !!(classFlags(r, t) & 0x4000) && r.parent(t) === ENUM;
   /** The serialization descriptor of a class (cached): flags, fields in stream order, nearest serializable superclass. */
   function describe(r, t) {
-    const table = descriptors.get(r) ?? descriptors.set(r, new Map()).get(r); if (table.has(t)) return table.get(t);
+    const table = descriptors.get(r) ?? descriptors.set(r, gcRoot(new Map())).get(r); if (table.has(t)) return table.get(t);
     const d = { type: t, name: t.startsWith('[') ? t.replaceAll('/', '.') : dotted(t), fields: [], superType: null }; table.set(t, d);
     if (t.startsWith('[')) return Object.assign(d, { suid: defaultSuid(r, t), flags: SC.SERIALIZABLE, array: true });
     if (BOX[t]) { const [suid, prim] = BOX[t]; return Object.assign(d, { suid, flags: SC.SERIALIZABLE, fields: [{ name: 'value', type: prim, code: prim }], superType: prim === 'Z' || prim === 'C' ? null : NUMBER, box: prim }); }

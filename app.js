@@ -1,6 +1,7 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=00979d36e5ab';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=00979d36e5ab';
-import { createDeviceView, createViewState } from './device-view.js?v=00979d36e5ab';
+import { APKWorkerClient } from './apk-worker-client.js?v=58b0147dafd8';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=58b0147dafd8';
+import { createDeviceView, createViewState } from './device-view.js?v=58b0147dafd8';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=58b0147dafd8';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -53,23 +54,14 @@ function showError(error, title = 'Tentativa de execução interrompida') {
   const inventory = state.mode === 'apk' ? state.inventory : null;
   const raw = error?.message || String(error);
   $('error-title').textContent = /JNI|native method|native library/i.test(raw) ? 'Limite de execução nativa' : title;
-  const cause = raw.replace(/^(?:L[^\n]+? \[[^\]\n]+\] at PC 0x[\da-f]+: )+/i, '');
+  const cause = causeOf(raw);
   $('error-message').textContent = cause.length > 800 ? '…' + cause.slice(-800) : cause;
   const details = [...(inventory?.unsupportedFeatures || [])];
   if (cause !== raw || cause.length > 800) details.push('Pilha de chamadas:\n' + raw);
   if (error.details) details.push(typeof error.details === 'string' ? error.details : JSON.stringify(error.details, null, 2));
   if (error.trace?.length) details.push('Últimas instruções da VM:\n' + error.trace.slice(-40).join('\n'));
   $('error-detail').textContent = [...new Set(details)].join('\n');
-  // A short plain-text report for pasting into a chat: the cause, the innermost frames, the last trace lines and every stubbed API.
-  const frames = [...raw.matchAll(/(L[^\s:]+?;->[^\s]+?) \[([^\]]+)\] at PC (0x[\da-f]+)/gi)].map(([, frame, dex, pc]) => `  ${frame} [${dex}] @${pc}`);
-  const trace = error.trace ?? [], stubs = error.stubs?.length ? error.stubs : [...new Set(trace.filter(line => /^STUB-/.test(line)))];
-  state.errorReport = [
-    `APK Browser Lab ${document.querySelector?.('script[src*="app.js"]')?.src?.split('v=')[1] ?? ''} · ${inventory?.packageName ?? state.fileName ?? 'APK'} · modo tolerante: ${$('tolerate-missing')?.value ?? 'off'}`,
-    `Erro: ${cause}`,
-    frames.length ? `Pilha (mais interna por último):\n${frames.slice(-12).join('\n')}` : '',
-    stubs.length ? `APIs com stub (${stubs.length}):\n${stubs.slice(0, 60).join('\n')}` : '',
-    trace.length ? `Últimas linhas do log:\n${trace.filter(line => !/^STUB-/.test(line)).slice(-15).join('\n')}` : '',
-  ].filter(Boolean).join('\n\n');
+  state.errorReport = buildDiagnosticReport({ error, packageName: inventory?.packageName ?? state.fileName ?? 'APK', tolerateMissing: $('tolerate-missing')?.value ?? 'off', build: document.querySelector?.('script[src*="app.js"]')?.src?.split('v=')[1] ?? '' }).text;
   $('error-detail').hidden = !details.length;
   $('error-diagnostics').hidden = !details.length;
   $('error-diagnostics').open = false;
@@ -81,7 +73,7 @@ function showError(error, title = 'Tentativa de execução interrompida') {
 }
 function reportAPKError(error, title) {
   state.lastAPKError = { error, title };
-  state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0;
+  state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
   $('android-content').inert = true; $('android-window-layer').inert = true;
   if (error.navigation) state.canGoBack = !!error.navigation.canGoBack;
   if (!apkVM.worker) { state.runtime = null; state.apkRunning = false; $('android-device').hidden = true; }
@@ -101,7 +93,7 @@ function beginOperation(message) {
 }
 function finishOperation(token) {
   if (token !== state.operation) return;
-  clearInterval(state.operationTimer); $('operation-panel').hidden = true; state.abortController = null; setBusy(false); if (state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length) flushPendingInputs();
+  clearInterval(state.operationTimer); $('operation-panel').hidden = true; state.abortController = null; setBusy(false); if (state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length || state.pendingScrollBys.size) flushPendingInputs();
 }
 function onWorkerProgress(progress = {}) {
   const phases = { 'framework-resources': 'Carregando dados originais de estilos Android', framework: 'Carregando código AOSP compilado', manifest: 'Lendo o manifesto', dex: 'Inspecionando DEX', native: 'Inventariando bibliotecas nativas', complete: 'Inspeção concluída', launch: 'Tentando iniciar a Activity', click: 'Executando callback DEX', back: 'Retornando à Activity anterior', resources: 'Lendo recursos e layouts XML' };
@@ -114,7 +106,7 @@ function onWorkerProgress(progress = {}) {
 }
 function cancelOperation() {
   ++state.operation; state.abortController?.abort(); apkVM.cancel();
-  state.viewSession++; state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.runtime = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true; state.lastAPKError = null;
+  state.viewSession++; state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear(); state.runtime = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true; state.lastAPKError = null;
   clearInterval(state.operationTimer); $('operation-panel').hidden = true;
   $('android-device').hidden = true; $('empty-preview').hidden = state.mode !== 'apk';
   setBusy(false);
@@ -228,7 +220,7 @@ async function inspectSelectedNative() {
 }
 async function importSource(source, autoRun = false) {
   if (state.busy) return;
-  state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.viewSession++; for (const id of ['android-content', 'android-window-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0;
+  state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.viewSession++; for (const id of ['android-content', 'android-window-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
   switchMode('apk'); hideError(); state.runtime = null; state.inventory = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true;
   $('empty-preview').querySelector('h2').textContent = 'Seu aplicativo começa aqui.'; $('empty-preview').querySelector('p').innerHTML = 'Selecione um APK e clique em Executar.<br>Ou rode a demonstração para testar.';
   const token = beginOperation('Lendo o arquivo APK…');

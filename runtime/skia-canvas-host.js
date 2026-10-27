@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=00979d36e5ab';
-import {getVectorGraphics} from './vector-native.js?v=00979d36e5ab';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=00979d36e5ab';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=00979d36e5ab';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=00979d36e5ab';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=00979d36e5ab';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=00979d36e5ab';
-import {createBitmapHost} from './bitmap-host.js?v=00979d36e5ab';
-import { gcRoot } from './heap-gc.js?v=00979d36e5ab';
+import {APKError} from './apk-runtime.js?v=58b0147dafd8';
+import {getVectorGraphics} from './vector-native.js?v=58b0147dafd8';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=58b0147dafd8';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=58b0147dafd8';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=58b0147dafd8';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=58b0147dafd8';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=58b0147dafd8';
+import {createBitmapHost} from './bitmap-host.js?v=58b0147dafd8';
+import { gcRoot } from './heap-gc.js?v=58b0147dafd8';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -14,8 +14,8 @@ const matrix=m=>[m[0],m[2],m[4],m[1],m[3],m[5],0,0,1];
 const finite=values=>{if(values.some(v=>!Number.isFinite(v)))fail('Non-finite Skia geometry');return values;};
 const argb=(CK,color,alpha=1)=>{const c=color>>>0;return CK.Color((c>>>16)&255,(c>>>8)&255,c&255,(c>>>24)/255*alpha);};
 /** Android BitmapShader over a snapshot raster. ALPHA_8 bitmaps are coverage only: Skia exposes them as (0,0,0,a), later tinted by the Paint's color filter. */
-function attachShader(CK,paint,shader){
- if(shader.kind!=='bitmap'||!shader.raster?.dataURL?.startsWith('data:image/png;base64,'))fail('Unsupported Paint shader description');
+function buildBitmapShader(CK,shader){
+ if(!shader.raster?.dataURL?.startsWith('data:image/png;base64,'))fail('Unsupported Paint shader description');
  const bytes=Uint8Array.from(atob(shader.raster.dataURL.slice(22)),c=>c.charCodeAt(0)),image=CK.MakeImageFromEncoded(bytes);if(!image)fail('Skia rejected the BitmapShader raster');
  let source=image,coverage=null;
  try{
@@ -24,10 +24,26 @@ function attachShader(CK,paint,shader){
    const mask=new CK.Paint(),filter=CK.ColorFilter.MakeBlend(CK.Color(0,0,0,1),CK.BlendMode.SrcIn);mask.setColorFilter(filter);
    try{surface.getCanvas().clear(CK.TRANSPARENT);surface.getCanvas().drawImage(image,0,0,mask);surface.flush();coverage=surface.makeImageSnapshot();source=coverage;}finally{mask.delete();filter.delete();surface.dispose();}
   }
-  const modes=[CK.TileMode.Clamp,CK.TileMode.Repeat,CK.TileMode.Mirror],built=source.makeShaderOptions(modes[shader.tileX],modes[shader.tileY],CK.FilterMode.Linear,CK.MipmapMode.None,shader.matrix?shader.matrix.slice():undefined);
-  paint.setShader(built);built.delete();
+  const modes=[CK.TileMode.Clamp,CK.TileMode.Repeat,CK.TileMode.Mirror];
+  return source.makeShaderOptions(modes[shader.tileX],modes[shader.tileY],CK.FilterMode.Linear,CK.MipmapMode.None,shader.matrix?shader.matrix.slice():undefined);
  }finally{coverage?.delete();image.delete();}
 }
+/** AGSL (android.graphics.RuntimeShader) as an SkSL runtime effect: uniforms are matched by name to the effect's uniform slots, `uniform shader` children in declaration order. */
+function buildRuntimeShader(CK,shader,overrides){
+ const effect=CK.RuntimeEffect.Make(shader.source,message=>fail('AGSL/SkSL compile error: '+message));if(!effect)fail('Skia rejected the AGSL runtime effect');
+ const floats=new Float32Array(effect.getUniformFloatCount()),values=new Map(shader.uniforms.map(u=>[u.name,u.values]));
+ for(const[name,v]of overrides??[])values.set(name,v);
+ for(let i=0;i<effect.getUniformCount();i++){const u=effect.getUniform(i),name=effect.getUniformName(i),v=values.get(name);if(!v)continue;if(v.length>u.rows*u.columns)fail(`AGSL uniform ${name} has more values than its type`);floats.set(v,u.slot);}
+ const childNames=[...shader.source.matchAll(/uniform\s+shader\s+(\w+)\s*;/g)].map(m=>m[1]),children=childNames.map(name=>{const input=shader.inputs.find(([n])=>n===name)?.[1];return input?buildShader(CK,input):CK.Shader.MakeColor(CK.Color4f(0,0,0,0));/* an unset child samples transparent black, as in hwui */});
+ try{return effect.makeShaderWithChildren(floats,children,shader.matrix?shader.matrix.slice():undefined);}finally{for(const c of children)c.delete();effect.delete?.();}
+}
+function buildShader(CK,shader,overrides){
+ if(shader.kind==='bitmap')return buildBitmapShader(CK,shader);
+ if(shader.kind==='runtime')return buildRuntimeShader(CK,shader,overrides);
+ return fail('Unsupported Paint shader description');
+}
+/** Android BitmapShader over a snapshot raster. ALPHA_8 bitmaps are coverage only: Skia exposes them as (0,0,0,a), later tinted by the Paint's color filter. */
+function attachShader(CK,paint,shader,overrides){const built=buildShader(CK,shader,overrides);paint.setShader(built);built.delete();}
 function makePaint(CK,state){const paint=new CK.Paint();paint.setAntiAlias(!!(state.flags&1));paint.setColor(argb(CK,state.argb));paint.setBlendMode({value:state.blendMode??3});paint.setStyle([CK.PaintStyle.Fill,CK.PaintStyle.Stroke,CK.PaintStyle.StrokeAndFill][state.style]);paint.setStrokeWidth(state.strokeWidth);paint.setStrokeMiter(state.strokeMiter);paint.setStrokeCap([CK.StrokeCap.Butt,CK.StrokeCap.Round,CK.StrokeCap.Square][state.strokeCap]);paint.setStrokeJoin([CK.StrokeJoin.Miter,CK.StrokeJoin.Round,CK.StrokeJoin.Bevel][state.strokeJoin]);if(state.colorFilterSnapshot){const filter=makeSkiaColorFilter(CK,state.colorFilterSnapshot);paint.setColorFilter(filter);filter?.delete();}if(state.shader)attachShader(CK,paint,state.shader);return paint;}
 function makeFont(backend,state,text){
  const CK=backend.CanvasKit;if(typeof text!=='string'||text.length>65536)fail('Skia text run exceeds65536characters');
@@ -90,7 +106,9 @@ export function rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,heig
      if(node.clipToBounds)canvas.clipRect(CK.LTRBRect(0,0,node.right-node.left,node.bottom-node.top),CK.ClipOp.Intersect,false);
      if(node.clipBounds)canvas.clipRect(CK.LTRBRect(...node.clipBounds),CK.ClipOp.Intersect,false);
      if(node.clipToOutline&&node.outline){if(node.outline.commands){const path=CK.Path.MakeFromCmds(node.outline.commands);path.setFillType({value:node.outline.fillType});canvas.clipPath(path,CK.ClipOp.Intersect,true);path.delete();}else if(node.outline.empty)canvas.clipRect(CK.LTRBRect(0,0,0,0),CK.ClipOp.Intersect,false);else canvas.clipRRect(CK.RRectXY(node.outline.rect,node.outline.radius,node.outline.radius),CK.ClipOp.Intersect,true);}
-     const layer=node.layerPaint?makePaint(CK,node.layerPaint):new CK.Paint();layer.setAlphaf((node.layerPaint?.alpha??1)*Math.max(0,Math.min(1,node.alpha)));canvas.saveLayer(layer);layer.delete();replay(node.displayList);canvas.restore();activeNodes.delete(command.node);
+     const isolate=!!node.layerPaint||node.layerType!==0||node.alpha<1;   // hwui only renders a node into an offscreen layer when it has alpha / a layer paint / a layer type
+     if(isolate){const layer=node.layerPaint?makePaint(CK,node.layerPaint):new CK.Paint();layer.setAlphaf((node.layerPaint?.alpha??1)*Math.max(0,Math.min(1,node.alpha)));canvas.saveLayer(layer);layer.delete();}
+     replay(node.displayList);if(isolate)canvas.restore();activeNodes.delete(command.node);
     }
    }else if(command.vectorTree){const tree=command.vectorState??graphics.get(command.vectorTree,'tree');canvas.translate(command.x,command.y);canvas.scale(command.width/tree.viewportWidth,command.height/tree.viewportHeight);if(command.mirrored){canvas.translate(tree.viewportWidth,0);canvas.scale(-1,1);}canvas.clipRect(CK.LTRBRect(0,0,tree.viewportWidth,tree.viewportHeight),CK.ClipOp.Intersect,true);sourceVector(CK,canvas,graphics,tree,command.colorFilter);
    }else if(command.argb!==undefined&&command.kind!=='skia'){const paint=makePaint(CK,command.paint??{argb:command.argb,flags:1,style:0,strokeWidth:0,strokeMiter:4,strokeCap:0,strokeJoin:0});canvas.drawRect(CK.XYWHRect(command.x,command.y,command.width,command.height),paint);paint.delete();
@@ -103,6 +121,28 @@ export function rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,heig
     else if(command.op==='oval')canvas.drawOval(command.args,paint);
     else if(command.op==='roundRect')canvas.drawRRect(CK.RRectXY(command.args.slice(0,4),command.args[4],command.args[5]),paint);
     else if(command.op==='rect')canvas.drawRect(command.args,paint);
+    else if(command.op==='circleProps'||command.op==='roundRectProps'||command.op==='ripple'){
+     // RecordingCanvas draws whose geometry/paint are CanvasProperty tokens: the values are read NOW, so RenderThread animators (RenderNodeAnimator) move them between frames.
+     const value=h=>graphics.get(h),number=h=>{const v=value(h);if(v.kind!=='float')fail('CanvasProperty<Float> expected');return v.value;},paintOf=h=>{const v=value(h);if(v.kind!=='paint')fail('CanvasProperty<Paint> expected');return v.paint;};
+     const props=command.props;let drawPaint;
+     if(command.op==='ripple'){
+      const shader=command.shader,progress=number(props.progress),noise=number(props.noise),f=Math.fround,PI=Math.PI,scale=1.5;
+      const circle=(a,b,k,c,sn)=>[f(scale*a+noise*k*Math.cos(scale*c)),f(scale*a+noise*k*Math.sin(scale*sn))];
+      // hwui AnimatedRipple::draw: the shader's progress / noise-phase uniforms come from the animated CanvasProperties (same formulas as RippleShader.setNoisePhase).
+      const overrides=[['in_progress',[f(progress)]],['in_noisePhase',[f(noise*0.001)]],['in_turbulencePhase',[f(noise)]],
+       ['in_tCircle1',[f(scale*0.5+noise*0.01*Math.cos(scale*0.55)),f(scale*0.5+noise*0.01*Math.sin(scale*0.55))]],
+       ['in_tCircle2',[f(scale*0.2+noise*-0.0066*Math.cos(scale*0.45)),f(scale*0.2+noise*-0.0066*Math.sin(scale*0.45))]],
+       ['in_tCircle3',[f(scale+noise*-0.0066*Math.cos(scale*0.35)),f(scale+noise*-0.0066*Math.sin(scale*0.35))]]];
+      const rot=(angle)=>[f(Math.cos(angle)),f(Math.sin(angle))];
+      overrides.push(['in_tRotation1',rot(noise*PI*0.0078125+1.7*PI)],['in_tRotation2',rot(noise*PI*-0.0078125+2*PI)],['in_tRotation3',rot(noise*PI*0.0078125+2.75*PI)]);
+      drawPaint=makePaint(CK,{...paintOf(props.paint),shader:null});attachShader(CK,drawPaint,shader,overrides);
+      if(!Number.isFinite(progress))fail('Non-finite ripple progress');
+     }else drawPaint=makePaint(CK,paintOf(props.paint));
+     try{
+      if(command.op==='roundRectProps')canvas.drawRRect(CK.RRectXY([number(props.left),number(props.top),number(props.right),number(props.bottom)],number(props.rx),number(props.ry)),drawPaint);
+      else canvas.drawCircle(number(props.cx),number(props.cy),number(props.radius),drawPaint);
+     }finally{drawPaint.delete();}
+    }
     else if(command.op==='color')canvas.drawColor(argb(CK,command.color),{value:command.blendMode??3});
     else if(command.op==='paint')canvas.drawPaint(paint);
     else if(command.op==='raster'){const raster=command.raster;if(raster?.kind!=='raster'||!raster.dataURL?.startsWith('data:image/png;base64,')||raster.dataURL.length>12*1024*1024)fail('Canvas raster requires a bounded actual PNG');const binary=atob(raster.dataURL.slice(22)),bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));const image=CK.MakeImageFromEncoded(bytes);if(!image)fail('Skia rejected a recorded widget raster');try{if(image.width()>4096||image.height()>4096||image.width()*image.height()>4*1024*1024)fail('Recorded widget raster exceeds Skia bounds');const drawImage=p=>{if(command.src&&command.dst)canvas.drawImageRect(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),p);else{if(command.imageMatrix)canvas.concat(command.imageMatrix);if(command.imageScale&&command.imageScale!==1){canvas.translate(command.args[0],command.args[1]);canvas.scale(command.imageScale,command.imageScale);canvas.drawImage(image,0,0,p);}else canvas.drawImage(image,command.args[0],command.args[1],p);}};

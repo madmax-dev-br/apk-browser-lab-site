@@ -1,9 +1,9 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { isTrustedRasterURL } from './raster-cache.js?v=00979d36e5ab';
+import { isTrustedRasterURL } from './raster-cache.js?v=58b0147dafd8';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
-  return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
+  return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
 }
 /**
  * ctx: { $ (id lookup), state, deviceState ({settings, bars, clockTimer}), hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, clickView, notifyParent, hooks }
@@ -175,6 +175,12 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
       if (session !== state.viewSession || element._pressed === pressed || element.disabled) return; element._pressed = pressed;
       if (state.pendingFocus.length >= 128) return; state.pendingFocus.push({ id: view.id, pressed }); flushPendingInputs();
     });
+    // RecyclerView (and other lists scrolled by the VM, not by DOM overflow): the wheel becomes View.scrollBy in the original RecyclerView code.
+    if (view.type?.endsWith('RecyclerView;') || view.type?.endsWith('/ListView;')) { element.dataset.listScroll = 'true'; element.addEventListener('wheel', event => {
+      if (element._session !== state.viewSession || !state.runtime) return; event.preventDefault();
+      const rect = element.getBoundingClientRect(), scale = rect.width / (element.offsetWidth || rect.width) || 1, unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.offsetHeight : 1, previous = state.pendingScrollBys.get(view.id) ?? { dx: 0, dy: 0 };
+      state.pendingScrollBys.set(view.id, { dx: previous.dx + event.deltaX * unit / scale, dy: previous.dy + event.deltaY * unit / scale }); flushPendingInputs();
+    }, { passive: false }); }
     if (kind === 'scroll') element.addEventListener('scroll', () => {
       if (session !== state.viewSession || !state.runtime || state.lastAPKError) return;
       const x = Math.round(element.scrollLeft), y = Math.round(element.scrollTop);
@@ -304,7 +310,8 @@ function queueComposeAction(ownerViewId, nodeId, action, args = []) {
   else { reportAPKError(new Error('A fila de ações Compose excedeu 128 eventos; reabra o APK.'), 'Fila de acessibilidade interrompida'); return; }
   flushPendingInputs();
 }
-const POINTER_CLICKS = false;   // flip to true once a press ripple draws without error under real MotionEvents (see docs/VALIDATION.md)
+const POINTER_CLICKS_DEFAULT = false;   // flip to true once a press ripple draws without error under real MotionEvents (see docs/VALIDATION.md)
+  const pointerClicks = () => deviceState.pointerClicks ?? POINTER_CLICKS_DEFAULT;   // ?pointerClicks=real|semantic on the player frame overrides it (validation runs both)
 /** Mouse/touch/pen on a Compose view -> VM pointer samples (real MotionEvents). Overlay controls are descendants, so their events bubble here too. */
 function bindPointerInput(host, owner) {
   host._composeOwner = owner;   // refreshed on every render: width/height/ids may change
@@ -329,7 +336,7 @@ function bindPointerInput(host, owner) {
     if (active !== null || event.button > 0) return;
     // Interim: taps on clickable controls keep the semantic OnClick path until the press ripple (RippleHostView/RenderNode recording) runs under real MotionEvents;
     // gestures that semantics cannot express (slider drags, touch scrolling and flings, anything on non-clickable content) are real pointer input.
-    if (!POINTER_CLICKS && event.target.closest?.('button,textarea,input,[role=button],[role=switch],[role=checkbox]')) return;
+    if (!pointerClicks() && event.target.closest?.('button,textarea,input,[role=button],[role=switch],[role=checkbox]')) return;
     active = event.pointerId;
     win.addEventListener('pointermove', track, true); win.addEventListener('pointerup', onUp, true); win.addEventListener('pointercancel', onCancel, true);
     send(0, event);
@@ -338,7 +345,7 @@ function bindPointerInput(host, owner) {
 function renderComposeSemantics(snapshot) {
   if (!document.getElementById('compose-accessibility-style')) {
     const style = document.createElement('style'); style.id = 'compose-accessibility-style';
-    style.textContent = '.compose-semantic-control:focus-visible{outline:2px solid #315ce8;outline-offset:-2px}.compose-semantic-control::selection{background:transparent;color:transparent}';
+    style.textContent = '.compose-semantic-control:focus-visible{outline:2px solid #315ce8;outline-offset:-2px}.compose-semantic-control::selection{background:transparent;color:transparent}input[type=range].compose-semantic-control{-webkit-appearance:none;appearance:none;background:transparent}input[type=range].compose-semantic-control::-webkit-slider-runnable-track{background:transparent}input[type=range].compose-semantic-control::-webkit-slider-thumb{-webkit-appearance:none;opacity:0}input[type=range].compose-semantic-control::-moz-range-track,input[type=range].compose-semantic-control::-moz-range-thumb{background:transparent;border:0;opacity:0}';
     document.head.append(style);
   }
   const owners = snapshot.composeSemantics?.owners || [], views = new Map(), active = new Set(), layers = new Set();
@@ -379,7 +386,7 @@ function renderComposeSemantics(snapshot) {
           control.type = 'range';   // Slider / SetProgress: dragging or the arrow keys send the semantic SetProgress action
           control.addEventListener('input', () => { if (session === state.viewSession) queueComposeAction(owner.ownerViewId, node.nodeId, 'SetProgress', [Number(control.value)]); });
         } else if (clickable) {
-          control.type = 'button'; control.addEventListener('click', event => { event.stopPropagation(); if (POINTER_CLICKS && event.detail > 0) return;   /* a pointer click already reached Compose as MotionEvents; keyboard / assistive activation (detail 0) uses the semantic action */
+          control.type = 'button'; control.addEventListener('click', event => { event.stopPropagation(); if (pointerClicks() && event.detail > 0) return;   /* a pointer click already reached Compose as MotionEvents; keyboard / assistive activation (detail 0) uses the semantic action */
           if (session === state.viewSession) queueComposeAction(owner.ownerViewId, node.nodeId, control._activation); });
         }
         control.addEventListener('contextmenu', event => {
@@ -438,10 +445,16 @@ function renderComposeSemantics(snapshot) {
 
 async function flushPendingInputs() {
   if (state.inputPromise) return state.inputPromise;
-  if (state.busy || !state.runtime || !state.pendingInputs.size && !state.pendingFocus.length && !state.pendingComposeActions.length && !state.pendingScrolls.size && !state.pendingPointers.length) return;
+  if (state.busy || !state.runtime || !state.pendingInputs.size && !state.pendingFocus.length && !state.pendingComposeActions.length && !state.pendingScrolls.size && !state.pendingPointers.length && !state.pendingScrollBys.size) return;
   const token = state.operation;
   state.inputPromise = (async () => {
-    while ((state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length) && !state.busy && token === state.operation) {
+    while ((state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length || state.pendingScrollBys.size) && !state.busy && token === state.operation) {
+      if (!state.pendingPointers.length && state.pendingScrollBys.size) {
+        const [id, delta] = state.pendingScrollBys.entries().next().value; state.pendingScrollBys.delete(id);
+        try { const snapshot = await state.runtime.scrollBy(id, delta.dx, delta.dy); if (token === state.operation) renderSnapshot(snapshot); }
+        catch (error) { if (token === state.operation) reportAPKError(error, 'Rolagem da lista interrompida'); state.pendingScrollBys.clear(); break; }
+        continue;
+      }
       if (state.pendingPointers.length) {
         // Pointer samples keep their order; consecutive MOVEs of the same gesture collapse to the newest while the VM is busy.
         while (state.pendingPointers.length > 1 && state.pendingPointers[0].action === 2 && state.pendingPointers[1].action === 2 && state.pendingPointers[0].ownerViewId === state.pendingPointers[1].ownerViewId) state.pendingPointers.shift();

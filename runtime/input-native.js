@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=00979d36e5ab';
-import { createHostRegistry } from './host-contract.js?v=00979d36e5ab';
+import { APKError } from './apk-error.js?v=58b0147dafd8';
+import { createHostRegistry } from './host-contract.js?v=58b0147dafd8';
 
 // Natives behind the ORIGINAL android.view.MotionEvent, KeyEvent, KeyCharacterMap and VelocityTracker (android-13.0.0_r1 Java in framework.dex):
 //   * MotionEvent  -- android_view_MotionEvent.cpp over libinput's MotionEvent: samples (current + history) of pointer coordinates per axis, pointer properties, an affine
@@ -50,14 +50,15 @@ export function createInputNativeBindings() {
     const c = newCoords();
     for (const [name, axis] of [['x', AXIS_X], ['y', AXIS_Y], ['pressure', AXIS_PRESSURE], ['size', AXIS_SIZE], ['touchMajor', AXIS_TOUCH_MAJOR], ['touchMinor', AXIS_TOUCH_MINOR], ['toolMajor', AXIS_TOOL_MAJOR], ['toolMinor', AXIS_TOOL_MINOR], ['orientation', AXIS_ORIENTATION]]) c.values[axis] = b2f(field(runtime, ref, COORDS, name, 'F') ?? 0);
     const bits = BigInt.asUintN(64, BigInt(field(runtime, ref, COORDS, 'mPackedAxisBits', 'J') ?? 0n)), packed = field(runtime, ref, COORDS, 'mPackedAxisValues', '[F');
-    let index = 0; for (let axis = 0; axis <= 63; axis++) if ((bits >> BigInt(axis)) & 1n) { if (axis <= MAX_AXIS && axis >= BASIC_AXES) { c.present.add(axis); c.values[axis] = b2f(runtime.object(packed).elements[index]); } index++; }
+    let index = 0; for (let axis = 0; axis <= 63; axis++) if ((bits >> BigInt(63 - axis)) & 1n) {   // PointerCoords packs axes MSB first: axis n is bit 63-n (BitSet64)
+      if (axis <= MAX_AXIS && axis >= BASIC_AXES) { c.present.add(axis); c.values[axis] = b2f(runtime.object(packed).elements[index]); } index++; }
     return c;
   };
   const writeCoords = (runtime, ref, e, sample, pointerIndex) => {
     const coords = sample.coords[pointerIndex];
     for (const [name, axis] of [['x', AXIS_X], ['y', AXIS_Y], ['pressure', AXIS_PRESSURE], ['size', AXIS_SIZE], ['touchMajor', AXIS_TOUCH_MAJOR], ['touchMinor', AXIS_TOUCH_MINOR], ['toolMajor', AXIS_TOOL_MAJOR], ['toolMinor', AXIS_TOOL_MINOR], ['orientation', AXIS_ORIENTATION]]) setField(runtime, ref, COORDS, name, 'F', f2b(axisValue(e, sample, axis, pointerIndex, false)));
     let bits = 0n; const values = [];
-    for (let axis = BASIC_AXES; axis <= MAX_AXIS; axis++) if (coords.present.has(axis)) { bits |= 1n << BigInt(axis); values.push(f2b(coords.values[axis])); }
+    for (let axis = BASIC_AXES; axis <= MAX_AXIS; axis++) if (coords.present.has(axis)) { bits |= 1n << BigInt(63 - axis); values.push(f2b(coords.values[axis])); }
     setField(runtime, ref, COORDS, 'mPackedAxisBits', 'J', BigInt.asIntN(64, bits));
     const array = runtime.newArray('[F', Math.max(8, values.length)); runtime.object(array).elements = [...values, ...new Array(Math.max(8, values.length) - values.length).fill(0)];
     setField(runtime, ref, COORDS, 'mPackedAxisValues', '[F', array);

@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=00979d36e5ab';
-import {getVectorGraphics} from './vector-native.js?v=00979d36e5ab';
-import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=00979d36e5ab';
-import { gcRoot } from './heap-gc.js?v=00979d36e5ab';
+import {APKError} from './apk-error.js?v=58b0147dafd8';
+import {getVectorGraphics} from './vector-native.js?v=58b0147dafd8';
+import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=58b0147dafd8';
+import { gcRoot } from './heap-gc.js?v=58b0147dafd8';
 const BITMAP='Landroid/graphics/Bitmap;',CONFIG='Landroid/graphics/Bitmap$Config;',SPACE='Landroid/graphics/ColorSpace;',NAMED='Landroid/graphics/ColorSpace$Named;',CANVAS='Landroid/graphics/Canvas;';
 // android.graphics.Bitmap.Config / ColorSpace.Named declaration order (API 28 + API 34 HLG/PQ appended).
 const CONFIGS=['ALPHA_8','RGB_565','ARGB_4444','ARGB_8888','RGBA_F16','HARDWARE'];
@@ -10,14 +10,14 @@ const DM='Landroid/util/DisplayMetrics;';
 const bits=new DataView(new ArrayBuffer(4)),num=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'bitmap-backend'});};
 const keys=new Set();const add=(owner,list)=>list.forEach(s=>keys.add(owner+'->'+s));
-add(BITMAP,[`createBitmap(II${CONFIG})${BITMAP}`,`createBitmap(II${CONFIG}Z)${BITMAP}`,`createBitmap(II${CONFIG}Z${SPACE})${BITMAP}`,`createBitmap(${DM}II${CONFIG})${BITMAP}`,`createBitmap(${DM}II${CONFIG}Z)${BITMAP}`,`createBitmap(${DM}II${CONFIG}Z${SPACE})${BITMAP}`,'getWidth()I','getHeight()I',`getConfig()${CONFIG}`,'hasAlpha()Z','setHasAlpha(Z)V',`getColorSpace()${SPACE}`,'isRecycled()Z','recycle()V','prepareToDraw()V','hasMipMap()Z','setHasMipMap(Z)V','isMutable()Z','isPremultiplied()Z','getDensity()I','getByteCount()I','getAllocationByteCount()I','getRowBytes()I','setDensity(I)V','eraseColor(I)V']);
+add(BITMAP,['getNativeInstance()J',`createBitmap(II${CONFIG})${BITMAP}`,`createBitmap(II${CONFIG}Z)${BITMAP}`,`createBitmap(II${CONFIG}Z${SPACE})${BITMAP}`,`createBitmap(${DM}II${CONFIG})${BITMAP}`,`createBitmap(${DM}II${CONFIG}Z)${BITMAP}`,`createBitmap(${DM}II${CONFIG}Z${SPACE})${BITMAP}`,'getWidth()I','getHeight()I',`getConfig()${CONFIG}`,'hasAlpha()Z','setHasAlpha(Z)V',`getColorSpace()${SPACE}`,'isRecycled()Z','recycle()V','prepareToDraw()V','hasMipMap()Z','setHasMipMap(Z)V','isMutable()Z','isPremultiplied()Z','getDensity()I','getByteCount()I','getAllocationByteCount()I','getRowBytes()I','setDensity(I)V','eraseColor(I)V']);
 add(CONFIG,[`values()[${CONFIG}`]);add(NAMED,[`values()[${NAMED}`]);
 add(SPACE,[`get(${NAMED})${SPACE}`,'getId()I','getName()Ljava/lang/String;','isSrgb()Z','isWideGamut()Z','getComponentCount()I']);
 add(CANVAS,[`throwIfCannotDraw(${BITMAP})V`,`<init>(${BITMAP})V`,`drawBitmap(${BITMAP}FFLandroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Rect;Landroid/graphics/Rect;Landroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Rect;Landroid/graphics/RectF;Landroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Matrix;Landroid/graphics/Paint;)V`]);
 /** Software Bitmap over the verified Skia canvas model: a Bitmap owns a recorded Canvas command list that Canvas(Bitmap) appends to;
  * its pixels are produced by the real Skia rasterizer when the bitmap is drawn (snapshot semantics at the draw call). */
 export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
- const enums=gcRoot(new Map()),spaces=gcRoot(new Map());
+ const enums=gcRoot(new Map()),spaces=gcRoot(new Map()),byHandle=gcRoot(new Map());   // byHandle: Bitmap.getNativeInstance() token -> Bitmap
  const enumValue=(owner,list,name)=>{
   const key=owner+name;if(!enums.has(key)){const ref=runtime.makeObject(owner),o=runtime.object(ref);o.enumName=name;o.enumOrdinal=list.indexOf(name);enums.set(key,ref);}return enums.get(key);
  };
@@ -37,7 +37,7 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
   const graphics=getVectorGraphics(runtime),handle=graphics.createCanvas(),canvas=graphics.get(handle,'canvas');Object.assign(canvas,{width,height});
   const ref=runtime.makeObject(BITMAP),o=runtime.object(ref);
   o.bitmap={width,height,config,hasAlpha,handle,recycled:false,mipMap:false,density:160,colorSpace:colorSpace('SRGB'),mutable};
-  runtime.storeField(o.fields,`${BITMAP}->mDensity:I`,160);
+  runtime.storeField(o.fields,`${BITMAP}->mDensity:I`,160);byHandle.set(handle,ref);
   return ref;
  };
  /** Records a draw of the bitmap's current pixels into a canvas handle. */
@@ -64,6 +64,8 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
    return null;
   },
   drawInto,create,live,enumValue,CONFIGS,matrixValues,rectF,recordNative,
+  /** Bitmap for a Bitmap.getNativeInstance() token (the API 33 RecordingCanvas natives take the bitmap handle, not the object). */
+  byNativeInstance(handle){const ref=byHandle.get(BigInt(handle));if(!ref)fail('Invalid Bitmap native instance token');live(ref);return ref;},
   /** Pixels of a Bitmap for BitmapShader sampling: a snapshot raster plus whether the bitmap is coverage-only (ALPHA_8). */
   shaderSource(bitmapRef){
    const b=live(bitmapRef),graphics=getVectorGraphics(runtime),holder=b.canvasObject??=runtime.allocate(CANVAS);
@@ -103,6 +105,7 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
    }
    const b=state(args[0]);
    switch(name){
+    case'getNativeInstance':return b.handle;
     case'getWidth':return b.width;case'getHeight':return b.height;case'getConfig':return b.config;case'hasAlpha':return b.hasAlpha?1:0;
     case'setHasAlpha':b.hasAlpha=!!args[1];return;case'getColorSpace':return b.colorSpace;case'isRecycled':return b.recycled?1:0;
     case'recycle':b.recycled=true;return;case'prepareToDraw':return;case'hasMipMap':return b.mipMap?1:0;case'setHasMipMap':b.mipMap=!!args[1];return;

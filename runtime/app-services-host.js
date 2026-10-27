@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=00979d36e5ab';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=00979d36e5ab';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=00979d36e5ab';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=00979d36e5ab';
+import { APKError } from './apk-error.js?v=58b0147dafd8';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=58b0147dafd8';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=58b0147dafd8';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=58b0147dafd8';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -619,7 +619,20 @@ export function createAppServicesHost(platform) {
   type(PACKAGE_INFO, OBJECT, [], { allocatable: true });
   for (const [name, ftype] of [['packageName', STRING], ['versionName', STRING], ['versionCode', 'I'], ['longVersionCode', 'J'], ['firstInstallTime', 'J'], ['lastUpdateTime', 'J'], ['applicationInfo', APPLICATION_INFO], ['requestedPermissions', '[Ljava/lang/String;'], ['signatures', '[Landroid/content/pm/Signature;'], ['signingInfo', 'Landroid/content/pm/SigningInfo;']]) registry.instanceField(PACKAGE_INFO, name, ftype, { reflect: true });
   def(PACKAGE_INFO, 'getLongVersionCode', '()J', (r, _m, [self]) => r.object(self).fields.get(`${PACKAGE_INFO}->longVersionCode:J`) ?? 0n);
-  def(PACKAGE_MANAGER, 'getPackageInfo', `(${STRING}I)${PACKAGE_INFO}`, (r, _m, [, name, flags]) => {
+  // API 33 PackageManager.PackageInfoFlags.of(long) + getPackageInfo(String, PackageInfoFlags): the same lookup with the flag value taken from the holder.
+  const INFO_FLAGS = 'Landroid/content/pm/PackageManager$PackageInfoFlags;'; type(INFO_FLAGS, OBJECT, [], { allocatable: true });
+  def(INFO_FLAGS, 'of', `(J)${INFO_FLAGS}`, (r, _m, [value]) => { const holder = r.makeObject(INFO_FLAGS); r.object(holder).flagsValue = BigInt(value); return holder; }, { static: true });
+  def(INFO_FLAGS, 'getValue', '()J', (r, _m, [self]) => r.object(self).flagsValue ?? 0n);
+  // API 33 PackageManager.ApplicationInfoFlags.of(long) + getApplicationInfo(String, ApplicationInfoFlags): only this package is installed;
+  // GET_META_DATA (128) decides whether metaData is filled, as in getApplicationInfo(String, int).
+  const APP_INFO_FLAGS = 'Landroid/content/pm/PackageManager$ApplicationInfoFlags;'; type(APP_INFO_FLAGS, OBJECT, [], { allocatable: true });
+  def(APP_INFO_FLAGS, 'of', `(J)${APP_INFO_FLAGS}`, (r, _m, [value]) => { const holder = r.makeObject(APP_INFO_FLAGS); r.object(holder).flagsValue = BigInt(value); return holder; }, { static: true });
+  def(APP_INFO_FLAGS, 'getValue', '()J', (r, _m, [self]) => r.object(self).flagsValue ?? 0n);
+  def(PACKAGE_MANAGER, 'getApplicationInfo', `(${STRING}${APP_INFO_FLAGS})${APPLICATION_INFO}`, (r, _m, [, name, flags]) => {
+    const n = text(r, name); if (n !== pkg()) r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', n);
+    return platform.applicationInfo(r, (Number((flags === null ? 0n : r.object(flags).flagsValue ?? 0n) & 128n)) !== 0);
+  });
+  const packageInfoDef = (r, _m, [, name, flags]) => {
     const n = text(r, name); if (n !== pkg()) r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', n);
     const info = r.allocate(PACKAGE_INFO), put = (name2, ftype, value) => r.storeField(r.object(info).fields, `${PACKAGE_INFO}->${name2}:${ftype}`, value), attrs = platform.manifest?.manifestAttrs ?? {};
     const code = Number(attrs.versionCode ?? 0) | 0;
@@ -629,7 +642,9 @@ export function createAppServicesHost(platform) {
     if (flags & 0x40) put('signatures', SIGNATURES, signatureArray(r));
     if (flags & 0x08000000) { const signing = r.allocate(SIGNING_INFO); r.object(signing).signers = signatureArray(r); put('signingInfo', SIGNING_INFO, signing); }
     return info;
-  });
+  };
+  def(PACKAGE_MANAGER, 'getPackageInfo', `(${STRING}I)${PACKAGE_INFO}`, packageInfoDef);
+  def(PACKAGE_MANAGER, 'getPackageInfo', `(${STRING}${INFO_FLAGS})${PACKAGE_INFO}`, (r, m, [self, name, holder]) => { if (holder === null) r.throwJava('Ljava/lang/NullPointerException;', 'flags'); return packageInfoDef(r, m, [self, name, Number(BigInt.asIntN(32, r.object(holder).flagsValue ?? 0n))]); });
 
   // The lab installs the APK itself: no store recorded it, so the installer package is null (what adb/sideloaded installs report).
   def(PACKAGE_MANAGER, 'checkPermission', `(${STRING}${STRING})I`, (r, _m, [, permission, name]) => { const permissionName = needPermission(r, permission); if (name === null) r.throwJava('Ljava/lang/NullPointerException;', null); return text(r, name) === pkg() && holdsPermission(r, permissionName) ? PERMISSION_GRANTED : PERMISSION_DENIED; });   // other packages are not installed on the virtual device

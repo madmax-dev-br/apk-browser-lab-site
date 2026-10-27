@@ -1,4 +1,4 @@
-import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=00979d36e5ab';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=58b0147dafd8';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: SCREEN_PRESETS.map(p => p.id), orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -21,6 +21,7 @@ export function sanitizeSettings(input = {}) {
   for (const [name, values] of Object.entries(ALLOWED)) if (values.includes(input[name])) out[name] = input[name];
   if (Number.isFinite(Number(input.fontScale))) out.fontScale = Math.min(2, Math.max(0.85, Number(input.fontScale)));
   if (Number.isFinite(Number(input.animatorScale))) out.animatorScale = Math.min(10, Math.max(0, Number(input.animatorScale)));
+  if (Number.isFinite(Number(input.statusBarHeightDp)) && input.statusBarHeightDp !== null && input.statusBarHeightDp !== '') out.statusBarHeightDp = Math.min(64, Math.max(16, Number(input.statusBarHeightDp)));   // dp; null = the framework's status_bar_height
   if (typeof input.darkTheme === 'boolean') out.darkTheme = input.darkTheme;
   if (typeof input.hour24 === 'boolean') out.hour24 = input.hour24;
   if (typeof input.locale === 'string' && /^[a-z]{2}-[A-Z]{2}$/.test(input.locale)) out.locale = input.locale;

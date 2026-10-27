@@ -1,6 +1,6 @@
 // Embeddable APK runner. Usage: <script type="module" src="…/player/apk-player.js"></script> then <apk-player src="app.apk" device="phone" locale="pt-BR" theme="dark">.
 // The APK runs inside an iframe (player/frame.html) served from the runtime's origin; this script only talks to it through versioned postMessage.
-import { ATTRIBUTES, configFromAttributes, parseConfig, envelope, validateFrameMessage } from './protocol.js?v=00979d36e5ab';
+import { ATTRIBUTES, configFromAttributes, parseConfig, envelope, validateFrameMessage } from './protocol.js?v=58b0147dafd8';
 
 const FRAME_TIMEOUT_MS = 20000;
 const DEFAULT_ASSETS_BASE = new URL('../', import.meta.url).href;
@@ -10,9 +10,9 @@ const sleepless = () => {};
 export class ApkPlayer extends EventTarget {
   /** ApkPlayer.mount(element, { apk: File|Blob|ArrayBuffer|URL string, config, assetsBase, name, activity, lazy, transfer }) */
   static mount(element, options = {}) { return new ApkPlayer(element, options); }
-  constructor(target, { apk = null, config = {}, assetsBase = DEFAULT_ASSETS_BASE, name = '', activity = '', lazy = false, transfer = true, title = 'Android app (APK player)', eventTarget = null, scale = 'fit', keepData = false, clearData = false } = {}) {
+  constructor(target, { apk = null, config = {}, assetsBase = DEFAULT_ASSETS_BASE, name = '', activity = '', lazy = false, transfer = true, title = 'Android app (APK player)', eventTarget = null, scale = 'fit', pointerClicks = null, keepData = false, clearData = false } = {}) {
     super();
-    this.target = target; this.eventTarget = eventTarget; this.options = { apk, name, activity, transfer, title, scale, keepData: !!keepData, clearData: !!clearData }; this.config = {}; this.destroyed = false; this.helloReceived = false; this.ready = false; this.outbox = [];
+    this.target = target; this.eventTarget = eventTarget; this.options = { apk, name, activity, transfer, title, scale, pointerClicks, keepData: !!keepData, clearData: !!clearData }; this.config = {}; this.destroyed = false; this.helloReceived = false; this.ready = false; this.outbox = []; this.diagnosticRequests = new Map(); this.diagnosticId = 0;
     const base = new URL(assetsBase, globalThis.location?.href); this.frameURL = new URL('player/frame.html', base.href.endsWith('/') ? base.href : base.href + '/');
     this.frameOrigin = this.frameURL.origin;
     this.onMessage = event => this.receive(event);
@@ -29,7 +29,7 @@ export class ApkPlayer extends EventTarget {
     if (this.destroyed || this.iframe) return;
     const hostOrigin = globalThis.location?.origin;
     if (!hostOrigin || hostOrigin === 'null') { this.emit('error', { kind: 'opaque-host-origin', message: 'The embedding page has an opaque origin (file:// or sandbox without allow-same-origin); serve it over http(s).', phase: 'mount', frontier: null }); return; }
-    const url = new URL(this.frameURL.href); url.searchParams.set('parent', hostOrigin); if (this.options.scale === 'actual') url.searchParams.set('scale', 'actual');
+    const url = new URL(this.frameURL.href); url.searchParams.set('parent', hostOrigin); if (this.options.scale === 'actual') url.searchParams.set('scale', 'actual'); if (this.options.pointerClicks) url.searchParams.set('pointerClicks', this.options.pointerClicks);
     const iframe = document.createElement('iframe');
     iframe.src = url.href; iframe.title = this.options.title; iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin'); iframe.setAttribute('allow', ''); iframe.setAttribute('referrerpolicy', 'no-referrer');
     iframe.style.cssText = 'border:0;width:100%;height:100%;display:block;background:transparent;color-scheme:normal';
@@ -48,6 +48,7 @@ export class ApkPlayer extends EventTarget {
     if (!result.ok) { this.emit('error', { kind: 'protocol', message: result.error, phase: 'message', frontier: null }); return; }
     const message = result.message;
     if (message.type === 'hello') { clearTimeout(this.helloTimer); this.helloReceived = true; this.sendInit(); for (const [pending, transfer] of this.outbox.splice(0)) this.post(pending, transfer); return; }
+    if (message.type === 'diagnostics') { const request = this.diagnosticRequests.get(message.id); if (request) { this.diagnosticRequests.delete(message.id); clearTimeout(request.timer); const { protocol, version, type, id, ...result } = message; request.resolve(result); } return; }
     if (message.type === 'ready') { this.ready = true; this.activity = message.activity; }
     if (message.type === 'activity-changed') this.activity = message.activity;
     if (message.type === 'config-applied') this.config = message.config;
@@ -71,13 +72,21 @@ export class ApkPlayer extends EventTarget {
     if (!this.helloReceived || !this.ready) this.pendingConfig = { ...this.pendingConfig, ...config };
     this.post(envelope('config', { config })); return this;
   }
+  /** The stub lists of the running app at this moment: Promise<{ stubs: { void, returns, classes }, tolerateMissing, packageName, report }> (`key xN` strings). Same data as `error.detail.stubs`. */
+  diagnostics(timeoutMs = 5000) {
+    if (this.destroyed) return Promise.reject(new Error('The player was destroyed.'));
+    return new Promise((resolve, reject) => {
+      const id = ++this.diagnosticId, timer = setTimeout(() => { this.diagnosticRequests.delete(id); reject(new Error('The player frame did not answer diagnostics().')); }, timeoutMs);
+      this.diagnosticRequests.set(id, { resolve, reject, timer }); this.post(envelope('diagnostics', { id }));
+    });
+  }
   back() { this.post(envelope('back')); return this; }
   restart() { this.post(envelope('restart')); return this; }
   /** Wipe the app's stored data (Settings > Apps > Clear storage) and restart it from empty storage. Resolves via the `data-cleared` event. */
   clearData() { this.post(envelope('clear-data')); return this; }
   destroy() {
     if (this.destroyed) return; try { if (this.helloReceived) this.iframe.contentWindow.postMessage(envelope('destroy'), this.frameOrigin); } catch { sleepless(); }
-    this.destroyed = true; clearTimeout(this.helloTimer); this.observer?.disconnect(); globalThis.removeEventListener('message', this.onMessage); this.iframe?.remove(); this.iframe = null; this.outbox.length = 0;
+    this.destroyed = true; clearTimeout(this.helloTimer); this.observer?.disconnect(); globalThis.removeEventListener('message', this.onMessage); this.iframe?.remove(); this.iframe = null; this.outbox.length = 0; for (const [, request] of this.diagnosticRequests) { clearTimeout(request.timer); request.reject(new Error('The player was destroyed.')); } this.diagnosticRequests.clear();
   }
 }
 
@@ -104,6 +113,7 @@ export class ApkPlayerElement extends HTMLElement {
   }
   disconnectedCallback() { this.player?.destroy(); this.player = null; this.mounted = false; }
   setConfig(patch) { this.player?.setConfig(patch); return this; }
+  diagnostics() { return this.player ? this.player.diagnostics() : Promise.reject(new Error('The player is not mounted.')); }
   back() { this.player?.back(); return this; }
   restart() { this.player?.restart(); return this; }
   clearData() { this.player?.clearData(); return this; }

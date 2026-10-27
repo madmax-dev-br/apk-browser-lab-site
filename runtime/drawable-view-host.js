@@ -1,8 +1,8 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=00979d36e5ab';
-import { APKError } from './apk-runtime.js?v=00979d36e5ab';
-import { getVectorGraphics } from './vector-native.js?v=00979d36e5ab';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=00979d36e5ab';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=00979d36e5ab';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=58b0147dafd8';
+import { APKError } from './apk-runtime.js?v=58b0147dafd8';
+import { getVectorGraphics } from './vector-native.js?v=58b0147dafd8';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=58b0147dafd8';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=58b0147dafd8';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -23,6 +23,25 @@ export function createDrawableViewHost(platform) {
   const buttonBounds=(runtime,receiver,width,height)=>{const view=runtime.object(receiver),drawable=view.buttonDrawable;if(!drawable)return null;const iw=dispatch(runtime,DRAWABLE,'getIntrinsicWidth',[],'I',drawable),ih=dispatch(runtime,DRAWABLE,'getIntrinsicHeight',[],'I',drawable),gravity=buttonGravity(runtime,receiver)&0x70,left=view.layoutDirection===1?width-iw:0,top=gravity===0x50?height-ih:gravity===0x10?Math.trunc((height-ih)/2):0;return {left,top,right:left+iw,bottom:top+ih};};
   const drawButton=(runtime,receiver,canvas,width,height)=>{const view=runtime.object(receiver);if(!view.buttonDrawable)return;prepareCpuAnimatedVector(runtime,view.buttonDrawable);const bounds=buttonBounds(runtime,receiver,width,height);view.buttonBounds=bounds;dispatch(runtime,DRAWABLE,'setBounds',['I','I','I','I'],'V',view.buttonDrawable,Object.values(bounds));if(view.backgroundDrawable)dispatch(runtime,DRAWABLE,'setHotspotBounds',['I','I','I','I'],'V',view.backgroundDrawable,Object.values(bounds));dispatch(runtime,DRAWABLE,'draw',[CANVAS],'V',view.buttonDrawable,[canvas]);};
   const applyButtonTint=(runtime,receiver)=>{const view=runtime.object(receiver);if(!view.buttonDrawable||!view.hasButtonTint&&!view.hasButtonBlendMode)return;view.buttonDrawable=dispatch(runtime,DRAWABLE,'mutate',[],DRAWABLE,view.buttonDrawable);prepareCpuAnimatedVector(runtime,view.buttonDrawable);if(view.hasButtonTint)dispatch(runtime,DRAWABLE,'setTintList',[TINT],'V',view.buttonDrawable,[view.buttonTintList??null]);if(view.hasButtonBlendMode)dispatch(runtime,DRAWABLE,'setTintBlendMode',[BLEND],'V',view.buttonDrawable,[view.buttonTintBlendMode??null]);if(dispatch(runtime,DRAWABLE,'isStateful',[],'Z',view.buttonDrawable))dispatch(runtime,DRAWABLE,'setState',['[I'],'Z',view.buttonDrawable,[dispatch(runtime,VIEW,'getDrawableState',[],'[I',receiver)]);};
+  /** ThreadedRenderer's draw pass for one View layer: View.draw records into a RenderNode through a hardware RecordingCanvas (Canvas.isHardwareAccelerated() is true, so RippleDrawable
+   *  takes its hardware path with RenderThread animators), then the display list is replayed onto the software `replay` canvas the page snapshot is taken from. */
+  const NODE = 'Landroid/graphics/RenderNode;', RECORDING = 'Landroid/graphics/RecordingCanvas;', ANIMATION_HOST = 'Landroid/graphics/RenderNode$AnimationHost;', HOST_CLASS = 'Ldev/apkweb/view/ViewAnimationHost;';
+  const recordLayer = (runtime, receiver, key, replay, width, height, draw) => {
+    const view = runtime.object(receiver), graphics = getVectorGraphics(runtime);
+    if (!runtime.classes.has(NODE) || !runtime.skiaHost) { graphics.resetCanvas(replay, width, height); draw(replay); return; }   // no hardware frontend / Skia in this VM: the software Canvas
+    if (!view[key]) {
+      let host = null; if (runtime.classes.has(HOST_CLASS)) { host = runtime.allocate(HOST_CLASS); dispatch(runtime, HOST_CLASS, '<init>', [VIEW], 'V', host, [receiver], 'direct'); }
+      view[key] = runtime.dispatch({ owner: NODE, name: 'create', parameters: ['Ljava/lang/String;', ANIMATION_HOST], result: NODE, signature: `(Ljava/lang/String;${ANIMATION_HOST})${NODE}` }, [`${view.type}#${key}`, host], 'static');
+    }
+    const node = view[key];
+    dispatch(runtime, NODE, 'setPosition', ['I', 'I', 'I', 'I'], 'Z', node, [0, 0, width, height]);
+    const canvas = dispatch(runtime, NODE, 'beginRecording', ['I', 'I'], RECORDING, node, [width, height]);
+    let recorded = false;
+    try { draw(canvas); recorded = true; } finally { try { dispatch(runtime, NODE, 'endRecording', [], 'V', node); } catch (error) { if (recorded) throw error; /* the draw failure is the error to report */ } }
+    const handle = runtime.object(node).fields.get(`${NODE}->mNativeRenderNode:J`);
+    graphics.resetCanvas(replay, width, height);
+    runtime.skiaHost.recordNative(runtime.object(replay).nativeCanvasHandle, { op: 'renderNode', node: handle });
+  };
   const render = (runtime, receiver) => {
     const view = runtime.object(receiver); if (view.drawingDrawable) return;
     const padding = view.padding || { left: 0, right: 0, top: 0, bottom: 0 };
@@ -33,7 +52,8 @@ export function createDrawableViewHost(platform) {
     view.drawingDrawable = true;
     try {
       if (!view.drawableCanvas) { view.drawableCanvas = runtime.allocate(CANVAS); dispatch(runtime, CANVAS, '<init>', [], 'V', view.drawableCanvas); }
-      const graphics = getVectorGraphics(runtime), canvas = view.drawableCanvas; graphics.resetCanvas(canvas, width, height);
+      const graphics = getVectorGraphics(runtime), replay = view.drawableCanvas;
+      recordLayer(runtime, receiver, 'drawableNode', replay, width, height, canvas => {
       for (const [drawable, image] of [[view.backgroundDrawable, false], [view.imageDrawable, true]]) {
         if (!drawable) continue;prepareCpuAnimatedVector(runtime,drawable);
         let left = image ? padding.left : 0, top = image ? padding.top : 0, right = image ? width - padding.right : width, bottom = image ? height - padding.bottom : height;
@@ -46,7 +66,8 @@ export function createDrawableViewHost(platform) {
         dispatch(runtime, DRAWABLE, 'draw', [CANVAS], 'V', drawable, [canvas]);
       }
       if (view.switchState) switchHost.draw(runtime, receiver, canvas, width, height);
-      view.drawableSVG = view.backgroundDrawable || view.imageDrawable || view.switchState ? graphics.snapshotCanvas(canvas, width, height) : null;
+      });
+      view.drawableSVG = view.backgroundDrawable || view.imageDrawable || view.switchState ? graphics.snapshotCanvas(replay, width, height) : null;
       if(view.foregroundDrawable){
         if(!view.foregroundCanvas){view.foregroundCanvas=runtime.allocate(CANVAS);dispatch(runtime,CANVAS,'<init>',[],'V',view.foregroundCanvas);}
         const foreground=prepareCpuAnimatedVector(runtime,view.foregroundDrawable),rect='Landroid/graphics/Rect;',gravity='Landroid/view/Gravity;';
@@ -59,10 +80,10 @@ export function createDrawableViewHost(platform) {
         dispatch(runtime,DRAWABLE,'setBounds',[rect],'V',foreground,[bounds[1]]);
         const read=name=>runtime.object(bounds[1]).fields.get(`${rect}->${name}:I`)??0;
         view.foregroundBounds=Object.fromEntries(['left','top','right','bottom'].map(name=>[name,read(name)]));
-        graphics.resetCanvas(view.foregroundCanvas,width,height);dispatch(runtime,DRAWABLE,'draw',[CANVAS],'V',foreground,[view.foregroundCanvas]);
+        recordLayer(runtime,receiver,'foregroundNode',view.foregroundCanvas,width,height,canvas=>dispatch(runtime,DRAWABLE,'draw',[CANVAS],'V',foreground,[canvas]));
         view.foregroundSVG=graphics.snapshotCanvas(view.foregroundCanvas,width,height);view.foregroundBoundsChanged=false;
       }else{view.foregroundSVG=null;view.foregroundBounds=null;}
-      if(view.buttonDrawable){if(!view.buttonCanvas){view.buttonCanvas=runtime.allocate(CANVAS);dispatch(runtime,CANVAS,'<init>',[],'V',view.buttonCanvas);}const bounds=buttonBounds(runtime,receiver,width,height),iw=bounds.right-bounds.left,ih=bounds.bottom-bounds.top;if(iw<=0||ih<=0||iw>4096||ih>4096)fail('CompoundButton indicator needs bounded positive intrinsic dimensions');graphics.resetCanvas(view.buttonCanvas,iw,ih);const raw=n=>{const d=new DataView(new ArrayBuffer(4));d.setFloat32(0,n,true);return d.getInt32(0,true);};dispatch(runtime,CANVAS,'translate',['F','F'],'V',view.buttonCanvas,[raw(-bounds.left),raw(-bounds.top)]);drawButton(runtime,receiver,view.buttonCanvas,width,height);view.buttonSVG=graphics.snapshotCanvas(view.buttonCanvas,iw,ih);view.compoundPadding=compoundPadding(runtime,receiver);}else{view.buttonSVG=null;view.buttonBounds=null;view.compoundPadding=null;}
+      if(view.buttonDrawable){if(!view.buttonCanvas){view.buttonCanvas=runtime.allocate(CANVAS);dispatch(runtime,CANVAS,'<init>',[],'V',view.buttonCanvas);}const bounds=buttonBounds(runtime,receiver,width,height),iw=bounds.right-bounds.left,ih=bounds.bottom-bounds.top;if(iw<=0||ih<=0||iw>4096||ih>4096)fail('CompoundButton indicator needs bounded positive intrinsic dimensions');const raw=n=>{const d=new DataView(new ArrayBuffer(4));d.setFloat32(0,n,true);return d.getInt32(0,true);};recordLayer(runtime,receiver,'buttonNode',view.buttonCanvas,iw,ih,canvas=>{dispatch(runtime,CANVAS,'translate',['F','F'],'V',canvas,[raw(-bounds.left),raw(-bounds.top)]);drawButton(runtime,receiver,canvas,width,height);});view.buttonSVG=graphics.snapshotCanvas(view.buttonCanvas,iw,ih);view.compoundPadding=compoundPadding(runtime,receiver);}else{view.buttonSVG=null;view.buttonBounds=null;view.compoundPadding=null;}
       view.needsDrawableDraw = false;
       runtime.record('DRAWABLE View.draw -> original Drawable DEX -> web Canvas commands');
     } finally { view.drawingDrawable = false; }

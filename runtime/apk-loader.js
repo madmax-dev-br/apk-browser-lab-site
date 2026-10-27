@@ -1,12 +1,12 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=00979d36e5ab';
-import { inspectELF } from './native-inspector.js?v=00979d36e5ab';
-import { inflateRaw } from './inflate.js?v=00979d36e5ab';
-import { resolveDevice } from './device-profile.js?v=00979d36e5ab';
-import { resourceProfileFor } from './device-configuration.js?v=00979d36e5ab';
-import { JniBridge } from './jni-host.js?v=00979d36e5ab';
-import { AndroidResources } from './android-resources.js?v=00979d36e5ab';
-import { AndroidPlatform } from './android-platform.js?v=00979d36e5ab';
-import { FrameworkProvider } from './framework-provider.js?v=00979d36e5ab';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=58b0147dafd8';
+import { inspectELF } from './native-inspector.js?v=58b0147dafd8';
+import { inflateRaw } from './inflate.js?v=58b0147dafd8';
+import { resolveDevice } from './device-profile.js?v=58b0147dafd8';
+import { resourceProfileFor } from './device-configuration.js?v=58b0147dafd8';
+import { JniBridge } from './jni-host.js?v=58b0147dafd8';
+import { AndroidResources } from './android-resources.js?v=58b0147dafd8';
+import { AndroidPlatform } from './android-platform.js?v=58b0147dafd8';
+import { FrameworkProvider } from './framework-provider.js?v=58b0147dafd8';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -158,7 +158,7 @@ export class APKArchive {
 /** Reads binary Android XML launcher declarations; no Android process or remote service. */
 // AOSP frameworks/base/core/res/res/values/public-final.xml (api 1-34) ids for the AndroidManifest attributes this loader reads.
 // Production bundles blank the attribute-name strings; Android's XmlBlock then resolves them from the RES_XML_RESOURCE_MAP chunk.
-const MANIFEST_ATTRIBUTE_IDS = new Map(Object.entries({ theme: 0x01010000, label: 0x01010001, icon: 0x01010002, name: 0x01010003, permission: 0x01010006, enabled: 0x0101000e, exported: 0x01010010, process: 0x01010011, authorities: 0x01010018, initOrder: 0x0101001a, multiprocess: 0x01010013, grantUriPermissions: 0x0101001b, launchMode: 0x0101001d, screenOrientation: 0x0101001e, configChanges: 0x0101001f, value: 0x01010024, resource: 0x01010025, targetActivity: 0x01010202, minSdkVersion: 0x0101020c, versionCode: 0x0101021b, versionName: 0x0101021c, windowSoftInputMode: 0x0101022b, targetSdkVersion: 0x01010270, maxSdkVersion: 0x01010271, allowBackup: 0x01010280, parentActivityName: 0x010103a7, appComponentFactory: 0x0101057a, extractNativeLibs: 0x010104ea, usesCleartextTraffic: 0x010104ec, networkSecurityConfig: 0x01010527, foregroundServiceType: 0x01010599 }).map(([name, id]) => [id, name]));
+const MANIFEST_ATTRIBUTE_IDS = new Map(Object.entries({ theme: 0x01010000, label: 0x01010001, icon: 0x01010002, name: 0x01010003, permission: 0x01010006, enabled: 0x0101000e, exported: 0x01010010, process: 0x01010011, authorities: 0x01010018, initOrder: 0x0101001a, multiprocess: 0x01010013, grantUriPermissions: 0x0101001b, launchMode: 0x0101001d, screenOrientation: 0x0101001e, configChanges: 0x0101001f, value: 0x01010024, resource: 0x01010025, targetActivity: 0x01010202, minSdkVersion: 0x0101020c, versionCode: 0x0101021b, versionName: 0x0101021c, windowSoftInputMode: 0x0101022b, targetSdkVersion: 0x01010270, maxSdkVersion: 0x01010271, allowBackup: 0x01010280, parentActivityName: 0x010103a7, appComponentFactory: 0x0101057a, extractNativeLibs: 0x010104ea, usesCleartextTraffic: 0x010104ec, enableOnBackInvokedCallback: 0x0101066c, networkSecurityConfig: 0x01010527, foregroundServiceType: 0x01010599 }).map(([name, id]) => [id, name]));
 export function parseManifest(data) {
   const b = new BinaryReader(data);
   let resourceMap = null;
@@ -559,10 +559,13 @@ export async function loadAPK(arrayBuffer, options = {}) {
     const provider=options.icuConverterProvider;icuConverterBackend=typeof provider==='function'?await provider():await provider.load();
     if(!icuConverterBackend?.module)fail('Invalid ICU converter provider');
   }
+  // PackageManagerService: an APK that needs a newer platform than the device's SDK_INT cannot be installed.
+  const deviceSdk = options.apiLevel ?? 33, minSdk = Number(manifest.usesSdk?.minSdkVersion ?? 1);
+  if (Number.isFinite(minSdk) && minSdk > deviceSdk) throw new APKError(`INSTALL_FAILED_OLDER_SDK: Requires newer sdk version #${minSdk} (current version is #${deviceSdk})`, { kind: 'install-failed-older-sdk', minSdkVersion: minSdk, deviceSdk });
   const runtime = new APKRuntime(program, { apkEntries: new Set(names), apkReader: name => archive.extractSync(name, 256 * 1024 * 1024), launcherActivity: manifest.launcherActivity, unsupportedFeatures,
     maxInstructionsPerEvent: options.maxInstructionsPerEvent,
     maxCallDepth: options.maxCallDepth,
-    maxHeapObjects: options.maxHeapObjects, tolerateMissingVoid: !!options.tolerateMissingVoid, tolerateMissing: options.tolerateMissing ?? (options.tolerateMissingVoid ? 'void' : 'off'),
+    maxHeapObjects: options.maxHeapObjects, apiLevel: deviceSdk, tolerateMissingVoid: !!options.tolerateMissingVoid, tolerateMissing: options.tolerateMissing ?? (options.tolerateMissingVoid ? 'void' : 'off'),
     icuBreakBackend,sqliteBackend,tzdata,zlibBackend,icuConverterBackend,
     nativeLibraries: nativeLibraryDetails, resources: resources.environment, nativeBindings: framework?.nativeBindings, skia,
     platform: new AndroidPlatform({ device: options.device, resources: resources.environment,

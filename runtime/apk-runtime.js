@@ -1,17 +1,17 @@
-import { VMClock } from './vm-clock.js?v=00979d36e5ab';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=00979d36e5ab';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=00979d36e5ab';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=00979d36e5ab';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=00979d36e5ab';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=00979d36e5ab';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=00979d36e5ab';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=00979d36e5ab';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=00979d36e5ab';
-import { APKError } from './apk-error.js?v=00979d36e5ab';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=00979d36e5ab';
-import { Scheduler, Blocked } from './scheduler.js?v=00979d36e5ab';
-import { bootClassLacksMember } from './boot-class-members.js?v=00979d36e5ab';
-export { APKError } from './apk-error.js?v=00979d36e5ab';
+import { VMClock } from './vm-clock.js?v=58b0147dafd8';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=58b0147dafd8';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=58b0147dafd8';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=58b0147dafd8';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=58b0147dafd8';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=58b0147dafd8';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=58b0147dafd8';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=58b0147dafd8';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=58b0147dafd8';
+import { APKError } from './apk-error.js?v=58b0147dafd8';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=58b0147dafd8';
+import { Scheduler, Blocked } from './scheduler.js?v=58b0147dafd8';
+import { bootClassLacksMember } from './boot-class-members.js?v=58b0147dafd8';
+export { APKError } from './apk-error.js?v=58b0147dafd8';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -533,6 +533,8 @@ for(const builder of ['StringBuilder','StringBuffer']){
  addBridge('java/lang/'+builder, [`append(Ljava/lang/CharSequence;II)Ljava/lang/${builder};`]);
  // The synthetic covariant bridges javac emits for Appendable (what an Appendable.append call resolves to).
  addBridge('java/lang/'+builder, ['append(Ljava/lang/CharSequence;)Ljava/lang/Appendable;', 'append(Ljava/lang/CharSequence;II)Ljava/lang/Appendable;', 'append(C)Ljava/lang/Appendable;']);
+ // The synthetic covariant bridges javac emits for Appendable (what an Appendable.append call resolves to).
+ addBridge('java/lang/'+builder, ['append(Ljava/lang/CharSequence;)Ljava/lang/Appendable;', 'append(Ljava/lang/CharSequence;II)Ljava/lang/Appendable;', 'append(C)Ljava/lang/Appendable;']);
  const self=`Ljava/lang/${builder};`;
  addBridge('java/lang/'+builder, [`delete(II)${self}`,`deleteCharAt(I)${self}`,'setCharAt(IC)V','setLength(I)V',`replace(IILjava/lang/String;)${self}`,`reverse()${self}`,'indexOf(Ljava/lang/String;)I','indexOf(Ljava/lang/String;I)I','lastIndexOf(Ljava/lang/String;)I','lastIndexOf(Ljava/lang/String;I)I','capacity()I','ensureCapacity(I)V','trimToSize()V','substring(I)Ljava/lang/String;','substring(II)Ljava/lang/String;','codePointAt(I)I',`appendCodePoint(I)${self}`,'getChars(II[CI)V',`insert(I[C)${self}`,`insert(I[CII)${self}`,`insert(ILjava/lang/CharSequence;II)${self}`]);
  for (const t of ['Ljava/lang/String;','Ljava/lang/Object;','Ljava/lang/CharSequence;','I','J','Z','C']) addBridge('java/lang/'+builder, [`insert(I${t})${self}`]);
@@ -851,7 +853,7 @@ class Heap {
 }
 
 export class APKRuntime {
-  constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 28, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 10000000, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off' } = {}) {
+  constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 10000000, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off' } = {}) {
     if (!Number.isInteger(maxCallDepth) || maxCallDepth < 16 || maxCallDepth > 100000) fail('VM maxCallDepth must be an integer from 16 to 100000');
     if(!Number.isInteger(maxHeapObjects)||maxHeapObjects<1024||maxHeapObjects>262144)fail('VM maxHeapObjects must be an integer from 1024 to 262144');
     this.maxHeapObjects=maxHeapObjects; this.apkEntries=apkEntries; this.apkReader=apkReader;
@@ -1245,7 +1247,8 @@ export class APKRuntime {
     const launchedActivity = this.activity;
     this.dispatch({ owner: type, name: '<init>', signature: '()V', parameters: [], result: 'V' }, [launchedActivity], 'direct');
     this.platform?.attachActivityContext?.(this, launchedActivity);
-    this.dispatch({ owner: type, name: 'onCreate', signature: '(Landroid/os/Bundle;)V', parameters: ['Landroid/os/Bundle;'], result: 'V' }, [launchedActivity, null], 'virtual');
+    const create = () => this.dispatch({ owner: type, name: 'onCreate', signature: '(Landroid/os/Bundle;)V', parameters: ['Landroid/os/Bundle;'], result: 'V' }, [launchedActivity, null], 'virtual');
+    if (this.platform?.performLifecycle) this.platform.performLifecycle(this, launchedActivity, 'onCreate', [null], create); else create();
     this.platform?.afterActivityCreate?.(this, launchedActivity);
     if (!this.root && !this.platform?.taskClosed) fail('Activity did not call setContentView');
     return this.snapshot();

@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=00979d36e5ab';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=00979d36e5ab';
+import { APKError } from './apk-runtime.js?v=58b0147dafd8';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=58b0147dafd8';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -67,29 +67,34 @@ export function createViewWindowHost(platform){
   if(nullish(callback))runtime.throwJava('Ljava/lang/NullPointerException;','View.post requires Runnable');runtime.object(callback);
   const record={receiver,callback,delay:Math.max(0,Number(delay)),onAnimation};if(!Number.isFinite(record.delay)||record.delay>2147483647)error('View callback delay exceeds web clock range');
   if(!isAttached(runtime,receiver)){const list=pendingViews.get(receiver.ref)??[];if(pendingViewCount>=1024)error('Aggregate detached View callback queue exceeds1024');list.push(record);pendingViewCount++;pendingViews.set(receiver.ref,list);return;}
-  const now=performance.now(),when=onAnimation?Math.ceil((Math.max(now,lastFrameMs)+record.delay+0.000001)/frameInterval)*frameInterval:now+record.delay;
+  const now=platform.clock.now(),when=onAnimation?Math.ceil((Math.max(now,lastFrameMs)+record.delay+0.000001)/frameInterval)*frameInterval:now+record.delay;
   schedule(runtime,when,()=>{runtime.record('WINDOW Runnable callback [web event queue]');run(runtime,callback);},{windowCallback:record,roots:[callback]});
+ };
+ const ensureFrameEvent=(runtime,when)=>{
+  // One queue task per frame lets callbacks posted while dispatching wait until a later frame.
+  if(platform.eventQueue.some(event=>event.windowFrameTime===when))return;
+  schedule(runtime,when,()=>{
+   const vsync=Math.max(when,Math.floor(platform.clock.now()/frameInterval)*frameInterval);/* Choreographer skips frames it was too late for: the frame time is the latest vsync not after now */lastFrameMs=vsync;platform.lastFrameMs=vsync;frameTime=BigInt(Math.round(vsync*1000000));runtime.record(`FRAME ${frameTime} [explicit60HzwebVMclock]`);
+   let animationClockLocked=false;
+   const animationClock=(name,parameters,values)=>runtime.dispatch({owner:'Landroid/view/animation/AnimationUtils;',name,parameters,result:'V',signature:`(${parameters.join('')})V`},runtime.argumentWords(parameters,values),'static');
+   try{if(runtime.dex.bootClasses?.has('Landroid/view/animation/AnimationUtils;')){animationClock('lockAnimationClock',['J'],[frameTime/1000000n]);animationClockLocked=true;}for(currentPhase=0;currentPhase<=4;currentPhase++){const due=pendingFrames.filter(x=>x.when<=when&&x.phase===currentPhase);for(const item of due)pendingFrames.splice(pendingFrames.indexOf(item),1);
+    for(const item of due){runtime.record(`FRAME callback phase=${currentPhase}`);if(item.js)item.js(runtime,vsync);else if(item.runnable)run(runtime,item.callback);else runtime.dispatch({owner:CALLBACK,name:'doFrame',signature:'(J)V',parameters:['J'],result:'V'},runtime.argumentWords(['J'],[frameTime],{receiver:item.callback}),'virtual');}
+   }}finally{try{if(animationClockLocked)animationClock('unlockAnimationClock',[],[]);}finally{frameTime=null;currentPhase=-1;}}
+  },{windowFrameTime:when,roots:[]});
  };
  const planFrame=(runtime,callback,delay,{phase=1,token=null,runnable=false}={})=>{
   if(nullish(callback))runtime.throwJava('Ljava/lang/NullPointerException;','Frame callback is null');runtime.object(callback);
   const amount=Math.max(0,Number(delay));if(!Number.isFinite(amount)||amount>2147483647)error('Frame delay exceeds web clock range');
   if(pendingFrames.length>=1024)error('Frame callback limit exceeded');
-  const now=performance.now(),sameFrame=frameTime!==null&&runnable&&phase>currentPhase&&amount===0;
+  const now=platform.clock.now(),sameFrame=frameTime!==null&&runnable&&phase>currentPhase&&amount===0;
   const when=sameFrame?lastFrameMs:Math.ceil((Math.max(now,lastFrameMs)+amount+0.000001)/frameInterval)*frameInterval;
   const entry={callback,token,runnable,phase,when};pendingFrames.push(entry);
   if(sameFrame)return;
-  // One queue task per frame lets callbacks posted while dispatching wait until a later frame.
-  if(platform.eventQueue.some(event=>event.windowFrameTime===when))return;
-  schedule(runtime,when,()=>{
-   lastFrameMs=when;frameTime=BigInt(Math.round(when*1000000));runtime.record(`FRAME ${frameTime} [explicit60HzwebVMclock]`);
-   let animationClockLocked=false;
-   const animationClock=(name,parameters,values)=>runtime.dispatch({owner:'Landroid/view/animation/AnimationUtils;',name,parameters,result:'V',signature:`(${parameters.join('')})V`},runtime.argumentWords(parameters,values),'static');
-   try{if(runtime.dex.bootClasses?.has('Landroid/view/animation/AnimationUtils;')){animationClock('lockAnimationClock',['J'],[frameTime/1000000n]);animationClockLocked=true;}for(currentPhase=0;currentPhase<=4;currentPhase++){const due=pendingFrames.filter(x=>x.when<=when&&x.phase===currentPhase);for(const item of due)pendingFrames.splice(pendingFrames.indexOf(item),1);
-    for(const item of due){runtime.record(`FRAME callback phase=${currentPhase}`);if(item.runnable)run(runtime,item.callback);else runtime.dispatch({owner:CALLBACK,name:'doFrame',signature:'(J)V',parameters:['J'],result:'V'},runtime.argumentWords(['J'],[frameTime],{receiver:item.callback}),'virtual');}
-   }}finally{try{if(animationClockLocked)animationClock('unlockAnimationClock',[],[]);}finally{frameTime=null;currentPhase=-1;}}
-  },{windowFrameTime:when,roots:[]});
+  ensureFrameEvent(runtime,when);
  };
- return { [GC_ROOTS](visit) { visit(display); visit(choreographer); visit(handler); },
+ /** A JS callback run in the next frame's traversal phase (RenderThread animators): `fn(runtime, frameTimeMs)`. */
+ const planJsFrame=(runtime,fn,phase=3)=>{ if(pendingFrames.length>=1024)error('Frame callback limit exceeded'); const when=Math.ceil((Math.max(platform.clock.now(),lastFrameMs)+0.000001)/frameInterval)*frameInterval; pendingFrames.push({js:fn,callback:null,token:null,runnable:false,phase,when}); ensureFrameEvent(runtime,when); };
+ return { planJsFrame, [GC_ROOTS](visit) { visit(display); visit(choreographer); visit(handler); },
   supports:key=>keys.has(key),
   interfaces:type=>type===TOKEN?['Landroid/os/IBinder;']:[],
   parent:type=>type===TOKEN||type===DISPLAY?'Ljava/lang/Object;':null,

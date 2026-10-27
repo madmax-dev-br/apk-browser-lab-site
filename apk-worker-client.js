@@ -1,6 +1,6 @@
-import { createRasterReceiver } from './raster-cache.js?v=00979d36e5ab';
+import { createRasterReceiver } from './raster-cache.js?v=58b0147dafd8';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=00979d36e5ab', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 30000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=58b0147dafd8', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 30000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -73,6 +73,8 @@ export class APKWorkerClient {
   async setDevice(device) { const response = await this.request('device', { device }, { timeoutMs: this.eventTimeoutMs }); return { outcome: response.outcome, snapshot: response.snapshot ?? null }; }
   /** One pointer sample for a Compose view: { ownerViewId, action (0 down,1 up,2 move,3 cancel), x, y (dp inside the view), t (ms, page clock) }. */
   async pointer(sample) { return (await this.request('pointer', sample, { timeoutMs: this.eventTimeoutMs })).snapshot; }
+  /** Wheel/trackpad scrolling of a RecyclerView (View.scrollBy, dispatched to the original RecyclerView code), in dp. */
+  async scrollBy(id, dx, dy) { return (await this.request('scrollby', { id, dx, dy }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async press(id, pressed) { return (await this.request('press', { id, pressed }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async focus(id, focused) { return (await this.request('focus', { id, focused }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async input(id, text) { return (await this.request('input', { id, text }, { timeoutMs: this.eventTimeoutMs })).snapshot; }

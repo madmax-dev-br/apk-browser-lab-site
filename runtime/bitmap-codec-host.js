@@ -1,6 +1,7 @@
-import { APKError } from './apk-error.js?v=00979d36e5ab';
-import { createHostRegistry } from './host-contract.js?v=00979d36e5ab';
-import { getVectorGraphics } from './vector-native.js?v=00979d36e5ab';
+import { gcRoot } from './heap-gc.js?v=58b0147dafd8';
+import { APKError } from './apk-error.js?v=58b0147dafd8';
+import { createHostRegistry } from './host-contract.js?v=58b0147dafd8';
+import { getVectorGraphics } from './vector-native.js?v=58b0147dafd8';
 
 // android.graphics.BitmapFactory (+ Options), Bitmap.CompressFormat and the Bitmap operations on top of the recorded-canvas Bitmap of bitmap-host.js: decoding PNG/JPEG/GIF/WebP/BMP
 // with the official Skia codecs (CanvasKit), inSampleSize / density scaling / inJustDecodeBounds / inBitmap reuse as in frameworks/base BitmapFactory.cpp, pixel access
@@ -36,7 +37,7 @@ export function createBitmapCodecHost(platform) {
 
   // ---- Bitmap.CompressFormat ----------------------------------------------------------------------------------------------------------------
   const formatValues = new WeakMap();
-  const formatValue = (r, name) => { const table = formatValues.get(r) ?? formatValues.set(r, new Map()).get(r); if (!table.has(name)) { const ref = r.makeObject(COMPRESS), o = r.object(ref); o.enumName = name; o.enumOrdinal = FORMATS.indexOf(name); r.storeField(o.fields, `${COMPRESS}->nativeInt:I`, FORMATS.indexOf(name)); table.set(name, ref); } return table.get(name); };
+  const formatValue = (r, name) => { const table = formatValues.get(r) ?? formatValues.set(r, gcRoot(new Map())).get(r); if (!table.has(name)) { const ref = r.makeObject(COMPRESS), o = r.object(ref); o.enumName = name; o.enumOrdinal = FORMATS.indexOf(name); r.storeField(o.fields, `${COMPRESS}->nativeInt:I`, FORMATS.indexOf(name)); table.set(name, ref); } return table.get(name); };
   for (const name of FORMATS) registry.staticField(COMPRESS, name, COMPRESS, r => formatValue(r, name));
   def(COMPRESS, 'values', `()[${COMPRESS}`, r => { const a = r.newArray(`[${COMPRESS}`, FORMATS.length); r.array(a).elements = FORMATS.map(n => formatValue(r, n)); return a; }, { static: true });
   def(COMPRESS, 'valueOf', `(${STRING})${COMPRESS}`, (r, _m, [name]) => { const n = r.stringCharacters(name); if (!FORMATS.includes(n)) r.throwJava('Ljava/lang/IllegalArgumentException;', `No enum constant android.graphics.Bitmap.CompressFormat.${n}`); return formatValue(r, n); }, { static: true });

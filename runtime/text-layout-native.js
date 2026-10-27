@@ -1,6 +1,6 @@
-import {APKError} from './apk-error.js?v=00979d36e5ab';
-import {getPaintStateByHandle} from './paint-host.js?v=00979d36e5ab';
-import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=00979d36e5ab';
+import {APKError} from './apk-error.js?v=58b0147dafd8';
+import {getPaintStateByHandle} from './paint-host.js?v=58b0147dafd8';
+import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=58b0147dafd8';
 
 const MT='Landroid/graphics/text/MeasuredText;',BUILDER=MT.slice(0,-1)+'$Builder;',LB='Landroid/graphics/text/LineBreaker;';
 const REG='Llibcore/util/NativeAllocationRegistry;';
@@ -99,7 +99,7 @@ export function createTextLayoutNativeBindings(){
  add(MT,'nGetReleaseFunc',[],'J',()=>0x5445585401n);add(LB,'nGetReleaseFunc',[],'J',()=>0x5445585402n);add(LB,'nGetReleaseResultFunc',[],'J',()=>0x5445585403n);
  add(BUILDER,'nInitBuilder',[],'J',r=>{backend(r);return allocate(r,'builder',{runs:[]});});
  add(BUILDER,'nAddStyleRun',['J','J','I','I','I','I','Z'],'V',(r,[h,p,style,word,start,end,rtl])=>{
-  const b=get(r,h,'builder');if(style||word)fail('Configured line-break style/word style requires a separate text backend');
+  const b=get(r,h,'builder');if((style!==0&&style!==2)||word)fail(`Configured line-break style requires a separate text backend (lineBreakStyle=${style} wordStyle=${word})`);
   if(start!==(b.runs.at(-1)?.end??0)||end<=start||end>65536||b.runs.length>=4096)fail('Invalid or excessive measured-text style runs');
   b.runs.push({start,end,paint:paintSnapshot(r,p),rtl:!!rtl});
  });

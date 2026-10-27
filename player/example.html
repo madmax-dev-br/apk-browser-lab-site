@@ -50,7 +50,8 @@
 &lt;script type="module"&gt;
   const player = document.querySelector('apk-player');
   player.addEventListener('ready', e =&gt; console.log('running', e.detail.activity));
-  player.addEventListener('error', e =&gt; console.warn(e.detail.kind, e.detail.frontier));
+  player.addEventListener('error', e =&gt; console.warn(e.detail.report));   // cause, frames, stubbed APIs, log tail
+  // tolerate-missing="primitives" (attribute, off by default) stubs missing Android APIs; await player.diagnostics() lists them
   player.setConfig({ theme: 'light', locale: 'en-US' });   // applied live (Android semantics)
 &lt;/script&gt;</code></pre>
   <h2>Mount from a File or ArrayBuffer</h2>
@@ -69,7 +70,7 @@ player.destroy();</code></pre>
   for (const [id, logId] of [['p1', 'log1'], ['p2', 'log2']]) {
     const player = document.getElementById(id);
     for (const type of ['ready', 'activity-changed', 'config-applied', 'closed']) player.addEventListener(type, event => log(logId, `${type} ${event.detail.activity ?? ''} ${event.detail.live === undefined ? '' : event.detail.live ? '(live)' : '(next launch)'}`.trim()));
-    player.addEventListener('error', event => log(logId, `error ${event.detail.kind}: ${event.detail.message.slice(0, 140)}`));
+    player.addEventListener('error', event => log(logId, `error ${event.detail.kind}: ${(event.detail.cause ?? event.detail.message).slice(0, 140)}`));
   }
   document.addEventListener('click', event => {
     const button = event.target.closest('button[data-act]'); if (!button) return;

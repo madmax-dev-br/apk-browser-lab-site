@@ -1,5 +1,6 @@
-import { createHostRegistry, parseSignature } from './host-contract.js?v=00979d36e5ab';
-import { JavaException } from './apk-runtime.js?v=00979d36e5ab';
+import { gcRoot } from './heap-gc.js?v=58b0147dafd8';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=58b0147dafd8';
+import { JavaException } from './apk-runtime.js?v=58b0147dafd8';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).
@@ -63,7 +64,7 @@ export function createDateTimeHost(platform) {
   const defaultId = () => { if (platform.device?.timeZone) return platform.device.timeZone; try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } };
   let overrideDefault = null; const defaultZone = () => ({ id: overrideDefault ?? defaultId() });
   const zoneObjects = new WeakMap();
-  const zone = (r, id) => { const m = zoneObjects.get(r) ?? zoneObjects.set(r, new Map()).get(r); if (!m.has(id)) { const ref = r.allocate(ZONE); r.object(ref).tzId = id; m.set(id, ref); } return m.get(id); };
+  const zone = (r, id) => { const m = zoneObjects.get(r) ?? zoneObjects.set(r, gcRoot(new Map())).get(r); if (!m.has(id)) { const ref = r.allocate(ZONE); r.object(ref).tzId = id; m.set(id, ref); } return m.get(id); };
   const zid = (r, ref) => r.object(ref).tzId;
   // ---- deprecated java.util.Date field accessors / constructors (default time zone), as libcore's Date: used by java.util.zip.ZipUtils and old app code
   const fieldsOf = (r, ref) => parts(Number(time(r, ref)), defaultZone().id);

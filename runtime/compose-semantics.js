@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=00979d36e5ab';
+import { APKError } from './apk-runtime.js?v=58b0147dafd8';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;';
 const OWNER = 'Landroidx/compose/ui/semantics/SemanticsOwner;', NODE = 'Landroidx/compose/ui/semantics/SemanticsNode;', CONFIG = 'Landroidx/compose/ui/semantics/SemanticsConfiguration;', KEY = 'Landroidx/compose/ui/semantics/SemanticsPropertyKey;';
 const ACTION = 'Landroidx/compose/ui/semantics/AccessibilityAction;', ANNOTATED = 'Landroidx/compose/ui/text/AnnotatedString;', RECT = 'Landroidx/compose/ui/geometry/Rect;';
@@ -88,7 +88,9 @@ export function createComposeSemanticsDriver(runtime) {
       role: values.has('Role') ? runtime.javaString(values.get('Role')) : null,
       rangeInfo: values.has('ProgressBarRangeInfo') ? rangeInfo(values.get('ProgressBarRangeInfo')) : null,
       isDialog: values.has('IsDialog'), isPopup: values.has('IsPopup'), boundsInRoot: bounds,
-      placed: bounds.right > bounds.left && bounds.bottom > bounds.top,
+      // ComposeTestRule's isDisplayed: the LayoutNode must be placed (LayoutInfo.isPlaced). SemanticsNode.boundsInRoot keeps the LAST coordinates of a LazyColumn item that
+      // scrolled out (it is composed but no longer placed), so empty bounds alone report such an item as visible.
+      placed: bounds.right > bounds.left && bounds.bottom > bounds.top && !!call(call(ref, NODE, 'getLayoutInfo', '()Landroidx/compose/ui/layout/LayoutInfo;'), 'Landroidx/compose/ui/layout/LayoutInfo;', 'isPlaced', '()Z'),
       propertyNames: [...values.keys()], actions };
   };
   const snapshot = ({ roots: explicitRoots, merged = true, maxNodes = 1024 } = {}) => {

@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=00979d36e5ab';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=00979d36e5ab';
-import {getVectorGraphics} from './vector-native.js?v=00979d36e5ab';
+import {APKError} from './apk-runtime.js?v=58b0147dafd8';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=58b0147dafd8';
+import {getVectorGraphics} from './vector-native.js?v=58b0147dafd8';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
-const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;';
+const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
 const keys=new Set();
 for(const signature of ['insertReorderBarrier()V','insertInorderBarrier()V'])keys.add('Landroid/graphics/Canvas;->'+signature);
-for(const [owner,signatures] of [[VIEW,['draw(Landroid/graphics/Canvas;)V','onDraw(Landroid/graphics/Canvas;)V','dispatchDraw(Landroid/graphics/Canvas;)V','getDrawingTime()J','updateDisplayListIfDirty()Landroid/view/RenderNode;']],[GROUP,['dispatchDraw(Landroid/graphics/Canvas;)V','drawChild(Landroid/graphics/Canvas;Landroid/view/View;J)Z']]])for(const signature of signatures)keys.add(owner+'->'+signature);
+for(const [owner,signatures] of [[VIEW,['draw(Landroid/graphics/Canvas;)V','onDraw(Landroid/graphics/Canvas;)V','dispatchDraw(Landroid/graphics/Canvas;)V','getDrawingTime()J','updateDisplayListIfDirty()Landroid/graphics/RenderNode;']],[GROUP,['dispatchDraw(Landroid/graphics/Canvas;)V','drawChild(Landroid/graphics/Canvas;Landroid/view/View;J)Z']]])for(const signature of signatures)keys.add(owner+'->'+signature);
 const floats=new DataView(new ArrayBuffer(4)),raw=value=>{floats.setFloat32(0,value,true);return floats.getInt32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'compose-canvas-boundary'});};
 
@@ -20,22 +20,24 @@ export function createComposeCanvasHost(platform){
   const canvas=(r,ref,name,parameters=[],result='V',values=[])=>call(r,ref,CANVAS,name,parameters,result,values);
   const dimensions=view=>[Math.max(0,(view.bounds?.right??0)-(view.bounds?.left??0)),Math.max(0,(view.bounds?.bottom??0)-(view.bounds?.top??0))];
   const markDirty=(r,receiver)=>{const view=r.object(receiver);view.displayListDirty=true;r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,1);};
+  /** View's RenderNode.AnimationHost (ViewAnimationHostBridge): attached while the View is attached to a window, so RenderThread animators apply (RippleDrawable). */
+  const animationHost=(r,view)=>{const HOSTCLASS='Ldev/apkweb/view/ViewAnimationHost;';if(!r.classes.has(HOSTCLASS))return null;const host=r.allocate(HOSTCLASS);r.dispatch({owner:HOSTCLASS,name:'<init>',parameters:[VIEW],result:'V',signature:`(${VIEW})V`},[host,view],'direct');return host;};
   const updateDisplayList=(r,receiver)=>{
     const view=r.object(receiver);if(!r.skiaHost||!r.classes.has(NODE))fail('View display lists require original RenderNode and verified Skia');
-    const node=view.viewRenderNode??=call(r,null,NODE,'create',['Ljava/lang/String;',VIEW],NODE,[view.type,receiver],'static');
-    const valid=!!call(r,node,NODE,'isValid',[],'Z'),recreate=view.displayListDirty||view.fields.get(`${VIEW}->mRecreateDisplayList:Z`);
+    const node=view.viewRenderNode??=call(r,null,NODE,'create',['Ljava/lang/String;',HOST],NODE,[view.type,animationHost(r,receiver)],'static');
+    const valid=!!call(r,node,NODE,'hasDisplayList',[],'Z'),recreate=view.displayListDirty||view.fields.get(`${VIEW}->mRecreateDisplayList:Z`);
     if(valid&&!recreate)return node;if(view.updatingDisplayList)fail('Recursive updateDisplayListIfDirty on the same View');
     const [width,height]=dimensions(view),bounds=view.bounds??{left:0,top:0,right:width,bottom:height};
-    call(r,node,NODE,'setLeftTopRightBottom',['I','I','I','I'],'Z',[bounds.left,bounds.top,bounds.right,bounds.bottom]);
+    call(r,node,NODE,'setPosition',['I','I','I','I'],'Z',[bounds.left,bounds.top,bounds.right,bounds.bottom]);
     // View.updateDisplayListIfDirty -> RenderNode properties: elevation/translationZ cast the HWUI shadow, the Outline shapes it and clips.
     {const z=view.webTransform,elevation=z?.elevation??0,translationZ=z?.translationZ??0;
      call(r,node,NODE,'setElevation',['F'],'Z',[raw(elevation)]);call(r,node,NODE,'setTranslationZ',['F'],'Z',[raw(translationZ)]);
      const outline=elevation+translationZ>0||view.clipToOutline?platform.viewOutlineHost.outlineObject(r,receiver):null;
      call(r,node,NODE,'setOutline',['Landroid/graphics/Outline;'],'Z',[outline??null]);call(r,node,NODE,'setClipToOutline',['Z'],'Z',[view.clipToOutline?1:0]);}
-    const target=call(r,node,NODE,'start',['I','I'],DISPLAY,[width,height]);view.updatingDisplayList=true;view.displayListDirty=false;r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,1);
+    const target=call(r,node,NODE,'beginRecording',['I','I'],DISPLAY,[width,height]);view.updatingDisplayList=true;view.displayListDirty=false;r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,1);
     try{const sx=view.fields.get(`${VIEW}->mScrollX:I`)??0,sy=view.fields.get(`${VIEW}->mScrollY:I`)??0;if(sx||sy)canvas(r,target,'translate',['F','F'],'V',[raw(-sx),raw(-sy)]);call(r,receiver,VIEW,'draw',[CANVAS],'V',[target]);}
     catch(error){view.displayListDirty=true;r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,1);throw error;}
-    finally{view.updatingDisplayList=false;call(r,node,NODE,'end',[DISPLAY],'V',[target]);r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,view.displayListDirty?1:0);}
+    finally{view.updatingDisplayList=false;call(r,node,NODE,'endRecording',[],'V',[]);r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,view.displayListDirty?1:0);}
     view.displayListGeneration=(view.displayListGeneration??0)+1;r.record(`HOST View.updateDisplayListIfDirty [original RenderNode/RecordingCanvas DEX; generation${view.displayListGeneration}]`);return node;
   };
   const textStyleValue=(r,receiver,attribute,method,result,fallback)=>{
@@ -142,7 +144,7 @@ export function createComposeCanvasHost(platform){
       return null;
     },
     renderTree(r,root){
-      const seen=new Set();drawingTime=Math.floor(performance.now());
+      const seen=new Set();drawingTime=Math.floor(r.platform?.lastFrameMs??r.clock.now());
       const visit=(receiver,depth=0)=>{
         const view=r.object(receiver);if(seen.has(view.id)||seen.size>=4096||depth>64)fail('Cyclic/excessive custom Canvas View tree');seen.add(view.id);
         if(view.visibility===4||view.visibility===8)return;
@@ -171,6 +173,7 @@ export function createComposeCanvasHost(platform){
         // Canvas.insertReorderBarrier/insertInorderBarrier are empty on a software Canvas; the recording canvas overrides them.
         const type=r.typeOf(args[0]);
         if(r.isSubtype(type,'Landroid/view/DisplayListCanvas;'))return r.dispatch({owner:'Landroid/view/DisplayListCanvas;',name:method.name,parameters:[],result:'V',signature:'()V'},[args[0]],'virtual');
+        if(r.isSubtype(type,DISPLAY))return r.dispatch({owner:DISPLAY,name:method.name==='insertReorderBarrier'?'enableZ':'disableZ',parameters:[],result:'V',signature:'()V'},[args[0]],'virtual');   // API 29+: RecordingCanvas.enableZ/disableZ
         return;
       }
       const [receiver,target]=args,view=r.object(receiver);

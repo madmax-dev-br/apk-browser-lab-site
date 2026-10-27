@@ -1,5 +1,6 @@
-import { APKError } from './apk-error.js?v=00979d36e5ab';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=00979d36e5ab';
+import { gcRoot } from './heap-gc.js?v=58b0147dafd8';
+import { APKError } from './apk-error.js?v=58b0147dafd8';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=58b0147dafd8';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -274,7 +275,7 @@ export function createSystemServicesHost(platform) {
   const packages = new WeakMap();
   def('Ljava/lang/Class;', 'getPackage', `()${PACKAGE}`, (r, _m, [self]) => {
     const t = r.object(self).classType.replace(/\$\$ldr\d+;$/, ';'); if (t.length === 1 || t.startsWith('[')) return null;
-    const name = t.slice(1, -1).replaceAll('/', '.'), dot = name.lastIndexOf('.'), pkgName = dot < 0 ? '' : name.slice(0, dot), table = packages.get(r) ?? packages.set(r, new Map()).get(r);
+    const name = t.slice(1, -1).replaceAll('/', '.'), dot = name.lastIndexOf('.'), pkgName = dot < 0 ? '' : name.slice(0, dot), table = packages.get(r) ?? packages.set(r, gcRoot(new Map())).get(r);
     if (!table.has(pkgName)) { const ref = r.allocate(PACKAGE); r.object(ref).packageName = pkgName; table.set(pkgName, ref); } return table.get(pkgName);
   });
   def(PACKAGE, 'getName', '()Ljava/lang/String;', (r, _m, [self]) => r.object(self).packageName); def(PACKAGE, 'toString', '()Ljava/lang/String;', (r, _m, [self]) => 'package ' + r.object(self).packageName);
@@ -284,7 +285,7 @@ export function createSystemServicesHost(platform) {
   const LOGGER = 'Ljava/util/logging/Logger;', LEVEL = 'Ljava/util/logging/Level;', levels = { OFF: 2147483647, SEVERE: 1000, WARNING: 900, INFO: 800, CONFIG: 700, FINE: 500, FINER: 400, FINEST: 300, ALL: -2147483648 };
   registry.type(LEVEL, 'Ljava/lang/Object;', [], { allocatable: true }); registry.type(LOGGER, 'Ljava/lang/Object;', [], { allocatable: true });
   const levelObjects = new WeakMap(), loggers = new WeakMap();
-  const levelOf = (r, name) => { const m = levelObjects.get(r) ?? levelObjects.set(r, new Map()).get(r); if (!m.has(name)) { const ref = r.allocate(LEVEL); r.object(ref).level = { name, value: levels[name] }; m.set(name, ref); } return m.get(name); };
+  const levelOf = (r, name) => { const m = levelObjects.get(r) ?? levelObjects.set(r, gcRoot(new Map())).get(r); if (!m.has(name)) { const ref = r.allocate(LEVEL); r.object(ref).level = { name, value: levels[name] }; m.set(name, ref); } return m.get(name); };
   for (const name of Object.keys(levels)) registry.staticField(LEVEL, name, LEVEL, r => levelOf(r, name));
   def(LEVEL, 'intValue', '()I', (r, _m, [self]) => r.object(self).level.value); def(LEVEL, 'getName', '()Ljava/lang/String;', (r, _m, [self]) => r.object(self).level.name); def(LEVEL, 'toString', '()Ljava/lang/String;', (r, _m, [self]) => r.object(self).level.name);
   // Logger hierarchy (LogManager): a logger's parent is the nearest existing ancestor by dotted name, else the root logger ""; handlers run up the chain while
@@ -292,7 +293,7 @@ export function createSystemServicesHost(platform) {
   const HANDLER = 'Ljava/util/logging/Handler;', LOG_RECORD = 'Ljava/util/logging/LogRecord;';
   registry.type(HANDLER, 'Ljava/lang/Object;', [], { allocatable: true }); registry.type(LOG_RECORD, 'Ljava/lang/Object;', [], { allocatable: true });
   const loggerNamed = (r, n) => {
-    const table = loggers.get(r) ?? loggers.set(r, new Map()).get(r);
+    const table = loggers.get(r) ?? loggers.set(r, gcRoot(new Map())).get(r);
     if (!table.has(n)) { const ref = r.allocate(LOGGER); r.object(ref).logger = { name: n, level: null, handlers: [], useParent: true, parent: undefined }; table.set(n, ref); } return table.get(n);
   };
   def(LOGGER, 'getLogger', `(Ljava/lang/String;)${LOGGER}`, (r, _m, [name]) => loggerNamed(r, r.stringCharacters(name)), { static: true });

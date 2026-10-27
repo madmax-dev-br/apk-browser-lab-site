@@ -8865,5 +8865,75 @@
     "sha256": "34b72d1cbca20e713ad04c1732d3333ba0929c11295bcb7e4ba31b9f0c830b53",
     "bytes": 1898,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "graphics/java/android/graphics/RenderNode.java",
+    "localPath": "framework-aosp/upstream/android/graphics/RenderNode.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/RenderNode.java?format=TEXT",
+    "sha256": "7a78c5a37e08098841ff60e3caa1e416e3aa02f86727d820d4e65f9888f04fe6",
+    "bytes": 72781,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "graphics/java/android/graphics/RecordingCanvas.java",
+    "localPath": "framework-aosp/upstream/android/graphics/RecordingCanvas.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/RecordingCanvas.java?format=TEXT",
+    "sha256": "f1a4429aaaf0cc2d66b95d25353858b3d4b4359e666a24ae75447926e3c6ac18",
+    "bytes": 10358,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "graphics/java/android/graphics/BaseRecordingCanvas.java",
+    "localPath": "framework-aosp/upstream/android/graphics/BaseRecordingCanvas.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/BaseRecordingCanvas.java?format=TEXT",
+    "sha256": "5830645939ea054ba9b6364aae0148aaa2267bc48f58237621cc4590a544c1e4",
+    "bytes": 30865,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/WindowInsetsAnimation.java",
+    "localPath": "framework-aosp/upstream/android/view/WindowInsetsAnimation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/WindowInsetsAnimation.java?format=TEXT",
+    "sha256": "9d967a474bbaa9fa5e26859733a6e95a1bd56d05306b702ad0b8be4c532d2d6e",
+    "bytes": 19973,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/ServiceLoader.java",
+    "localPath": "framework-aosp/upstream/java/util/ServiceLoader.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/ServiceLoader.java?format=TEXT",
+    "sha256": "acd5adda9a53c7a22c3e8aae5a8529b11dbc7e8fcef5707cdc746cfd9ff1f691",
+    "bytes": 25325,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "graphics/java/android/graphics/animation/FallbackLUTInterpolator.java",
+    "localPath": "framework-aosp/upstream/android/graphics/animation/FallbackLUTInterpolator.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/animation/FallbackLUTInterpolator.java?format=TEXT",
+    "sha256": "6f5b688a4bb00d91f7197a9ced1b3e870e1462492ace2c5cd821e28a465e9343",
+    "bytes": 3036,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/packages/modules/SdkExtensions",
+    "tag": "android-13.0.0_r1",
+    "path": "java/android/os/ext/SdkExtensions.java",
+    "localPath": "framework-aosp/upstream/android/os/ext/SdkExtensions.java",
+    "url": "https://android.googlesource.com/platform/packages/modules/SdkExtensions/+/android-13.0.0_r1/java/android/os/ext/SdkExtensions.java?format=TEXT",
+    "sha256": "d644055ae2e2a89fd515654b4d9dd3becb9b44872830ab72c912fad529c2af1d",
+    "bytes": 4003,
+    "license": "Apache-2.0"
   }
 ]

@@ -1,7 +1,7 @@
-import { APKError } from './apk-runtime.js?v=00979d36e5ab';
+import { APKError } from './apk-runtime.js?v=58b0147dafd8';
 
 const VIEW = 'Landroid/view/View;', MATRIX = 'Landroid/graphics/Matrix;';
-const keys = new Set(['getLocationOnScreen([I)V', 'getLocationOnScreen()[I', 'getLocationInWindow([I)V', 'transformFromViewToWindowSpace([I)V'].map(signature => VIEW + '->' + signature));
+const keys = new Set(['getLocationOnScreen([I)V', 'getLocationOnScreen()[I', 'getLocationInWindow([I)V', 'transformFromViewToWindowSpace([I)V', 'transformMatrixToGlobal(Landroid/graphics/Matrix;)V'].map(signature => VIEW + '->' + signature));
 for(const name of ['getVerticalFadingEdgeLength', 'getHorizontalFadingEdgeLength'])keys.add(VIEW+'->'+name+'()I');
 for(const signature of ['requestRectangleOnScreen(Landroid/graphics/Rect;)Z','requestRectangleOnScreen(Landroid/graphics/Rect;Z)Z'])keys.add(VIEW+'->'+signature);
 keys.add('Landroid/view/ViewGroup;->requestChildRectangleOnScreen(Landroid/view/View;Landroid/graphics/Rect;Z)Z');
@@ -67,6 +67,19 @@ export function createViewCoordinateHost(platform) {
         const enabled=(view.fields.get(VIEW+'->mViewFlags:I')??0)&(vertical?0x2000:0x1000);
         if(enabled)fail('Fading-edge masks are not implemented by this View renderer');
         return 0; // AOSP View.java: disabled fading edges return zero before consulting the cache.
+      }
+      if(name==='transformMatrixToGlobal'){
+        // View.transformMatrixToGlobal: the ancestors' transforms from the root down (ViewRootImpl applies the embedded-hierarchy window matrix, identity here, then -mCurScrollY).
+        const chain=hierarchy(runtime,receiver),matrix=args[1];if(matrix===null||matrix===undefined)runtime.throwJava('Ljava/lang/NullPointerException;','Attempt to invoke virtual method on a null object reference');
+        const win=windowState(runtime,chain),mat=(n,p,v)=>call(runtime,matrix,MATRIX,n,p,n==='preConcat'?'Z':'Z',v);
+        for(let i=chain.length-1;i>=0;i--){
+          const view=runtime.object(chain[i]);
+          if(i===chain.length-1)call(runtime,matrix,MATRIX,'preTranslate',['F','F'],'Z',[raw(0),raw(-win.rootScrollY)]);
+          else{const parent=runtime.object(chain[i+1]);call(runtime,matrix,MATRIX,'preTranslate',['F','F'],'Z',[raw(-(parent.fields.get(`${VIEW}->mScrollX:I`)??0)),raw(-(parent.fields.get(`${VIEW}->mScrollY:I`)??0))]);}
+          call(runtime,matrix,MATRIX,'preTranslate',['F','F'],'Z',[raw(view.bounds?.left??view.fields.get(`${VIEW}->mLeft:I`)??0),raw(view.bounds?.top??view.fields.get(`${VIEW}->mTop:I`)??0)]);
+          if(!call(runtime,chain[i],VIEW,'hasIdentityMatrix',[],'Z'))call(runtime,matrix,MATRIX,'preConcat',[MATRIX],'Z',[call(runtime,chain[i],VIEW,'getMatrix',[],MATRIX)]);
+        }
+        return;
       }
       if(name==='requestChildRectangleOnScreen')return 0; // Original ViewGroup default; real ScrollView overrides dispatch first.
       if(name==='requestRectangleOnScreen'){

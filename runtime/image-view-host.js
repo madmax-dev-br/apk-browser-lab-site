@@ -1,4 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=00979d36e5ab';
+import { gcRoot } from './heap-gc.js?v=58b0147dafd8';
+import { createHostRegistry } from './host-contract.js?v=58b0147dafd8';
 
 // android.widget.ImageView members that the drawable-view-host does not cover: the ScaleType enum (getScaleType / setScaleType, ordinal = the XML android:scaleType value that
 // drawable-view-host already honours when drawing) and setImageBitmap (ImageView wraps the Bitmap in a BitmapDrawable, android-13.0.0_r1 ImageView.setImageBitmap).
@@ -10,7 +11,7 @@ export function createImageViewHost(platform) {
   type(SCALE_TYPE, ENUM);
   const values = new WeakMap();
   const scaleType = (r, name) => {
-    const table = values.get(r) ?? values.set(r, new Map()).get(r);
+    const table = values.get(r) ?? values.set(r, gcRoot(new Map())).get(r);
     if (!table.has(name)) { const ref = r.makeObject(SCALE_TYPE), o = r.object(ref); o.enumName = name; o.enumOrdinal = NAMES.indexOf(name); r.storeField(o.fields, `${SCALE_TYPE}->nativeInt:I`, NAMES.indexOf(name)); table.set(name, ref); }
     return table.get(name);
   };

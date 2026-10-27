@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=00979d36e5ab';
+import { APKError } from './apk-error.js?v=58b0147dafd8';
 
 // Registry for "contract hosts": JS reimplementations of named platform methods, each registered with its exact JVM
 // signature. The registry answers the runtime's supports()/invoke()/parent()/reflection queries uniformly so that
@@ -45,7 +45,7 @@ export function createHostRegistry() {
     canAllocate: type => allocatable.has(type),
     readStatic(runtime, field) {
       const entry = fields.get(`${field.owner}->${field.name}:${field.type}`); if (!entry) return null;
-      if (!entry.cache.has(runtime)) entry.cache.set(runtime, entry.compute(runtime));
+      if (!entry.cache.has(runtime)) { const value = entry.compute(runtime); entry.cache.set(runtime, value); if (value !== null && typeof value === 'object') (runtime.hostStaticValues ??= []).push(value); }   // cached host static values are GC roots (the cache is a WeakMap the collector cannot walk)
       return { handled: true, value: entry.cache.get(runtime) };
     },
     reflectionDefinition(owner, kind, name, parameters) {
