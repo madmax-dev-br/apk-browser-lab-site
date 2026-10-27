@@ -1,5 +1,5 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=36ea061c5c9d';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=36ea061c5c9d';
+import { bitsFloat, floatBits } from './host-contract.js?v=7268006482d0';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=7268006482d0';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB
@@ -74,7 +74,7 @@ export function createPeripheralServicesHost(platform) {
     def(owner, 'toString', `()${STRING}`, (r, _m, [self]) => { const s = r.object(self).lockState; return `${s.kind} ${s.tag} held=${s.held}; refcounted=${s.counted}`; });
   };
   lock(WIFI_LOCK); lock(MULTICAST_LOCK);
-  const newLock = (r, owner, kind, tag) => { const o = r.allocate(owner); r.object(o).lockState = { kind, tag: tag === null ? null : text(r, tag), held: false, counted: true, count: 0 }; return o; };
+  const newLock = (r, owner, kind, tag) => { const o = r.allocate(owner); r.object(o).lockState = { kind, tag: (tag === null || tag === 0) ? null : text(r, tag), held: false, counted: true, count: 0 }; return o; };
   def(WIFI, 'createWifiLock', `(${STRING})${WIFI_LOCK}`, (r, _m, [, tag]) => newLock(r, WIFI_LOCK, 'WifiLock', tag));
   def(WIFI, 'createWifiLock', `(I${STRING})${WIFI_LOCK}`, (r, _m, [, mode, tag]) => { if (![1, 2, 3, 4].includes(mode)) iae(r, `Illegal argument, lockType ${mode}`); return newLock(r, WIFI_LOCK, 'WifiLock', tag); });
   def(WIFI, 'createMulticastLock', `(${STRING})${MULTICAST_LOCK}`, (r, _m, [, tag]) => newLock(r, MULTICAST_LOCK, 'MulticastLock', tag));

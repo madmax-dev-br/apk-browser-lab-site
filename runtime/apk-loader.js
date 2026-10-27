@@ -1,14 +1,14 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=36ea061c5c9d';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=36ea061c5c9d';
-import { inspectELF } from './native-inspector.js?v=36ea061c5c9d';
-import { inflateRaw } from './inflate.js?v=36ea061c5c9d';
-import { resolveDevice } from './device-profile.js?v=36ea061c5c9d';
-import { resourceProfileFor } from './device-configuration.js?v=36ea061c5c9d';
-import { JniBridge } from './jni-host.js?v=36ea061c5c9d';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=36ea061c5c9d';
-import { AndroidResources } from './android-resources.js?v=36ea061c5c9d';
-import { AndroidPlatform } from './android-platform.js?v=36ea061c5c9d';
-import { FrameworkProvider } from './framework-provider.js?v=36ea061c5c9d';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=7268006482d0';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=7268006482d0';
+import { inspectELF } from './native-inspector.js?v=7268006482d0';
+import { inflateRaw } from './inflate.js?v=7268006482d0';
+import { resolveDevice } from './device-profile.js?v=7268006482d0';
+import { resourceProfileFor } from './device-configuration.js?v=7268006482d0';
+import { JniBridge } from './jni-host.js?v=7268006482d0';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=7268006482d0';
+import { AndroidResources } from './android-resources.js?v=7268006482d0';
+import { AndroidPlatform } from './android-platform.js?v=7268006482d0';
+import { FrameworkProvider } from './framework-provider.js?v=7268006482d0';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -348,7 +348,8 @@ async function prepareResources(archive, names, options, report, yieldControl, w
     }
     const trees = layoutOnly ? layouts : xmlTrees, errors = layoutOnly ? layoutErrors : xmlErrors;
     if (!trees.has(path)) throw new APKError(`${layoutOnly ? 'Layout' : 'XML'} ${path} is not prepared: ${errors.get(path) ?? 'not found in APK compiled XML resources'}`, { kind: 'resource-unsupported', resourceId: Number(id) >>> 0, path });
-    return trees.get(path);
+    const tree = trees.get(path); nameFrameworkAttributes(tree, id => frameworkTable?.entries?.get(id >>> 0)?.[0]?.name ?? null);
+    return tree;
   };
   const environment = { table, layouts, xmlTrees, frameworkTable, frameworkXml: typeof options.frameworkGetXml === 'function',
     resolve: id => table.resolve(id),
@@ -400,6 +401,20 @@ export function apkSigningCertificates(archive) {
  * onProgress receives {phase,message,completed,total,filename?}; yieldControl can
  * supply a scheduler. Native metadata is always listed, ELF expansion is opt-in.
  */
+/**
+ * Compiled XML may carry framework attributes only by resource id (aapt2 resource optimisation drops the attribute-name string and the android namespace of attributes the
+ * framework resource map identifies): the name and namespace Android resolves through the resource map are filled in once per tree, so android:id, android:layout_width... are
+ * recognised wherever the tree is read (inflater, AttributeSet).
+ */
+const ANDROID_NAMESPACE = 'http://schemas.android.com/apk/res/android';
+export function nameFrameworkAttributes(node, nameOf) {
+  if (!node || node.attributeNamesFilled) return;
+  Object.defineProperty(node, 'attributeNamesFilled', { value: true, enumerable: false });
+  for (const attribute of node.attributes ?? []) {
+    if (!attribute.name && attribute.resourceId && (attribute.resourceId >>> 24) === 1) { const name = nameOf(attribute.resourceId); if (name) { attribute.name = name; if (!attribute.namespace) attribute.namespace = ANDROID_NAMESPACE; } }
+  }
+  for (const child of node.children ?? []) nameFrameworkAttributes(child, nameOf);
+}
 export async function loadAPK(arrayBuffer, options = {}) {
   if (!(arrayBuffer instanceof ArrayBuffer) && !(arrayBuffer instanceof Uint8Array)) fail('loadAPK requires an APK ArrayBuffer');
   const archive = new APKArchive(arrayBuffer), names = [...archive.entries.keys()];

@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=36ea061c5c9d';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=36ea061c5c9d';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=36ea061c5c9d';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=36ea061c5c9d';
+import { APKError } from './apk-error.js?v=7268006482d0';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=7268006482d0';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=7268006482d0';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=7268006482d0';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -407,7 +407,7 @@ export function createAppServicesHost(platform) {
   const channelGroupId = (r, channel) => { const g = vc(r, channel, CHANNEL, 'getGroup', [], STRING); return g === null ? null : r.stringCharacters(g); };
   const groupId = (r, group) => { const id = vc(r, group, GROUP, 'getId', [], STRING); return id === null ? null : r.stringCharacters(id); };
   const createChannel = (r, channel) => {
-    if (channel === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    if (channel === null || channel === 0 || channel === undefined) r.throwJava('Ljava/lang/NullPointerException;', null);
     const id = channelId(r, channel), group = channelGroupId(r, channel);
     if (group !== null && !notificationState.groups.has(group)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'NotificationChannelGroup doesn\'t exist');
     const existing = notificationState.channels.get(id);
@@ -418,9 +418,9 @@ export function createAppServicesHost(platform) {
     const importance = vc(r, channel, CHANNEL, 'getImportance', [], 'I');   // an app may lower the importance of its own channel; raising it is the user's choice
     if (importance < vc(r, existing, CHANNEL, 'getImportance', [], 'I')) vc(r, existing, CHANNEL, 'setImportance', ['I'], 'V', [importance]);
   };
-  const listValues = (r, list) => { if (list === null) r.throwJava('Ljava/lang/NullPointerException;', null); return r.array(vc(r, list, LIST_T, 'toArray', [], '[Ljava/lang/Object;')).elements; };
+  const listValues = (r, list) => { if (list === null || list === 0 || list === undefined) r.throwJava('Ljava/lang/NullPointerException;', null); return r.array(vc(r, list, LIST_T, 'toArray', [], '[Ljava/lang/Object;')).elements; };
   const createGroup = (r, group) => {
-    if (group === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    if (group === null || group === 0 || group === undefined) r.throwJava('Ljava/lang/NullPointerException;', null);
     const id = groupId(r, group), existing = notificationState.groups.get(id);
     if (existing === undefined) { notificationState.groups.set(id, group); return; }
     vc(r, existing, GROUP, 'setDescription', [STRING], 'V', [vc(r, group, GROUP, 'getDescription', [], STRING)]);
@@ -729,6 +729,12 @@ export function createAppServicesHost(platform) {
   });
   def(PACKAGE_MANAGER, 'queryIntentServices', `(${INTENT_TYPE}I)Ljava/util/List;`, (r, _m, [, intent, flags]) => resolveInfos(r, intent, 'service', (flags & 128) !== 0));
   def(PACKAGE_MANAGER, 'queryBroadcastReceivers', `(${INTENT_TYPE}I)Ljava/util/List;`, (r, _m, [, intent, flags]) => resolveInfos(r, intent, 'receiver', (flags & 128) !== 0));
+  // Activities resolve the same way: only this app is installed, so an external intent (a browser, the Play Store, the dialer) truthfully resolves to nothing.
+  def(PACKAGE_MANAGER, 'queryIntentActivities', `(${INTENT_TYPE}I)Ljava/util/List;`, (r, _m, [, intent]) => resolveInfos(r, intent, 'activity', false));
+  def(PACKAGE_MANAGER, 'resolveActivity', `(${INTENT_TYPE}I)${RESOLVE_INFO}`, (r, _m, [, intent]) => {
+    const list = resolveInfos(r, intent, 'activity', false);
+    return r.dispatch({ owner: 'Ljava/util/List;', name: 'isEmpty', parameters: [], result: 'Z', signature: '()Z' }, [list], 'virtual') ? null : r.dispatch({ owner: 'Ljava/util/List;', name: 'get', parameters: ['I'], result: OBJECT, signature: `(I)${OBJECT}` }, [list, 0], 'virtual');
+  });
   def(PACKAGE_MANAGER, 'resolveService', `(${INTENT_TYPE}I)${RESOLVE_INFO}`, (r, _m, [, intent, flags]) => { const list = resolveInfos(r, intent, 'service', (flags & 128) !== 0); return r.dispatch({ owner: 'Ljava/util/List;', name: 'isEmpty', parameters: [], result: 'Z', signature: '()Z' }, [list], 'virtual') ? null : r.dispatch({ owner: 'Ljava/util/List;', name: 'get', parameters: ['I'], result: OBJECT, signature: `(I)${OBJECT}` }, [list, 0], 'virtual'); });
 
   // ---- AssetManager over the APK's assets/ tree -----------------------------------------------------------------------------------------------

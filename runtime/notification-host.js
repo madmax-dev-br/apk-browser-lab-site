@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=36ea061c5c9d';
-import { createHostRegistry } from './host-contract.js?v=36ea061c5c9d';
+import { APKError } from './apk-error.js?v=7268006482d0';
+import { createHostRegistry } from './host-contract.js?v=7268006482d0';
 
 // android.app.Notification, Notification.Builder / Action / BigTextStyle / BigPictureStyle / InboxStyle, NotificationChannel and android.graphics.drawable.Icon (android-13.0.0_r1).
 // None of these is in the framework DEX. The Builder is a recorder, exactly as in Notification.java: every setter stores a value and build() writes the public fields of
@@ -55,24 +55,54 @@ export function createNotificationHost(platform) {
   const channel = (r, ref) => r.object(ref).channel ?? r.throwJava('Ljava/lang/IllegalStateException;', 'NotificationChannel used before construction');
   def(CHANNEL, '<init>', `(${STRING}${CHARS}I)V`, (r, _m, [self, id, name, importance]) => {
     if (id === null) r.throwJava('Ljava/lang/NullPointerException;', null);
-    r.object(self).channel = { id: text(r, id), name: name, importance, description: null, group: null, showBadge: true, lights: false, lightColor: 0, vibration: false, vibrationPattern: null, sound: null, lockscreenVisibility: -1000, bypassDnd: false, canBubble: false };
+    // NotificationChannel field initialisers (android-13.0.0_r1): ids/names are trimmed to MAX_TEXT_LENGTH (1000), the sound defaults to Settings.System.DEFAULT_NOTIFICATION_URI and the
+    // audio attributes to Notification.AUDIO_ATTRIBUTES_DEFAULT (USAGE_NOTIFICATION, CONTENT_TYPE_SONIFICATION), no override of the lock-screen visibility, badges shown.
+    r.object(self).channel = { id: text(r, id).slice(0, 1000), name: (name === null || name === 0) ? null : r.javaString(name).slice(0, 1000), importance, description: null, group: null, showBadge: true, lights: false, lightColor: 0, vibration: false, vibrationPattern: null,
+      sound: callStaticUri(r, DEFAULT_NOTIFICATION_URI), audio: null, lockscreenVisibility: -1000, bypassDnd: false, canBubble: false, conversationId: null, parentChannelId: null, importantConversation: false };
   });
-  def(CHANNEL, 'getId', `()${STRING}`, (r, _m, [self]) => channel(r, self).id); def(CHANNEL, 'getName', `()${CHARS}`, (r, _m, [self]) => channel(r, self).name); def(CHANNEL, 'setName', `(${CHARS})V`, (r, _m, [self, v]) => { channel(r, self).name = v; });
+  const callStaticUri = (r, spec) => r.dispatch({ owner: URI, name: 'parse', parameters: [STRING], result: URI, signature: `(${STRING})${URI}` }, r.argumentWords([STRING], [spec]), 'static');
+  const DEFAULT_NOTIFICATION_URI = 'content://settings/system/notification_sound';
+  const AUDIO_ATTRIBUTES = 'Landroid/media/AudioAttributes;', AUDIO_BUILDER = 'Landroid/media/AudioAttributes$Builder;';
+  const defaultAudioAttributes = r => {   // Notification.AUDIO_ATTRIBUTES_DEFAULT
+    const builder = r.allocate(AUDIO_BUILDER); r.dispatch({ owner: AUDIO_BUILDER, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [builder], 'direct');
+    for (const [name, value] of [['setUsage', 5], ['setContentType', 4]]) r.dispatch({ owner: AUDIO_BUILDER, name, parameters: ['I'], result: AUDIO_BUILDER, signature: `(I)${AUDIO_BUILDER}` }, [builder, value], 'virtual');
+    return r.dispatch({ owner: AUDIO_BUILDER, name: 'build', parameters: [], result: AUDIO_ATTRIBUTES, signature: `()${AUDIO_ATTRIBUTES}` }, [builder], 'virtual');
+  };
+  def(CHANNEL, 'getAudioAttributes', `()${AUDIO_ATTRIBUTES}`, (r, _m, [self]) => { const c = channel(r, self); return c.audio === undefined || c.audio === 0 ? null : (c.audio ??= defaultAudioAttributes(r)); });
+  def(CHANNEL, 'canBubble', '()Z', (r, _m, [self]) => channel(r, self).canBubble ? 1 : 0); def(CHANNEL, 'setAllowBubbles', '(Z)V', (r, _m, [self, v]) => { channel(r, self).canBubble = !!v; });
+  def(CHANNEL, 'getConversationId', `()${STRING}`, (r, _m, [self]) => channel(r, self).conversationId); def(CHANNEL, 'getParentChannelId', `()${STRING}`, (r, _m, [self]) => channel(r, self).parentChannelId);
+  def(CHANNEL, 'isImportantConversation', '()Z', (r, _m, [self]) => channel(r, self).importantConversation ? 1 : 0);
+  def(CHANNEL, 'setConversationId', `(${STRING}${STRING})V`, (r, _m, [self, parent, conversation]) => { const c = channel(r, self); c.parentChannelId = parent; c.conversationId = conversation; });
+  def(CHANNEL, 'describeContents', '()I', () => 0);
+  def(CHANNEL, 'equals', `(${OBJECT})Z`, (r, _m, [self, other]) => {
+    if (other === null || other === undefined || other === 0) return 0; if (other === self || other.ref === self.ref) return 1;
+    const b = r.object(other).channel; if (!b) return 0; const a = channel(r, self);
+    const eq = (x, y) => (x === y) || (x && y && typeof x === 'object' && typeof y === 'object' && r.dispatch({ owner: OBJECT, name: 'equals', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [x, y], 'virtual') === 1);
+    const same = (x, y) => (x === null || x === 0 || x === undefined) ? (y === null || y === 0 || y === undefined) : (typeof x === 'string' ? x === y : eq(x, y));
+    const sound = [a.sound, b.sound], audio = [a.audio ?? null, b.audio ?? null];
+    return a.importance === b.importance && a.bypassDnd === b.bypassDnd && a.lockscreenVisibility === b.lockscreenVisibility && a.lights === b.lights && a.lightColor === b.lightColor && a.showBadge === b.showBadge && a.canBubble === b.canBubble && a.vibration === b.vibration
+      && same(a.id, b.id) && same(r.javaString ? (a.name === null ? null : r.javaString(a.name)) : a.name, r.javaString ? (b.name === null ? null : r.javaString(b.name)) : b.name) && same(a.description, b.description) && same(sound[0], sound[1]) && same(a.group, b.group)
+      && same(audio[0], audio[1]) && JSON.stringify(a.vibrationPattern === null ? null : r.array(a.vibrationPattern).elements.map(String)) === JSON.stringify(b.vibrationPattern === null ? null : r.array(b.vibrationPattern).elements.map(String)) ? 1 : 0;
+  });
+  def(CHANNEL, 'hashCode', '()I', (r, _m, [self]) => { const c = channel(r, self); let h = 17; for (const part of [c.id, String(c.importance), String(c.lockscreenVisibility), String(c.lightColor), String(c.showBadge), String(c.lights)]) { for (let i = 0; i < (part ?? '').length; i++) h = (Math.imul(h, 31) + part.charCodeAt(i)) | 0; } return h; });
+  registry.staticField(CHANNEL, 'DEFAULT_CHANNEL_ID', STRING, () => 'miscellaneous');
+  def(CHANNEL, 'getId', `()${STRING}`, (r, _m, [self]) => channel(r, self).id); def(CHANNEL, 'getName', `()${CHARS}`, (r, _m, [self]) => channel(r, self).name); def(CHANNEL, 'setName', `(${CHARS})V`, (r, _m, [self, v]) => { channel(r, self).name = (v === null || v === 0) ? null : r.javaString(v).slice(0, 1000); });
   def(CHANNEL, 'getImportance', '()I', (r, _m, [self]) => channel(r, self).importance); def(CHANNEL, 'setImportance', '(I)V', (r, _m, [self, v]) => { channel(r, self).importance = v; });
   for (const [property, field, code] of [['Description', 'description', STRING], ['Group', 'group', STRING], ['ShowBadge', 'showBadge', 'Z'], ['LightColor', 'lightColor', 'I'], ['LockscreenVisibility', 'lockscreenVisibility', 'I'], ['BypassDnd', 'bypassDnd', 'Z'], ['VibrationPattern', 'vibrationPattern', '[J']]) {
     const read = property === 'ShowBadge' ? 'canShowBadge' : property === 'BypassDnd' ? 'canBypassDnd' : property === 'VibrationPattern' ? 'getVibrationPattern' : `get${property}`;
     def(CHANNEL, `set${property}`, `(${code})V`, (r, _m, [self, v]) => { channel(r, self)[field] = code === 'Z' ? !!v : v; });
     def(CHANNEL, read, `()${code}`, (r, _m, [self]) => { const v = channel(r, self)[field]; return code === 'Z' ? (v ? 1 : 0) : v; });
   }
+  def(CHANNEL, 'setDescription', `(${STRING})V`, (r, _m, [self, v]) => { channel(r, self).description = (v === null || v === 0) ? null : r.stringCharacters(v).slice(0, 1000); });   // getTrimmedString
   def(CHANNEL, 'enableLights', '(Z)V', (r, _m, [self, v]) => { channel(r, self).lights = !!v; }); def(CHANNEL, 'shouldShowLights', '()Z', (r, _m, [self]) => channel(r, self).lights ? 1 : 0);
   def(CHANNEL, 'enableVibration', '(Z)V', (r, _m, [self, v]) => { channel(r, self).vibration = !!v; }); def(CHANNEL, 'shouldVibrate', '()Z', (r, _m, [self]) => channel(r, self).vibration ? 1 : 0);
-  def(CHANNEL, 'setSound', `(${URI}Landroid/media/AudioAttributes;)V`, (r, _m, [self, uri]) => { channel(r, self).sound = uri; }); def(CHANNEL, 'getSound', `()${URI}`, (r, _m, [self]) => channel(r, self).sound);
+  def(CHANNEL, 'setSound', `(${URI}Landroid/media/AudioAttributes;)V`, (r, _m, [self, uri, audio]) => { const c = channel(r, self); c.sound = uri; c.audio = (audio === null || audio === 0) ? 0 : audio; }); def(CHANNEL, 'getSound', `()${URI}`, (r, _m, [self]) => channel(r, self).sound);
 
   // ---- NotificationChannelGroup (frameworks/base NotificationChannelGroup.java) -----------------------------------------------------------------------
   const GROUP = 'Landroid/app/NotificationChannelGroup;', LIST = 'Ljava/util/List;';
   const group = (r, ref) => r.object(ref).channelGroup ?? r.throwJava('Ljava/lang/IllegalStateException;', 'NotificationChannelGroup used before construction');
   const trimmed = (r, value) => value === null ? null : r.stringCharacters(value).slice(0, 40);   // getTrimmedString: ids and names are cut to MAX_TEXT_LENGTH (1000) -- ids to 40 chars in Channel/Group
-  def(GROUP, '<init>', `(${STRING}${CHARS})V`, (r, _m, [self, id, name]) => { r.object(self).channelGroup = { id: id === null ? null : r.stringCharacters(id).slice(0, 1000), name: name === null ? null : r.javaString(name).slice(0, 1000), description: null, blocked: false, channels: null }; });
+  def(GROUP, '<init>', `(${STRING}${CHARS})V`, (r, _m, [self, id, name]) => { r.object(self).channelGroup = { id: (id === null || id === 0) ? null : r.stringCharacters(id).slice(0, 1000), name: (name === null || name === 0) ? null : r.javaString(name).slice(0, 1000), description: null, blocked: false, channels: null }; });
   def(GROUP, 'getId', `()${STRING}`, (r, _m, [self]) => group(r, self).id); def(GROUP, 'getName', `()${CHARS}`, (r, _m, [self]) => group(r, self).name);
   def(GROUP, 'getDescription', `()${STRING}`, (r, _m, [self]) => group(r, self).description); def(GROUP, 'setDescription', `(${STRING})V`, (r, _m, [self, v]) => { group(r, self).description = v === null ? null : r.stringCharacters(v).slice(0, 1000); });
   def(GROUP, 'isBlocked', '()Z', (r, _m, [self]) => group(r, self).blocked ? 1 : 0);

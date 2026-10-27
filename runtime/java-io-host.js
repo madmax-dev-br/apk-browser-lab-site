@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=36ea061c5c9d';
-import { APKError } from './apk-error.js?v=36ea061c5c9d';
-import { VirtualFileSystem, normalizePath } from './virtual-fs.js?v=36ea061c5c9d';
+import { createHostRegistry } from './host-contract.js?v=7268006482d0';
+import { APKError } from './apk-error.js?v=7268006482d0';
+import { VirtualFileSystem, normalizePath } from './virtual-fs.js?v=7268006482d0';
 
 // The app's virtual filesystem owner and the little java.io glue the platform still needs. java.io itself (File, the byte/char streams, FileDescriptor, RandomAccessFile,
 // UnixFileSystem) is the original Android 13 libcore in framework.dex; its syscalls land in src/libcore-io-native.js over the VirtualFileSystem created here.
@@ -30,6 +30,18 @@ export function createJavaIoHost(platform) {
   const byteStream = (runtime, bytes) => {
     const array = runtime.newArray('[B', bytes.length); runtime.array(array).elements = Array.from(bytes, v => (v << 24) >> 24);
     return construct(runtime, BAIS, ['[B'], [array]);
+  };
+
+  // An APK entry as an InputStream. Small entries are a ByteArrayInputStream; a large one (the 23 MB Hermes bundle of a React Native app) is mounted read-only in the virtual file system
+  // under the package's code path and read through the original FileInputStream, chunk by chunk, instead of becoming one giant Java byte[] (AssetInputStream is file-backed too).
+  const LARGE_ENTRY = 256 * 1024, BIS_TYPE = 'Ljava/io/BufferedInputStream;';
+  const apkEntryStream = (runtime, entry) => {
+    const bytes = runtime.apkReader(entry);
+    if (bytes.length <= LARGE_ENTRY) return byteStream(runtime, bytes);
+    const path = `${fs().codePath}/.entries/${entry}`;
+    if (!fs().nodes.has(path)) fs().mount(path, bytes);
+    const stream = construct(runtime, FIS, [STRING], [path]);
+    return construct(runtime, BIS_TYPE, [IS], [stream]);
   };
 
   // ---- System.in / out / err: libcore's System.initPhase wiring over the three standard descriptors (src/libcore-io-native.js logs descriptor 1/2 writes the way logd does).
@@ -79,5 +91,5 @@ export function createJavaIoHost(platform) {
     def(STATFS, `get${name}`, '()I', () => value); def(STATFS, `get${name}Long`, '()J', () => BigInt(value));
   }
   def(STATFS, 'getTotalBytes', '()J', () => BigInt(BLOCK) * BigInt(BLOCKS)); def(STATFS, 'getFreeBytes', '()J', () => BigInt(BLOCK) * BigInt(FREE)); def(STATFS, 'getAvailableBytes', '()J', () => BigInt(BLOCK) * BigInt(AVAILABLE));
-  return { ...registry, readStatic: (runtime, field) => field.owner === SYSTEM && ['in', 'out', 'err'].includes(field.name) ? { handled: true, value: stdio(runtime, field.name) } : registry.readStatic(runtime, field), interfaces: registry.interfacesOf, fs, makeFile, apkResourceURL: entryURL, apkResourceStream: (r, entry) => byteStream(r, r.apkReader(entry)) };
+  return { ...registry, readStatic: (runtime, field) => field.owner === SYSTEM && ['in', 'out', 'err'].includes(field.name) ? { handled: true, value: stdio(runtime, field.name) } : registry.readStatic(runtime, field), interfaces: registry.interfacesOf, fs, makeFile, apkResourceURL: entryURL, apkResourceStream: (r, entry) => apkEntryStream(r, entry) };
 }

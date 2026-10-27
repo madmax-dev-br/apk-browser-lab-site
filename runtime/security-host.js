@@ -1,5 +1,5 @@
-import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=36ea061c5c9d';
-import { APKError } from './apk-error.js?v=36ea061c5c9d';
+import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=7268006482d0';
+import { APKError } from './apk-error.js?v=7268006482d0';
 
 // java.security.Security / Provider and java.net.IDN for libraries that probe the platform at launch (OkHttp's Platform.get(), Conscrypt checks, host name
 // normalisation). Contracts: java.security.Security, java.security.Provider (android-13.0.0_r1 libcore) and java.net.IDN (ToASCII/ToUnicode of RFC 3490).
@@ -112,8 +112,19 @@ export function createSecurityHost(platform) {
   def(OSSI, 'setUseSessionTickets', '(Z)V', () => {}); def(OSSI, 'setHostname', `(${STRING})V`, () => {}); def(OSSI, 'getAlpnSelectedProtocol', `()${BYTES}`, () => null); def(OSSI, 'setAlpnProtocols', `(${BYTES})V`, () => {});
   const noSockets = r => r.throwJava('Ljava/net/SocketException;', 'TLS sockets are not available in the browser lab (HTTP goes through the fetch bridge)');
   for (const parameters of ['', 'Ljava/net/Socket;Ljava/lang/String;IZ', 'Ljava/lang/String;I', 'Ljava/net/InetAddress;I']) def(OSFI, 'createSocket', `(${parameters})${'Ljava/net/Socket;'}`, noSockets);
-  def(OSFI, 'getDefaultCipherSuites', '()[Ljava/lang/String;', r => array(r, STRING, ['TLS_AES_128_GCM_SHA256', 'TLS_AES_256_GCM_SHA384', 'TLS_CHACHA20_POLY1305_SHA256', 'TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256', 'TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256']));
-  def(OSFI, 'getSupportedCipherSuites', '()[Ljava/lang/String;', r => array(r, STRING, ['TLS_AES_128_GCM_SHA256', 'TLS_AES_256_GCM_SHA384', 'TLS_CHACHA20_POLY1305_SHA256', 'TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256', 'TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256']));
+  // Conscrypt (android-13): the cipher suites a client socket enables by default, and the extra legacy ones it can be asked to enable.
+  const DEFAULT_SUITES = ['TLS_AES_128_GCM_SHA256', 'TLS_AES_256_GCM_SHA384', 'TLS_CHACHA20_POLY1305_SHA256', 'TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256', 'TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384', 'TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256',
+    'TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256', 'TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384', 'TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256', 'TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA', 'TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA',
+    'TLS_RSA_WITH_AES_128_GCM_SHA256', 'TLS_RSA_WITH_AES_256_GCM_SHA384', 'TLS_RSA_WITH_AES_128_CBC_SHA', 'TLS_RSA_WITH_AES_256_CBC_SHA'];
+  const SUPPORTED_SUITES = [...DEFAULT_SUITES, 'TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA', 'TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA', 'TLS_RSA_WITH_3DES_EDE_CBC_SHA', 'TLS_EMPTY_RENEGOTIATION_INFO_SCSV'];
+  const DEFAULT_PROTOCOLS = ['TLSv1.3', 'TLSv1.2'], SUPPORTED_PROTOCOLS = ['TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3'];
+  def(OSFI, 'getDefaultCipherSuites', '()[Ljava/lang/String;', r => array(r, STRING, DEFAULT_SUITES));
+  def(OSFI, 'getSupportedCipherSuites', '()[Ljava/lang/String;', r => array(r, STRING, SUPPORTED_SUITES));
+  // SSLContext.getDefaultSSLParameters / getSupportedSSLParameters (SSLContextSpi -> the socket factory's defaults): a real javax.net.ssl.SSLParameters of the cipher suites and protocols.
+  const SSL_PARAMETERS = 'Ljavax/net/ssl/SSLParameters;';
+  const parameters = (r, suites, protocols) => { const ref = r.allocate(SSL_PARAMETERS); r.dispatch({ owner: SSL_PARAMETERS, name: '<init>', parameters: [`[${STRING}`, `[${STRING}`], result: 'V', signature: `([${STRING}[${STRING})V` }, [ref, array(r, STRING, suites), array(r, STRING, protocols)], 'direct'); return ref; };
+  def(SSL_CONTEXT, 'getDefaultSSLParameters', `()${SSL_PARAMETERS}`, (r, _m, [self]) => { if (!r.object(self).factory) r.throwJava('Ljava/lang/IllegalStateException;', 'SSLContext is not initialized'); return parameters(r, DEFAULT_SUITES, DEFAULT_PROTOCOLS); });
+  def(SSL_CONTEXT, 'getSupportedSSLParameters', `()${SSL_PARAMETERS}`, (r, _m, [self]) => { if (!r.object(self).factory) r.throwJava('Ljava/lang/IllegalStateException;', 'SSLContext is not initialized'); return parameters(r, SUPPORTED_SUITES, SUPPORTED_PROTOCOLS); });
 
   // TrustManagerFactory / KeyManagerFactory (algorithms PKIX and X509 on Android).
   def(TMF, 'getDefaultAlgorithm', `()${STRING}`, () => 'PKIX', { static: true });
@@ -132,7 +143,7 @@ export function createSecurityHost(platform) {
   def(SSL_CONTEXT, 'getInstance', `(${STRING})${SSL_CONTEXT}`, (r, _m, [name]) => { const ref = r.allocate(SSL_CONTEXT); r.object(ref).protocol = algorithm(r, name, PROTOCOLS, 'SSLContext'); return ref; }, { static: true });
   def(SSL_CONTEXT, 'getDefault', `()${SSL_CONTEXT}`, r => { const ref = r.allocate(SSL_CONTEXT); Object.assign(r.object(ref), { protocol: 'Default', factory: r.allocate(OSFI) }); return ref; }, { static: true });
   def(SSL_CONTEXT, 'getProtocol', `()${STRING}`, (r, _m, [self]) => r.object(self).protocol);
-  def(SSL_CONTEXT, 'init', `([${KM}[${TM}${SECURE_RANDOM})V`, (r, _m, [self, , trust]) => { const o = r.object(self); o.trustManagers = trust === null ? null : [...r.array(trust).elements]; o.factory = r.allocate(OSFI); });
+  def(SSL_CONTEXT, 'init', `([${KM}[${TM}${SECURE_RANDOM})V`, (r, _m, [self, , trust]) => { const o = r.object(self); o.trustManagers = (trust === null || trust === 0 || trust === undefined) ? null : [...r.array(trust).elements]; o.factory = r.allocate(OSFI); });
   def(SSL_CONTEXT, 'getSocketFactory', `()${SSL_SOCKET_FACTORY}`, (r, _m, [self]) => r.object(self).factory ?? r.throwJava('Ljava/lang/IllegalStateException;', 'SSLContext is not initialized'));
 
   // java.security.KeyStore: an in-memory store ("AndroidCAStore" is the empty system store; AndroidKeyStore is not backed by hardware here).

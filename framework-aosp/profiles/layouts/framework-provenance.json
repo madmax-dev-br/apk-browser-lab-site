@@ -80,7 +80,7 @@
       "license": "Apache-2.0"
     }
   ],
-  "requiresDefaultFrameworkSha256": "2effd1ff50c8d673e5c52f6c55bcd65bd3df8efe843edd02d43e6b76807800b4",
+  "requiresDefaultFrameworkSha256": "4e02c908e0643792f09d5c66295b00eee4d33e49b75fc1eff0f2b59986f5768e",
   "compileOnlyDeclarationsPackaged": false,
   "scrollViewMetadata": {
     "schemaVersion": 1,

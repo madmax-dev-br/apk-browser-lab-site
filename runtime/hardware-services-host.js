@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=36ea061c5c9d';
-import { createHostRegistry } from './host-contract.js?v=36ea061c5c9d';
-import { GC_ROOTS } from './heap-gc.js?v=36ea061c5c9d';
+import { gcRoot } from './heap-gc.js?v=7268006482d0';
+import { createHostRegistry } from './host-contract.js?v=7268006482d0';
+import { GC_ROOTS } from './heap-gc.js?v=7268006482d0';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
 // contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes, and an AlarmManager that
@@ -120,6 +120,13 @@ export function createHardwareServicesHost(platform) {
     '(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;ILandroid/os/Handler;)Z', '(Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;IILandroid/os/Handler;)Z'])
     def(SENSOR, 'registerListener', signature, (r) => { r.record('SENSOR registerListener refused: the virtual device has no sensors'); return 0; });
   def(SENSOR, 'flush', '(Landroid/hardware/SensorEventListener;)Z', () => 0);
+
+  // ---- OrientationEventListener: it listens to the accelerometer, and this device has none (getDefaultSensor(TYPE_ACCELEROMETER) is null) --------------------------------------
+  const ORIENTATION = 'Landroid/view/OrientationEventListener;'; type(ORIENTATION, OBJECT, [], { allocatable: true });
+  def(ORIENTATION, '<init>', `(${CONTEXT})V`, () => {}); def(ORIENTATION, '<init>', `(${CONTEXT}I)V`, () => {});
+  def(ORIENTATION, 'canDetectOrientation', '()Z', () => 0);
+  def(ORIENTATION, 'enable', '()V', r => { r.record('SENSOR OrientationEventListener.enable ignored: Cannot detect sensors. Not enabled'); });   // OrientationEventListener.enable logs the same and returns
+  def(ORIENTATION, 'disable', '()V', () => {});
 
   // ---- UiModeManager: follows the Dispositivo panel's dark-theme switch -----------------------------------------------------------------------------------------
   const UI_MODE = service('uimode', 'Landroid/app/UiModeManager;');

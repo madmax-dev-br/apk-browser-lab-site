@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=36ea061c5c9d';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=36ea061c5c9d';
+import { createHostRegistry } from './host-contract.js?v=7268006482d0';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=7268006482d0';
 
 // Shared plumbing of the system-service hosts (hardware-services-host.js, device-services-host.js, system-managers-host.js): a host contract registry plus the Context service
 // table -- each service has a Context.*_SERVICE name and a manager class; the manager object is a host object created once per runtime. Behaviour follows what an API 33 phone
@@ -27,7 +27,7 @@ export function createServiceKit(platform) {
   };
   const call = (r, receiver, owner, name, parameters, result, args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, r.argumentWords(parameters, args, { receiver }), 'virtual');
   const callStatic = (r, owner, name, parameters, result, args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, r.argumentWords(parameters, args), 'static');
-  const text = (r, v) => v === null || v === undefined ? null : r.stringCharacters(v);
+  const text = (r, v) => v === null || v === undefined || v === 0 ? null : r.stringCharacters(v);   // bytecode passes a null reference as 0
   const uid = () => platform.virtualProcess?.uid ?? 10000;
   const holds = (r, permission) => platform.holdsPermission?.(r, permission) ?? false;
   /** Context.enforceCallingOrSelfPermission: SecurityException with the framework's message. */

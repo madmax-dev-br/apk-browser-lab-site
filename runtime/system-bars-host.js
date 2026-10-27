@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=36ea061c5c9d';
-import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=36ea061c5c9d';
+import { APKError } from './apk-error.js?v=7268006482d0';
+import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=7268006482d0';
 // SystemUI of the virtual device: status bar, navigation bar (gesture handle or 3 buttons) and the window policy PhoneWindow/DecorView apply to the app:
 // edge-to-edge (targetSdk >= 35 unless windowOptOutEdgeToEdgeEnforcement, Window.setDecorFitsSystemWindows(false), SYSTEM_UI_FLAG_LAYOUT_*),
 // bar colors/appearance (theme + Window setters + WindowInsetsController + SYSTEM_UI_FLAG_LIGHT_*), hiding (FLAG_FULLSCREEN, SYSTEM_UI_FLAG_FULLSCREEN/HIDE_NAVIGATION,
@@ -8,7 +8,8 @@ import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=36ea061c5c9d'
 const WINDOW = 'Landroid/view/Window;', VIEW = 'Landroid/view/View;', CONTROLLER = 'Landroid/view/WindowInsetsController;', INSETS = 'Landroid/view/WindowInsets;', INSETS_VALUE = 'Landroid/graphics/Insets;', TYPE = 'Landroid/view/WindowInsets$Type;';
 const keys = new Set(), add = (owner, signatures) => signatures.forEach(signature => keys.add(`${owner}->${signature}`));
 add(WINDOW, ['setStatusBarColor(I)V', 'getStatusBarColor()I', 'setNavigationBarColor(I)V', 'getNavigationBarColor()I', 'setNavigationBarDividerColor(I)V', 'getNavigationBarDividerColor()I', 'setDecorFitsSystemWindows(Z)V',
-  'addFlags(I)V', 'clearFlags(I)V', 'setFlags(II)V', 'setNavigationBarContrastEnforced(Z)V', 'isNavigationBarContrastEnforced()Z', 'setStatusBarContrastEnforced(Z)V', 'isStatusBarContrastEnforced()Z', 'getInsetsController()Landroid/view/WindowInsetsController;']);
+  'addFlags(I)V', 'clearFlags(I)V', 'setFlags(II)V', 'setNavigationBarContrastEnforced(Z)V', 'isNavigationBarContrastEnforced()Z', 'setStatusBarContrastEnforced(Z)V', 'isStatusBarContrastEnforced()Z', 'getInsetsController()Landroid/view/WindowInsetsController;',
+  'addOnFrameMetricsAvailableListener(Landroid/view/Window$OnFrameMetricsAvailableListener;Landroid/os/Handler;)V', 'removeOnFrameMetricsAvailableListener(Landroid/view/Window$OnFrameMetricsAvailableListener;)V']);
 add(VIEW, ['setSystemUiVisibility(I)V', 'getSystemUiVisibility()I', 'getWindowSystemUiVisibility()I', 'getWindowInsetsController()Landroid/view/WindowInsetsController;']);
 add(CONTROLLER, ['setSystemBarsAppearance(II)V', 'getSystemBarsAppearance()I', 'hide(I)V', 'show(I)V', 'addOnControllableInsetsChangedListener(Landroid/view/WindowInsetsController$OnControllableInsetsChangedListener;)V', 'removeOnControllableInsetsChangedListener(Landroid/view/WindowInsetsController$OnControllableInsetsChangedListener;)V', 'setSystemBarsBehavior(I)V', 'getSystemBarsBehavior()I']);
 const FLAG = { FULLSCREEN: 0x400, LAYOUT_NO_LIMITS: 0x200, TRANSLUCENT_STATUS: 0x04000000, TRANSLUCENT_NAVIGATION: 0x08000000, DRAWS_SYSTEM_BAR_BACKGROUNDS: 0x80000000 | 0 };
@@ -73,7 +74,7 @@ export function createSystemBarsHost(platform) {
   const changed = (r, frame, invalidate = true) => {
     if (!frame.window && !frame.root) return; const value = compute(r, frame), next = key(value);
     if (frame.barsKey !== next) { frame.barsKey = next; if (invalidate && frame.root) { platform.insetsHost.invalidate?.(r, frame.root); platform.viewLayoutHost.relayoutRoot?.(r, frame.root); } }
-    platform.requestDraw?.(r, frame.root);
+    if (frame.root) platform.requestDraw?.(r, frame.root);   // an Activity that has not called setContentView yet has a window but no root View to redraw
   };
   const buildInsets = (r, value) => { r.traceMuted = (r.traceMuted || 0) + 1; try { return buildInsetsUnmuted(r, value); } finally { r.traceMuted--; } };
   const buildInsetsUnmuted = (r, value) => {
@@ -132,6 +133,9 @@ export function createSystemBarsHost(platform) {
         if (name === 'getWindowInsetsController') { const frame = platform.frames.at(-1); return frame ? controllerFor(r, frame) : null; }
       }
       const frame = frameOfWindow(r, receiver), bars = stateOf(r, frame);
+      // Frame metrics need GPU/RenderThread timing the lab does not produce: listeners are kept (and removable) but, truthfully, never receive a FrameMetrics.
+      if (name === 'addOnFrameMetricsAvailableListener') { if (args[1] === null || args[1] === 0) r.throwJava('Ljava/lang/NullPointerException;', 'Attempt to invoke interface method on a null object reference'); (bars.frameMetricsListeners ??= []).push(args[1]); return; }
+      if (name === 'removeOnFrameMetricsAvailableListener') { const list = bars.frameMetricsListeners ?? [], index = list.findIndex(x => x?.ref === args[1]?.ref); if (index >= 0) list.splice(index, 1); return; }
       if (name === 'setStatusBarColor') { bars.statusColor = args[1] | 0; changed(r, frame, false); return; }
       if (name === 'getStatusBarColor') return bars.statusColor;
       if (name === 'setNavigationBarColor') { bars.navColor = args[1] | 0; changed(r, frame, false); return; }

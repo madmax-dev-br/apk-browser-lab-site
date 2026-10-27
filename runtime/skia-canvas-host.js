@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=36ea061c5c9d';
-import {getVectorGraphics} from './vector-native.js?v=36ea061c5c9d';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=36ea061c5c9d';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=36ea061c5c9d';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=36ea061c5c9d';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=36ea061c5c9d';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=36ea061c5c9d';
-import {createBitmapHost} from './bitmap-host.js?v=36ea061c5c9d';
-import { gcRoot } from './heap-gc.js?v=36ea061c5c9d';
+import {APKError} from './apk-runtime.js?v=7268006482d0';
+import {getVectorGraphics} from './vector-native.js?v=7268006482d0';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=7268006482d0';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=7268006482d0';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=7268006482d0';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=7268006482d0';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=7268006482d0';
+import {createBitmapHost} from './bitmap-host.js?v=7268006482d0';
+import { gcRoot } from './heap-gc.js?v=7268006482d0';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -40,7 +40,17 @@ function buildRuntimeShader(CK,shader,overrides){
 function buildShader(CK,shader,overrides){
  if(shader.kind==='bitmap')return buildBitmapShader(CK,shader);
  if(shader.kind==='runtime')return buildRuntimeShader(CK,shader,overrides);
+ if(shader.kind==='linear'||shader.kind==='radial'||shader.kind==='sweep'||shader.kind==='compose')return buildGradientShader(CK,shader,overrides);
  return fail('Unsupported Paint shader description');
+}
+/** Android gradients: sRGB stops, premultiplied interpolation (Gradient.cpp's kInterpolateColorsInPremul_Flag), Android TileMode ordinals CLAMP/REPEAT/MIRROR. */
+function buildGradientShader(CK,shader,overrides){
+ const matrix=shader.matrix?shader.matrix.slice():undefined,modes=[CK.TileMode.Clamp,CK.TileMode.Repeat,CK.TileMode.Mirror];
+ if(shader.kind==='compose'){const dst=buildShader(CK,shader.dst,overrides),src=buildShader(CK,shader.src,overrides);try{return CK.Shader.MakeBlend({value:shader.blend},dst,src);}finally{dst.delete();src.delete();}}
+ const colors=shader.colors.map(c=>CK.Color4f(((c>>>16)&255)/255,((c>>>8)&255)/255,(c&255)/255,(c>>>24)/255)),pos=shader.positions?Float32Array.from(shader.positions):null,flags=1;
+ if(shader.kind==='linear')return CK.Shader.MakeLinearGradient(shader.p0,shader.p1,colors,pos,modes[shader.tile],matrix,flags);
+ if(shader.kind==='radial')return shader.focal?CK.Shader.MakeTwoPointConformalGradient(shader.focal,0,shader.center,shader.radius,colors,pos,modes[shader.tile],matrix,flags):CK.Shader.MakeRadialGradient(shader.center,shader.radius,colors,pos,modes[shader.tile],matrix,flags);
+ return CK.Shader.MakeSweepGradient(shader.center[0],shader.center[1],colors,pos,CK.TileMode.Clamp,matrix,flags,0,360);
 }
 /** Android BitmapShader over a snapshot raster. ALPHA_8 bitmaps are coverage only: Skia exposes them as (0,0,0,a), later tinted by the Paint's color filter. */
 function attachShader(CK,paint,shader,overrides){const built=buildShader(CK,shader,overrides);paint.setShader(built);built.delete();}
@@ -267,7 +277,7 @@ export function createSkiaCanvasHost(runtime,backend){
  add(PATH,[`addRect(${RF}${DIR})V`,`addRect(FFFF${DIR})V`,`addOval(${RF}${DIR})V`,`addOval(FFFF${DIR})V`,`addCircle(FFF${DIR})V`,`addArc(${RF}FF)V`,'addArc(FFFFFF)V',`arcTo(${RF}FFZ)V`,`arcTo(${RF}FF)V`,'arcTo(FFFFFFZ)V',
   'offset(FF)V',`offset(FF${PATH})V`,`transform(${MATRIX})V`,`transform(${MATRIX}${PATH})V`,`addPath(${PATH}${MATRIX})V`,`addPath(${PATH}FF)V`,`computeBounds(${RF}Z)V`,'incReserve(I)V','toggleInverseFillType()V','isInverseFillType()Z']);
  add(PATH,['addRoundRect(Landroid/graphics/RectF;[FLandroid/graphics/Path$Direction;)V']);
- add(CANVAS,[`drawPath(${PATH}Landroid/graphics/Paint;)V`,'drawCircle(FFFLandroid/graphics/Paint;)V','drawOval(FFFFLandroid/graphics/Paint;)V','drawRoundRect(FFFFFFLandroid/graphics/Paint;)V','drawColor(I)V','drawText(Ljava/lang/String;FFLandroid/graphics/Paint;)V','drawText(Ljava/lang/String;IIFFLandroid/graphics/Paint;)V','clipRect(FFFF)Z','clipRect(Landroid/graphics/Rect;)Z',`clipPath(${PATH})Z`]);
+ add(CANVAS,[`drawPath(${PATH}Landroid/graphics/Paint;)V`,'drawCircle(FFFLandroid/graphics/Paint;)V','drawOval(FFFFLandroid/graphics/Paint;)V','drawRoundRect(FFFFFFLandroid/graphics/Paint;)V','drawColor(I)V','drawText(Ljava/lang/String;FFLandroid/graphics/Paint;)V','drawText(Ljava/lang/String;IIFFLandroid/graphics/Paint;)V','drawText(Ljava/lang/CharSequence;IIFFLandroid/graphics/Paint;)V','drawText([CIIFFLandroid/graphics/Paint;)V','clipRect(FFFF)Z','clipRect(Landroid/graphics/Rect;)Z',`clipPath(${PATH})Z`]);
  add(CANVAS,['drawRect(Landroid/graphics/RectF;Landroid/graphics/Paint;)V','drawRoundRect(Landroid/graphics/RectF;FFLandroid/graphics/Paint;)V','drawOval(Landroid/graphics/RectF;Landroid/graphics/Paint;)V','saveLayer(FFFFLandroid/graphics/Paint;)I','save()I','restore()V','restoreToCount(I)V','getSaveCount()I']);
  add(CANVAS,['setCompatibilityVersion(I)V','<init>(J)V','getClipBounds(Landroid/graphics/Rect;)Z']);
  add(CANVAS,['drawLine(FFFFLandroid/graphics/Paint;)V','drawPoint(FFLandroid/graphics/Paint;)V','drawArc(FFFFFFZLandroid/graphics/Paint;)V','drawArc(Landroid/graphics/RectF;FFZLandroid/graphics/Paint;)V']);
@@ -476,7 +486,12 @@ export function createSkiaCanvasHost(runtime,backend){
     let text;if(typeof value==='string')text=value.slice(cs,ce);else if(vm.typeOf(value)==='Ljava/lang/String;')text=vm.stringCharacters(value).slice(cs,ce);else{const chars=array?vm.array(value).elements.slice(cs,ce):(()=>{const ref=vm.newArray('[C',ce-cs);vm.dispatch({owner:'Landroid/text/TextUtils;',name:'getChars',parameters:['Ljava/lang/CharSequence;','I','I','[C','I'],result:'V',signature:'(Ljava/lang/CharSequence;II[CI)V'},[value,cs,ce,ref,0],'static');return vm.array(ref).elements;})();text='';for(let i=0;i<chars.length;i+=16384)text+=String.fromCharCode(...chars.slice(i,i+16384));}
     const face=resolveTypeface(paint.typefaceRef);record(receiver,{op:'paragraphRun',text,runStart:start-cs,runEnd:end-cs,args:finite([number(args[6]),number(args[7])]),isRtl:!!args[8],paint:{...paint,weight:face.weight,italic:face.italic}});return;
    }
-   if(name==='drawText'){let text=args[1],x,y;if(typeof text!=='string')fail('Canvas.drawText requires a String');if(method.parameters.length===6){const from=args[2],to=args[3];if(from<0||to<from||to>text.length)vm.throwJava('Ljava/lang/IndexOutOfBoundsException;','Text range');text=text.slice(from,to);x=number(args[4]);y=number(args[5]);}else{x=number(args[2]);y=number(args[3]);}if(text.length>65536)fail('Skia text run limit exceeded');record(receiver,{op:'text',text,args:finite([x,y]),paint});return;}
+   if(name==='drawText'&&method.parameters[0]==='[C'){   // drawText(char[] text, int index, int count, float x, float y, Paint)
+    if(args[1]==null||args[1]===0)vm.throwJava('Ljava/lang/NullPointerException;',null);const chars=vm.array(args[1]).elements,index=args[2],count=args[3];
+    if((index|count)<0||index+count>chars.length)vm.throwJava('Ljava/lang/IndexOutOfBoundsException;','Text range');
+    if(count>65536)fail('Skia text run limit exceeded');record(receiver,{op:'text',text:String.fromCharCode(...chars.slice(index,index+count).map(v=>v&0xffff)),args:finite([number(args[4]),number(args[5])]),paint});return;
+  }
+  if(name==='drawText'){let text=args[1],x,y;if(method.parameters[0]==='Ljava/lang/CharSequence;'){if(text==null||text===0)vm.throwJava('Ljava/lang/NullPointerException;',null);if(typeof text!=='string')text=vm.stringCharacters(vm.dispatch({owner:'Ljava/lang/Object;',name:'toString',parameters:[],result:'Ljava/lang/String;',signature:'()Ljava/lang/String;'},[text],'virtual'));}if(typeof text!=='string')fail('Canvas.drawText requires a String');if(method.parameters.length===6){const from=args[2],to=args[3];if(from<0||to<from||to>text.length)vm.throwJava('Ljava/lang/IndexOutOfBoundsException;','Text range');text=text.slice(from,to);x=number(args[4]);y=number(args[5]);}else{x=number(args[2]);y=number(args[3]);}if(text.length>65536)fail('Skia text run limit exceeded');record(receiver,{op:'text',text,args:finite([x,y]),paint});return;}
    const op={drawCircle:'circle',drawOval:'oval',drawRoundRect:'roundRect',drawLine:'line',drawPoint:'point'}[name];if(!op)fail('Unsupported Skia Canvas operation '+name);record(receiver,{op,args:finite(values.slice(0,-1)),paint});
   },
   };

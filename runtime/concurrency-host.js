@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=36ea061c5c9d';
-import { createHostRegistry } from './host-contract.js?v=36ea061c5c9d';
-import { Blocked, VMThread } from './scheduler.js?v=36ea061c5c9d';
-import { Invoke } from './interpreter.js?v=36ea061c5c9d';
-import { GC_ROOTS } from './heap-gc.js?v=36ea061c5c9d';
+import { APKError } from './apk-error.js?v=7268006482d0';
+import { createHostRegistry } from './host-contract.js?v=7268006482d0';
+import { Blocked, VMThread } from './scheduler.js?v=7268006482d0';
+import { Invoke } from './interpreter.js?v=7268006482d0';
+import { GC_ROOTS } from './heap-gc.js?v=7268006482d0';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -324,7 +324,7 @@ export function createConcurrencyHost(platform) {
     def(owner, 'drainTo', `(${COLLECTION})I`, (r, _m, [self, target]) => drain(r, self, target, Infinity));
     def(owner, 'drainTo', `(${COLLECTION}I)I`, (r, _m, [self, target, max]) => drain(r, self, target, max));
     def(owner, 'offer', `(${OBJECT}J${UNIT})Z`, (r, _m, [self, item, t, unit]) => {
-      if (item === null) throwNew(r, 'Ljava/lang/NullPointerException;'); const queue = q(r, self);
+      if (item === null || item === 0 || item === undefined) throwNew(r, 'Ljava/lang/NullPointerException;'); const queue = q(r, self);
       checkInterrupt(r);
       if (queue.items.length < queue.capacity) { insert(r, queue, item); return 1; }
       const millis = Number(vcall(r, unit, UNIT, 'toMillis', ['J'], 'J', [t]));

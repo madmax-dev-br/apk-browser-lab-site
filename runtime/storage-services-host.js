@@ -1,6 +1,6 @@
-import { floatBits } from './host-contract.js?v=36ea061c5c9d';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=36ea061c5c9d';
-import { networkOf } from './network-native.js?v=36ea061c5c9d';
+import { floatBits } from './host-contract.js?v=7268006482d0';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=7268006482d0';
+import { networkOf } from './network-native.js?v=7268006482d0';
 
 // Storage-related system services over the app's virtual filesystem and the lab's network bridge (android-13.0.0_r1 StorageManager, StorageStatsManager, DownloadManager,
 // NetworkStatsManager). The device has one 8 GiB volume (the numbers StatFs reports); downloads are real HTTP(S) exchanges made through the network bridge under the device's
@@ -209,7 +209,7 @@ export function createStorageServicesHost(platform) {
   });
   def(QUERY, '<init>', '()V', (r, _m, [self]) => { r.object(self).query = { ids: null, status: null, orderBy: '_id', ascending: false }; });
   const query = (r, self) => r.object(self).query ?? npe(r, 'DownloadManager.Query used before construction');
-  def(QUERY, 'setFilterById', `([J)${QUERY}`, (r, _m, [self, ids]) => { query(r, self).ids = ids === null ? null : r.array(ids).elements.map(v => Number(v)); return self; });
+  def(QUERY, 'setFilterById', `([J)${QUERY}`, (r, _m, [self, ids]) => { query(r, self).ids = (ids === null || ids === 0) ? null : r.array(ids).elements.map(v => Number(v)); return self; });
   def(QUERY, 'setFilterByStatus', `(I)${QUERY}`, (r, _m, [self, status]) => { query(r, self).status = status; return self; });
   def(QUERY, 'orderBy', `(${STRING}I)${QUERY}`, (r, _m, [self, column, direction]) => {
     if (direction !== 1 && direction !== 2) iae(r, `Invalid direction: ${direction}`); const c = text(r, column);

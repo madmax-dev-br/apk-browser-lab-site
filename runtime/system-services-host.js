@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=36ea061c5c9d';
-import { APKError } from './apk-error.js?v=36ea061c5c9d';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=36ea061c5c9d';
+import { gcRoot } from './heap-gc.js?v=7268006482d0';
+import { APKError } from './apk-error.js?v=7268006482d0';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=7268006482d0';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -365,6 +365,30 @@ export function createSystemServicesHost(platform) {
   const used = runtime => BigInt(runtime.heap.size * 16 + runtime.fieldSlots * 8 + runtime.arrayCells * 8 + runtime.collectionCells * 16);
   def(RUNTIME, 'maxMemory', '()J', () => MAX_MEMORY); def(RUNTIME, 'totalMemory', '()J', () => TOTAL_MEMORY);
   def(RUNTIME, 'freeMemory', '()J', (runtime) => { const free = TOTAL_MEMORY - used(runtime); return free > 0n ? free : 0n; });
+  // Runtime.exec: the device image the VM models has no executables the app can run (no su, no which, no shell binaries in the virtual filesystem), so starting any program fails the
+  // way ProcessBuilder.start does on a device when the file is missing: IOException "Cannot run program \"<name>\": error=2, No such file or directory". Root-detection libraries
+  // (RootBeer and friends) rely on exactly this answer from an unrooted phone.
+  const PROCESS_BUILDER_START = (runtime, command) => runtime.throwJava('Ljava/io/IOException;', `Cannot run program "${command}": error=2, No such file or directory`);
+  const execArray = (runtime, commands) => {
+    if (commands === null || commands === 0) runtime.throwJava('Ljava/lang/NullPointerException;', 'cmdarray == null');
+    const elements = runtime.array(commands).elements;
+    if (elements.length === 0) runtime.throwJava('Ljava/lang/IndexOutOfBoundsException;', 'length=0; index=0');
+    for (const element of elements) if (element === null || element === 0) runtime.throwJava('Ljava/lang/NullPointerException;', null);
+    return runtime.stringCharacters(elements[0]);
+  };
+  const execLine = (runtime, line) => {
+    if (line === null || line === 0) runtime.throwJava('Ljava/lang/NullPointerException;', 'command == null');
+    const text = runtime.stringCharacters(line).trim();
+    if (text === '') runtime.throwJava('Ljava/lang/IllegalArgumentException;', 'Empty command');
+    return text.split(/[ \t\n\r\f]+/)[0];   // StringTokenizer on whitespace: the first token is the program
+  };
+  const JAVA_PROCESS = 'Ljava/lang/Process;', FILE_T = 'Ljava/io/File;';
+  def(RUNTIME, 'exec', `(${STRING_T})${JAVA_PROCESS}`, (runtime, _m, [, line]) => PROCESS_BUILDER_START(runtime, execLine(runtime, line)));
+  def(RUNTIME, 'exec', `(${STRING_T}[${STRING_T})${JAVA_PROCESS}`, (runtime, _m, [, line]) => PROCESS_BUILDER_START(runtime, execLine(runtime, line)));
+  def(RUNTIME, 'exec', `(${STRING_T}[${STRING_T}${FILE_T})${JAVA_PROCESS}`, (runtime, _m, [, line]) => PROCESS_BUILDER_START(runtime, execLine(runtime, line)));
+  def(RUNTIME, 'exec', `([${STRING_T})${JAVA_PROCESS}`, (runtime, _m, [, commands]) => PROCESS_BUILDER_START(runtime, execArray(runtime, commands)));
+  def(RUNTIME, 'exec', `([${STRING_T}[${STRING_T})${JAVA_PROCESS}`, (runtime, _m, [, commands]) => PROCESS_BUILDER_START(runtime, execArray(runtime, commands)));
+  def(RUNTIME, 'exec', `([${STRING_T}[${STRING_T}${FILE_T})${JAVA_PROCESS}`, (runtime, _m, [, commands]) => PROCESS_BUILDER_START(runtime, execArray(runtime, commands)));
   def(RUNTIME, 'gc', '()V', (runtime) => { runtime.record('RUNTIME gc requested; the VM has no garbage collector (Runtime.gc is a hint)'); });
 
   // ---- Runtime.nativeLoad: the primitive under System.load and SoLoader's SoFileLoader (libcore Runtime.java; returns null on success, else the dlopen error text)

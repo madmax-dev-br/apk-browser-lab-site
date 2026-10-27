@@ -11295,5 +11295,265 @@
     "sha256": "72eefa68ada402ce3ed297c4142f5becb42c1efa6484a6d8f93e39c1bc86722a",
     "bytes": 2170,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/ForegroundColorSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/ForegroundColorSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/ForegroundColorSpan.java?format=TEXT",
+    "sha256": "3c9b29a145c3ed36c75354b29bbd50b2c875c67470405783c95120949dea051f",
+    "bytes": 3092,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/BackgroundColorSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/BackgroundColorSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/BackgroundColorSpan.java?format=TEXT",
+    "sha256": "49f79ee43762a22566bac91fc6a058b4aac0301340d2103377e06c06b873eb49",
+    "bytes": 3045,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/AbsoluteSizeSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/AbsoluteSizeSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/AbsoluteSizeSpan.java?format=TEXT",
+    "sha256": "9a5f6cde528973a863215b8bc8a5b9d31c623d04eac5026d90eb3bfde37e0051",
+    "bytes": 3883,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/RelativeSizeSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/RelativeSizeSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/RelativeSizeSpan.java?format=TEXT",
+    "sha256": "d73cbae75bc852e14a2ef4a227afc3ee079d868bc5044dce86f7eea9f7145b25",
+    "bytes": 2993,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/StyleSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/StyleSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/StyleSpan.java?format=TEXT",
+    "sha256": "d40b038703fbd80887ac7e6363c67e287e2c9db9c64171e8d1ead33df3a47acd",
+    "bytes": 6259,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/TypefaceSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/TypefaceSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/TypefaceSpan.java?format=TEXT",
+    "sha256": "8acf1618f1eea543cd6881b395ee9a53a5ac19c672f854fc0c7282b6ff57256c",
+    "bytes": 5920,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/UnderlineSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/UnderlineSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/UnderlineSpan.java?format=TEXT",
+    "sha256": "278b162c89a2d6abe292bbbe77de0c12c0d80657a2f76754813a0bc95b72c8fa",
+    "bytes": 2187,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/StrikethroughSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/StrikethroughSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/StrikethroughSpan.java?format=TEXT",
+    "sha256": "f850ea4527dc01d5a05490308985ad1421dc297010c1bdef843e9727b5e0bd72",
+    "bytes": 2230,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/ScaleXSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/ScaleXSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/ScaleXSpan.java?format=TEXT",
+    "sha256": "c56a1d6859034fec8af643bd70a70527aa52f355aa9f1e84357a495ef3be0c0f",
+    "bytes": 3118,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/SuperscriptSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/SuperscriptSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/SuperscriptSpan.java?format=TEXT",
+    "sha256": "e7cafe6346e71fe95b9e0d5f871b3c17f12d7cf92beee83b00f1e8beb875e4fc",
+    "bytes": 2606,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/SubscriptSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/SubscriptSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/SubscriptSpan.java?format=TEXT",
+    "sha256": "9e0ebdebc8ee4764ef2580131fcefc8f0b4fa71d68c32707a4c4410c8359d3a1",
+    "bytes": 2730,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/DynamicDrawableSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/DynamicDrawableSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/DynamicDrawableSpan.java?format=TEXT",
+    "sha256": "291ffb9bd1055b9ba274e11a480bf5f3565cfa7e88a333cb3fe09d7d28144ff8",
+    "bytes": 6199,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/ImageSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/ImageSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/ImageSpan.java?format=TEXT",
+    "sha256": "2703ff06124a22e66111451fc499c43fd2048597fd592c7eab9472a6a967fcab",
+    "bytes": 10442,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/WrapTogetherSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/WrapTogetherSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/WrapTogetherSpan.java?format=TEXT",
+    "sha256": "200c1de63bef0f4da7811e0c2615121a6e36b9b14beec0e2d05b889d5d234e1d",
+    "bytes": 712,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/BulletSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/BulletSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/BulletSpan.java?format=TEXT",
+    "sha256": "3623213c1c96f8d60d8f7c2f001f5af49a297b0b1140709da5d6fea726c537e2",
+    "bytes": 8249,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/QuoteSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/QuoteSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/QuoteSpan.java?format=TEXT",
+    "sha256": "6fcd566260ea5042eedd50963971e543f8e93293a8f2ee18e12738d4812c1216",
+    "bytes": 6259,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/MaskFilterSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/MaskFilterSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/MaskFilterSpan.java?format=TEXT",
+    "sha256": "9d3d14157f599c4624bc6737336ce2b82d3e1f5d03b4fe8c834d9572c9404e6d",
+    "bytes": 1968,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/DrawableMarginSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/DrawableMarginSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/DrawableMarginSpan.java?format=TEXT",
+    "sha256": "a0004c3550be4ae4d5e5667de65042b16b923b4ae3e3c9ab64583bd5ae9eeb38",
+    "bytes": 4143,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/IconMarginSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/IconMarginSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/IconMarginSpan.java?format=TEXT",
+    "sha256": "aff02fd5a507d467d4aa9c0364a50c5c59b37b66811c518cbf96d59868e858dd",
+    "bytes": 3684,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/style/TextAppearanceSpan.java",
+    "localPath": "framework-aosp/upstream/android/text/style/TextAppearanceSpan.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/style/TextAppearanceSpan.java?format=TEXT",
+    "sha256": "55d527399544a3b8a305f2c4db95f3e00303027db14a4eb9c79eeb64088bf418",
+    "bytes": 17697,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/javax/net/ssl/SSLParameters.java",
+    "localPath": "framework-aosp/upstream/javax/net/ssl/SSLParameters.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/javax/net/ssl/SSLParameters.java?format=TEXT",
+    "sha256": "576c5777c3c9e4c898a48e2c8c1d4e262af3716f1016033b1e6800776e37222c",
+    "bytes": 19754,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/javax/net/ssl/SNIServerName.java",
+    "localPath": "framework-aosp/upstream/javax/net/ssl/SNIServerName.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/javax/net/ssl/SNIServerName.java?format=TEXT",
+    "sha256": "6ef9104720bf624c946581f5b733e238b5cea5046d9708775a9e20d4f012fff4",
+    "bytes": 7138,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/javax/net/ssl/SNIMatcher.java",
+    "localPath": "framework-aosp/upstream/javax/net/ssl/SNIMatcher.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/javax/net/ssl/SNIMatcher.java?format=TEXT",
+    "sha256": "7f5926046d12a22468503c9f91e1f08ede591ab00034ad447f1589529c6e0d8d",
+    "bytes": 3939,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/javax/net/ssl/SNIHostName.java",
+    "localPath": "framework-aosp/upstream/javax/net/ssl/SNIHostName.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/javax/net/ssl/SNIHostName.java?format=TEXT",
+    "sha256": "2a183882f51ad2a534429fb6f97d9daa3631ebacec3f9ad145998fa14fb6493c",
+    "bytes": 15780,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/javax/net/ssl/StandardConstants.java",
+    "localPath": "framework-aosp/upstream/javax/net/ssl/StandardConstants.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/javax/net/ssl/StandardConstants.java?format=TEXT",
+    "sha256": "3e25116b5fc42758c09132118d8e5e79d089be159406682d93afead705ecd4d9",
+    "bytes": 2174,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/AudioAttributes.java",
+    "localPath": "framework-aosp/upstream/android/media/AudioAttributes.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/AudioAttributes.java?format=TEXT",
+    "sha256": "2d6462cd361a51cc9e35198626295f897ee779a626422d6d40e7b3576bd69fdd",
+    "bytes": 76966,
+    "license": "Apache-2.0"
   }
 ]

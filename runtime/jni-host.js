@@ -1,13 +1,13 @@
-import { APKError } from './apk-error.js?v=36ea061c5c9d';
-import { JavaException } from './apk-runtime.js?v=36ea061c5c9d';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=36ea061c5c9d';
-import { buildElfDescriptor } from './native-descriptor.js?v=36ea061c5c9d';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=36ea061c5c9d';
-import { NativeLinker, LinkError } from './native-linker.js?v=36ea061c5c9d';
-import { hostFunction } from './wasm-host-function.js?v=36ea061c5c9d';
-import { parseWasm } from './wasm-dylink.js?v=36ea061c5c9d';
-import { formatVersion } from './rn-version.js?v=36ea061c5c9d';
-import { registerWasmMemory } from './unsafe-native.js?v=36ea061c5c9d';
+import { APKError } from './apk-error.js?v=7268006482d0';
+import { JavaException } from './apk-runtime.js?v=7268006482d0';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=7268006482d0';
+import { buildElfDescriptor } from './native-descriptor.js?v=7268006482d0';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=7268006482d0';
+import { NativeLinker, LinkError } from './native-linker.js?v=7268006482d0';
+import { hostFunction } from './wasm-host-function.js?v=7268006482d0';
+import { parseWasm } from './wasm-dylink.js?v=7268006482d0';
+import { formatVersion } from './rn-version.js?v=7268006482d0';
+import { registerWasmMemory } from './unsafe-native.js?v=7268006482d0';
 
 // JNI -> WebAssembly bridge.
 //

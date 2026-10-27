@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=36ea061c5c9d';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=36ea061c5c9d';
+import { APKError } from './apk-error.js?v=7268006482d0';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=7268006482d0';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -18,7 +18,7 @@ export function getPaintStateByHandle(runtime,handle){
   return getPaintState(runtime,reference);
 }
 export function getSolidPaintByHandle(runtime,handle){const reference=handleRegistry(runtime).values.get(handle);if(!reference)fail('Invalid VM Paint token; this is not a native memory address');return getSolidPaint(runtime,reference);}
-const initial = flags => ({ flags: (flags | HIDDEN_FLAGS), color: 0xff000000 | 0, colorFilter: null, xfermode: null, strokeWidth: 0, strokeMiter: 4, style: 0, strokeCap: 0, strokeJoin: 0, textSize: 12, textScaleX: 1, textSkewX: 0, letterSpacing: 0, wordSpacing: 0, hinting: 1, hyphenEdit: 0 });
+const initial = flags => ({ flags: (flags | HIDDEN_FLAGS), color: 0xff000000 | 0, colorFilter: null, xfermode: null, strokeWidth: 0, strokeMiter: 4, style: 0, strokeCap: 0, strokeJoin: 0, textSize: 12, textScaleX: 1, textSkewX: 0, letterSpacing: 0, wordSpacing: 0, hinting: 1, hyphenEdit: 0, textAlign: 0, elegantTextHeight: false, fontFeatureSettings: null, fontVariationSettings: null });
 const keys = new Set([
   '<init>()V', '<init>(I)V', `<init>(${PAINT})V`, 'reset()V', `set(${PAINT})V`,
   'getNativeInstance()J', 'getTextLocale()Ljava/util/Locale;', 'getTextLocales()Landroid/os/LocaleList;', 'setTextLocale(Ljava/util/Locale;)V', 'setTextLocales(Landroid/os/LocaleList;)V',
@@ -35,6 +35,11 @@ const keys = new Set([
   'isAntiAlias()Z', 'setAntiAlias(Z)V', 'isDither()Z', 'setDither(Z)V', 'isFilterBitmap()Z', 'setFilterBitmap(Z)V'
 ].map(signature => PAINT + '->' + signature).concat([`${PDX}-><init>(Landroid/graphics/PorterDuff$Mode;)V`]));
 for (const signature of [
+  'getFontFeatureSettings()Ljava/lang/String;', 'setFontFeatureSettings(Ljava/lang/String;)V', 'getFontVariationSettings()Ljava/lang/String;', 'setFontVariationSettings(Ljava/lang/String;)Z',
+  'isElegantTextHeight()Z', 'setElegantTextHeight(Z)V', 'getShadowLayerRadius()F', 'getShadowLayerDx()F', 'getShadowLayerDy()F', 'getShadowLayerColor()I',
+  'measureText(Ljava/lang/String;)F', 'measureText(Ljava/lang/String;II)F', 'measureText(Ljava/lang/CharSequence;II)F', 'measureText([CII)F',
+]) keys.add(PAINT + '->' + signature);
+for (const signature of [
   `getFontMetrics()${METRICS}`, `getFontMetrics(${METRICS})F`,
   `getFontMetricsInt()${METRICS_INT}`, `getFontMetricsInt(${METRICS_INT})I`,
   'getFontSpacing()F', 'ascent()F', 'descent()F', 'getUnderlinePosition()F', 'getUnderlineThickness()F',
@@ -44,6 +49,7 @@ const enums = [
   ['Style', 'Style', 'style', ['FILL', 'STROKE', 'FILL_AND_STROKE']],
   ['StrokeCap', 'Cap', 'strokeCap', ['BUTT', 'ROUND', 'SQUARE']],
   ['StrokeJoin', 'Join', 'strokeJoin', ['MITER', 'ROUND', 'BEVEL']],
+  ['TextAlign', 'Align', 'textAlign', ['LEFT', 'CENTER', 'RIGHT']],
 ];
 for (const [suffix, nested] of enums) {
   keys.add(`${PAINT}->get${suffix}()Landroid/graphics/Paint$${nested};`);
@@ -162,8 +168,14 @@ export function createPaintHost() {
         let content='';for(let from=0;from<chars.length;from+=16384)content+=String.fromCharCode(...chars.slice(from,from+16384));
         // Partial/RTL items: the whole context is shaped (joining and clusters need it) and the advance is the sum of the cluster boxes of [start,offset).
         // Plain Latin partial LTR items stay unsupported: Minikin shapes them as their own run, and cross-boundary kerning would differ.
-        if((isRtl||start!==contextStart||end!==contextEnd)&&!isRtl&&/^[\u0020-\u024f]*$/.test(content))fail('Run advance requires a complete LTR shaping run; partial context/bidi items need the Android Minikin boundary');
         if(!runtime.skiaHost?.measureRun)fail('Paint run advance requires the verified Skia shaping backend');
+        // A Latin LTR item inside a larger context (a styled span of a line): Minikin shapes [start, end) as its own run -- the context only matters to contextual scripts and
+        // bidi -- so the item is shaped alone and the advance is the clusters of [start, offset), including the kerning that applies inside the item.
+        if(!isRtl&&(start!==contextStart||end!==contextEnd)&&/^[\u0020-\u024f]*$/.test(content)){
+          const item=content.slice(start-contextStart,end-contextStart),value=runtime.skiaHost.measureRun(item,{offset:offset-start,start:0,isRtl:false},paint);
+          runtime.record('HOST Paint.getRunAdvance [original SkParagraph/SkShaper; LTR item shaped as its own run]');return rawFloat(value);
+        }
+        if((isRtl||start!==contextStart||end!==contextEnd)&&!isRtl)fail('Run advance requires a complete LTR shaping run; partial non-Latin context/bidi items need the Android Minikin boundary');
         const value=runtime.skiaHost.measureRun(content,{offset:offset-contextStart,start:start-contextStart,isRtl},paint);runtime.record('HOST Paint.getRunAdvance [original SkParagraph/SkShaper; complete LTR run]');return rawFloat(value);
       }
       if (name === 'reset') { runtime.storeField(object.fields,`${PAINT}->mBidiFlags:I`,2); object.webPaint = initial(1); initializeTextLocales(runtime,object.webPaint); return; }
@@ -205,6 +217,38 @@ export function createPaintHost() {
         }
         if (!method.parameters.length) return target;
         return integer ? values.descent - values.ascent + values.leading : rawFloat(Math.fround(values.descent - values.ascent) + values.leading);
+      }
+      if (name === 'getFontFeatureSettings') return paint.fontFeatureSettings;
+      if (name === 'setFontFeatureSettings') {   // CSS font-feature-settings text, applied to the shaper (text-layout-native.js parses it); an empty string clears it
+        const value = nullish(args[1]) ? null : runtime.stringCharacters(args[1]); paint.fontFeatureSettings = value === '' ? null : value; return;
+      }
+      if (name === 'getFontVariationSettings') return paint.fontVariationSettings;
+      if (name === 'setFontVariationSettings') {   // Paint.setFontVariationSettings: false (and no change) when the typeface has none of the requested axes -- the lab's static Roboto and fallback fonts have no variation axes
+        const value = nullish(args[1]) ? '' : runtime.stringCharacters(args[1]);
+        if (value === '') { paint.fontVariationSettings = null; return 1; }
+        return 0;
+      }
+      if (name === 'isElegantTextHeight') return paint.elegantTextHeight ? 1 : 0;
+      if (name === 'setElegantTextHeight') { paint.elegantTextHeight = !!args[1]; return; }
+      if (name === 'getShadowLayerRadius') return rawFloat(paint.shadowLayer?.radius ?? 0);
+      if (name === 'getShadowLayerDx') return rawFloat(paint.shadowLayer?.dx ?? 0);
+      if (name === 'getShadowLayerDy') return rawFloat(paint.shadowLayer?.dy ?? 0);
+      if (name === 'getShadowLayerColor') return paint.shadowLayer?.color ?? 0;
+      if (name === 'measureText') {
+        // Paint.measureText = the advance of the whole run (Paint.getRunAdvance over [start, end) with the text as its own context); a null text is an NPE
+        if (nullish(args[1])) runtime.throwJava('Ljava/lang/IllegalArgumentException;', 'text cannot be null');
+        const kind = method.parameters[0], hasRange = method.parameters.length === 3;
+        const length = kind === '[C' ? runtime.array(args[1]).elements.length : typeof args[1] === 'string' ? args[1].length : runtime.dispatch({ owner: runtime.typeOf(args[1]), name: 'length', parameters: [], result: 'I', signature: '()I' }, [args[1]], 'virtual');
+        const start = hasRange ? args[2] : 0, end = hasRange ? (kind === '[C' ? args[2] + args[3] : args[3]) : length;
+        if (start < 0 || end < start || end > length) runtime.throwJava(kind === '[C' ? 'Ljava/lang/ArrayIndexOutOfBoundsException;' : 'Ljava/lang/IndexOutOfBoundsException;', `start ${start}, end ${end}, length ${length}`);
+        if (start === end) return rawFloat(0);
+        if (end - start > 65536) fail('Paint.measureText exceeds 65536 UTF16 units');
+        if (!runtime.skiaHost?.measureRun) fail('Paint.measureText requires the verified Skia shaping backend');
+        let content;
+        if (kind === '[C') content = String.fromCharCode(...runtime.array(args[1]).elements.slice(start, end).map(v => v & 0xffff));
+        else if (typeof args[1] === 'string') content = args[1].slice(start, end);
+        else { const buffer = runtime.newArray('[C', end - start); runtime.dispatch({ owner: 'Landroid/text/TextUtils;', name: 'getChars', parameters: ['Ljava/lang/CharSequence;', 'I', 'I', '[C', 'I'], result: 'V', signature: '(Ljava/lang/CharSequence;II[CI)V' }, [args[1], start, end, buffer, 0], 'static'); content = String.fromCharCode(...runtime.array(buffer).elements.map(v => v & 0xffff)); }
+        const value = runtime.skiaHost.measureRun(content, { offset: content.length, start: 0, isRtl: false }, paint); runtime.record('HOST Paint.measureText [original SkParagraph/SkShaper run advance]'); return rawFloat(value);
       }
       if (name === 'clearShadowLayer') { paint.shadowLayer = null; return; }
       if (name === 'hasShadowLayer') return paint.shadowLayer ? 1 : 0;
