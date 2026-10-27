@@ -1,8 +1,9 @@
-import { APKError } from './apk-error.js?v=64078a5322f4';
-import { throwNew } from './java-throw.js?v=64078a5322f4';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=64078a5322f4';
-import { networkOf, isIpLiteral } from './network-native.js?v=64078a5322f4';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=64078a5322f4';
+import { APKError } from './apk-error.js?v=fd59ee7c3d79';
+import { throwNew } from './java-throw.js?v=fd59ee7c3d79';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=fd59ee7c3d79';
+import { networkOf, isIpLiteral } from './network-native.js?v=fd59ee7c3d79';
+import { Blocked } from './scheduler.js?v=fd59ee7c3d79';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=fd59ee7c3d79';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -54,7 +55,7 @@ function lookup(fs, path) {
     if (cursor === '/') return { error: 'ENOENT', path: canonical };
   }
 }
-const modeOf = (runtime, node) => (node.type === 'dir' ? C.S_IFDIR : C.S_IFREG) | (node.mode & 0o7777);
+const modeOf = (runtime, node) => (node.type === 'dir' ? C.S_IFDIR : node.type === 'fifo' ? C.S_IFIFO : C.S_IFREG) | (node.mode & 0o7777);
 const inode = node => node.ino ??= ++inodeCounter;
 function makeStat(runtime, node, std = false) {
   const uid = runtime.platform.virtualProcess.uid, sec = Math.floor(node.mtime / 1000), ns = (node.mtime % 1000) * 1_000_000;
@@ -126,14 +127,25 @@ function open(runtime, path, flags, mode) {
 function release(runtime, number) {
   const table = state(runtime).table, entry = table.get(number);
   table.delete(number); entry.desc.refs--;
+  if (entry.desc.refs === 0) entry.desc.onLastClose?.();
 }
 function readInto(runtime, fn, fdRef, buffer, offset, count, position) {
   const entry = entryOf(runtime, fn, fdRef), desc = entry.desc;
   if (desc.kind === 'dir') err(runtime, fn, 'EISDIR');
   if (!readable(desc) || (desc.kind === 'std' && desc.name !== 'stdin')) err(runtime, fn, 'EBADF');
   const target = bufferAccess(runtime, buffer, offset, count);
+  if (desc.kind === 'pipe') {   // a pipe end: data written so far, EOF once every write end is closed, EAGAIN for O_NONBLOCK; a blocking read with nothing to read cannot wait on this scheduler
+    if (position !== null) err(runtime, fn, 'ESPIPE');
+    const pipe = desc.pipe; if (count === 0) return 0;
+    if (pipe.chunks.length === 0) { if (pipe.writers === 0) return 0; if (desc.nonblock) err(runtime, fn, 'EAGAIN'); return new Blocked({ ready: () => pipe.chunks.length > 0 || pipe.writers === 0, retry: true, interruptible: true, reason: `read(pipe): empty pipe, write end open` }); }   // the reading thread parks until a writer writes or closes; the scheduler reports a deadlock when no thread could
+    const taken = []; let need = Math.min(count, pipe.size);
+    while (need > 0) { const chunk = pipe.chunks[0]; if (chunk.length <= need) { taken.push(chunk); need -= chunk.length; pipe.chunks.shift(); } else { taken.push(chunk.subarray(0, need)); pipe.chunks[0] = chunk.subarray(need); need = 0; } }
+    const bytes = new Uint8Array(taken.reduce((n, c) => n + c.length, 0)); let at = 0; for (const c of taken) { bytes.set(c, at); at += c.length; }
+    pipe.size -= bytes.length; target.put(bytes); return bytes.length;
+  }
   if (count === 0 || desc.kind === 'std') return 0;                       // stdin is an empty stream: end of file
   const at = position ?? desc.offset, node = desc.node;
+  runtime.fileMappings?.flushNode(node);   // shared file mappings in native memory reach the file before it is read (src/file-mapping.js)
   if (at >= node.size) return 0;
   const length = Math.min(count, node.size - at), chunk = new Uint8Array(length); files(runtime).readAt(node, at, chunk, 0, length);
   target.put(chunk); if (position === null) desc.offset += length; return length;
@@ -143,15 +155,24 @@ function writeFrom(runtime, fn, fdRef, buffer, offset, count, position) {
   if (desc.kind === 'dir') err(runtime, fn, 'EBADF');
   if (!writable(desc)) err(runtime, fn, 'EBADF');
   const source = bufferAccess(runtime, buffer, offset, count), bytes = source.get();
+  if (desc.kind === 'pipe') {
+    if (position !== null) err(runtime, fn, 'ESPIPE');
+    const pipe = desc.pipe; if (pipe.readers === 0) err(runtime, fn, 'EPIPE');
+    if (bytes.length === 0) return 0;
+    if (pipe.size >= 65536) { if (desc.nonblock) err(runtime, fn, 'EAGAIN'); return new Blocked({ ready: () => pipe.readers === 0 || pipe.size < 65536, retry: true, interruptible: true, reason: 'write(pipe): pipe buffer full (64 KiB)' }); }
+    const accepted = Math.min(bytes.length, 65536 - pipe.size);   // a write that does not fit is partial, like write(2) on a pipe; the caller (IoBridge.write) loops
+    pipe.chunks.push(accepted === bytes.length ? bytes : bytes.slice(0, accepted)); pipe.size += accepted; return accepted;
+  }
   if (desc.kind === 'std') { stdLog(runtime, desc, bytes); return count; }
   const fs = files(runtime), node = desc.node, at = position ?? (desc.append ? node.size : desc.offset);
+  runtime.fileMappings?.flushNode(node);
   try { fs.writeAt(node, at, bytes, 0, count); } catch (error) { if (error instanceof RangeError) err(runtime, fn, 'EFBIG'); throw error; }
-  if (position === null) desc.offset = at + count; return count;
+  if (position === null) desc.offset = at + count; runtime.fileMappings?.refreshNode(node); return count;
 }
 const sizeOf = desc => desc.kind === 'file' ? desc.node.size : 0;
 function seek(runtime, fn, fdRef, offset, whence) {
   const desc = entryOf(runtime, fn, fdRef).desc;
-  if (desc.kind === 'std') err(runtime, fn, 'ESPIPE');
+  if (desc.kind === 'std' || desc.kind === 'pipe') err(runtime, fn, 'ESPIPE');
   const base = whence === C.SEEK_SET ? 0 : whence === C.SEEK_CUR ? desc.offset : whence === C.SEEK_END ? sizeOf(desc) : -1;
   if (base < 0) err(runtime, fn, 'EINVAL');
   const target = BigInt(base) + offset; if (target < 0n) err(runtime, fn, 'EINVAL');
@@ -171,6 +192,15 @@ export function createLibcoreIoNativeBindings() {
   add(OSCONST, 'initConstants()V', runtime => { for (const [name, value] of Object.entries(C)) runtime.staticFields.set(`${OSCONST}->${name}:I`, value | 0); });
 
   // ---- descriptors and I/O
+  // pipe2: an in-process byte queue shared by a read end and a write end (64 KiB capacity like the kernel's default); the ends report EOF / EPIPE when the other side is closed
+  L('pipe2(I)[Ljava/io/FileDescriptor;', (runtime, [, flags]) => {
+    const pipe = { chunks: [], size: 0, readers: 1, writers: 1 }, nonblock = !!(flags & C.O_NONBLOCK), cloexec = !!(flags & C.O_CLOEXEC);
+    const read = { kind: 'pipe', pipe, acc: C.O_RDONLY, offset: 0, append: false, ownerTag: 0n, refs: 0, nonblock, onLastClose: () => { pipe.readers = 0; } };
+    const write = { kind: 'pipe', pipe, acc: C.O_WRONLY, offset: 0, append: false, ownerTag: 0n, refs: 0, nonblock, onLastClose: () => { pipe.writers = 0; } };
+    const readNumber = allocateFd(runtime, read, 0, cloexec); if (readNumber < 0) err(runtime, 'pipe2', 'EMFILE');
+    const writeNumber = allocateFd(runtime, write, 0, cloexec); if (writeNumber < 0) { release(runtime, readNumber); err(runtime, 'pipe2', 'EMFILE'); }
+    const array = runtime.newArray(`[${FD}`, 2); runtime.array(array).elements = [newFileDescriptor(runtime, readNumber), newFileDescriptor(runtime, writeNumber)]; return array;
+  });
   L('open(Ljava/lang/String;II)Ljava/io/FileDescriptor;', (runtime, [, path, flags, mode]) => newFileDescriptor(runtime, open(runtime, path, flags, mode)));
   // ---- sockets. The browser cannot open raw TCP: a socket descriptor exists (so java.net.Socket behaves up to connect()), connect() obeys the device network policy and
   // fails with the errno an Android device reports (ENETUNREACH offline or for a host the policy does not allow); a connect the policy would allow stops with an explicit
@@ -264,13 +294,15 @@ export function createLibcoreIoNativeBindings() {
   L('lseek(Ljava/io/FileDescriptor;JI)J', (runtime, [, fdRef, offset, whence]) => seek(runtime, 'lseek', fdRef, offset, whence));
   L('fstat(Ljava/io/FileDescriptor;)Landroid/system/StructStat;', (runtime, [, fdRef]) => {
     const desc = entryOf(runtime, 'fstat', fdRef).desc;
-    return makeStat(runtime, desc.kind === 'std' ? { type: 'file', size: 0, mtime: 0, mode: 0 } : desc.node, desc.kind === 'std');
+    return makeStat(runtime, desc.kind === 'std' ? { type: 'file', size: 0, mtime: 0, mode: 0 } : desc.kind === 'pipe' ? { type: 'fifo', size: desc.pipe.size, mtime: files(runtime).now(), mode: 0o600 } : desc.node, desc.kind === 'std');
   });
   L('ftruncate(Ljava/io/FileDescriptor;J)V', (runtime, [, fdRef, length]) => {
     const desc = entryOf(runtime, 'ftruncate', fdRef).desc;
     if (desc.kind !== 'file' || !writable(desc) || length < 0n) err(runtime, 'ftruncate', 'EINVAL');
     const node = desc.node, target = Number(length);
+    runtime.fileMappings?.flushNode(node);
     if (target < node.size) { node.size = target; node.mtime = files(runtime).now(); } else if (target > node.size) files(runtime).writeAt(node, target, new Uint8Array(0), 0, 0);
+    runtime.fileMappings?.refreshNode(node);
   });
   for (const name of ['fsync', 'fdatasync']) L(`${name}(Ljava/io/FileDescriptor;)V`, (runtime, [, fdRef]) => { const desc = entryOf(runtime, name, fdRef).desc; if (desc.kind !== 'file' && desc.kind !== 'dir') err(runtime, name, 'EINVAL'); });   // the filesystem is memory: every write is already stable
   L('isatty(Ljava/io/FileDescriptor;)Z', (runtime, [, fdRef]) => { entryOf(runtime, 'isatty', fdRef); return 0; });

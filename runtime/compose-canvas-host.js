@@ -1,6 +1,6 @@
-import {APKError} from './apk-runtime.js?v=64078a5322f4';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=64078a5322f4';
-import {getVectorGraphics} from './vector-native.js?v=64078a5322f4';
+import {APKError} from './apk-runtime.js?v=fd59ee7c3d79';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=fd59ee7c3d79';
+import {getVectorGraphics} from './vector-native.js?v=fd59ee7c3d79';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -111,6 +111,8 @@ export function createComposeCanvasHost(platform){
     try{
       const sx=parent.fields.get(`${VIEW}->mScrollX:I`)??0,sy=parent.fields.get(`${VIEW}->mScrollY:I`)??0;
       canvas(r,target,'translate',['F','F'],'V',[raw(child.bounds.left-sx),raw(child.bounds.top-sy)]);
+      const legacy=platform.viewApi.legacyAnimation(r,parentRef,childRef);   // View.draw(Canvas, ViewGroup, long) -> applyLegacyAnimation: the Animation's Transformation for this frame
+      if(legacy?.matrix)canvas(r,target,'concat',[MATRIX],'V',[legacy.matrix]);
       const matrix=platform.viewTransformHost.snapshot(r,childRef);
       if(matrix){
         const ref=child.canvasTransform??=r.allocate(MATRIX);
@@ -120,7 +122,7 @@ export function createComposeCanvasHost(platform){
       }
       if(parent.clipChildren!==false)canvas(r,target,'clipRect',['F','F','F','F'],'Z',[raw(0),raw(0),raw(w),raw(h)]);
       platform.viewOutlineHost.clip(r,childRef,target);
-      const alpha=child.renderAlpha??child.alpha??1;
+      const alpha=(child.renderAlpha??child.alpha??1)*(legacy?.alpha??1);
       if(alpha!==1){
         if(!Number.isFinite(alpha)||alpha<0||alpha>1)fail('Unsupported child Canvas alpha');
         const paint=child.canvasAlphaPaint??=r.allocate(PAINT);if(!r.object(paint).webPaint)call(r,paint,PAINT,'<init>',[],'V',[],'direct');

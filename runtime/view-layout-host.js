@@ -1,6 +1,6 @@
-import { APKError } from './apk-runtime.js?v=64078a5322f4';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=64078a5322f4';
-import { gcRoot } from './heap-gc.js?v=64078a5322f4';
+import { APKError } from './apk-runtime.js?v=fd59ee7c3d79';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=fd59ee7c3d79';
+import { gcRoot } from './heap-gc.js?v=fd59ee7c3d79';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -67,6 +67,8 @@ export function createViewLayoutHost(platform) {
   const imageMeasure = (runtime, receiver, wSpec, hSpec) => {
     const view = runtime.object(receiver), padding = view.padding || {}, drawable = view.imageDrawable;
     if (view.adjustViewBounds) fail('ImageView adjustViewBounds measurement requires the original ImageView.onMeasure');
+    const unsupportedImage = platform.imageViewApi.unsupportedRendering(runtime, receiver);
+    if (unsupportedImage) fail(`ImageView ${unsupportedImage} is set, and the native image path does not apply it yet`);
     let w = 0, h = 0;
     if (drawable) { w = call(runtime, drawable, 'Landroid/graphics/drawable/Drawable;', 'getIntrinsicWidth', '()I'); h = call(runtime, drawable, 'Landroid/graphics/drawable/Drawable;', 'getIntrinsicHeight', '()I'); if (w <= 0) w = 1; if (h <= 0) h = 1; }
     w += (padding.left || 0) + (padding.right || 0); h += (padding.top || 0) + (padding.bottom || 0);
@@ -88,6 +90,8 @@ export function createViewLayoutHost(platform) {
   const nativeTextMeasure = (runtime, receiver, wSpec, hSpec) => {
     if (!runtime.skia?.measureText) fail('Native text measurement requires the verified Skia CPU font backend');
     const switchState = platform.drawableViewHost.measureSwitch?.(runtime, receiver);
+    const unsupported = platform.textViewApi.unsupportedRendering(runtime, receiver);
+    if (unsupported) fail(`TextView ${unsupported} is set, and the native text path does not draw it yet`);
     const view = runtime.object(receiver), text = String(view.displayText ?? view.text ?? ''), lines = text.split('\n'); if (lines.length > 1024) fail('Native text line limit exceeded');
     const typeface = call(runtime, receiver, 'Landroid/widget/TextView;', 'getTypeface', '()Landroid/graphics/Typeface;'), info = runtime.skiaHost.resolveTypeface(typeface); view.textFontWeight = info.weight; view.textFontItalic = info.italic; const font = { textSize: view.textSize || 14, flags: 1, typefaceRef: typeface }, runs = lines.map(line => runtime.skiaHost.measureText(line, font));
     const metrics = runs[0].metrics, padding = platform.drawableViewHost.compoundPadding?.(runtime,receiver) || view.padding || {}, includePadding = view.includeFontPadding !== false;

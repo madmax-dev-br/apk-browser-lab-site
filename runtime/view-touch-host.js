@@ -1,9 +1,9 @@
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=64078a5322f4';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=fd59ee7c3d79';
 
 // The classic View touch pipeline: View.dispatchTouchEvent / onTouchEvent, ViewGroup.dispatchTouchEvent / onInterceptTouchEvent / requestDisallowInterceptTouchEvent and
 // View.setOnTouchListener, following android-13.0.0_r1 View.java and ViewGroup.java for a single pointer (the browser delivers one pointer per gesture). A real MotionEvent
 // reaches a classic View from a Compose AndroidView (AndroidViewHolder.dispatchTouchEvent), from an app's own dispatch code, or from a host that injects pointer events.
-// Not modelled: long-press detection (CheckForLongPress), multi-touch target splitting, hover/generic motion, the scrolling-container tap delay and TouchDelegate.
+// Long press: CheckForLongPress after 500 ms of VM time. Not modelled: multi-touch target splitting, hover/generic motion, the scrolling-container tap delay and TouchDelegate.
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', MOTION = 'Landroid/view/MotionEvent;', LISTENER = 'Landroid/view/View$OnTouchListener;';
 const DOWN = 0, UP = 1, MOVE = 2, CANCEL = 3;
 
@@ -77,20 +77,29 @@ export function createViewTouchHost(platform) {
     if (view.enabled === false) { if (action === UP && pressed()) setPressed(false); return clickable ? 1 : 0; }
     if (!clickable) return 0;
     switch (action) {
-      case DOWN: setPressed(true); view.touchWasPressed = true; break;
+      case DOWN: {
+        // CheckForLongPress: after ViewConfiguration.getLongPressTimeout() (500 ms of VM time) a still-pressed View performs its long click; the following UP then does not click
+        setPressed(true); view.touchWasPressed = true; view.hasPerformedLongPress = false;
+        const token = view.longPressToken = (view.longPressToken ?? 0) + 1;
+        if (flag(call(r, self, VIEW, 'isLongClickable', [], 'Z'))) platform.queueTask(() => {
+          if (view.longPressToken !== token || !view.touchWasPressed || !pressed()) return;
+          if (flag(call(r, self, VIEW, 'performLongClick', [], 'Z'))) view.hasPerformedLongPress = true;
+        }, 500, [self]);
+        break;
+      }
       case UP: {
         if (pressed() || view.touchWasPressed) {
           let focusTaken = false;
           if (flag(call(r, self, VIEW, 'isFocusable', [], 'Z')) && flag(call(r, self, VIEW, 'isFocusableInTouchMode', [], 'Z')) && !flag(call(r, self, VIEW, 'isFocused', [], 'Z'))) focusTaken = flag(call(r, self, VIEW, 'requestFocus', [], 'Z'));
-          if (!focusTaken) call(r, self, VIEW, 'performClick', [], 'Z');
+          if (!focusTaken && !view.hasPerformedLongPress) call(r, self, VIEW, 'performClick', [], 'Z');
           setPressed(false);
         }
-        view.touchWasPressed = false; break;
+        view.longPressToken++; view.hasPerformedLongPress = false; view.touchWasPressed = false; break;
       }
-      case CANCEL: setPressed(false); view.touchWasPressed = false; break;
+      case CANCEL: setPressed(false); view.longPressToken++; view.hasPerformedLongPress = false; view.touchWasPressed = false; break;
       case MOVE: {
         const x = bitsFloat(event(r, ev, 'getX', 'F')), y = bitsFloat(event(r, ev, 'getY', 'F')), b = view.bounds;
-        if (b && (x < 0 || y < 0 || x >= b.right - b.left || y >= b.bottom - b.top) && pressed()) { setPressed(false); view.touchWasPressed = false; }
+        if (b && (x < 0 || y < 0 || x >= b.right - b.left || y >= b.bottom - b.top) && pressed()) { setPressed(false); view.longPressToken++; view.touchWasPressed = false; }
         break;
       }
       default: break;

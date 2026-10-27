@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=64078a5322f4';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=64078a5322f4';
+import { APKError } from './apk-runtime.js?v=fd59ee7c3d79';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=fd59ee7c3d79';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -8,8 +8,7 @@ const same=(a,b)=>a?.ref!==undefined&&a.ref===b?.ref;
 const keys=new Set();
 keys.add(VIEW+'->isHardwareAccelerated()Z');keys.add(VIEW+'->findOnBackInvokedDispatcher()Landroid/window/OnBackInvokedDispatcher;');
 keys.add(VIEW+'->generateViewId()I');
-// Legacy View.startAnimation/setAnimation are not implemented (they fail as unsupported), so mCurrentAnimation is always null: clearAnimation() is then the original no-op and getAnimation() is null.
-keys.add(VIEW+'->clearAnimation()V');keys.add(VIEW+'->getAnimation()Landroid/view/animation/Animation;');
+// clearAnimation / getAnimation / setAnimation / startAnimation live in src/view-api-host.js (legacy android.view.animation drives from the draw pass in compose-canvas-host drawChild)
 for(const signature of ['getWindowToken()Landroid/os/IBinder;','getApplicationWindowToken()Landroid/os/IBinder;','getWindowVisibility()I','getRootView()Landroid/view/View;','isAttachedToWindow()Z','hasWindowFocus()Z','getHandler()Landroid/os/Handler;','post(Ljava/lang/Runnable;)Z','postDelayed(Ljava/lang/Runnable;J)Z','postOnAnimation(Ljava/lang/Runnable;)V','postOnAnimationDelayed(Ljava/lang/Runnable;J)V','removeCallbacks(Ljava/lang/Runnable;)Z'])keys.add(VIEW+'->'+signature);
 for(const signature of ['hasFocusable()Z','hasExplicitFocusable()Z','getDisplay()Landroid/view/Display;','isInTouchMode()Z','isFocused()Z','hasFocus()Z','findFocus()Landroid/view/View;','clearFocus()V','requestFocus()Z','requestFocus(I)Z','requestFocus(ILandroid/graphics/Rect;)Z','requestFocusFromTouch()Z','isFocusable()Z','isFocusableInTouchMode()Z','setFocusable(Z)V','setFocusable(I)V','setFocusableInTouchMode(Z)V','setOnFocusChangeListener(Landroid/view/View$OnFocusChangeListener;)V','getOnFocusChangeListener()Landroid/view/View$OnFocusChangeListener;','onFocusChanged(ZILandroid/graphics/Rect;)V'])keys.add(VIEW+'->'+signature);
 for(const signature of ['getFocusedChild()Landroid/view/View;','setDescendantFocusability(I)V','getDescendantFocusability()I'])keys.add('Landroid/view/ViewGroup;->'+signature);
@@ -100,7 +99,7 @@ export function createViewWindowHost(platform){
   /** ViewGroup.removeViewInternal / window removal: the focused descendant is un-focused BEFORE the subtree is detached (callbacks still see an attached hierarchy). */
   unfocusSubtree(runtime,receiver){clearFocus(runtime,receiver);},
   afterAttach(runtime,receiver,attached){if(attached){if(runtime.object(receiver).focused)focusedWindows.set(focusKey(runtime,receiver),receiver);let value=receiver;const seen=new Set();while(value){if(seen.has(value.ref)||seen.size>=4096)error('Cyclic View callback attachment hierarchy');seen.add(value.ref);const pending=pendingViews.get(value.ref)||[];pendingViews.delete(value.ref);pendingViewCount-=pending.length;for(const item of pending)enqueueView(runtime,value,item.callback,item.delay,item.onAnimation);value=runtime.object(value).parent;}}else clearFocus(runtime,receiver);},
-  invoke(runtime,method,args){const name=method.name,receiver=args[0];if(name==='clearAnimation')return;if(name==='getAnimation')return null;
+  invoke(runtime,method,args){const name=method.name,receiver=args[0];
    if(method.owner===VIEW&&name==='generateViewId'){
     // AOSP View's process-wide 24-bit ID space; this VM has one Java thread.
     const value=platform.nextGeneratedViewId??1;platform.nextGeneratedViewId=value===0x00ffffff?1:value+1;return value;

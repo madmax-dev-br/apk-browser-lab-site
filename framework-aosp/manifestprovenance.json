@@ -508,9 +508,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 4051712,
-  "sha256": "4e02c908e0643792f09d5c66295b00eee4d33e49b75fc1eff0f2b59986f5768e",
-  "classCount": 2889,
+  "bytes": 4263272,
+  "sha256": "582abc5289ae2b655f691036c8646ee814acc1012915eedfd2e4f4027f4c5d1f",
+  "classCount": 2986,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -755,6 +755,8 @@
     "Landroid/graphics/Color;",
     "Landroid/graphics/ColorFilter$NoImagePreloadHolder;",
     "Landroid/graphics/Compatibility;",
+    "Landroid/graphics/ImageFormat$Format;",
+    "Landroid/graphics/ImageFormat;",
     "Landroid/graphics/Insets$1;",
     "Landroid/graphics/Insets;",
     "Landroid/graphics/LeakyTypefaceStorage;",
@@ -953,7 +955,32 @@
     "Landroid/media/AudioAttributes$CapturePolicy;",
     "Landroid/media/AudioAttributes$SpatializationBehavior;",
     "Landroid/media/AudioAttributes;",
+    "Landroid/media/AudioDeviceInfo;",
+    "Landroid/media/AudioFocusRequest$1;",
+    "Landroid/media/AudioFocusRequest$Builder;",
+    "Landroid/media/AudioFocusRequest;",
+    "Landroid/media/AudioFormat$1;",
+    "Landroid/media/AudioFormat$Builder;",
+    "Landroid/media/AudioFormat$Encoding;",
+    "Landroid/media/AudioFormat$SurroundSoundEncoding;",
+    "Landroid/media/AudioFormat;",
+    "Landroid/media/AudioManagerDevices;",
+    "Landroid/media/AudioRouting$OnRoutingChangedListener;",
+    "Landroid/media/AudioRouting;",
     "Landroid/media/AudioSystem;",
+    "Landroid/media/AudioTimestamp$Timebase;",
+    "Landroid/media/AudioTimestamp;",
+    "Landroid/media/AudioTrack$1;",
+    "Landroid/media/AudioTrack$Builder;",
+    "Landroid/media/AudioTrack$NativeEventHandlerDelegate$1;",
+    "Landroid/media/AudioTrack$NativeEventHandlerDelegate;",
+    "Landroid/media/AudioTrack$OnPlaybackPositionUpdateListener;",
+    "Landroid/media/AudioTrack$RoutingListener;",
+    "Landroid/media/AudioTrack;",
+    "Landroid/media/PlaybackParams$1;",
+    "Landroid/media/PlaybackParams$AudioFallbackMode;",
+    "Landroid/media/PlaybackParams$AudioStretchMode;",
+    "Landroid/media/PlaybackParams;",
     "Landroid/media/audiopolicy/AudioProductStrategy;",
     "Landroid/os/AsyncTask$1;",
     "Landroid/os/AsyncTask$2;",
@@ -990,6 +1017,20 @@
     "Landroid/os/Parcel$ReadWriteHelper;",
     "Landroid/os/Parcel$SquashReadHelper;",
     "Landroid/os/Parcel;",
+    "Landroid/os/ParcelFileDescriptor$1;",
+    "Landroid/os/ParcelFileDescriptor$2;",
+    "Ljava/io/InputStream;",
+    "Ljava/io/FileInputStream;",
+    "Landroid/os/ParcelFileDescriptor$AutoCloseInputStream;",
+    "Ljava/io/Flushable;",
+    "Ljava/io/OutputStream;",
+    "Ljava/io/FileOutputStream;",
+    "Landroid/os/ParcelFileDescriptor$AutoCloseOutputStream;",
+    "Ljava/io/IOException;",
+    "Landroid/os/ParcelFileDescriptor$FileDescriptorDetachedException;",
+    "Landroid/os/ParcelFileDescriptor$OnCloseListener;",
+    "Landroid/os/ParcelFileDescriptor$Status;",
+    "Landroid/os/ParcelFileDescriptor;",
     "Landroid/os/ParcelFormatException;",
     "Landroid/os/ParcelUuid$1;",
     "Landroid/os/ParcelUuid;",
@@ -1125,10 +1166,32 @@
     "Landroid/text/TextUtils$StringWithRemovedChars;",
     "Landroid/text/TextUtils$TruncateAt;",
     "Landroid/text/TextUtils;",
+    "Landroid/text/method/TransformationMethod2;",
+    "Landroid/text/method/AllCapsTransformationMethod;",
+    "Landroid/text/method/MovementMethod;",
+    "Landroid/text/method/BaseMovementMethod;",
+    "Landroid/text/method/ArrowKeyMovementMethod;",
     "Landroid/text/method/BaseKeyListener$1;",
     "Landroid/text/method/MetaKeyKeyListener;",
     "Landroid/text/method/KeyListener;",
     "Landroid/text/method/BaseKeyListener;",
+    "Landroid/text/method/NumberKeyListener;",
+    "Landroid/text/method/DateKeyListener;",
+    "Landroid/text/method/DateTimeKeyListener;",
+    "Landroid/text/method/DialerKeyListener;",
+    "Landroid/text/method/DigitsKeyListener;",
+    "Landroid/text/method/ScrollingMovementMethod;",
+    "Landroid/text/method/LinkMovementMethod;",
+    "Landroid/text/method/PasswordTransformationMethod$PasswordCharSequence;",
+    "Ljava/lang/ref/Reference;",
+    "Ljava/lang/ref/WeakReference;",
+    "Landroid/text/method/PasswordTransformationMethod$ViewReference;",
+    "Landroid/text/style/UpdateAppearance;",
+    "Landroid/text/style/UpdateLayout;",
+    "Landroid/text/method/PasswordTransformationMethod$Visible;",
+    "Landroid/text/method/PasswordTransformationMethod;",
+    "Landroid/text/method/QwertyKeyListener$Replaced;",
+    "Landroid/text/method/QwertyKeyListener;",
     "Landroid/text/method/ReplacementTransformationMethod$ReplacementCharSequence;",
     "Landroid/text/method/ReplacementTransformationMethod$SpannedReplacementCharSequence;",
     "Landroid/text/method/ReplacementTransformationMethod;",
@@ -1137,9 +1200,10 @@
     "Landroid/text/method/TextKeyListener$NullKeyListener;",
     "Landroid/text/method/TextKeyListener$SettingsObserver;",
     "Landroid/text/method/TextKeyListener;",
+    "Landroid/text/method/TimeKeyListener;",
+    "Landroid/text/method/Touch$DragState;",
+    "Landroid/text/method/Touch;",
     "Landroid/text/style/CharacterStyle;",
-    "Landroid/text/style/UpdateAppearance;",
-    "Landroid/text/style/UpdateLayout;",
     "Landroid/text/style/MetricAffectingSpan;",
     "Landroid/text/style/AbsoluteSizeSpan;",
     "Landroid/text/style/AccessibilityClickableSpan$1;",
@@ -1208,6 +1272,17 @@
     "Landroid/text/style/TtsSpan;",
     "Landroid/text/style/TypefaceSpan;",
     "Landroid/text/style/UnderlineSpan;",
+    "Landroid/text/util/LinkSpec;",
+    "Ljava/util/function/Function;",
+    "Landroid/text/util/Linkify$$ExternalSyntheticLambda0;",
+    "Landroid/text/util/Linkify$MatchFilter;",
+    "Landroid/text/util/Linkify$1;",
+    "Landroid/text/util/Linkify$2;",
+    "Landroid/text/util/Linkify$TransformFilter;",
+    "Landroid/text/util/Linkify$3;",
+    "Landroid/text/util/Linkify$4;",
+    "Landroid/text/util/Linkify$LinkifyMask;",
+    "Landroid/text/util/Linkify;",
     "Landroid/util/MapCollections;",
     "Landroid/util/ArrayMap$1;",
     "Landroid/util/ArrayMap;",
@@ -1236,7 +1311,6 @@
     "Landroid/util/LongSparseArray;",
     "Landroid/util/LongSparseLongArray$Parcelling;",
     "Landroid/util/LongSparseLongArray;",
-    "Ljava/io/IOException;",
     "Landroid/util/MalformedJsonException;",
     "Landroid/util/MapCollections$ArrayIterator;",
     "Landroid/util/MapCollections$EntrySet;",
@@ -1249,6 +1323,7 @@
     "Landroid/util/Pair;",
     "Landroid/util/PathParser$PathData;",
     "Landroid/util/PathParser;",
+    "Landroid/util/Patterns;",
     "Landroid/util/Pools$Pool;",
     "Landroid/util/Pools$SimplePool;",
     "Landroid/util/Pools$SynchronizedPool;",
@@ -1274,6 +1349,15 @@
     "Landroid/view/ContextThemeWrapper;",
     "Landroid/view/RecordingCanvas;",
     "Landroid/view/DisplayListCanvas;",
+    "Landroid/view/FocusFinder$UserSpecifiedFocusComparator$NextFocusGetter;",
+    "Landroid/view/FocusFinder$$ExternalSyntheticLambda0;",
+    "Landroid/view/FocusFinder$$ExternalSyntheticLambda1;",
+    "Landroid/view/FocusFinder$1;",
+    "Landroid/view/FocusFinder$FocusSorter$$ExternalSyntheticLambda0;",
+    "Landroid/view/FocusFinder$FocusSorter$$ExternalSyntheticLambda1;",
+    "Landroid/view/FocusFinder$FocusSorter;",
+    "Landroid/view/FocusFinder$UserSpecifiedFocusComparator;",
+    "Landroid/view/FocusFinder;",
     "Landroid/view/InputEvent$1;",
     "Landroid/view/InputEvent;",
     "Landroid/view/KeyCharacterMap$1;",
@@ -1384,17 +1468,35 @@
     "Landroid/view/animation/BaseInterpolator;",
     "Landroid/view/animation/AccelerateDecelerateInterpolator;",
     "Landroid/view/animation/AccelerateInterpolator;",
+    "Landroid/view/animation/Animation;",
+    "Landroid/view/animation/AlphaAnimation;",
+    "Landroid/view/animation/Animation$1;",
+    "Landroid/view/animation/Animation$2;",
+    "Landroid/view/animation/Animation$3;",
+    "Landroid/view/animation/Animation$AnimationListener;",
+    "Landroid/view/animation/Animation$Description;",
+    "Landroid/view/animation/Animation$NoImagePreloadHolder;",
+    "Landroid/view/animation/AnimationSet;",
     "Landroid/view/animation/AnimationUtils$1;",
     "Landroid/view/animation/AnimationUtils$AnimationState;",
     "Landroid/view/animation/AnimationUtils;",
     "Landroid/view/animation/AnticipateInterpolator;",
     "Landroid/view/animation/AnticipateOvershootInterpolator;",
     "Landroid/view/animation/BounceInterpolator;",
+    "Landroid/view/animation/ClipRectAnimation;",
     "Landroid/view/animation/CycleInterpolator;",
     "Landroid/view/animation/DecelerateInterpolator;",
+    "Landroid/view/animation/LayoutAnimationController$AnimationParameters;",
+    "Landroid/view/animation/GridLayoutAnimationController$AnimationParameters;",
+    "Landroid/view/animation/LayoutAnimationController;",
+    "Landroid/view/animation/GridLayoutAnimationController;",
     "Landroid/view/animation/LinearInterpolator;",
     "Landroid/view/animation/OvershootInterpolator;",
     "Landroid/view/animation/PathInterpolator;",
+    "Landroid/view/animation/RotateAnimation;",
+    "Landroid/view/animation/ScaleAnimation;",
+    "Landroid/view/animation/Transformation;",
+    "Landroid/view/animation/TranslateAnimation;",
     "Landroid/view/autofill/AutofillId$1;",
     "Landroid/view/autofill/AutofillId;",
     "Landroid/view/autofill/AutofillManager$AutofillCallback$AutofillEventType;",
@@ -1457,7 +1559,6 @@
     "Lcom/android/internal/util/FunctionalUtils$ThrowingCheckedConsumer;",
     "Lcom/android/internal/util/FunctionalUtils$ThrowingCheckedFunction;",
     "Lcom/android/internal/util/FunctionalUtils$ThrowingConsumer;",
-    "Ljava/util/function/Function;",
     "Lcom/android/internal/util/FunctionalUtils$ThrowingFunction;",
     "Lcom/android/internal/util/FunctionalUtils$ThrowingRunnable;",
     "Lcom/android/internal/util/FunctionalUtils$ThrowingSupplier;",
@@ -1506,12 +1607,9 @@
     "Ldev/apkweb/media/AudioSources;",
     "Ldev/apkweb/net/ApkEntries;",
     "Ldev/apkweb/net/BridgeHttpEngine$1;",
-    "Ljava/io/InputStream;",
     "Ldev/apkweb/net/BridgeHttpEngine$BodyStream;",
     "Ldev/apkweb/net/BridgeHttpEngine$BridgeAccess;",
     "Ldev/apkweb/net/BridgeHttpEngine$EmptyStream;",
-    "Ljava/io/Flushable;",
-    "Ljava/io/OutputStream;",
     "Ldev/apkweb/net/BridgeHttpEngine$RequestBody;",
     "Ldev/apkweb/net/BridgeHttpEngine;",
     "Ljava/net/URLConnection;",
@@ -1527,6 +1625,7 @@
     "Ldev/apkweb/net/MainThreadPolicy;",
     "Ldev/apkweb/net/NetBridge;",
     "Ldev/apkweb/os/BundleHidden;",
+    "Ldev/apkweb/os/FileUtilsHidden;",
     "Ldev/apkweb/pm/PmHidden;",
     "Ldev/apkweb/util/ArraysOps;",
     "Ldev/apkweb/util/AtomicBooleanOps;",
@@ -1549,6 +1648,7 @@
     "Ljava/util/RandomAccess;",
     "Ldev/apkweb/util/CollectionOps$SubList;",
     "Ldev/apkweb/util/CollectionOps;",
+    "Ldev/apkweb/util/DateSymbolsHidden;",
     "Ldev/apkweb/util/IntegerOps;",
     "Ldev/apkweb/util/LayoutHidden;",
     "Ldev/apkweb/util/LongOps;",
@@ -1565,6 +1665,7 @@
     "Ldev/apkweb/util/RandomOps;",
     "Ldev/apkweb/util/StringBuilderOps;",
     "Ldev/apkweb/util/StringOps;",
+    "Ldev/apkweb/view/FocusHidden;",
     "Ldev/apkweb/view/ViewAnimationHost;",
     "Ldev/apkweb/view/ViewHidden;",
     "Ldev/apkweb/view/WindowAnimationHost;",
@@ -1603,9 +1704,7 @@
     "Ljava/io/FileDescriptor$1;",
     "Ljava/io/FileDescriptor;",
     "Ljava/io/FileInputStream$UseManualSkipException;",
-    "Ljava/io/FileInputStream;",
     "Ljava/io/FileNotFoundException;",
-    "Ljava/io/FileOutputStream;",
     "Ljava/io/InputStreamReader;",
     "Ljava/io/FileReader;",
     "Ljava/io/FileSystem;",
@@ -1651,13 +1750,11 @@
     "Ljava/lang/CharSequence$1CodePointIterator;",
     "Ljava/lang/FindBugsSuppressWarnings;",
     "Ljava/lang/Number;",
-    "Ljava/lang/ref/Reference;",
     "Ljava/lang/ref/PhantomReference;",
     "Ljava/lang/ref/Reference$SinkHolder$1;",
     "Ljava/lang/ref/Reference$SinkHolder;",
     "Ljava/lang/ref/ReferenceQueue;",
     "Ljava/lang/ref/SoftReference;",
-    "Ljava/lang/ref/WeakReference;",
     "Ljava/lang/reflect/Modifier;",
     "Ljava/math/BigDecimal$$ExternalSyntheticBackportWithForwarding0;",
     "Ljava/math/BigDecimal$1;",
@@ -3817,6 +3914,77 @@
         "insetRight",
         "insetTop",
         "insetBottom"
+      ],
+      "Animation": [
+        "interpolator",
+        "fillEnabled",
+        "fillBefore",
+        "fillAfter",
+        "duration",
+        "startOffset",
+        "repeatCount",
+        "repeatMode",
+        "zAdjustment",
+        "background",
+        "detachWallpaper",
+        "showWallpaper",
+        "hasRoundedCorners",
+        "showBackdrop",
+        "backdropColor"
+      ],
+      "AnimationSet": [
+        "shareInterpolator",
+        "fillBefore",
+        "fillAfter",
+        "duration",
+        "startOffset",
+        "repeatMode"
+      ],
+      "RotateAnimation": [
+        "fromDegrees",
+        "toDegrees",
+        "pivotX",
+        "pivotY"
+      ],
+      "ScaleAnimation": [
+        "fromXScale",
+        "toXScale",
+        "fromYScale",
+        "toYScale",
+        "pivotX",
+        "pivotY"
+      ],
+      "TranslateAnimation": [
+        "fromXDelta",
+        "toXDelta",
+        "fromYDelta",
+        "toYDelta"
+      ],
+      "AlphaAnimation": [
+        "fromAlpha",
+        "toAlpha"
+      ],
+      "ClipRectAnimation": [
+        "fromLeft",
+        "fromTop",
+        "fromRight",
+        "fromBottom",
+        "toLeft",
+        "toTop",
+        "toRight",
+        "toBottom"
+      ],
+      "LayoutAnimation": [
+        "delay",
+        "animation",
+        "animationOrder",
+        "interpolator"
+      ],
+      "GridLayoutAnimation": [
+        "columnDelay",
+        "rowDelay",
+        "direction",
+        "directionPriority"
       ]
     },
     "privateAttributesByGroup": {
@@ -3884,14 +4052,35 @@
       "AnticipateOvershootInterpolator": {},
       "CycleInterpolator": {},
       "DrawableWrapper": {},
-      "InsetDrawable": {}
+      "InsetDrawable": {},
+      "Animation": {
+        "showWallpaper": 17957111,
+        "hasRoundedCorners": 17956963
+      },
+      "AnimationSet": {},
+      "RotateAnimation": {},
+      "ScaleAnimation": {},
+      "TranslateAnimation": {},
+      "AlphaAnimation": {},
+      "ClipRectAnimation": {
+        "fromLeft": 17956956,
+        "fromTop": 17956958,
+        "fromRight": 17956957,
+        "fromBottom": 17956955,
+        "toLeft": 17957137,
+        "toTop": 17957139,
+        "toRight": 17957138,
+        "toBottom": 17957136
+      },
+      "LayoutAnimation": {},
+      "GridLayoutAnimation": {}
     },
     "idProfile": "Android SDK API36 revision2 resource data (same profile loaded by runtime)",
     "resourceProfilePath": "assets/framework-resources/framework-resources.json",
     "resourceProfileSha256": "158aaa38c505a747927941fcf26839225ca5864e06c1ad0bf3cc04afe3b57487",
     "aapt2": "$ANDROID_SDK/build-tools/36.1.0/aapt2",
-    "inputXmlSha256": "dcc71811532538728f95d2557378fda8fcfe94c1b77242dc99119426cb9cdc5d",
-    "generatedRJavaSha256": "891e4ad75701f2b06f5922c4ce43776d9b8f4b955d96a3878896071f8f560521",
+    "inputXmlSha256": "747cf5492500faae7782eac8a6d050314d4b3d7a5d65d68a33a7ac9b5b38b38d",
+    "generatedRJavaSha256": "9e749ff00ffb17f1cd4dc52b1eb9440c50e70bd52f45227828a349665f10de41",
     "adaptations": [
       "All styleable memberships are copied from complete selected original AOSP13 declare-styleable elements.",
       "AAPT2 independently verifies every public ID and numeric array/index ordering against the actual runtime ARSC profile.",
@@ -15458,6 +15647,376 @@
       "sha256": "2d6462cd361a51cc9e35198626295f897ee779a626422d6d40e7b3576bd69fdd",
       "bytes": 76966,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/ParcelFileDescriptor.java",
+      "localPath": "framework-aosp/upstream/android/os/ParcelFileDescriptor.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/ParcelFileDescriptor.java?format=TEXT",
+      "sha256": "4c604594cafc6822b952bed8c0d159fc1aebe868e4b6f310774cb0a91f21ede3",
+      "bytes": 45519,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/FocusFinder.java",
+      "localPath": "framework-aosp/upstream/android/view/FocusFinder.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/FocusFinder.java?format=TEXT",
+      "sha256": "3ff93dda7e2e780a84b197fab58eed1261ac2f7786c5aadd365f824675fd3b75",
+      "bytes": 38819,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/animation/Animation.java",
+      "localPath": "framework-aosp/upstream/android/view/animation/Animation.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/animation/Animation.java?format=TEXT",
+      "sha256": "f6c6e896169dab25f5f98a7ca13a371ede3cf2ce6646dd168dc2cb197db729bc",
+      "bytes": 46368,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/animation/AlphaAnimation.java",
+      "localPath": "framework-aosp/upstream/android/view/animation/AlphaAnimation.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/animation/AlphaAnimation.java?format=TEXT",
+      "sha256": "01f4491c5c1d1b497fb58c2ad51e0c928997b0fde6a787146a46bbc3aad57ea1",
+      "bytes": 2747,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/animation/AnimationSet.java",
+      "localPath": "framework-aosp/upstream/android/view/animation/AnimationSet.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/animation/AnimationSet.java?format=TEXT",
+      "sha256": "b7f7c8f56be5b63f9b522e638dc2ab6fc49788c969520312954000dbfc575a1b",
+      "bytes": 18223,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/animation/RotateAnimation.java",
+      "localPath": "framework-aosp/upstream/android/view/animation/RotateAnimation.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/animation/RotateAnimation.java?format=TEXT",
+      "sha256": "349f1a2453a239205047b1ff63841616ab39340a56ca9cae192cc83096e02ddc",
+      "bytes": 6841,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/animation/ScaleAnimation.java",
+      "localPath": "framework-aosp/upstream/android/view/animation/ScaleAnimation.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/animation/ScaleAnimation.java?format=TEXT",
+      "sha256": "5e6c97cea56b8a5c995931594b9d9b22a7c17f873a615adad7686b2bf0ee5bf7",
+      "bytes": 10527,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/animation/TranslateAnimation.java",
+      "localPath": "framework-aosp/upstream/android/view/animation/TranslateAnimation.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/animation/TranslateAnimation.java?format=TEXT",
+      "sha256": "0090eefba4b4b02d4435e76ebc60c6b622384d34d8a47e6a214ec6a4c37855ce",
+      "bytes": 8822,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/animation/Transformation.java",
+      "localPath": "framework-aosp/upstream/android/view/animation/Transformation.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/animation/Transformation.java?format=TEXT",
+      "sha256": "dfff293297f0f45b352cbe5a13be5df4fb81958a32c1ae814cc32e05f3bc90fd",
+      "bytes": 7532,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/animation/ClipRectAnimation.java",
+      "localPath": "framework-aosp/upstream/android/view/animation/ClipRectAnimation.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/animation/ClipRectAnimation.java?format=TEXT",
+      "sha256": "fc0403902b34c7794da6fe06a6603bfbd3069b7d987260fe2f1dabc2c9f523f8",
+      "bytes": 6241,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/animation/LayoutAnimationController.java",
+      "localPath": "framework-aosp/upstream/android/view/animation/LayoutAnimationController.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/animation/LayoutAnimationController.java?format=TEXT",
+      "sha256": "324cfedcfab41835f504cdeaf7c10db36b832124993f5f07c388822f433bb7d4",
+      "bytes": 14940,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/animation/GridLayoutAnimationController.java",
+      "localPath": "framework-aosp/upstream/android/view/animation/GridLayoutAnimationController.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/animation/GridLayoutAnimationController.java?format=TEXT",
+      "sha256": "f3cb151714f2c118a498d737380a4baa2f994f913fb2ac423792f12c61b6366c",
+      "bytes": 14095,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/animation/LayoutAnimationController.java",
+      "localPath": "framework-aosp/upstream/android/view/animation/LayoutAnimationController.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/animation/LayoutAnimationController.java?format=TEXT",
+      "sha256": "324cfedcfab41835f504cdeaf7c10db36b832124993f5f07c388822f433bb7d4",
+      "bytes": 14940,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/BaseMovementMethod.java",
+      "localPath": "framework-aosp/upstream/android/text/method/BaseMovementMethod.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/BaseMovementMethod.java?format=TEXT",
+      "sha256": "67c5c543cb8fee17390b013d84fcf93aae723bdd40d74f3c80bb4ecff12c54ff",
+      "bytes": 23891,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/MovementMethod.java",
+      "localPath": "framework-aosp/upstream/android/text/method/MovementMethod.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/MovementMethod.java?format=TEXT",
+      "sha256": "0a6e45560649512327344f3fd58fa40666d6396280673b0878244813b74d1981",
+      "bytes": 2563,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/ScrollingMovementMethod.java",
+      "localPath": "framework-aosp/upstream/android/text/method/ScrollingMovementMethod.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/ScrollingMovementMethod.java?format=TEXT",
+      "sha256": "cf1206e13bdb15d96ad48e7ab0b3a49c01f1def684ac14e4170d2be63d2104dc",
+      "bytes": 3659,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/ArrowKeyMovementMethod.java",
+      "localPath": "framework-aosp/upstream/android/text/method/ArrowKeyMovementMethod.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/ArrowKeyMovementMethod.java?format=TEXT",
+      "sha256": "a2e58168ebf77c8d8ed9643654f86c89ace547346eb7fa9a69b8e82e7686d2b9",
+      "bytes": 12741,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/LinkMovementMethod.java",
+      "localPath": "framework-aosp/upstream/android/text/method/LinkMovementMethod.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/LinkMovementMethod.java?format=TEXT",
+      "sha256": "1b2c1dc564d5f5b34dd35a615bbd811fb9735971d3b6a6e7f93d434201776135",
+      "bytes": 9185,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/Touch.java",
+      "localPath": "framework-aosp/upstream/android/text/method/Touch.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/Touch.java?format=TEXT",
+      "sha256": "3044c91cda5ff9d14699965d50d87eea97c8da378610c24afcf9f52d01558b9a",
+      "bytes": 7713,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/DigitsKeyListener.java",
+      "localPath": "framework-aosp/upstream/android/text/method/DigitsKeyListener.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/DigitsKeyListener.java?format=TEXT",
+      "sha256": "6a0a3b1fcc6da6031698a3d2111f931cd435af426170df848c3da2b19568f2f0",
+      "bytes": 15040,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/DateKeyListener.java",
+      "localPath": "framework-aosp/upstream/android/text/method/DateKeyListener.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/DateKeyListener.java?format=TEXT",
+      "sha256": "b8150ad9d22ab8a038d294fff96418101e0c19d2e016d3d240956bab8040e60e",
+      "bytes": 4269,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/TimeKeyListener.java",
+      "localPath": "framework-aosp/upstream/android/text/method/TimeKeyListener.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/TimeKeyListener.java?format=TEXT",
+      "sha256": "c6926d08894fcc5f274b097c2fc948ec9734ff2cc21f86f0f2655f7fa33ae08f",
+      "bytes": 4920,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/DateTimeKeyListener.java",
+      "localPath": "framework-aosp/upstream/android/text/method/DateTimeKeyListener.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/DateTimeKeyListener.java?format=TEXT",
+      "sha256": "c2213c560ebf0a7ff6c5dfe192b187aa06f67a4da4cd5b9f6abf7f9384957c94",
+      "bytes": 5041,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/DialerKeyListener.java",
+      "localPath": "framework-aosp/upstream/android/text/method/DialerKeyListener.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/DialerKeyListener.java?format=TEXT",
+      "sha256": "4c4b20181e4bc09cfc6ea913db41d22725b28d7631c39001694f84bffdff41fd",
+      "bytes": 3509,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/NumberKeyListener.java",
+      "localPath": "framework-aosp/upstream/android/text/method/NumberKeyListener.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/NumberKeyListener.java?format=TEXT",
+      "sha256": "adc8845cf3757fc243b00a977a3c013d1bb8c7d3b236df856bddbaad7ddcbd29",
+      "bytes": 8510,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/PasswordTransformationMethod.java",
+      "localPath": "framework-aosp/upstream/android/text/method/PasswordTransformationMethod.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/PasswordTransformationMethod.java?format=TEXT",
+      "sha256": "4d440a3284cef214d07edc660f563d90400a809a1291c94e182386fd5f6a54de",
+      "bytes": 8726,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/AllCapsTransformationMethod.java",
+      "localPath": "framework-aosp/upstream/android/text/method/AllCapsTransformationMethod.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/AllCapsTransformationMethod.java?format=TEXT",
+      "sha256": "6b95dfe7e9b1102023caa59495f039f95b54a709d9627fc094f890fd366bb131",
+      "bytes": 2425,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/QwertyKeyListener.java",
+      "localPath": "framework-aosp/upstream/android/text/method/QwertyKeyListener.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/QwertyKeyListener.java?format=TEXT",
+      "sha256": "3b0e79196b25aace5f35056b49e92f4e18a82a457b0bf0f5302a70e93df0fde7",
+      "bytes": 19811,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/util/Linkify.java",
+      "localPath": "framework-aosp/upstream/android/text/util/Linkify.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/util/Linkify.java?format=TEXT",
+      "sha256": "911031f9a82c987277c3498f5714df2253c0bf9a2eca883bbe32ad103b78ba39",
+      "bytes": 31719,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/method/TransformationMethod2.java",
+      "localPath": "framework-aosp/upstream/android/text/method/TransformationMethod2.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/method/TransformationMethod2.java?format=TEXT",
+      "sha256": "07a38d7e4852fe207e815fbf7a3ad3f6c250005b8d30b09982ef7d49915d8b24",
+      "bytes": 1321,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/util/Patterns.java",
+      "localPath": "framework-aosp/upstream/android/util/Patterns.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/util/Patterns.java?format=TEXT",
+      "sha256": "51d66d1131e575597129801a7a1affab9a7032ea05d27d85dac584160c9985c9",
+      "bytes": 29461,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/AudioFormat.java",
+      "localPath": "framework-aosp/upstream/android/media/AudioFormat.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/AudioFormat.java?format=TEXT",
+      "sha256": "608853c1df3ab4096730c91656c1b8ec0e585e03c22e9fc1d708f20404382562",
+      "bytes": 69927,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/ImageFormat.java",
+      "localPath": "framework-aosp/upstream/android/graphics/ImageFormat.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/ImageFormat.java?format=TEXT",
+      "sha256": "58bd9852719133514a9b8cc6a47746eeba6755b234a34bb6ec3944ac833c1c54",
+      "bytes": 33860,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/AudioFocusRequest.java",
+      "localPath": "framework-aosp/upstream/android/media/AudioFocusRequest.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/AudioFocusRequest.java?format=TEXT",
+      "sha256": "04ef1dcd1b8f64a970d2d47a80970ff2a1d9684d61f53c833feec7045e24e9ec",
+      "bytes": 28971,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/AudioRouting.java",
+      "localPath": "framework-aosp/upstream/android/media/AudioRouting.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/AudioRouting.java?format=TEXT",
+      "sha256": "be8ddcd57cea42b2340620fd4ae0d32198cb3be9506edb9e5fcd8e67ecb7bc22",
+      "bytes": 3217,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/PlaybackParams.java",
+      "localPath": "framework-aosp/upstream/android/media/PlaybackParams.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/PlaybackParams.java?format=TEXT",
+      "sha256": "83c297d1feb8329ffbd9323d56e4ac182c42b51a2e8e40a78cf1fe3112a84d89",
+      "bytes": 9109,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/AudioTimestamp.java",
+      "localPath": "framework-aosp/upstream/android/media/AudioTimestamp.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/AudioTimestamp.java?format=TEXT",
+      "sha256": "39b71ae06b50a2f3a55e642bd1e3dd6bd679cab51621fe18f47e41ba8d121ed9",
+      "bytes": 3481,
+      "license": "Apache-2.0"
     }
   ],
   "algorithmPatches": [],
@@ -15630,6 +16189,54 @@
         "kind": "drop-permission-lint-and-proto-dump-redirect-hidden-constants-to-lab",
         "inputSha256": "2d6462cd361a51cc9e35198626295f897ee779a626422d6d40e7b3576bd69fdd",
         "outputSha256": "94a777b794ab7e07b487085852f12ec29e52eece653f9a5d1b51fad60061cb11"
+      },
+      {
+        "path": "android/os/ParcelFileDescriptor.java",
+        "kind": "hidden-file-utils-to-lab-helper-and-ashmem-memoryfile-unsupported",
+        "inputSha256": "4c604594cafc6822b952bed8c0d159fc1aebe868e4b6f310774cb0a91f21ede3",
+        "outputSha256": "56b74438502fb5ed5c2fba877fed2206030ec07cc4ad0358ce840ff0703e85d8"
+      },
+      {
+        "path": "android/view/FocusFinder.java",
+        "kind": "hidden-view-members-to-lab-helper",
+        "inputSha256": "3ff93dda7e2e780a84b197fab58eed1261ac2f7786c5aadd365f824675fd3b75",
+        "outputSha256": "814887363c80f519061a2359f57c8c68487f9041d4da4d8f87635a90df8414fd"
+      },
+      {
+        "path": "android/text/method/ArrowKeyMovementMethod.java",
+        "kind": "word-iterator-movement-unsupported",
+        "inputSha256": "a2e58168ebf77c8d8ed9643654f86c89ace547346eb7fa9a69b8e82e7686d2b9",
+        "outputSha256": "3b90be97aa0fbcb0056a8ca8e609e2a08693b53cf73d902cb3187159c9827c0c"
+      },
+      {
+        "path": "android/text/method/LinkMovementMethod.java",
+        "kind": "hidden-text-link-span-and-floating-toolbar-removed",
+        "inputSha256": "1b2c1dc564d5f5b34dd35a615bbd811fb9735971d3b6a6e7f93d434201776135",
+        "outputSha256": "9553a7e85fa984a506cb0c8952d9ceb868a274ee9c3ccfb15bc7f14dd7b9c065"
+      },
+      {
+        "path": "android/text/method/Touch.java",
+        "kind": "hidden-getHorizontallyScrolling-to-public-isHorizontallyScrollable",
+        "inputSha256": "3044c91cda5ff9d14699965d50d87eea97c8da378610c24afcf9f52d01558b9a",
+        "outputSha256": "fbd16e36d8584afc5302d7c54d3c6cc50d12e841194096e8f26524e520006fa8"
+      },
+      {
+        "path": "android/text/method/NumberKeyListener.java",
+        "kind": "icu-am-pm-symbols-to-lab-helper",
+        "inputSha256": "adc8845cf3757fc243b00a977a3c013d1bb8c7d3b236df856bddbaad7ddcbd29",
+        "outputSha256": "59529105031315c2f4b922e742bb41241c93a26b2bb30cfc8f22cd9e9b31ce6f"
+      },
+      {
+        "path": "android/text/util/Linkify.java",
+        "kind": "phone-number-gatherer-unsupported-no-libphonenumber",
+        "inputSha256": "911031f9a82c987277c3498f5714df2253c0bf9a2eca883bbe32ad103b78ba39",
+        "outputSha256": "4ce84d3538c0c119ce63ee0a72104d5e92512413475a975a9d66a64b0882f6fd"
+      },
+      {
+        "path": "android/media/AudioFocusRequest.java",
+        "kind": "hidden-audiomanager-focus-flags-to-aosp-constants",
+        "inputSha256": "04ef1dcd1b8f64a970d2d47a80970ff2a1d9684d61f53c833feec7045e24e9ec",
+        "outputSha256": "c7c37af03d578d7ad8c2b3e119f3e7d172ac77a56c879b1a391c69a884c5b5b1"
       }
     ],
     "labAuthored": [
@@ -15642,8 +16249,20 @@
         "sha256": "6eb24223a304bd21e5f5001f3a884fc5806d40b04ca577302ba6250cc28ed45a"
       },
       {
+        "path": "framework-aosp/lab-java/android/media/AudioDeviceInfo.java",
+        "sha256": "ac7854e58722bf4ab75d16e4d22b0f67b3cb1cc728a466318582e825a725fbbc"
+      },
+      {
+        "path": "framework-aosp/lab-java/android/media/AudioManagerDevices.java",
+        "sha256": "ac9358de07e31affd872e2ad06c7104fc932bde7f253378eeb82142d9c71d61d"
+      },
+      {
         "path": "framework-aosp/lab-java/android/media/AudioSystem.java",
-        "sha256": "b1d03ae16345a8bc12cca14dfe3a1d2089044464abb6dc0991c948f8b7e938ed"
+        "sha256": "0ba80c455046d89a7eec97183f3125f3384c92afa068bf924e6160e2bc5f7602"
+      },
+      {
+        "path": "framework-aosp/lab-java/android/media/AudioTrack.java",
+        "sha256": "10f692d623e0c7e17f8ae00f3e0f5cf91b9d446a6cadc0b60dd5673bd163dceb"
       },
       {
         "path": "framework-aosp/lab-java/android/media/audiopolicy/AudioProductStrategy.java",
@@ -15714,6 +16333,10 @@
         "sha256": "9ebf33d15978a4c11d916379f804c455363c6bd4b9f4efa010375b8d9e23a8bf"
       },
       {
+        "path": "framework-aosp/lab-java/dev/apkweb/os/FileUtilsHidden.java",
+        "sha256": "4377b883537594110661ee7c8952fcd182abe289bf3d2428d513045d1ecfa588"
+      },
+      {
         "path": "framework-aosp/lab-java/dev/apkweb/pm/PmHidden.java",
         "sha256": "167332621f54edd765e5f7b9af993582e1f368b16591b13fb3039fd8dbafe9f4"
       },
@@ -15766,6 +16389,10 @@
         "sha256": "27539bc48e4ca7fe675d2d7627e7e97de6fddf8071c548ebcd656af81b732f6b"
       },
       {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/DateSymbolsHidden.java",
+        "sha256": "040a010d4dd87849ee0efb32572fbc8afc9b886d036c09abe93ede04de5cb2b8"
+      },
+      {
         "path": "framework-aosp/lab-java/dev/apkweb/util/IntegerOps.java",
         "sha256": "90d13f05a84e1dc7baf1318ec548643b35b99a541ed4c6af35a0858ab077f6c9"
       },
@@ -15792,6 +16419,10 @@
       {
         "path": "framework-aosp/lab-java/dev/apkweb/util/StringOps.java",
         "sha256": "3ebf76b73cbb22a51e1f854562e1e12fa9223ee99ec2f2faee0a6a8500b743b7"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/view/FocusHidden.java",
+        "sha256": "fb39879c8592a292f7f05950f9bbce5bd66307d14f0df3d48d7be0a37a2c1be0"
       },
       {
         "path": "framework-aosp/lab-java/dev/apkweb/view/ViewHidden.java",
@@ -17249,8 +17880,8 @@
   "generatedSources": [
     {
       "localPath": "framework-aosp/generated/com/android/internal/R.java",
-      "sha256": "891e4ad75701f2b06f5922c4ce43776d9b8f4b955d96a3878896071f8f560521",
-      "bytes": 664631,
+      "sha256": "9e749ff00ffb17f1cd4dc52b1eb9440c50e70bd52f45227828a349665f10de41",
+      "bytes": 668521,
       "role": "AAPT2 generated framework resource attribute data"
     }
   ],
@@ -17258,6 +17889,7 @@
     "android.content.pm.ActivityInfo.Config (forward metadata; original ActivityInfo replaces it)"
   ],
   "compileOnlyDeclarations": [
+    "android.annotation.AnimRes",
     "android.annotation.AnimatorRes",
     "android.annotation.AnyRes",
     "android.annotation.AnyThread",
@@ -17273,6 +17905,7 @@
     "android.annotation.HalfFloat",
     "android.annotation.IntDef",
     "android.annotation.IntRange",
+    "android.annotation.InterpolatorRes",
     "android.annotation.LayoutRes",
     "android.annotation.MainThread",
     "android.annotation.NonNull",

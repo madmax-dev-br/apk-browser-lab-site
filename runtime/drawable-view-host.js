@@ -1,8 +1,8 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=64078a5322f4';
-import { APKError } from './apk-runtime.js?v=64078a5322f4';
-import { getVectorGraphics } from './vector-native.js?v=64078a5322f4';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=64078a5322f4';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=64078a5322f4';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=fd59ee7c3d79';
+import { APKError } from './apk-runtime.js?v=fd59ee7c3d79';
+import { getVectorGraphics } from './vector-native.js?v=fd59ee7c3d79';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=fd59ee7c3d79';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=fd59ee7c3d79';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -56,14 +56,16 @@ export function createDrawableViewHost(platform) {
       recordLayer(runtime, receiver, 'drawableNode', replay, width, height, canvas => {
       for (const [drawable, image] of [[view.backgroundDrawable, false], [view.imageDrawable, true]]) {
         if (!drawable) continue;prepareCpuAnimatedVector(runtime,drawable);
-        let left = image ? padding.left : 0, top = image ? padding.top : 0, right = image ? width - padding.right : width, bottom = image ? height - padding.bottom : height;
+        let drawableMatrix = null; let left = image ? padding.left : 0, top = image ? padding.top : 0, right = image ? width - padding.right : width, bottom = image ? height - padding.bottom : height;
         if (image && (view.imageScaleType ?? 3) !== 1) {
           const iw = dispatch(runtime, DRAWABLE, 'getIntrinsicWidth', [], 'I', drawable), ih = dispatch(runtime, DRAWABLE, 'getIntrinsicHeight', [], 'I', drawable), type = view.imageScaleType ?? 3;
-          if (type === 0) fail('ImageView MATRIX scaleType requires explicit Matrix host state');
-          if (iw > 0 && ih > 0) { const availableWidth = right - left, availableHeight = bottom - top; let scale = [5, 7].includes(type) ? 1 : type === 6 ? Math.max(availableWidth / iw, availableHeight / ih) : Math.min(availableWidth / iw, availableHeight / ih); if (type === 7) scale = Math.min(1, availableWidth / iw, availableHeight / ih); const w = iw * scale, h = ih * scale, align = type === 2 ? 0 : type === 4 ? 1 : .5; left += (availableWidth - w) * align; top += (availableHeight - h) * align; right = left + w; bottom = top + h; }
+          if (type === 0) { const matrix = platform.imageViewApi.imageMatrix(runtime, receiver); drawableMatrix = matrix; left = padding.left; top = padding.top; right = left + (iw > 0 ? iw : width); bottom = top + (ih > 0 ? ih : height); }   // ImageView MATRIX: the drawable keeps its intrinsic size, positioned by the image matrix
+          else if (iw > 0 && ih > 0) { const availableWidth = right - left, availableHeight = bottom - top; let scale = [5, 7].includes(type) ? 1 : type === 6 ? Math.max(availableWidth / iw, availableHeight / ih) : Math.min(availableWidth / iw, availableHeight / ih); if (type === 7) scale = Math.min(1, availableWidth / iw, availableHeight / ih); const w = iw * scale, h = ih * scale, align = type === 2 ? 0 : type === 4 ? 1 : .5; left += (availableWidth - w) * align; top += (availableHeight - h) * align; right = left + w; bottom = top + h; }
         }
         dispatch(runtime, DRAWABLE, 'setBounds', ['I', 'I', 'I', 'I'], 'V', drawable, [Math.round(left), Math.round(top), Math.round(right), Math.round(bottom)]);
+        if (drawableMatrix) { dispatch(runtime, CANVAS, 'save', [], 'I', canvas); dispatch(runtime, CANVAS, 'concat', ['Landroid/graphics/Matrix;'], 'V', canvas, [drawableMatrix]); }
         dispatch(runtime, DRAWABLE, 'draw', [CANVAS], 'V', drawable, [canvas]);
+        if (drawableMatrix) dispatch(runtime, CANVAS, 'restore', [], 'V', canvas);
       }
       if (view.switchState) switchHost.draw(runtime, receiver, canvas, width, height);
       });
@@ -136,8 +138,11 @@ export function createDrawableViewHost(platform) {
       dispatch(runtime, DRAWABLE, 'setLayoutDirection', ['I'], 'Z', drawable, [view.layoutDirection ?? 0]);
       if (dispatch(runtime, DRAWABLE, 'isStateful', [], 'Z', drawable)) dispatch(runtime, DRAWABLE, 'setState', ['[I'], 'Z', drawable, [dispatch(runtime, VIEW, 'getDrawableState', [], '[I', receiver)]);
       adoptBackgroundPadding(runtime, receiver, drawable);
+      platform.viewApi?.applyTint(runtime, receiver, 'background');   // View.applyBackgroundTint
     }
     if (drawable) { if(field==='foregroundDrawable'){dispatch(runtime,DRAWABLE,'setLayoutDirection',['I'],'Z',drawable,[view.layoutDirection??0]);if(dispatch(runtime,DRAWABLE,'isStateful',[],'Z',drawable))dispatch(runtime,DRAWABLE,'setState',['[I'],'Z',drawable,[dispatch(runtime,VIEW,'getDrawableState',[],'[I',receiver)]);if(view.attached)dispatch(runtime,DRAWABLE,'setVisible',['Z','Z'],'Z',drawable,[view.visibility===4||view.visibility===8?0:1,0]);} dispatch(runtime, DRAWABLE, 'setCallback', ['Landroid/graphics/drawable/Drawable$Callback;'], 'V', drawable, [receiver]); if (field === 'imageDrawable' && view.imageAlpha !== undefined) dispatch(runtime, DRAWABLE, 'setAlpha', ['I'], 'V', drawable, [view.imageAlpha]); }
+    if(drawable&&field==='imageDrawable')platform.imageViewApi?.drawableChanged(runtime,receiver);   // ImageView.applyColorMod / applyImageTint on the new drawable
+    if(drawable&&field==='foregroundDrawable')platform.viewApi?.applyTint(runtime,receiver,'foreground');   // View.applyForegroundTint
     render(runtime, receiver);
     if(field==='foregroundDrawable'){platform.requestDraw(runtime,receiver);dispatch(runtime,VIEW,'requestLayout',[],'V',receiver);}
   };
@@ -183,7 +188,7 @@ export function createDrawableViewHost(platform) {
         if (!Number.isInteger(args[1]) || args[1] < 0 || args[1] > 1024) fail('Invalid drawable state extra space');
         if (method.owner === IMAGE && view.imageState && !view.mergeImageState) return view.imageState;
         const extra = method.owner === IMAGE && view.imageState ? runtime.array(view.imageState).elements : [];
-        const states = []; if (view.windowFocused !== false && view.attached) states.push(16842909); if (view.enabled !== false) states.push(16842910); if (view.focused) states.push(16842908); if (view.selected) states.push(16842913); if (view.pressed) states.push(16842919); if (view.checked) states.push(16842912);
+        const states = []; if (view.windowFocused !== false && view.attached) states.push(16842909); if (view.enabled !== false) states.push(16842910); if (view.focused) states.push(16842908); if (view.selected) states.push(16842913); if (view.activated) states.push(16843518); if (view.pressed) states.push(16842919); if (view.checked) states.push(16842912);
         const result = runtime.newArray('[I', states.length + args[1] + extra.length); runtime.object(result).elements.splice(0, states.length, ...states);
         if (extra.length) return this.invoke(runtime, { owner: VIEW, name: 'mergeDrawableStates' }, [result, view.imageState]); return result;
       }

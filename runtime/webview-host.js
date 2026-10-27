@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=64078a5322f4';
-import { createHostRegistry } from './host-contract.js?v=64078a5322f4';
-import { APKError } from './apk-error.js?v=64078a5322f4';
+import { gcRoot } from './heap-gc.js?v=fd59ee7c3d79';
+import { createHostRegistry } from './host-contract.js?v=fd59ee7c3d79';
+import { APKError } from './apk-error.js?v=fd59ee7c3d79';
 
 // android.webkit.WebView and its public companions for the browser VM (design: docs/APK-REAL-TASKS.md, task 33).
 //
