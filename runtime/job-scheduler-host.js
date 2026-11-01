@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=4ca1bd96a090';
-import { createHostRegistry } from './host-contract.js?v=4ca1bd96a090';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=4ca1bd96a090';
+import { APKError } from './apk-error.js?v=64ce1d942f1e';
+import { createHostRegistry } from './host-contract.js?v=64ce1d942f1e';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=64ce1d942f1e';
 
 // android.app.job: JobScheduler, JobInfo (+ Builder), JobParameters and the JobService base class, with the scheduling rules of Android 13's JobSchedulerService for the
 // constraints a virtual device can answer. AOSP references: frameworks/base/apex/jobscheduler (JobSchedulerService.validateJob, JobStatus.isReady / wouldBeReadyWithConstraint,
@@ -145,6 +145,22 @@ export function createJobSchedulerHost(platform) {
   def(SERVICE, 'onBind', '(Landroid/content/Intent;)Landroid/os/IBinder;', () => null); def(SERVICE, 'onUnbind', '(Landroid/content/Intent;)Z', () => 0);
   def(SERVICE, 'getApplication', '()Landroid/app/Application;', () => platform.application);
   def(SERVICE, 'stopSelf', '()V', (r, _m, [self]) => { platform.serviceControl?.stopSelf(r, self); }); def(SERVICE, 'stopSelf', '(I)V', (r, _m, [self, startId]) => { platform.serviceControl?.stopSelf(r, self, startId); });
+  // Foreground services (Service.java): startForeground needs android.permission.FOREGROUND_SERVICE on API 28+ and a Notification; the state is kept on the Service.
+  const NOTIFICATION = 'Landroid/app/Notification;';
+  const foreground = (r, self, id, notification, type) => {
+    if (id === 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'id must not be 0');
+    if (notification === null || notification === 0) r.throwJava('Ljava/lang/NullPointerException;', 'notification');
+    if (!platform.holdsPermission?.(r, 'android.permission.FOREGROUND_SERVICE')) r.throwJava('Ljava/lang/SecurityException;', `Permission Denial: startForeground requires android.permission.FOREGROUND_SERVICE`);
+    r.object(self).foreground = { id, type }; r.record(`SERVICE startForeground ${id}`);
+  };
+  def(SERVICE, 'startForeground', `(I${NOTIFICATION})V`, (r, _m, [self, id, notification]) => foreground(r, self, id, notification, -1));
+  def(SERVICE, 'startForeground', `(I${NOTIFICATION}I)V`, (r, _m, [self, id, notification, type]) => foreground(r, self, id, notification, type));
+  def(SERVICE, 'stopForeground', '(Z)V', (r, _m, [self]) => { r.object(self).foreground = null; });
+  def(SERVICE, 'stopForeground', '(I)V', (r, _m, [self]) => { r.object(self).foreground = null; });
+  def(SERVICE, 'getForegroundServiceType', '()I', (r, _m, [self]) => r.object(self).foreground?.type ?? 0);   // FOREGROUND_SERVICE_TYPE_NONE
+  def(SERVICE, 'onRebind', '(Landroid/content/Intent;)V', () => {}); def(SERVICE, 'onTaskRemoved', '(Landroid/content/Intent;)V', () => {});
+  def(SERVICE, 'onConfigurationChanged', '(Landroid/content/res/Configuration;)V', () => {});
+  def(SERVICE, 'dump', '(Ljava/io/FileDescriptor;Ljava/io/PrintWriter;[Ljava/lang/String;)V', (r, _m, [, , writer]) => { if (writer !== null && writer !== 0) r.dispatch({ owner: 'Ljava/io/PrintWriter;', name: 'println', parameters: ['Ljava/lang/String;'], result: 'V', signature: '(Ljava/lang/String;)V' }, [writer, 'nothing to dump'], 'virtual'); });
   def(SERVICE, 'stopSelfResult', '(I)Z', (r, _m, [self, startId]) => platform.serviceControl?.stopSelf(r, self, startId) ?? 0);
   def(SERVICE, 'onStartCommand', '(Landroid/content/Intent;II)I', (r, _m, [self, intent, , startId]) => { r.dispatch({ owner: SERVICE, name: 'onStart', parameters: ['Landroid/content/Intent;', 'I'], result: 'V', signature: '(Landroid/content/Intent;I)V' }, [self, intent, startId], 'virtual'); return 1; });   // START_STICKY (the app targets API 5+)
   def(SERVICE, 'onStart', '(Landroid/content/Intent;I)V', () => {}); def(SERVICE, 'onLowMemory', '()V', () => {}); def(SERVICE, 'onTrimMemory', '(I)V', () => {});

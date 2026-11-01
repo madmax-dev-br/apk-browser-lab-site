@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=4ca1bd96a090';
+import { APKError } from './apk-runtime.js?v=64ce1d942f1e';
 const KEY_LISTENER = 'Landroid/text/method/KeyListener;', TEXT_KEYS = 'Landroid/text/method/TextKeyListener;', CAPITALIZE = 'Landroid/text/method/TextKeyListener$Capitalize;';
 const SINGLE_LINE = 'Landroid/text/method/SingleLineTransformationMethod;', TRANSFORM = 'Landroid/text/method/TransformationMethod;';
 const FACTORY = 'Landroid/text/Editable$Factory;', EDITABLE = 'Landroid/text/Editable;', TEXT = 'Landroid/widget/TextView;';
@@ -6,6 +6,7 @@ const keys = new Set([`${TEXT}->setEditableFactory(${FACTORY})V`, `${TEXT}->getK
 for (const signature of ['setSingleLine()V', 'setSingleLine(Z)V', 'isSingleLine()Z', 'setLines(I)V', 'setMinLines(I)V', 'setMaxLines(I)V', 'getMinLines()I', 'getMaxLines()I', 'setHorizontallyScrolling(Z)V', 'getHorizontallyScrolling()Z']) keys.add(`${TEXT}->${signature}`);
 /** Mutable text and spans live in original Factory/SpannableStringBuilder DEX.
  * The host synchronizes browser text edits with the actual Editable buffer. */
+const WATCHER = 'Ldev/apkweb/view/EditableChangeWatcher;';
 export function createEditableTextHost(platform) {
   const call = (runtime, receiver, owner, name, parameters, result, values = [], mode = 'virtual') => runtime.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, mode === 'static' ? values : [receiver, ...values], mode);
   const field = (runtime, view, name, type, value) => runtime.storeField(view.fields, `${TEXT}->${name}:${type}`, value);
@@ -16,7 +17,15 @@ export function createEditableTextHost(platform) {
     if (!available(runtime)) throw new APKError('Original Editable.Factory and SpannableStringBuilder DEX are required', { kind: 'editable-text-unsupported' });
     const editable = call(runtime, factory(runtime, view), FACTORY, 'newEditable', ['Ljava/lang/CharSequence;'], EDITABLE, [source]);
     if (!editable || !runtime.isSubtype(runtime.object(editable).type, EDITABLE)) throw new APKError('Editable.Factory returned an invalid Editable');
-    view.editable = editable; view.sourceEditable = true; return editable;
+    view.editable = editable; view.sourceEditable = true;
+    // TextView.ChangeWatcher: edits made on the Editable itself (InputConnection, app code) come back to the view the page draws (dev.apkweb.view.EditableChangeWatcher, layouts profile).
+    if (runtime.classes.has(WATCHER) && runtime.isSubtype(view.type, 'Landroid/widget/EditText;')) {
+      const watcher = runtime.allocate(WATCHER); runtime.dispatch({ owner: WATCHER, name: '<init>', parameters: ['Landroid/widget/TextView;'], result: 'V', signature: '(Landroid/widget/TextView;)V' }, [watcher, { ref: view.id }], 'direct');
+      const length = runtime.dispatch({ owner: 'Ljava/lang/CharSequence;', name: 'length', parameters: [], result: 'I', signature: '()I' }, [editable], 'virtual');
+      runtime.dispatch({ owner: 'Landroid/text/Spannable;', name: 'setSpan', parameters: ['Ljava/lang/Object;', 'I', 'I', 'I'], result: 'V', signature: '(Ljava/lang/Object;III)V' }, [editable, watcher, 0, length, 18 | (100 << 16)], 'virtual');
+      runtime.dispatch({ owner: 'Landroid/text/Selection;', name: 'setSelection', parameters: ['Landroid/text/Spannable;', 'I'], result: 'V', signature: '(Landroid/text/Spannable;I)V' }, [editable, 0], 'static');   // EditText's ArrowKeyMovementMethod.initialize puts the cursor at 0
+    }
+    return editable;
   };
   return {
     supports: key => keys.has(key), parent: () => null,
@@ -26,9 +35,10 @@ export function createEditableTextHost(platform) {
       if (!view.sourceEditable) return create(runtime, view, view.text ?? '');
       return view.editable;
     },
-    update(runtime, receiver, text, { replaceBuffer = false, sourceValue = text, start = 0, removed = 0, added = text.length } = {}) {
+    update(runtime, receiver, text, { alreadyUpdated = false, replaceBuffer = false, sourceValue = text, start = 0, removed = 0, added = text.length } = {}) {
       const view = runtime.object(receiver);
       if (!runtime.isSubtype(view.type, 'Landroid/widget/EditText;') || !available(runtime)) return null;
+      if (alreadyUpdated && view.sourceEditable) return view.editable;   // the change started on the Editable: it already holds the text
       if (replaceBuffer || !view.sourceEditable) return create(runtime, view, sourceValue);
       call(runtime, view.editable, EDITABLE, 'replace', ['I', 'I', 'Ljava/lang/CharSequence;', 'I', 'I'], EDITABLE, [start, start + removed, text, start, start + added]);
       return view.editable;

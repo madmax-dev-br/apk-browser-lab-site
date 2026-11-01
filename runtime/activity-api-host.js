@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=4ca1bd96a090';
-import { APKError } from './apk-error.js?v=4ca1bd96a090';
-import { gcRoot } from './heap-gc.js?v=4ca1bd96a090';
+import { createHostRegistry } from './host-contract.js?v=64ce1d942f1e';
+import { APKError } from './apk-error.js?v=64ce1d942f1e';
+import { gcRoot } from './heap-gc.js?v=64ce1d942f1e';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -63,6 +63,16 @@ export function createActivityApiHost(platform) {
   def(COMPONENT, 'compareTo', `(${COMPONENT})I`, (r, _m, [self, other]) => compare(r, self, other));
   def(COMPONENT, 'compareTo', `(${OBJECT})I`, (r, _m, [self, other]) => compare(r, self, other));
   def(COMPONENT, 'describeContents', '()I', () => 0);
+  const PARCEL = 'Landroid/os/Parcel;';
+  def(COMPONENT, 'writeToParcel', `(${PARCEL}I)V`, (r, _m, [self, out]) => { call(r, out, PARCEL, 'writeString', [STRING], 'V', [cn(r, self).packageName]); call(r, out, PARCEL, 'writeString', [STRING], 'V', [cn(r, self).className]); });
+  def(COMPONENT, 'writeToParcel', `(${COMPONENT}${PARCEL})V`, (r, _m, [component, out]) => {   // null is a null package string
+    if (nullish(component)) call(r, out, PARCEL, 'writeString', [STRING], 'V', [null]); else call(r, component, COMPONENT, 'writeToParcel', [PARCEL, 'I'], 'V', [out, 0]);
+  }, { static: true });
+  def(COMPONENT, '<init>', `(${PARCEL})V`, (r, _m, [self, source]) => { const o = cn(r, self); o.packageName = text(r, call(r, source, PARCEL, 'readString', [], STRING)); o.className = text(r, call(r, source, PARCEL, 'readString', [], STRING)); });
+  def(COMPONENT, 'readFromParcel', `(${PARCEL})${COMPONENT}`, (r, _m, [source]) => {
+    const pkg = call(r, source, PARCEL, 'readString', [], STRING); if (nullish(pkg)) return null;
+    return newComponent(r, text(r, pkg), text(r, call(r, source, PARCEL, 'readString', [], STRING)));
+  }, { static: true });
   const relative = (r, pkg, cls) => { if (nullish(cls) || !text(r, cls).length) iae(r, 'class name cannot be empty'); const name = text(r, cls); return newComponent(r, pkg, name[0] === '.' ? text(r, pkg) + name : name); };
   def(COMPONENT, 'createRelative', `(${STRING}${STRING})${COMPONENT}`, (r, _m, [pkg, cls]) => relative(r, pkg, cls), { static: true });
   def(COMPONENT, 'createRelative', `(${CONTEXT}${STRING})${COMPONENT}`, (r, _m, [context, cls]) => relative(r, call(r, context, CONTEXT, 'getPackageName', [], STRING), cls), { static: true });

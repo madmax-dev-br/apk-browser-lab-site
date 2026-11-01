@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=4ca1bd96a090';
+import { APKError } from './apk-runtime.js?v=64ce1d942f1e';
 
 const TEXT = 'Landroid/widget/TextView;', EDIT = 'Landroid/widget/EditText;', CHECK = 'Landroid/widget/CompoundButton;', PROGRESS = 'Landroid/widget/ProgressBar;';
 const PARCELABLE = 'Landroid/os/Parcelable;', CHAR = 'Ljava/lang/CharSequence;', ABS = 'Landroid/view/AbsSavedState;';
@@ -27,21 +27,34 @@ export function createWidgetStateHost({ saveBase, restoreBase }) {
     if (view.sourceEditable && view.editable) {
       const length = call(runtime, view.editable, 'Ljava/lang/CharSequence;', 'length', [], 'I');
       const spans = call(runtime, view.editable, 'Landroid/text/Spanned;', 'getSpans', ['I', 'I', 'Ljava/lang/Class;'], '[Ljava/lang/Object;', [0, length, runtime.classObject('Ljava/lang/Object;')]);
-      if (runtime.object(spans).elements.length) fail('TextView span, selection, error, or Editor saved state is not connected');
+      const selection = ['SELECTION_START', 'SELECTION_END'].map(name => runtime.readStatic({ owner: 'Landroid/text/Selection;', name, type: 'Ljava/lang/Object;', key: `Landroid/text/Selection;->${name}:Ljava/lang/Object;` }));
+      // the cursor (Selection spans) is saved as selStart/selEnd below and the lab's own TextWatcher mirror is not part of the app's text: any other span is not carried yet
+      const others = runtime.object(spans).elements.filter(span => !selection.some(mark => mark?.ref === span?.ref) && runtime.object(span).type !== 'Ldev/apkweb/view/EditableChangeWatcher;');
+      if (others.length) fail('TextView span, selection, error, or Editor saved state is not connected');
     }
     return view;
   };
   const saveText = (runtime, receiver) => {
     const view = plain(runtime, receiver), base = saveBase(runtime, receiver);
     if (!freezes(runtime, receiver)) return base;
-    const state = make(runtime, TEXT, base); write(runtime, state, TEXT, 'text', CHAR, view.text ?? ''); return state;
+    const state = make(runtime, TEXT, base); write(runtime, state, TEXT, 'text', CHAR, view.text ?? '');
+    if (view.sourceEditable && view.editable) {   // TextView.onSaveInstanceState: the cursor / selection is part of the saved state when the text is frozen
+      const sel = ['getSelectionStart', 'getSelectionEnd'].map(name => runtime.dispatch({ owner: 'Landroid/text/Selection;', name, parameters: ['Ljava/lang/CharSequence;'], result: 'I', signature: '(Ljava/lang/CharSequence;)I' }, [view.editable], 'static'));
+      if (sel[0] >= 0 || sel[1] >= 0) { write(runtime, state, TEXT, 'selStart', 'I', sel[0]); write(runtime, state, TEXT, 'selEnd', 'I', sel[1]); }
+    }
+    return state;
   };
   const restoreText = (runtime, receiver, state) => {
     if (!state || !runtime.isSubtype(runtime.object(state).type, stateType(TEXT))) return restoreBase(runtime, receiver, state);
     const text = read(runtime, state, TEXT, 'text', CHAR);
-    if (text != null && typeof text !== 'string' || read(runtime, state, TEXT, 'error', CHAR) || read(runtime, state, TEXT, 'editorState', 'Landroid/os/ParcelableParcel;') || (read(runtime, state, TEXT, 'selStart', 'I') ?? -1) >= 0 || (read(runtime, state, TEXT, 'selEnd', 'I') ?? -1) >= 0) fail('TextView span, selection, error, or Editor saved state is not connected');
+    if (text != null && typeof text !== 'string' || read(runtime, state, TEXT, 'error', CHAR) || read(runtime, state, TEXT, 'editorState', 'Landroid/os/ParcelableParcel;')) fail('TextView span, selection, error, or Editor saved state is not connected');
+    const selStart = read(runtime, state, TEXT, 'selStart', 'I') ?? -1, selEnd = read(runtime, state, TEXT, 'selEnd', 'I') ?? -1;
     restoreBase(runtime, receiver, superState(runtime, state));
     if (text != null) call(runtime, receiver, TEXT, 'setText', [CHAR], 'V', [text]);
+    if (selStart >= 0 && selEnd >= 0 && runtime.object(receiver).editable) {   // TextView.onRestoreInstanceState: the cursor comes back, clamped to the text
+      const editable = runtime.object(receiver).editable, length = call(runtime, editable, 'Ljava/lang/CharSequence;', 'length', [], 'I');
+      if (Math.max(selStart, selEnd) <= length) runtime.dispatch({ owner: 'Landroid/text/Selection;', name: 'setSelection', parameters: ['Landroid/text/Spannable;', 'I', 'I'], result: 'V', signature: '(Landroid/text/Spannable;II)V' }, [editable, selStart, selEnd], 'static');
+    }
   };
   return {
     supports: key => keys.has(key),

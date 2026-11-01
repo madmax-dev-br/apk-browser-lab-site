@@ -27625,5 +27625,125 @@
     "sha256": "0622af39dba8c8b99e1cbf02eeb55615586f187fdf8549d50c6a18e1deeacf8e",
     "bytes": 28524,
     "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/inputmethod/EditorInfo.java",
+    "localPath": "framework-aosp/upstream/android/view/inputmethod/EditorInfo.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/EditorInfo.java?format=TEXT",
+    "sha256": "65b8e5557d8dd158fa8a48b62151ea5ec7caa1e72e873d2dfaebc82fc71960a8",
+    "bytes": 51671,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/inputmethod/InputConnection.java",
+    "localPath": "framework-aosp/upstream/android/view/inputmethod/InputConnection.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/InputConnection.java?format=TEXT",
+    "sha256": "667dd6a70e24030927d17bc5dc234a974a9e25b6c5c39037f75d4e7eaf649009",
+    "bytes": 64253,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/inputmethod/InputConnectionWrapper.java",
+    "localPath": "framework-aosp/upstream/android/view/inputmethod/InputConnectionWrapper.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/InputConnectionWrapper.java?format=TEXT",
+    "sha256": "30e871ddf37e2fab922d26e81560065ccccebf75965a024976d110a90bdf971a",
+    "bytes": 10986,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/inputmethod/BaseInputConnection.java",
+    "localPath": "framework-aosp/upstream/android/view/inputmethod/BaseInputConnection.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/BaseInputConnection.java?format=TEXT",
+    "sha256": "7f7efc37ef37dcb4a35cb6135ff7a307fd9e2128bfc57dd265ba99bea279be26",
+    "bytes": 35614,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/inputmethod/CompletionInfo.java",
+    "localPath": "framework-aosp/upstream/android/view/inputmethod/CompletionInfo.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/CompletionInfo.java?format=TEXT",
+    "sha256": "c2370c52e26f6ff3c70e85dcf741f2e5c0ca8a98cf672f77a6ae5d4a11c6e7a8",
+    "bytes": 6162,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/inputmethod/CorrectionInfo.java",
+    "localPath": "framework-aosp/upstream/android/view/inputmethod/CorrectionInfo.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/CorrectionInfo.java?format=TEXT",
+    "sha256": "4737ea5b787a198b1511d6cfa7960546d426b598481a4ebb575402dfed07f280",
+    "bytes": 3310,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/inputmethod/ExtractedText.java",
+    "localPath": "framework-aosp/upstream/android/view/inputmethod/ExtractedText.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/ExtractedText.java?format=TEXT",
+    "sha256": "0ad87986c006b6f4b381b2553e9b7a98b3820b4f8c8106b0f11f937aa598f5bd",
+    "bytes": 4759,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/inputmethod/ExtractedTextRequest.java",
+    "localPath": "framework-aosp/upstream/android/view/inputmethod/ExtractedTextRequest.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/ExtractedTextRequest.java?format=TEXT",
+    "sha256": "b176b91569dd864b73ab96a9599b11d4b9840696b0c44fe2aa0bc773ba9b25e0",
+    "bytes": 2658,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/inputmethod/SurroundingText.java",
+    "localPath": "framework-aosp/upstream/android/view/inputmethod/SurroundingText.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/SurroundingText.java?format=TEXT",
+    "sha256": "7de344bd0973dcbf476b3755f8239047c13bad5d90c85ace2fc3e53cf4ffa155",
+    "bytes": 6299,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/inputmethod/TextAttribute.java",
+    "localPath": "framework-aosp/upstream/android/view/inputmethod/TextAttribute.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/TextAttribute.java?format=TEXT",
+    "sha256": "830c18c7b3cbc000586afe1303a620c2c9e61ad1cf3f5c4b5b340607c627015f",
+    "bytes": 4922,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/inputmethod/InputContentInfo.java",
+    "localPath": "framework-aosp/upstream/android/view/inputmethod/InputContentInfo.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/InputContentInfo.java?format=TEXT",
+    "sha256": "c5ab7fb7ccaa7b2287f909d4a419c3d97004b1a9e782108b748fa19402044afc",
+    "bytes": 11158,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/inputmethod/TextSnapshot.java",
+    "localPath": "framework-aosp/upstream/android/view/inputmethod/TextSnapshot.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/TextSnapshot.java?format=TEXT",
+    "sha256": "ecdf0fffee910b8766514b176fe1d3093a0357d165254c62338426e2e7fca370",
+    "bytes": 5431,
+    "license": "Apache-2.0"
   }
 ]

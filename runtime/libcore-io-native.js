@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=4ca1bd96a090';
-import { throwNew } from './java-throw.js?v=4ca1bd96a090';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=4ca1bd96a090';
-import { networkOf, isIpLiteral } from './network-native.js?v=4ca1bd96a090';
-import { Blocked } from './scheduler.js?v=4ca1bd96a090';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=4ca1bd96a090';
+import { APKError } from './apk-error.js?v=64ce1d942f1e';
+import { throwNew } from './java-throw.js?v=64ce1d942f1e';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=64ce1d942f1e';
+import { networkOf, isIpLiteral } from './network-native.js?v=64ce1d942f1e';
+import { Blocked } from './scheduler.js?v=64ce1d942f1e';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=64ce1d942f1e';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK

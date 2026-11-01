@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=4ca1bd96a090';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=4ca1bd96a090';
+import { APKError } from './apk-runtime.js?v=64ce1d942f1e';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=64ce1d942f1e';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -139,7 +139,7 @@ export function createViewWindowHost(platform){
    if(name==='getOnFocusChangeListener')return view.focusChangeListener??null;
    if(name==='setDescendantFocusability'){if(![0x20000,0x40000,0x60000].includes(args[1]))runtime.throwJava('Ljava/lang/IllegalArgumentException;','Invalid descendant focusability');view.descendantFocusability=args[1];return;}
    if(name==='getDescendantFocusability')return view.descendantFocusability??0x20000;
-   if(name==='onFocusChanged'){view.focused=!!args[1];view.lastFocusDirection=args[2];view.previousFocusRect=args[3];if(!nullish(view.focusChangeListener))runtime.dispatch({owner:runtime.object(view.focusChangeListener).type,name:'onFocusChange',signature:'(Landroid/view/View;Z)V',parameters:[VIEW,'Z'],result:'V'},[view.focusChangeListener,receiver,args[1]],'virtual');return;}
+   if(name==='onFocusChanged'){view.focused=!!args[1];platform.inputMethodService?.viewFocusChanged(runtime,receiver,!!args[1]);view.lastFocusDirection=args[2];view.previousFocusRect=args[3];if(!nullish(view.focusChangeListener))runtime.dispatch({owner:runtime.object(view.focusChangeListener).type,name:'onFocusChange',signature:'(Landroid/view/View;Z)V',parameters:[VIEW,'Z'],result:'V'},[view.focusChangeListener,receiver,args[1]],'virtual');return;}
    if(name==='getRootView')return rootOf(runtime,receiver);
    if(name==='isAttachedToWindow')return isAttached(runtime,receiver)?1:0;
    if(name==='getWindowToken'||name==='getApplicationWindowToken')return windowToken(runtime,receiver);

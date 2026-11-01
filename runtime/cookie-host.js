@@ -1,5 +1,5 @@
-import { gcRoot } from './heap-gc.js?v=4ca1bd96a090';
-import { createHostRegistry } from './host-contract.js?v=4ca1bd96a090';
+import { gcRoot } from './heap-gc.js?v=64ce1d942f1e';
+import { createHostRegistry } from './host-contract.js?v=64ce1d942f1e';
 
 // android.webkit.CookieManager / CookieSyncManager for the browser VM: a real in-memory RFC 6265 cookie jar (the lab has no WebView, but React Native's networking and apps' own
 // HTTP code keep their session cookies in the process-wide CookieManager).

@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=4ca1bd96a090';
-import { gcRoot } from './heap-gc.js?v=4ca1bd96a090';
-import { APKError } from './apk-error.js?v=4ca1bd96a090';
+import { createHostRegistry } from './host-contract.js?v=64ce1d942f1e';
+import { gcRoot } from './heap-gc.js?v=64ce1d942f1e';
+import { APKError } from './apk-error.js?v=64ce1d942f1e';
 
 // Public android.widget.TextView API (API 33) beyond what the platform's native text model carries, with the semantics of android-13.0.0_r1 TextView.java.
 // The lab renders TextView / Button / EditText text through its native SkParagraph path (view-layout-host measure, compose-canvas-host draw), which honours the text, size, colour, typeface,
@@ -85,6 +85,36 @@ export function createTextViewApiHost(platform) {
   });
   def(TEXT, 'setImeActionLabel', `(${CHARS}I)V`, (r, _m, [self, label, id]) => { const s = tv(r, self); s.imeActionLabel = nullish(label) ? null : label; s.imeActionId = id; });
   def(TEXT, 'getImeActionLabel', `()${CHARS}`, (r, _m, [self]) => tv(r, self).imeActionLabel);
+  // TextView.onCheckIsTextEditor / onCreateInputConnection (android-13.0.0_r1): an editable TextView with an input type is a text editor; its EditorInfo carries input type, IME options (the
+  // default action is NEXT when a next focus exists, else DONE, for a single-line field), hint, selection and caps mode, and the connection is the lab's EditableInputConnection over the Editable.
+  const EDITOR_INFO = 'Landroid/view/inputmethod/EditorInfo;', EDITABLE_CONNECTION = 'Ldev/apkweb/view/EditableInputConnection;', CONNECTION = 'Landroid/view/inputmethod/InputConnection;';
+  def(TEXT, 'onCheckIsTextEditor', '()Z', (r, _m, [self]) => isEditText(r, self) && call(r, self, TEXT, 'getInputType', [], 'I') !== 0 ? 1 : 0);
+  def(TEXT, 'onCreateInputConnection', `(${EDITOR_INFO})${CONNECTION}`, (r, _m, [self, outAttrs]) => {
+    if (nullish(outAttrs)) r.throwJava('Ljava/lang/NullPointerException;', 'outAttrs');
+    if (!flag(call(r, self, TEXT, 'onCheckIsTextEditor', [], 'Z')) || !r.classes.has(EDITABLE_CONNECTION)) return null;
+    const fields = r.object(outAttrs).fields, put = (name, type, value) => r.storeField(fields, `${EDITOR_INFO}->${name}:${type}`, value);
+    const inputType = call(r, self, TEXT, 'getInputType', [], 'I'), multiLine = (inputType & 0x20000) !== 0;
+    let imeOptions = call(r, self, TEXT, 'getImeOptions', [], 'I');
+    if ((imeOptions & 0xff) === 0) {   // IME_ACTION_UNSPECIFIED: NEXT when focus can move on, else DONE
+      const next = call(r, self, VIEW, 'focusSearch', ['I'], VIEW, [2]);
+      imeOptions |= !nullish(next) && next.ref !== self.ref ? 5 : 6;
+    }
+    if (multiLine && (imeOptions & 0x40000000) === 0) imeOptions |= 0x40000000;   // IME_FLAG_NO_ENTER_ACTION: Enter inserts a new line
+    put('inputType', 'I', inputType); put('imeOptions', 'I', imeOptions);
+    put('privateImeOptions', STRING, call(r, self, TEXT, 'getPrivateImeOptions', [], STRING)); put('fieldId', 'I', call(r, self, VIEW, 'getId', [], 'I'));
+    const label = tv(r, self).imeActionLabel; put('actionLabel', CHARS, label ?? null); put('actionId', 'I', tv(r, self).imeActionId ?? 0);
+    put('hintText', CHARS, call(r, self, TEXT, 'getHint', [], CHARS));
+    const connection = construct(r, EDITABLE_CONNECTION, ['Landroid/widget/TextView;'], [self]);
+    put('initialSelStart', 'I', call(r, self, TEXT, 'getSelectionStart', [], 'I')); put('initialSelEnd', 'I', call(r, self, TEXT, 'getSelectionEnd', [], 'I'));
+    put('initialCapsMode', 'I', call(r, connection, CONNECTION, 'getCursorCapsMode', ['I'], 'I', [inputType]));
+    return connection;
+  });
+  const BRIDGE = 'Ldev/apkweb/view/TextBridge;';
+  registry.type(BRIDGE, OBJECT);
+  def(BRIDGE, 'changed', `(${TEXT}${CHARS}${CHARS}I)V`, (r, _m, [view, before, after]) => {   // an Editable edit reached the view: update what the page draws and run the TextWatchers (View.text is the string the page renders)
+    const text = csString(r, after); if (text === (r.object(view).text ?? '')) return;
+    platform.setInput(r, r.object(view).id, text, { alreadyUpdated: true });
+  }, { static: true });
   def(TEXT, 'getImeActionId', '()I', (r, _m, [self]) => tv(r, self).imeActionId);
   def(TEXT, 'setOnEditorActionListener', '(Landroid/widget/TextView$OnEditorActionListener;)V', (r, _m, [self, listener]) => { r.object(self).editorActionListener = nullish(listener) ? null : listener; });
   def(TEXT, 'onEditorAction', '(I)V', (r, _m, [self, actionCode]) => {   // TextView.onEditorAction: the listener first; then the default (next / previous focus, or hide the IME for done)

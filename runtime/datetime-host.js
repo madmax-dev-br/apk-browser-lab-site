@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=4ca1bd96a090';
-import { createHostRegistry, parseSignature } from './host-contract.js?v=4ca1bd96a090';
-import { JavaException } from './apk-runtime.js?v=4ca1bd96a090';
+import { gcRoot } from './heap-gc.js?v=64ce1d942f1e';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=64ce1d942f1e';
+import { JavaException } from './apk-runtime.js?v=64ce1d942f1e';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).
@@ -54,6 +54,13 @@ export function createDateTimeHost(platform) {
     const name = dtf(id, { timeZoneName: 'longOffset' }).formatToParts(new Date(t)).find(p => p.type === 'timeZoneName').value, m = /GMT([+-])(\d{2}):(\d{2})/.exec(name);
     return m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000 : 0;
   }
+  // 'z' / 'zzzz': the zone's short / long display name (UTC, GMT, Coordinated Universal Time, Pacific Standard Time ...); a zone the platform data names only by offset prints GMT+hh:mm.
+  const zoneName = (f, t, long) => {
+    if (f.zone === 'UTC' || f.zone === 'GMT') return long ? (f.zone === 'UTC' ? 'Coordinated Universal Time' : 'Greenwich Mean Time') : f.zone;
+    if (/^GMT[+-]/.test(f.zone)) return gmtName(f.zone, t);
+    try { const name = new Intl.DateTimeFormat('en-US', { timeZone: f.zone, timeZoneName: long ? 'long' : 'short' }).formatToParts(new Date(t)).find(p => p.type === 'timeZoneName')?.value; if (name && !/^GMT[+-]\d/.test(name)) return name; } catch { /* unknown zone id */ }
+    return gmtName(f.zone, t);
+  };
   const gmtName = (id, t) => { const o = offsetOf(id, t); if (o === 0) return 'GMT'; const a = Math.abs(o) / 60000; return `GMT${o < 0 ? '-' : '+'}${two(Math.floor(a / 60))}:${two(a % 60)}`; };
   function parts(t, id) {
     const shifted = new Date(t + offsetOf(id, t)); // fields of the wall clock: shift by the offset, read in UTC
@@ -102,7 +109,44 @@ export function createDateTimeHost(platform) {
     } return out;
   };
   const sdf = (r, ref) => r.object(ref).sdf ?? r.throwJava('Ljava/lang/IllegalStateException;', 'SimpleDateFormat used before construction');
-  const localeTag = (r, locale) => { const tag = locale ? r.object(locale).localeData?.tag : null; return tag && tag !== 'und' ? tag : 'en-US'; };
+  const localeTag = (r, locale) => { const tag = locale ? r.object(locale).localeData?.tag : null; return tag && tag !== 'und' ? tag : platform.device?.locale || 'en-US'; };   // no Locale given: Locale.getDefault(), the device's
+  // ---- DateFormat.getDateInstance / getTimeInstance / getDateTimeInstance / getInstance: the locale's pattern for a style, taken from the platform's CLDR data (Intl) and turned into the
+  // SimpleDateFormat pattern the formatter below runs. DateFormat.FULL=0, LONG=1, MEDIUM=2, SHORT=3 (DEFAULT=MEDIUM). U+202F / U+00A0 before AM/PM become plain spaces (Android 13 / CLDR 41).
+  const DATE_FORMAT = 'Ljava/text/DateFormat;', STYLE_NAMES = ['full', 'long', 'medium', 'short'];
+  for (const [name, value] of Object.entries({ FULL: 0, LONG: 1, MEDIUM: 2, SHORT: 3, DEFAULT: 2 })) registry.staticField(DATE_FORMAT, name, 'I', () => value);
+  const stylePattern = (tag, dateStyle, timeStyle) => {
+    const options = { timeZone: 'UTC' }; if (dateStyle !== null) options.dateStyle = STYLE_NAMES[dateStyle]; if (timeStyle !== null) options.timeStyle = STYLE_NAMES[timeStyle];
+    const sample = new Date(Date.UTC(2003, 0, 2, 4, 5, 6)), parts = new Intl.DateTimeFormat(tag, options).formatToParts(sample), plain = new Intl.DateTimeFormat(tag, { timeZone: 'UTC', month: 'long', weekday: 'long' }).formatToParts(sample);
+    const longMonth = plain.find(p => p.type === 'month')?.value, longWeekday = plain.find(p => p.type === 'weekday')?.value, twelve = parts.some(p => p.type === 'dayPeriod');
+    const width = (value, letter) => /^0\d/.test(value) ? letter + letter : letter;
+    let out = '';
+    for (const { type, value } of parts) {
+      switch (type) {
+        case 'era': out += 'G'; break;
+        case 'year': out += value.length === 2 ? 'yy' : 'y'; break;
+        case 'month': out += /^\d+$/.test(value) ? width(value, 'M') : value === longMonth ? 'MMMM' : 'MMM'; break;
+        case 'weekday': out += value === longWeekday ? 'EEEE' : 'EEE'; break;
+        case 'day': out += width(value, 'd'); break;
+        case 'hour': out += width(value, twelve ? 'h' : 'H'); break;
+        case 'minute': out += 'mm'; break;
+        case 'second': out += 'ss'; break;
+        case 'dayPeriod': out += 'a'; break;
+        case 'timeZoneName': out += value.length > 5 ? 'zzzz' : 'z'; break;
+        default: { const literal = value.replace(/[\u202f\u00a0]/g, ' '); out += literal.replace(/[A-Za-z]+/g, m => `'${m}'`).replace(/^'$/, "''"); }
+      }
+    }
+    return out;
+  };
+  const styled = (r, dateStyle, timeStyle, locale) => {
+    for (const style of [dateStyle, timeStyle]) if (style !== null && (style < 0 || style > 3)) r.throwJava('Ljava/lang/IllegalArgumentException;', `Illegal ${style === dateStyle ? 'date' : 'time'} style ${style}`);
+    const object = r.allocate(SDF), tag = localeTag(r, locale); init(r, object, stylePattern(tag, dateStyle, timeStyle), locale); return object;
+  };
+  for (const [name, sig, fn] of [
+    ['getDateInstance', '()', r => styled(r, 2, null, null)], ['getDateInstance', '(I)', (r, style) => styled(r, style, null, null)], ['getDateInstance', `(ILjava/util/Locale;)`, (r, style, l) => styled(r, style, null, l)],
+    ['getTimeInstance', '()', r => styled(r, null, 2, null)], ['getTimeInstance', '(I)', (r, style) => styled(r, null, style, null)], ['getTimeInstance', `(ILjava/util/Locale;)`, (r, style, l) => styled(r, null, style, l)],
+    ['getDateTimeInstance', '()', r => styled(r, 2, 2, null)], ['getDateTimeInstance', '(II)', (r, d, t) => styled(r, d, t, null)], ['getDateTimeInstance', `(IILjava/util/Locale;)`, (r, d, t, l) => styled(r, d, t, l)],
+    ['getInstance', '()', r => styled(r, 3, 3, null)],
+  ]) def(DATE_FORMAT, name, `${sig}${DATE_FORMAT}`, (r, _m, a) => fn(r, ...a), { static: true });
   const init = (r, self, pattern, locale) => { if (pattern === null) r.throwJava('Ljava/lang/NullPointerException;', 'pattern == null'); const text = r.stringCharacters(pattern); r.object(self).sdf = { pattern: text, tokens: tokens(r, text), zone: defaultZone().id, lenient: true, tag: localeTag(r, locale) }; };
   def(SDF, '<init>', '()V', (r, _m, [self]) => init(r, self, "M/d/yy h:mm a", null));
   def(SDF, '<init>', `(${STRING})V`, (r, _m, [self, p]) => init(r, self, p, null));
@@ -127,7 +171,7 @@ export function createDateTimeHost(platform) {
         case 'E': out += n >= 4 ? intlName(f.tag, f.zone, t, { weekday: 'long' }) : intlName(f.tag, f.zone, t, { weekday: 'short' }); break;
         case 'u': out += num(p.dow === 0 ? 7 : p.dow); break;
         case 'a': out += p.hour < 12 ? 'AM' : 'PM'; break;
-        case 'z': out += gmtName(f.zone, t); break;
+        case 'z': out += zoneName(f, t, n >= 4); break;
         case 'Z': { const a = Math.abs(o) / 60000; out += `${o < 0 ? '-' : '+'}${two(Math.floor(a / 60))}${two(a % 60)}`; break; }
         case 'X': { if (o === 0) { out += 'Z'; break; } const a = Math.abs(o) / 60000, h = two(Math.floor(a / 60)), mm = two(a % 60); out += `${o < 0 ? '-' : '+'}${h}${n === 1 ? '' : n === 2 ? mm : ':' + mm}`; break; }
         default: throw new Error(`SimpleDateFormat field '${tok.field}' (week-based fields) is not implemented`);

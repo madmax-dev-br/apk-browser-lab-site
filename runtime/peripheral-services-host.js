@@ -1,5 +1,6 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=4ca1bd96a090';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=4ca1bd96a090';
+import { bitsFloat, floatBits } from './host-contract.js?v=64ce1d942f1e';
+import { APKError } from './apk-error.js?v=64ce1d942f1e';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=64ce1d942f1e';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB
@@ -36,6 +37,27 @@ export function createPeripheralServicesHost(platform) {
   def(WIFI, 'compareSignalLevel', '(II)I', (r, _m, [a, b]) => a - b, { static: true });
   def(WIFI, 'getConnectionInfo', `()${WIFI_INFO}`, r => { enforce(r, 'android.permission.ACCESS_WIFI_STATE'); const info = r.makeObject(WIFI_INFO); r.object(info).wifiInfo = { connected: connected(), location: kit.holds(r, 'android.permission.ACCESS_FINE_LOCATION') }; return info; });
   const info = (r, ref) => r.object(ref).wifiInfo ?? npe(r, 'WifiInfo used before it was obtained');
+  // android.net.wifi.SupplicantState: the wpa_supplicant states; the virtual radio is COMPLETED while associated (connectivity online) and DISCONNECTED otherwise.
+  const SUPPLICANT = 'Landroid/net/wifi/SupplicantState;', SUPPLICANT_NAMES = ['DISCONNECTED', 'INTERFACE_DISABLED', 'INACTIVE', 'SCANNING', 'AUTHENTICATING', 'ASSOCIATING', 'ASSOCIATED', 'FOUR_WAY_HANDSHAKE', 'GROUP_HANDSHAKE', 'COMPLETED', 'DORMANT', 'UNINITIALIZED', 'INVALID'];
+  type(SUPPLICANT, 'Ljava/lang/Enum;', ['Landroid/os/Parcelable;'], { allocatable: true });
+  const supplicant = (r, ordinal) => r.readStatic({ owner: SUPPLICANT, name: SUPPLICANT_NAMES[ordinal], type: SUPPLICANT, key: `${SUPPLICANT}->${SUPPLICANT_NAMES[ordinal]}:${SUPPLICANT}` });
+  SUPPLICANT_NAMES.forEach((name, ordinal) => registry.staticField(SUPPLICANT, name, SUPPLICANT, r => { const value = r.allocate(SUPPLICANT), o = r.object(value); o.enumName = name; o.enumOrdinal = ordinal; return value; }));
+  def(SUPPLICANT, 'values', `()[${SUPPLICANT}`, r => { const array = r.newArray(`[${SUPPLICANT}`, SUPPLICANT_NAMES.length); r.array(array).elements = SUPPLICANT_NAMES.map((_, i) => supplicant(r, i)); return array; }, { static: true });
+  def(SUPPLICANT, 'valueOf', `(${STRING})${SUPPLICANT}`, (r, _m, [name]) => { if (nullish(name)) npe(r, 'Name is null'); const at = SUPPLICANT_NAMES.indexOf(text(r, name)); if (at < 0) iae(r, `No enum constant android.net.wifi.SupplicantState.${text(r, name)}`); return supplicant(r, at); }, { static: true });
+  def(SUPPLICANT, 'isValidState', `(${SUPPLICANT})Z`, (r, _m, [state]) => { if (nullish(state)) npe(r); const o = r.object(state).enumOrdinal; return o !== 11 && o !== 12 ? 1 : 0; }, { static: true });   // UNINITIALIZED and INVALID are not states wpa_supplicant reports
+  def(SUPPLICANT, 'describeContents', '()I', () => 0);
+  def(WIFI_INFO, 'getSupplicantState', `()${SUPPLICANT}`, (r, _m, [self]) => supplicant(r, info(r, self).connected ? 9 : 0));
+  def(WIFI_INFO, 'getCurrentSecurityType', '()I', (r, _m, [self]) => info(r, self).connected ? 0 : -1);   // SECURITY_TYPE_OPEN for the emulated open access point / SECURITY_TYPE_UNKNOWN
+  def(WIFI_INFO, 'isRestricted', '()Z', () => 0);
+  def(WIFI_INFO, 'getSubscriptionId', '()I', () => -1);   // not a carrier Wi-Fi network: SubscriptionManager.INVALID_SUBSCRIPTION_ID
+  def(WIFI_INFO, 'getPasspointFqdn', `()${STRING}`, () => null); def(WIFI_INFO, 'getPasspointProviderFriendlyName', `()${STRING}`, () => null);
+  def(WIFI_INFO, 'getInformationElements', `()${LIST}`, r => emptyList(r));
+  def(WIFI_INFO, 'getMaxSupportedTxLinkSpeedMbps', '()I', (r, _m, [self]) => info(r, self).connected ? 144 : -1); def(WIFI_INFO, 'getMaxSupportedRxLinkSpeedMbps', '()I', (r, _m, [self]) => info(r, self).connected ? 144 : -1);
+  def(WIFI_INFO, 'getApplicableRedactions', '()J', () => 7n);   // REDACT_FOR_ACCESS_FINE_LOCATION | REDACT_FOR_LOCAL_MAC_ADDRESS | REDACT_FOR_NETWORK_SETTINGS
+  def(WIFI_INFO, 'makeCopy', `(J)${WIFI_INFO}`, (r, _m, [self]) => { const copy = r.makeObject(WIFI_INFO); r.object(copy).wifiInfo = { ...info(r, self) }; return copy; });
+  def(WIFI_INFO, 'getAffiliatedMloLinks', `()${LIST}`, r => emptyList(r)); def(WIFI_INFO, 'getApMldMacAddress', '()Landroid/net/MacAddress;', () => null); def(WIFI_INFO, 'getApMloLinkId', '()I', () => -1);
+  def(WIFI_INFO, 'describeContents', '()I', () => 0);
+  def(WIFI_INFO, 'writeToParcel', '(Landroid/os/Parcel;I)V', () => { throw new APKError('WifiInfo.writeToParcel: the virtual device has no WifiInfo CREATOR to read it back with', { kind: 'wifi-info-parcel-unsupported' }); });
   def(WIFI_INFO, 'getSSID', `()${STRING}`, (r, _m, [self]) => { const i = info(r, self); return i.connected && i.location ? EMULATED_SSID : UNKNOWN_SSID; });   // the SSID is redacted without location access
   def(WIFI_INFO, 'getBSSID', `()${STRING}`, (r, _m, [self]) => { const i = info(r, self); return i.connected && i.location ? EMULATED_BSSID : DEFAULT_MAC; });
   def(WIFI_INFO, 'getMacAddress', `()${STRING}`, () => DEFAULT_MAC);   // apps always see the placeholder address since Android 6
