@@ -249,8 +249,8 @@
       "soname": "libappmodules.so",
       "abi": "wasm32",
       "file": "apps/cff0c355aef6/libappmodules.wasm",
-      "bytes": 1995476,
-      "sha256": "eaa38aa4719515cce4e4a6d2f52020d3bd173eb0eed4bd658a73fdec372983d5",
+      "bytes": 1996002,
+      "sha256": "68abfaad13af06c1f84a51afd6d55a1001c2c522648110445cf0683d4ffb312e",
       "needed": [
         "libreact_codegen_rnsvg.so",
         "libreact_codegen_rnscreens.so",

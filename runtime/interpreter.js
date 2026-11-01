@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=0b42079f5fd6';
-import { Blocked, QUANTUM } from './scheduler.js?v=0b42079f5fd6';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=0b42079f5fd6';
+import { APKError } from './apk-error.js?v=da1f75bcefcc';
+import { Blocked, QUANTUM } from './scheduler.js?v=da1f75bcefcc';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=da1f75bcefcc';
 
 // Frame-based DEX interpreter.
 //
@@ -202,7 +202,13 @@ function pump(rt, thread, input) {
         const driver = thread.driver; if (driver === null) return { done: true };
         let R;
         try { R = driver(rt, thread); }
-        catch (error) { try { rt.threadUncaught(thread, error); } catch (fatal) { fatal.vmFatal = true; throw fatal; } return { done: true }; }
+        catch (error) {
+          let handler;
+          try { handler = rt.threadUncaught(thread, error); } catch (fatal) { fatal.vmFatal = true; throw fatal; }
+          // The uncaught-exception handler runs as this thread's last frames (it may block, e.g. a crash reporter awaiting a task); an exception it throws is ignored, as in Java.
+          if (handler instanceof Invoke) { thread.driver = null; input = { kind: 'result', R: handler, fresh: true }; continue; }
+          return { done: true };
+        }
         if (R === undefined) return { done: true };
         input = { kind: 'result', R, fresh: true }; continue;
       }

@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=0b42079f5fd6';
+import { APKError } from './apk-error.js?v=da1f75bcefcc';
 
 // Green-thread scheduler for the VM.
 //
@@ -27,7 +27,7 @@ export class VMThread {
 
 export const QUANTUM = 20000;   // instructions a thread runs before another runnable thread gets the processor
 
-const QUIET_IDLE_LIMIT = 5000;   // consecutive clock skips with no host event in between
+const QUIET_IDLE_LIMIT = 50000;   // consecutive clock skips with no host event in between
 export class Scheduler {
   constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0 }; this.quietIdles = 0; }
   get clock() { return this.rt.platform.clock; }

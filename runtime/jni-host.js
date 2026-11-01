@@ -1,16 +1,16 @@
-import { APKError } from './apk-error.js?v=0b42079f5fd6';
-import { JavaException } from './apk-runtime.js?v=0b42079f5fd6';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=0b42079f5fd6';
-import { buildElfDescriptor } from './native-descriptor.js?v=0b42079f5fd6';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=0b42079f5fd6';
-import { NativeLinker, LinkError } from './native-linker.js?v=0b42079f5fd6';
-import { hostFunction } from './wasm-host-function.js?v=0b42079f5fd6';
-import { parseWasm } from './wasm-dylink.js?v=0b42079f5fd6';
-import { formatVersion } from './rn-version.js?v=0b42079f5fd6';
-import { registerWasmMemory } from './unsafe-native.js?v=0b42079f5fd6';
-import { writeSkPath } from './skia-path-layout.js?v=0b42079f5fd6';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=0b42079f5fd6';
-import { withVariants } from './native-provider-variants.js?v=0b42079f5fd6';
+import { APKError } from './apk-error.js?v=da1f75bcefcc';
+import { JavaException } from './apk-runtime.js?v=da1f75bcefcc';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=da1f75bcefcc';
+import { buildElfDescriptor } from './native-descriptor.js?v=da1f75bcefcc';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=da1f75bcefcc';
+import { NativeLinker, LinkError } from './native-linker.js?v=da1f75bcefcc';
+import { hostFunction } from './wasm-host-function.js?v=da1f75bcefcc';
+import { parseWasm } from './wasm-dylink.js?v=da1f75bcefcc';
+import { formatVersion } from './rn-version.js?v=da1f75bcefcc';
+import { registerWasmMemory } from './unsafe-native.js?v=da1f75bcefcc';
+import { writeSkPath } from './skia-path-layout.js?v=da1f75bcefcc';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=da1f75bcefcc';
+import { withVariants } from './native-provider-variants.js?v=da1f75bcefcc';
 
 // JNI -> WebAssembly bridge.
 //

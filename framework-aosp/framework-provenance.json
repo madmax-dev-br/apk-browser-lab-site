@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 7032556,
-  "sha256": "43062a868df31e7dd9b672269fd5d6552e1f4506507c2a909f5fe9dfb1196bd8",
-  "classCount": 5417,
+  "bytes": 7074960,
+  "sha256": "861441f4c08411df8ee6c46d22810fd5e01d58f5d742ef0f97c8f5b6cc71b890",
+  "classCount": 5448,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -3672,6 +3672,7 @@
     "Ldev/apkweb/util/CollectionOps$SubList;",
     "Ldev/apkweb/util/CollectionOps;",
     "Ldev/apkweb/util/DateSymbolsHidden;",
+    "Ldev/apkweb/util/Fences;",
     "Ldev/apkweb/util/IntegerOps;",
     "Ldev/apkweb/util/LayoutHidden;",
     "Ldev/apkweb/util/LongOps;",
@@ -3686,8 +3687,11 @@
     "Ldev/apkweb/util/RandomOps$$ExternalSyntheticLambda4;",
     "Ldev/apkweb/util/RandomOps$$ExternalSyntheticLambda5;",
     "Ldev/apkweb/util/RandomOps;",
+    "Ldev/apkweb/util/SecondarySeed;",
     "Ldev/apkweb/util/StringBuilderOps;",
     "Ldev/apkweb/util/StringOps;",
+    "Ldev/apkweb/util/ThreadProbe$1;",
+    "Ldev/apkweb/util/ThreadProbe;",
     "Ldev/apkweb/view/FocusHidden;",
     "Ldev/apkweb/view/ViewAnimationHost;",
     "Ldev/apkweb/view/ViewHidden;",
@@ -4746,8 +4750,35 @@
     "Ljava/util/XMLUtils$Resolver;",
     "Ljava/util/XMLUtils;",
     "Ljava/util/concurrent/AbstractExecutorService;",
+    "Ljava/util/concurrent/ConcurrentNavigableMap;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$CSLMSpliterator;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$Iter;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$EntryIterator;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$EntrySet;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$EntrySpliterator$$ExternalSyntheticLambda0;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$EntrySpliterator;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$Index;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$KeyIterator;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$KeySet;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$KeySpliterator;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$Node;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$SubMap$SubMapIter;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$SubMap$SubMapEntryIterator;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$SubMap$SubMapKeyIterator;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$SubMap$SubMapValueIterator;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$SubMap;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$ValueIterator;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$ValueSpliterator;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap$Values;",
+    "Ljava/util/concurrent/ConcurrentSkipListMap;",
+    "Ljava/util/concurrent/ConcurrentSkipListSet$$ExternalSyntheticLambda0;",
+    "Ljava/util/concurrent/ConcurrentSkipListSet;",
     "Ljava/util/concurrent/atomic/AtomicIntegerArray;",
     "Ljava/util/concurrent/atomic/AtomicLongArray;",
+    "Ljava/util/concurrent/atomic/LongAdder$SerializationProxy;",
+    "Ljava/util/concurrent/atomic/Striped64;",
+    "Ljava/util/concurrent/atomic/LongAdder;",
+    "Ljava/util/concurrent/atomic/Striped64$Cell;",
     "Ljava/util/function/BiConsumer$$ExternalSyntheticLambda0;",
     "Ljava/util/function/BiFunction$$ExternalSyntheticLambda0;",
     "Ljava/util/function/BiPredicate;",
@@ -33734,6 +33765,56 @@
       "sha256": "e812e00d8497c588aba0f0e2ebfcbe2ed40f4e973f57bab2b1f36ef81ef74c54",
       "bytes": 4493,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/concurrent/ConcurrentSkipListMap.java",
+      "localPath": "framework-aosp/upstream/java/util/concurrent/ConcurrentSkipListMap.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/ConcurrentSkipListMap.java?format=TEXT",
+      "sha256": "22439ff127a3e22d16eeb0f06fc1938151838b0c0129b465b4a852aca26f3a04",
+      "bytes": 129441,
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/concurrent/ConcurrentSkipListSet.java",
+      "localPath": "framework-aosp/upstream/java/util/concurrent/ConcurrentSkipListSet.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/ConcurrentSkipListSet.java?format=TEXT",
+      "sha256": "09428c92bb02b9cbb7609a3470ec6ac9698e3f6350f3ac903ab95df99a6e3245",
+      "bytes": 19484,
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/concurrent/ConcurrentNavigableMap.java",
+      "localPath": "framework-aosp/upstream/java/util/concurrent/ConcurrentNavigableMap.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/ConcurrentNavigableMap.java?format=TEXT",
+      "sha256": "9c045678ca1d4467c5342ab1a874127efa2b3573602975c94ac7864a3484acb9",
+      "bytes": 6887,
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/concurrent/atomic/Striped64.java",
+      "localPath": "framework-aosp/upstream/java/util/concurrent/atomic/Striped64.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/atomic/Striped64.java?format=TEXT",
+      "sha256": "47e7a2937624772dd43ea5c7b5aca54972705df13f7e54faa1651570b003691b",
+      "bytes": 17247,
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/concurrent/atomic/LongAdder.java",
+      "localPath": "framework-aosp/upstream/java/util/concurrent/atomic/LongAdder.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/atomic/LongAdder.java?format=TEXT",
+      "sha256": "d39efda64fec130c35e9d25be42315744796e9154db34bcf070b97163155ad6c",
+      "bytes": 8313,
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0"
     }
   ],
   "algorithmPatches": [],
@@ -33954,6 +34035,18 @@
         "kind": "hidden-audiomanager-focus-flags-to-aosp-constants",
         "inputSha256": "04ef1dcd1b8f64a970d2d47a80970ff2a1d9684d61f53c833feec7045e24e9ec",
         "outputSha256": "c7c37af03d578d7ad8c2b3e119f3e7d172ac77a56c879b1a391c69a884c5b5b1"
+      },
+      {
+        "path": "java/util/concurrent/ConcurrentSkipListMap.java",
+        "kind": "varhandle-to-field-updaters-lab-fences-and-secondary-seed",
+        "inputSha256": "22439ff127a3e22d16eeb0f06fc1938151838b0c0129b465b4a852aca26f3a04",
+        "outputSha256": "ec48071a522bd4880e9dde3d2ff37508b5830ff9e9ae7f943dd07e695b952869"
+      },
+      {
+        "path": "java/util/concurrent/atomic/Striped64.java",
+        "kind": "varhandle-to-field-updaters-and-lab-thread-probe",
+        "inputSha256": "47e7a2937624772dd43ea5c7b5aca54972705df13f7e54faa1651570b003691b",
+        "outputSha256": "772d0fb69581cf8954e025a6bba35c818994e20e528c1baa5a29eb745e3e1d57"
       }
     ],
     "labAuthored": [
@@ -34114,6 +34207,10 @@
         "sha256": "040a010d4dd87849ee0efb32572fbc8afc9b886d036c09abe93ede04de5cb2b8"
       },
       {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/Fences.java",
+        "sha256": "dac45aa1e875938bdc7ba8c4a81691beeb031518feec7004aedeaed870e4de95"
+      },
+      {
         "path": "framework-aosp/lab-java/dev/apkweb/util/IntegerOps.java",
         "sha256": "90d13f05a84e1dc7baf1318ec548643b35b99a541ed4c6af35a0858ab077f6c9"
       },
@@ -34134,12 +34231,20 @@
         "sha256": "4d168264543fd7a175afc5059c2b93d8a5b28d5a62dde8504e67affe9f2910d9"
       },
       {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/SecondarySeed.java",
+        "sha256": "d99f6a3c2be7b3dfac04c8034d41d45106e296ac6028dcdad3137740728dcfb0"
+      },
+      {
         "path": "framework-aosp/lab-java/dev/apkweb/util/StringBuilderOps.java",
         "sha256": "22a269c372d18d13c885f4b43a493fea30194fd73bc1b43954c17df1afaf9617"
       },
       {
         "path": "framework-aosp/lab-java/dev/apkweb/util/StringOps.java",
         "sha256": "3ebf76b73cbb22a51e1f854562e1e12fa9223ee99ec2f2faee0a6a8500b743b7"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/util/ThreadProbe.java",
+        "sha256": "3619151d039db3518a5a53e396beb619ffcb4e82349a4bf89377dae491d79c18"
       },
       {
         "path": "framework-aosp/lab-java/dev/apkweb/view/FocusHidden.java",

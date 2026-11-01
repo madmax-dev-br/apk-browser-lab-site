@@ -27315,5 +27315,55 @@
     "sha256": "e812e00d8497c588aba0f0e2ebfcbe2ed40f4e973f57bab2b1f36ef81ef74c54",
     "bytes": 4493,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/ConcurrentSkipListMap.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/ConcurrentSkipListMap.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/ConcurrentSkipListMap.java?format=TEXT",
+    "sha256": "22439ff127a3e22d16eeb0f06fc1938151838b0c0129b465b4a852aca26f3a04",
+    "bytes": 129441,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/ConcurrentSkipListSet.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/ConcurrentSkipListSet.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/ConcurrentSkipListSet.java?format=TEXT",
+    "sha256": "09428c92bb02b9cbb7609a3470ec6ac9698e3f6350f3ac903ab95df99a6e3245",
+    "bytes": 19484,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/ConcurrentNavigableMap.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/ConcurrentNavigableMap.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/ConcurrentNavigableMap.java?format=TEXT",
+    "sha256": "9c045678ca1d4467c5342ab1a874127efa2b3573602975c94ac7864a3484acb9",
+    "bytes": 6887,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/atomic/Striped64.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/atomic/Striped64.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/atomic/Striped64.java?format=TEXT",
+    "sha256": "47e7a2937624772dd43ea5c7b5aca54972705df13f7e54faa1651570b003691b",
+    "bytes": 17247,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/atomic/LongAdder.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/atomic/LongAdder.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/atomic/LongAdder.java?format=TEXT",
+    "sha256": "d39efda64fec130c35e9d25be42315744796e9154db34bcf070b97163155ad6c",
+    "bytes": 8313,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
   }
 ]

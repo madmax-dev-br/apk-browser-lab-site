@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=0b42079f5fd6';
-import { createHostRegistry } from './host-contract.js?v=0b42079f5fd6';
-import { Blocked, VMThread } from './scheduler.js?v=0b42079f5fd6';
-import { Invoke } from './interpreter.js?v=0b42079f5fd6';
-import { GC_ROOTS } from './heap-gc.js?v=0b42079f5fd6';
+import { APKError } from './apk-error.js?v=da1f75bcefcc';
+import { createHostRegistry } from './host-contract.js?v=da1f75bcefcc';
+import { Blocked, VMThread } from './scheduler.js?v=da1f75bcefcc';
+import { Invoke } from './interpreter.js?v=da1f75bcefcc';
+import { GC_ROOTS } from './heap-gc.js?v=da1f75bcefcc';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -98,7 +98,7 @@ export function createConcurrencyHost(platform) {
   def(THREAD, '<init>', `(Ljava/lang/ThreadGroup;${RUNNABLE}${STRING}J)V`, (r, _m, [self, g, t, n]) => init(r, self, t, n, nullish(g) ? null : g));
   def(THREAD, '<init>', `(Ljava/lang/ThreadGroup;${STRING})V`, (r, _m, [self, g, n]) => init(r, self, null, n, nullish(g) ? null : g));
   def(THREAD, '<init>', `(Ljava/lang/ThreadGroup;${RUNNABLE})V`, (r, _m, [self, g, t]) => init(r, self, t, undefined, nullish(g) ? null : g));
-  def(THREAD, 'run', '()V', (r, _m, [self]) => { const t = state(r, self).target; if (t !== null) vcall(r, t, RUNNABLE, 'run', [], 'V'); });
+  def(THREAD, 'run', '()V', (r, _m, [self]) => { const t = state(r, self).target; if (t !== null) return new Invoke(RUNNABLE_RUN, [t], 'virtual'); });   // a continuation: a target that blocks parks only this thread
   function runThread(r, ref) {
     const st = state(r, ref), previous = current; current = ref;
     try { vcall(r, ref, THREAD, 'run', [], 'V'); }
@@ -106,10 +106,12 @@ export function createConcurrencyHost(platform) {
     finally { current = previous; if (!st.keepAlive) { st.finished = true; } }
   }
   /** Thread.dispatchUncaughtException: the thread's own handler, else its ThreadGroup. */
-  function uncaught(r, ref, throwable) {
+  function uncaughtInvoke(r, ref, throwable) {
     const st = state(r, ref), handler = st.handler ?? st.group ?? mainGroup(r);
-    vcall(r, handler, UEH, 'uncaughtException', [THREAD, THROWABLE], 'V', [ref, throwable]);
+    r.record(`RUNTIME uncaught exception in thread "${st.name}": ${r.typeOf(throwable)}: ${r.object(throwable).message ?? ''}`);
+    return new Invoke({ owner: UEH, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [handler, ref, throwable], 'virtual');
   }
+  const uncaught = (r, ref, throwable) => r.finishHostStep(uncaughtInvoke(r, ref, throwable));
   function fatal(r, ref, throwable) {
     r.record(`LOG E AndroidRuntime: FATAL EXCEPTION: ${state(r, ref).name}: ${r.typeOf(throwable)}: ${r.object(throwable).message ?? ''}`);
     throw new APKError(`Uncaught exception in thread "${state(r, ref).name}": ${r.typeOf(throwable)}${r.object(throwable).message ? ': ' + r.object(throwable).message : ''}`, { kind: 'uncaught-thread-exception' });
@@ -119,7 +121,7 @@ export function createConcurrencyHost(platform) {
   def(THREAD, 'start', '()V', (r, _m, [self]) => {
     const st = state(r, self); if (st.started) throwNew(r, 'Ljava/lang/IllegalThreadStateException;');
     st.javaObject = self;
-    r.uncaughtHook ??= (thread, error) => { if (!error?.value) throw error; uncaught(r, thread.javaObject, error.value); };
+    r.uncaughtHook ??= (thread, error) => { if (!error?.value) throw error; return uncaughtInvoke(r, thread.javaObject, error.value); };
     r.scheduler.start(st, (rt, thread) => {
       if (thread.began) { if (thread.lastOutcome?.error) throw thread.lastOutcome.error; return undefined; }   // run() ended: an exception reaches the uncaught handler
       thread.began = true;
@@ -205,8 +207,8 @@ export function createConcurrencyHost(platform) {
   // ThreadGroup.uncaughtException: the parent group first; the root group hands it to the default handler, and with none installed the process dies the way Android's does (FATAL EXCEPTION).
   def(GROUP, 'uncaughtException', `(${THREAD}${THROWABLE})V`, (r, _m, [self, thread, throwable]) => {
     const g = groupState(r, self);
-    if (g.parent) { vcall(r, g.parent, GROUP, 'uncaughtException', [THREAD, THROWABLE], 'V', [thread, throwable]); return; }
-    if (defaultHandler) { vcall(r, defaultHandler, UEH, 'uncaughtException', [THREAD, THROWABLE], 'V', [thread, throwable]); return; }
+    if (g.parent) return new Invoke({ owner: GROUP, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [g.parent, thread, throwable], 'virtual');
+    if (defaultHandler) return new Invoke({ owner: UEH, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [defaultHandler, thread, throwable], 'virtual');
     fatal(r, thread, throwable);
   });
   def(GROUP, '<init>', `(${STRING})V`, (r, _m, [self, n]) => { r.object(self).group = { name: nullish(n) ? null : r.stringCharacters(n), parent: current ? state(r, current).group : mainGroup(r), maxPriority: 10, daemon: false }; });
@@ -389,7 +391,7 @@ export function createConcurrencyHost(platform) {
     type(owner, OBJECT, [HANDLER], { allocatable: true }); def(owner, '<init>', '()V', () => {});
     def(owner, 'rejectedExecution', `(${RUNNABLE}${TPE})V`, (r, _m, [, task, executor]) => {
       if (name === 'AbortPolicy') throwNew(r, 'Ljava/util/concurrent/RejectedExecutionException;', `Task ${describe(r, task)} rejected from ${describe(r, executor)}`);
-      if (name === 'CallerRunsPolicy') { if (!pool(r, executor).shutdown) vcall(r, task, RUNNABLE, 'run', [], 'V'); }
+      if (name === 'CallerRunsPolicy') { if (!pool(r, executor).shutdown) return new Invoke({ owner: RUNNABLE, name: 'run', parameters: [], result: 'V', signature: '()V' }, [task], 'virtual'); }
       if (name === 'DiscardOldestPolicy' && !pool(r, executor).shutdown) { pool(r, executor).queue.shift(); vcall(r, executor, TPE, 'execute', [RUNNABLE], 'V', [task]); }
     });
     void abort;
@@ -419,7 +421,7 @@ export function createConcurrencyHost(platform) {
   // until work arrives, the pool shuts down, or a non-core worker's keep-alive time passes.
   function startWorker(r, self, worker) {
     const p = pool(r, self), st = state(r, worker.thread); st.javaObject = worker.thread; st.keepAlive = true;
-    r.uncaughtHook ??= (thread, error) => { if (!error?.value) throw error; uncaught(r, thread.javaObject, error.value); };
+    r.uncaughtHook ??= (thread, error) => { if (!error?.value) throw error; return uncaughtInvoke(r, thread.javaObject, error.value); };
     r.scheduler.start(st, (rt, thread) => {
       if (thread.lastOutcome?.error) throw thread.lastOutcome.error;     // the previous task's exception already ran afterExecute; the worker dies and the handler sees it
       if (worker.expired) { retire(r, self, worker); return undefined; }
@@ -556,7 +558,7 @@ export function createConcurrencyHost(platform) {
   def(EXECUTORS, 'defaultThreadFactory', `()${FACTORY}`, r => defaultFactory(r), { static: true });
   def(EXECUTORS, 'callable', `(${RUNNABLE}${OBJECT})${CALLABLE}`, (r, _m, [task, result]) => { const c = r.allocate('Ljava/util/concurrent/Executors$RunnableAdapter;'); r.object(c).adapter = { task, result }; return c; }, { static: true });
   type('Ljava/util/concurrent/Executors$RunnableAdapter;', OBJECT, [CALLABLE], { allocatable: true });
-  def('Ljava/util/concurrent/Executors$RunnableAdapter;', 'call', `()${OBJECT}`, (r, _m, [self]) => { const a = r.object(self).adapter; vcall(r, a.task, RUNNABLE, 'run', [], 'V'); return a.result; });
+  def('Ljava/util/concurrent/Executors$RunnableAdapter;', 'call', `()${OBJECT}`, (r, _m, [self]) => { const a = r.object(self).adapter; return new Invoke({ owner: RUNNABLE, name: 'run', parameters: [], result: 'V', signature: '()V' }, [a.task], 'virtual', () => a.result); });
 
   // ---- CountDownLatch --------------------------------------------------------------------------------------------------------------------------
   const LATCH = 'Ljava/util/concurrent/CountDownLatch;'; type(LATCH, OBJECT, [], { allocatable: true });
@@ -675,7 +677,7 @@ export function createConcurrencyHost(platform) {
   // Activity.runOnUiThread (android-13.0.0_r1 Activity.java): run now when already on the UI thread, otherwise post to the main Looper's Handler.
   def('Landroid/app/Activity;', 'runOnUiThread', `(${RUNNABLE})V`, (r, _m, [, action]) => {
     if (action === null) throwNew(r, 'Ljava/lang/NullPointerException;');
-    if ((r.thread ?? r.scheduler.mainThread()) === r.scheduler.main) return vcall(r, action, RUNNABLE, 'run', [], 'V');
+    if ((r.thread ?? r.scheduler.mainThread()) === r.scheduler.main) return new Invoke({ owner: RUNNABLE, name: 'run', parameters: [], result: 'V', signature: '()V' }, [action], 'virtual');
     const handler = r.allocate(HANDLER_CLASS), looper = scall(r, LOOPER, 'getMainLooper', [], LOOPER);
     r.dispatch({ owner: HANDLER_CLASS, name: '<init>', parameters: [LOOPER], result: 'V', signature: `(${LOOPER})V` }, [handler, looper], 'direct');
     vcall(r, handler, HANDLER_CLASS, 'post', [RUNNABLE], 'Z', [action]);

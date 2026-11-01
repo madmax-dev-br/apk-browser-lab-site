@@ -1,20 +1,20 @@
-import { VMClock } from './vm-clock.js?v=0b42079f5fd6';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=0b42079f5fd6';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=0b42079f5fd6';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=0b42079f5fd6';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=0b42079f5fd6';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=0b42079f5fd6';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=0b42079f5fd6';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=0b42079f5fd6';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=0b42079f5fd6';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=0b42079f5fd6';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=0b42079f5fd6';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=0b42079f5fd6';
-import { APKError } from './apk-error.js?v=0b42079f5fd6';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=0b42079f5fd6';
-import { Scheduler, Blocked } from './scheduler.js?v=0b42079f5fd6';
-import { bootClassLacksMember } from './boot-class-members.js?v=0b42079f5fd6';
-export { APKError } from './apk-error.js?v=0b42079f5fd6';
+import { VMClock } from './vm-clock.js?v=da1f75bcefcc';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=da1f75bcefcc';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=da1f75bcefcc';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=da1f75bcefcc';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=da1f75bcefcc';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=da1f75bcefcc';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=da1f75bcefcc';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=da1f75bcefcc';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=da1f75bcefcc';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=da1f75bcefcc';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=da1f75bcefcc';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=da1f75bcefcc';
+import { APKError } from './apk-error.js?v=da1f75bcefcc';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=da1f75bcefcc';
+import { Scheduler, Blocked } from './scheduler.js?v=da1f75bcefcc';
+import { bootClassLacksMember } from './boot-class-members.js?v=da1f75bcefcc';
+export { APKError } from './apk-error.js?v=da1f75bcefcc';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -628,7 +628,8 @@ addBridge('java/util/AbstractCollection', ['isEmpty()Z','addAll(Ljava/util/Colle
 addBridge('java/util/Set', ['iterator()Ljava/util/Iterator;', 'size()I', 'isEmpty()Z']);
 addBridge('java/util/Collection', ['iterator()Ljava/util/Iterator;', 'size()I', 'isEmpty()Z']);
 for(const owner of ['java/util/Collection','java/util/Set','java/util/AbstractCollection','java/util/ArrayList','java/util/Vector','java/util/concurrent/CopyOnWriteArrayList','java/util/concurrent/CopyOnWriteArraySet']) addBridge(owner,['removeAll(Ljava/util/Collection;)Z']);
-addBridge('java/util/Collection',['contains(Ljava/lang/Object;)Z']);
+addBridge('java/util/Collection',['contains(Ljava/lang/Object;)Z','remove(Ljava/lang/Object;)Z']);
+addBridge('java/util/Set',['remove(Ljava/lang/Object;)Z','clear()V']);
 addBridge('java/util/Iterator', ['hasNext()Z', 'next()Ljava/lang/Object;', 'remove()V']);
 const HOST_MAP_ENTRY='Lapkweb/bridge/MapEntry;';
 EXTERNAL_PARENTS.set(HOST_MAP_ENTRY,'Ljava/lang/Object;');EXTERNAL_INTERFACES.set(HOST_MAP_ENTRY,['Ljava/util/Map$Entry;']);
@@ -1011,7 +1012,8 @@ export class APKRuntime {
     if (words.length !== wordCount(method.parameters) + (staticCall ? 0 : 1)) fail(`Invalid argument count: ${methodKey(method)}`);
     const args = []; let position = 0;
     if (!staticCall) args.push(words[position++]);
-    for (const type of method.parameters) { args.push(words[position]); position += type === 'J' || type === 'D' ? 2 : 1; }
+    // A null reference is the register value 0 in bytecode; host code receives it as null (the same value Java's own `== null` sees), never as a number it must remember to test.
+    for (const type of method.parameters) { const word = words[position]; args.push(word === 0 && type.length > 1 ? null : word); position += type === 'J' || type === 'D' ? 2 : 1; }
     return args;
   }
   object(value) {
@@ -1520,7 +1522,7 @@ export class APKRuntime {
         if (result && typeof result.then === 'function') fail(`Framework native binding must be synchronous: ${definition.method.key}`);
         return hostReturn(definition.method, result);
       }
-      if (!definition.code) fail(`Unsupported abstract/missing-code method: ${definition.method.key}`);
+      if (!definition.code) fail(`Unsupported abstract/missing-code method: ${definition.method.key}${mode === 'virtual' && args[0] && typeof args[0] === 'object' && args[0].ref !== undefined ? ` (receiver ${this.typeOf(args[0])})` : ''}`);
       this.recordMethod(definition.method);
       if (wantFrame) return new PendingCall(definition.method, definition.code, args, definition);   // the run loop pushes the frame itself
       return this.execute(definition.method, definition.code, args);
@@ -3352,6 +3354,24 @@ export class APKRuntime {
       if (name === 'toArray') { const value = this.newArray('[Ljava/lang/Object;', values.length); this.object(value).elements = values.slice(); return value; }
       if (name === 'indexOf' || name === 'contains') { const index = values.findIndex(v => this.javaEquals(args[1], v)); return name === 'contains' ? (index < 0 ? 0 : 1) : index; }
       if (name === 'get' || name === 'set') { const index = int(args[1]); if (index < 0 || index >= values.length)this.throwJava('Ljava/lang/IndexOutOfBoundsException;','List index out of bounds'); const previous = values[index]; if (name === 'set') { if (obj.readOnly)this.throwJava('Ljava/lang/UnsupportedOperationException;','Read-only List');if(obj.arrayRef)this.checkArrayValue(this.array(obj.arrayRef),args[2]);values[index] = args[2]; } return previous; }
+      if (obj.mapSource && (name === 'remove' || name === 'clear' || name === 'add' || name === 'addAll')) {
+        // keySet()/values()/entrySet() are live views of the map: removal writes through, insertion is unsupported (AbstractMap's views), and a copy is never edited.
+        const source = this.object(obj.mapSource);
+        if (name === 'add' || name === 'addAll') this.throwJava('Ljava/lang/UnsupportedOperationException;', null);
+        if (source.readOnly) this.throwJava('Ljava/lang/UnsupportedOperationException;', null);
+        if (name === 'clear') { this.reserveCollection(-source.map.size); source.map.clear(); source.mapBuckets?.clear(); this.bumpModCount(source); return undefined; }
+        if (name === 'remove') {
+          let target;
+          if (obj.viewKind === 'keys') { if (source.concurrentMap && isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', null); target = this.mapEntry(source, args[1]).entry; }
+          else if (obj.viewKind === 'values') { for (const entry of source.map.values()) if (this.javaEquals(args[1], entry.value)) { target = entry; break; } }
+          else if (!isNull(args[1]) && this.isSubtype(this.typeOf(args[1]), 'Ljava/util/Map$Entry;')) {
+            const call = (receiver, member) => this.dispatch({ owner: 'Ljava/util/Map$Entry;', name: member, parameters: [], result: 'Ljava/lang/Object;', signature: '()Ljava/lang/Object;' }, [receiver], 'virtual'), found = this.mapEntry(source, call(args[1], 'getKey')).entry;
+            if (found && this.javaEquals(call(args[1], 'getValue'), found.value)) target = found;
+          }
+          if (!target) return 0;
+          this.mapRemove(source, target); return 1;
+        }
+      }
       if (obj.readOnly || obj.fixedSize) fail('Read-only/fixed-size List');
       if (name === 'clear') { this.reserveCollection(-values.length); values.length = 0; this.bumpModCount(obj); return undefined; }
       if (name === 'addAll') {

@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=0b42079f5fd6';
-import { APKError } from './apk-error.js?v=0b42079f5fd6';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=0b42079f5fd6';
+import { gcRoot } from './heap-gc.js?v=da1f75bcefcc';
+import { APKError } from './apk-error.js?v=da1f75bcefcc';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=da1f75bcefcc';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -356,6 +356,8 @@ export function createSystemServicesHost(platform) {
   platform.environment = ENV;   // the process environment libcore's Linux.getenv/environ report
   def('Ljava/lang/System;', 'getenv', '(Ljava/lang/String;)Ljava/lang/String;', (r, _m, [name]) => { if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'name == null'); return ENV[r.stringCharacters(name)] ?? null; }, { static: true });
 
+  // System.exit(status): the app ends its own virtual process (Crashlytics' handler does this after reporting a crash). It is surfaced as an explicit process-exit stop, never ignored.
+  def('Ljava/lang/System;', 'exit', '(I)V', (_r, _m, [status]) => { throw new APKError(`System.exit(${status}): the app terminated its own virtual process`, { kind: 'process-exit', status }); }, { static: true });
   def('Ljava/lang/System;', 'mapLibraryName', '(Ljava/lang/String;)Ljava/lang/String;', (r, _m, [name]) => { if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'libname == null'); return 'lib' + r.stringCharacters(name) + '.so'; }, { static: true }); // libcore System.mapLibraryName
 
   // ---- java.lang.Runtime memory/processor accounting for the virtual heap ------------------------------------------------------------------
