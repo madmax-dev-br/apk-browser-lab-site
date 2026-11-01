@@ -27175,5 +27175,85 @@
     "sha256": "6af3f17c5011f30f7502306c4a79d33a9c1487ab4c53b30559a05114de892484",
     "bytes": 5079,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/com/android/internal/app/MicroAlertController.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/app/MicroAlertController.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/app/MicroAlertController.java?format=TEXT",
+    "sha256": "97139d1fc7b3be7ffb43ce3bba65732b38b31b3756843db727c10658fa203397",
+    "bytes": 4283,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/content/res/ResourceId.java",
+    "localPath": "framework-aosp/upstream/android/content/res/ResourceId.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/res/ResourceId.java?format=TEXT",
+    "sha256": "d6e196e12801693cea88862f3a0082922ac0c8925683fe85868c4796d2798686",
+    "bytes": 1570,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/widget/SimpleAdapter.java",
+    "localPath": "framework-aosp/upstream/android/widget/SimpleAdapter.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/SimpleAdapter.java?format=TEXT",
+    "sha256": "c6edb8c57f905ce84d78dfd4be06643cdea2e19f52ed1fc70ffa950525a0abf9",
+    "bytes": 15966,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/widget/SimpleCursorAdapter.java",
+    "localPath": "framework-aosp/upstream/android/widget/SimpleCursorAdapter.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/SimpleCursorAdapter.java?format=TEXT",
+    "sha256": "7bd71790c52ff521e01cbb12db8448c3f4c0094ea3d4d172cab9aaec8625951c",
+    "bytes": 17054,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/widget/ResourceCursorAdapter.java",
+    "localPath": "framework-aosp/upstream/android/widget/ResourceCursorAdapter.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ResourceCursorAdapter.java?format=TEXT",
+    "sha256": "3e6527a8520b87fa88b0fd820216e7c983641ad15f50de3bc04792a38b0396ef",
+    "bytes": 6442,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/widget/ThemedSpinnerAdapter.java",
+    "localPath": "framework-aosp/upstream/android/widget/ThemedSpinnerAdapter.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ThemedSpinnerAdapter.java?format=TEXT",
+    "sha256": "d80d1237ad55f14cc9362f4b9a04d71aceab33871eafbb1efdf6d259b7fb561a",
+    "bytes": 1942,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/widget/CursorFilter.java",
+    "localPath": "framework-aosp/upstream/android/widget/CursorFilter.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/CursorFilter.java?format=TEXT",
+    "sha256": "afde2f5b1a979330aa03e20e831998baf6d79373419eafd83d1f7c22a27468f9",
+    "bytes": 2218,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/com/google/android/collect/Lists.java",
+    "localPath": "framework-aosp/upstream/com/google/android/collect/Lists.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/google/android/collect/Lists.java?format=TEXT",
+    "sha256": "5fe846e3f6dfbbed0811dc65aec06ad0aaaf23c3e946cdabd1d692259e89f831",
+    "bytes": 2289,
+    "license": "Apache-2.0"
   }
 ]

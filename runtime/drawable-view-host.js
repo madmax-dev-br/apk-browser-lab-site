@@ -1,8 +1,8 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=8e7bcbaf9d29';
-import { APKError } from './apk-runtime.js?v=8e7bcbaf9d29';
-import { getVectorGraphics } from './vector-native.js?v=8e7bcbaf9d29';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=8e7bcbaf9d29';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=8e7bcbaf9d29';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=1debfc41250a';
+import { APKError } from './apk-runtime.js?v=1debfc41250a';
+import { getVectorGraphics } from './vector-native.js?v=1debfc41250a';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=1debfc41250a';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=1debfc41250a';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -17,7 +17,7 @@ const same = (a, b) => a?.ref !== undefined && a.ref === b?.ref;
 export function createDrawableViewHost(platform) {
   const ninePatch = createNinePatchDrawableHost(platform);
   const dispatch = (runtime, owner, name, parameters, result, receiver, values = [], mode = 'virtual') => runtime.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...values], mode);
-  const compoundPadding=(runtime,receiver)=>{const view=runtime.object(receiver);if(view.switchState)return switchHost.compoundPadding(runtime,receiver,view.padding);if(!view.buttonDrawable)return null;const result={left:0,top:0,right:0,bottom:0,...view.padding},width=dispatch(runtime,DRAWABLE,'getIntrinsicWidth',[],'I',view.buttonDrawable);result[view.layoutDirection===1?'right':'left']+=width;return result;};
+  const compoundPadding=(runtime,receiver)=>{const view=runtime.object(receiver);if(view.switchState)return switchHost.compoundPadding(runtime,receiver,view.padding);if(!view.buttonDrawable)return platform.textViewApi.compoundPadding(runtime,receiver);const result={left:0,top:0,right:0,bottom:0,...view.padding},width=dispatch(runtime,DRAWABLE,'getIntrinsicWidth',[],'I',view.buttonDrawable);result[view.layoutDirection===1?'right':'left']+=width;return result;};
   const buttonGravity=(runtime,receiver)=>{const view=runtime.object(receiver);if(view.gravity!=null)return view.gravity;const table=platform.resources?.frameworkTable;if(!table||!view.context)return 0x800033;const id=table.findId('attr/gravity');if(!id)return 0x800033;const attrs=runtime.newArray('[I',1);runtime.array(attrs).elements=[id];const array=platform.styleBackend.obtain(runtime,platform.styleBackend.theme(runtime,view.context),null,attrs,view.defStyleAttr||table.findId('attr/'+(runtime.isSubtype(view.type,'Landroid/widget/Switch;')?'switchStyle':'checkboxStyle')));try{return dispatch(runtime,'Landroid/content/res/TypedArray;','getInt',['I','I'],'I',array,[0,0x800033]);}finally{dispatch(runtime,'Landroid/content/res/TypedArray;','recycle',[],'V',array);}};
   const switchHost = createSwitchWidgetHost(platform, { dispatch, buttonGravity });
   const buttonBounds=(runtime,receiver,width,height)=>{const view=runtime.object(receiver),drawable=view.buttonDrawable;if(!drawable)return null;const iw=dispatch(runtime,DRAWABLE,'getIntrinsicWidth',[],'I',drawable),ih=dispatch(runtime,DRAWABLE,'getIntrinsicHeight',[],'I',drawable),gravity=buttonGravity(runtime,receiver)&0x70,left=view.layoutDirection===1?width-iw:0,top=gravity===0x50?height-ih:gravity===0x10?Math.trunc((height-ih)/2):0;return {left,top,right:left+iw,bottom:top+ih};};
@@ -42,6 +42,7 @@ export function createDrawableViewHost(platform) {
     graphics.resetCanvas(replay, width, height);
     runtime.skiaHost.recordNative(runtime.object(replay).nativeCanvasHandle, { op: 'renderNode', node: handle });
   };
+  const rawFloat = n => { const d = new DataView(new ArrayBuffer(4)); d.setFloat32(0, n, true); return d.getInt32(0, true); };
   const render = (runtime, receiver) => {
     const view = runtime.object(receiver); if (view.drawingDrawable) return;
     const padding = view.padding || { left: 0, right: 0, top: 0, bottom: 0 };
@@ -67,9 +68,14 @@ export function createDrawableViewHost(platform) {
         dispatch(runtime, DRAWABLE, 'draw', [CANVAS], 'V', drawable, [canvas]);
         if (drawableMatrix) dispatch(runtime, CANVAS, 'restore', [], 'V', canvas);
       }
+      // TextView.onDraw compound drawables (CheckedTextView's check indicator, icons beside text): drawn into the same layer, the text raster sits above it
+      if (runtime.isSubtype(view.type, TEXT)) for (const { drawable, x, y } of platform.textViewApi.compoundPlacements(runtime, receiver, width, height)) {
+        prepareCpuAnimatedVector(runtime, drawable); dispatch(runtime, CANVAS, 'save', [], 'I', canvas); dispatch(runtime, CANVAS, 'translate', ['F', 'F'], 'V', canvas, [rawFloat(x), rawFloat(y)]);
+        dispatch(runtime, DRAWABLE, 'draw', [CANVAS], 'V', drawable, [canvas]); dispatch(runtime, CANVAS, 'restore', [], 'V', canvas);
+      }
       if (view.switchState) switchHost.draw(runtime, receiver, canvas, width, height);
       });
-      view.drawableSVG = view.backgroundDrawable || view.imageDrawable || view.switchState ? graphics.snapshotCanvas(replay, width, height) : null;
+      view.drawableSVG = view.backgroundDrawable || view.imageDrawable || view.switchState || (runtime.isSubtype(view.type, TEXT) && platform.textViewApi.compoundList(runtime, receiver).length) ? graphics.snapshotCanvas(replay, width, height) : null;
       if(view.foregroundDrawable){
         if(!view.foregroundCanvas){view.foregroundCanvas=runtime.allocate(CANVAS);dispatch(runtime,CANVAS,'<init>',[],'V',view.foregroundCanvas);}
         const foreground=prepareCpuAnimatedVector(runtime,view.foregroundDrawable),rect='Landroid/graphics/Rect;',gravity='Landroid/view/Gravity;';
@@ -86,6 +92,7 @@ export function createDrawableViewHost(platform) {
         view.foregroundSVG=graphics.snapshotCanvas(view.foregroundCanvas,width,height);view.foregroundBoundsChanged=false;
       }else{view.foregroundSVG=null;view.foregroundBounds=null;}
       if(view.buttonDrawable){if(!view.buttonCanvas){view.buttonCanvas=runtime.allocate(CANVAS);dispatch(runtime,CANVAS,'<init>',[],'V',view.buttonCanvas);}const bounds=buttonBounds(runtime,receiver,width,height),iw=bounds.right-bounds.left,ih=bounds.bottom-bounds.top;if(iw<=0||ih<=0||iw>4096||ih>4096)fail('CompoundButton indicator needs bounded positive intrinsic dimensions');const raw=n=>{const d=new DataView(new ArrayBuffer(4));d.setFloat32(0,n,true);return d.getInt32(0,true);};recordLayer(runtime,receiver,'buttonNode',view.buttonCanvas,iw,ih,canvas=>{dispatch(runtime,CANVAS,'translate',['F','F'],'V',canvas,[raw(-bounds.left),raw(-bounds.top)]);drawButton(runtime,receiver,canvas,width,height);});view.buttonSVG=graphics.snapshotCanvas(view.buttonCanvas,iw,ih);view.compoundPadding=compoundPadding(runtime,receiver);}else{view.buttonSVG=null;view.buttonBounds=null;view.compoundPadding=null;}
+      if (runtime.isSubtype(view.type, TEXT) && !view.buttonDrawable && !view.switchState) view.compoundPadding = platform.textViewApi.compoundPadding(runtime, receiver);   // the text raster starts inside the drawables' space
       view.needsDrawableDraw = false;
       runtime.record('DRAWABLE View.draw -> original Drawable DEX -> web Canvas commands');
     } finally { view.drawingDrawable = false; }
@@ -129,6 +136,25 @@ export function createDrawableViewHost(platform) {
     } finally { dispatch(runtime, TA, 'recycle', [], 'V', array); }
     switchHost.attributes(runtime, receiver, attrsRef, defStyle);
   };
+  /** TextView constructor: textSize from the android:style, the default style or its textAppearance (theme -> defStyleAttr -> style -> textAppearance); explicit android:textSize applies afterwards. */
+  const applyStyledTextSize = (runtime, receiver, attrsRef = null) => {
+    const view = runtime.object(receiver), table = platform.resources?.frameworkTable;
+    if (!table || !view.context || !runtime.classes.has('Landroid/content/res/TypedArray;') || !runtime.isSubtype(view.type, TEXT)) return;
+    const defStyle = view.defStyleAttr || table.findId(defaultStyleName(runtime, view.type)), TA = 'Landroid/content/res/TypedArray;', node = attrsRef ? runtime.object(attrsRef).node : null;
+    let attrs = null; const kept = node?.attributes.filter(a => (a.name === 'style' && !a.namespace) || (a.name === 'textAppearance' && a.namespace === 'http://schemas.android.com/apk/res/android')) ?? []; if (kept.length) { attrs = runtime.makeObject('Lapkweb/bridge/AttributeSet;'); runtime.object(attrs).node = { ...node, attributes: kept }; }   // only style and textAppearance: the other explicit attributes are applied by the XML pass
+    const ids = runtime.newArray('[I', 2); runtime.object(ids).elements = [table.findId('attr/textSize'), table.findId('attr/textAppearance')];
+    const theme = platform.styleBackend.theme(runtime, view.context), array = platform.styleBackend.obtain(runtime, theme, attrs, ids, defStyle), floatOf = raw => { const d = new DataView(new ArrayBuffer(4)); d.setInt32(0, raw, true); return d.getFloat32(0, true); };
+    let appearance = 0;
+    try {
+      if (dispatch(runtime, TA, 'hasValue', ['I'], 'Z', array, [0])) { view.textSize = Math.fround(floatOf(dispatch(runtime, TA, 'getDimension', ['I', 'F'], 'F', array, [0, 0]))); return; }
+      appearance = dispatch(runtime, TA, 'getResourceId', ['I', 'I'], 'I', array, [1, 0]);
+    } finally { dispatch(runtime, TA, 'recycle', [], 'V', array); }
+    if (!appearance) return;
+    const sizeIds = runtime.newArray('[I', 1); runtime.object(sizeIds).elements = [table.findId('attr/textSize')];
+    const fromAppearance = platform.styleBackend.obtain(runtime, theme, null, sizeIds, 0, 0, appearance);
+    try { if (dispatch(runtime, TA, 'hasValue', ['I'], 'Z', fromAppearance, [0])) view.textSize = Math.fround(floatOf(dispatch(runtime, TA, 'getDimension', ['I', 'F'], 'F', fromAppearance, [0, 0]))); }
+    finally { dispatch(runtime, TA, 'recycle', [], 'V', fromAppearance); }
+  };
   const setDrawable = (runtime, receiver, field, drawable) => {
     const view = runtime.object(receiver), previous = view[field];if(drawable)prepareCpuAnimatedVector(runtime,drawable);
     if (previous && !same(previous, drawable)) dispatch(runtime, DRAWABLE, 'setCallback', ['Landroid/graphics/drawable/Drawable$Callback;'], 'V', previous, [null]);
@@ -147,7 +173,7 @@ export function createDrawableViewHost(platform) {
     if(field==='foregroundDrawable'){platform.requestDraw(runtime,receiver);dispatch(runtime,VIEW,'requestLayout',[],'V',receiver);}
   };
   return {
-    compoundPadding,drawButton,applyThemeDefaults,defaultStyleName,switchWidget:(runtime,receiver)=>switchHost.get(runtime,receiver),measureSwitch:(runtime,receiver)=>switchHost.measure(runtime,receiver),checkedChanged:(runtime,receiver,checked)=>switchHost.checkedChanged(runtime,receiver,checked),
+    compoundPadding,drawButton,applyThemeDefaults,applyStyledTextSize,defaultStyleName,switchWidget:(runtime,receiver)=>switchHost.get(runtime,receiver),measureSwitch:(runtime,receiver)=>switchHost.measure(runtime,receiver),checkedChanged:(runtime,receiver,checked)=>switchHost.checkedChanged(runtime,receiver,checked),
     setForegroundFromXML(runtime,receiver,attribute,context){
       const theme=platform.styleBackend.theme(runtime,context),reference=attribute.kind==='attribute'?platform.styleBackend.resolved(attribute,runtime.object(theme).themeValues,false):attribute;
       let drawable=null;
@@ -162,8 +188,8 @@ export function createDrawableViewHost(platform) {
     interfaces: type => type === VIEW || type === IMAGE ? ['Landroid/graphics/drawable/Drawable$Callback;'] : [],
     viewKind(runtime, object) { return runtime.isSubtype(object.type, IMAGE) ? 'image' : null; },
     drawTree(runtime, root, seen = new Set()) { if (!root) return; const view = runtime.object(root); if (seen.has(view.id) || seen.size >= 4096) fail('Cyclic/excessive drawable frame'); seen.add(view.id); if (view.visibility === 8 || view.visibility === 4) return; if (view.imageDrawable || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.switchState) render(runtime, root); for (const child of view.children || []) this.drawTree(runtime, child, seen); },
-    afterAttach(runtime, receiver) { const view = runtime.object(receiver); if (runtime.isSubtype(view.type, IMAGE) || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.stateListAnimator || view.switchState) this.invoke(runtime, { owner: VIEW, name: 'refreshDrawableState' }, [receiver]); },
-    afterLayout(runtime, receiver) { const view = runtime.object(receiver); if (view.imageDrawable || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.switchState) render(runtime, receiver); },
+    afterAttach(runtime, receiver) { const view = runtime.object(receiver); if (runtime.isSubtype(view.type, IMAGE) || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.stateListAnimator || view.switchState || (runtime.isSubtype(view.type, TEXT) && platform.textViewApi.compoundList(runtime, receiver).length)) this.invoke(runtime, { owner: VIEW, name: 'refreshDrawableState' }, [receiver]); },
+    afterLayout(runtime, receiver) { const view = runtime.object(receiver); if (view.imageDrawable || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.switchState || (runtime.isSubtype(view.type, TEXT) && platform.textViewApi.compoundList(runtime, receiver).length)) render(runtime, receiver); },
     invoke(runtime, method, args) {
       const name = method.name;
       if (ninePatch.handles(method.owner)) return ninePatch.invoke(runtime, method, args);
@@ -194,7 +220,7 @@ export function createDrawableViewHost(platform) {
       }
       if (name === 'refreshDrawableState') { view.drawableStateDirty = true; dispatch(runtime, runtime.isSubtype(view.type, IMAGE) ? IMAGE : VIEW, 'drawableStateChanged', [], 'V', args[0]); const parent = view.parent; if (parent && runtime.isSubtype(runtime.object(parent).type, 'Landroid/view/ViewGroup;')) dispatch(runtime, 'Landroid/view/ViewGroup;', 'childDrawableStateChanged', [VIEW], 'V', parent, [args[0]]); return; }   // View.refreshDrawableState tells the parent
       if (name === 'drawableStateChanged') {
-        for (const drawable of [view.backgroundDrawable, view.foregroundDrawable, view.buttonDrawable, ...(method.owner === IMAGE ? [view.imageDrawable] : [])]) if (drawable && dispatch(runtime, DRAWABLE, 'isStateful', [], 'Z', drawable)) { prepareCpuAnimatedVector(runtime,drawable);const state = dispatch(runtime, VIEW, 'getDrawableState', [], '[I', args[0]); dispatch(runtime, DRAWABLE, 'setState', ['[I'], 'Z', drawable, [state]); }
+        for (const drawable of [view.backgroundDrawable, view.foregroundDrawable, view.buttonDrawable, ...(method.owner === IMAGE ? [view.imageDrawable] : []), ...(runtime.isSubtype(view.type, TEXT) ? platform.textViewApi.compoundList(runtime, args[0]) : [])]) if (drawable && dispatch(runtime, DRAWABLE, 'isStateful', [], 'Z', drawable)) { prepareCpuAnimatedVector(runtime,drawable);const state = dispatch(runtime, VIEW, 'getDrawableState', [], '[I', args[0]); dispatch(runtime, DRAWABLE, 'setState', ['[I'], 'Z', drawable, [state]); }
         switchHost.stateChanged(runtime, args[0]);
         if (view.stateListAnimator) dispatch(runtime, 'Landroid/animation/StateListAnimator;', 'setState', ['[I'], 'V', view.stateListAnimator, [dispatch(runtime, VIEW, 'getDrawableState', [], '[I', args[0])]);
         return;
@@ -231,7 +257,7 @@ export function createDrawableViewHost(platform) {
       if (name === 'setImageResource' || name === 'setBackgroundResource') { const drawable = args[1] ? platform.styleBackend.loadDrawable(runtime, args[1], platform.styleBackend.theme(runtime, view.context)) : null; return setDrawable(runtime, args[0], name === 'setImageResource' ? 'imageDrawable' : 'backgroundDrawable', drawable); }
       if (name === 'setImageDrawable' || name === 'setBackground' || name === 'setBackgroundDrawable') return setDrawable(runtime, args[0], name === 'setImageDrawable' ? 'imageDrawable' : 'backgroundDrawable', args[1]);
       if (name === 'verifyDrawable') return same(args[1], view.imageDrawable) || same(args[1], view.backgroundDrawable) || same(args[1], view.foregroundDrawable) || same(args[1],view.buttonDrawable) ? 1 : 0;
-      if (name === 'invalidateDrawable') { if (same(args[1], view.imageDrawable) || same(args[1], view.backgroundDrawable) || same(args[1], view.foregroundDrawable)||same(args[1],view.buttonDrawable)){if(view.drawingDrawable){view.needsDrawableDraw=true;platform.requestDraw(runtime,args[0],1000/60);}else{render(runtime,args[0]);platform.requestDraw(runtime,args[0]);}} return; }
+      if (name === 'invalidateDrawable') { if (same(args[1], view.imageDrawable) || same(args[1], view.backgroundDrawable) || same(args[1], view.foregroundDrawable)||same(args[1],view.buttonDrawable)||(runtime.isSubtype(view.type,TEXT)&&platform.textViewApi.compoundList(runtime,args[0]).some(d=>same(args[1],d)))){if(view.drawingDrawable){view.needsDrawableDraw=true;platform.requestDraw(runtime,args[0],1000/60);}else{render(runtime,args[0]);platform.requestDraw(runtime,args[0]);}} return; }
       fail('Unknown Drawable View method ' + name);
     },
   };

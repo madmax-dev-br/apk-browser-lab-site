@@ -1,6 +1,6 @@
-import {APKError} from './apk-runtime.js?v=8e7bcbaf9d29';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=8e7bcbaf9d29';
-import {getVectorGraphics} from './vector-native.js?v=8e7bcbaf9d29';
+import {APKError} from './apk-runtime.js?v=1debfc41250a';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=1debfc41250a';
+import {getVectorGraphics} from './vector-native.js?v=1debfc41250a';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -46,8 +46,16 @@ export function createComposeCanvasHost(platform){
     const ids=r.newArray('[I',1);r.array(ids).elements=[id];let attrs=null;if(view.appliedNode){attrs=r.makeObject('Lapkweb/bridge/AttributeSet;');r.object(attrs).node=view.appliedNode;}
     const defStyle=view.defStyleAttr||table.findId(platform.drawableViewHost.defaultStyleName(r,view.type));
     const array=platform.styleBackend.obtain(r,platform.styleBackend.theme(r,view.context),attrs,ids,defStyle);
-    try{if(!call(r,array,'Landroid/content/res/TypedArray;','hasValue',['I'],'Z',[0]))return fallback;return call(r,array,'Landroid/content/res/TypedArray;',method,method==='getInt'?['I','I']:['I'],result,method==='getInt'?[0,fallback]:[0]);}
-    finally{call(r,array,'Landroid/content/res/TypedArray;','recycle');}
+    const TA='Landroid/content/res/TypedArray;',read=(typed,index)=>call(r,typed,TA,method,method==='getInt'?['I','I']:['I'],result,method==='getInt'?[index,fallback]:[index]);
+    try{if(call(r,array,TA,'hasValue',['I'],'Z',[0]))return read(array,0);}
+    finally{call(r,array,TA,'recycle');}
+    // TextView constructor: android:textAppearance (explicit, from the style or from the default style) supplies what the view's own attributes do not
+    const appearanceId=table.findId('attr/textAppearance');if(!appearanceId||attribute==='textAppearance')return fallback;
+    const aids=r.newArray('[I',1);r.array(aids).elements=[appearanceId];const holder=platform.styleBackend.obtain(r,platform.styleBackend.theme(r,view.context),attrs,aids,defStyle);let appearance=0;
+    try{appearance=call(r,holder,TA,'getResourceId',['I','I'],'I',[0,0]);}finally{call(r,holder,TA,'recycle');}
+    if(!appearance)return fallback;
+    const fromAppearance=platform.styleBackend.obtain(r,platform.styleBackend.theme(r,view.context),null,ids,0,0,appearance);
+    try{return call(r,fromAppearance,TA,'hasValue',['I'],'Z',[0])?read(fromAppearance,0):fallback;}finally{call(r,fromAppearance,TA,'recycle');}
   };
   const textColor=(r,receiver,hint)=>{
     const view=r.object(receiver);if(!hint&&view.textColor!=null){if(typeof view.textColor==='number')return view.textColor|0;const value=view.textColor.slice(1);return (Number.parseInt(value,16)|(value.length===6?0xff000000:0))|0;}
@@ -57,9 +65,10 @@ export function createComposeCanvasHost(platform){
   };
   const drawNativeText=(r,receiver,target)=>{
     const view=r.object(receiver);if(r.isSubtype(view.type,'Landroid/widget/CompoundButton;')&&!view.buttonDrawable)fail('CompoundButton Canvas needs its real indicator drawable and geometry');
-    if(view.compoundDrawables?.some(Boolean)||view.marquee||view.ellipsize)fail('Native TextView Canvas compound/marquee/ellipsis layout is not connected');
+    if(view.marquee||view.ellipsize)fail('Native TextView Canvas marquee/ellipsis layout is not connected');
     if(!view.textMetrics)fail('Native TextView Canvas requires completed actual font measurement');
-    const displayed=String(view.displayText??view.text??''),hint=!displayed&&!!view.hint,text=hint?String(view.hint):displayed;if(!text)return;
+    {const [cw,ch]=dimensions(view);for(const {drawable:d,x,y} of platform.textViewApi.compoundPlacements(r,receiver,cw,ch)){const save=canvas(r,target,'save',[],'I');try{canvas(r,target,'translate',['F','F'],'V',[raw(x),raw(y)]);call(r,d,DRAWABLE,'draw',[CANVAS],'V',[target]);}finally{canvas(r,target,'restoreToCount',['I'],'V',[save]);}}}   // TextView.onDraw: compound drawables first, then the text
+    const displayed=String(view.ellipsizedText??view.displayText??view.text??''),hint=!displayed&&!!view.hint,text=hint?String(view.hint):displayed;if(!text)return;
     const [width,height]=dimensions(view),pad=platform.drawableViewHost.compoundPadding(r,receiver)??view.padding??{},innerWidth=Math.max(0,width-(pad.left??0)-(pad.right??0)),innerHeight=Math.max(0,height-(pad.top??0)-(pad.bottom??0));if(!innerWidth||!innerHeight)return;
     const color=textColor(r,receiver,hint),typeface=call(r,receiver,'Landroid/widget/TextView;','getTypeface',[],'Landroid/graphics/Typeface;'),face=r.skiaHost.resolveTypeface(typeface),size=view.textSize||14;
     const gravity=view.gravity??textStyleValue(r,receiver,'gravity','getInt','I',0x800033),abs=r.classes.has('Landroid/view/Gravity;')?call(r,null,'Landroid/view/Gravity;','getAbsoluteGravity',['I','I'],'I',[gravity,view.layoutDirection??0],'static'):gravity;
@@ -67,7 +76,7 @@ export function createComposeCanvasHost(platform){
     const nativeParagraph=!hint&&view.textParagraph,blockHeight=nativeParagraph?view.textParagraph.height:bottom-top+(lines.length-1)*(view.textLineHeight??bottom-top),dy=vertical===0x10?(innerHeight-blockHeight)/2:vertical===0x50?innerHeight-blockHeight:0,save=canvas(r,target,'save',[],'I');
     try{canvas(r,target,'clipRect',['F','F','F','F'],'Z',[raw(pad.left??0),raw(pad.top??0),raw(width-(pad.right??0)),raw(height-(pad.bottom??0))]);const scrollX=view.updatingDisplayList?0:view.fields.get(`${VIEW}->mScrollX:I`)??0,scrollY=view.updatingDisplayList?0:view.fields.get(`${VIEW}->mScrollY:I`)??0;
       if(nativeParagraph){const renderWidth=view.textParagraph.layoutWidth,align=horizontal===1?'center':horizontal===5?'right':'left',key=JSON.stringify([text,renderWidth,size,face.weight,face.italic,color,align,view.layoutDirection,view.maxLines]);
-        if(view.canvasTextRasterKey!==key){const result=measureSkiaParagraph(r.skia,text,{width:renderWidth,textSize:size,weight:face.weight,italic:face.italic,direction:view.layoutDirection??0,maxLines:view.maxLines??null,color,alignment:align,raster:true});if(Math.abs(result.height-view.textParagraph.height)>.001)fail('Native widget paragraph differs from its completed measurement');const length=result.raster.dataURL.length,next=cachedTextRasterBytes-(textRasterSizes.get(view.id)??0)+length;if(next>32*1024*1024)fail('Native widget paragraph raster cache exceeds32MiB');cachedTextRasterBytes=next;textRasterSizes.set(view.id,length);view.canvasTextRaster=result.raster;view.canvasTextRasterKey=key;}
+        if(view.canvasTextRasterKey!==key){const result=measureSkiaParagraph(r.skia,text,{width:renderWidth,textSize:size,weight:face.weight,italic:face.italic,direction:view.layoutDirection??0,maxLines:view.maxLines??null,ellipsis:platform.textViewApi.ellipsizeKind(r,receiver)==='END'&&view.maxLines!=null?'\u2026':null,color,alignment:align,raster:true});if(Math.abs(result.height-view.textParagraph.height)>.001)fail('Native widget paragraph differs from its completed measurement');const length=result.raster.dataURL.length,next=cachedTextRasterBytes-(textRasterSizes.get(view.id)??0)+length;if(next>32*1024*1024)fail('Native widget paragraph raster cache exceeds32MiB');cachedTextRasterBytes=next;textRasterSizes.set(view.id,length);view.canvasTextRaster=result.raster;view.canvasTextRasterKey=key;}
         r.skiaHost.recordNative(r.object(target).nativeCanvasHandle,{op:'raster',raster:view.canvasTextRaster,args:[(pad.left??0)+(horizontal===1?(innerWidth-renderWidth)/2:horizontal===5?innerWidth-renderWidth:0)-scrollX,(pad.top??0)+dy-scrollY]});
       }else{const paint={argb:color>>>0,color:color>>>0,flags:1,style:0,strokeWidth:0,strokeMiter:4,strokeCap:0,strokeJoin:0,blendMode:3,textSize:size,textScaleX:1,textSkewX:0,letterSpacing:0,wordSpacing:0,hinting:1,weight:face.weight,italic:face.italic};
         lines.forEach((line,index)=>{const advance=r.skiaHost.measureText(line,font).width,dx=horizontal===1?(innerWidth-advance)/2:horizontal===5?innerWidth-advance:0;r.skiaHost.recordNative(r.object(target).nativeCanvasHandle,{op:'paragraphRun',text:line,args:[(pad.left??0)+dx-scrollX,(pad.top??0)+dy-top+index*(view.textLineHeight??bottom-top)-scrollY],isRtl:!!view.layoutDirection,paint});});

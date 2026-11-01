@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=8e7bcbaf9d29';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=8e7bcbaf9d29';
-import { isTrustedRasterURL } from './raster-cache.js?v=8e7bcbaf9d29';
+import { updateWebViewSlot } from './webview-slot.js?v=1debfc41250a';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=1debfc41250a';
+import { isTrustedRasterURL } from './raster-cache.js?v=1debfc41250a';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -246,7 +246,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (view.textRaster && ['text', 'button'].includes(kind)) {
     const drawing = view.textRaster;
     if (!pngURLOk(drawing.dataURL) || !Number.isFinite(drawing.width) || !Number.isFinite(drawing.height)) throw new Error('PNG de parágrafo inválido recebido da VM.');
-    const image = `url("${drawing.dataURL}")`, size = `${drawing.width}px ${drawing.height}px`, position = `${view.padding?.left || 0}px ${view.padding?.top || 0}px`;
+    const image = `url("${drawing.dataURL}")`, size = `${drawing.width}px ${drawing.height}px`, position = `${(view.compoundPadding || view.padding)?.left || 0}px ${(view.compoundPadding || view.padding)?.top || 0}px`;
     element.style.backgroundImage = element.style.backgroundImage ? `${image}, ${element.style.backgroundImage}` : image;
     element.style.backgroundSize = view.drawableSVG ? `${size}, 100% 100%` : size;
     element.style.backgroundPosition = view.drawableSVG ? `${position}, 0 0` : position;

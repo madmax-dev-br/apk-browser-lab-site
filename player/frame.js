@@ -1,9 +1,9 @@
 // Entry of dist/player/frame.html: device frame + system bars + rendering, driven by postMessage from the embedding page.
-import { APKWorkerClient } from '../apk-worker-client.js?v=8e7bcbaf9d29';
-import { createDeviceView, createViewState } from '../device-view.js?v=8e7bcbaf9d29';
-import { sanitizeSettings } from '../device-settings.js?v=8e7bcbaf9d29';
-import { createFrameController } from './frame-controller.js?v=8e7bcbaf9d29';
-import { validateHostMessage, envelope } from './protocol.js?v=8e7bcbaf9d29';
+import { APKWorkerClient } from '../apk-worker-client.js?v=1debfc41250a';
+import { createDeviceView, createViewState } from '../device-view.js?v=1debfc41250a';
+import { sanitizeSettings } from '../device-settings.js?v=1debfc41250a';
+import { createFrameController } from './frame-controller.js?v=1debfc41250a';
+import { validateHostMessage, envelope } from './protocol.js?v=1debfc41250a';
 
 const parentOrigin = new URLSearchParams(location.search).get('parent');
 const $ = id => document.getElementById(id) ?? (frameStub[id] ??= Object.assign(document.createElement('div'), { id }));

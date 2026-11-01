@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=8e7bcbaf9d29';
-import { gcRoot } from './heap-gc.js?v=8e7bcbaf9d29';
-import { APKError } from './apk-error.js?v=8e7bcbaf9d29';
+import { createHostRegistry } from './host-contract.js?v=1debfc41250a';
+import { gcRoot } from './heap-gc.js?v=1debfc41250a';
+import { APKError } from './apk-error.js?v=1debfc41250a';
 
 // Public android.widget.TextView API (API 33) beyond what the platform's native text model carries, with the semantics of android-13.0.0_r1 TextView.java.
 // The lab renders TextView / Button / EditText text through its native SkParagraph path (view-layout-host measure, compose-canvas-host draw), which honours the text, size, colour, typeface,
@@ -227,7 +227,7 @@ export function createTextViewApiHost(platform) {
 
   // ---- compound drawables -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   const drawables = (r, self) => { const s = tv(r, self); return s.compound ??= { left: null, top: null, right: null, bottom: null, start: null, end: null, relative: false }; };
-  const adopt = (r, self, d) => { if (!nullish(d)) { call(r, d, DRAWABLE, 'setCallback', ['Landroid/graphics/drawable/Drawable$Callback;'], 'V', [self]); call(r, d, DRAWABLE, 'setLayoutDirection', ['I'], 'Z', [call(r, self, VIEW, 'getLayoutDirection', [], 'I')]); } return nullish(d) ? null : d; };
+  const adopt = (r, self, d) => { if (!nullish(d)) { call(r, d, DRAWABLE, 'setCallback', ['Landroid/graphics/drawable/Drawable$Callback;'], 'V', [self]); call(r, d, DRAWABLE, 'setLayoutDirection', ['I'], 'Z', [call(r, self, VIEW, 'getLayoutDirection', [], 'I')]); if (call(r, d, DRAWABLE, 'isStateful', [], 'Z')) call(r, d, DRAWABLE, 'setState', ['[I'], 'Z', [call(r, self, VIEW, 'getDrawableState', [], '[I')]); } return nullish(d) ? null : d; };
   const syncCompoundPaddingState = (r, self) => { const c = drawables(r, self); r.object(self).compoundDrawables = [c.left, c.top, c.right, c.bottom]; };
   const setCompound = (r, self, left, top, right, bottom) => {
     const c = drawables(r, self); c.relative = false; c.start = c.end = null;
@@ -300,6 +300,30 @@ export function createTextViewApiHost(platform) {
     syncCompoundPaddingState(r, self); platform.requestDraw?.(r, self);
   };
   registry.compoundDrawables = (r, self) => drawables(r, self);
+  /** The TextView.getCompoundPadding* box when a compound drawable is set (the native text path lays out and draws the text inside it), else null. */
+  registry.compoundPadding = (r, self) => {
+    const c = r.object(self).tv?.compound; if (!c || ![c.left, c.top, c.right, c.bottom].some(d => !nullish(d))) return null;
+    return { left: compoundPad(r, self, 'left'), top: compoundPad(r, self, 'top'), right: compoundPad(r, self, 'right'), bottom: compoundPad(r, self, 'bottom') };
+  };
+  /** TextView.onMeasure's drawable extents: the heights of the left / right drawables and the widths of the top / bottom ones. */
+  registry.compoundExtents = (r, self) => {
+    const c = r.object(self).tv?.compound; if (!c) return null;
+    return { leftHeight: sizeOfDrawable(r, c.left, 'h'), rightHeight: sizeOfDrawable(r, c.right, 'h'), topWidth: sizeOfDrawable(r, c.top, 'w'), bottomWidth: sizeOfDrawable(r, c.bottom, 'w') };
+  };
+  /** The drawables to draw with their positions (TextView.onDraw compound drawable pass), in the view's own coordinates before scrolling. */
+  registry.compoundPlacements = (r, self, width, height) => {
+    const c = r.object(self).tv?.compound; if (!c) return [];
+    const cl = compoundPad(r, self, 'left'), ct = compoundPad(r, self, 'top'), cr = compoundPad(r, self, 'right'), cb = compoundPad(r, self, 'bottom');
+    const pad = n => call(r, self, VIEW, n, [], 'I'), vspace = height - cb - ct, hspace = width - cr - cl, out = [];
+    const w = d => sizeOfDrawable(r, d, 'w'), h = d => sizeOfDrawable(r, d, 'h');
+    if (!nullish(c.left)) out.push({ drawable: c.left, x: pad('getPaddingLeft'), y: ct + (vspace - h(c.left)) / 2 });
+    if (!nullish(c.right)) out.push({ drawable: c.right, x: width - pad('getPaddingRight') - w(c.right), y: ct + (vspace - h(c.right)) / 2 });
+    if (!nullish(c.top)) out.push({ drawable: c.top, x: cl + (hspace - w(c.top)) / 2, y: pad('getPaddingTop') });
+    if (!nullish(c.bottom)) out.push({ drawable: c.bottom, x: cl + (hspace - w(c.bottom)) / 2, y: height - pad('getPaddingBottom') - h(c.bottom) });
+    return out;
+  };
+  /** Every compound drawable currently set (for drawable-state propagation). */
+  registry.compoundList = (r, self) => { const c = r.object(self).tv?.compound; return c ? [c.left, c.top, c.right, c.bottom].filter(d => !nullish(d)) : []; };
 
 
   // ---- TextView.BufferType (NORMAL, SPANNABLE, EDITABLE) ---------------------------------------------------------------------------------------------------------------------------------------------------
@@ -606,9 +630,17 @@ export function createTextViewApiHost(platform) {
 
   // ---- renderer contract -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   /** Why the native text path cannot draw this TextView as AOSP would (a property set to a non-default value it has no support for), or null. */
+  /** 'START' | 'MIDDLE' | 'END' | 'MARQUEE' or null: the TruncateAt the native text path ellipsizes with. */
+  registry.ellipsizeKind = (r, self) => { const e = r.object(self).tv?.ellipsize; return nullish(e) ? null : r.object(e).enumName ?? null; };
+  const ellipsizeUnsupported = (r, self, s) => {
+    if (nullish(s.ellipsize)) return false;
+    const where = r.object(s.ellipsize).enumName, view = r.object(self), single = view.singleLine || view.maxLines === 1;
+    // MARQUEE at rest lays the line out unbounded and clips it at the view (the fading edge is not drawn); only the running scroll (the view is selected or focused) needs an animation.
+    return (where === 'MARQUEE' && !!(view.selected || view.focused)) || (where !== 'MARQUEE' && !single && where !== 'END');
+  };
   registry.unsupportedRendering = (r, self) => {
     const s = r.object(self).tv; if (!s) return null;
-    const checks = [[s.letterSpacing !== 0, 'letterSpacing'], [s.lineSpacingExtra !== 0 || s.lineSpacingMult !== 1, 'lineSpacing'], [s.shadowRadius !== 0, 'shadowLayer'], [s.ellipsize !== null && s.ellipsize !== undefined, 'ellipsize'],
+    const checks = [[s.letterSpacing !== 0, 'letterSpacing'], [s.lineSpacingExtra !== 0 || s.lineSpacingMult !== 1, 'lineSpacing'], [s.shadowRadius !== 0, 'shadowLayer'], [ellipsizeUnsupported(r, self, s), 'ellipsize (a running marquee, or start / middle on more than one line)'],
       [s.breakStrategy !== 0, 'breakStrategy'], [s.hyphenationFrequency !== 0, 'hyphenationFrequency'], [s.justificationMode !== 0, 'justificationMode'], [s.fontFeatureSettings !== null, 'fontFeatureSettings'],
       [s.fontVariationSettings !== null, 'fontVariationSettings'], [s.textScaleX !== 1, 'textScaleX'], [s.paint && (call(r, s.paint, PAINT, 'getFlags', [], 'I') & 0x38) !== 0, 'paintFlags (underline / strike-through / fake bold)'],
       [s.lineBreakStyle !== 0 || s.lineBreakWordStyle !== 0, 'lineBreak']];

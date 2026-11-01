@@ -300,12 +300,28 @@
       "SDKJarSha256": "d9eb9da824d9e247a352f570f01e1169e725b2954bca9e283a71786c59b59f9a",
       "compileOnlyContracts": [
         {
+          "path": "framework-aosp/legacy-dialog/build/metadata/android/annotation/ArrayRes.java",
+          "sha256": "259bf664e7a352e53b42dc1bf882e56b57bfcf5fba370d9d01ecd13cc9b6f155"
+        },
+        {
           "path": "framework-aosp/legacy-dialog/build/metadata/android/annotation/IdRes.java",
           "sha256": "674449d882533c69a5d47a5b75ab10dc421dc018723656bda06456dece347b43"
         },
         {
+          "path": "framework-aosp/legacy-dialog/build/metadata/android/annotation/NonNull.java",
+          "sha256": "07c8d2e04bbb1519f41ef9b1c75befb9a91af559b755f598a7ab3ff7dfb18ac2"
+        },
+        {
+          "path": "framework-aosp/legacy-dialog/build/metadata/android/annotation/Nullable.java",
+          "sha256": "c89bb7d2801d1c6070c2f437876c3937c808bc74ac4202a18daf1940e9e7ee90"
+        },
+        {
           "path": "framework-aosp/legacy-dialog/build/metadata/android/annotation/StringRes.java",
           "sha256": "4fcc7ddc2dda43aeccd9382f925b3c169780452c717364a973f966129a83007a"
+        },
+        {
+          "path": "framework-aosp/legacy-dialog/build/metadata/android/annotation/WorkerThread.java",
+          "sha256": "9a508ab1d96f9152c7dd027ced6d5a98b59d37274559ade7a328dc794b3c5565"
         },
         {
           "path": "framework-aosp/legacy-dialog/build/metadata/android/app/ActionBar$LayoutParams.class",
@@ -437,7 +453,7 @@
         },
         {
           "path": "framework-aosp/legacy-dialog/build/metadata/android/view/Window.java",
-          "sha256": "9c16be1c951971e758702010ed95b8e2e4c8c00dff25424e01182383e9c6ab3c"
+          "sha256": "20f8832aaf1dcda952c74237fd8b024906a7affc4838ce7b6c0fad3c2a35fb0a"
         },
         {
           "path": "framework-aosp/legacy-dialog/build/metadata/android/view/WindowManager$BadTokenException.class",
@@ -508,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 6913308,
-  "sha256": "ff2d149b2f32b3ab646e05c3fd68662cdcce283f654afb0cd4c0583fc0c063e5",
-  "classCount": 5409,
+  "bytes": 7029280,
+  "sha256": "e66f234913d1b35bf96280834cbc682bad4971003e4d01047524e16d8a156c2d",
+  "classCount": 5412,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -1935,9 +1951,12 @@
     "Lcom/android/internal/R$array;",
     "Lcom/android/internal/R$attr;",
     "Lcom/android/internal/R$bool;",
+    "Lcom/android/internal/R$color;",
     "Lcom/android/internal/R$dimen;",
+    "Lcom/android/internal/R$drawable;",
     "Lcom/android/internal/R$id;",
     "Lcom/android/internal/R$integer;",
+    "Lcom/android/internal/R$layout;",
     "Lcom/android/internal/R$string;",
     "Lcom/android/internal/R$style;",
     "Lcom/android/internal/R$styleable;",
@@ -6408,6 +6427,200 @@
         "rowDelay",
         "direction",
         "directionPriority"
+      ],
+      "AlertDialog": [
+        "fullDark",
+        "topDark",
+        "centerDark",
+        "bottomDark",
+        "fullBright",
+        "topBright",
+        "centerBright",
+        "bottomBright",
+        "bottomMedium",
+        "centerMedium",
+        "layout",
+        "buttonPanelSideLayout",
+        "listLayout",
+        "multiChoiceItemLayout",
+        "singleChoiceItemLayout",
+        "listItemLayout",
+        "progressLayout",
+        "horizontalProgressLayout",
+        "showTitle",
+        "needsDefaultBackgrounds",
+        "controllerType",
+        "selectionScrollOffset"
+      ],
+      "ButtonBarLayout": [
+        "allowStacking"
+      ],
+      "RecycleListView": [
+        "paddingBottomNoButtons",
+        "paddingTopNoTitle"
+      ],
+      "ListView": [
+        "entries",
+        "divider",
+        "dividerHeight",
+        "headerDividersEnabled",
+        "footerDividersEnabled",
+        "overScrollHeader",
+        "overScrollFooter"
+      ],
+      "AbsListView": [
+        "listSelector",
+        "drawSelectorOnTop",
+        "stackFromBottom",
+        "scrollingCache",
+        "textFilterEnabled",
+        "transcriptMode",
+        "cacheColorHint",
+        "fastScrollEnabled",
+        "fastScrollStyle",
+        "smoothScrollbar",
+        "choiceMode",
+        "fastScrollAlwaysVisible"
+      ],
+      "CheckedTextView": [
+        "checked",
+        "checkMark",
+        "checkMarkTint",
+        "checkMarkTintMode",
+        "checkMarkGravity"
+      ],
+      "FastScroll": [
+        "thumbDrawable",
+        "thumbMinWidth",
+        "thumbMinHeight",
+        "trackDrawable",
+        "backgroundRight",
+        "backgroundLeft",
+        "position",
+        "textAppearance",
+        "textColor",
+        "textSize",
+        "minWidth",
+        "minHeight",
+        "padding",
+        "thumbPosition"
+      ],
+      "View": [
+        "id",
+        "tag",
+        "scrollX",
+        "scrollY",
+        "background",
+        "padding",
+        "paddingHorizontal",
+        "paddingVertical",
+        "paddingLeft",
+        "paddingTop",
+        "paddingRight",
+        "paddingBottom",
+        "paddingStart",
+        "paddingEnd",
+        "focusable",
+        "__removed3",
+        "__removed4",
+        "__removed5",
+        "autofillHints",
+        "importantForAutofill",
+        "importantForContentCapture",
+        "scrollCaptureHint",
+        "focusableInTouchMode",
+        "visibility",
+        "fitsSystemWindows",
+        "scrollbars",
+        "scrollbarStyle",
+        "isScrollContainer",
+        "fadeScrollbars",
+        "scrollbarFadeDuration",
+        "scrollbarDefaultDelayBeforeFade",
+        "scrollbarSize",
+        "scrollbarThumbHorizontal",
+        "scrollbarThumbVertical",
+        "scrollbarTrackHorizontal",
+        "scrollbarTrackVertical",
+        "scrollbarAlwaysDrawHorizontalTrack",
+        "scrollbarAlwaysDrawVerticalTrack",
+        "fadingEdge",
+        "requiresFadingEdge",
+        "fadingEdgeLength",
+        "nextFocusLeft",
+        "nextFocusRight",
+        "nextFocusUp",
+        "nextFocusDown",
+        "nextFocusForward",
+        "clickable",
+        "longClickable",
+        "contextClickable",
+        "saveEnabled",
+        "filterTouchesWhenObscured",
+        "drawingCacheQuality",
+        "keepScreenOn",
+        "duplicateParentState",
+        "minHeight",
+        "minWidth",
+        "soundEffectsEnabled",
+        "hapticFeedbackEnabled",
+        "contentDescription",
+        "accessibilityTraversalBefore",
+        "accessibilityTraversalAfter",
+        "onClick",
+        "overScrollMode",
+        "alpha",
+        "elevation",
+        "translationX",
+        "translationY",
+        "translationZ",
+        "transformPivotX",
+        "transformPivotY",
+        "rotation",
+        "rotationX",
+        "rotationY",
+        "scaleX",
+        "scaleY",
+        "verticalScrollbarPosition",
+        "layerType",
+        "layoutDirection",
+        "textDirection",
+        "textAlignment",
+        "importantForAccessibility",
+        "accessibilityLiveRegion",
+        "labelFor",
+        "theme",
+        "transitionName",
+        "nestedScrollingEnabled",
+        "stateListAnimator",
+        "backgroundTint",
+        "backgroundTintMode",
+        "outlineProvider",
+        "foreground",
+        "foregroundGravity",
+        "foregroundInsidePadding",
+        "foregroundTint",
+        "foregroundTintMode",
+        "scrollIndicators",
+        "pointerIcon",
+        "forceHasOverlappingRendering",
+        "tooltipText",
+        "keyboardNavigationCluster",
+        "__removed0",
+        "nextClusterForward",
+        "__removed1",
+        "focusedByDefault",
+        "defaultFocusHighlightEnabled",
+        "screenReaderFocusable",
+        "accessibilityPaneTitle",
+        "accessibilityHeading",
+        "allowClickWhenDisabled",
+        "outlineSpotShadowColor",
+        "outlineAmbientShadowColor",
+        "forceDarkAllowed",
+        "clipToOutline",
+        "preferKeepClear",
+        "autoHandwritingEnabled"
       ]
     },
     "privateAttributesByGroup": {
@@ -6496,14 +6709,57 @@
         "toBottom": 17957136
       },
       "LayoutAnimation": {},
-      "GridLayoutAnimation": {}
+      "GridLayoutAnimation": {},
+      "AlertDialog": {
+        "buttonPanelSideLayout": 17956896,
+        "listLayout": 17956998,
+        "multiChoiceItemLayout": 17957021,
+        "singleChoiceItemLayout": 17957112,
+        "listItemLayout": 17956997,
+        "progressLayout": 17957080,
+        "horizontalProgressLayout": 17956968,
+        "showTitle": 17957110,
+        "needsDefaultBackgrounds": 17957023,
+        "controllerType": 17956915,
+        "selectionScrollOffset": 17957106
+      },
+      "ButtonBarLayout": {
+        "allowStacking": 17956882
+      },
+      "RecycleListView": {
+        "paddingBottomNoButtons": 17957031,
+        "paddingTopNoTitle": 17957032
+      },
+      "ListView": {},
+      "AbsListView": {},
+      "CheckedTextView": {
+        "checkMarkGravity": 17956898
+      },
+      "FastScroll": {
+        "thumbDrawable": 17957133,
+        "thumbMinWidth": 17957135,
+        "thumbMinHeight": 17957134,
+        "trackDrawable": 17957148,
+        "backgroundRight": 17956891,
+        "backgroundLeft": 17956888,
+        "position": 17957068
+      },
+      "View": {
+        "__removed3": 17956867,
+        "__removed4": 17956868,
+        "__removed5": 17956869,
+        "scrollCaptureHint": 17957093,
+        "foregroundInsidePadding": 17956951,
+        "__removed0": 17956864,
+        "__removed1": 17956865
+      }
     },
     "idProfile": "Android SDK API36 revision2 resource data (same profile loaded by runtime)",
     "resourceProfilePath": "assets/framework-resources/framework-resources.json",
     "resourceProfileSha256": "ede88f5ead33e891eef7dc603f1ca24497f1e06b18da59a144969f5bc3ab18ca",
     "aapt2": "$ANDROID_SDK/build-tools/36.1.0/aapt2",
-    "inputXmlSha256": "747cf5492500faae7782eac8a6d050314d4b3d7a5d65d68a33a7ac9b5b38b38d",
-    "generatedRJavaSha256": "9e749ff00ffb17f1cd4dc52b1eb9440c50e70bd52f45227828a349665f10de41",
+    "inputXmlSha256": "c6b79fe8a9a9aeab306b997e0d218205c62b6e05ca7de8230b8434bf517f1982",
+    "generatedRJavaSha256": "3dfe2221de3105d3d4b64a9e70b3bace833c92590316a4da55044b1f886f7b38",
     "adaptations": [
       "All styleable memberships are copied from complete selected original AOSP13 declare-styleable elements.",
       "AAPT2 independently verifies every public ID and numeric array/index ordering against the actual runtime ARSC profile.",
@@ -6913,7 +7169,10 @@
       "array": 292,
       "id": 1554,
       "style": 1343,
-      "string": 2764
+      "string": 2764,
+      "layout": 382,
+      "drawable": 1009,
+      "color": 963
     },
     "generatedAttrCount": 1879
   },
@@ -35683,8 +35942,8 @@
   "generatedSources": [
     {
       "localPath": "framework-aosp/generated/com/android/internal/R.java",
-      "sha256": "9e749ff00ffb17f1cd4dc52b1eb9440c50e70bd52f45227828a349665f10de41",
-      "bytes": 668521,
+      "sha256": "3dfe2221de3105d3d4b64a9e70b3bace833c92590316a4da55044b1f886f7b38",
+      "bytes": 830740,
       "role": "AAPT2 generated framework resource attribute data"
     }
   ],

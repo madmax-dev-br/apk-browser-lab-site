@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=8e7bcbaf9d29';
+import { APKError } from './apk-runtime.js?v=1debfc41250a';
 
 const fail = message => { throw new APKError(message, { kind: 'skia-paragraph-unsupported' }); };
 const fontWeightOf = (CK, weight) => { if(!Number.isInteger(weight)||weight<0||weight>1000)fail('Font weight must be in [0,1000]'); return Object.values(CK.FontWeight).find(value=>value?.value===weight)??{value:weight}; };
@@ -15,7 +15,7 @@ const base64 = bytes => { let binary = ''; for (let offset = 0; offset < bytes.l
  * This is an explicit web text backend, not Android StaticLayout/Minikin. No OS
  * fonts, character-width estimates, or silently substituted glyphs are used.
  */
-export function measureSkiaParagraph(backend, text, { width, textSize = 14, weight = 400, italic = false, direction = 0, color = 0xff000000, maxLines = null, raster = false, alignment = 'start' } = {}) {
+export function measureSkiaParagraph(backend, text, { width, textSize = 14, weight = 400, italic = false, direction = 0, color = 0xff000000, maxLines = null, raster = false, alignment = 'start', ellipsis = null } = {}) {
   if (typeof text !== 'string' || text.length > 65536) fail('Paragraph text exceeds 65536 characters');
   if (!Number.isFinite(width) || width <= 0 || width > 4096 || !Number.isFinite(textSize) || textSize <= 0 || textSize > 512) fail('Paragraph extent exceeds the web text backend limits');
   if (maxLines !== null && (!Number.isInteger(maxLines) || maxLines < 1)) fail('Paragraph maxLines must be a positive integer');
@@ -29,7 +29,7 @@ export function measureSkiaParagraph(backend, text, { width, textSize = 14, weig
   const argb = color >>> 0;
   const textStyle = { color: CK.Color(argb >>> 16 & 255, argb >>> 8 & 255, argb & 255, (argb >>> 24) / 255), fontFamilies: ['Roboto'], fontSize: textSize,
     fontStyle: { weight: fontWeight, width: CK.FontWidth.Normal, slant: italic ? CK.FontSlant.Italic : CK.FontSlant.Upright } };
-  const style = new CK.ParagraphStyle({ ...(maxLines === null ? {} : { maxLines }), textDirection: direction ? CK.TextDirection.RTL : CK.TextDirection.LTR, textAlign: {start:CK.TextAlign.Start,left:CK.TextAlign.Left,right:CK.TextAlign.Right,center:CK.TextAlign.Center}[alignment], textStyle });
+  const style = new CK.ParagraphStyle({ ...(maxLines === null ? {} : { maxLines }), ...(ellipsis ? { ellipsis } : {}), textDirection: direction ? CK.TextDirection.RTL : CK.TextDirection.LTR, textAlign: {start:CK.TextAlign.Start,left:CK.TextAlign.Left,right:CK.TextAlign.Right,center:CK.TextAlign.Center}[alignment], textStyle });
   const itemized = itemizeFonts(backend, text, weight, italic);
   let builder, paragraph;
   try {

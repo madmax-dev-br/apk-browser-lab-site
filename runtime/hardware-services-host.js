@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=8e7bcbaf9d29';
-import { createHostRegistry } from './host-contract.js?v=8e7bcbaf9d29';
-import { GC_ROOTS } from './heap-gc.js?v=8e7bcbaf9d29';
+import { gcRoot } from './heap-gc.js?v=1debfc41250a';
+import { createHostRegistry } from './host-contract.js?v=1debfc41250a';
+import { GC_ROOTS } from './heap-gc.js?v=1debfc41250a';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
 // contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes, and an AlarmManager that

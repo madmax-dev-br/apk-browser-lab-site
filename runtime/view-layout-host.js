@@ -1,6 +1,6 @@
-import { APKError } from './apk-runtime.js?v=8e7bcbaf9d29';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=8e7bcbaf9d29';
-import { gcRoot } from './heap-gc.js?v=8e7bcbaf9d29';
+import { APKError } from './apk-runtime.js?v=1debfc41250a';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=1debfc41250a';
+import { gcRoot } from './heap-gc.js?v=1debfc41250a';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -51,6 +51,9 @@ export function createViewLayoutHost(platform) {
       const rootView = runtime.object(root), frameRect = platform.systemBarsHost?.contentFrame(runtime, root), geometry = platform.dialogWindowHost?.geometry(runtime,root) ?? (frameRect ? { width: frameRect.right - frameRect.left, height: frameRect.bottom - frameRect.top } : null), device = platform.device ?? { widthDp: 411, heightDp: 840 }, parentW = algorithm(runtime, SPEC, 'makeMeasureSpec', '(II)I', [geometry?.width??device.widthDp, 0x40000000]), parentH = algorithm(runtime, SPEC, 'makeMeasureSpec', '(II)I', [geometry?.height??device.heightDp, 0x40000000]);
       const width = algorithm(runtime, CHILD, 'getChildMeasureSpec', '(III)I', [parentW, 0, geometry?.layoutWidth??rootView.layoutWidth??-1]), height = algorithm(runtime, CHILD, 'getChildMeasureSpec', '(III)I', [parentH, 0, geometry?.layoutHeight??rootView.layoutHeight??-1]);
       call(runtime,root,VIEW,'measure','(II)V',[width,height]); const view=runtime.object(root);
+      // DecorView.onMeasure: a floating window under its theme's windowMinWidth is measured again at exactly that width
+      const minWidth = platform.dialogWindowHost?.minWidth(runtime, root) ?? 0;
+      if (minWidth > 0 && algorithm(runtime, SPEC, 'getMode', '(I)I', [width]) === (0x80000000 | 0) && (view.measuredWidth & SIZE) < minWidth) call(runtime,root,VIEW,'measure','(II)V',[algorithm(runtime, SPEC, 'makeMeasureSpec', '(II)I', [minWidth, 0x40000000]), height]);
       call(runtime,root,VIEW,'layout','(IIII)V',[0,0,view.measuredWidth&SIZE,view.measuredHeight&SIZE]); platform.requestDraw(runtime,root);
     }, 0, [root]);
   };
@@ -81,6 +84,16 @@ export function createViewLayoutHost(platform) {
     const [minW, maxW, minH, maxH] = platform.progressBarApi.limits(runtime, receiver), dw = Math.max(minW, Math.min(maxW, 0)) + (padding.left || 0) + (padding.right || 0), dh = Math.max(minH, Math.min(maxH, 0)) + (padding.top || 0) + (padding.bottom || 0);
     measured(runtime, receiver, algorithm(runtime, ALGORITHMS, 'resolveSizeAndState', '(III)I', [dw, wSpec, 0]), algorithm(runtime, ALGORITHMS, 'resolveSizeAndState', '(III)I', [dh, hSpec, 0]));
   };
+  /** TextUtils.ellipsize(text, paint, avail, where): the longest prefix / suffix (or both halves for MIDDLE) that fits next to the ellipsis character. */
+  const ellipsizeLine = (runtime, line, font, avail, where) => {
+    const width = text => runtime.skiaHost.measureText(text, font).width, ellipsis = '\u2026';
+    avail -= width(ellipsis); if (avail < 0) return ellipsis;
+    const longest = (fits, limit) => { let lo = 0, hi = line.length; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (fits(mid) <= limit) lo = mid; else hi = mid - 1; } return lo; };
+    if (where === 'END') return line.slice(0, longest(n => width(line.slice(0, n)), avail)) + ellipsis;
+    if (where === 'START') return ellipsis + line.slice(line.length - longest(n => width(line.slice(line.length - n)), avail));
+    const right = longest(n => width(line.slice(line.length - n)), avail / 2), rest = avail - width(line.slice(line.length - right));
+    return line.slice(0, longest(n => width(line.slice(0, n)), rest)) + ellipsis + line.slice(line.length - right);
+  };
   const nativeTextMeasure = (runtime, receiver, wSpec, hSpec) => {
     if (!runtime.skia?.measureText) fail('Native text measurement requires the verified Skia CPU font backend');
     const switchState = platform.drawableViewHost.measureSwitch?.(runtime, receiver);
@@ -89,15 +102,25 @@ export function createViewLayoutHost(platform) {
     const view = runtime.object(receiver), text = String(view.displayText ?? view.text ?? ''), lines = text.split('\n'); if (lines.length > 1024) fail('Native text line limit exceeded');
     const typeface = call(runtime, receiver, 'Landroid/widget/TextView;', 'getTypeface', '()Landroid/graphics/Typeface;'), info = runtime.skiaHost.resolveTypeface(typeface); view.textFontWeight = info.weight; view.textFontItalic = info.italic; const font = { textSize: view.textSize || 14, flags: 1, typefaceRef: typeface }, runs = lines.map(line => runtime.skiaHost.measureText(line, font));
     const metrics = runs[0].metrics, padding = platform.drawableViewHost.compoundPadding?.(runtime,receiver) || view.padding || {}, includePadding = view.includeFontPadding !== false;
+    const mode = algorithm(runtime, SPEC, 'getMode', '(I)I', [wSpec]), available = algorithm(runtime, SPEC, 'getSize', '(I)I', [wSpec]);
+    // TextUtils.ellipsize for a single line: START / MIDDLE / END cut the line to the width left by the padding and put the ellipsis in the cut (marquee needs an animation and stays unsupported).
+    view.ellipsizedText = null;
+    const where = platform.textViewApi.ellipsizeKind(runtime, receiver);
+    if (where && where !== 'MARQUEE' && lines.length === 1 && (view.singleLine || view.maxLines === 1) && mode) {
+      const room = available - (padding.left || 0) - (padding.right || 0);
+      if (runs[0].width > room) { const cut = ellipsizeLine(runtime, lines[0], font, room, where); view.ellipsizedText = cut; lines[0] = cut; runs[0] = runtime.skiaHost.measureText(cut, font); }
+    }
     const top = includePadding ? Math.floor(metrics.bounds[1]) : Math.round(metrics.ascent), bottom = includePadding ? Math.ceil(metrics.bounds[3]) : Math.round(metrics.descent);
     const lineHeight = Math.max(1, Math.round(metrics.descent) - Math.round(metrics.ascent) + Math.round(metrics.leading || 0));
-    let height = bottom - top + (lines.length - 1) * lineHeight + (padding.top || 0) + (padding.bottom || 0), width = Math.ceil(Math.max(...runs.map(run => run.width))) + (padding.left || 0) + (padding.right || 0);
-    const mode = algorithm(runtime, SPEC, 'getMode', '(I)I', [wSpec]), available = algorithm(runtime, SPEC, 'getSize', '(I)I', [wSpec]);
+    let textHeight = bottom - top + (lines.length - 1) * lineHeight, textWidth = Math.ceil(Math.max(...runs.map(run => run.width)));
+    const extents = platform.textViewApi.compoundExtents(runtime, receiver);   // TextView.onMeasure: the left / right drawables set a minimum height, the top / bottom ones a minimum width
+    if (extents) { textHeight = Math.max(textHeight, extents.leftHeight, extents.rightHeight); textWidth = Math.max(textWidth, extents.topWidth, extents.bottomWidth); }
+    let height = textHeight + (padding.top || 0) + (padding.bottom || 0), width = textWidth + (padding.left || 0) + (padding.right || 0);
     view.textRaster = null; view.textParagraph = null;
     let paragraph = null;
     if (mode && width > available && !view.singleLine && !view.horizontallyScrolling || view.maxLines != null && lines.length > view.maxLines) {
       const desiredWidth = width, paragraphWidth = mode === 0x40000000 || mode && desiredWidth > available ? available : desiredWidth, contentWidth = paragraphWidth - (padding.left || 0) - (padding.right || 0);
-      paragraph = measureSkiaParagraph(runtime.skia, text, { width: contentWidth, textSize: font.textSize, weight: info.weight, italic: info.italic, direction: view.layoutDirection || 0, maxLines: view.maxLines ?? null, color: view.textColor == null ? 0xff757575 : typeof view.textColor === 'string' ? parseInt(view.textColor.replace('#', ''), 16) : view.textColor, raster: true });
+      paragraph = measureSkiaParagraph(runtime.skia, text, { width: contentWidth, textSize: font.textSize, weight: info.weight, italic: info.italic, direction: view.layoutDirection || 0, maxLines: view.maxLines ?? null, ellipsis: where === 'END' && view.maxLines != null ? '\u2026' : null, color: view.textColor == null ? 0xff757575 : typeof view.textColor === 'string' ? parseInt(view.textColor.replace('#', ''), 16) : view.textColor, raster: true });
       width = paragraphWidth;
       height = Math.ceil(paragraph.height) + (padding.top || 0) + (padding.bottom || 0);
       view.textRaster = paragraph.raster;

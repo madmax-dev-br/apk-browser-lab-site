@@ -1,6 +1,6 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=8e7bcbaf9d29';
-import { APKError } from './apk-runtime.js?v=8e7bcbaf9d29';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=8e7bcbaf9d29';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=1debfc41250a';
+import { APKError } from './apk-runtime.js?v=1debfc41250a';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=1debfc41250a';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -126,7 +126,7 @@ export class AndroidStyleBackend {
       if (value.dataType || value.rawData === 1) indices[++indices[0]] = index;
     });
     this.put(runtime, array, TYPED_ARRAY, 'mTheme', THEME, themeRef || null);
-    if (node) { const parser = runtime.makeObject(XML); runtime.object(parser).pooledStrings = xmlStrings; this.put(runtime, array, TYPED_ARRAY, 'mXml', XML, parser); }
+    if (node) { const parser = runtime.makeObject(XML); runtime.object(parser).pooledStrings = xmlStrings; runtime.object(parser).styledNode = node; this.put(runtime, array, TYPED_ARRAY, 'mXml', XML, parser); }
     runtime.record(`RESOURCE styled attributes ${requested.length} (${indices[0]} present; original data)`);
     return array;
   }

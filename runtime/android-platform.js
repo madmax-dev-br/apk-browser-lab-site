@@ -1,83 +1,84 @@
-import { createComposeCanvasHost } from './compose-canvas-host.js?v=8e7bcbaf9d29';
-import { createViewTransformHost } from './view-transform-host.js?v=8e7bcbaf9d29';
-import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=8e7bcbaf9d29';
-import { createViewOutlineHost } from './view-outline-host.js?v=8e7bcbaf9d29';
-import { createShaderHost } from './shader-host.js?v=8e7bcbaf9d29';
-import { createSystemBarsHost } from './system-bars-host.js?v=8e7bcbaf9d29';
-import { createDeviceStateHost } from './device-state-host.js?v=8e7bcbaf9d29';
-import { createJobSchedulerHost } from './job-scheduler-host.js?v=8e7bcbaf9d29';
-import { createPendingIntentHost } from './pending-intent-host.js?v=8e7bcbaf9d29';
-import { createBinderHost } from './binder-host.js?v=8e7bcbaf9d29';
-import { createInputManagerHost } from './input-native.js?v=8e7bcbaf9d29';
-import { createBackDispatcherHost } from './back-dispatcher-host.js?v=8e7bcbaf9d29';
-import { createRenderThreadAnimators } from './rt-animators.js?v=8e7bcbaf9d29';
-import { renderNodeByHandle } from './rendernode-native.js?v=8e7bcbaf9d29';
-import { resolveDevice } from './device-profile.js?v=8e7bcbaf9d29';
-import { configurationFor } from './device-configuration.js?v=8e7bcbaf9d29';
-import { createViewCoordinateHost } from './view-coordinate-host.js?v=8e7bcbaf9d29';
-import { createEditableTextHost } from './editable-text-host.js?v=8e7bcbaf9d29';
-import { createComponentCallbacksHost } from './component-callbacks-host.js?v=8e7bcbaf9d29';
-import { createViewStateHost } from './view-state-host.js?v=8e7bcbaf9d29';
-import { createLocaleServiceHost } from './locale-service-host.js?v=8e7bcbaf9d29';
-import { APKError } from './apk-runtime.js?v=8e7bcbaf9d29';
-import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=8e7bcbaf9d29';
-import { createViewTreeHost } from './view-tree-host.js?v=8e7bcbaf9d29';
-import { createDialogWindowHost } from './dialog-window-host.js?v=8e7bcbaf9d29';
-import { createProgressBarApiHost } from './progress-bar-api-host.js?v=8e7bcbaf9d29';
-import { createViewGroupApiHost } from './viewgroup-api-host.js?v=8e7bcbaf9d29';
-import { createViewWindowHost } from './view-window-host.js?v=8e7bcbaf9d29';
-import { createVectorCanvasHost } from './vector-native.js?v=8e7bcbaf9d29';
-import { createPaintHost } from './paint-host.js?v=8e7bcbaf9d29';
-import { createContentResolverHost } from './content-resolver-host.js?v=8e7bcbaf9d29';
-import { createDrawableViewHost } from './drawable-view-host.js?v=8e7bcbaf9d29';
-import { createDeviceServicesHost } from './device-services-host.js?v=8e7bcbaf9d29';
-import { createSystemServicesHost } from './system-services-host.js?v=8e7bcbaf9d29';
-import { createJavaIoHost } from './java-io-host.js?v=8e7bcbaf9d29';
-import { createClassLoaderHost } from './class-loader-host.js?v=8e7bcbaf9d29';
-import { createAppServicesHost } from './app-services-host.js?v=8e7bcbaf9d29';
-import { createConcurrencyHost } from './concurrency-host.js?v=8e7bcbaf9d29';
-import { createDateTimeHost } from './datetime-host.js?v=8e7bcbaf9d29';
+import { createComposeCanvasHost } from './compose-canvas-host.js?v=1debfc41250a';
+import { createViewTransformHost } from './view-transform-host.js?v=1debfc41250a';
+import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=1debfc41250a';
+import { createViewOutlineHost } from './view-outline-host.js?v=1debfc41250a';
+import { createShaderHost } from './shader-host.js?v=1debfc41250a';
+import { createSystemBarsHost } from './system-bars-host.js?v=1debfc41250a';
+import { createDeviceStateHost } from './device-state-host.js?v=1debfc41250a';
+import { createJobSchedulerHost } from './job-scheduler-host.js?v=1debfc41250a';
+import { createPendingIntentHost } from './pending-intent-host.js?v=1debfc41250a';
+import { createBinderHost } from './binder-host.js?v=1debfc41250a';
+import { createInputManagerHost } from './input-native.js?v=1debfc41250a';
+import { createBackDispatcherHost } from './back-dispatcher-host.js?v=1debfc41250a';
+import { createRenderThreadAnimators } from './rt-animators.js?v=1debfc41250a';
+import { renderNodeByHandle } from './rendernode-native.js?v=1debfc41250a';
+import { resolveDevice } from './device-profile.js?v=1debfc41250a';
+import { configurationFor } from './device-configuration.js?v=1debfc41250a';
+import { createViewCoordinateHost } from './view-coordinate-host.js?v=1debfc41250a';
+import { createEditableTextHost } from './editable-text-host.js?v=1debfc41250a';
+import { createComponentCallbacksHost } from './component-callbacks-host.js?v=1debfc41250a';
+import { createViewStateHost } from './view-state-host.js?v=1debfc41250a';
+import { createLocaleServiceHost } from './locale-service-host.js?v=1debfc41250a';
+import { APKError } from './apk-runtime.js?v=1debfc41250a';
+import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=1debfc41250a';
+import { createViewTreeHost } from './view-tree-host.js?v=1debfc41250a';
+import { createDialogWindowHost } from './dialog-window-host.js?v=1debfc41250a';
+import { createProgressBarApiHost } from './progress-bar-api-host.js?v=1debfc41250a';
+import { createViewGroupApiHost } from './viewgroup-api-host.js?v=1debfc41250a';
+import { createViewInternalsHost } from './view-internals-host.js?v=1debfc41250a';
+import { createViewWindowHost } from './view-window-host.js?v=1debfc41250a';
+import { createVectorCanvasHost } from './vector-native.js?v=1debfc41250a';
+import { createPaintHost } from './paint-host.js?v=1debfc41250a';
+import { createContentResolverHost } from './content-resolver-host.js?v=1debfc41250a';
+import { createDrawableViewHost } from './drawable-view-host.js?v=1debfc41250a';
+import { createDeviceServicesHost } from './device-services-host.js?v=1debfc41250a';
+import { createSystemServicesHost } from './system-services-host.js?v=1debfc41250a';
+import { createJavaIoHost } from './java-io-host.js?v=1debfc41250a';
+import { createClassLoaderHost } from './class-loader-host.js?v=1debfc41250a';
+import { createAppServicesHost } from './app-services-host.js?v=1debfc41250a';
+import { createConcurrencyHost } from './concurrency-host.js?v=1debfc41250a';
+import { createDateTimeHost } from './datetime-host.js?v=1debfc41250a';
 const LOCALE_CONSTANTS = { US: 'en-US', UK: 'en-GB', ENGLISH: 'en', ROOT: 'und', CANADA: 'en-CA', CANADA_FRENCH: 'fr-CA', FRANCE: 'fr-FR', FRENCH: 'fr', GERMAN: 'de', GERMANY: 'de-DE', ITALIAN: 'it', ITALY: 'it-IT', JAPAN: 'ja-JP', JAPANESE: 'ja', KOREA: 'ko-KR', KOREAN: 'ko', CHINA: 'zh-CN', CHINESE: 'zh', PRC: 'zh-CN', SIMPLIFIED_CHINESE: 'zh-CN', TAIWAN: 'zh-TW', TRADITIONAL_CHINESE: 'zh-TW' };
-import { createNumberFormatHost } from './number-format-host.js?v=8e7bcbaf9d29';
-import { createCookieHost } from './cookie-host.js?v=8e7bcbaf9d29';
-import { createViewApiHost } from './view-api-host.js?v=8e7bcbaf9d29';
-import { createTextViewApiHost } from './textview-api-host.js?v=8e7bcbaf9d29';
-import { createIntentApiHost } from './intent-api-host.js?v=8e7bcbaf9d29';
-import { createImageViewApiHost } from './image-view-api-host.js?v=8e7bcbaf9d29';
-import { createUriApiHost } from './uri-api-host.js?v=8e7bcbaf9d29';
-import { createFormatterHost } from './formatter-host.js?v=8e7bcbaf9d29';
-import { createJcaHost } from './jca-host.js?v=8e7bcbaf9d29';
-import { createIcuBidiHost } from './icu-bidi-host.js?v=8e7bcbaf9d29';
-import { createSecurityHost } from './security-host.js?v=8e7bcbaf9d29';
-import { createReflectionHost } from './reflection-host.js?v=8e7bcbaf9d29';
-import { createSerializationHost } from './serialization-host.js?v=8e7bcbaf9d29';
-import { createBitmapCodecHost } from './bitmap-codec-host.js?v=8e7bcbaf9d29';
-import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=8e7bcbaf9d29';
-import { createImageViewHost } from './image-view-host.js?v=8e7bcbaf9d29';
-import { createWebViewHost } from './webview-host.js?v=8e7bcbaf9d29';
-import { createContentExtrasHost } from './content-extras-host.js?v=8e7bcbaf9d29';
-import { createSettingsHost } from './settings-host.js?v=8e7bcbaf9d29';
-import { createHardwareServicesHost } from './hardware-services-host.js?v=8e7bcbaf9d29';
-import { createPeripheralServicesHost } from './peripheral-services-host.js?v=8e7bcbaf9d29';
-import { createStorageServicesHost } from './storage-services-host.js?v=8e7bcbaf9d29';
-import { createSystemManagersHost } from './system-managers-host.js?v=8e7bcbaf9d29';
-import { DEVICE_FEATURES } from './service-kit.js?v=8e7bcbaf9d29';
-import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=8e7bcbaf9d29';
-import { createViewTouchHost } from './view-touch-host.js?v=8e7bcbaf9d29';
-import { createMagnifierHost } from './magnifier-host.js?v=8e7bcbaf9d29';
-import { createDisplayHost } from './display-host.js?v=8e7bcbaf9d29';
-import { createNotificationHost } from './notification-host.js?v=8e7bcbaf9d29';
-import { createDatabaseSupportHost } from './database-support-host.js?v=8e7bcbaf9d29';
-import { VMClock } from './vm-clock.js?v=8e7bcbaf9d29';
-import { createWindowInsetsHost } from './window-insets-host.js?v=8e7bcbaf9d29';
-import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=8e7bcbaf9d29';
-import { createViewLayoutHost } from './view-layout-host.js?v=8e7bcbaf9d29';
-import { createInputMethodServiceHost } from './input-method-service-host.js?v=8e7bcbaf9d29';
-import { createAutofillServiceHost } from './autofill-service-host.js?v=8e7bcbaf9d29';
-import { createClipboardServiceHost } from './clipboard-service-host.js?v=8e7bcbaf9d29';
-import { createViewInputHost } from './view-input-host.js?v=8e7bcbaf9d29';
-import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=8e7bcbaf9d29';
-import { maybeCollect } from './heap-gc.js?v=8e7bcbaf9d29';
+import { createNumberFormatHost } from './number-format-host.js?v=1debfc41250a';
+import { createCookieHost } from './cookie-host.js?v=1debfc41250a';
+import { createViewApiHost } from './view-api-host.js?v=1debfc41250a';
+import { createTextViewApiHost } from './textview-api-host.js?v=1debfc41250a';
+import { createIntentApiHost } from './intent-api-host.js?v=1debfc41250a';
+import { createImageViewApiHost } from './image-view-api-host.js?v=1debfc41250a';
+import { createUriApiHost } from './uri-api-host.js?v=1debfc41250a';
+import { createFormatterHost } from './formatter-host.js?v=1debfc41250a';
+import { createJcaHost } from './jca-host.js?v=1debfc41250a';
+import { createIcuBidiHost } from './icu-bidi-host.js?v=1debfc41250a';
+import { createSecurityHost } from './security-host.js?v=1debfc41250a';
+import { createReflectionHost } from './reflection-host.js?v=1debfc41250a';
+import { createSerializationHost } from './serialization-host.js?v=1debfc41250a';
+import { createBitmapCodecHost } from './bitmap-codec-host.js?v=1debfc41250a';
+import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=1debfc41250a';
+import { createImageViewHost } from './image-view-host.js?v=1debfc41250a';
+import { createWebViewHost } from './webview-host.js?v=1debfc41250a';
+import { createContentExtrasHost } from './content-extras-host.js?v=1debfc41250a';
+import { createSettingsHost } from './settings-host.js?v=1debfc41250a';
+import { createHardwareServicesHost } from './hardware-services-host.js?v=1debfc41250a';
+import { createPeripheralServicesHost } from './peripheral-services-host.js?v=1debfc41250a';
+import { createStorageServicesHost } from './storage-services-host.js?v=1debfc41250a';
+import { createSystemManagersHost } from './system-managers-host.js?v=1debfc41250a';
+import { DEVICE_FEATURES } from './service-kit.js?v=1debfc41250a';
+import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=1debfc41250a';
+import { createViewTouchHost } from './view-touch-host.js?v=1debfc41250a';
+import { createMagnifierHost } from './magnifier-host.js?v=1debfc41250a';
+import { createDisplayHost } from './display-host.js?v=1debfc41250a';
+import { createNotificationHost } from './notification-host.js?v=1debfc41250a';
+import { createDatabaseSupportHost } from './database-support-host.js?v=1debfc41250a';
+import { VMClock } from './vm-clock.js?v=1debfc41250a';
+import { createWindowInsetsHost } from './window-insets-host.js?v=1debfc41250a';
+import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=1debfc41250a';
+import { createViewLayoutHost } from './view-layout-host.js?v=1debfc41250a';
+import { createInputMethodServiceHost } from './input-method-service-host.js?v=1debfc41250a';
+import { createAutofillServiceHost } from './autofill-service-host.js?v=1debfc41250a';
+import { createClipboardServiceHost } from './clipboard-service-host.js?v=1debfc41250a';
+import { createViewInputHost } from './view-input-host.js?v=1debfc41250a';
+import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=1debfc41250a';
+import { maybeCollect } from './heap-gc.js?v=1debfc41250a';
 
 const ACTIVITY = 'Landroid/app/Activity;', INTENT = 'Landroid/content/Intent;', BUNDLE = 'Landroid/os/Bundle;';
 const APPLICATION = 'Landroid/app/Application;', APP_CONTEXT = 'Landroid/app/ContextImpl;';
@@ -210,7 +211,7 @@ function checkString(value, context) { if (typeof value !== 'string') error(`${c
 /** Explicit local Activity/Intent/Bundle and basic XML Views subset. Never bridges AndroidX. */
 const CORE_SERVICE_CLASSES = { 'Landroid/view/LayoutInflater;': 'layout_inflater', 'Landroid/view/WindowManager;': 'window', 'Landroid/view/accessibility/AccessibilityManager;': 'accessibility', 'Landroid/view/autofill/AutofillManager;': 'autofill', 'Landroid/content/ClipboardManager;': 'clipboard', 'Landroid/view/inputmethod/InputMethodManager;': 'input_method', 'Landroid/os/BatteryManager;': 'batterymanager', 'Landroid/net/ConnectivityManager;': 'connectivity', 'Landroid/app/job/JobScheduler;': 'jobscheduler', 'Landroid/telephony/TelephonyManager;': 'phone' };
 export class AndroidPlatform {
-  constructor({ resources = null, applicationName = null, packageName = null, manifest = null, apkBytes = null, device = null } = {}) { this.device = resolveDevice(device || {}); this.clock = new VMClock(); this.apkBytes = apkBytes; this.manifest = manifest; this.resources = resources; this.applicationName = applicationName; this.packageName = packageName; this.application = null; this.applicationState = 'new'; this.frames = []; this.taskClosed = false; this.resourceObject = null; this.finishedActivities = new Set(); this.eventQueue = []; this.eventSequence = 0; this.virtualProcess = { source: 'browser-vm', pid: 1, uid: 10000, foreground: true }; this.transactionSequence = 0; this.porterModes = new Map(); this.inflaters = new Map(); this.applicationCallbacks = []; this.styleBackend = new AndroidStyleBackend(this); this.viewTreeHost = createViewTreeHost(this); this.viewWindowHost = createViewWindowHost(this); this.canvasHost = createVectorCanvasHost(); this.paintHost = createPaintHost(); this.contentHost = createContentResolverHost(this); this.drawableViewHost = createDrawableViewHost(this); this.deviceServices = createDeviceServicesHost(this); this.insetsHost = createWindowInsetsHost(this); this.accessibilityService = createAccessibilityServiceHost(this); this.viewLayoutHost = createViewLayoutHost(this); this.autofillService = createAutofillServiceHost(this); this.inputMethodService = createInputMethodServiceHost(); this.clipboardService = createClipboardServiceHost(this); this.viewInputHost = createViewInputHost(this); this.xmlHost = new AndroidXmlHost(this); this.localeService = createLocaleServiceHost(this); this.viewStateHost = createViewStateHost(); this.componentCallbacksHost = createComponentCallbacksHost(this); this.editableTextHost = createEditableTextHost(this); this.viewCoordinateHost = createViewCoordinateHost(this); this.viewTransformHost = createViewTransformHost(this); this.viewPropertyAnimatorHost = createViewPropertyAnimatorHost(this); this.viewOutlineHost = createViewOutlineHost(this); this.composeCanvasHost = createComposeCanvasHost(this); this.dialogWindowHost = createDialogWindowHost(this); this.systemServices = createSystemServicesHost(this); this.javaIo = createJavaIoHost(this); this.classLoaders = createClassLoaderHost(this); this.appServices = createAppServicesHost(this); this.concurrency = createConcurrencyHost(this); this.dateTime = createDateTimeHost(this); this.numberFormat = createNumberFormatHost(this); this.cookies = createCookieHost(this); this.viewApi = createViewApiHost(this); this.textViewApi = createTextViewApiHost(this); this.intentApi = createIntentApiHost(this); this.imageViewApi = createImageViewApiHost(this); this.progressBarApi = createProgressBarApiHost(this); this.viewGroupApi = createViewGroupApiHost(this); this.uriApi = createUriApiHost(this); this.formatter = createFormatterHost(this); this.security = createSecurityHost(this); this.jca = createJcaHost(this); this.reflection = createReflectionHost(this); this.serialization = createSerializationHost(this); this.bitmapCodec = createBitmapCodecHost(this); this.bitmapDrawable = createBitmapDrawableHost(this); this.imageView = createImageViewHost(this); this.webView = createWebViewHost(this); this.contentExtras = createContentExtrasHost(this); this.settings = createSettingsHost(this); this.systemFeatures = new Set(DEVICE_FEATURES); this.hardwareServices = createHardwareServicesHost(this); this.peripheralServices = createPeripheralServicesHost(this); this.storageServices = createStorageServicesHost(this); this.systemManagers = createSystemManagersHost(this); this.typefaceBuilder = createTypefaceBuilderHost(this); this.viewTouch = createViewTouchHost(this); this.magnifier = createMagnifierHost(this); this.displayHost = createDisplayHost(this); this.notifications = createNotificationHost(this); this.databaseSupport = createDatabaseSupportHost(this); this.shaderHost = createShaderHost(this); this.systemBarsHost = createSystemBarsHost(this); this.deviceState = createDeviceStateHost(this); this.jobScheduler = createJobSchedulerHost(this); this.pendingIntents = createPendingIntentHost(this); this.binderHost = createBinderHost(this); this.inputManagerHost = createInputManagerHost(this); this.backDispatcher = createBackDispatcherHost(this); this.rtAnimators = createRenderThreadAnimators(this); this.icuBidi = createIcuBidiHost(this); this.contractHosts = [this.systemServices, this.javaIo, this.classLoaders, this.appServices, this.concurrency, this.dateTime, this.numberFormat, this.cookies, this.viewApi, this.textViewApi, this.intentApi, this.imageViewApi, this.progressBarApi, this.viewGroupApi, this.uriApi, this.formatter, this.icuBidi, this.security, this.jca, this.reflection, this.serialization, this.bitmapCodec, this.bitmapDrawable, this.imageView, this.webView, this.contentExtras, this.settings, this.hardwareServices, this.peripheralServices, this.storageServices, this.systemManagers, this.typefaceBuilder, this.viewTouch, this.magnifier, this.displayHost, this.notifications, this.databaseSupport, this.shaderHost, this.deviceState, this.jobScheduler, this.pendingIntents, this.binderHost, this.inputManagerHost, this.backDispatcher]; }
+  constructor({ resources = null, applicationName = null, packageName = null, manifest = null, apkBytes = null, device = null } = {}) { this.device = resolveDevice(device || {}); this.clock = new VMClock(); this.apkBytes = apkBytes; this.manifest = manifest; this.resources = resources; this.applicationName = applicationName; this.packageName = packageName; this.application = null; this.applicationState = 'new'; this.frames = []; this.taskClosed = false; this.resourceObject = null; this.finishedActivities = new Set(); this.eventQueue = []; this.eventSequence = 0; this.virtualProcess = { source: 'browser-vm', pid: 1, uid: 10000, foreground: true }; this.transactionSequence = 0; this.porterModes = new Map(); this.inflaters = new Map(); this.applicationCallbacks = []; this.styleBackend = new AndroidStyleBackend(this); this.viewTreeHost = createViewTreeHost(this); this.viewWindowHost = createViewWindowHost(this); this.canvasHost = createVectorCanvasHost(); this.paintHost = createPaintHost(); this.contentHost = createContentResolverHost(this); this.drawableViewHost = createDrawableViewHost(this); this.deviceServices = createDeviceServicesHost(this); this.insetsHost = createWindowInsetsHost(this); this.accessibilityService = createAccessibilityServiceHost(this); this.viewLayoutHost = createViewLayoutHost(this); this.autofillService = createAutofillServiceHost(this); this.inputMethodService = createInputMethodServiceHost(); this.clipboardService = createClipboardServiceHost(this); this.viewInputHost = createViewInputHost(this); this.xmlHost = new AndroidXmlHost(this); this.localeService = createLocaleServiceHost(this); this.viewStateHost = createViewStateHost(); this.componentCallbacksHost = createComponentCallbacksHost(this); this.editableTextHost = createEditableTextHost(this); this.viewCoordinateHost = createViewCoordinateHost(this); this.viewTransformHost = createViewTransformHost(this); this.viewPropertyAnimatorHost = createViewPropertyAnimatorHost(this); this.viewOutlineHost = createViewOutlineHost(this); this.composeCanvasHost = createComposeCanvasHost(this); this.dialogWindowHost = createDialogWindowHost(this); this.systemServices = createSystemServicesHost(this); this.javaIo = createJavaIoHost(this); this.classLoaders = createClassLoaderHost(this); this.appServices = createAppServicesHost(this); this.concurrency = createConcurrencyHost(this); this.dateTime = createDateTimeHost(this); this.numberFormat = createNumberFormatHost(this); this.cookies = createCookieHost(this); this.viewApi = createViewApiHost(this); this.textViewApi = createTextViewApiHost(this); this.intentApi = createIntentApiHost(this); this.imageViewApi = createImageViewApiHost(this); this.progressBarApi = createProgressBarApiHost(this); this.viewGroupApi = createViewGroupApiHost(this); this.viewInternals = createViewInternalsHost(this); this.uriApi = createUriApiHost(this); this.formatter = createFormatterHost(this); this.security = createSecurityHost(this); this.jca = createJcaHost(this); this.reflection = createReflectionHost(this); this.serialization = createSerializationHost(this); this.bitmapCodec = createBitmapCodecHost(this); this.bitmapDrawable = createBitmapDrawableHost(this); this.imageView = createImageViewHost(this); this.webView = createWebViewHost(this); this.contentExtras = createContentExtrasHost(this); this.settings = createSettingsHost(this); this.systemFeatures = new Set(DEVICE_FEATURES); this.hardwareServices = createHardwareServicesHost(this); this.peripheralServices = createPeripheralServicesHost(this); this.storageServices = createStorageServicesHost(this); this.systemManagers = createSystemManagersHost(this); this.typefaceBuilder = createTypefaceBuilderHost(this); this.viewTouch = createViewTouchHost(this); this.magnifier = createMagnifierHost(this); this.displayHost = createDisplayHost(this); this.notifications = createNotificationHost(this); this.databaseSupport = createDatabaseSupportHost(this); this.shaderHost = createShaderHost(this); this.systemBarsHost = createSystemBarsHost(this); this.deviceState = createDeviceStateHost(this); this.jobScheduler = createJobSchedulerHost(this); this.pendingIntents = createPendingIntentHost(this); this.binderHost = createBinderHost(this); this.inputManagerHost = createInputManagerHost(this); this.backDispatcher = createBackDispatcherHost(this); this.rtAnimators = createRenderThreadAnimators(this); this.icuBidi = createIcuBidiHost(this); this.contractHosts = [this.systemServices, this.javaIo, this.classLoaders, this.appServices, this.concurrency, this.dateTime, this.numberFormat, this.cookies, this.viewApi, this.textViewApi, this.intentApi, this.imageViewApi, this.progressBarApi, this.viewGroupApi, this.viewInternals, this.uriApi, this.formatter, this.icuBidi, this.security, this.jca, this.reflection, this.serialization, this.bitmapCodec, this.bitmapDrawable, this.imageView, this.webView, this.contentExtras, this.settings, this.hardwareServices, this.peripheralServices, this.storageServices, this.systemManagers, this.typefaceBuilder, this.viewTouch, this.magnifier, this.displayHost, this.notifications, this.databaseSupport, this.shaderHost, this.deviceState, this.jobScheduler, this.pendingIntents, this.binderHost, this.inputManagerHost, this.backDispatcher]; }
   readStatic(runtime, field) {
     for (const host of this.contractHosts) { const hosted = host.readStatic(runtime, field); if (hosted) return hosted; }
     // Android 13 Bundle.EMPTY: one singleton whose mMap is the immutable ArrayMap.EMPTY; any insertion throws UnsupportedOperationException("ArrayMap is immutable").
@@ -307,7 +308,7 @@ export class AndroidPlatform {
     const kind = this.drawableViewHost.viewKind(runtime, object) ?? this.webView.viewKind(runtime, object); if (kind) return kind;
     for (const [name, containerKind] of [['ScrollView', 'scroll'], ['LinearLayout', 'linear'], ['FrameLayout', 'frame']]) if (runtime.isSubtype(object.type, `Landroid/widget/${name};`)) return containerKind;
     if (runtime.isSubtype(object.type, 'Landroid/view/ViewGroup;')) return 'group';
-    if (object.type === 'Landroid/view/View;' || runtime.dex.classes.has(object.type) && runtime.isSubtype(object.type, 'Landroid/view/View;') && !['TextView', 'ProgressBar'].some(name => runtime.isSubtype(object.type, `Landroid/widget/${name};`))) return 'view';
+    if (object.type === 'Landroid/view/View;' || (runtime.dex.classes.has(object.type) || runtime.classes.has(object.type)) && runtime.isSubtype(object.type, 'Landroid/view/View;') && !['TextView', 'ProgressBar'].some(name => runtime.isSubtype(object.type, `Landroid/widget/${name};`))) return 'view';
     return null;
   }
   navigationState(runtime) { this.syncCurrent(runtime); const sourceBackHandler = !!runtime.activity && !!runtime.objectOverride(runtime.object(runtime.activity).type, 'onBackPressed()V'); return { sourceBackHandler, canGoBack: this.frames.length > 1 || sourceBackHandler, activityStack: this.frames.map((frame) => frame.type.slice(1, -1).replaceAll('/', '.')), closed: this.taskClosed }; }
@@ -364,8 +365,20 @@ export class AndroidPlatform {
     if (value.kind === 'unresolved' || value.kind === 'bag') error(`XML attribute ${attribute.name} has unresolved resource 0x${attribute.reference.toString(16)}: ${value.reason || value.kind}`, { kind: 'resource-unsupported', resourceId: attribute.reference });
     return value;
   }
+  /** Whether the attribute belongs to R.styleable.<Class> of a class in the view's ancestry that is original framework bytecode rather than a host-modeled class. */
+  ownedByOriginalClass(runtime, type, attribute) {
+    if (!attribute.resourceId) return false;
+    for (let current = type, guard = 0; current && guard < 32; current = runtime.parent(current), guard++) {
+      if (!runtime.classes.get(current) || !current.startsWith('Landroid/') && !current.startsWith('Lcom/android/internal/')) continue;
+      const simple = current.slice(current.lastIndexOf('/') + 1, -1).split('$').pop();
+      let array; try { array = runtime.readStatic({ owner: 'Lcom/android/internal/R$styleable;', name: simple, type: '[I' }); } catch { continue; }
+      if (array && runtime.array(array).elements.includes(attribute.resourceId | 0)) return true;
+    }
+    return false;
+  }
   dimension(attribute, runtime, floating = false) {
-    const value = this.typedAttribute(attribute);
+    // ?attr/ references resolve against the theme of the context being inflated (set by inflate()).
+    const value = attribute.kind === 'attribute' && this.inflateContext ? this.styleBackend.resolved(attribute, runtime.object(this.styleBackend.theme(runtime, this.inflateContext)).themeValues) : this.typedAttribute(attribute);
     if (value.kind === 'integer' && [-1, -2, 0].includes(value.value)) return value.value;
     if (runtime && (runtime.classes || runtime.dex.classes).has('Landroid/util/TypedValue;') && value.kind === 'dimension') { const converted = this.aospDimension(runtime, value, floating ? 'complexToDimension' : 'complexToDimensionPixelSize'); return floating ? bitsFloat(converted) : converted; }
     if (value.kind !== 'dimension' || !['dp', 'sp', 'px'].includes(value.unit)) error(`Unsupported XML dimension ${attribute.name}: ${value.kind}/${value.unit}`);
@@ -387,6 +400,7 @@ export class AndroidPlatform {
     const value = factoryView || runtime.makeObject(type), view = runtime.object(value);
     view.max ??= 100; view.progress ??= 0; view.checked ??= false; view.visibility ??= 0; view.context = context; view.enabled ??= true; view.xmlTag = node.name; view.padding ??= { left: 0, top: 0, right: 0, bottom: 0 };
     if (view.appliedNode !== node) for (const attribute of node.attributes) {
+      this.inflateContext = context;
       if (attribute.namespace === null && attribute.name === 'style' && type === names.ProgressBar && attribute.kind === 'attribute' && attribute.reference === 16842872) { view.progressStyle = 'horizontal'; continue; }
       // Other namespaces belong to subclass DEX constructors, not the framework View attributes.
       if (attribute.namespace !== 'http://schemas.android.com/apk/res/android') continue;
@@ -406,7 +420,8 @@ export class AndroidPlatform {
         case 'minLines': if (!runtime.isSubtype(type, 'Landroid/widget/TextView;') || !Number.isInteger(typed.value) || typed.value < 0) error('Invalid TextView minLines attribute'); runtime.dispatch({owner:'Landroid/widget/TextView;',name:'setMinLines',signature:'(I)V',parameters:['I'],result:'V'},[value,typed.value],'virtual'); break;
         case 'maxLines': if (!runtime.isSubtype(type, 'Landroid/widget/TextView;') || !Number.isInteger(typed.value) || typed.value < 0) error('Invalid TextView maxLines attribute'); view.maxLines = typed.value; break;
         case 'progressTint': if (typed.kind !== 'color') error('Only scalar progressTint is supported'); view.progressTint = typed.value; break;
-        case 'src': if (attribute.kind !== 'reference') error('ImageView src requires a real resource'); view.imageDrawable = this.styleBackend.loadDrawable(runtime, attribute.reference, this.styleBackend.theme(runtime, context)); runtime.dispatch({ owner: 'Landroid/graphics/drawable/Drawable;', name: 'setCallback', signature: '(Landroid/graphics/drawable/Drawable$Callback;)V', parameters: ['Landroid/graphics/drawable/Drawable$Callback;'], result: 'V' }, [view.imageDrawable, value], 'virtual'); break;
+        case 'src': if (attribute.kind === 'reference' && !attribute.reference) { view.imageDrawable = null; break; }   // @null
+          if (attribute.kind !== 'reference') error('ImageView src requires a real resource'); view.imageDrawable = this.styleBackend.loadDrawable(runtime, attribute.reference, this.styleBackend.theme(runtime, context)); runtime.dispatch({ owner: 'Landroid/graphics/drawable/Drawable;', name: 'setCallback', signature: '(Landroid/graphics/drawable/Drawable$Callback;)V', parameters: ['Landroid/graphics/drawable/Drawable$Callback;'], result: 'V' }, [view.imageDrawable, value], 'virtual'); break;
         case 'scaleType': view.imageScaleType = typed.value; break;
         case 'contentDescription': view.contentDescription = typed.value; break;
         case 'minWidth': view.minimumWidth = this.dimension(attribute, runtime); break;
@@ -437,11 +452,33 @@ export class AndroidPlatform {
         case 'orientation': if (!runtime.isSubtype(type, names.LinearLayout) || ![0, 1].includes(typed.value)) error('XML orientation is only supported on LinearLayout'); view.orientation = typed.value; break;
         case 'text': if (!runtime.isSubtype(type, 'Landroid/widget/TextView;') || !['string', 'null'].includes(typed.kind)) error('XML text must resolve to a string on a TextView'); view.text = typed.value ?? ''; break;
         case 'textSize': if (type === names.LinearLayout) error('XML textSize requires TextView'); view.textSize = this.dimension(attribute, runtime, true); break;
-        case 'textColor': if (typed.kind !== 'color') error('XML textColor must resolve to a scalar color'); view.textColor = typed.value; break;
+        case 'textColor': if (typed.kind === 'string' && /^res\/color[^/]*\/[^/]+\.xml$/.test(typed.value)) { view.textColor = null; break; }   // a ColorStateList resource: resolved per state when the text is drawn
+          if (typed.kind !== 'color') error('XML textColor must resolve to a color or a ColorStateList resource'); view.textColor = typed.value; break;
         case 'enabled': if (typed.kind !== 'boolean') error('XML enabled must resolve to a boolean'); view.enabled = !!typed.value; break;
         case 'padding': { const size = this.dimension(attribute, runtime); view.padding = { left: size, top: size, right: size, bottom: size }; break; }
         case 'paddingLeft': case 'paddingRight': case 'paddingTop': case 'paddingBottom': view.padding[attribute.name.slice(7).toLowerCase()] = this.dimension(attribute, runtime); break;
-        default: error(`Unsupported XML attribute android:${attribute.name} on <${node.name}>`, { kind: 'xml-attribute-unsupported', attribute: attribute.name, tag: node.name });
+        // Start/end insets: the lab lays out left-to-right (a right-to-left device locale fails at the layout direction check below), so start is left and end is right, as for layout_marginStart/End.
+        case 'paddingStart': case 'paddingEnd': view.padding[attribute.name === 'paddingStart' ? 'left' : 'right'] = this.dimension(attribute, runtime); break;
+        case 'layoutDirection': if (![0, 2, 3].includes(typed.value)) error('XML layoutDirection="rtl" needs right-to-left layout, which the lab does not run', { kind: 'xml-attribute-unsupported', attribute: 'layoutDirection', tag: node.name }); view.layoutDirectionAttribute = typed.value; break;
+        case 'textAppearance': break;   // resolved with the style: TextView size / colour / typeface read the textAppearance resource (see applyStyledTextSize and the canvas text style lookups)
+        case 'scrollIndicators': runtime.dispatch({ owner: 'Landroid/view/View;', name: 'setScrollIndicators', signature: '(I)V', parameters: ['I'], result: 'V' }, [value, typed.value], 'virtual'); break;
+        case 'scrollbarAlwaysDrawVerticalTrack': case 'scrollbarAlwaysDrawHorizontalTrack': view[attribute.name] = !!typed.value; break;   // scroll bars are not drawn by the lab; the flags are kept for the View API
+        case 'textAlignment': runtime.dispatch({ owner: 'Landroid/view/View;', name: 'setTextAlignment', signature: '(I)V', parameters: ['I'], result: 'V' }, [value, typed.value], 'virtual'); break;
+        case 'ellipsize': { if (!runtime.isSubtype(type, 'Landroid/widget/TextView;')) error('XML ellipsize requires TextView'); const at = [null, 'START', 'MIDDLE', 'END', 'MARQUEE'][typed.value]; runtime.dispatch({ owner: 'Landroid/widget/TextView;', name: 'setEllipsize', signature: '(Landroid/text/TextUtils$TruncateAt;)V', parameters: ['Landroid/text/TextUtils$TruncateAt;'], result: 'V' }, [value, at ? runtime.readStatic({ owner: 'Landroid/text/TextUtils$TruncateAt;', name: at, type: 'Landroid/text/TextUtils$TruncateAt;' }) : null], 'virtual'); break; }
+        case 'drawableStart': case 'drawableEnd': case 'drawableLeft': case 'drawableRight': case 'drawableTop': case 'drawableBottom': {   // TextView compound drawables: set together after the attribute pass
+          if (!runtime.isSubtype(type, 'Landroid/widget/TextView;')) error(`XML ${attribute.name} requires TextView`);
+          const reference = attribute.kind === 'attribute' ? this.styleBackend.resolved(attribute, runtime.object(this.styleBackend.theme(runtime, context)).themeValues, false) : attribute;
+          if (reference.kind === 'null' || (reference.kind === 'reference' && !reference.reference)) { (view.xmlCompound ??= {})[attribute.name.slice(8).toLowerCase()] = null; break; }
+          if (reference.kind !== 'reference') error(`XML ${attribute.name} requires a Drawable resource`);
+          (view.xmlCompound ??= {})[attribute.name.slice(8).toLowerCase()] = this.styleBackend.loadDrawable(runtime, reference.reference, this.styleBackend.theme(runtime, context)); break;
+        }
+        case 'drawablePadding': runtime.dispatch({ owner: 'Landroid/widget/TextView;', name: 'setCompoundDrawablePadding', signature: '(I)V', parameters: ['I'], result: 'V' }, [value, this.dimension(attribute, runtime)], 'virtual'); break;
+        case 'scrollbars': for (const [bit, method] of [[0x100, 'setHorizontalScrollBarEnabled'], [0x200, 'setVerticalScrollBarEnabled']]) runtime.dispatch({ owner: 'Landroid/view/View;', name: method, signature: '(Z)V', parameters: ['Z'], result: 'V' }, [value, (typed.value & bit) ? 1 : 0], 'virtual'); break;
+        case 'overScrollMode': runtime.dispatch({ owner: 'Landroid/view/View;', name: 'setOverScrollMode', signature: '(I)V', parameters: ['I'], result: 'V' }, [value, typed.value], 'virtual'); break;
+        default:
+          // An attribute of the styleable of an original (DEX) widget class in this view's ancestry (AbsListView, ListView, RecycleListView, ...) is read by that class's own constructor from the AttributeSet.
+          if (this.ownedByOriginalClass(runtime, type, attribute)) break;
+          error(`Unsupported XML attribute android:${attribute.name} on <${node.name}>`, { kind: 'xml-attribute-unsupported', attribute: attribute.name, tag: node.name });
       }
     }
     // View constructor order: a background Drawable's padding is applied first; explicit android:padding* attributes win.
@@ -449,6 +486,11 @@ export class AndroidPlatform {
       if (attribute.namespace !== 'http://schemas.android.com/apk/res/android') continue;
       if (attribute.name === 'padding') { const size = this.dimension(attribute, runtime); view.padding = { left: size, top: size, right: size, bottom: size }; }
       else if (['paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom'].includes(attribute.name)) view.padding[attribute.name.slice(7).toLowerCase()] = this.dimension(attribute, runtime);
+    }
+    if (view.xmlCompound) {   // TextView constructor: setCompoundDrawables*WithIntrinsicBounds with the drawables the attributes named
+      const c = view.xmlCompound, D = 'Landroid/graphics/drawable/Drawable;', relative = 'start' in c || 'end' in c; view.xmlCompound = null;
+      const sides = relative ? [c.start ?? null, c.top ?? null, c.end ?? null, c.bottom ?? null] : [c.left ?? null, c.top ?? null, c.right ?? null, c.bottom ?? null];
+      runtime.dispatch({ owner: 'Landroid/widget/TextView;', name: relative ? 'setCompoundDrawablesRelativeWithIntrinsicBounds' : 'setCompoundDrawablesWithIntrinsicBounds', signature: `(${D}${D}${D}${D})V`, parameters: [D, D, D, D], result: 'V' }, [value, ...sides], 'virtual');
     }
     view.appliedNode = node; this.syncViewFields(runtime, value); this.drawableViewHost.afterLayout(runtime, value); if (options.applyOnly) return value;
     if (!['LinearLayout', 'FrameLayout', 'ScrollView'].some(name => runtime.isSubtype(type, names[name])) && node.children.length) error(`XML ${short} cannot contain child Views`);
@@ -460,6 +502,8 @@ export class AndroidPlatform {
     if (!root) return null;
     const view = runtime.object(root); if (seen.has(view.id) || seen.size >= 4096) error('Cyclic/excessive View tree'); seen.add(view.id);
     if (view.androidId === (id >>> 0)) return root;
+    // An original subclass that overrides findViewTraversal (ListView also searches its header and footer views) decides for its subtree, as View.findViewById does.
+    if (runtime.objectOverride(view.type, 'findViewTraversal(I)Landroid/view/View;')) { const found = runtime.dispatch({ owner: 'Landroid/view/View;', name: 'findViewTraversal', parameters: ['I'], result: 'Landroid/view/View;', signature: '(I)Landroid/view/View;' }, [root, id], 'virtual'); return nullish(found) ? null : found; }
     for (const child of view.children) { const found = this.find(runtime, child, id, seen); if (found) return found; }
     return null;
   }
@@ -748,7 +792,7 @@ export class AndroidPlatform {
     if (name === 'generateDefaultLayoutParams') { const linear = runtime.isSubtype(object.type, 'Landroid/widget/LinearLayout;'), frame = runtime.isSubtype(object.type, 'Landroid/widget/FrameLayout;'), type = linear ? 'Landroid/widget/LinearLayout$LayoutParams;' : frame ? 'Landroid/widget/FrameLayout$LayoutParams;' : LAYOUT_PARAMS, width = linear ? object.orientation === 1 ? -1 : -2 : frame ? -1 : -2, height = frame ? -1 : -2, ref = runtime.allocate(type); runtime.dispatch({ owner: type, name: '<init>', signature: '(II)V', parameters: ['I', 'I'], result: 'V' }, [ref, width, height], 'direct'); return ref; }
     if (name === 'generateLayoutParams') return this.layoutParamsFromAttributes(runtime, receiver, args[1]);
     if (name === 'onFinishInflate') return; // AOSP View.onFinishInflate() has an empty base body.
-    if (name === '<init>' && method.parameters[0] === 'Landroid/content/Context;') { object.context = args[1]; object.enabled = true; if(method.parameters[2]==='I')object.defStyleAttr=args[3]; if (runtime.isSubtype(object.type, 'Landroid/widget/TextView;')) object.textSize = Math.fround((runtime.isSubtype(object.type, 'Landroid/widget/EditText;') ? 18 : 14) * (this.device.fontScale || 1)); /* these defaults are sp values (scaledDensity = density * fontScale) */ this.drawableViewHost.applyThemeDefaults(runtime, receiver, args[2]); if (args[2] && runtime.object(args[2]).node) this.inflate(runtime, runtime.object(args[2]).node, args[1], 0, { existing: receiver, applyOnly: true }); this.syncViewFields(runtime, receiver); return; }
+    if (name === '<init>' && method.parameters[0] === 'Landroid/content/Context;') { object.context = args[1]; object.enabled = true; if(method.parameters[2]==='I')object.defStyleAttr=args[3]; if (runtime.isSubtype(object.type, 'Landroid/widget/TextView;')) object.textSize = Math.fround((runtime.isSubtype(object.type, 'Landroid/widget/EditText;') ? 18 : 14) * (this.device.fontScale || 1)); /* these defaults are sp values (scaledDensity = density * fontScale) */ this.drawableViewHost.applyThemeDefaults(runtime, receiver, args[2]); this.drawableViewHost.applyStyledTextSize(runtime, receiver, args[2]); if (args[2] && runtime.object(args[2]).node) this.inflate(runtime, runtime.object(args[2]).node, args[1], 0, { existing: receiver, applyOnly: true }); this.syncViewFields(runtime, receiver); return; }
     if (owner === 'Landroid/content/res/Resources;') {
       if (name === 'getConfiguration') return this.resourceConfiguration(runtime,receiver);
       if(runtime.object(receiver).resourceConfigurationDifference)error('Resource selection for this changed configuration is not installed',{kind:'configuration-resources-unsupported',changes:runtime.object(receiver).resourceConfigurationDifference});

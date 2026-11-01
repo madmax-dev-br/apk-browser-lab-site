@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=8e7bcbaf9d29';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=8e7bcbaf9d29';
+import { APKError } from './apk-runtime.js?v=1debfc41250a';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=1debfc41250a';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -22,7 +22,7 @@ export function createViewWindowHost(platform){
  // Choreographer.sFrameDelay is a legacy animation setting, not the VSYNC interval.
  let legacyFrameDelay=10n;
  const frameInterval=1000/60, pendingViews=gcRoot(new Map()), pendingFrames=gcRoot([]), tokens=gcRoot(new Map());let display=null,choreographer=null,handler=null,frameTime=null,lastFrameMs=0,currentPhase=-1,pendingViewCount=0;
- const focusedWindows=gcRoot(new Map()),focusQueryStack=new Set();let focusDepth=0,inTouchMode=false,focusQueryNodes=0;
+ const focusedWindows=gcRoot(new Map()),focusQueryStack=new Set();let focusDepth=0,inTouchMode=true,focusQueryNodes=0; /* config_defaultInTouchMode is true on a touchscreen device: a window starts in touch mode and leaves it on a key press */
  const rootOf=(runtime,receiver)=>{let current=receiver;const seen=new Set();while(runtime.object(current).parent){if(seen.has(current.ref)||seen.size>=4096)error('Cyclic/excessive View window hierarchy');seen.add(current.ref);current=runtime.object(current).parent;}return current;};
  const frameOf=(runtime,receiver)=>{const root=rootOf(runtime,receiver);const context=runtime.object(receiver).context;return platform.frames.find(frame=>same(frame.root,root)||frame.window&&same(runtime.object(frame.window).decor,root)||same(frame.activity,context))||null;};
  const focusKey=(runtime,receiver)=>frameOf(runtime,receiver)?.activity.ref??rootOf(runtime,receiver).ref;

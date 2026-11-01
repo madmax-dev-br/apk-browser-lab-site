@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=8e7bcbaf9d29';
+import { APKError } from './apk-runtime.js?v=1debfc41250a';
 const PARSER = 'Landroid/content/res/XmlBlock$Parser;', PULL = 'Lorg/xmlpull/v1/XmlPullParser;', ATTRS = 'Landroid/util/AttributeSet;', RES_PARSER = 'Landroid/content/res/XmlResourceParser;';
 const ANDROID = 'http://schemas.android.com/apk/res/android';
 const methods = [
@@ -33,9 +33,10 @@ export class AndroidXmlHost {
   }
   event(parser) { if (parser.closed) fail('parser is closed'); return parser.events[parser.cursor]; }
   advance(parser) { if (parser.cursor < parser.events.length - 1) parser.cursor++; const event = this.event(parser); parser.node = event.node; return event.type; }
-  attribute(parser, first, second) {
+  attribute(parser, first, second, byIndex = typeof first === 'number') {
+    // A null namespace String arrives as 0, so the by-index forms are told apart by the method's first parameter type, not by the value.
     const event = this.event(parser); if (event.type !== 2) return null;
-    return typeof first === 'number' ? event.node.attributes[first] ?? null : event.node.attributes.find(attr => (attr.namespace || '') === (first || '') && attr.name === second) ?? null;
+    return byIndex ? event.node.attributes[first] ?? null : event.node.attributes.find(attr => (attr.namespace || '') === (first || '') && attr.name === second) ?? null;
   }
   invoke(runtime, method, args) {
     const name = method.name;
@@ -45,6 +46,9 @@ export class AndroidXmlHost {
     const parser = runtime.object(args[0]);
     if (name === 'getPooledString') { const text = parser.pooledStrings?.get(args[1]); if (text === undefined) fail(`pool index ${args[1]} is not prepared`); return text; }
     if (name === 'close') { parser.closed = true; return; }
+    // The Parser a styled TypedArray keeps (mXml) is not a cursor over events: it names the AttributeSet's element for TypedArray.getPositionDescription and error messages (XmlBlock.Parser: "Binary XML file line #n")
+    if (!parser.events && name === 'getPositionDescription') return `Binary XML file line #${parser.styledNode?.lineNumber ?? -1}`;
+    if (!parser.events && name === 'getLineNumber') return parser.styledNode?.lineNumber ?? -1;
     const event = this.event(parser), node = event.node;
     if (name === 'getEventType') return event.type;
     if (name === 'next' || name === 'nextToken') return this.advance(parser);
@@ -69,7 +73,7 @@ export class AndroidXmlHost {
     if (name === 'getStyleAttribute') return node?.attributes.find(attr => attr.name === 'style')?.reference || 0;
     if (name === 'getIdAttributeResourceValue') return this.attribute(parser, ANDROID, 'id')?.reference ?? args[1];
     if (name === 'getIdAttribute' || name === 'getClassAttribute') { const attr = this.attribute(parser, name === 'getIdAttribute' ? ANDROID : null, name === 'getIdAttribute' ? 'id' : 'class'); return attr ? attr.rawValue ?? (attr.kind === 'reference' ? `@${attr.reference}` : String(attr.value)) : null; }
-    const attr = this.attribute(parser, args[1], args[2]);
+    const attr = this.attribute(parser, args[1], args[2], method.parameters?.[0] === 'I');
     if (name === 'getAttributeName') return attr?.name ?? null;
     if (name === 'getAttributeNamespace') return attr?.namespace || '';
     if (name === 'getAttributePrefix') return node?.namespaces.find(ns => ns.uri === attr?.namespace)?.prefix ?? null;
