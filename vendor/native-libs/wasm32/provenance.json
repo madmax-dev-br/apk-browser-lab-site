@@ -249,8 +249,8 @@
       "soname": "libappmodules.so",
       "abi": "wasm32",
       "file": "apps/cff0c355aef6/libappmodules.wasm",
-      "bytes": 2574111,
-      "sha256": "6d5426bc86fde04e7e3d45d15277c63194a7811942e5d237175e881b8ab00013",
+      "bytes": 2587605,
+      "sha256": "b80ff9505a876dac89c5522816f36037ec8c2948c5f669312da25670f6fd2dad",
       "needed": [
         "libreact_codegen_rnsvg.so",
         "libreact-native-mmkv.so",

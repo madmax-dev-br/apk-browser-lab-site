@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=6a35ed61b8ba';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=6a35ed61b8ba';
+import { APKError } from './apk-error.js?v=423a9fac80d0';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=423a9fac80d0';
 
 const MANAGER = 'Landroid/view/inputmethod/InputMethodManager;';
 const VIEW = 'Landroid/view/View;';

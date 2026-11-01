@@ -1,17 +1,17 @@
-import { APKError } from './apk-error.js?v=6a35ed61b8ba';
-import { JavaException } from './apk-runtime.js?v=6a35ed61b8ba';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=6a35ed61b8ba';
-import { buildElfDescriptor } from './native-descriptor.js?v=6a35ed61b8ba';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=6a35ed61b8ba';
-import { NativeLinker, LinkError } from './native-linker.js?v=6a35ed61b8ba';
-import { hostFunction } from './wasm-host-function.js?v=6a35ed61b8ba';
-import { parseWasm } from './wasm-dylink.js?v=6a35ed61b8ba';
-import { formatVersion } from './rn-version.js?v=6a35ed61b8ba';
-import { registerWasmMemory } from './unsafe-native.js?v=6a35ed61b8ba';
-import { writeSkPath } from './skia-path-layout.js?v=6a35ed61b8ba';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=6a35ed61b8ba';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=6a35ed61b8ba';
-import { withVariants } from './native-provider-variants.js?v=6a35ed61b8ba';
+import { APKError } from './apk-error.js?v=423a9fac80d0';
+import { JavaException } from './apk-runtime.js?v=423a9fac80d0';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=423a9fac80d0';
+import { buildElfDescriptor } from './native-descriptor.js?v=423a9fac80d0';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=423a9fac80d0';
+import { NativeLinker, LinkError } from './native-linker.js?v=423a9fac80d0';
+import { hostFunction } from './wasm-host-function.js?v=423a9fac80d0';
+import { parseWasm } from './wasm-dylink.js?v=423a9fac80d0';
+import { formatVersion } from './rn-version.js?v=423a9fac80d0';
+import { registerWasmMemory } from './unsafe-native.js?v=423a9fac80d0';
+import { writeSkPath } from './skia-path-layout.js?v=423a9fac80d0';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=423a9fac80d0';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=423a9fac80d0';
+import { withVariants } from './native-provider-variants.js?v=423a9fac80d0';
 
 // JNI -> WebAssembly bridge.
 //
@@ -44,6 +44,25 @@ const sanitizeAlias = type => type.replace(/\$\$ldr\d+;$/, ';');
 export const BASE_SONAME = 'libc++_shared.so';
 
 /** Lab-controlled registry of WebAssembly native libraries. `add` verifies the pinned SHA-256 before compiling; there is no API that accepts APK bytes. */
+export function briefValue(r, type, value) {
+  try {
+    if (value === null || value === undefined) return 'null';
+    if (type === 'J') return `${value}L`; if (type !== 'L' && !type.startsWith('L') && !type.startsWith('[')) return String(value);
+    if (typeof value === 'string') return JSON.stringify(value.slice(0, 120));
+    const o = r.object(value);
+    if (o.type === 'Ljava/lang/String;') return JSON.stringify(r.stringCharacters(value).slice(0, 120));
+    const name = String(o.type).replace(/^L|;$/g, '').split('/').pop();
+    if (/^Readable(Native)?(Map|Array)$/.test(name)) {   // the data a JS call carried: ReadableNativeMap/Array.toString() lists it
+      const text = r.dispatch({ owner: o.type, name: 'toString', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [value], 'virtual');
+      return `${name}${JSON.stringify(r.stringCharacters(text).slice(0, Number(globalThis.process?.env?.APKWEB_JNI_TRACE_WIDTH ?? 900)))}`;
+    }
+    return `${name}@${value.ref}`;
+  } catch { return '?'; }
+}
+
+const JNI_TRACE = globalThis.process?.env?.APKWEB_JNI_TRACE ? new RegExp(globalThis.process.env.APKWEB_JNI_TRACE) : null;
+let nativeTraced = 0;
+
 export class NativeLibraryProvider {
   constructor({ abi = 'wasm32' } = {}) { this.abi = abi; this.modules = new Map(); this.unavailable = new Map(); }
   /** `hostImports(bridge, soname)` may supply imports the linker does not (a library's own host module, e.g. apkweb_sqlcipher): { module: { name: fn } }. Lab code only, never from an APK. */
@@ -305,6 +324,8 @@ export class JniBridge {
   invoke(binding, method, args, mode) {
     const r = this.runtime, isStatic = mode === 'static';
     const parameters = method.parameters;
+    const tracing = JNI_TRACE && nativeTraced < Number(globalThis.process?.env?.APKWEB_JNI_TRACE_MAX ?? 4000) && JNI_TRACE.test(`${method.owner}->${method.name}`);
+    if (tracing) { nativeTraced++; r.record(`LOG D JNITrace: native ${String(method.owner).replace(/^L|;$/g, '')}.${method.name}(${parameters.map((t, i) => briefValue(r, t, args[(isStatic ? 0 : 1) + i])).join(', ')})`); }
     return this.#enter(method, () => {
       const wasmArgs = [this.proc.envPtr, this.#local(isStatic ? r.classObject(method.owner) : args[0])];
       parameters.forEach((type, i) => wasmArgs.push(this.#toWasm(type, args[(isStatic ? 0 : 1) + i])));
@@ -486,21 +507,7 @@ export class JniBridge {
     // up to APKWEB_JNI_TRACE_MAX lines (default 4000). It shows what a React Native app's JavaScript asks of the platform through its TurboModules and what comes back.
     const traceFilter = globalThis.process?.env?.APKWEB_JNI_TRACE ? new RegExp(globalThis.process.env.APKWEB_JNI_TRACE) : null, traceMax = Number(globalThis.process?.env?.APKWEB_JNI_TRACE_MAX ?? 4000);
     let traced = 0;
-    const brief = (type, value) => {
-      try {
-        if (value === null || value === undefined) return 'null';
-        if (type === 'J') return `${value}L`; if (type !== 'L' && !type.startsWith('L') && !type.startsWith('[')) return String(value);
-        if (typeof value === 'string') return JSON.stringify(value.slice(0, 120));
-        const o = r.object(value);
-        if (o.type === 'Ljava/lang/String;') return JSON.stringify(r.stringCharacters(value).slice(0, 120));
-        const name = String(o.type).replace(/^L|;$/g, '').split('/').pop();
-        if (/^Readable(Native)?(Map|Array)$/.test(name)) {   // the data a JS call carried: ReadableNativeMap/Array.toString() lists it
-          const text = r.dispatch({ owner: o.type, name: 'toString', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [value], 'virtual');
-          return `${name}${JSON.stringify(r.stringCharacters(text).slice(0, 900))}`;
-        }
-        return `${name}@${value.ref}`;
-      } catch { return '?'; }
-    };
+    const brief = (type, value) => briefValue(r, type, value);
     const callWith = (mode, kind, resultType) => (_env, objOrCls, ...rest) => {
       const nonvirtual = mode === 'nonvirtual', mid = rest[nonvirtual ? 1 : 0], argPtr = rest[nonvirtual ? 2 : 1];
       const info = self.methodIds[mid]; if (!info) throw new APKError('Invalid jmethodID', { kind: 'jni-invalid-reference' });

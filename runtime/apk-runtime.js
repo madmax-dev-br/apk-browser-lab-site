@@ -1,21 +1,22 @@
-import { VMClock } from './vm-clock.js?v=6a35ed61b8ba';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=6a35ed61b8ba';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=6a35ed61b8ba';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=6a35ed61b8ba';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=6a35ed61b8ba';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=6a35ed61b8ba';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=6a35ed61b8ba';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=6a35ed61b8ba';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=6a35ed61b8ba';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=6a35ed61b8ba';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=6a35ed61b8ba';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=6a35ed61b8ba';
-import { APKError } from './apk-error.js?v=6a35ed61b8ba';
-import { collectGarbage } from './heap-gc.js?v=6a35ed61b8ba';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=6a35ed61b8ba';
-import { Scheduler, Blocked } from './scheduler.js?v=6a35ed61b8ba';
-import { bootClassLacksMember } from './boot-class-members.js?v=6a35ed61b8ba';
-export { APKError } from './apk-error.js?v=6a35ed61b8ba';
+import { VMClock } from './vm-clock.js?v=423a9fac80d0';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=423a9fac80d0';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=423a9fac80d0';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=423a9fac80d0';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=423a9fac80d0';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=423a9fac80d0';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=423a9fac80d0';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=423a9fac80d0';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=423a9fac80d0';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=423a9fac80d0';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=423a9fac80d0';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=423a9fac80d0';
+import { APKError } from './apk-error.js?v=423a9fac80d0';
+import { collectGarbage } from './heap-gc.js?v=423a9fac80d0';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=423a9fac80d0';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=423a9fac80d0';
+import { Scheduler, Blocked } from './scheduler.js?v=423a9fac80d0';
+import { bootClassLacksMember } from './boot-class-members.js?v=423a9fac80d0';
+export { APKError } from './apk-error.js?v=423a9fac80d0';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -490,7 +491,7 @@ addBridge('java/lang/Class', ['newInstance()Ljava/lang/Object;', 'getDeclaredCon
   'getConstructor([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;', 'getConstructors()[Ljava/lang/reflect/Constructor;', 'getDeclaredConstructors()[Ljava/lang/reflect/Constructor;',
   'getDeclaredMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;', 'getMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;',
   'getDeclaredMethods()[Ljava/lang/reflect/Method;', 'getDeclaredField(Ljava/lang/String;)Ljava/lang/reflect/Field;', 'getField(Ljava/lang/String;)Ljava/lang/reflect/Field;',
-  'getDeclaredFields()[Ljava/lang/reflect/Field;']);
+  'getDeclaredFields()[Ljava/lang/reflect/Field;', 'getFields()[Ljava/lang/reflect/Field;']);
 EXTERNAL_PARENTS.set('Ljava/lang/reflect/Array;','Ljava/lang/Object;');
 { const existing = EXTERNAL_INTERFACES.get('Ljava/lang/Class;') ?? []; EXTERNAL_INTERFACES.set('Ljava/lang/Class;', [...new Set([...existing, 'Ljava/io/Serializable;', 'Ljava/lang/reflect/Type;', 'Ljava/lang/reflect/AnnotatedElement;', 'Ljava/lang/reflect/GenericDeclaration;'])]); } // java.lang.Class implements these
 addBridge('java/lang/reflect/Array',['newInstance(Ljava/lang/Class;I)Ljava/lang/Object;','newInstance(Ljava/lang/Class;[I)Ljava/lang/Object;','getLength(Ljava/lang/Object;)I','get(Ljava/lang/Object;I)Ljava/lang/Object;','set(Ljava/lang/Object;ILjava/lang/Object;)V']);
@@ -1193,6 +1194,8 @@ export class APKRuntime {
     if (field.owner === 'Ljava/lang/String;' && field.name === 'CASE_INSENSITIVE_ORDER') {
       const value = this.allocate('Ldev/apkweb/util/CaseInsensitiveOrder;'); this.storeField(this.staticFields, field.key, value); return value;
     }
+    const constant = constantField(field.owner, field.name);
+    if (constant && constant.type === field.type) return constant.value;   // SDK compile-time constant read through reflection
     fail(`Unsupported external static field: ${field.key}`);
   }
   writeStatic(reference, value) {
@@ -1798,7 +1801,7 @@ export class APKRuntime {
   }
   /** Would Class.forName / resolveClass accept this (component) type? Static scans use it without side effects. */
   classResolvable(component) {
-    return !(!this.classes.has(component) && !BRIDGE_OWNERS.has(component) && !EXTERNAL_PARENTS.has(component) && !EXTERNAL_INTERFACE_NAMES.has(component) && !EXTERNAL_INTERFACES.has(component) && component.length !== 1 && !['Ljava/lang/Object;', 'Ljava/lang/CharSequence;'].includes(component) && !this.skiaHost?.parent?.(component) && !this.platform?.parent?.(component) && !this.platform?.fallbackParent?.(component));
+    return !(!this.classes.has(component) && !BRIDGE_OWNERS.has(component) && !EXTERNAL_PARENTS.has(component) && !EXTERNAL_INTERFACE_NAMES.has(component) && !EXTERNAL_INTERFACES.has(component) && component.length !== 1 && !['Ljava/lang/Object;', 'Ljava/lang/CharSequence;'].includes(component) && !this.skiaHost?.parent?.(component) && !this.platform?.parent?.(component) && !this.platform?.fallbackParent?.(component) && !constantFields(component));   // an SDK class with compile-time constants exists on the device even without a body in the VM
   }
   resolveClass(name, initialize = false, loader = undefined) {
     if (typeof name !== 'string') this.throwJava('Ljava/lang/NullPointerException;', 'null class name');
@@ -1887,6 +1890,16 @@ export class APKRuntime {
           // record static-ness, so the member carries a "static unless a receiver is supplied" marker (Java ignores the receiver of static methods).
           const found = this.bridgeReflection(owner, kind === 'constructor' ? '<init>' : name, parameters);
           if (found) return found;
+        }
+        if (kind === 'field') {   // compile-time constants of an SDK class (Manifest.permission, Context.*_SERVICE, Build.VERSION_CODES, framework R ...): what the class file declares
+          const constant = constantField(owner, name);
+          if (constant && (!publicOnly || (constant.flags & 1))) return { field: { owner, name, type: constant.type, key: `${owner}->${name}:${constant.type}` }, flags: constant.flags };
+        }
+        // A class the SDK table knows completely: a field it does not list does not exist (NoSuchFieldException below); one it lists as a non-constant field exists but has no value here.
+        if (kind === 'field') {   // a non-constant field exists on the class (its value is the platform's, or an explicit "unsupported static field" when read)
+          const other = nonConstantField(owner, name);
+          if (other && (!publicOnly || (other.flags & 1))) return { field: { owner, name, type: other.type, key: `${owner}->${name}:${other.type}` }, flags: other.flags };
+          if (owner === type && knownClass(owner)) continue;
         }
         if (owner === type && !bootClassLacksMember(owner, kind, name)) fail(`External reflection metadata is not implemented: ${owner}->${name}${parameters ? '(' + parameters.join('') + ')' : ''} (${kind})`);
         continue;
@@ -3281,12 +3294,25 @@ export class APKRuntime {
         const member = this.reflectionLookup(type, kind, memberName, parameters, !name.startsWith('getDeclared'));
         return this.reflectionObject(kind, member);
       }
+      if (name === 'getFields') {   // Class.getFields: the public fields of the class, its superclasses and its interfaces
+        const out = [], seen = new Set(), pending = [type];
+        while (pending.length && seen.size < 256) {
+          const owner = pending.shift(); if (!owner || seen.has(owner)) continue; seen.add(owner);
+          const cls = this.classes.get(owner);
+          if (cls) { for (const item of [...cls.fields, ...cls.staticFields]) if (item.flags & 1) out.push({ field: cls.dex.fields[item.index], flags: item.flags }); pending.push(cls.superclass, ...cls.interfaces); }
+          else { for (const c of constantFields(owner) ?? []) if (c.flags & 1) out.push({ field: { owner, name: c.name, type: c.type, key: `${owner}->${c.name}:${c.type}` }, flags: c.flags }); const parent = this.parent(owner); if (parent) pending.push(parent); }
+        }
+        const result = this.newArray('[Ljava/lang/reflect/Field;', out.length); this.object(result).elements = out.map(member => this.reflectionObject('field', member)); return result;
+      }
       if (['getDeclaredMethods', 'getDeclaredConstructors', 'getConstructors', 'getDeclaredFields'].includes(name)) {
         const cls = this.classes.get(type); if (!cls){
           if(name==='getConstructors'&&(type.length===1||type.startsWith('[')))return this.newArray('[Ljava/lang/reflect/Constructor;',0);
           // Platform classes without DEX bodies: the members are the registered bridge signatures (static-ness unknown, see bridgeReflection).
           const kind = name.includes('Constructors') ? 'constructor' : name.includes('Fields') ? 'field' : 'method';
-          if (kind === 'field') return this.newArray('[Ljava/lang/reflect/Field;',0);
+          if (kind === 'field') {   // SDK classes without a body: their compile-time constants
+            const rows = constantFields(type) ?? [], result = this.newArray('[Ljava/lang/reflect/Field;', rows.length);
+            this.object(result).elements = rows.map(c => this.reflectionObject('field', { field: { owner: type, name: c.name, type: c.type, key: `${type}->${c.name}:${c.type}` }, flags: c.flags })); return result;
+          }
           this.bridgeReflection(type, '<init>', []); // builds BRIDGE_INDEX
           const members = [...BRIDGE_INDEX.entries()].filter(([key]) => key.startsWith(type + '\0')).flatMap(([key, list]) => list.map(entry => ({ name: key.slice(type.length + 1), entry })))
             .filter(item => (kind === 'constructor') === (item.name === '<init>')).map(item => this.bridgeReflection(type, item.name, parseParameters(item.entry.params)));
