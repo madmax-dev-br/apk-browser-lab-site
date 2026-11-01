@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=8455f781bc30';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=8455f781bc30';
-import { createHostRegistry } from './host-contract.js?v=8455f781bc30';
-import { resolveDevice } from './device-profile.js?v=8455f781bc30';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=8455f781bc30';
-import { gcRoot } from './heap-gc.js?v=8455f781bc30';
+import { APKError } from './apk-error.js?v=42b8efaafc8b';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=42b8efaafc8b';
+import { createHostRegistry } from './host-contract.js?v=42b8efaafc8b';
+import { resolveDevice } from './device-profile.js?v=42b8efaafc8b';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=42b8efaafc8b';
+import { gcRoot } from './heap-gc.js?v=42b8efaafc8b';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -75,6 +75,7 @@ export function createDeviceStateHost(platform) {
   def(NET_INFO, 'isConnected', '()Z', () => 1); def(NET_INFO, 'isConnectedOrConnecting', '()Z', () => 1); def(NET_INFO, 'isAvailable', '()Z', () => 1); def(NET_INFO, 'getType', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? 1 : 0);
   def(NET_INFO, 'getTypeName', `()${STRING}`, (r, _m, [self]) => r.object(self).transport === 1 ? 'WIFI' : 'MOBILE'); def(NET_INFO, 'isRoaming', '()Z', () => 0);
   def(CONNECTIVITY, 'getActiveNetwork', `()${NETWORK}`, r => activeNetwork(r)); def(CONNECTIVITY, 'getActiveNetworkInfo', `()${NET_INFO}`, r => netInfo(r));
+  def(CONNECTIVITY, 'getNetworkInfo', `(${NETWORK})${NET_INFO}`, (r, _m, [, network]) => network ? netInfo(r) : null);   // deprecated since API 29, still called by NetInfo/Sentry-era code
   def(CONNECTIVITY, 'getNetworkCapabilities', `(${NETWORK})${CAPABILITIES}`, (r, _m, [, network]) => network ? capabilitiesFor(r, network) : null);
   def(CONNECTIVITY, 'isActiveNetworkMetered', '()Z', r => { const n = activeNetwork(r); return n && r.object(n).transport === 0 ? 1 : 0; });
   def(CONNECTIVITY, 'getAllNetworks', `()[${NETWORK}`, r => { const n = activeNetwork(r), array = r.newArray(`[${NETWORK}`, n ? 1 : 0); if (n) r.array(array).elements = [n]; return array; });

@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=8455f781bc30';
-import { APKError } from './apk-error.js?v=8455f781bc30';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=8455f781bc30';
+import { gcRoot } from './heap-gc.js?v=42b8efaafc8b';
+import { APKError } from './apk-error.js?v=42b8efaafc8b';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=42b8efaafc8b';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -268,6 +268,12 @@ export function createSystemServicesHost(platform) {
     def(owner, 'intValue', '()I', (r, _m, [self]) => { const v = numeric(r, self); return typeof v === 'bigint' ? Number(BigInt.asIntN(32, v)) : Number.isInteger(v) ? Number(BigInt.asIntN(32, BigInt(v))) : Number(toInteger(v, 32)); });
     def(owner, 'longValue', '()J', (r, _m, [self]) => { const v = numeric(r, self); return typeof v === 'bigint' ? v : Number.isInteger(v) ? BigInt(v) : toInteger(v, 64); });
     def(owner, 'floatValue', '()F', (r, _m, [self]) => floatBits(Number(numeric(r, self)))); def(owner, 'doubleValue', '()D', (r, _m, [self]) => doubleBits(Number(numeric(r, self))));
+  }
+
+  // Float/Double instance predicates (the static Float.isNaN(F) etc. are bridged to the original libcore; these read the box)
+  for (const [owner, code] of [['Ljava/lang/Float;', 'F'], ['Ljava/lang/Double;', 'D']]) {
+    def(owner, 'isNaN', '()Z', (r, _m, [self]) => Number.isNaN(Number(numeric(r, self))) ? 1 : 0);
+    def(owner, 'isInfinite', '()Z', (r, _m, [self]) => { const v = Number(numeric(r, self)); return v === Infinity || v === -Infinity ? 1 : 0; });
   }
 
   // ---- java.lang.Package (Android: derived from the class name, no manifest attributes) ---------------------------------------------------------------

@@ -249,8 +249,8 @@
       "soname": "libappmodules.so",
       "abi": "wasm32",
       "file": "apps/cff0c355aef6/libappmodules.wasm",
-      "bytes": 2202242,
-      "sha256": "9dc5f61f9c76836c7bb5f5a4af6d5d0984f7e357efdead5427768dde2e91b87b",
+      "bytes": 2574111,
+      "sha256": "6d5426bc86fde04e7e3d45d15277c63194a7811942e5d237175e881b8ab00013",
       "needed": [
         "libreact_codegen_rnsvg.so",
         "libreact-native-mmkv.so",
@@ -277,7 +277,7 @@
         "scripts/wasm/lab-link.mjs: shared-library link rule (DT_NEEDED in link order)"
       ],
       "apkSha256": "cff0c355aef64b259003ea70dee76ce7882058b8ecca1fd4be960aadab80e0a3",
-      "scope": "APK cff0c355aef6 only. NOT the app's own libappmodules.so (generated app code, never read or reproduced): React Native's template (cmake-utils/default-app-setup/OnLoad.cpp: core TurboModules through rncore_ModuleProvider) plus the autolinking of the open-source libraries the lab builds for this APK (react-native-svg, react-native-screens: separate codegen libraries as in React Native's autolinking; react-native-gesture-handler, @react-native-async-storage/async-storage, @react-native-clipboard/clipboard: their generated codegen projects compiled into this library). A TurboModule or Fabric component the app has from any other library, or its own, is not provided: React Native reports it by name (TurboModuleRegistry.getEnforcing ... could not be found)."
+      "scope": "APK cff0c355aef6 only. NOT the app's own libappmodules.so (generated app code, never read or reproduced): React Native's template (cmake-utils/default-app-setup/OnLoad.cpp: core TurboModules through rncore_ModuleProvider) plus the autolinking of the open-source libraries the lab builds for this APK (react-native-svg, react-native-screens: separate codegen libraries as in React Native's autolinking; react-native-gesture-handler, @react-native-async-storage/async-storage, @react-native-clipboard/clipboard, react-native-reanimated 3.18.0 (rnreanimated: NativeReanimatedModule and NativeWorkletsModule), react-native-permissions (4.1.5 group), @sentry/react-native 6.10.0, react-native-share, react-native-webview 13.15.0, @react-native-google-signin/google-signin, react-native-view-shot and @survicate/react-native-survicate (4.1.0 to 4.3.0 group): their generated codegen projects compiled into this library, which is what lets TurboModuleRegistry find the Java TurboModules of those packages; react-native-mmkv: its project and library, see its own entry). A Java TurboModule whose package the lab cannot build has no C++ spec and TurboModuleRegistry returns null for it (getEnforcing throws); @braze/react-native-sdk (proprietary license) is named in packages.json `unresolved` and fails with its name and reason. A TurboModule or Fabric component the app has from any other library, or its own, is not provided: React Native reports it by name (TurboModuleRegistry.getEnforcing ... could not be found)."
     },
     "libworklets.so": {
       "soname": "libworklets.so",

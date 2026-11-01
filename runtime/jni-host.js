@@ -1,17 +1,17 @@
-import { APKError } from './apk-error.js?v=8455f781bc30';
-import { JavaException } from './apk-runtime.js?v=8455f781bc30';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=8455f781bc30';
-import { buildElfDescriptor } from './native-descriptor.js?v=8455f781bc30';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=8455f781bc30';
-import { NativeLinker, LinkError } from './native-linker.js?v=8455f781bc30';
-import { hostFunction } from './wasm-host-function.js?v=8455f781bc30';
-import { parseWasm } from './wasm-dylink.js?v=8455f781bc30';
-import { formatVersion } from './rn-version.js?v=8455f781bc30';
-import { registerWasmMemory } from './unsafe-native.js?v=8455f781bc30';
-import { writeSkPath } from './skia-path-layout.js?v=8455f781bc30';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=8455f781bc30';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=8455f781bc30';
-import { withVariants } from './native-provider-variants.js?v=8455f781bc30';
+import { APKError } from './apk-error.js?v=42b8efaafc8b';
+import { JavaException } from './apk-runtime.js?v=42b8efaafc8b';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=42b8efaafc8b';
+import { buildElfDescriptor } from './native-descriptor.js?v=42b8efaafc8b';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=42b8efaafc8b';
+import { NativeLinker, LinkError } from './native-linker.js?v=42b8efaafc8b';
+import { hostFunction } from './wasm-host-function.js?v=42b8efaafc8b';
+import { parseWasm } from './wasm-dylink.js?v=42b8efaafc8b';
+import { formatVersion } from './rn-version.js?v=42b8efaafc8b';
+import { registerWasmMemory } from './unsafe-native.js?v=42b8efaafc8b';
+import { writeSkPath } from './skia-path-layout.js?v=42b8efaafc8b';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=42b8efaafc8b';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=42b8efaafc8b';
+import { withVariants } from './native-provider-variants.js?v=42b8efaafc8b';
 
 // JNI -> WebAssembly bridge.
 //
@@ -482,16 +482,40 @@ export class JniBridge {
         case 'Z': case 'B': case 'S': case 'C': case 'I': return value | 0; default: return self.#local(value);
       }
     };
+    // APKWEB_JNI_TRACE=<regex on "Owner->name"> (probe tool): every native-to-Java call whose method matches is written to the VM log as `LOG D JNITrace: ...` with its arguments and its result or exception,
+    // up to APKWEB_JNI_TRACE_MAX lines (default 4000). It shows what a React Native app's JavaScript asks of the platform through its TurboModules and what comes back.
+    const traceFilter = globalThis.process?.env?.APKWEB_JNI_TRACE ? new RegExp(globalThis.process.env.APKWEB_JNI_TRACE) : null, traceMax = Number(globalThis.process?.env?.APKWEB_JNI_TRACE_MAX ?? 4000);
+    let traced = 0;
+    const brief = (type, value) => {
+      try {
+        if (value === null || value === undefined) return 'null';
+        if (type === 'J') return `${value}L`; if (type !== 'L' && !type.startsWith('L') && !type.startsWith('[')) return String(value);
+        if (typeof value === 'string') return JSON.stringify(value.slice(0, 120));
+        const o = r.object(value);
+        if (o.type === 'Ljava/lang/String;') return JSON.stringify(r.stringCharacters(value).slice(0, 120));
+        const name = String(o.type).replace(/^L|;$/g, '').split('/').pop();
+        if (/^Readable(Native)?(Map|Array)$/.test(name)) {   // the data a JS call carried: ReadableNativeMap/Array.toString() lists it
+          const text = r.dispatch({ owner: o.type, name: 'toString', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [value], 'virtual');
+          return `${name}${JSON.stringify(r.stringCharacters(text).slice(0, 900))}`;
+        }
+        return `${name}@${value.ref}`;
+      } catch { return '?'; }
+    };
     const callWith = (mode, kind, resultType) => (_env, objOrCls, ...rest) => {
       const nonvirtual = mode === 'nonvirtual', mid = rest[nonvirtual ? 1 : 0], argPtr = rest[nonvirtual ? 2 : 1];
       const info = self.methodIds[mid]; if (!info) throw new APKError('Invalid jmethodID', { kind: 'jni-invalid-reference' });
       const raw = kind === 'A' ? jvalues(info.parameters, argPtr) : varargs(info.parameters, argPtr);
       const values = info.parameters.map((type, i) => toVM(type, raw[i]));
       const words = r.argumentWords(info.parameters, values, mode === 'static' ? {} : { receiver: self.#value(objOrCls) });
+      const tracing = traceFilter && traced < traceMax && traceFilter.test(`${info.owner}->${info.name}`);
+      const label = tracing ? `${String(info.owner).replace(/^L|;$/g, '')}.${info.name}(${info.parameters.map((t, i) => brief(t, values[i])).join(', ')})` : '';
       let result;
-      if (mode === 'static') result = r.dispatch({ ...info }, words, 'static');
-      else if (nonvirtual) result = r.dispatch({ ...info, owner: self.#classType(rest[0]) }, words, info.name === '<init>' ? 'direct' : 'direct');
-      else result = r.dispatch(info, words, 'virtual');
+      try {
+        if (mode === 'static') result = r.dispatch({ ...info }, words, 'static');
+        else if (nonvirtual) result = r.dispatch({ ...info, owner: self.#classType(rest[0]) }, words, info.name === '<init>' ? 'direct' : 'direct');
+        else result = r.dispatch(info, words, 'virtual');
+      } catch (error) { if (tracing) { traced++; r.record(`LOG D JNITrace: ${label} threw ${String(error?.message ?? error).slice(0, 160)}`); } throw error; }
+      if (tracing) { traced++; r.record(`LOG D JNITrace: ${label} -> ${resultType === 'V' ? 'void' : brief(resultType, result)}`); }
       return toJNI(resultType, result);
     };
     const callTypes = [['Object', 'L'], ['Boolean', 'Z'], ['Byte', 'B'], ['Char', 'C'], ['Short', 'S'], ['Int', 'I'], ['Long', 'J'], ['Float', 'F'], ['Double', 'D'], ['Void', 'V']];
