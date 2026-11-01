@@ -1,15 +1,15 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=d50f2f368405';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=d50f2f368405';
-import { inspectELF } from './native-inspector.js?v=d50f2f368405';
-import { inflateRaw } from './inflate.js?v=d50f2f368405';
-import { resolveDevice } from './device-profile.js?v=d50f2f368405';
-import { resourceProfileFor } from './device-configuration.js?v=d50f2f368405';
-import { JniBridge } from './jni-host.js?v=d50f2f368405';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=d50f2f368405';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=d50f2f368405';
-import { AndroidResources } from './android-resources.js?v=d50f2f368405';
-import { AndroidPlatform } from './android-platform.js?v=d50f2f368405';
-import { FrameworkProvider } from './framework-provider.js?v=d50f2f368405';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=8e7bcbaf9d29';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=8e7bcbaf9d29';
+import { inspectELF } from './native-inspector.js?v=8e7bcbaf9d29';
+import { inflateRaw } from './inflate.js?v=8e7bcbaf9d29';
+import { resolveDevice } from './device-profile.js?v=8e7bcbaf9d29';
+import { resourceProfileFor } from './device-configuration.js?v=8e7bcbaf9d29';
+import { JniBridge } from './jni-host.js?v=8e7bcbaf9d29';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=8e7bcbaf9d29';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=8e7bcbaf9d29';
+import { AndroidResources } from './android-resources.js?v=8e7bcbaf9d29';
+import { AndroidPlatform } from './android-platform.js?v=8e7bcbaf9d29';
+import { FrameworkProvider } from './framework-provider.js?v=8e7bcbaf9d29';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });

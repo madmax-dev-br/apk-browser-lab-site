@@ -7,7 +7,8 @@
 // own origin or a srcdoc is an opaque origin that cannot touch the lab's DOM, Worker or storage. Scripts run only when the app enabled JavaScript. The frame gets no
 // permissions policy features (`allow=""`), no referrer, and no ambient credentials where the browser supports `credentialless`.
 
-import { bridgeMarkup, injectIntoHead } from './webview-bridge.js?v=d50f2f368405';
+import { bridgeMarkup, injectIntoHead } from './webview-bridge.js?v=8e7bcbaf9d29';
+import { rewriteDocument, RESOURCE_MAX_BYTES } from './webview-resources.js?v=8e7bcbaf9d29';
 
 export const FRAME_SANDBOX = Object.freeze({ scripts: 'allow-scripts', forms: 'allow-forms' });
 export const FRAME_ATTRIBUTES = Object.freeze({ allow: '', referrerpolicy: 'no-referrer', loading: 'eager', 'aria-label': 'WebView' });
@@ -73,6 +74,8 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
     timers.clearTimeout(frame.grace); frame.grace = null;
     try { frame.port?.close?.(); } catch { /* already closed */ }
     frame.port = null; frame.bridge = null; frame.counts = null;
+    for (const settle of frame.pendingStatic?.values() ?? []) settle(null);
+    frame.pendingStatic?.clear();
     frame.iframe?.remove?.(); frame.form?.remove?.(); frame.iframe = null; frame.form = null;
   };
   const fail = (frame, code, description) => { timers.clearTimeout(frame.timer); frame.timer = null; send({ type: 'webview-event', id: frame.id, loadId: frame.loadId, event: 'error', code, description }); };
@@ -96,13 +99,39 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
         const html = /html/i.test(response.headers.get('content-type') ?? '') ? await response.text() : null;
         if (frame.loadId !== loadId) return;
         timers.clearTimeout(frame.timer); frame.timer = null;
-        attachFrame(frame, id, message, html === null ? { src: url } : { srcdoc: withBase(html, url) });
+        prepareFrame(frame, id, message, html === null ? { src: url } : { srcdoc: withBase(html, url) });
       }).catch(() => { if (frame.loadId === loadId) fail(frame, -7, 'net::ERR_FAILED (the lab document could not be fetched)'); });
       return;
     }
-    attachFrame(frame, id, message, source);
+    prepareFrame(frame, id, message, source);
   }
   const sameOrigin = (url, origin) => { try { return new URL(url, origin).origin === origin; } catch { return false; } };
+  // Static references of a document whose requests the lab answers (the app's shouldInterceptRequest, assets of the APK) are resolved before the frame exists (src/webview-resources.js).
+  const MAX_STATIC_BYTES = 32 * 1024 * 1024;
+  function requestResource(frame, loadId, url, budget) {
+    return new Promise(resolve => {
+      frame.pendingStatic ??= new Map(); frame.staticRid = (frame.staticRid ?? 0) + 1;
+      const rid = -frame.staticRid;
+      frame.pendingStatic.set(rid, result => {
+        if (!result || result.passthrough) { resolve(null); return; }
+        if (result.failed || !result.bytes) { resolve({ status: 502, mime: 'text/plain', bytes: null }); return; }
+        budget.bytes += result.bytes.length;
+        resolve(budget.bytes > MAX_STATIC_BYTES ? { status: 502, mime: 'text/plain', bytes: null } : { status: result.status, mime: result.mime, bytes: result.bytes });
+      });
+      send({ type: 'webview-event', id: frame.id, loadId, event: 'resource', rid, url, method: 'GET' });
+    });
+  }
+  async function prepareFrame(frame, id, message, source) {
+    if (!message.resolve || !('srcdoc' in source)) { attachFrame(frame, id, message, source); return; }
+    const loadId = message.loadId, budget = { bytes: 0 };
+    timers.clearTimeout(frame.timer);
+    frame.timer = timers.setTimeout(() => { if (frame.loadId === loadId && !frame.iframe) fail(frame, -8, 'net::ERR_TIMED_OUT (the sub-resources of the document did not arrive)'); }, message.timeoutMs ?? 30000);
+    let rewritten = null;
+    try { rewritten = await rewriteDocument(source.srcdoc, { base: message.resolve.base, resolve: (url) => requestResource(frame, loadId, url, budget) }); } catch { rewritten = null; }
+    if (frame.loadId !== loadId) return;
+    timers.clearTimeout(frame.timer); frame.timer = null;
+    attachFrame(frame, id, message, { srcdoc: rewritten ? rewritten.html : source.srcdoc });
+  }
   function attachFrame(frame, id, message, source) {
     const element = frame.element;
     const iframe = doc.createElement('iframe'), sandbox = sandboxFor({ javascript: message.javascript });
@@ -120,7 +149,7 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
       if (frame.bridge && !frame.port) frame.grace = timers.setTimeout(() => { if (frame.iframe === iframe && !frame.port) send({ type: 'webview-event', id, loadId: message.loadId, event: 'bridge-failed' }); }, GRACE_MS);
     });
     if (message.bridge) listen();
-    frame.iframe = iframe; frame.bridge = null; frame.counts = { console: 0, js: 0, dialog: 0, navigate: 0, title: 0, popup: 0 };
+    frame.iframe = iframe; frame.bridge = null; frame.counts = { console: 0, js: 0, dialog: 0, navigate: 0, title: 0, popup: 0, resource: 0 };
     if ('srcdoc' in source) {
       let document_ = source.srcdoc;
       // a document the lab hands to the frame itself gets the page bridge and the network policy in front of it (src/webview-bridge.js); an opaque one cannot
@@ -140,7 +169,7 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
 
   // ---- the page bridge: a frame says hello, the page answers with one end of a MessageChannel, everything after that travels over the port ------------------------------------------
   const str = (value, max) => (typeof value === 'string' ? value.slice(0, max) : '');
-  const LIMITS = { console: 1000, js: 5000, dialog: 100, navigate: 200, title: 200, popup: 20 };
+  const LIMITS = { console: 1000, js: 5000, dialog: 100, navigate: 200, title: 200, popup: 20, resource: 2000 };
   const count = (frame, kind) => (frame.counts[kind] = (frame.counts[kind] ?? 0) + 1) <= LIMITS[kind];
   /** What a frame may say, validated and bounded: anything else is dropped. The Worker validates again; nothing here is trusted because it came through a port. */
   function forward(frame, data) {
@@ -159,6 +188,7 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
         break;
       }
       case 'navigate': if (count(frame, 'navigate') && typeof data.url === 'string' && data.url.length <= 8192 && (data.method === 'GET' || data.method === 'POST')) send({ ...base, event: 'navigate', url: data.url, method: data.method, body: data.method === 'POST' ? str(data.body, 65536) : null, gesture: data.gesture === true }); break;
+      case 'resource': if (count(frame, 'resource') && Number.isSafeInteger(data.rid) && data.rid > 0 && typeof data.url === 'string' && data.url.length <= 8192 && ['GET', 'POST', 'HEAD'].includes(data.method)) send({ ...base, event: 'resource', rid: data.rid, url: data.url, method: data.method }); break;
       case 'eval-result': if (Number.isSafeInteger(data.evalId) && typeof data.ok === 'boolean') send({ ...base, event: 'eval-result', evalId: data.evalId, ok: data.ok, json: data.ok ? str(data.json, 1048576) : null }); break;
       default: break;
     }
@@ -184,6 +214,16 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
     }
     frame.port.postMessage({ t: 'eval', evalId: message.evalId, script: message.script });
   }
+  /** The Worker's answer to a resource request: for a static reference of the document being prepared (negative rid) or for the bridge inside the frame (positive rid). */
+  function resourceResult(message) {
+    const frame = frames.get(message.id);
+    if (!frame || frame.loadId !== message.loadId || !Number.isSafeInteger(message.rid)) return;
+    const bytes = message.bytes instanceof Uint8Array && message.bytes.length <= RESOURCE_MAX_BYTES ? message.bytes : null;
+    const result = message.passthrough === true ? { passthrough: true } : typeof message.failed === 'string' || (message.bytes && !bytes) ? { failed: true }
+      : { status: Number.isSafeInteger(message.status) ? message.status : 200, reason: str(message.reason, 128), mime: str(message.mime, 200) || 'application/octet-stream', encoding: message.encoding ? str(message.encoding, 40) : null, bytes };
+    if (message.rid < 0) { const settle = frame.pendingStatic?.get(message.rid); if (settle) { frame.pendingStatic.delete(message.rid); settle(result); } return; }
+    if (frame.port) { if (result.bytes) result.bytes = result.bytes.slice(); frame.port.postMessage({ t: 'resource-result', rid: message.rid, ...result }); }
+  }
   return {
     frames,
     attach(id, element) {
@@ -196,6 +236,7 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
       if (!message || message.type !== 'webview' || !Number.isSafeInteger(message.id)) return;
       if (message.op === 'load') load(message.id, message);
       else if (message.op === 'eval') evaluate(message);
+      else if (message.op === 'resource-result') resourceResult(message);
       else if (message.op === 'stop') { const frame = frames.get(message.id); if (frame) { dispose(frame); frame.loadId = -1; } queued.delete(message.id); }
       else if (message.op === 'destroy') { dispose(frames.get(message.id)); frames.delete(message.id); queued.delete(message.id); slots.delete(message.id); }
     },

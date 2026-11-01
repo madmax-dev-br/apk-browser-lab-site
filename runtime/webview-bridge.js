@@ -73,7 +73,7 @@ export function bridgeMarkup({ csp, config, javascript }) {
 
 const BRIDGE = `(function () {
   'use strict';
-  var C = __CONFIG__, port = null, queue = [], consoleCount = 0, calls = 0, helloTries = 0;
+  var C = __CONFIG__, port = null, queue = [], consoleCount = 0, calls = 0, helloTries = 0, waiting = {}, R = C.resolve || null;
   function post(message) { if (port) { try { port.postMessage(message); } catch (e) { /* the page is gone */ } } else if (queue.length < 500) queue.push(message); }
   function text(value) {
     if (typeof value === 'string') return value;
@@ -97,6 +97,7 @@ const BRIDGE = `(function () {
   function json(value) { if (value === undefined) return 'null'; try { var s = JSON.stringify(value); return s === undefined ? 'null' : s; } catch (e) { return 'null'; } }
   function onCommand(event) {
     var data = event.data;
+    if (data && data.t === 'resource-result') { var waiter = waiting[data.rid]; if (waiter) { delete waiting[data.rid]; waiter(data); } return; }
     if (!data || data.t !== 'eval') return;
     try { var value = (0, eval)(String(data.script)); post({ t: 'eval-result', evalId: data.evalId, ok: true, json: limit(json(value), 1048576) }); }
     catch (error) { post({ t: 'eval-result', evalId: data.evalId, ok: false, json: null }); }
@@ -149,7 +150,7 @@ const BRIDGE = `(function () {
   });
   if (C.userAgent) { try { Object.defineProperty(navigator, 'userAgent', { get: function () { return C.userAgent; }, configurable: true }); Object.defineProperty(navigator, 'appVersion', { get: function () { return C.userAgent.replace(/^Mozilla\\//, ''); }, configurable: true }); } catch (e) { /* not definable */ } }
   /* navigations the document starts are the app's to allow: shouldOverrideUrlLoading */
-  function absolute(url) { try { return new URL(url, document.baseURI).href; } catch (e) { return null; } }
+  function absolute(url) { try { return new URL(url, (R && R.base) || document.baseURI).href; } catch (e) { return null; } }
   function navigate(url, method, body, gesture) { post({ t: 'navigate', url: limit(url, 8192), method: method, body: body === null ? null : limit(body, 65536), gesture: !!gesture }); }
   document.addEventListener('click', function (event) {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -180,5 +181,112 @@ const BRIDGE = `(function () {
       event.preventDefault(); navigate(url, event.formData ? 'POST' : 'GET', null, event.userInitiated);
     });
   } catch (e) { /* no Navigation API: clicks and submits above still work */ }
+  /* sub-resources (phase 3): when the document comes from the APK or the app intercepts requests, the lab answers them instead of the network */
+  if (R) (function () {
+    var nextRid = 0, local = /^(data|blob|about|javascript):/i, srcState = new WeakMap(), xhrState = new WeakMap();
+    function resolveUrl(u) { try { return new URL(String(u), R.base || document.baseURI).href; } catch (e) { return null; } }
+    function ask(url, method) {
+      return new Promise(function (resolve, reject) {
+        var id = ++nextRid; if (id > 5000) { reject(new TypeError('Failed to fetch')); return; }
+        waiting[id] = resolve; post({ t: 'resource', rid: id, url: limit(url, 8192), method: method });
+        setTimeout(function () { if (waiting[id]) { delete waiting[id]; reject(new TypeError('Failed to fetch')); } }, 30000);
+      });
+    }
+    function mimeOf(res) { return String(res.mime || 'application/octet-stream') + (res.encoding && !/charset/i.test(res.mime || '') ? '; charset=' + res.encoding : ''); }
+    function textOf(res) { try { return new TextDecoder(res.encoding || 'utf-8').decode(res.bytes); } catch (e) { return new TextDecoder().decode(res.bytes); } }
+    function dataUrl(res) { var s = '', b = res.bytes; for (var i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768)); return 'data:' + String(res.mime || 'application/octet-stream').split(';')[0] + ';base64,' + btoa(s); }
+    var nativeFetch = window.fetch ? window.fetch.bind(window) : null;
+    if (nativeFetch) window.fetch = function (input, init) {
+      try {
+        var isRequest = typeof Request !== 'undefined' && input instanceof Request, url = resolveUrl(isRequest ? input.url : input);
+        var method = String((init && init.method) || (isRequest && input.method) || 'GET').toUpperCase();
+        if (!url || local.test(url)) return nativeFetch(input, init);
+        return ask(url, method).then(function (res) {
+          if (res.passthrough) return nativeFetch(isRequest ? input : url, init);
+          if (res.failed) throw new TypeError('Failed to fetch');
+          var status = res.status >= 200 && res.status <= 599 ? res.status : 502, empty = status === 204 || status === 205 || status === 304 || method === 'HEAD';
+          var response = new Response(empty ? null : res.bytes, { status: status, statusText: res.reason || '', headers: { 'content-type': mimeOf(res) } });
+          try { Object.defineProperty(response, 'url', { value: url }); } catch (e) { /* read-only in this engine */ }
+          return response;
+        });
+      } catch (e) { return Promise.reject(e); }
+    };
+    var XP = window.XMLHttpRequest && window.XMLHttpRequest.prototype;
+    if (XP) {
+      var nativeOpen = XP.open, nativeSend = XP.send;
+      var finish = function (x, state, res) {
+        var type = x.responseType || '', ok = !res.failed, status = ok ? res.status : 0, headers = ok ? 'content-type: ' + mimeOf(res) + '\\r\\n' : '', value = null;
+        try { if (ok) value = type === 'arraybuffer' ? res.bytes.buffer.slice(0) : type === 'blob' ? new Blob([res.bytes], { type: res.mime }) : type === 'json' ? JSON.parse(textOf(res)) : textOf(res); } catch (e) { value = null; }
+        var def = function (name, v) { try { Object.defineProperty(x, name, { configurable: true, get: function () { return v; } }); } catch (e) { /* not definable */ } };
+        def('readyState', 4); def('status', status); def('statusText', ok ? (res.reason || '') : ''); def('responseURL', ok ? state.url : ''); def('response', value);
+        def('responseText', type === '' || type === 'text' ? (ok ? value : '') : ''); def('responseXML', null);
+        x.getResponseHeader = function (name) { return ok && String(name).toLowerCase() === 'content-type' ? mimeOf(res) : null; };
+        x.getAllResponseHeaders = function () { return headers; };
+        var fire = function (name) { try { x.dispatchEvent(typeof ProgressEvent === 'function' ? new ProgressEvent(name) : new Event(name)); } catch (e) { /* no events */ } };
+        fire('readystatechange'); fire(ok ? 'load' : 'error'); fire('loadend');
+      };
+      XP.open = function (method, url, async) {
+        var abs = resolveUrl(url), args = Array.prototype.slice.call(arguments);
+        if (abs && arguments.length > 1) args[1] = abs;
+        xhrState.set(this, abs && !local.test(abs) && async !== false ? { method: String(method).toUpperCase(), url: abs } : null);
+        return nativeOpen.apply(this, args);
+      };
+      XP.send = function (body) {
+        var x = this, state = xhrState.get(x);
+        if (!state) return nativeSend.apply(x, arguments);
+        ask(state.url, state.method).then(function (res) {
+          if (res.passthrough) { nativeSend.call(x, body); return; }
+          finish(x, state, res);
+        }, function () { finish(x, state, { failed: true }); });
+      };
+    }
+    /* elements that load a URL: the answer replaces the URL before the browser can fetch it */
+    var nativeSetAttribute = window.Element && window.Element.prototype.setAttribute;
+    function commit(element, prop, value) { if (nativeSetAttribute) nativeSetAttribute.call(element, prop, value); }
+    function setResolved(element, prop, kind, value) {
+      var url = resolveUrl(value);
+      if (!url || local.test(String(value))) { srcState.delete(element); commit(element, prop, value); return; }
+      var token = {}; srcState.set(element, { prop: prop, url: url, token: token });
+      ask(url, 'GET').then(function (res) {
+        var current = srcState.get(element); if (!current || current.token !== token) return;
+        var event = function (name) { try { element.dispatchEvent(new Event(name)); } catch (e) { /* no events */ } };
+        if (res.passthrough || res.failed) { commit(element, prop, url); return; }
+        if (kind === 'script') { element.text = textOf(res); event('load'); }
+        else if (kind === 'style') { var style = document.createElement('style'); style.textContent = textOf(res); if (element.parentNode) element.parentNode.insertBefore(style, element.nextSibling); else (document.head || document.documentElement).appendChild(style); event('load'); }
+        else commit(element, prop, dataUrl(res));
+      }, function () { commit(element, prop, url); });
+    }
+    function guard(name, prop, kind) {
+      var proto = window[name] && window[name].prototype, descriptor = proto && Object.getOwnPropertyDescriptor(proto, prop);
+      if (!descriptor || !descriptor.set) return;
+      Object.defineProperty(proto, prop, { configurable: true, enumerable: descriptor.enumerable,
+        get: function () { var known = srcState.get(this); return known && known.prop === prop ? known.url : descriptor.get.call(this); },
+        set: function (value) { setResolved(this, prop, kind, value); } });
+    }
+    guard('HTMLImageElement', 'src', 'media'); guard('HTMLSourceElement', 'src', 'media'); guard('HTMLMediaElement', 'src', 'media'); guard('HTMLTrackElement', 'src', 'media');
+    guard('HTMLScriptElement', 'src', 'script'); guard('HTMLLinkElement', 'href', 'style');
+    var tagKinds = { IMG: ['src', 'media'], SOURCE: ['src', 'media'], AUDIO: ['src', 'media'], VIDEO: ['src', 'media'], TRACK: ['src', 'media'], SCRIPT: ['src', 'script'], LINK: ['href', 'style'] };
+    if (window.Element && nativeSetAttribute) window.Element.prototype.setAttribute = function (name, value) {
+      var entry = tagKinds[this.tagName], lower = String(name).toLowerCase();
+      if (entry && entry[0] === lower && (lower !== 'href' || /stylesheet/i.test(this.getAttribute('rel') || ''))) { setResolved(this, lower, entry[1], value); return; }
+      return nativeSetAttribute.apply(this, arguments);
+    };
+    /* markup inserted by script (innerHTML, insertAdjacentHTML) is parsed by the browser, which starts its loads at once; the answer replaces them afterwards */
+    try {
+      new MutationObserver(function (records) {
+        records.forEach(function (record) {
+          Array.prototype.forEach.call(record.addedNodes || [], function (node) {
+            if (!node || node.nodeType !== 1) return;
+            var all = [node].concat(Array.prototype.slice.call(node.querySelectorAll ? node.querySelectorAll('img[src],source[src],audio[src],video[src],track[src],link[rel~=stylesheet][href]') : []));
+            all.forEach(function (element) {
+              var entry = tagKinds[element.tagName]; if (!entry || srcState.has(element) || element.tagName === 'SCRIPT') return;
+              var value = element.getAttribute(entry[0]); if (!value || local.test(value)) return;
+              setResolved(element, entry[0], entry[1], value);
+            });
+          });
+        });
+      }).observe(document, { childList: true, subtree: true });
+    } catch (e) { /* no observer */ }
+  })();
   hello();
 })();`;

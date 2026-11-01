@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=d50f2f368405';
-import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=d50f2f368405';
-import { isInterfaceName } from './webview-bridge.js?v=d50f2f368405';
-import { APKError } from './apk-error.js?v=d50f2f368405';
+import { gcRoot } from './heap-gc.js?v=8e7bcbaf9d29';
+import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=8e7bcbaf9d29';
+import { isInterfaceName } from './webview-bridge.js?v=8e7bcbaf9d29';
+import { APKError } from './apk-error.js?v=8e7bcbaf9d29';
 
 // android.webkit.WebView and its public companions for the browser VM (design: docs/APK-REAL-TASKS.md, task 33).
 //
@@ -100,6 +100,45 @@ export function createWebViewHost(platform) {
   const errorObject = (r, code, description) => { const ref = r.makeObject(LAB_ERROR); r.object(ref).error = { code, description }; return ref; };
   const clientCall = (r, state, name, parameters, result, args, owner = CLIENT) => { if (isNull(state.client)) return undefined; return call(r, state.client, owner, name, parameters, result, args); };
   const chromeCall = (r, state, name, parameters, result, args) => { if (isNull(state.chrome)) return undefined; return call(r, state.chrome, CHROME, name, parameters, result, args); };
+  // ---- shouldInterceptRequest (phase 3): the app's WebViewClient answers requests of documents the lab serves itself ----------------------------------------------------------
+  const INTERCEPT_SIGNATURES = [`shouldInterceptRequest(${WEBVIEW}${REQUEST})${RESPONSE}`, `shouldInterceptRequest(${WEBVIEW}${STRING})${RESPONSE}`];
+  /** Does the app's WebViewClient (a class of its own) override shouldInterceptRequest? Only then are requests routed to the VM at all. */
+  const overridesIntercept = (r, state) => {
+    if (isNull(state.client)) return false;
+    for (let owner = r.typeOf(state.client), guard = 0; owner && owner !== CLIENT && guard < 64; owner = r.parent(owner), guard++) {
+      const methods = r.classes.get(owner)?.methods; if (methods && INTERCEPT_SIGNATURES.some(signature => methods.has(signature))) return true;
+    }
+    return false;
+  };
+  const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+  const readResponseBytes = (r, stream) => {
+    const chunks = []; let total = 0;
+    try {
+      for (;;) {
+        const buffer = r.newArray('[B', 16384), got = call(r, stream, INPUT_STREAM, 'read', ['[B', 'I', 'I'], 'I', [buffer, 0, 16384]);
+        if (got < 0) break;
+        total += got; if (total > MAX_RESPONSE_BYTES) return { tooLarge: true };
+        chunks.push(Uint8Array.from(r.array(buffer).elements.slice(0, got), v => v & 255));
+      }
+    } finally { try { call(r, stream, INPUT_STREAM, 'close', [], 'V', []); } catch { /* a stream that cannot close */ } }
+    const bytes = new Uint8Array(total); let at = 0; for (const c of chunks) { bytes.set(c, at); at += c.length; }
+    return { bytes };
+  };
+  /**
+   * Asks the app's WebViewClient to answer a request of a document the lab serves. null: not overridden or the app returned null (nobody intercepted it); otherwise
+   * { status, reason, mime, encoding, bytes } (the response headers of a WebResourceResponse are not carried: the page builds its own response headers), or { failed: description }.
+   */
+  const intercept = (r, self, state, { url, method = 'GET', headers = new Map(), mainFrame = false, gesture = false }) => {
+    if (!overridesIntercept(r, state)) return null;
+    const request = requestObject(r, url, { mainFrame, method, headers, gesture });
+    const response = clientCall(r, state, 'shouldInterceptRequest', [WEBVIEW, REQUEST], RESPONSE, [self, request]);
+    if (isNull(response)) return null;
+    const o = r.object(response), chars = v => (isNull(v) ? null : typeof v === 'string' ? v : r.stringCharacters(v));
+    let bytes = new Uint8Array(0);
+    if (!isNull(o.data)) { const read = readResponseBytes(r, o.data); if (read.tooLarge) return { failed: `the response is larger than ${MAX_RESPONSE_BYTES} bytes` }; bytes = read.bytes; }
+    return { status: Number.isSafeInteger(o.status) ? o.status : 200, reason: chars(o.reason) ?? 'OK', mime: chars(o.mime) ?? 'text/plain', encoding: chars(o.encoding), bytes };
+  };
+
   /** Android's callbacks for a main-frame load that failed before any content: onPageStarted, onReceivedError, onPageFinished (all on the UI thread, in that order). */
   const failLoad = (r, self, state, url, code, description) => {
     const loadId = ++state.loadId; state.loading = true; state.originalUrl = url; state.url = url;
@@ -340,6 +379,6 @@ export function createWebViewHost(platform) {
       return { webviewId: s.id, url: s.url, loading: s.loading, progress: s.progress, canGoBack: s.index > 0, canGoForward: s.index >= 0 && s.index < s.history.length - 1, javascript: !!s.settings && !!r.object(s.settings).values.get('JavaScriptEnabled'), backend: !!backend() };
     },
     /** For the backend (phase 1): state access and the Android callbacks it triggers. */
-    internals: { interfaceDescriptors, interfaceMethods, invokeInterface, consoleMessage, jsResult, stateOf, postMain, clientCall, chromeCall, requestObject, errorObject, pushHistory, failLoad, settingsOf, setting, levelValue, uriOf, historyItem, unavailable, staticCall, call },
+    internals: { interfaceDescriptors, interfaceMethods, invokeInterface, consoleMessage, jsResult, stateOf, postMain, clientCall, chromeCall, requestObject, errorObject, pushHistory, failLoad, settingsOf, setting, levelValue, uriOf, historyItem, unavailable, staticCall, call, overridesIntercept, intercept },
   };
 }

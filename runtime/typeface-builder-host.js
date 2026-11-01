@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=d50f2f368405';
+import { createHostRegistry } from './host-contract.js?v=8e7bcbaf9d29';
 
 // android.graphics.Typeface.Builder / Typeface.CustomFallbackBuilder and android.graphics.fonts.{Font, Font.Builder, FontFamily, FontFamily.Builder, FontStyle} (android-13.0.0_r1
 // contracts). Font bytes come from the app's virtual filesystem (File), the APK's assets/ (AssetManager) or a ByteBuffer, are validated and shaped by Skia's FreeType, and the

@@ -1,7 +1,8 @@
-import { APKError } from './apk-error.js?v=d50f2f368405';
-import { networkOf } from './network-native.js?v=d50f2f368405';
-import { WEBVIEW_ERRORS } from './webview-host.js?v=d50f2f368405';
-import { buildCsp } from './webview-bridge.js?v=d50f2f368405';
+import { APKError } from './apk-error.js?v=8e7bcbaf9d29';
+import { networkOf } from './network-native.js?v=8e7bcbaf9d29';
+import { WEBVIEW_ERRORS } from './webview-host.js?v=8e7bcbaf9d29';
+import { buildCsp } from './webview-bridge.js?v=8e7bcbaf9d29';
+import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=8e7bcbaf9d29';
 
 // The Worker's side of the WebView backend (design: docs/APK-REAL-TASKS.md, task 33). The page owns the iframes (src/webview-frame.js); this module decides what may be loaded,
 // tells the page what to load (`post`), and turns the page's events (`handleEvent`) into the callbacks Android would deliver, on the VM main thread, in Android's order.
@@ -23,7 +24,10 @@ export function decideNavigation(text, { labOrigin = '', online = true, allowed 
   try { url = new URL(text, labOrigin || undefined); } catch { return { ok: false, code: WEBVIEW_ERRORS.BAD_URL, description: 'net::ERR_INVALID_URL' }; }
   if (url.protocol === 'about:') return url.href === 'about:blank' ? { ok: true, url: url.href } : { ok: false, code: WEBVIEW_ERRORS.BAD_URL, description: 'net::ERR_INVALID_URL' };
   if (url.protocol === 'data:') return { ok: true, url: url.href };
-  if (url.protocol === 'file:') return { ok: false, code: WEBVIEW_ERRORS.UNSUPPORTED_SCHEME, description: 'net::ERR_UNKNOWN_URL_SCHEME (file: URLs, including file:///android_asset/, need the asset server of a later phase)' };
+  if (url.protocol === 'file:') {
+    if (url.href.startsWith(ASSET_PREFIX)) return assetEntry(url.href) ? { ok: true, url: url.href, asset: true } : { ok: false, code: WEBVIEW_ERRORS.FILE_NOT_FOUND, description: 'net::ERR_FILE_NOT_FOUND' };
+    return { ok: false, code: WEBVIEW_ERRORS.UNSUPPORTED_SCHEME, description: 'net::ERR_UNKNOWN_URL_SCHEME (only file:///android_asset/ is served: the lab has no other files to show a WebView)' };
+  }
   if (!SCHEMES.has(url.protocol)) return { ok: false, code: WEBVIEW_ERRORS.UNSUPPORTED_SCHEME, description: `net::ERR_UNKNOWN_URL_SCHEME (${url.protocol})` };
   if (labOrigin && url.origin === labOrigin) {
     return url.pathname.startsWith(LAB_WEBVIEW_PATH) ? { ok: true, url: url.href }
@@ -54,8 +58,17 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
   /** Will the lab hand this load's text to the frame itself (so the page bridge can be put in front of it)? Loads of other origins are opaque. */
   const scriptable = request => {
     if (request.kind === 'data' || request.kind === 'dataBase') return isHtml(request.mime);
+    if (request.kind === 'url' && request.url.startsWith(ASSET_PREFIX)) return true;   // an asset the lab reads out of the APK itself
     if (request.kind === 'url' && labOrigin) { try { return new URL(request.url).origin === labOrigin; } catch { return false; } }
     return false;
+  };
+  /** The document a main-frame load shows when the lab, not the browser, produced its bytes (an asset, or the app's own answer to shouldInterceptRequest). */
+  const documentOf = (url, mime, bytes, encoding) => {
+    if (isHtml(mime)) {
+      let text; try { text = new TextDecoder(encoding || 'utf-8').decode(bytes); } catch { text = new TextDecoder().decode(bytes); }
+      return { kind: 'dataBase', url, displayUrl: url, baseUrl: url, data: text, mime: 'text/html', encoding: null, headers: new Map() };
+    }
+    return { kind: 'data', url, displayUrl: url, baseUrl: null, data: toBase64(bytes), mime: mime || mimeForPath(url), encoding: 'base64', headers: new Map() };
   };
   const bridgeFor = (r, self, state, request, javascript) => {
     const h = host(), values = r.object(h.settingsOf(r, self)).values;
@@ -65,7 +78,8 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
         allowedHosts: network.online ? network.policy.allowedHosts ?? [] : [], labOrigin, labPath: LAB_WEBVIEW_PATH, javascript, blockNetworkLoads: !!values.get('BlockNetworkLoads'),
         blockNetworkImage: !!values.get('BlockNetworkImage'), loadsImages: !!values.get('LoadsImagesAutomatically'), mixedContentMode: values.get('MixedContentMode') ?? 1, pageIsHttps: !base || /^https:/i.test(base) || request.kind === 'url',
       }),
-      config: { userAgent: values.get('UserAgentString'), domStorage: !!values.get('DomStorageEnabled'), textZoom: values.get('TextZoom') ?? 100, interfaces: javascript ? h.interfaceDescriptors(r, state) : {} },
+      config: { userAgent: values.get('UserAgentString'), domStorage: !!values.get('DomStorageEnabled'), textZoom: values.get('TextZoom') ?? 100, interfaces: javascript ? h.interfaceDescriptors(r, state) : {},
+        resolve: state.bridge.resolve ? { base: state.bridge.resolve.base } : null },
     };
   };
 
@@ -88,16 +102,35 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
       views.set(state.id, { self, state });
       const failPending = state.bridge?.pending ?? [];   // evaluations queued for the document that is being replaced have no document to run in
       for (const pending of failPending) backend.deliver(r, self, state, pending.callback, null);
-      state.bridge = { loadId, scriptable: scriptable(request), ready: false, pending: [], evals: new Map(), nextEval: 1, calls: new Map() };
+      state.bridge = { loadId, scriptable: scriptable(request), ready: false, pending: [], evals: new Map(), nextEval: 1, calls: new Map(), resolve: null, resources: 0 };
       if (request.history !== 'keep' && !request.reload) h.pushHistory(state, { url: shown, originalUrl: shown, title: null, request: { ...request, history: undefined } });
       h.postMain(r, () => {
         if (state.destroyed || loadId !== state.loadId) return;
         h.clientCall(r, state, 'onPageStarted', [WEBVIEW, STRING, 'Landroid/graphics/Bitmap;'], 'V', [self, shown, null]);
         h.chromeCall(r, state, 'onProgressChanged', [WEBVIEW, 'I'], 'V', [self, 0]);
       }, [self, state.client, state.chrome]);
-      const settings = h.settingsOf(r, self), values = r.object(settings).values, javascript = !!values.get('JavaScriptEnabled');
-      post({ type: 'webview', op: 'load', id: state.id, loadId, request: serial(request), javascript, timeoutMs, userAgent: values.get('UserAgentString'),
-        bridge: state.bridge.scriptable ? bridgeFor(r, self, state, request, javascript) : null });
+      const isAsset = request.kind === 'url' && request.url.startsWith(ASSET_PREFIX), lab = state.bridge.scriptable, intercepts = h.overridesIntercept(r, state);
+      if (request.kind === 'url' && !lab && intercepts) note(r, 'intercept:opaque', 'STUB-WEBVIEW shouldInterceptRequest (this page is from another origin: the browser loads it itself, so the app is not asked about it or its sub-resources; only documents the lab serves are intercepted)');
+      const dispatch = final => {
+        const bridge = state.bridge; if (bridge.loadId !== loadId) return;
+        bridge.scriptable = scriptable(final);
+        if (bridge.scriptable && (isAsset || intercepts || final.kind === 'dataBase' && final.baseUrl?.startsWith(ASSET_PREFIX))) bridge.resolve = { base: final.baseUrl && final.baseUrl !== 'about:blank' ? final.baseUrl : final.url };
+        const settings = h.settingsOf(r, self), values = r.object(settings).values, javascript = !!values.get('JavaScriptEnabled');
+        post({ type: 'webview', op: 'load', id: state.id, loadId, request: serial(final), javascript, timeoutMs, userAgent: values.get('UserAgentString'),
+          resolve: bridge.resolve, bridge: bridge.scriptable ? bridgeFor(r, self, state, final, javascript) : null });
+      };
+      if (!isAsset && !(lab && intercepts && request.kind === 'url')) { dispatch(request); return; }
+      // The lab produces this main document itself, after the callbacks already queued (Android answers shouldInterceptRequest off the UI thread, later than loadUrl returns).
+      h.postMain(r, () => {
+        if (state.destroyed || loadId !== state.loadId) return;
+        const answered = intercepts ? h.intercept(r, self, state, { url: request.url, method: 'GET', headers: request.headers ?? new Map(), mainFrame: true }) : null;
+        if (answered?.failed) { h.failLoad(r, self, state, shown, WEBVIEW_ERRORS.IO, `net::ERR_FAILED (${answered.failed})`); return; }
+        if (answered) { dispatch(documentOf(request.url, answered.mime, answered.bytes, answered.encoding)); return; }
+        if (!isAsset) { dispatch(request); return; }
+        const entry = assetEntry(request.url);
+        if (!entry || !r.apkEntries.has(entry)) { h.failLoad(r, self, state, shown, WEBVIEW_ERRORS.FILE_NOT_FOUND, 'net::ERR_FILE_NOT_FOUND'); return; }
+        dispatch(documentOf(request.url, mimeForPath(entry), Uint8Array.from(r.apkReader(entry)), null));
+      }, [self, state.client, state.chrome]);
     },
     stop(r, self, state) { post({ type: 'webview', op: 'stop', id: state.id }); },
     destroy(r, self, state) { post({ type: 'webview', op: 'destroy', id: state.id }); views.delete(state.id); },
@@ -206,9 +239,29 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
           });
           break;
         case 'navigate': queue(() => backend.navigation(r, self, state, event)); break;
+        case 'resource': queue(() => backend.resource(r, self, state, event)); break;
         default: break;
       }
       platform.onExternalActivity?.();
+    },
+    /**
+     * A sub-resource request of a document the lab serves (static references before the frame exists, fetch/XHR/elements afterwards): the app's shouldInterceptRequest answers it, else
+     * an android_asset URL is read out of the APK, else nobody intercepted it (the page then lets the browser do it, under the document's CSP). Replies with op 'resource-result'.
+     */
+    resource(r, self, state, event) {
+      const bridge = state.bridge, reply = fields => post({ type: 'webview', op: 'resource-result', id: state.id, loadId: event.loadId, rid: event.rid, ...fields });
+      if (!bridge?.resolve || typeof event.url !== 'string' || event.url.length > 8192 || !['GET', 'POST', 'HEAD'].includes(event.method)) { reply({ failed: 'this document does not resolve sub-resources' }); return; }
+      if (++bridge.resources > 2000) { reply({ failed: 'too many sub-resource requests for one document' }); return; }
+      const h = host();
+      const answered = h.intercept(r, self, state, { url: event.url, method: event.method, mainFrame: false });
+      if (answered?.failed) { reply({ failed: answered.failed }); return; }
+      if (answered) { reply({ status: answered.status, reason: answered.reason, mime: answered.mime, encoding: answered.encoding, bytes: answered.bytes }); return; }
+      const entry = assetEntry(event.url);
+      if (entry) {
+        if (!r.apkEntries.has(entry)) { reply({ status: 404, reason: 'Not Found', mime: 'text/plain', encoding: null, bytes: new Uint8Array(0) }); return; }
+        reply({ status: 200, reason: 'OK', mime: mimeForPath(entry), encoding: null, bytes: Uint8Array.from(r.apkReader(entry)) }); return;
+      }
+      reply({ passthrough: true });
     },
     title(r, self, state, title) {
       if (state.title === String(title)) return;
