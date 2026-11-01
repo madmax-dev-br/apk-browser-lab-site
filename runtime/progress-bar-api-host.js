@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=42b8efaafc8b';
+import { createHostRegistry } from './host-contract.js?v=92c3740c94ed';
 
 // android.widget.ProgressBar public API (API 33) with the semantics of android-13.0.0_r1 ProgressBar.java: min / max / progress / secondary progress with their clamping rules, the
 // determinate <-> indeterminate switch (getProgress() is 0 while indeterminate and setProgress is ignored), progress and indeterminate drawables with the four tint sets applied to the
@@ -60,7 +60,7 @@ export function createProgressBarApiHost(platform) {
     const p = st(r, self), t = p.tint.indeterminate; if (nullish(p.indeterminateDrawable) || !(t.hasList || t.hasBlend)) return;
     p.indeterminateDrawable = call(r, p.indeterminateDrawable, DRAWABLE, 'mutate', [], DRAWABLE); applyOne(r, self, p, 'indeterminate', p.indeterminateDrawable);
   };
-  const swapCurrent = (r, self, drawable) => { const p = st(r, self); if (p.current !== drawable) { p.current = nullish(drawable) ? null : drawable; redraw(r, self); } };
+  const swapCurrent = (r, self, drawable) => { const p = st(r, self); if (p.current !== drawable) { p.current = nullish(drawable) ? null : drawable; if (!r.object(self).indeterminate) applyLevel(r, self); redraw(r, self); } };
   const attach = (r, self, drawable) => {
     call(r, drawable, DRAWABLE, 'setLayoutDirection', ['I'], 'Z', [call(r, self, VIEW, 'getLayoutDirection', [], 'I')]);
     stateOf(r, self, drawable);
@@ -107,8 +107,15 @@ export function createProgressBarApiHost(platform) {
   tintAccessors('indeterminate', 'Indeterminate', (r, self) => { applyIndeterminateTint(r, self); redraw(r, self); });
 
   // ---- range and progress ---------------------------------------------------------------------------------------------------------------------------
+  /** ProgressBar.doRefreshProgress: the progress layer of the current drawable (the drawable itself when it is not a LayerDrawable) shows `scale` of its range through its level (0..10000). */
+  const applyLevel = (r, self) => {
+    const p = st(r, self), view = r.object(self), d = p.current; if (nullish(d) || view.indeterminate) return;
+    const span = view.max - p.min, scale = span > 0 ? (view.progress - p.min) / span : 0;
+    let target = d; if (r.isSubtype(r.object(d).type, LAYER)) { const layer = call(r, d, LAYER, 'findDrawableByLayerId', ['I'], DRAWABLE, [ID_PROGRESS]); if (!nullish(layer)) target = layer; }
+    call(r, target, DRAWABLE, 'setLevel', ['I'], 'Z', [Math.trunc(scale * 10000)]);
+  };
   const refresh = (r, self) => {
-    const view = r.object(self); redraw(r, self);
+    const view = r.object(self); applyLevel(r, self); redraw(r, self);
     // ProgressBar.refreshProgress -> onProgressRefresh: a subclass (AbsSeekBar) reacts; the base class only redraws.
     return view;
   };

@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=42b8efaafc8b';
-import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=42b8efaafc8b';
-import { createHostRegistry } from './host-contract.js?v=42b8efaafc8b';
-import { GC_ROOTS } from './heap-gc.js?v=42b8efaafc8b';
+import { gcRoot } from './heap-gc.js?v=92c3740c94ed';
+import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=92c3740c94ed';
+import { createHostRegistry } from './host-contract.js?v=92c3740c94ed';
+import { GC_ROOTS } from './heap-gc.js?v=92c3740c94ed';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
 // contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes, and an AlarmManager that

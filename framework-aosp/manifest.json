@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 7078512,
-  "sha256": "5c9642b2b93be98ac8102b445cd27f42961b1814d373234b63d2534ab73284a8",
-  "classCount": 5453,
+  "bytes": 7099272,
+  "sha256": "6ba3c28cf0e19b5e0d2e75c21539ce6aaf0e0c51508fff7336053257dda013d9",
+  "classCount": 5459,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -4784,6 +4784,12 @@
     "Ljava/util/concurrent/atomic/Striped64;",
     "Ljava/util/concurrent/atomic/LongAdder;",
     "Ljava/util/concurrent/atomic/Striped64$Cell;",
+    "Ljava/util/concurrent/locks/AbstractOwnableSynchronizer;",
+    "Ljava/util/concurrent/locks/AbstractQueuedLongSynchronizer$ConditionObject;",
+    "Ljava/util/concurrent/locks/AbstractQueuedLongSynchronizer;",
+    "Ljava/util/concurrent/locks/AbstractQueuedSynchronizer$ConditionObject;",
+    "Ljava/util/concurrent/locks/AbstractQueuedSynchronizer$Node;",
+    "Ljava/util/concurrent/locks/AbstractQueuedSynchronizer;",
     "Ljava/util/function/BiConsumer$$ExternalSyntheticLambda0;",
     "Ljava/util/function/BiFunction$$ExternalSyntheticLambda0;",
     "Ljava/util/function/BiPredicate;",
@@ -6546,6 +6552,25 @@
         "padding",
         "thumbPosition"
       ],
+      "ClipDrawable": [
+        "clipOrientation",
+        "gravity",
+        "drawable"
+      ],
+      "ShapeDrawable": [
+        "color",
+        "width",
+        "height",
+        "dither",
+        "tint",
+        "tintMode"
+      ],
+      "ShapeDrawablePadding": [
+        "left",
+        "top",
+        "right",
+        "bottom"
+      ],
       "View": [
         "id",
         "tag",
@@ -6785,6 +6810,9 @@
         "backgroundLeft": 17956888,
         "position": 17957068
       },
+      "ClipDrawable": {},
+      "ShapeDrawable": {},
+      "ShapeDrawablePadding": {},
       "View": {
         "__removed3": 17956867,
         "__removed4": 17956868,
@@ -6799,8 +6827,8 @@
     "resourceProfilePath": "assets/framework-resources/framework-resources.json",
     "resourceProfileSha256": "ede88f5ead33e891eef7dc603f1ca24497f1e06b18da59a144969f5bc3ab18ca",
     "aapt2": "$ANDROID_SDK/build-tools/36.1.0/aapt2",
-    "inputXmlSha256": "c6b79fe8a9a9aeab306b997e0d218205c62b6e05ca7de8230b8434bf517f1982",
-    "generatedRJavaSha256": "3dfe2221de3105d3d4b64a9e70b3bace833c92590316a4da55044b1f886f7b38",
+    "inputXmlSha256": "cddad6abeba932f18c3fcf1ea7e2edd42647e9ad1df9b4ff8abe7fd27579bf03",
+    "generatedRJavaSha256": "e12ebdf7a62ee34ee8ea3ed7eb399a8733f04f9c674d39d805fb14dce07b7b13",
     "adaptations": [
       "All styleable memberships are copied from complete selected original AOSP13 declare-styleable elements.",
       "AAPT2 independently verifies every public ID and numeric array/index ordering against the actual runtime ARSC profile.",
@@ -33860,6 +33888,36 @@
       "sha256": "f7539cfb72365fbfef502c620af5ee7eda3bbeb81bc3af8392a6c5bea13f861d",
       "bytes": 4354,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/concurrent/locks/AbstractOwnableSynchronizer.java",
+      "localPath": "framework-aosp/upstream/java/util/concurrent/locks/AbstractOwnableSynchronizer.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/locks/AbstractOwnableSynchronizer.java?format=TEXT",
+      "sha256": "1883e4f1e03d8926619e7d5588c59bceec8f5dafd401131fdf2fb7287c5d4592",
+      "bytes": 3281,
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/concurrent/locks/AbstractQueuedSynchronizer.java",
+      "localPath": "framework-aosp/upstream/java/util/concurrent/locks/AbstractQueuedSynchronizer.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/locks/AbstractQueuedSynchronizer.java?format=TEXT",
+      "sha256": "c9b58430ff144ad3ab5789752e3ff57366821d7f0bd345230f0a153e1bc655bb",
+      "bytes": 92736,
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/concurrent/locks/AbstractQueuedLongSynchronizer.java",
+      "localPath": "framework-aosp/upstream/java/util/concurrent/locks/AbstractQueuedLongSynchronizer.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/locks/AbstractQueuedLongSynchronizer.java?format=TEXT",
+      "sha256": "b9b2ad047a240905e2413add615c3fe5d47e3f0ad57c97555d9bd5a2fbf6137f",
+      "bytes": 71284,
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0"
     }
   ],
   "algorithmPatches": [],
@@ -34092,6 +34150,18 @@
         "kind": "varhandle-to-field-updaters-and-lab-thread-probe",
         "inputSha256": "47e7a2937624772dd43ea5c7b5aca54972705df13f7e54faa1651570b003691b",
         "outputSha256": "772d0fb69581cf8954e025a6bba35c818994e20e528c1baa5a29eb745e3e1d57"
+      },
+      {
+        "path": "java/util/concurrent/locks/AbstractQueuedSynchronizer.java",
+        "kind": "varhandle-to-field-updaters",
+        "inputSha256": "c9b58430ff144ad3ab5789752e3ff57366821d7f0bd345230f0a153e1bc655bb",
+        "outputSha256": "54c0842eb70e7ec0ff586bbbdff82dfb31c6b0504e9bf205e32754f8853f4bb5"
+      },
+      {
+        "path": "java/util/concurrent/locks/AbstractQueuedLongSynchronizer.java",
+        "kind": "varhandle-to-field-updaters",
+        "inputSha256": "b9b2ad047a240905e2413add615c3fe5d47e3f0ad57c97555d9bd5a2fbf6137f",
+        "outputSha256": "8379ce422450b6cbecbf08be9e12c3c5b07273b9dc1a484398b84930a7ba50bb"
       }
     ],
     "labAuthored": [
@@ -36125,8 +36195,8 @@
   "generatedSources": [
     {
       "localPath": "framework-aosp/generated/com/android/internal/R.java",
-      "sha256": "3dfe2221de3105d3d4b64a9e70b3bace833c92590316a4da55044b1f886f7b38",
-      "bytes": 830740,
+      "sha256": "e12ebdf7a62ee34ee8ea3ed7eb399a8733f04f9c674d39d805fb14dce07b7b13",
+      "bytes": 831703,
       "role": "AAPT2 generated framework resource attribute data"
     }
   ],

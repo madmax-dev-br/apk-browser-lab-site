@@ -1,20 +1,21 @@
-import { VMClock } from './vm-clock.js?v=42b8efaafc8b';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=42b8efaafc8b';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=42b8efaafc8b';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=42b8efaafc8b';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=42b8efaafc8b';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=42b8efaafc8b';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=42b8efaafc8b';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=42b8efaafc8b';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=42b8efaafc8b';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=42b8efaafc8b';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=42b8efaafc8b';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=42b8efaafc8b';
-import { APKError } from './apk-error.js?v=42b8efaafc8b';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=42b8efaafc8b';
-import { Scheduler, Blocked } from './scheduler.js?v=42b8efaafc8b';
-import { bootClassLacksMember } from './boot-class-members.js?v=42b8efaafc8b';
-export { APKError } from './apk-error.js?v=42b8efaafc8b';
+import { VMClock } from './vm-clock.js?v=92c3740c94ed';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=92c3740c94ed';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=92c3740c94ed';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=92c3740c94ed';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=92c3740c94ed';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=92c3740c94ed';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=92c3740c94ed';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=92c3740c94ed';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=92c3740c94ed';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=92c3740c94ed';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=92c3740c94ed';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=92c3740c94ed';
+import { APKError } from './apk-error.js?v=92c3740c94ed';
+import { collectGarbage } from './heap-gc.js?v=92c3740c94ed';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=92c3740c94ed';
+import { Scheduler, Blocked } from './scheduler.js?v=92c3740c94ed';
+import { bootClassLacksMember } from './boot-class-members.js?v=92c3740c94ed';
+export { APKError } from './apk-error.js?v=92c3740c94ed';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -896,7 +897,7 @@ export class APKRuntime {
   constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 10000000, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off' } = {}) {
     if (!Number.isInteger(maxCallDepth) || maxCallDepth < 16 || maxCallDepth > 100000) fail('VM maxCallDepth must be an integer from 16 to 100000');
     if(!Number.isInteger(maxHeapObjects)||maxHeapObjects<1024||maxHeapObjects>262144)fail('VM maxHeapObjects must be an integer from 1024 to 262144');
-    this.maxHeapObjects=maxHeapObjects; this.apkEntries=apkEntries; this.apkReader=apkReader;
+    this.maxHeapObjects=maxHeapObjects; this.gcSafepointFloor=Math.floor(maxHeapObjects*0.5); this.apkEntries=apkEntries; this.apkReader=apkReader;
     // Opt-in tolerant mode for platform methods the lab does not implement: 'void' skips void ones; 'primitives' also answers
     // boolean/byte/short/char/int/long/float/double methods with 0/false; 'all' also answers object methods with null. Every stubbed call is counted and traced (STUB-VOID / STUB-RETURN), so the run
     // doubles as the to-do list of missing bridges; a run that stubbed anything is never treated as validated. The default stays strict.
@@ -1450,6 +1451,11 @@ export class APKRuntime {
     if (wantFrame || (!(outcome instanceof Blocked) && !(outcome instanceof Invoke))) return outcome;
     // A blocking or call-back native reached through host code (not an interpreter call site) cannot park its thread or push frames: finish it inside the scheduler.
     return this.finishHostStep(outcome);
+  }
+  /** Heap-pressure collection at a thread-switch safepoint of a scheduling run (no host native is in flight there; see heap-gc.js). A no-op unless collection is enabled and the heap passed half its limit. */
+  safepointCollect() {
+    if (!this.gcEnabled || this.heap.size < Math.max(Math.floor(this.maxHeapObjects * 0.5), this.gcNextAt ?? 0)) return;
+    collectGarbage(this, { reason: 'safepoint', safepoint: true });
   }
   /** Completes a native's Blocked / Invoke result synchronously for a host caller (nested waits and nested runs). */
   finishHostStep(step) {

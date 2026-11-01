@@ -27405,5 +27405,115 @@
     "sha256": "f7539cfb72365fbfef502c620af5ee7eda3bbeb81bc3af8392a6c5bea13f861d",
     "bytes": 4354,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "graphics/java/android/graphics/drawable/ShapeDrawable.java",
+    "localPath": "framework-aosp/upstream/android/graphics/drawable/ShapeDrawable.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/ShapeDrawable.java?format=TEXT",
+    "sha256": "ac43cec79a2321b52c0982ab71840c4058a1b5e69e7239a95c7fe81dac947a0c",
+    "bytes": 21007,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "graphics/java/android/graphics/drawable/ClipDrawable.java",
+    "localPath": "framework-aosp/upstream/android/graphics/drawable/ClipDrawable.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/ClipDrawable.java?format=TEXT",
+    "sha256": "daa09691616a81f74a189576eb0738c6296c642df02989ef2455bbdc1fca01ba",
+    "bytes": 8014,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "graphics/java/android/graphics/drawable/shapes/Shape.java",
+    "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/Shape.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/Shape.java?format=TEXT",
+    "sha256": "f56c30f30b4add6e9723ee3a336efffcce4c35160b05d4495e8328f3e1c17f56",
+    "bytes": 4017,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "graphics/java/android/graphics/drawable/shapes/RectShape.java",
+    "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/RectShape.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/RectShape.java?format=TEXT",
+    "sha256": "36fb2b851188d544abd761d0fb9e378a9a1f5cd1aa9503a6bd08716c81918578",
+    "bytes": 2498,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "graphics/java/android/graphics/drawable/shapes/RoundRectShape.java",
+    "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/RoundRectShape.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/RoundRectShape.java?format=TEXT",
+    "sha256": "a289d8091bd468f3c587c77939970b9f33f3dc3361cafad851c05864e14c8bbf",
+    "bytes": 6251,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "graphics/java/android/graphics/drawable/shapes/OvalShape.java",
+    "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/OvalShape.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/OvalShape.java?format=TEXT",
+    "sha256": "f1c499f337298dd28c9067d094b01bfa50b96bcc1e9860c08dc7ef2adbcd9c37",
+    "bytes": 1604,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "graphics/java/android/graphics/drawable/shapes/ArcShape.java",
+    "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/ArcShape.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/ArcShape.java?format=TEXT",
+    "sha256": "068841a792d73b064876a7a21fb2a606af4473d8bd1c2c8df47c4fd552b08008",
+    "bytes": 2991,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "graphics/java/android/graphics/drawable/shapes/PathShape.java",
+    "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/PathShape.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/PathShape.java?format=TEXT",
+    "sha256": "c08dd2655711c120fcafcbc733a004f2f73a6503a3355aabdf57ba3e1c149965",
+    "bytes": 3525,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/locks/AbstractOwnableSynchronizer.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/locks/AbstractOwnableSynchronizer.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/locks/AbstractOwnableSynchronizer.java?format=TEXT",
+    "sha256": "1883e4f1e03d8926619e7d5588c59bceec8f5dafd401131fdf2fb7287c5d4592",
+    "bytes": 3281,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/locks/AbstractQueuedSynchronizer.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/locks/AbstractQueuedSynchronizer.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/locks/AbstractQueuedSynchronizer.java?format=TEXT",
+    "sha256": "c9b58430ff144ad3ab5789752e3ff57366821d7f0bd345230f0a153e1bc655bb",
+    "bytes": 92736,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/locks/AbstractQueuedLongSynchronizer.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/locks/AbstractQueuedLongSynchronizer.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/locks/AbstractQueuedLongSynchronizer.java?format=TEXT",
+    "sha256": "b9b2ad047a240905e2413add615c3fe5d47e3f0ad57c97555d9bd5a2fbf6137f",
+    "bytes": 71284,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
   }
 ]

@@ -1,4 +1,5 @@
-// Mark-and-sweep reclamation of the VM heap (runtime.heap), run only at quiescent points between host requests.
+// Mark-and-sweep reclamation of the VM heap (runtime.heap), run at quiescent points between host requests and, under heap pressure, at the scheduler's thread-switch safepoints
+// inside one long scheduling run (runtime.safepointCollect): there no host native is in flight, so every live Java value is in a thread's frames or in the rooted tables below.
 //
 // Why: Java objects live in runtime.heap and are never freed otherwise; a few dozen UI interactions (Compose recomposition, layout, semantics snapshots) exhaust the
 // 262,144-object limit. Ids are never reused, so a stale id can only be *absent*, never the wrong object.
@@ -55,13 +56,13 @@ export function pinAll(runtime) {
 /** True when `id` once named a heap object that has since been collected (a stale id from the page, a pending event...). */
 export function isFreedId(runtime, id) { return Number.isSafeInteger(id) && id > 0 && id < runtime.nextId && runtime.heap.list[id] === undefined; }
 
-function quiescent(runtime) {
+function quiescent(runtime, safepoint = false) {
   if (runtime.depth !== 0) return 'dispatch-in-flight';
-  if (runtime.nestedRuns) return 'nested-run';
+  if (runtime.nestedRuns > (safepoint ? 1 : 0)) return 'nested-run';   // a safepoint is inside the one scheduling run that owns the JavaScript stack
   if (runtime.initDepth) return 'class-initializer-running';
   const scheduler = runtime.scheduler;
   if (scheduler) { if (scheduler.waitingNested?.size) return 'host-wait-in-flight'; for (const thread of scheduler.threads) if (thread.nestedDepth > 0 || thread.nestedBlock) return 'host-wait-in-flight'; }   // Scheduler.resolveNested: a host call (a native, a class initializer) is parked on the JS stack and may hold raw ids
-  if (runtime.thread?.frames?.length) return 'main-thread-running';
+  if (!safepoint && runtime.thread?.frames?.length) return 'main-thread-running';   // at a safepoint every frame is a root through the scheduler
   return null;
 }
 
@@ -74,9 +75,9 @@ function unannotatedTask(runtime) {
  * Collects unreachable objects. Returns { collected, reason?, before, after, freed, ms, markMs }.
  * options: { audit, extraRoots: () => iterable of values | values[], reason, requireQuiescence = true }
  */
-export function collectGarbage(runtime, { audit = globalThis.process?.env?.APKWEB_GC_AUDIT === '1', extraRoots = null, reason = 'manual' } = {}) {
+export function collectGarbage(runtime, { audit = globalThis.process?.env?.APKWEB_GC_AUDIT === '1', extraRoots = null, reason = 'manual', safepoint = false } = {}) {
   const started = performance.now(), heap = runtime.heap, before = heap.size;
-  const blocked = quiescent(runtime) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null);
+  const blocked = quiescent(runtime, safepoint) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null);
   if (blocked) { const skips = (runtime.gcSkips ??= {}); skips[blocked] = (skips[blocked] ?? 0) + 1; return { collected: false, reason: blocked, before, after: before, freed: 0, ms: 0 }; }
   const limit = runtime.nextId, marked = new Uint8Array(limit), worklist = [];
   const visited = new WeakSet(), stack = [];

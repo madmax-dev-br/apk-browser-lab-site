@@ -1,6 +1,6 @@
-import {APKError} from './apk-runtime.js?v=42b8efaafc8b';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=42b8efaafc8b';
-import {getVectorGraphics} from './vector-native.js?v=42b8efaafc8b';
+import {APKError} from './apk-runtime.js?v=92c3740c94ed';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=92c3740c94ed';
+import {getVectorGraphics} from './vector-native.js?v=92c3740c94ed';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -200,7 +200,15 @@ export function createComposeCanvasHost(platform){
           if(view.imageDrawable){const [w,h]=dimensions(view);platform.drawableViewHost.drawImage(r,receiver,target,w,h);}
           return;
         }
-        if(r.isSubtype(view.type,'Landroid/widget/ProgressBar;'))fail(`Native widget Canvas drawing is not connected: ${view.type}`);
+        if(r.isSubtype(view.type,'Landroid/widget/ProgressBar;')){   // ProgressBar.drawTrack: the current drawable (progress or indeterminate) inside the padding, at the level the bar's progress set
+          const current=view.pb?.current;if(current===null||current===undefined)return;
+          const padding=view.padding??{left:0,right:0,top:0,bottom:0},[w,h]=dimensions(view),drawable='Landroid/graphics/drawable/Drawable;';
+          r.dispatch({owner:drawable,name:'setBounds',parameters:['I','I','I','I'],result:'V',signature:'(IIII)V'},[current,0,0,Math.max(0,w-(padding.left??0)-(padding.right??0)),Math.max(0,h-(padding.top??0)-(padding.bottom??0))],'virtual');
+          const save=canvas(r,target,'save',[],'I');
+          try{canvas(r,target,'translate',['F','F'],'V',[raw(padding.left??0),raw(padding.top??0)]);r.dispatch({owner:drawable,name:'draw',parameters:['Landroid/graphics/Canvas;'],result:'V',signature:'(Landroid/graphics/Canvas;)V'},[current,target],'virtual');}
+          finally{canvas(r,target,'restoreToCount',['I'],'V',[save]);}
+          return;
+        }
         return;
       }
       if(method.name==='dispatchDraw'&&method.owner===VIEW)return; // Empty original View hook.

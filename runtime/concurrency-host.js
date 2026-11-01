@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=42b8efaafc8b';
-import { createHostRegistry } from './host-contract.js?v=42b8efaafc8b';
-import { Blocked, VMThread } from './scheduler.js?v=42b8efaafc8b';
-import { Invoke } from './interpreter.js?v=42b8efaafc8b';
-import { GC_ROOTS } from './heap-gc.js?v=42b8efaafc8b';
+import { APKError } from './apk-error.js?v=92c3740c94ed';
+import { createHostRegistry } from './host-contract.js?v=92c3740c94ed';
+import { Blocked, VMThread } from './scheduler.js?v=92c3740c94ed';
+import { Invoke } from './interpreter.js?v=92c3740c94ed';
+import { GC_ROOTS } from './heap-gc.js?v=92c3740c94ed';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -619,7 +619,7 @@ export function createConcurrencyHost(platform) {
 
   // ---- ReentrantLock.newCondition (AbstractQueuedSynchronizer.ConditionObject): await releases the lock fully, parks until signalled (or interrupted / timed out), then
   // reacquires the lock with its previous hold count before returning. The lock state is the ReentrantLock bridge's (obj.lockState: owner thread, holds).
-  const CONDITION = 'Ljava/util/concurrent/locks/Condition;', CONDITION_OBJECT = 'Ljava/util/concurrent/locks/AbstractQueuedSynchronizer$ConditionObject;', LOCK_CLASS = 'Ljava/util/concurrent/locks/ReentrantLock;';
+  const CONDITION = 'Ljava/util/concurrent/locks/Condition;', CONDITION_OBJECT = 'Ldev/apkweb/locks/HostLockCondition;'   /* not AbstractQueuedSynchronizer$ConditionObject: that is the original AQS class now */, LOCK_CLASS = 'Ljava/util/concurrent/locks/ReentrantLock;';
   type(CONDITION_OBJECT, OBJECT, [CONDITION], { allocatable: true }); registry.parents.set(CONDITION, OBJECT); registry.interfaces.set(CONDITION, []);
   def(LOCK_CLASS, 'newCondition', `()${CONDITION}`, (r, _m, [lock]) => { const c = r.allocate(CONDITION_OBJECT); r.object(c).condition = { lock: r.object(lock).lockState, waiters: [] }; return c; });
   const conditionAwait = (r, self, { timeoutMs = Infinity, uninterruptible = false, result }) => {

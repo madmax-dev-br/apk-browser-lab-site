@@ -4,14 +4,27 @@
   "enabledByDefault": false,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "sha256": "07c07b06b8136da7c48b408678307760d925d2455961290ae9ed72e17381533c",
-  "bytes": 335264,
+  "sha256": "5b488ba3c33929b0aed5fb4a2d450a2914201cae691b254968905cf0f12ff6a3",
+  "bytes": 352152,
   "classes": [
     "Landroid/R$styleable;",
     "Landroid/app/AlertDialog$Builder;",
     "Landroid/app/AlertDialog;",
     "Landroid/content/CursorEntityIterator;",
     "Landroid/content/res/ResourceId;",
+    "Landroid/graphics/drawable/ClipDrawable$1;",
+    "Landroid/graphics/drawable/ClipDrawable$ClipState;",
+    "Landroid/graphics/drawable/ClipDrawable;",
+    "Landroid/graphics/drawable/ShapeDrawable$1;",
+    "Landroid/graphics/drawable/ShapeDrawable$ShaderFactory;",
+    "Landroid/graphics/drawable/ShapeDrawable$ShapeState;",
+    "Landroid/graphics/drawable/ShapeDrawable;",
+    "Landroid/graphics/drawable/shapes/Shape;",
+    "Landroid/graphics/drawable/shapes/RectShape;",
+    "Landroid/graphics/drawable/shapes/ArcShape;",
+    "Landroid/graphics/drawable/shapes/OvalShape;",
+    "Landroid/graphics/drawable/shapes/PathShape;",
+    "Landroid/graphics/drawable/shapes/RoundRectShape;",
     "Landroid/provider/ContactsContract$1;",
     "Landroid/provider/ContactsContract$AggregationExceptions;",
     "Landroid/provider/ContactsContract$Authorization;",
@@ -228,7 +241,7 @@
     "Lcom/google/android/collect/Lists;",
     "Lcom/google/android/collect/Sets;"
   ],
-  "classCount": 220,
+  "classCount": 233,
   "algorithmPatches": [],
   "compiledSources": [
     {
@@ -633,9 +646,89 @@
       "sha256": "ab7c8c84e26d90c5aa9c0a5a2de7f40e54f8f2becc023b51b1e4478cf4048379",
       "bytes": 5438,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/ShapeDrawable.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/ShapeDrawable.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/ShapeDrawable.java?format=TEXT",
+      "sha256": "ac43cec79a2321b52c0982ab71840c4058a1b5e69e7239a95c7fe81dac947a0c",
+      "bytes": 21007,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/ClipDrawable.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/ClipDrawable.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/ClipDrawable.java?format=TEXT",
+      "sha256": "daa09691616a81f74a189576eb0738c6296c642df02989ef2455bbdc1fca01ba",
+      "bytes": 8014,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/shapes/Shape.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/Shape.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/Shape.java?format=TEXT",
+      "sha256": "f56c30f30b4add6e9723ee3a336efffcce4c35160b05d4495e8328f3e1c17f56",
+      "bytes": 4017,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/shapes/RectShape.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/RectShape.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/RectShape.java?format=TEXT",
+      "sha256": "36fb2b851188d544abd761d0fb9e378a9a1f5cd1aa9503a6bd08716c81918578",
+      "bytes": 2498,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/shapes/RoundRectShape.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/RoundRectShape.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/RoundRectShape.java?format=TEXT",
+      "sha256": "a289d8091bd468f3c587c77939970b9f33f3dc3361cafad851c05864e14c8bbf",
+      "bytes": 6251,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/shapes/OvalShape.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/OvalShape.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/OvalShape.java?format=TEXT",
+      "sha256": "f1c499f337298dd28c9067d094b01bfa50b96bcc1e9860c08dc7ef2adbcd9c37",
+      "bytes": 1604,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/shapes/ArcShape.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/ArcShape.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/ArcShape.java?format=TEXT",
+      "sha256": "068841a792d73b064876a7a21fb2a606af4473d8bd1c2c8df47c4fd552b08008",
+      "bytes": 2991,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/shapes/PathShape.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/PathShape.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/PathShape.java?format=TEXT",
+      "sha256": "c08dd2655711c120fcafcbc733a004f2f73a6503a3355aabdf57ba3e1c149965",
+      "bytes": 3525,
+      "license": "Apache-2.0"
     }
   ],
-  "requiresDefaultFrameworkSha256": "5c9642b2b93be98ac8102b445cd27f42961b1814d373234b63d2534ab73284a8",
+  "requiresDefaultFrameworkSha256": "6ba3c28cf0e19b5e0d2e75c21539ce6aaf0e0c51508fff7336053257dda013d9",
   "sourceTransforms": [
     {
       "path": "com/android/internal/app/AlertController.java",

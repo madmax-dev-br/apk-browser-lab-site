@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=42b8efaafc8b';
-import {getVectorGraphics} from './vector-native.js?v=42b8efaafc8b';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=42b8efaafc8b';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=42b8efaafc8b';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=42b8efaafc8b';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=42b8efaafc8b';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=42b8efaafc8b';
-import {createBitmapHost} from './bitmap-host.js?v=42b8efaafc8b';
-import { gcRoot } from './heap-gc.js?v=42b8efaafc8b';
+import {APKError} from './apk-runtime.js?v=92c3740c94ed';
+import {getVectorGraphics} from './vector-native.js?v=92c3740c94ed';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=92c3740c94ed';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=92c3740c94ed';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=92c3740c94ed';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=92c3740c94ed';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=92c3740c94ed';
+import {createBitmapHost} from './bitmap-host.js?v=92c3740c94ed';
+import { gcRoot } from './heap-gc.js?v=92c3740c94ed';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -420,7 +420,7 @@ export function createSkiaCanvasHost(runtime,backend){
     if(name==='isEmpty'){const shape=builder.snapshot();try{return shape.isEmpty()?1:0;}finally{shape.delete();}}
     if(name==='setFillType'){const index=vm.object(args[1]).fields.get('Landroid/graphics/Path$FillType;->nativeInt:I');if(!Number.isInteger(index)||index<0||index>3)fail('Path requires original FillType enum');builder.setFillType([CK.FillType.Winding,CK.FillType.EvenOdd,CK.FillType.InverseWinding,CK.FillType.InverseEvenOdd][index]);return;}
     if(name==='getFillType'){const shape=builder.snapshot();const index=shape.getFillType().value;shape.delete();const names=['WINDING','EVEN_ODD','INVERSE_WINDING','INVERSE_EVEN_ODD'],owner='Landroid/graphics/Path$FillType;',name=names[index];return vm.readStatic({owner,name,type:owner,key:`${owner}->${name}:${owner}`});}
-    if(name==='addPath'){const shape=path(args[1]).builder.snapshot(),count=shape.countPoints();if(pathCells+count>1000000){shape.delete();fail('Aggregate Skia Path point limit exceeded');}builder.addPath(shape);shape.delete();pathCells+=count;return;}
+    if(name==='addPath'&&method.parameters.length===1){const shape=path(args[1]).builder.snapshot(),count=shape.countPoints();if(pathCells+count>1000000){shape.delete();fail('Aggregate Skia Path point limit exceeded');}builder.addPath(shape);shape.delete();pathCells+=count;return;}
     if(name==='addRoundRect'&&method.parameters[0]==='F'&&method.parameters[4]==='[F'){   // addRoundRect(l, t, r, b, float[] radii, dir): eight radii, x then y per corner
       const radii=vm.array(args[5]);if(radii.elements.length<8)vm.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','radii[] needs 8 values');
       const direction=vm.object(args[6]).fields.get('Landroid/graphics/Path$Direction;->nativeInt:I');if(direction!==0&&direction!==1)fail('Path requires original Direction enum');
@@ -452,7 +452,7 @@ export function createSkiaCanvasHost(runtime,backend){
         builder.arcToOval(r,angles[0],angles[1],forceMoveTo);grow(before);return;
       }
       if(name==='offset'||name==='transform'||(name==='addPath'&&method.parameters.length===2)){
-        const m=name==='offset'?[1,0,number(args[1]),0,1,number(args[2]),0,0,1]:finite(Array.from(getMatrixValues(vm,args[1])));
+        const m=name==='addPath'?null:name==='offset'?[1,0,number(args[1]),0,1,number(args[2]),0,0,1]:finite(Array.from(getMatrixValues(vm,args[1])));
         if(name==='addPath'){const source=path(args[1]).builder.snapshot();try{builder.addPath(source,getMatrixValues(vm,args[2]));}finally{source.delete();}grow(before);return;}
         const destination=name==='offset'?args[3]:args[2];
         if(destination){const source=builder.snapshot(),copy=new CK.PathBuilder(source);source.delete();copy.transform(m);const target=path(destination);target.builder.delete();target.builder=copy;}else builder.transform(m);
