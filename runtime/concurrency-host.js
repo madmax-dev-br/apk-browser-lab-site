@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=92c3740c94ed';
-import { createHostRegistry } from './host-contract.js?v=92c3740c94ed';
-import { Blocked, VMThread } from './scheduler.js?v=92c3740c94ed';
-import { Invoke } from './interpreter.js?v=92c3740c94ed';
-import { GC_ROOTS } from './heap-gc.js?v=92c3740c94ed';
+import { APKError } from './apk-error.js?v=6a35ed61b8ba';
+import { createHostRegistry } from './host-contract.js?v=6a35ed61b8ba';
+import { Blocked, VMThread } from './scheduler.js?v=6a35ed61b8ba';
+import { Invoke } from './interpreter.js?v=6a35ed61b8ba';
+import { GC_ROOTS } from './heap-gc.js?v=6a35ed61b8ba';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -322,7 +322,7 @@ export function createConcurrencyHost(platform) {
   };
   for (const [owner, capacity] of Object.entries(queueTypes)) {
     const priority = owner.endsWith('PriorityBlockingQueue;');
-    type(owner, OBJECT, [QUEUE, 'Ljava/util/Queue;', COLLECTION, 'Ljava/lang/Iterable;'], { allocatable: true });
+    type(owner, 'Ljava/util/AbstractQueue;', [QUEUE, 'Ljava/util/Queue;', COLLECTION, 'Ljava/lang/Iterable;', ...(owner.endsWith('Deque;') ? ['Ljava/util/Deque;'] : []), ...(owner.endsWith('LinkedBlockingDeque;') ? ['Ljava/util/concurrent/BlockingDeque;'] : [])], { allocatable: true });   // addAll/removeAll/retainAll/containsAll/toArray(T[])/toString come from the original AbstractQueue / AbstractCollection over iterator() and size()
     const make = (comparator) => ({ items: [], capacity, ...(priority ? { comparator } : {}) });
     def(owner, '<init>', '()V', (r, _m, [self]) => { r.object(self).bqueue = make(null); });
     if (capacity === null) { def(owner, '<init>', '(I)V', (r, _m, [self, n]) => { if (n <= 0) throwNew(r, 'Ljava/lang/IllegalArgumentException;'); r.object(self).bqueue = { items: [], capacity: n }; }); def(owner, '<init>', '(IZ)V', (r, _m, [self, n]) => { if (n <= 0) throwNew(r, 'Ljava/lang/IllegalArgumentException;'); r.object(self).bqueue = { items: [], capacity: n }; }); }
@@ -387,6 +387,48 @@ export function createConcurrencyHost(platform) {
     });
     def(owner, 'toArray', '()[Ljava/lang/Object;', (r, _m, [self]) => { const items = q(r, self).items, array = r.newArray('[Ljava/lang/Object;', items.length); r.array(array).elements = items.slice(); return array; });
     def(owner, 'iterator', '()Ljava/util/Iterator;', (r, _m, [self]) => { const ref = r.allocate('Ljava/util/concurrent/QueueIterator;'); r.object(ref).iteration = { items: q(r, self).items.slice(), index: 0, queue: q(r, self), last: -1 }; return ref; });
+  }
+  // ---- Deque operations of LinkedBlockingDeque / ConcurrentLinkedDeque (java.util.Deque and BlockingDeque): the queue's items are ordered head (index 0) to tail --------------------------------
+  for (const owner of Object.keys(queueTypes).filter(name => name.endsWith('Deque;'))) {
+    const noNull = (r, item) => { if (item === null || item === 0 || item === undefined) throwNew(r, 'Ljava/lang/NullPointerException;'); };
+    const put = (r, self, item, first) => { noNull(r, item); const queue = q(r, self); if (queue.items.length >= queue.capacity) return 0; if (first) queue.items.unshift(item); else queue.items.push(item); return 1; };
+    const add = (r, self, item, first) => put(r, self, item, first) ? undefined : throwNew(r, 'Ljava/lang/IllegalStateException;', 'Deque full');
+    for (const [suffix, first] of [['First', true], ['Last', false]]) {
+      def(owner, `add${suffix}`, `(${OBJECT})V`, (r, _m, [self, item]) => add(r, self, item, first));
+      def(owner, `offer${suffix}`, `(${OBJECT})Z`, (r, _m, [self, item]) => put(r, self, item, first));
+      def(owner, `put${suffix}`, `(${OBJECT})V`, (r, _m, [self, item]) => {
+        noNull(r, item); const queue = q(r, self); checkInterrupt(r);
+        const again = () => block(r, { reason: 'BlockingDeque.put()', ready: () => queue.items.length < queue.capacity, finish: () => { waitInterrupted(r); return put(r, self, item, first) ? undefined : again(); } });
+        return put(r, self, item, first) ? undefined : again();
+      });
+      def(owner, `offer${suffix}`, `(${OBJECT}J${UNIT})Z`, (r, _m, [self, item, t, unit]) => {
+        noNull(r, item); const queue = q(r, self); checkInterrupt(r); if (put(r, self, item, first)) return 1;
+        const millis = Number(vcall(r, unit, UNIT, 'toMillis', ['J'], 'J', [t]));
+        return block(r, { reason: 'BlockingDeque.offer(timeout)', ready: () => queue.items.length < queue.capacity, timeoutMs: Math.max(0, millis), finish: () => { waitInterrupted(r); return put(r, self, item, first); } });
+      });
+      const take = queue => first ? queue.items.shift() : queue.items.pop();
+      def(owner, `poll${suffix}`, `()${OBJECT}`, (r, _m, [self]) => { const queue = q(r, self); return queue.items.length ? take(queue) : null; });
+      def(owner, `peek${suffix}`, `()${OBJECT}`, (r, _m, [self]) => { const items = q(r, self).items; return items.length ? items[first ? 0 : items.length - 1] : null; });
+      def(owner, `get${suffix}`, `()${OBJECT}`, (r, _m, [self]) => { const items = q(r, self).items; return items.length ? items[first ? 0 : items.length - 1] : throwNew(r, 'Ljava/util/NoSuchElementException;'); });
+      def(owner, `remove${suffix}`, `()${OBJECT}`, (r, _m, [self]) => { const queue = q(r, self); return queue.items.length ? take(queue) : throwNew(r, 'Ljava/util/NoSuchElementException;'); });
+      def(owner, `poll${suffix}`, `(J${UNIT})${OBJECT}`, (r, _m, [self, t, unit]) => {
+        const queue = q(r, self); if (queue.items.length) return take(queue); checkInterrupt(r);
+        const millis = Number(vcall(r, unit, UNIT, 'toMillis', ['J'], 'J', [t]));
+        return block(r, { reason: 'BlockingDeque.poll(timeout)', ready: () => queue.items.length > 0, timeoutMs: Math.max(0, millis), finish: () => { waitInterrupted(r); return queue.items.length ? take(queue) : null; } });
+      });
+      def(owner, `take${suffix}`, `()${OBJECT}`, (r, _m, [self]) => {
+        const queue = q(r, self); if (queue.items.length) return take(queue); checkInterrupt(r);
+        const again = () => block(r, { reason: 'BlockingDeque.take()', ready: () => queue.items.length > 0, finish: () => { waitInterrupted(r); return queue.items.length ? take(queue) : again(); } });
+        return again();
+      });
+      def(owner, `remove${suffix}Occurrence`, `(${OBJECT})Z`, (r, _m, [self, item]) => {
+        if (item === null) return 0; const items = q(r, self).items, match = x => sameRef(x, item) || r.javaEquals(item, x);
+        const at = first ? items.findIndex(match) : items.findLastIndex(match); if (at < 0) return 0; items.splice(at, 1); return 1;
+      });
+    }
+    def(owner, 'push', `(${OBJECT})V`, (r, _m, [self, item]) => add(r, self, item, true));
+    def(owner, 'pop', `()${OBJECT}`, (r, _m, [self]) => { const queue = q(r, self); return queue.items.length ? queue.items.shift() : throwNew(r, 'Ljava/util/NoSuchElementException;'); });
+    def(owner, 'descendingIterator', '()Ljava/util/Iterator;', (r, _m, [self]) => { const ref = r.allocate('Ljava/util/concurrent/QueueIterator;'); r.object(ref).iteration = { items: q(r, self).items.slice().reverse(), index: 0, queue: q(r, self), last: -1 }; return ref; });
   }
   type('Ljava/util/concurrent/QueueIterator;', OBJECT, ['Ljava/util/Iterator;'], { allocatable: true });
   def('Ljava/util/concurrent/QueueIterator;', 'hasNext', '()Z', (r, _m, [self]) => { const it = r.object(self).iteration; return it.index < it.items.length ? 1 : 0; });
@@ -580,86 +622,18 @@ export function createConcurrencyHost(platform) {
   type('Ljava/util/concurrent/Executors$RunnableAdapter;', OBJECT, [CALLABLE], { allocatable: true });
   def('Ljava/util/concurrent/Executors$RunnableAdapter;', 'call', `()${OBJECT}`, (r, _m, [self]) => { const a = r.object(self).adapter; return new Invoke({ owner: RUNNABLE, name: 'run', parameters: [], result: 'V', signature: '()V' }, [a.task], 'virtual', () => a.result); });
 
-  // ---- CountDownLatch --------------------------------------------------------------------------------------------------------------------------
-  const LATCH = 'Ljava/util/concurrent/CountDownLatch;'; type(LATCH, OBJECT, [], { allocatable: true });
-  def(LATCH, '<init>', '(I)V', (r, _m, [self, n]) => { if (n < 0) throwNew(r, 'Ljava/lang/IllegalArgumentException;', 'count < 0'); r.object(self).latch = { count: n }; });
-  def(LATCH, 'countDown', '()V', (r, _m, [self]) => { const l = r.object(self).latch; if (l.count > 0) l.count--; });
-  def(LATCH, 'getCount', '()J', (r, _m, [self]) => BigInt(r.object(self).latch.count));
-  def(LATCH, 'await', '()V', (r, _m, [self]) => {
-    const l = r.object(self).latch; checkInterrupt(r); if (l.count === 0) return undefined;
-    return block(r, { reason: 'CountDownLatch.await()', ready: () => l.count === 0, finish: () => { waitInterrupted(r); return undefined; } });
-  });
-  def(LATCH, 'await', `(J${UNIT})Z`, (r, _m, [self, t, u]) => {
-    const l = r.object(self).latch; checkInterrupt(r); if (l.count === 0) return 1;
-    return block(r, { reason: 'CountDownLatch.await(timeout)', ready: () => l.count === 0, timeoutMs: Math.max(0, ms(r, t, u)), finish: () => { waitInterrupted(r); return l.count === 0 ? 1 : 0; } });
-  });
+  // CountDownLatch, Semaphore, CyclicBarrier, Phaser, Exchanger, ReentrantLock, ReentrantReadWriteLock and their Conditions are the original libcore classes over AbstractQueuedSynchronizer + LockSupport.
 
-  // ---- Semaphore: permits are a counter; acquire parks until enough are available (fair semaphores grant in arrival order because parked threads are woken in order). -----------------
-  const SEMAPHORE = 'Ljava/util/concurrent/Semaphore;'; type(SEMAPHORE, OBJECT, ['Ljava/io/Serializable;'], { allocatable: true });
-  const sem = (r, ref) => r.object(ref).semaphore ?? throwNew(r, 'Ljava/lang/IllegalStateException;', 'Semaphore used before construction');
-  def(SEMAPHORE, '<init>', '(I)V', (r, _m, [self, permits]) => { r.object(self).semaphore = { permits, fair: false }; });
-  def(SEMAPHORE, '<init>', '(IZ)V', (r, _m, [self, permits, fair]) => { r.object(self).semaphore = { permits, fair: !!fair }; });
-  const acquireN = (r, self, n, { interruptible = true, timeoutMs = Infinity, timed = false } = {}) => {
-    if (n < 0) throwNew(r, 'Ljava/lang/IllegalArgumentException;'); const s = sem(r, self); if (interruptible) checkInterrupt(r);
-    const take = () => { s.permits -= n; return timed ? 1 : undefined; };
-    if (s.permits >= n) return take();
-    if (timed && timeoutMs <= 0) return 0;
-    return block(r, { reason: 'Semaphore.acquire', ready: () => s.permits >= n, timeoutMs, interruptible, finish: () => { if (interruptible) waitInterrupted(r); return s.permits >= n ? take() : timed ? 0 : undefined; } });
-  };
-  def(SEMAPHORE, 'acquire', '()V', (r, _m, [self]) => acquireN(r, self, 1)); def(SEMAPHORE, 'acquire', '(I)V', (r, _m, [self, n]) => acquireN(r, self, n));
-  def(SEMAPHORE, 'acquireUninterruptibly', '()V', (r, _m, [self]) => acquireN(r, self, 1, { interruptible: false })); def(SEMAPHORE, 'acquireUninterruptibly', '(I)V', (r, _m, [self, n]) => acquireN(r, self, n, { interruptible: false }));
-  def(SEMAPHORE, 'tryAcquire', '()Z', (r, _m, [self]) => { const s = sem(r, self); if (s.permits >= 1) { s.permits--; return 1; } return 0; });
-  def(SEMAPHORE, 'tryAcquire', '(I)Z', (r, _m, [self, n]) => { if (n < 0) throwNew(r, 'Ljava/lang/IllegalArgumentException;'); const s = sem(r, self); if (s.permits >= n) { s.permits -= n; return 1; } return 0; });
-  def(SEMAPHORE, 'tryAcquire', `(J${UNIT})Z`, (r, _m, [self, t, u]) => acquireN(r, self, 1, { timed: true, timeoutMs: Math.max(0, ms(r, t, u)) }));
-  def(SEMAPHORE, 'tryAcquire', `(IJ${UNIT})Z`, (r, _m, [self, n, t, u]) => acquireN(r, self, n, { timed: true, timeoutMs: Math.max(0, ms(r, t, u)) }));
-  def(SEMAPHORE, 'release', '()V', (r, _m, [self]) => { sem(r, self).permits++; }); def(SEMAPHORE, 'release', '(I)V', (r, _m, [self, n]) => { if (n < 0) throwNew(r, 'Ljava/lang/IllegalArgumentException;'); sem(r, self).permits += n; });
-  def(SEMAPHORE, 'availablePermits', '()I', (r, _m, [self]) => sem(r, self).permits); def(SEMAPHORE, 'isFair', '()Z', (r, _m, [self]) => sem(r, self).fair ? 1 : 0);
-  def(SEMAPHORE, 'drainPermits', '()I', (r, _m, [self]) => { const s = sem(r, self), n = s.permits; s.permits = 0; return n; });
-  def(SEMAPHORE, 'hasQueuedThreads', '()Z', () => 0); def(SEMAPHORE, 'getQueueLength', '()I', () => 0);
-
-  // ---- ReentrantLock.newCondition (AbstractQueuedSynchronizer.ConditionObject): await releases the lock fully, parks until signalled (or interrupted / timed out), then
-  // reacquires the lock with its previous hold count before returning. The lock state is the ReentrantLock bridge's (obj.lockState: owner thread, holds).
-  const CONDITION = 'Ljava/util/concurrent/locks/Condition;', CONDITION_OBJECT = 'Ldev/apkweb/locks/HostLockCondition;'   /* not AbstractQueuedSynchronizer$ConditionObject: that is the original AQS class now */, LOCK_CLASS = 'Ljava/util/concurrent/locks/ReentrantLock;';
-  type(CONDITION_OBJECT, OBJECT, [CONDITION], { allocatable: true }); registry.parents.set(CONDITION, OBJECT); registry.interfaces.set(CONDITION, []);
-  def(LOCK_CLASS, 'newCondition', `()${CONDITION}`, (r, _m, [lock]) => { const c = r.allocate(CONDITION_OBJECT); r.object(c).condition = { lock: r.object(lock).lockState, waiters: [] }; return c; });
-  const conditionAwait = (r, self, { timeoutMs = Infinity, uninterruptible = false, result }) => {
-    const c = r.object(self).condition, thread = r.thread ?? r.scheduler.mainThread(), lock = c.lock;
-    if (lock.owner !== thread) throwNew(r, 'Ljava/lang/IllegalMonitorStateException;');
-    if (!uninterruptible && thread.interrupted) { thread.interrupted = false; throwNew(r, 'Ljava/lang/InterruptedException;'); }
-    const waiter = { signalled: false, thread }, holds = lock.holds; c.waiters.push(waiter); lock.owner = null; lock.holds = 0;
-    const reacquire = outcome => { if (lock.owner === null) { lock.owner = thread; lock.holds = holds; return outcome(); } const blocked = new Blocked({ reason: 'Condition.await (reacquiring the lock)', ready: () => lock.owner === null, finish: () => reacquire(outcome) }); blocked.lockState = lock; return blocked; };
-    return new Blocked({ reason: 'Condition.await', ready: () => waiter.signalled, interruptible: !uninterruptible, deadline: timeoutMs === Infinity ? Infinity : platform.clock.now() + timeoutMs, finish: timedOut => {
-      const index = c.waiters.indexOf(waiter); if (index >= 0) c.waiters.splice(index, 1);
-      return reacquire(() => { if (!uninterruptible && !waiter.signalled && thread.interrupted) { thread.interrupted = false; throwNew(r, 'Ljava/lang/InterruptedException;'); } return result(waiter.signalled, timedOut); });
-    } });
-  };
-  def(CONDITION_OBJECT, 'await', '()V', (r, _m, [self]) => conditionAwait(r, self, { result: () => undefined }));
-  def(CONDITION_OBJECT, 'awaitUninterruptibly', '()V', (r, _m, [self]) => conditionAwait(r, self, { uninterruptible: true, result: () => undefined }));
-  def(CONDITION_OBJECT, 'await', `(J${UNIT})Z`, (r, _m, [self, t, u]) => conditionAwait(r, self, { timeoutMs: Math.max(0, ms(r, t, u)), result: signalled => signalled ? 1 : 0 }));
-  def(CONDITION_OBJECT, 'awaitNanos', '(J)J', (r, _m, [self, nanos]) => { const start = platform.clock.now(); return conditionAwait(r, self, { timeoutMs: Math.max(0, Number(nanos) / 1e6), result: () => nanos - BigInt(Math.round((platform.clock.now() - start) * 1e6)) }); });
-  def(CONDITION_OBJECT, 'signal', '()V', (r, _m, [self]) => { const c = r.object(self).condition; if (c.lock.owner !== (r.thread ?? r.scheduler.mainThread())) throwNew(r, 'Ljava/lang/IllegalMonitorStateException;'); const w = c.waiters.shift(); if (w) w.signalled = true; });
-  def(CONDITION_OBJECT, 'signalAll', '()V', (r, _m, [self]) => { const c = r.object(self).condition; if (c.lock.owner !== (r.thread ?? r.scheduler.mainThread())) throwNew(r, 'Ljava/lang/IllegalMonitorStateException;'); for (const w of c.waiters.splice(0)) w.signalled = true; });
-
-  // ReentrantLock monitoring (AbstractQueuedSynchronizer): the owner, and the threads parked for the lock (blocked on lock() or re-acquiring after Condition.await) and on a Condition.
-  const lockStateOf = (r, ref) => r.object(ref).lockState ?? throwNew(r, 'Ljava/lang/IllegalStateException;', 'ReentrantLock used before constructor');
-  const threadObject = (r, thread) => thread.javaObject ?? (r.mainThread ??= r.makeObject('Ljava/lang/Thread;'));
-  const lockQueue = (r, lock) => r.scheduler.threads.filter(thread => thread.state === 'blocked' && thread.blocked?.lockState === lock);
-  const threadList = (r, threads) => { const list = r.allocate('Ljava/util/ArrayList;'); r.dispatch({ owner: 'Ljava/util/ArrayList;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [list], 'direct'); for (const thread of threads) vcall(r, list, 'Ljava/util/ArrayList;', 'add', [OBJECT], 'Z', [threadObject(r, thread)]); return list; };
-  const conditionOf = (r, lock, condition) => {
-    if (condition === null) throwNew(r, 'Ljava/lang/NullPointerException;');
-    const c = r.object(condition).condition; if (!c) throwNew(r, 'Ljava/lang/IllegalArgumentException;', 'not owner');
-    if (c.lock !== lock) throwNew(r, 'Ljava/lang/IllegalArgumentException;', 'not owner');
-    if (lock.owner !== (r.thread ?? r.scheduler.mainThread())) throwNew(r, 'Ljava/lang/IllegalMonitorStateException;');
-    return c;
-  };
-  def(LOCK_CLASS, 'getOwner', '()Ljava/lang/Thread;', (r, _m, [self]) => { const lock = lockStateOf(r, self); return lock.owner === null ? null : threadObject(r, lock.owner); });
-  def(LOCK_CLASS, 'getQueueLength', '()I', (r, _m, [self]) => lockQueue(r, lockStateOf(r, self)).length);
-  def(LOCK_CLASS, 'hasQueuedThreads', '()Z', (r, _m, [self]) => lockQueue(r, lockStateOf(r, self)).length ? 1 : 0);
-  def(LOCK_CLASS, 'hasQueuedThread', '(Ljava/lang/Thread;)Z', (r, _m, [self, thread]) => { if (thread === null) throwNew(r, 'Ljava/lang/NullPointerException;'); return lockQueue(r, lockStateOf(r, self)).some(t => threadObject(r, t).ref === thread.ref) ? 1 : 0; });
-  def(LOCK_CLASS, 'getQueuedThreads', `()${COLLECTION}`, (r, _m, [self]) => threadList(r, lockQueue(r, lockStateOf(r, self))));
-  def(LOCK_CLASS, 'hasWaiters', `(${CONDITION})Z`, (r, _m, [self, condition]) => conditionOf(r, lockStateOf(r, self), condition).waiters.length ? 1 : 0);
-  def(LOCK_CLASS, 'getWaitQueueLength', `(${CONDITION})I`, (r, _m, [self, condition]) => conditionOf(r, lockStateOf(r, self), condition).waiters.length);
-  def(LOCK_CLASS, 'getWaitingThreads', `(${CONDITION})${COLLECTION}`, (r, _m, [self, condition]) => threadList(r, conditionOf(r, lockStateOf(r, self), condition).waiters.map(waiter => waiter.thread)));
+  // ForkJoinPool.managedBlock(ManagedBlocker): outside a ForkJoinPool worker (this VM has none) it is the documented loop `while (!blocker.isReleasable() && !blocker.block());`, run as chained
+  // continuations of the calling green thread so that a blocker that parks (Phaser's QNode over LockSupport) suspends only this thread.
+  const FORK_JOIN = 'Ljava/util/concurrent/ForkJoinPool;', MANAGED_BLOCKER = 'Ljava/util/concurrent/ForkJoinPool$ManagedBlocker;';
+  type(FORK_JOIN, OBJECT, [], { allocatable: false }); type(MANAGED_BLOCKER, OBJECT); registry.interfaces.set(MANAGED_BLOCKER, []);
+  const blockerCall = (name, blocker, then) => new Invoke({ owner: MANAGED_BLOCKER, name, parameters: [], result: 'Z', signature: '()Z' }, [blocker], 'virtual', then);
+  def(FORK_JOIN, 'managedBlock', `(${MANAGED_BLOCKER})V`, (r, _m, [blocker]) => {
+    if (blocker === null || blocker === 0 || blocker === undefined) throwNew(r, 'Ljava/lang/NullPointerException;');
+    const loop = () => blockerCall('isReleasable', blocker, releasable => releasable ? undefined : blockerCall('block', blocker, done => done ? undefined : loop()));
+    return loop();
+  }, { static: true });
 
   // ---- AtomicMarkableReference / AtomicStampedReference (a single thread runs at a time, so compare-and-set is a plain compare + assign) ------------------------
   for (const [owner, code, getter] of [['Ljava/util/concurrent/atomic/AtomicMarkableReference;', 'Z', 'isMarked'], ['Ljava/util/concurrent/atomic/AtomicStampedReference;', 'I', 'getStamp']]) {

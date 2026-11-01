@@ -27515,5 +27515,115 @@
     "sha256": "b9b2ad047a240905e2413add615c3fe5d47e3f0ad57c97555d9bd5a2fbf6137f",
     "bytes": 71284,
     "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/ArrayDeque.java",
+    "localPath": "framework-aosp/upstream/java/util/ArrayDeque.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/ArrayDeque.java?format=TEXT",
+    "sha256": "f755aecc97f68732e2f65945f31184f3d3e566a700f6a460a2beedc729244b9d",
+    "bytes": 35076,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/locks/Lock.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/locks/Lock.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/locks/Lock.java?format=TEXT",
+    "sha256": "b09673968cf636562aeb02da99a239735e037e7cbf78b7df985ab8265b5f6905",
+    "bytes": 15430,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/locks/Condition.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/locks/Condition.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/locks/Condition.java?format=TEXT",
+    "sha256": "276505fc20ea113d939306855b91a65ea5032dafc0066bf5cb477a3c6332d7cd",
+    "bytes": 22268,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/locks/ReadWriteLock.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/locks/ReadWriteLock.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/locks/ReadWriteLock.java?format=TEXT",
+    "sha256": "0e82784f66cfbb9c798344870251362319f339f497dfd23aea87e5e08810628a",
+    "bytes": 6184,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/locks/ReentrantLock.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/locks/ReentrantLock.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/locks/ReentrantLock.java?format=TEXT",
+    "sha256": "41fad8d52f674b49c42bf667e851052f12263b157fd1cbc3de7c15ee906bc7f2",
+    "bytes": 28380,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/locks/ReentrantReadWriteLock.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/locks/ReentrantReadWriteLock.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/locks/ReentrantReadWriteLock.java?format=TEXT",
+    "sha256": "e3ccd09e5f2998c52067a2293f7bb9e7854148fc9297a14f35de8d1903be1ba6",
+    "bytes": 59890,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/Semaphore.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/Semaphore.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/Semaphore.java?format=TEXT",
+    "sha256": "39e9ea598e2601b0e0eae7a3f55878e522baad2f69c04e0af0f4fdff0d09f2ba",
+    "bytes": 30148,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/CountDownLatch.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/CountDownLatch.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/CountDownLatch.java?format=TEXT",
+    "sha256": "82df6a224f3234f2556d5a1fb4035cc0b3b460faa3c70e418aa3f0b384cf819e",
+    "bytes": 11772,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/CyclicBarrier.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/CyclicBarrier.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/CyclicBarrier.java?format=TEXT",
+    "sha256": "427db93242c1d2c86e893c138b25cb22965ba3706e4b3bd15b151257c489e39e",
+    "bytes": 19044,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/Phaser.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/Phaser.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/Phaser.java?format=TEXT",
+    "sha256": "c8b09756bd15f341217513d6ced04b4d56e4c312ec9cb047cf1dc54245cdb4c3",
+    "bytes": 46339,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/Exchanger.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/Exchanger.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/Exchanger.java?format=TEXT",
+    "sha256": "0622af39dba8c8b99e1cbf02eeb55615586f187fdf8549d50c6a18e1deeacf8e",
+    "bytes": 28524,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
   }
 ]

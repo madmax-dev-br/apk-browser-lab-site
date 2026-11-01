@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=92c3740c94ed';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=92c3740c94ed';
-import { createHostRegistry } from './host-contract.js?v=92c3740c94ed';
-import { resolveDevice } from './device-profile.js?v=92c3740c94ed';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=92c3740c94ed';
-import { gcRoot } from './heap-gc.js?v=92c3740c94ed';
+import { APKError } from './apk-error.js?v=6a35ed61b8ba';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=6a35ed61b8ba';
+import { createHostRegistry } from './host-contract.js?v=6a35ed61b8ba';
+import { resolveDevice } from './device-profile.js?v=6a35ed61b8ba';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=6a35ed61b8ba';
+import { gcRoot } from './heap-gc.js?v=6a35ed61b8ba';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -70,6 +70,8 @@ export function createDeviceStateHost(platform) {
   def(CAPABILITIES, 'hasTransport', '(I)Z', (r, _m, [self, t]) => r.object(self).transport === t ? 1 : 0);
   def(CAPABILITIES, 'hasCapability', '(I)Z', (r, _m, [self, c]) => { const o = r.object(self); if (c === 11) return o.metered ? 0 : 1; if ([12, 13, 14, 15, 16, 18, 19, 20, 21].includes(c)) return 1; return 0; });
   def(CAPABILITIES, 'getLinkDownstreamBandwidthKbps', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? 100000 : 20000); def(CAPABILITIES, 'getLinkUpstreamBandwidthKbps', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? 50000 : 5000);
+  // NetworkCapabilities.getSignalStrength: a Wi-Fi network reports its RSSI (the same -50 dBm WifiInfo.getRssi gives for the connected virtual access point); a cellular network leaves it unspecified.
+  def(CAPABILITIES, 'getSignalStrength', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? -50 : -2147483648);
   def(CAPABILITIES, 'toString', `()${STRING}`, (r, _m, [self]) => `[ Transports: ${r.object(self).transport === 1 ? 'WIFI' : 'CELLULAR'} Capabilities: INTERNET${r.object(self).metered ? '' : '&NOT_METERED'}&VALIDATED ]`);
   const netInfo = r => { const network = activeNetwork(r); if (!network) return null; const info = r.makeObject(NET_INFO); r.object(info).transport = r.object(network).transport; return info; };
   def(NET_INFO, 'isConnected', '()Z', () => 1); def(NET_INFO, 'isConnectedOrConnecting', '()Z', () => 1); def(NET_INFO, 'isAvailable', '()Z', () => 1); def(NET_INFO, 'getType', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? 1 : 0);

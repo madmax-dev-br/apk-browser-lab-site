@@ -1,21 +1,21 @@
-import { VMClock } from './vm-clock.js?v=92c3740c94ed';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=92c3740c94ed';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=92c3740c94ed';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=92c3740c94ed';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=92c3740c94ed';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=92c3740c94ed';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=92c3740c94ed';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=92c3740c94ed';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=92c3740c94ed';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=92c3740c94ed';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=92c3740c94ed';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=92c3740c94ed';
-import { APKError } from './apk-error.js?v=92c3740c94ed';
-import { collectGarbage } from './heap-gc.js?v=92c3740c94ed';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=92c3740c94ed';
-import { Scheduler, Blocked } from './scheduler.js?v=92c3740c94ed';
-import { bootClassLacksMember } from './boot-class-members.js?v=92c3740c94ed';
-export { APKError } from './apk-error.js?v=92c3740c94ed';
+import { VMClock } from './vm-clock.js?v=6a35ed61b8ba';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=6a35ed61b8ba';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=6a35ed61b8ba';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=6a35ed61b8ba';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=6a35ed61b8ba';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=6a35ed61b8ba';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=6a35ed61b8ba';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=6a35ed61b8ba';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=6a35ed61b8ba';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=6a35ed61b8ba';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=6a35ed61b8ba';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=6a35ed61b8ba';
+import { APKError } from './apk-error.js?v=6a35ed61b8ba';
+import { collectGarbage } from './heap-gc.js?v=6a35ed61b8ba';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=6a35ed61b8ba';
+import { Scheduler, Blocked } from './scheduler.js?v=6a35ed61b8ba';
+import { bootClassLacksMember } from './boot-class-members.js?v=6a35ed61b8ba';
+export { APKError } from './apk-error.js?v=6a35ed61b8ba';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -741,21 +741,6 @@ const TIME_FACTORS = [1n, 1000n, 1000000n, 1000000000n, 60000000000n, 3600000000
 EXTERNAL_PARENTS.set('Ljava/util/concurrent/TimeUnit;', 'Ljava/lang/Enum;');
 for (const name of ['Nanos', 'Micros', 'Millis', 'Seconds', 'Minutes', 'Hours', 'Days']) addBridge('java/util/concurrent/TimeUnit', [`to${name}(J)J`]);
 addBridge('java/util/concurrent/TimeUnit', ['convert(JLjava/util/concurrent/TimeUnit;)J', 'valueOf(Ljava/lang/String;)Ljava/util/concurrent/TimeUnit;', 'values()[Ljava/util/concurrent/TimeUnit;']);
-const REENTRANT_LOCK='Ljava/util/concurrent/locks/ReentrantLock;';
-EXTERNAL_PARENTS.set(REENTRANT_LOCK,'Ljava/lang/Object;');EXTERNAL_INTERFACES.set(REENTRANT_LOCK,['Ljava/util/concurrent/locks/Lock;','Ljava/io/Serializable;']);
-addBridge('java/util/concurrent/locks/ReentrantLock',['<init>()V','<init>(Z)V','lock()V','lockInterruptibly()V','tryLock()Z','tryLock(JLjava/util/concurrent/TimeUnit;)Z','unlock()V','getHoldCount()I','isHeldByCurrentThread()Z','isLocked()Z','isFair()Z']);
-const RW_LOCK = 'Ljava/util/concurrent/locks/ReentrantReadWriteLock;';
-EXTERNAL_PARENTS.set(RW_LOCK, 'Ljava/lang/Object;');
-EXTERNAL_INTERFACES.set(RW_LOCK, ['Ljava/util/concurrent/locks/ReadWriteLock;', 'Ljava/io/Serializable;']);
-addBridge(RW_LOCK.slice(1, -1), ['<init>()V', '<init>(Z)V', 'readLock()Ljava/util/concurrent/locks/ReentrantReadWriteLock$ReadLock;',
-  'readLock()Ljava/util/concurrent/locks/Lock;', 'writeLock()Ljava/util/concurrent/locks/ReentrantReadWriteLock$WriteLock;', 'writeLock()Ljava/util/concurrent/locks/Lock;',
-  'getReadHoldCount()I', 'getReadLockCount()I', 'getWriteHoldCount()I', 'isWriteLocked()Z', 'isWriteLockedByCurrentThread()Z', 'isFair()Z']);
-for (const kind of ['ReadLock', 'WriteLock']) {
-  const owner = RW_LOCK.slice(1, -1) + '$' + kind;
-  EXTERNAL_PARENTS.set(`L${owner};`, 'Ljava/lang/Object;'); EXTERNAL_INTERFACES.set(`L${owner};`, ['Ljava/util/concurrent/locks/Lock;', 'Ljava/io/Serializable;']);
-  addBridge(owner, [`<init>(${RW_LOCK})V`, 'lock()V', 'lockInterruptibly()V', 'tryLock()Z', 'tryLock(JLjava/util/concurrent/TimeUnit;)Z', 'unlock()V']);
-}
-addBridge('java/util/concurrent/locks/ReentrantReadWriteLock$WriteLock', ['getHoldCount()I', 'isHeldByCurrentThread()Z']);
 for (const [name, type] of [['AtomicReferenceFieldUpdater', 'Ljava/lang/Object;'], ['AtomicIntegerFieldUpdater', 'I'], ['AtomicLongFieldUpdater', 'J']]) {
   const owner = `java/util/concurrent/atomic/${name}`;
   EXTERNAL_PARENTS.set(`L${owner};`, 'Ljava/lang/Object;');
@@ -771,14 +756,6 @@ addBridge('java/util/concurrent/ThreadPoolExecutor', ['execute(Ljava/lang/Runnab
 EXTERNAL_PARENTS.set('Landroid/os/Handler;', 'Ljava/lang/Object;');
 addBridge('android/os/Handler', ['<init>()V', '<init>(Landroid/os/Looper;)V', '<init>(Landroid/os/Looper;Landroid/os/Handler$Callback;)V',
   '<init>(Landroid/os/Handler$Callback;)V', 'getLooper()Landroid/os/Looper;', 'createAsync(Landroid/os/Looper;)Landroid/os/Handler;', 'post(Ljava/lang/Runnable;)Z']);
-EXTERNAL_PARENTS.set('Ljava/util/ArrayDeque;', 'Ljava/lang/Object;');
-EXTERNAL_INTERFACES.set('Ljava/util/ArrayDeque;', ['Ljava/util/Deque;', 'Ljava/util/Queue;', 'Ljava/util/Collection;', 'Ljava/lang/Iterable;']);
-addBridge('java/util/ArrayDeque', ['toArray()[Ljava/lang/Object;', '<init>(Ljava/util/Collection;)V', '<init>()V', '<init>(I)V', 'size()I', 'isEmpty()Z', 'clear()V', 'add(Ljava/lang/Object;)Z', 'addFirst(Ljava/lang/Object;)V', 'addLast(Ljava/lang/Object;)V',
-  'offer(Ljava/lang/Object;)Z', 'offerFirst(Ljava/lang/Object;)Z', 'offerLast(Ljava/lang/Object;)Z', 'push(Ljava/lang/Object;)V',
-  'pop()Ljava/lang/Object;', 'remove()Ljava/lang/Object;', 'removeFirst()Ljava/lang/Object;', 'removeLast()Ljava/lang/Object;',
-  'poll()Ljava/lang/Object;', 'pollFirst()Ljava/lang/Object;', 'pollLast()Ljava/lang/Object;', 'getFirst()Ljava/lang/Object;', 'getLast()Ljava/lang/Object;',
-  'peek()Ljava/lang/Object;', 'peekFirst()Ljava/lang/Object;', 'peekLast()Ljava/lang/Object;', 'iterator()Ljava/util/Iterator;',
-  'element()Ljava/lang/Object;', 'contains(Ljava/lang/Object;)Z', 'remove(Ljava/lang/Object;)Z', 'removeFirstOccurrence(Ljava/lang/Object;)Z', 'removeLastOccurrence(Ljava/lang/Object;)Z', 'addAll(Ljava/util/Collection;)Z']);
 addBridge('android/util/Log', ['isLoggable(Ljava/lang/String;I)Z', 'println(ILjava/lang/String;Ljava/lang/String;)I', 'wtf(Ljava/lang/String;Ljava/lang/String;)I', 'wtf(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I', 'wtf(Ljava/lang/String;Ljava/lang/Throwable;)I', 'getStackTraceString(Ljava/lang/Throwable;)Ljava/lang/String;']);
 addBridge('android/util/Log', ['w(Ljava/lang/String;Ljava/lang/Throwable;)I']);
 for (const name of ['v', 'd', 'i', 'w', 'e']) addBridge('android/util/Log', [`${name}(Ljava/lang/String;Ljava/lang/String;)I`, `${name}(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I`]);
@@ -889,7 +866,6 @@ const LAB_HELPERS = new Map([
   ['Ljava/lang/String;', [`${UTIL}StringOps;`]], ['Ljava/lang/Integer;', [`${UTIL}IntegerOps;`]], ['Ljava/lang/Long;', [`${UTIL}LongOps;`]], ['Ljava/lang/Boolean;', [`${UTIL}BooleanOps;`]],
   ['Ljava/lang/Math;', [`${UTIL}MathOps;`]], ['Ljava/lang/Character;', [`${UTIL}CharacterOps;`]], ['Ljava/lang/StringBuilder;', [`${UTIL}StringBuilderOps;`]], ['Ljava/lang/StringBuffer;', [`${UTIL}StringBuilderOps;`]],
   ['Ljava/util/Random;', [`${UTIL}RandomOps;`]], ['Ljava/util/concurrent/ThreadLocalRandom;', [`${UTIL}RandomOps;`]],
-  ['Ljava/util/ArrayDeque;', [`${UTIL}CollectionOps;`]], ['Ljava/util/concurrent/ConcurrentLinkedQueue;', [`${UTIL}CollectionOps;`]], ['Ljava/util/concurrent/LinkedBlockingQueue;', [`${UTIL}CollectionOps;`]],
   ['Ljava/util/concurrent/CopyOnWriteArrayList;', [`${UTIL}CollectionOps;`]], ['Ljava/util/HashSet;', [`${UTIL}CollectionOps;`]], ['Ljava/util/LinkedHashSet;', [`${UTIL}CollectionOps;`]],
 ]);
 
@@ -1324,8 +1300,7 @@ export class APKRuntime {
       && !/^Ljava\/util\/(HashMap|WeakHashMap|LinkedHashMap|ArrayList|Vector|Stack);$/.test(type)
       && !/^Ljava\/lang\/ref\/(WeakReference|SoftReference);$/.test(type)
       && !SET_TYPES.some(owner => type === `L${owner};`)
-      && !['Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/concurrent/ConcurrentHashMap;', 'Ljava/lang/ThreadLocal;', 'Ljava/lang/InheritableThreadLocal;', 'Ljava/util/Random;', 'Ljava/util/ArrayDeque;', 'Landroid/os/Handler;'].includes(type)
-      && ![REENTRANT_LOCK, RW_LOCK, RW_LOCK.slice(0, -1) + '$ReadLock;', RW_LOCK.slice(0, -1) + '$WriteLock;'].includes(type)
+      && !['Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/concurrent/ConcurrentHashMap;', 'Ljava/lang/ThreadLocal;', 'Ljava/lang/InheritableThreadLocal;', 'Ljava/util/Random;', 'Landroid/os/Handler;'].includes(type)
       && !this.skiaHost?.canAllocate?.(type) && !this.platform?.canAllocate?.(type)
       && !this.isSubtype(type, 'Ljava/lang/Throwable;'));
   }
@@ -2883,76 +2858,6 @@ export class APKRuntime {
     const primitiveBoxType = Object.keys(BOX_TYPES).find(type => BOX_TYPES[type] === method.owner);
     const obj = this.object(args[0]);
     if (!this.isSubtype(obj.type, method.owner)) fail(`Receiver does not match ${methodKey(method)}`);
-    if(method.owner===REENTRANT_LOCK){
-      if(name==='<init>'){obj.lockState={fair:!!args[1],owner:null,holds:0};return;}
-      const state=obj.lockState;if(!state)fail('ReentrantLock used before constructor');const thread=this.thread??this.scheduler.mainThread();
-      if(name==='isFair')return state.fair?1:0;if(name==='isLocked')return state.holds?1:0;
-      if(name==='isHeldByCurrentThread')return state.owner===thread?1:0;if(name==='getHoldCount')return state.owner===thread?state.holds:0;
-      if(name==='unlock'){if(state.owner!==thread||!state.holds)this.throwJava('Ljava/lang/IllegalMonitorStateException;','Lock is not held by this VM thread');if(--state.holds===0)state.owner=null;return;}
-      const timed=method.parameters.length===2,interruptible=name==='lockInterruptibly'||timed;
-      if(interruptible&&thread.interrupted){thread.interrupted=false;this.throwJava('Ljava/lang/InterruptedException;',null);}
-      if(timed&&!this.isSubtype(this.typeOf(args[2]),'Ljava/util/concurrent/TimeUnit;'))this.throwJava('Ljava/lang/IllegalArgumentException;','Lock timeout requires TimeUnit');
-      const acquire=()=>{if(state.holds===2147483647)this.throwJava('Ljava/lang/Error;','Maximum lock count exceeded');state.owner=thread;state.holds++;return name==='tryLock'?1:undefined;};
-      if(state.owner===null||state.owner===thread)return acquire();
-      if(name==='tryLock'&&(!timed||wide(args[1])<=0n))return 0;
-      // Contended: park until the owner releases (a timed tryLock gives up at its deadline).
-      const deadline=timed?this.platform.clock.now()+Number(wide(args[1])*this.object(args[2]).nanoFactor/1000000n):Infinity;
-      const wait=()=>{const blocked=new Blocked({reason:'ReentrantLock',ready:()=>state.owner===null,deadline,interruptible,finish:timedOut=>{
-        if(interruptible&&thread.interrupted){thread.interrupted=false;this.throwJava('Ljava/lang/InterruptedException;',null);}
-        if(state.owner===null||state.owner===thread)return acquire();
-        return timedOut?0:wait();}});blocked.lockState=state;return blocked;};   // lockState: the queue getQueueLength/getQueuedThreads report
-      return wait();
-    }
-    if (method.owner === RW_LOCK) {
-      if (name === '<init>') { obj.lockState = { fair: !!args[1], writeOwner: null, writes: 0, readers: new Map() }; return undefined; }
-      const state = obj.lockState; if (!state) fail('Read-write lock used before constructor');
-      const thread = this.thread ?? this.scheduler.mainThread();
-      if (name === 'readLock' || name === 'writeLock') {
-        const property = name === 'readLock' ? 'readerLock' : 'writerLock';
-        if (!obj[property]) { obj[property] = this.makeObject(RW_LOCK.slice(0, -1) + (name === 'readLock' ? '$ReadLock;' : '$WriteLock;')); this.object(obj[property]).lockState = state; }
-        return obj[property];
-      }
-      if (name === 'isFair') return state.fair ? 1 : 0;
-      if (name === 'getReadHoldCount') return state.readers.get(thread) ?? 0;
-      if (name === 'getReadLockCount') return [...state.readers.values()].reduce((sum, count) => sum + count, 0);
-      if (name === 'getWriteHoldCount') return state.writeOwner === thread ? state.writes : 0;
-      if (name === 'isWriteLocked') return state.writes ? 1 : 0;
-      if (name === 'isWriteLockedByCurrentThread') return state.writeOwner === thread ? 1 : 0;
-    }
-    if (method.owner.startsWith(RW_LOCK.slice(0, -1) + '$')) {
-      if (name === '<init>') { const parent = this.object(args[1]); if (!parent.lockState) fail('Read-write lock used before constructor'); obj.lockState = parent.lockState; return undefined; }
-      const state = obj.lockState; if (!state) fail('Lock used before constructor');
-      const thread = this.thread ?? this.scheduler.mainThread(), read = method.owner.endsWith('$ReadLock;');
-      if (name === 'tryLock' && args.length > 1) { const unit = this.object(args[2]); if (!this.isSubtype(unit.type, 'Ljava/util/concurrent/TimeUnit;')) this.throwJava('Ljava/lang/IllegalArgumentException;', 'Lock timeout requires TimeUnit'); }
-      const heldReads = state.readers.get(thread) ?? 0, totalReads = [...state.readers.values()].reduce((sum, count) => sum + count, 0);
-      if (name === 'getHoldCount') return state.writeOwner === thread ? state.writes : 0;
-      if (name === 'isHeldByCurrentThread') return state.writeOwner === thread ? 1 : 0;
-      if (name === 'unlock') {
-        if (read) { if (!heldReads) this.throwJava('Ljava/lang/IllegalMonitorStateException;', 'Read lock is not held by this VM thread'); if (heldReads === 1) state.readers.delete(thread); else state.readers.set(thread, heldReads - 1); }
-        else { if (state.writeOwner !== thread || !state.writes) this.throwJava('Ljava/lang/IllegalMonitorStateException;', 'Write lock is not held by this VM thread'); if (--state.writes === 0) state.writeOwner = null; }
-        return undefined;
-      }
-      const timed = name === 'tryLock' && args.length > 1, interruptible = name === 'lockInterruptibly' || timed;
-      if (interruptible && thread.interrupted) { thread.interrupted = false; this.throwJava('Ljava/lang/InterruptedException;', null); }
-      const isAvailable = () => { const reads = [...state.readers.values()].reduce((sum, count) => sum + count, 0); return read ? state.writeOwner === null || state.writeOwner === thread : state.writeOwner === thread || (state.writeOwner === null && reads === 0); };
-      const grant = () => {
-        const held = state.readers.get(thread) ?? 0, total = [...state.readers.values()].reduce((sum, count) => sum + count, 0);
-        if (read) { if (total >= 65535) this.throwJava('Ljava/lang/Error;', 'Maximum read lock count exceeded'); state.readers.set(thread, held + 1); }
-        else { if (state.writes >= 65535) this.throwJava('Ljava/lang/Error;', 'Maximum write lock count exceeded'); state.writeOwner = thread; state.writes++; }
-        return name === 'tryLock' ? 1 : undefined;
-      };
-      if (!isAvailable()) {
-        if (name === 'tryLock' && (!timed || wide(args[1]) <= 0n)) return 0;
-        // Contended: park until the lock can be granted (a timed tryLock gives up at its deadline).
-        const deadline = timed ? this.platform.clock.now() + Number(wide(args[1]) * this.object(args[2]).nanoFactor / 1000000n) : Infinity;
-        const wait = () => new Blocked({ reason: read ? 'ReadLock' : 'WriteLock', ready: isAvailable, deadline, interruptible, finish: timedOut => {
-          if (interruptible && thread.interrupted) { thread.interrupted = false; this.throwJava('Ljava/lang/InterruptedException;', null); }
-          if (isAvailable()) return grant();
-          return timedOut ? 0 : wait(); } });
-        return wait();
-      }
-      return grant();
-    }
     if (method.owner === 'Ljava/util/concurrent/TimeUnit;') {
       const targetIndex = ['toNanos', 'toMicros', 'toMillis', 'toSeconds', 'toMinutes', 'toHours', 'toDays'].indexOf(name);
       const sourceFactor = name === 'convert' ? this.object(args[2]).nanoFactor : obj.nanoFactor;
@@ -3022,38 +2927,6 @@ export class APKRuntime {
     }
     if (method.owner === 'Ljava/util/AbstractCollection;' && name === 'isEmpty') {
       return this.dispatch({ owner: obj.type, name: 'size', signature: '()I', parameters: [], result: 'I' }, [args[0]], 'virtual') === 0 ? 1 : 0;
-    }
-    if (method.owner === 'Ljava/util/ArrayDeque;') {
-      if (name === '<init>' && method.parameters[0] === 'Ljava/util/Collection;') {
-        if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', 'Attempt to invoke interface method on a null Collection');
-        const incoming = this.collectionValues(this.object(args[1])).slice(); if (incoming.some(isNull)) this.throwJava('Ljava/lang/NullPointerException;', 'null deque element');
-        if (incoming.length > 1000000) fail('Deque size limit exceeded'); this.reserveCollection(incoming.length); obj.list = incoming; obj.modCount = 0; return undefined; // AOSP ArrayDeque(Collection) = addAll in iteration order
-      }
-      if (name === '<init>') { if (args.length > 1 && int(args[1]) < 0) this.throwJava('Ljava/lang/IllegalArgumentException;', 'negative deque capacity'); obj.list = []; obj.modCount = 0; return undefined; }
-      if (name === 'toArray') { const value = this.newArray('[Ljava/lang/Object;', obj.list.length); this.object(value).elements = obj.list.slice(); return value; }
-      if (name === 'size') return obj.list.length;
-      if (name === 'isEmpty') return obj.list.length ? 0 : 1;
-      if (name === 'clear') { this.reserveCollection(-obj.list.length); obj.list = []; this.bumpModCount(obj); return undefined; }
-      if (name === 'iterator') { const value = this.makeObject('Ljava/util/Iterator;'), iterator = this.object(value); iterator.source = args[0]; iterator.liveList = true; iterator.expectedModCount = obj.modCount; iterator.index = 0; iterator.last = -1; iterator.values = obj.list.slice(); return value; }
-      if (name.startsWith('add') || name.startsWith('offer') || name === 'push') {
-        if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', 'null deque element');
-        if (obj.list.length >= 1000000) fail('Deque size limit exceeded');
-        this.reserveCollection(1); if (name.endsWith('First') || name === 'push') obj.list.unshift(args[1]); else obj.list.push(args[1]); this.bumpModCount(obj);
-        return name.startsWith('offer') || name === 'add' ? 1 : undefined;
-      }
-      if (name === 'contains') return obj.list.some(v => this.javaEquals(args[1], v)) ? 1 : 0;   // ArrayDeque.contains/remove(Object)/removeFirstOccurrence/removeLastOccurrence use equals(); null is never present
-      if (name === 'removeFirstOccurrence' || name === 'removeLastOccurrence' || (name === 'remove' && method.parameters.length === 1)) {
-        const at = isNull(args[1]) ? -1 : name === 'removeLastOccurrence' ? obj.list.findLastIndex(v => this.javaEquals(args[1], v)) : obj.list.findIndex(v => this.javaEquals(args[1], v));
-        if (at < 0) return 0; obj.list.splice(at, 1); this.reserveCollection(-1); this.bumpModCount(obj); return 1;
-      }
-      if (name === 'addAll') {
-        const incoming = this.collectionValues(this.object(args[1])).slice(); if (incoming.some(isNull)) this.throwJava('Ljava/lang/NullPointerException;', 'null deque element');
-        this.reserveCollection(incoming.length); obj.list.push(...incoming); this.bumpModCount(obj); return incoming.length ? 1 : 0;
-      }
-      if (!obj.list.length) { if (name.startsWith('poll') || name.startsWith('peek')) return null; this.throwJava('Ljava/util/NoSuchElementException;', 'empty deque'); }
-      const last = name.endsWith('Last'), value = obj.list[last ? obj.list.length - 1 : 0];
-      if (name.startsWith('peek') || name.startsWith('get') || name === 'element') return value;
-      if (last) obj.list.pop(); else obj.list.shift(); this.reserveCollection(-1); this.bumpModCount(obj); return value;
     }
     return BRIDGE_NEXT;
   }
