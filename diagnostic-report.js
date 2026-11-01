@@ -17,6 +17,7 @@ export function buildDiagnosticReport({ error, product = 'APK Browser Lab', pack
     `${product}${build ? ' ' + build : ''} · ${packageName} · modo tolerante: ${tolerateMissing}`,
     `Erro: ${cause}`,
     frames.length ? `Pilha (mais interna por último):\n${frames.slice(-12).join('\n')}` : '',
+    error?.details?.profile?.text ? error.details.profile.text : '',
     list.length ? `APIs com stub (${list.length}):\n${list.slice(0, 60).join('\n')}` : '',
     trace.length ? `Últimas linhas do log:\n${trace.filter(line => !/^STUB-/.test(line)).slice(-15).join('\n')}` : '',
     apiGaps || '',

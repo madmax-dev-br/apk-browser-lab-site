@@ -62,7 +62,7 @@ function scan(u, units, handlerTargets) {
 export function compileMethod(rt, method, code, prog, tries, support) {
   const { units, dex } = prog, u = units;
   const handlerTargets = []; for (const entry of tries) { for (const h of entry.catches) handlerTargets.push(h.address); if (entry.catchAll !== null) handlerTargets.push(entry.catchAll); }
-  const decoded = scan(u, code.units, handlerTargets); if (decoded === null) return null;
+  const decoded = scan(u, code.units, handlerTargets); if (decoded === null) { if (typeof process !== 'undefined' && process.env?.APKWEB_DEBUG_JIT) console.error(`JIT: ${method.key} stays interpreted: an opcode the compiler does not know`); return null; }
   const { instructions, leaders } = decoded;
   // packed/sparse switch targets are leaders too
   for (const ins of instructions) if (ins.op === 0x2b || ins.op === 0x2c) {
@@ -78,7 +78,7 @@ export function compileMethod(rt, method, code, prog, tries, support) {
   const put = (n, e) => `r[${n}] = ${e};`;
   const putWide = (n, e) => `r[${n}] = ${e}; r[${n + 1}] = W;`;
   const jump = (from, target) => {
-    if (target <= from) return `if (rt.steps + n > max) { n -= rt.steps + n - max - 1; H.fuse(max); } if (--rt.q <= 0) { rt.q = ${support.QUANTUM}; f.pc = ${target}; return ${YIELD}; } pc = ${target}; continue;`;
+    if (target <= from) return `if (rt.steps + n > max) { n -= rt.steps + n - max - 1; H.fuse(max, rt); } if (--rt.q <= 0) { rt.q = ${support.QUANTUM}; f.pc = ${target}; return ${YIELD}; } pc = ${target}; continue;`;
     return `pc = ${target}; continue;`;
   };
   const intBinary = (operation, x, y, fromLiteral) => {
@@ -105,7 +105,7 @@ export function compileMethod(rt, method, code, prog, tries, support) {
     if (INVOKES.has(op)) {
       // A call site whose callee the interpreter has resolved (inline cache) is entered here; anything else is left to the interpreter, which fills the cache.
       let site;
-      try { site = prog.refs[pc] ??= support.makeInvokeSite(dex, u, pc, op, a, hi); } catch { return null; }
+      try { site = prog.refs[pc] ??= support.makeInvokeSite(dex, u, pc, op, a, hi); } catch (error) { if (typeof process !== 'undefined' && process.env?.APKWEB_DEBUG_JIT) console.error(`JIT: ${method.key} stays interpreted: invoke site at pc ${pc} failed: ${error.message}`); return null; }
       const k = site.argc, registers = site.first >= 0 ? Array.from({ length: k }, (_, j) => site.first + j) : [u[pc + 2] & 15, (u[pc + 2] >> 4) & 15, (u[pc + 2] >> 8) & 15, (u[pc + 2] >> 12) & 15, lo].slice(0, k);
       const index = sites.length; sites.push(site);
       const hit = site.virtual ? `H.receiverType(rt, a0) === s.type` : 'true';
@@ -248,7 +248,7 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         }
       }
     })();
-    if (body === null) return null;
+    if (body === null) { if (typeof process !== 'undefined' && process.env?.APKWEB_DEBUG_JIT) console.error(`JIT: ${method.key} stays interpreted: opcode 0x${op.toString(16)} at pc ${pc} is not compiled`); return null; }
     emit(`${count}${track}${body}`);
     // fall through into the next case label; a block that ends in an unconditional jump never falls through
   }

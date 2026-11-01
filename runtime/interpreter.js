@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=8f16f6152b47';
-import { Blocked, QUANTUM } from './scheduler.js?v=8f16f6152b47';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=8f16f6152b47';
+import { APKError } from './apk-error.js?v=639746f765d0';
+import { Blocked, QUANTUM } from './scheduler.js?v=639746f765d0';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=639746f765d0';
 
 // Frame-based DEX interpreter.
 //
@@ -126,7 +126,7 @@ function jitSupport(rt) {
     prepareCall, receiverType: (rt, receiver) => receiver !== null && typeof receiver === 'object' ? (rt.heap.list[receiver.ref]?.type ?? rt.typeOf(receiver)) : rt.typeOf(receiver),
     arith: arithmetic, long: (op, x, y) => longArithmetic(op, x, y), num: (kind, op, x, y) => numericBinary(kind === 'float' ? 2 : 3, op, x, y), cmp, same: equal,
     floatBits, floatNumber, doubleBits, doubleNumber, javaInt, javaLong,
-    fuse(max) { throw new APKError(`Instruction budget (${max}/event) exceeded`); },
+    fuse(max, rt) { rt.budgetExceeded(`Instruction budget (${max}/event) exceeded`); },
     castFail(rt, value, type) { rt.throwJava('Ljava/lang/ClassCastException;', `Cannot cast ${rt.typeOf(value)} to ${type}`); },
     fieldSite(rt, site, reference, object) {
       if (!reference || !rt.isSubtype(object.type, reference.owner)) fail('Invalid field/receiver');
@@ -365,7 +365,7 @@ function runLoop(rt, owner, base) {
           if (status === YIELD) { if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { need = true; break inner; } rt.q = QUANTUM; rt.budgetTick(); continue inner; }
         }
         start = pc;
-        if (++rt.steps > max) fail(`Instruction budget (${max}/event) exceeded`);
+        if (++rt.steps > max) rt.budgetExceeded(`Instruction budget (${max}/event) exceeded`);
         stats.instructions++;
         const w = u[pc], op = w & 255, a = w >> 8, lo = a & 15, hi = a >> 4;
         if (probe) probe(f.method, dex, pc, op, probeWord(u, pc));
@@ -410,9 +410,9 @@ function runLoop(rt, owner, base) {
           case 0x22: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid allocation type'); if (rt.initialized.get(type)?.status !== 'initialized') { const gate = rt.initStep(type); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } regs[a] = rt.allocate(type); pc += 2; break; }
           case 0x23: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid array type'); regs[lo] = rt.newArray(type, int(regs[hi])); pc += 2; break; }
           case 0x27: { const value = regs[a]; if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'throw null'); throw new JavaException(value, rt.object(value).message ?? rt.typeOf(value), rt.object(value).exceptionDetails); }
-          case 0x28: { const target = pc + ((a << 24) >> 24); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && --quantum <= 0) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
-          case 0x29: { const target = pc + ((u[pc + 1] << 16) >> 16); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && --quantum <= 0) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
-          case 0x2a: { const target = pc + (u[pc + 1] | (u[pc + 2] << 16)); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && --quantum <= 0) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
+          case 0x28: { const target = pc + ((a << 24) >> 24); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
+          case 0x29: { const target = pc + ((u[pc + 1] << 16) >> 16); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
+          case 0x2a: { const target = pc + (u[pc + 1] | (u[pc + 2] << 16)); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
           case 0x32: case 0x33: case 0x34: case 0x35: case 0x36: case 0x37: {
             const x = regs[lo], y = regs[hi];
             const match = op === 0x32 ? (x === y || equal(x, y)) : op === 0x33 ? (x !== y && !equal(x, y)) : op === 0x34 ? x < y : op === 0x35 ? x >= y : op === 0x36 ? x > y : x <= y;
@@ -422,7 +422,7 @@ function runLoop(rt, owner, base) {
           case 0x38: case 0x39: case 0x3a: case 0x3b: case 0x3c: case 0x3d: {
             const x = regs[a];
             const match = op === 0x38 ? (x === null || x === 0) : op === 0x39 ? (x !== null && x !== 0) : op === 0x3a ? x < 0 : op === 0x3b ? x >= 0 : op === 0x3c ? x > 0 : x <= 0;
-            if (match) { const t = pc + ((u[pc + 1] << 16) >> 16); pc = t; if (t <= start && ((++prog.loops === JIT_LOOPS && rt.jit) ? compileHot(rt, f, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } } else pc += 2;
+            if (match) { const t = pc + ((u[pc + 1] << 16) >> 16); pc = t; if (t <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } } else pc += 2;
             break;
           }
           case 0x44: case 0x45: case 0x46: case 0x47: case 0x48: case 0x49: case 0x4a: {
@@ -536,7 +536,7 @@ function runLoop(rt, owner, base) {
             let outcome;
             const bridge = site.bridge;
             if (bridge !== null && site.bridgeEpoch === rt.resolveEpoch && (!site.virtual || (typeof args[0] !== 'string' && args[0] !== null && args[0] !== 0 && rt.typeOf(args[0]) === site.bridgeType && rt.heap.list[args[0].ref].annotationValues === undefined))) {
-              rt.callStats.bridged++; rt.record(bridge.text);
+              rt.callStats.bridged++; if (rt.profile.active) rt.profile.host(bridge.key); rt.record(bridge.text);
               outcome = rt.bridge(bridge.selected, args, site.mode, bridge.key, bridge);
             } else {
               rt.callStats.dispatched++; rt.lastBridge = null; const depthBefore = rt.depth;

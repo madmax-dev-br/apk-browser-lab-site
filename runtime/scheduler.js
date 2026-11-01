@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=8f16f6152b47';
+import { APKError } from './apk-error.js?v=639746f765d0';
 
 // Green-thread scheduler for the VM.
 //
@@ -43,13 +43,13 @@ export class Scheduler {
    * a startup that runs many threads, none of them spinning, does not pool their work into one thread's budget. The sum over all threads for one host event is capped separately
    * (maxEventInstructions) so threads that keep waking each other cannot run forever.
    */
-  beginEvent(rt) { if (rt.steps === 0) { rt.eventWallStart = performance.now(); this.eventTotal = 0; this.lastSteps = 0; for (const thread of this.threads) thread.budget = 0; } }
+  beginEvent(rt) { if (rt.steps === 0) { rt.profile.reset(); rt.eventWallStart = performance.now(); this.eventTotal = 0; this.lastSteps = 0; for (const thread of this.threads) thread.budget = 0; } }
   switching(rt, previous, next) {
     const steps = rt.steps; if (steps > (rt.peakThreadSteps ?? 0)) rt.peakThreadSteps = steps;
     this.eventTotal += steps >= this.lastSteps ? steps - this.lastSteps : steps;
     if (previous) previous.budget = previous.state === 'runnable' ? steps : 0;
     if (this.eventTotal > (rt.peakEventTotal ?? 0)) rt.peakEventTotal = this.eventTotal;
-    if (this.eventTotal > rt.maxEventInstructions) throw new APKError(`Instruction budget (${rt.maxEventInstructions} across all threads of one event) exceeded; threads: ${this.describe()}`, { kind: 'event-instruction-budget' });
+    if (this.eventTotal > rt.maxEventInstructions) rt.budgetExceeded(`Instruction budget (${rt.maxEventInstructions} across all threads of one event) exceeded; threads: ${this.describe()}`, { kind: 'event-instruction-budget' });
     rt.steps = this.lastSteps = next.budget ?? 0;
   }
   add(thread) { if (!this.threads.includes(thread)) this.threads.push(thread); }
