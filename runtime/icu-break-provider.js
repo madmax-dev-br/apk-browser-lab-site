@@ -1,5 +1,5 @@
 const TYPES = { character: 0, word: 1, line: 2, sentence: 3 };
-const MAX_TEXT = 65536, MAX_WASM = 4 * 1024 * 1024, MAX_DATA = 8 * 1024 * 1024;
+const MAX_HANDLES = 16384, MAX_TEXT = 65536, MAX_WASM = 4 * 1024 * 1024, MAX_DATA = 8 * 1024 * 1024;
 const fail = message => { throw new Error(`ICU boundary backend: ${message}`); };
 const bytes = value => value instanceof Uint8Array ? value : new Uint8Array(value);
 async function digest(value) {
@@ -35,7 +35,7 @@ function createRegexSessionFactory(api, allocate, errorName) {
     };
     const remember = (pointer, kind) => {
       if (!pointer) limit('native allocation returned null');
-      if (disposed || handles.size >= 256 || totalHandles >= 1024 || sequence >= 0x7fffffff) { api.icu_regex_close(pointer); limit('active regex handle limit exceeded'); }
+      if (disposed || handles.size >= MAX_HANDLES || totalHandles >= MAX_HANDLES || sequence >= 0x7fffffff) { api.icu_regex_close(pointer); limit('active regex handle limit exceeded'); }
       const token = ++sequence; handles.set(token, { pointer, kind, input: 0, length: 0 }); totalHandles++; return token;
     };
     const close = token => { const value = get(token); api.icu_regex_close(value.pointer); if (value.input) api.free(value.input); handles.delete(token); totalHandles--; };

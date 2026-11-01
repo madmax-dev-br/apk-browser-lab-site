@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=423a9fac80d0';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=423a9fac80d0';
-import { createHostRegistry } from './host-contract.js?v=423a9fac80d0';
-import { resolveDevice } from './device-profile.js?v=423a9fac80d0';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=423a9fac80d0';
-import { gcRoot } from './heap-gc.js?v=423a9fac80d0';
+import { APKError } from './apk-error.js?v=922cd5cf3ad7';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=922cd5cf3ad7';
+import { createHostRegistry } from './host-contract.js?v=922cd5cf3ad7';
+import { resolveDevice } from './device-profile.js?v=922cd5cf3ad7';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=922cd5cf3ad7';
+import { gcRoot } from './heap-gc.js?v=922cd5cf3ad7';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -39,7 +39,7 @@ export function createDeviceStateHost(platform) {
     for (const [key, [typeName, value]] of Object.entries(extras)) platform.put(r, intent, key, typeName, value); return intent;
   };
   const batteryIntent = r => { const { level, charging } = platform.device.battery; return makeIntent(r, 'android.intent.action.BATTERY_CHANGED', { level: ['I', level], scale: ['I', 100], status: ['I', level >= 100 && charging ? 5 : charging ? 2 : 3], plugged: ['I', charging ? 2 : 0], present: ['Z', 1], health: ['I', 2], temperature: ['I', 280], voltage: ['I', 3900 + level], technology: [STRING, 'Li-ion'], battery_low: ['Z', level <= 15 && !charging ? 1 : 0], icon_small: ['I', 0] }); };
-  const sticky = (r, action) => action === 'android.intent.action.BATTERY_CHANGED' ? batteryIntent(r) : null;
+  const sticky = (r, action) => action === 'android.intent.action.BATTERY_CHANGED' ? batteryIntent(r) : platform.stickyBroadcasts?.get(action) ?? null;
   const deliver = (r, action, makeExtras) => {
     for (const entry of [...registrations]) if (entry.actions.includes(action)) platform.queueTask(() => { if (!registrations.includes(entry)) return; try { call(r, entry.receiver, RECEIVER, 'onReceive', [CONTEXT, INTENT], 'V', [entry.context, makeIntent(r, action, makeExtras?.() ?? {})]); } catch (error) { if (!(error instanceof APKError)) throw error; throw error; } }, 0, [entry.receiver, entry.context]);
     sent.broadcasts++;
@@ -151,9 +151,15 @@ export function createDeviceStateHost(platform) {
   const call = (r, receiver, owner, name, parameters = [], result = 'V', values = [], mode = 'virtual') => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, mode === 'static' ? values : [receiver, ...values], mode);
   const floatBits = value => { const d = new DataView(new ArrayBuffer(4)); d.setFloat32(0, value, true); return d.getInt32(0, true); };
   const declaredChanges = frame => { const declaration = platform.manifest?.activities?.find(value => value.descriptor === frame.type || value.name === frame.type.slice(1, -1).replaceAll('/', '.')); const value = declaration?.configChanges; return Number.isFinite(Number(value)) ? Number(value) | 0 : 0; };
+  // ActivityRecord.getConfigurationChanges: "We don't want window configuration to cause relaunches" -- CONFIG_WINDOW_CONFIGURATION (bounds / rotation of the window) is never a reason on its own.
+  const WINDOW_CONFIGURATION = 0x20000000;
+  const needsRelaunch = (frame, changes) => (changes & ~declaredChanges(frame) & ~WINDOW_CONFIGURATION) !== 0;
   const views = (r, root, visit, seen = new Set()) => { if (!root || seen.has(root.ref) || seen.size >= 8192) return; seen.add(root.ref); visit(root); for (const child of r.object(root).children || []) views(r, child, visit, seen); };
   const applyAnimatorScale = (r, scale, initial = false) => { if (initial && scale === 1) return; if (r.classes.has('Landroid/animation/ValueAnimator;')) call(r, null, 'Landroid/animation/ValueAnimator;', 'setDurationScale', ['F'], 'V', [floatBits(scale)], 'static'); };
-  const apply = (r, next) => {
+  // `userNext` is the device the user set (Dispositivo panel); the Configuration is built from the *effective* device: the user's with the top Activity's fixed orientation
+  // (setRequestedOrientation / android:screenOrientation) folded in. `except` is an Activity being launched: it takes the new configuration at creation, not as a change.
+  const apply = (r, userNext, { except = null } = {}) => {
+    platform.userDevice = userNext; const next = platform.effectiveDevice(userNext, except ?? platform.frames.at(-1));
     const previous = platform.device; if (same(previous, next)) return { changed: 0, relaunched: 0, delivered: 0 };
     platform.device = next;
     const seen = platform.frames.at(-1), bars = seen && (seen.root || seen.window) ? platform.systemBarsHost.describe(r, seen) : null;
@@ -172,9 +178,13 @@ export function createDeviceStateHost(platform) {
     if (diff) {
       r.record(`DEVICE configuration changed: diff=0x${(diff >>> 0).toString(16)} -> ${Object.entries(CONFIG_FLAGS).filter(([, flag]) => diff & flag).map(([name]) => name).join(',')}`);
       // 3. Activities: the stack is processed bottom-up; each one either handles the change (android:configChanges) or is relaunched with saved state.
+      const top = except ?? platform.frames.at(-1);
       for (const frame of [...platform.frames]) {
-        if (frame.finished || frame.destroyed || !platform.frames.includes(frame)) continue;
-        if ((diff & ~declaredChanges(frame)) === 0) {
+        if (frame.finished || frame.destroyed || !platform.frames.includes(frame) || frame === except) continue;
+        // ActivityTaskSupervisor.ensureActivityConfiguration: a stopped Activity below the top takes the configuration when it comes back (PlatformSettle in AndroidPlatform.finish).
+        if (frame !== top) { frame.pendingDiff = (frame.pendingDiff | 0) | diff; continue; }
+        const total = diff | (frame.pendingDiff | 0); frame.pendingDiff = 0; platform.lastConfigurationDiff = total;
+        if (!needsRelaunch(frame, total)) {
           call(r, frame.activity, frame.type, 'onConfigurationChanged', [CONFIGURATION], 'V', [current]); delivered++;
           views(r, frame.root, view => { if (r.objectOverride?.(r.object(view).type, 'onConfigurationChanged(Landroid/content/res/Configuration;)V')) call(r, view, VIEW, 'onConfigurationChanged', [CONFIGURATION], 'V', [current]); });
         } else { platform.recreateActivity(r, frame); relaunched++; }
@@ -186,5 +196,5 @@ export function createDeviceStateHost(platform) {
     notify(r, previous, next, diff);
     return { changed: 1, diff, delivered, relaunched };
   };
-  return { ...registry, getService, applyAnimatorScale, apply, resolve: settings => resolveDevice(settings), CONFIG_FLAGS };
+  return { ...registry, getService, applyAnimatorScale, apply, declaredChanges, needsRelaunch, resolve: settings => resolveDevice(settings), CONFIG_FLAGS };
 }

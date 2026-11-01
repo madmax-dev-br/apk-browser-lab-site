@@ -142,6 +142,7 @@ export function collectGarbage(runtime, { audit = globalThis.process?.env?.APKWE
     const record = heap.list[id];
     if (record === undefined || marked[id] || record.freed === true) continue;
     if (globalThis.process?.env?.APKWEB_GC_MARK_ONLY === '1') { freed++; continue; }
+    if (typeof record.onFree === 'function') { try { record.onFree(); } catch { /* the native resource is already gone */ } }   // NativeAllocationRegistry cleaners: native handles die with the Java object that owns them
     heap.list[id] = audit ? tombstone(id, record.type) : undefined; heap.size--; freed++;
     if (runtime.monitors?.has(id)) runtime.monitors.delete(id);
   }
@@ -153,7 +154,7 @@ export function collectGarbage(runtime, { audit = globalThis.process?.env?.APKWE
     collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
   }
   runtime.gcNextAt = Math.min(Math.floor(runtime.maxHeapObjects * 0.85), heap.size + Math.floor(runtime.maxHeapObjects * 0.25));
-  runtime.gcLastNextId = runtime.nextId; runtime.fieldSlots = fieldSlots; runtime.arrayCells = arrayCells; runtime.collectionCells = collectionCells;
+  runtime.gcPressure = false; runtime.gcLastNextId = runtime.nextId; runtime.fieldSlots = fieldSlots; runtime.arrayCells = arrayCells; runtime.collectionCells = collectionCells;
   runtime.gcStats = { collections: (runtime.gcStats?.collections ?? 0) + 1, freed: (runtime.gcStats?.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(runtime.gcStats?.peakLiveAfterGc ?? 0, heap.size), lastReason: reason };
   return { collected: true, reason, before, after: heap.size, freed, ms: Math.round(performance.now() - started), markMs: Math.round(markMs) };
 }
@@ -166,8 +167,8 @@ export function maybeCollect(runtime, options = {}) {
   // Audit mode collects after every event that allocated at least APKWEB_GC_AUDIT_MIN (default 200) objects: a collection scans the whole live graph (~100 ms), and an event that allocates fewer
   // objects cannot have dropped a root; skipping them keeps full-suite audits to minutes instead of hours.
   if (audit && runtime.nextId - (runtime.gcLastNextId ?? 0) < Number(globalThis.process?.env?.APKWEB_GC_AUDIT_MIN ?? 200)) return { collected: false, reason: 'audit-small-event', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };
-  if (!audit && runtime.gcLastNextId === runtime.nextId) return { collected: false, reason: 'nothing-allocated', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // no allocation since the last collection: nothing new can be garbage
+  if (!audit && !runtime.gcPressure && runtime.gcLastNextId === runtime.nextId) return { collected: false, reason: 'nothing-allocated', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // no allocation since the last collection: nothing new can be garbage
   // Hysteresis: after a collection the next one waits until the heap grew by 25% of the limit (a heap that is legitimately large must not be re-scanned on every event).
-  if (!audit && runtime.heap.size < Math.max(threshold, runtime.gcNextAt ?? 0)) return { collected: false, reason: 'below-threshold', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };
+  if (!audit && !runtime.gcPressure && runtime.heap.size < Math.max(threshold, runtime.gcNextAt ?? 0)) return { collected: false, reason: 'below-threshold', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };
   return collectGarbage(runtime, { ...options, audit, reason: audit ? 'audit' : 'threshold' });
 }

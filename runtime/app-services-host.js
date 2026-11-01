@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=423a9fac80d0';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=423a9fac80d0';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=423a9fac80d0';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=423a9fac80d0';
+import { APKError } from './apk-error.js?v=922cd5cf3ad7';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=922cd5cf3ad7';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=922cd5cf3ad7';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=922cd5cf3ad7';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -109,7 +109,43 @@ export function createAppServicesHost(platform) {
   // onCreate, onBind once, and ServiceConnection.onServiceConnected (or onNullBinding) posted to the main thread; the last unbind runs
   // onUnbind and onDestroy. Started services (startService) are not covered here.
   const INTENT = 'Landroid/content/Intent;', COMPONENT = 'Landroid/content/ComponentName;', SERVICE_CONNECTION = 'Landroid/content/ServiceConnection;';
-  const boundServices = gcRoot(new Map()), boundConnections = new Map();   // className -> { ref, binder, intent, component, connections:Set<ref> }; connection ref -> className
+  const boundServices = gcRoot(new Map()), boundConnections = new Map();
+  const createService = (r, className, descriptor) => {
+    const ref = r.allocate(descriptor); call(r, descriptor, '<init>', [], 'V', [ref], 'direct'); r.object(ref).baseContext = platform.application;
+    call(r, descriptor, 'onCreate', [], 'V', [ref]);
+    const service = { ref, binder: null, bound: false, started: false, startId: 0, intent: null, component: null, connections: new Set(), since: platform.clock.now() };
+    boundServices.set(className, service); return service;
+  };
+  // Context.startService / startForegroundService / stopService and Service.stopSelf (ActiveServices): the Service is created once, onStartCommand follows on the main thread for every start with a growing
+  // startId, and it is destroyed by stopService/stopSelf once no connection keeps it bound. Background-start limits do not apply: the lab's app is always in the foreground.
+  const serviceTarget = (r, intent, verb) => {
+    const component = intentCall(r, intent, 'getComponent', 'Landroid/content/ComponentName;'), explicitPackage = intentCall(r, intent, 'getPackage', STRING);
+    const targetPackage = component !== null ? r.stringCharacters(call(r, COMPONENT, 'getPackageName', [], STRING, [component])) : explicitPackage === null ? null : r.stringCharacters(explicitPackage);
+    if (targetPackage === null) r.throwJava('Ljava/lang/IllegalArgumentException;', `Service Intent must be explicit: ${r.stringCharacters(call(r, 'Ljava/lang/Object;', 'toString', [], STRING, [intent]))}`);
+    if (targetPackage !== pkg()) { r.record(`SERVICE ${verb} ${targetPackage}: package not installed`); return null; }
+    if (component === null) throw new APKError(`Context.${verb}Service by package and action inside this app is not resolved yet; pass a ComponentName`, { kind: 'service-binding-unsupported' });
+    const className = r.stringCharacters(call(r, COMPONENT, 'getClassName', [], STRING, [component])), descriptor = `L${className.replaceAll('.', '/')};`;
+    if (!(platform.manifest?.services ?? []).includes(className) || !r.classes.has(descriptor)) { r.record(`SERVICE ${verb} ${className}: not declared`); return null; }
+    return { component, className, descriptor };
+  };
+  const startService = (r, intent) => {
+    const target = serviceTarget(r, intent, 'start'); if (!target) return null;
+    const service = boundServices.get(target.className) ?? createService(r, target.className, target.descriptor);
+    service.started = true; const startId = ++service.startId; r.record(`SERVICE start ${target.className} #${startId}`);
+    platform.queueTask(() => { if (boundServices.get(target.className) === service && service.started) call(r, target.descriptor, 'onStartCommand', [INTENT, 'I', 'I'], 'I', [service.ref, intent, 0, startId]); }, 0, [service.ref, intent]);
+    return target.component;
+  };
+  const stopServiceNamed = (r, className) => {
+    const service = boundServices.get(className); if (!service?.started) return 0;
+    service.started = false; r.record(`SERVICE stop ${className}`);
+    if (!service.connections.size) { boundServices.delete(className); call(r, r.typeOf(service.ref), 'onDestroy', [], 'V', [service.ref]); }
+    return 1;
+  };
+  const classNameOf = ref => { for (const [name, service] of boundServices) if (service.ref.ref === ref.ref) return name; return null; };
+  platform.serviceControl = { stopSelf: (r, self, startId = null) => { const name = classNameOf(self); if (name === null) return 0; const service = boundServices.get(name); if (startId !== null && startId !== service.startId) return 0; return stopServiceNamed(r, name); } };
+  defContext('startService', `(${INTENT})Landroid/content/ComponentName;`, (r, _m, [, intent]) => startService(r, intent));
+  defContext('startForegroundService', `(${INTENT})Landroid/content/ComponentName;`, (r, _m, [, intent]) => startService(r, intent));
+  defContext('stopService', `(${INTENT})Z`, (r, _m, [, intent]) => { const target = serviceTarget(r, intent, 'stop'); return target ? stopServiceNamed(r, target.className) : 0; });   // className -> { ref, binder, intent, component, connections:Set<ref> }; connection ref -> className
   const call = (r, owner, name, parameters, result, args, mode = 'virtual') => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, args, mode);
   const intentCall = (r, intent, name, result) => r.dispatch({ owner: INTENT, name, parameters: [], result, signature: `()${result}` }, [intent], 'virtual');
   defContext('bindService', `(${INTENT}Landroid/content/ServiceConnection;I)Z`, (r, _m, [, intent, connection, flags]) => {
@@ -124,11 +160,9 @@ export function createAppServicesHost(platform) {
     let service = boundServices.get(className);
     if (!service) {
       if (!(flags & 1)) { r.record(`SERVICE bind ${className}: not running and no BIND_AUTO_CREATE`); return 1; }
-      const ref = r.allocate(descriptor); call(r, descriptor, '<init>', [], 'V', [ref], 'direct'); r.object(ref).baseContext = platform.application;
-      call(r, descriptor, 'onCreate', [], 'V', [ref]);
-      service = { ref, binder: call(r, descriptor, 'onBind', [INTENT], 'Landroid/os/IBinder;', [ref, intent]), intent, component, connections: new Set(), since: platform.clock.now() };
-      boundServices.set(className, service); r.record(`SERVICE create+bind ${className}`);
+      service = createService(r, className, descriptor); r.record(`SERVICE create+bind ${className}`);
     }
+    if (!service.bound) { service.bound = true; service.intent = intent; service.component = component; service.binder = call(r, descriptor, 'onBind', [INTENT], 'Landroid/os/IBinder;', [service.ref, intent]); }   // onBind runs once, for the first connection
     service.connections.add(connection.ref); boundConnections.set(connection.ref, className);
     platform.queueTask(() => {
       if (!service.connections.has(connection.ref)) return;
@@ -142,8 +176,9 @@ export function createAppServicesHost(platform) {
     if (className === undefined) r.throwJava('Ljava/lang/IllegalArgumentException;', `Service not registered: ${r.typeOf(connection).slice(1, -1).replaceAll('/', '.')}`);
     boundConnections.delete(connection.ref); const service = boundServices.get(className); service.connections.delete(connection.ref);
     if (!service.connections.size) {
-      const descriptor = r.typeOf(service.ref); boundServices.delete(className);
-      call(r, descriptor, 'onUnbind', [INTENT], 'Z', [service.ref, service.intent]); call(r, descriptor, 'onDestroy', [], 'V', [service.ref]); r.record(`SERVICE unbind+destroy ${className}`);
+      const descriptor = r.typeOf(service.ref); service.bound = false;
+      call(r, descriptor, 'onUnbind', [INTENT], 'Z', [service.ref, service.intent]);
+      if (!service.started) { boundServices.delete(className); call(r, descriptor, 'onDestroy', [], 'V', [service.ref]); r.record(`SERVICE unbind+destroy ${className}`); }
     }
   });
   // Context.getAttributionTag() (API 30): null unless the Context came from createAttributionContext, which the lab does not create.

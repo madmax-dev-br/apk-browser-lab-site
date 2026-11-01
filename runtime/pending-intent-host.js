@@ -1,13 +1,13 @@
-import { APKError } from './apk-error.js?v=423a9fac80d0';
-import { createHostRegistry } from './host-contract.js?v=423a9fac80d0';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=423a9fac80d0';
+import { APKError } from './apk-error.js?v=922cd5cf3ad7';
+import { createHostRegistry } from './host-contract.js?v=922cd5cf3ad7';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=922cd5cf3ad7';
 
 // android.app.PendingIntent (android-13.0.0_r1 PendingIntent.java + ActivityManagerService.getIntentSenderLocked): tokens are identified by (kind, package, requestCode, Intent.filterEquals),
 // FLAG_NO_CREATE / FLAG_CANCEL_CURRENT / FLAG_UPDATE_CURRENT / FLAG_ONE_SHOT behave as documented, and apps targeting API 31+ must say FLAG_IMMUTABLE or FLAG_MUTABLE.
 // send() hands the Intent to the same delivery paths the app itself would use (sendBroadcast / startActivity on the application Context); starting a Service from one is not modelled.
 const PENDING = 'Landroid/app/PendingIntent;', CONTEXT = 'Landroid/content/Context;', INTENT = 'Landroid/content/Intent;', STRING = 'Ljava/lang/String;', BUNDLE = 'Landroid/os/Bundle;';
 const FLAG = { ONE_SHOT: 1 << 30, NO_CREATE: 1 << 29, CANCEL_CURRENT: 1 << 28, UPDATE_CURRENT: 1 << 27, IMMUTABLE: 1 << 26, MUTABLE: 1 << 25, ALLOW_UNSAFE_IMPLICIT_INTENT: 1 << 24 };
-const KIND = { activity: 2, broadcast: 1, service: 4, foregroundService: 5 };
+const KIND = { activity: 2, broadcast: 1, service: 4, foregroundService: 5, result: 100 };
 
 export function createPendingIntentHost(platform) {
   const registry = createHostRegistry(), { def, type } = registry;
@@ -47,22 +47,34 @@ export function createPendingIntentHost(platform) {
   def(PENDING, 'getActivity', `(${CONTEXT}I${INTENT}I${BUNDLE})${PENDING}`, (r, m, args) => get(KIND.activity)(r, m, args.slice(0, 4)), { static: true });
   const tokenOf = (r, self) => tokens.get(r.object(self).tokenKey);
   def(PENDING, 'cancel', '()V', (r, _m, [self]) => { const token = tokenOf(r, self); if (token) { token.canceled = true; tokens.delete(r.object(self).tokenKey); } });
-  const send = (r, self, extra) => {
+  const send = (r, self, code = 0, extra = null) => {
     const token = tokenOf(r, self); if (!token || token.canceled) r.throwJava('Landroid/app/PendingIntent$CanceledException;', null);
     if (token.flags & FLAG.ONE_SHOT) { token.canceled = true; tokens.delete(r.object(self).tokenKey); }
     r.record(`PENDINGINTENT send kind=${token.kind}`);
     const context = platform.application;
-    if (token.kind === KIND.broadcast) call(r, CONTEXT, 'sendBroadcast', [INTENT], 'V', [context, token.intent]);
+    if (token.kind === KIND.result) {
+      // Activity.createPendingResult: send(code, intent) delivers onActivityResult(requestCode, code, data) to the Activity, once it is resumed (the result queue of its Activity record)
+      const frame = platform.frames.find(entry => entry.activity.ref === token.activity.ref); if (!frame) throw new APKError('PendingIntent.send(): the Activity that created this result is gone', { kind: 'pending-result-gone' });
+      (frame.pendingActivityResults ||= []).push({ requestCode: token.requestCode, resultCode: code | 0, data: extra ?? token.intent ?? null });
+      platform.queueTask(() => { if (platform.frames.includes(frame)) platform.deliverActivityResults(r, frame); }, 0, [token.activity, token.intent, extra]);
+    } else if (token.kind === KIND.broadcast) call(r, CONTEXT, 'sendBroadcast', [INTENT], 'V', [context, token.intent]);
     else if (token.kind === KIND.activity) call(r, CONTEXT, 'startActivity', [INTENT], 'V', [context, token.intent]);
     else throw new APKError('PendingIntent.send() for a Service: starting services from a PendingIntent is not modelled by the virtual device', { kind: 'pending-intent-service-unsupported' });
   };
   def(PENDING, 'send', '()V', (r, _m, [self]) => send(r, self));
-  def(PENDING, 'send', `(${CONTEXT}I${INTENT})V`, (r, _m, [self]) => send(r, self));
-  def(PENDING, 'send', '(I)V', (r, _m, [self]) => send(r, self));
+  def(PENDING, 'send', `(${CONTEXT}I${INTENT})V`, (r, _m, [self, , code, intent]) => send(r, self, code, intent));
+  def(PENDING, 'send', '(I)V', (r, _m, [self, code]) => send(r, self, code));
   def(PENDING, 'getCreatorPackage', `()${STRING}`, () => platform.packageName); def(PENDING, 'getCreatorUid', '()I', () => platform.virtualProcess.uid);
   def(PENDING, 'isImmutable', '()Z', (r, _m, [self]) => (tokenOf(r, self)?.flags ?? 0) & FLAG.IMMUTABLE ? 1 : 0);
   def(PENDING, 'hashCode', '()I', (r, _m, [self]) => [...r.object(self).tokenKey].reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0));
   def(PENDING, 'equals', '(Ljava/lang/Object;)Z', (r, _m, [self, other]) => other && r.typeOf(other) === PENDING && r.object(other).tokenKey === r.object(self).tokenKey ? 1 : 0);
   def(PENDING, 'toString', `()${STRING}`, (r, _m, [self]) => `PendingIntent{${r.object(self).tokenKey ? 'live' : 'unknown'}}`);
-  return { ...registry, [GC_ROOTS](visit) { for (const token of tokens.values()) visit(token); } };
+  /** Activity.createPendingResult(requestCode, data, flags): a token that, sent, delivers an activity result to `activity`. */
+  const createResult = (r, activity, requestCode, data, flags) => {
+    const key = `result|${activity.ref}|${requestCode}`, existing = tokens.get(key); flags |= 0;
+    if (existing && !existing.canceled && !(flags & FLAG.CANCEL_CURRENT)) { if (flags & FLAG.UPDATE_CURRENT) existing.intent = data; return existing.object; }
+    if (flags & FLAG.NO_CREATE) return null;
+    const object = r.makeObject(PENDING); r.object(object).tokenKey = key; tokens.set(key, { object, intent: data, flags, canceled: false, kind: KIND.result, activity, requestCode }); return object;
+  };
+  return { ...registry, createResult, [GC_ROOTS](visit) { for (const token of tokens.values()) visit(token); } };
 }

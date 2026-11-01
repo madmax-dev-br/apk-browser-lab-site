@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=423a9fac80d0';
-import { throwNew } from './java-throw.js?v=423a9fac80d0';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=423a9fac80d0';
-import { networkOf, isIpLiteral } from './network-native.js?v=423a9fac80d0';
-import { Blocked } from './scheduler.js?v=423a9fac80d0';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=423a9fac80d0';
+import { APKError } from './apk-error.js?v=922cd5cf3ad7';
+import { throwNew } from './java-throw.js?v=922cd5cf3ad7';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=922cd5cf3ad7';
+import { networkOf, isIpLiteral } from './network-native.js?v=922cd5cf3ad7';
+import { Blocked } from './scheduler.js?v=922cd5cf3ad7';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=922cd5cf3ad7';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -237,6 +237,35 @@ export function createLibcoreIoNativeBindings() {
     const address = runtime.dispatch({ owner: INET, name: 'getByAddress', parameters: ['[B'], result: INET, signature: `([B)${INET}` }, [bytes], 'static');
     return construct(runtime, 'Ljava/net/InetSocketAddress;', [INET, 'I'], [address, 0]);
   });
+  // ---- network interfaces (libcore_io_Linux.cpp getifaddrs / if_nametoindex / ioctlFlags / ioctlMTU, under java.net.NetworkInterface). The virtual device has the loopback
+  // interface and one Wi-Fi interface, wlan0, which is up with the 10.0.2.15/24 address WifiManager and ConnectivityManager report while connectivity is online and
+  // down without an address while it is offline. Per interface the kernel lists an AF_PACKET entry (the hardware address) and one entry per IP address.
+  const IFF_UP = 0x1, IFF_BROADCAST = 0x2, IFF_LOOPBACK = 0x8, IFF_RUNNING = 0x40, IFF_MULTICAST = 0x1000;
+  const interfaces = runtime => {
+    const online = runtime.platform.device?.connectivity !== 'offline';
+    return [
+      { name: 'lo', index: 1, flags: IFF_UP | IFF_LOOPBACK | IFF_RUNNING, mtu: 65536, mac: [0, 0, 0, 0, 0, 0], addresses: [{ addr: [127, 0, 0, 1], mask: [255, 0, 0, 0], broadcast: null }, { addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], mask: [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], broadcast: null }] },
+      { name: 'wlan0', index: 2, flags: online ? IFF_UP | IFF_BROADCAST | IFF_RUNNING | IFF_MULTICAST : IFF_BROADCAST | IFF_MULTICAST, mtu: 1500, mac: [2, 0, 0, 0, 0, 0], addresses: online ? [{ addr: [10, 0, 2, 15], mask: [255, 255, 255, 0], broadcast: [10, 0, 2, 255] }] : [] },
+    ];
+  };
+  const address = (runtime, bytes) => bytes === null ? null : runtime.dispatch({ owner: INET, name: 'getByAddress', parameters: ['[B'], result: INET, signature: `([B)${INET}` }, [byteArray(runtime, bytes)], 'static');
+  const IFADDRS = 'Landroid/system/StructIfaddrs;';
+  L(`getifaddrs()[${IFADDRS}`, runtime => {
+    const entries = [];
+    for (const face of interfaces(runtime)) {
+      entries.push(construct(runtime, IFADDRS, [STRING, 'I', INET, INET, INET, '[B'], [face.name, face.flags, null, null, null, byteArray(runtime, face.mac)]));
+      for (const a of face.addresses) entries.push(construct(runtime, IFADDRS, [STRING, 'I', INET, INET, INET, '[B'], [face.name, face.flags, address(runtime, a.addr), address(runtime, a.mask), address(runtime, a.broadcast), null]));
+    }
+    const array = runtime.newArray(`[${IFADDRS}`, entries.length); runtime.object(array).elements = entries; return array;
+  });
+  L('if_nametoindex(Ljava/lang/String;)I', (runtime, [, name]) => { if (name === null || name === 0) throwNew(runtime, 'Ljava/lang/NullPointerException;', 'name == null'); return interfaces(runtime).find(face => face.name === text(runtime, name))?.index ?? 0; });
+  L('if_indextoname(I)Ljava/lang/String;', (runtime, [, index]) => interfaces(runtime).find(face => face.index === index)?.name ?? null);
+  const interfaceOf = (runtime, functionName, fdRef, name) => {
+    const desc = entryOf(runtime, functionName, fdRef).desc; if (desc.kind !== 'socket') err(runtime, functionName, 'ENOTSOCK');
+    const face = interfaces(runtime).find(value => value.name === text(runtime, name)); if (!face) err(runtime, functionName, 'ENODEV'); return face;
+  };
+  L('ioctlFlags(Ljava/io/FileDescriptor;Ljava/lang/String;)I', (runtime, [, fdRef, name]) => interfaceOf(runtime, 'ioctlFlags', fdRef, name).flags);
+  L('ioctlMTU(Ljava/io/FileDescriptor;Ljava/lang/String;)I', (runtime, [, fdRef, name]) => interfaceOf(runtime, 'ioctlMTU', fdRef, name).mtu);
   L(`getnameinfo(${INET}I)Ljava/lang/String;`, (runtime, [, address, flags]) => {   // numeric form only: the VM has no reverse DNS (NI_NUMERICHOST is what libcore asks for)
     const raw = runtime.object(runtime.dispatch({ owner: INET, name: 'getAddress', parameters: [], result: '[B', signature: '()[B' }, [address], 'virtual')).elements.map(v => v & 255);
     if (raw.length === 4) return raw.join('.');

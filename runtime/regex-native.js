@@ -1,4 +1,4 @@
-import {APKError} from './apk-error.js?v=423a9fac80d0';
+import {APKError} from './apk-error.js?v=922cd5cf3ad7';
 
 const PATTERN='Lcom/android/icu/util/regex/PatternNative;',MATCHER='Lcom/android/icu/util/regex/MatcherNative;',REGISTRY='Llibcore/util/NativeAllocationRegistry;';
 const FINALIZERS=new Map([[0x5245475001n,'pattern'],[0x5245474d01n,'matcher']]);
@@ -61,11 +61,17 @@ export function regexRegistryBridge(r,method,args){
  }
  if(method.owner===REGISTRY&&method.name==='registerNativeAllocation'&&method.signature==='(Ljava/lang/Object;J)Ljava/lang/Runnable;'){
   const kind=r.object(args[0]).regexFinalizer;if(!kind)return null;
-  r.object(args[1]);checked(r,args[2],kind);const reference=r.makeObject(REGEX_CLEANER);r.object(reference).regexCleanup=args[2];return{value:reference};
+  const referent=r.object(args[1]),handle=args[2];checked(r,handle,kind);const reference=r.makeObject(REGEX_CLEANER);r.object(reference).regexCleanup=handle;
+  // ART runs the NativeAllocationRegistry cleaner when the referent (the Pattern/Matcher native holder) becomes unreachable; this VM has no finalizers, so the collector calls this when it frees the referent.
+  referent.onFree=()=>{const state=states.get(r);if(state?.handles.has(handle)){try{close(r,handle);}catch{/* already released */}}};
+  if(stateFor(r).handles.size>=128)r.gcPressure=true;   // many live native regex objects: ask for a collection at the next safepoint instead of waiting for heap pressure
+  return{value:reference};
  }
  if(method.name==='run'&&method.signature==='()V'&&args[0]&&r.object(args[0]).type===REGEX_CLEANER){
-  const cleaner=r.object(args[0]);if(cleaner.regexCleanup){close(r,cleaner.regexCleanup);cleaner.regexCleanup=0n;}return{value:undefined};
+  const cleaner=r.object(args[0]);if(cleaner.regexCleanup){if(states.get(r)?.handles.has(cleaner.regexCleanup))close(r,cleaner.regexCleanup);cleaner.regexCleanup=0n;}return{value:undefined};
  }
  return null;
 }
+/** Live native regex handles (patterns + matchers) of this runtime. */
+export const regexHandleCount=r=>states.get(r)?.handles.size??0;
 export function disposeRegex(r){const state=states.get(r);if(state){state.session.dispose();state.handles.clear();states.delete(r);}}

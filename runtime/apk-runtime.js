@@ -1,22 +1,22 @@
-import { VMClock } from './vm-clock.js?v=423a9fac80d0';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=423a9fac80d0';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=423a9fac80d0';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=423a9fac80d0';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=423a9fac80d0';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=423a9fac80d0';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=423a9fac80d0';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=423a9fac80d0';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=423a9fac80d0';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=423a9fac80d0';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=423a9fac80d0';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=423a9fac80d0';
-import { APKError } from './apk-error.js?v=423a9fac80d0';
-import { collectGarbage } from './heap-gc.js?v=423a9fac80d0';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=423a9fac80d0';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=423a9fac80d0';
-import { Scheduler, Blocked } from './scheduler.js?v=423a9fac80d0';
-import { bootClassLacksMember } from './boot-class-members.js?v=423a9fac80d0';
-export { APKError } from './apk-error.js?v=423a9fac80d0';
+import { VMClock } from './vm-clock.js?v=922cd5cf3ad7';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=922cd5cf3ad7';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=922cd5cf3ad7';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=922cd5cf3ad7';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=922cd5cf3ad7';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=922cd5cf3ad7';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=922cd5cf3ad7';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=922cd5cf3ad7';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=922cd5cf3ad7';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=922cd5cf3ad7';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=922cd5cf3ad7';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=922cd5cf3ad7';
+import { APKError } from './apk-error.js?v=922cd5cf3ad7';
+import { collectGarbage } from './heap-gc.js?v=922cd5cf3ad7';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=922cd5cf3ad7';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=922cd5cf3ad7';
+import { Scheduler, Blocked } from './scheduler.js?v=922cd5cf3ad7';
+import { bootClassLacksMember } from './boot-class-members.js?v=922cd5cf3ad7';
+export { APKError } from './apk-error.js?v=922cd5cf3ad7';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1432,7 +1432,7 @@ export class APKRuntime {
   }
   /** Heap-pressure collection at a thread-switch safepoint of a scheduling run (no host native is in flight there; see heap-gc.js). A no-op unless collection is enabled and the heap passed half its limit. */
   safepointCollect() {
-    if (!this.gcEnabled || this.heap.size < Math.max(Math.floor(this.maxHeapObjects * 0.5), this.gcNextAt ?? 0)) return;
+    if (!this.gcEnabled || (!this.gcPressure && this.heap.size < Math.max(Math.floor(this.maxHeapObjects * 0.5), this.gcNextAt ?? 0))) return;
     collectGarbage(this, { reason: 'safepoint', safepoint: true });
   }
   /** Completes a native's Blocked / Invoke result synchronously for a host caller (nested waits and nested runs). */

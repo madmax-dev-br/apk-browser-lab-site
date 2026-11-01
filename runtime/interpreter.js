@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=423a9fac80d0';
-import { Blocked, QUANTUM } from './scheduler.js?v=423a9fac80d0';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=423a9fac80d0';
+import { APKError } from './apk-error.js?v=922cd5cf3ad7';
+import { Blocked, QUANTUM } from './scheduler.js?v=922cd5cf3ad7';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=922cd5cf3ad7';
 
 // Frame-based DEX interpreter.
 //
@@ -325,7 +325,7 @@ function runLoop(rt, owner, base) {
       if (need) {
         need = false;
         if (owner === null && ran) return undefined;               // a scheduling slice ends when the thread it ran stops
-        if (rt.heap.size > rt.gcSafepointFloor) rt.safepointCollect();   // heap pressure inside one long run: collect at this thread switch
+        if (rt.heap.size > rt.gcSafepointFloor || rt.gcPressure) rt.safepointCollect();   // heap pressure inside one long run: collect at this thread switch
         // ---- thread switch: pick a runnable thread (waiting for events/timers while the owner is blocked), then resume it
         let picked = null;
         for (;;) {

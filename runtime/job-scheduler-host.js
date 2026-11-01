@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=423a9fac80d0';
-import { createHostRegistry } from './host-contract.js?v=423a9fac80d0';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=423a9fac80d0';
+import { APKError } from './apk-error.js?v=922cd5cf3ad7';
+import { createHostRegistry } from './host-contract.js?v=922cd5cf3ad7';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=922cd5cf3ad7';
 
 // android.app.job: JobScheduler, JobInfo (+ Builder), JobParameters and the JobService base class, with the scheduling rules of Android 13's JobSchedulerService for the
 // constraints a virtual device can answer. AOSP references: frameworks/base/apex/jobscheduler (JobSchedulerService.validateJob, JobStatus.isReady / wouldBeReadyWithConstraint,
@@ -144,7 +144,10 @@ export function createJobSchedulerHost(platform) {
   def(SERVICE, '<init>', '()V', () => {}); def(SERVICE, 'onCreate', '()V', () => {}); def(SERVICE, 'onDestroy', '()V', () => {});
   def(SERVICE, 'onBind', '(Landroid/content/Intent;)Landroid/os/IBinder;', () => null); def(SERVICE, 'onUnbind', '(Landroid/content/Intent;)Z', () => 0);
   def(SERVICE, 'getApplication', '()Landroid/app/Application;', () => platform.application);
-  def(SERVICE, 'stopSelf', '()V', () => {}); def(SERVICE, 'onLowMemory', '()V', () => {}); def(SERVICE, 'onTrimMemory', '(I)V', () => {});
+  def(SERVICE, 'stopSelf', '()V', (r, _m, [self]) => { platform.serviceControl?.stopSelf(r, self); }); def(SERVICE, 'stopSelf', '(I)V', (r, _m, [self, startId]) => { platform.serviceControl?.stopSelf(r, self, startId); });
+  def(SERVICE, 'stopSelfResult', '(I)Z', (r, _m, [self, startId]) => platform.serviceControl?.stopSelf(r, self, startId) ?? 0);
+  def(SERVICE, 'onStartCommand', '(Landroid/content/Intent;II)I', (r, _m, [self, intent, , startId]) => { r.dispatch({ owner: SERVICE, name: 'onStart', parameters: ['Landroid/content/Intent;', 'I'], result: 'V', signature: '(Landroid/content/Intent;I)V' }, [self, intent, startId], 'virtual'); return 1; });   // START_STICKY (the app targets API 5+)
+  def(SERVICE, 'onStart', '(Landroid/content/Intent;I)V', () => {}); def(SERVICE, 'onLowMemory', '()V', () => {}); def(SERVICE, 'onTrimMemory', '(I)V', () => {});
   def(JOB_SERVICE, '<init>', '()V', () => {});
   def(JOB_SERVICE, 'jobFinished', `(${PARAMS}Z)V`, (r, _m, [, params, wantsReschedule]) => {
     if (params === null || params === 0) r.throwJava('Ljava/lang/NullPointerException;', 'params');
