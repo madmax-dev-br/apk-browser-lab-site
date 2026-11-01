@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=1debfc41250a';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=1debfc41250a';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=1debfc41250a';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=1debfc41250a';
+import { APKError } from './apk-error.js?v=45f4fd6b930a';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=45f4fd6b930a';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=45f4fd6b930a';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=45f4fd6b930a';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager

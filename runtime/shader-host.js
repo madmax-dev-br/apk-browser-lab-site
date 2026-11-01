@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=1debfc41250a';
-import { createHostRegistry, bitsFloat } from './host-contract.js?v=1debfc41250a';
-import { getMatrixValues } from './matrix-native.js?v=1debfc41250a';
-import { gcRoot } from './heap-gc.js?v=1debfc41250a';
+import { APKError } from './apk-error.js?v=45f4fd6b930a';
+import { createHostRegistry, bitsFloat } from './host-contract.js?v=45f4fd6b930a';
+import { getMatrixValues } from './matrix-native.js?v=45f4fd6b930a';
+import { gcRoot } from './heap-gc.js?v=45f4fd6b930a';
 // android.graphics.Shader / BitmapShader / Shader.TileMode. A BitmapShader samples a Bitmap's pixels at draw time (snapshot
 // semantics, as the Bitmap host already does for drawBitmap); RippleDrawable uses an ALPHA_8 mask this way. Skia builds the
 // real image shader when the recorded command is replayed (skia-canvas-host makePaint).

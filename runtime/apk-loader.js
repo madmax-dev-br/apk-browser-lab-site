@@ -1,15 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=1debfc41250a';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=1debfc41250a';
-import { inspectELF } from './native-inspector.js?v=1debfc41250a';
-import { inflateRaw } from './inflate.js?v=1debfc41250a';
-import { resolveDevice } from './device-profile.js?v=1debfc41250a';
-import { resourceProfileFor } from './device-configuration.js?v=1debfc41250a';
-import { JniBridge } from './jni-host.js?v=1debfc41250a';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=1debfc41250a';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=1debfc41250a';
-import { AndroidResources } from './android-resources.js?v=1debfc41250a';
-import { AndroidPlatform } from './android-platform.js?v=1debfc41250a';
-import { FrameworkProvider } from './framework-provider.js?v=1debfc41250a';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=45f4fd6b930a';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=45f4fd6b930a';
+import { inspectELF } from './native-inspector.js?v=45f4fd6b930a';
+import { inflateRaw } from './inflate.js?v=45f4fd6b930a';
+import { resolveDevice } from './device-profile.js?v=45f4fd6b930a';
+import { resourceProfileFor } from './device-configuration.js?v=45f4fd6b930a';
+import { JniBridge } from './jni-host.js?v=45f4fd6b930a';
+import { providerForApk } from './native-provider-variants.js?v=45f4fd6b930a';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=45f4fd6b930a';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=45f4fd6b930a';
+import { AndroidResources } from './android-resources.js?v=45f4fd6b930a';
+import { AndroidPlatform } from './android-platform.js?v=45f4fd6b930a';
+import { FrameworkProvider } from './framework-provider.js?v=45f4fd6b930a';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -614,7 +615,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   if (nativeLibraryProvider) { // the lab's React Native libraries are built for one RN version: record the app's (from its DEX) and Hermes bytecode version (from its bundle) for the provider's gate
     runtime.reactNativeVersion = detectReactNativeVersion(runtime); runtime.hermesBytecodeVersion = await detectHermesBytecodeVersion(archive);
   }
-  if (nativeLibraryProvider) runtime.jni = new JniBridge(runtime, nativeLibraryProvider, runtime.platform);
+  if (nativeLibraryProvider) runtime.jni = new JniBridge(runtime, providerForApk(nativeLibraryProvider, runtime.apkSha256), runtime.platform);
   if (!manifest.activities.length) manifest.activities = runtime.activities().map(type => ({ name: dottedName(type), descriptor: type, launcher: false }));
   const kotlin = program.types.some(t => t.startsWith('Lkotlin/'));
   const compose = program.types.some(t => t.startsWith('Landroidx/compose/') || t.startsWith('Lorg/jetbrains/compose/'));

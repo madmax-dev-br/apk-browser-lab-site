@@ -1,15 +1,16 @@
-import { APKError } from './apk-error.js?v=1debfc41250a';
-import { JavaException } from './apk-runtime.js?v=1debfc41250a';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=1debfc41250a';
-import { buildElfDescriptor } from './native-descriptor.js?v=1debfc41250a';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=1debfc41250a';
-import { NativeLinker, LinkError } from './native-linker.js?v=1debfc41250a';
-import { hostFunction } from './wasm-host-function.js?v=1debfc41250a';
-import { parseWasm } from './wasm-dylink.js?v=1debfc41250a';
-import { formatVersion } from './rn-version.js?v=1debfc41250a';
-import { registerWasmMemory } from './unsafe-native.js?v=1debfc41250a';
-import { writeSkPath } from './skia-path-layout.js?v=1debfc41250a';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=1debfc41250a';
+import { APKError } from './apk-error.js?v=45f4fd6b930a';
+import { JavaException } from './apk-runtime.js?v=45f4fd6b930a';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=45f4fd6b930a';
+import { buildElfDescriptor } from './native-descriptor.js?v=45f4fd6b930a';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=45f4fd6b930a';
+import { NativeLinker, LinkError } from './native-linker.js?v=45f4fd6b930a';
+import { hostFunction } from './wasm-host-function.js?v=45f4fd6b930a';
+import { parseWasm } from './wasm-dylink.js?v=45f4fd6b930a';
+import { formatVersion } from './rn-version.js?v=45f4fd6b930a';
+import { registerWasmMemory } from './unsafe-native.js?v=45f4fd6b930a';
+import { writeSkPath } from './skia-path-layout.js?v=45f4fd6b930a';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=45f4fd6b930a';
+import { withVariants } from './native-provider-variants.js?v=45f4fd6b930a';
 
 // JNI -> WebAssembly bridge.
 //
@@ -58,7 +59,7 @@ export class NativeLibraryProvider {
     needed = parsed.dylink.needed;
     const module = await WebAssembly.compile(bytes);
     this.unavailable.delete(soname);
-    this.modules.set(soname, { soname, abi: this.abi, bytes, sha256: actual, module, needed, provenance, hostImports, apkSha256, requires: provenance?.requires ?? null, descriptor: buildElfDescriptor({ soname, needed, wasmSha256: actual }) });
+    this.modules.set(soname, withVariants(this.modules.get(soname), { soname, abi: this.abi, bytes, sha256: actual, module, needed, provenance, hostImports, apkSha256, requires: provenance?.requires ?? null, descriptor: buildElfDescriptor({ soname, needed, wasmSha256: actual }) }));
     return this;
   }
   has(soname) { return this.modules.has(soname); }

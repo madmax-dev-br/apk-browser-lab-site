@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=1debfc41250a';
+import { APKError } from './apk-error.js?v=45f4fd6b930a';
 
 // Green-thread scheduler for the VM.
 //

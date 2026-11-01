@@ -219,7 +219,7 @@
         "reactNative": "0.79.4"
       }
     },
-    "libappmodules.so": {
+    "libappmodules.so@b4d48ef5fcf8": {
       "soname": "libappmodules.so",
       "abi": "wasm32",
       "file": "apps/b4d48ef5fcf8/libappmodules.wasm",
@@ -244,6 +244,36 @@
       ],
       "apkSha256": "b4d48ef5fcf8d24aad6e4eca01a74b1c4585c91ea3f34c2c5517fdf2d8d16189",
       "scope": "fixtures/rn-hello.apk only: its libappmodules.so is React Native's template (cmake-utils/default-app-setup/OnLoad.cpp, which registers the core TurboModules through rncore_ModuleProvider) with no autolinked libraries. It is NOT offered to any other APK (Wellhub's libappmodules is generated from its own dependency set)."
+    },
+    "libappmodules.so@cff0c355aef6": {
+      "soname": "libappmodules.so",
+      "abi": "wasm32",
+      "file": "apps/cff0c355aef6/libappmodules.wasm",
+      "bytes": 1569160,
+      "sha256": "944ffb1f02b835c8bf05791cfe21be13f53ed499e25be91b54ea9e036397ccbb",
+      "needed": [
+        "libreact_codegen_rnsvg.so",
+        "libfbjni.so",
+        "libjsi.so",
+        "libreactnative.so",
+        "libc++_shared.so"
+      ],
+      "upstream": "https://github.com/facebook/react-native",
+      "tag": "v0.79.4",
+      "commit": "58edb0af93e5ef251dc967d7a24dab240b18917e",
+      "license": "licenses/react-native-MIT.txt",
+      "sources": [
+        "packages/react-native/ReactAndroid/cmake-utils/default-app-setup/OnLoad.cpp",
+        "autolinking.cpp and autolinking.h written by scripts/wasm/gen-app-autolinking.mjs with the templates of GenerateAutolinkingNewArchitecturesFileTask.kt (@react-native/gradle-plugin 0.79.4) for the packages of scripts/wasm/rn-libs/packages.json that have codegen",
+        "react-native-gesture-handler 2.22.1 generated codegen project (@react-native/codegen 0.79.4 over src/specs, scripts/wasm/prepare-rn-libs.py): TurboModule spec and the Button/RootView component descriptors"
+      ],
+      "ports": [
+        "scripts/wasm/rn-libs/app-driver: the app-level project (ReactNative-application.cmake's compile options and link line) that builds libappmodules.so next to react_codegen_rnsvg",
+        "scripts/wasm/rn-libs/shim.cmake: Emscripten toolchain, imported ReactAndroid/fbjni/hermes-engine prefab targets over the lab-built libraries",
+        "scripts/wasm/lab-link.mjs: shared-library link rule (DT_NEEDED in link order)"
+      ],
+      "apkSha256": "cff0c355aef64b259003ea70dee76ce7882058b8ecca1fd4be960aadab80e0a3",
+      "scope": "APK cff0c355aef6 only. NOT the app's own libappmodules.so (generated app code, never read or reproduced): React Native's template (cmake-utils/default-app-setup/OnLoad.cpp: core TurboModules through rncore_ModuleProvider) plus the autolinking of the open-source libraries the lab builds for this APK: react-native-svg (its codegen library, a separate libreact_codegen_rnsvg.so as in the app) and react-native-gesture-handler (its codegen project, compiled into libappmodules.so as React Native's autolinking does). A TurboModule or Fabric component the app has from any other library, or its own, is not provided: React Native reports it by name (TurboModuleRegistry.getEnforcing ... could not be found)."
     },
     "libworklets.so": {
       "soname": "libworklets.so",
@@ -354,7 +384,7 @@
         "scripts/wasm/rn-libs/shim.cmake: Emscripten toolchain, -DANDROID, imported ReactAndroid/fbjni/hermes-engine prefab targets over the lab-built libraries, `android`/`log` ports, ANDROID_ABI=wasm32",
         "scripts/wasm/lab-link.mjs: shared-library link rule (DT_NEEDED in link order)",
         "scripts/wasm/ports/include/lab-bionic.h (force-included), -Wno-error appended through EMCC_CFLAGS",
-        "scripts/wasm/rn-libs/svg-driver: the app-level project that add_subdirectory()s the library, with folly-flags.cmake compile options as ReactNative-application.cmake applies them"
+        "scripts/wasm/rn-libs/app-driver: the app-level project that add_subdirectory()s the library, with folly-flags.cmake compile options as ReactNative-application.cmake applies them"
       ],
       "apkSha256": "cff0c355aef64b259003ea70dee76ce7882058b8ecca1fd4be960aadab80e0a3",
       "scope": "Wellhub 10.22.1 only: the version is the one identified from that APK (docs/WELLHUB-NATIVE-VERSIONS.md); another app may ship another version of the same soname."

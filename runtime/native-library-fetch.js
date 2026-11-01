@@ -1,6 +1,7 @@
-import { APKError } from './apk-error.js?v=1debfc41250a';
-import { buildElfDescriptor } from './native-descriptor.js?v=1debfc41250a';
-import { sha256Hex } from './sha256-sync.js?v=1debfc41250a';
+import { APKError } from './apk-error.js?v=45f4fd6b930a';
+import { buildElfDescriptor } from './native-descriptor.js?v=45f4fd6b930a';
+import { sha256Hex } from './sha256-sync.js?v=45f4fd6b930a';
+import { withVariants } from './native-provider-variants.js?v=45f4fd6b930a';
 
 // Browser-side provider of the lab's wasm32 native libraries (vendor/native-libs/wasm32, published next to the page by scripts/build-web.mjs).
 //
@@ -25,7 +26,7 @@ export function xhrFetchSync(url) {
 export class LazyNativeLibraryProvider {
   constructor({ provenance, baseURL, revision = '', fetchSync = xhrFetchSync, abi = 'wasm32' }) {
     this.abi = abi; this.modules = new Map(); this.fetched = [];
-    for (const lib of Object.values(provenance.libraries)) this.modules.set(lib.soname, this.#entry(lib, baseURL, revision, fetchSync));
+    for (const lib of Object.values(provenance.libraries)) this.modules.set(lib.soname, withVariants(this.modules.get(lib.soname), this.#entry(lib, baseURL, revision, fetchSync)));
   }
   /** Reads provenance.json from `baseURL` (async, once) and returns the provider. */
   static async fromURL(baseURL, { revision = '', fetchImpl = globalThis.fetch.bind(globalThis), fetchSync = xhrFetchSync } = {}) {

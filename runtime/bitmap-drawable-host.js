@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=1debfc41250a';
-import { createHostRegistry } from './host-contract.js?v=1debfc41250a';
+import { APKError } from './apk-error.js?v=45f4fd6b930a';
+import { createHostRegistry } from './host-contract.js?v=45f4fd6b930a';
 
 // android.graphics.drawable.BitmapDrawable (android-13.0.0_r1 BitmapDrawable.java) over the recorded-canvas Bitmap: intrinsic size scaled by the target density, gravity placement
 // of the bitmap inside the bounds (FILL by default), alpha, ColorFilter, filter/dither/antialias flags. Shader tiling (setTileMode*) and tinting need Skia shader/color-filter state
