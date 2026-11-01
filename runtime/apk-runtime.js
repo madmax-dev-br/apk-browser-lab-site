@@ -1,20 +1,20 @@
-import { VMClock } from './vm-clock.js?v=45f4fd6b930a';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=45f4fd6b930a';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=45f4fd6b930a';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=45f4fd6b930a';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=45f4fd6b930a';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=45f4fd6b930a';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=45f4fd6b930a';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=45f4fd6b930a';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=45f4fd6b930a';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=45f4fd6b930a';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=45f4fd6b930a';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=45f4fd6b930a';
-import { APKError } from './apk-error.js?v=45f4fd6b930a';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=45f4fd6b930a';
-import { Scheduler, Blocked } from './scheduler.js?v=45f4fd6b930a';
-import { bootClassLacksMember } from './boot-class-members.js?v=45f4fd6b930a';
-export { APKError } from './apk-error.js?v=45f4fd6b930a';
+import { VMClock } from './vm-clock.js?v=0b42079f5fd6';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=0b42079f5fd6';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=0b42079f5fd6';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=0b42079f5fd6';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=0b42079f5fd6';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=0b42079f5fd6';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=0b42079f5fd6';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=0b42079f5fd6';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=0b42079f5fd6';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=0b42079f5fd6';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=0b42079f5fd6';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=0b42079f5fd6';
+import { APKError } from './apk-error.js?v=0b42079f5fd6';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=0b42079f5fd6';
+import { Scheduler, Blocked } from './scheduler.js?v=0b42079f5fd6';
+import { bootClassLacksMember } from './boot-class-members.js?v=0b42079f5fd6';
+export { APKError } from './apk-error.js?v=0b42079f5fd6';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -662,7 +662,7 @@ addBridge('android/os/Looper', ['getMainLooper()Landroid/os/Looper;', 'myLooper(
 // ContextImpl.getMainLooper() returns the process main thread's Looper for every Context (Activity, Application, Service, wrappers).
 addBridge('android/content/Context', ['getMainLooper()Landroid/os/Looper;']);
 addBridge('android/content/ContextWrapper', ['getMainLooper()Landroid/os/Looper;']);
-addBridge('android/os/SystemClock', ['uptimeMillis()J', 'elapsedRealtime()J', 'elapsedRealtimeNanos()J', 'uptimeNanos()J', 'currentThreadTimeMillis()J', 'sleep(J)V']);
+addBridge('android/os/SystemClock', ['uptimeMillis()J', 'elapsedRealtime()J', 'elapsedRealtimeNanos()J', 'uptimeNanos()J', 'currentThreadTimeMillis()J', 'sleep(J)V', 'currentNetworkTimeClock()Ljava/time/Clock;']);
 for (const name of ['Throwable', 'Error', 'LinkageError', 'UnsatisfiedLinkError', 'Exception', 'RuntimeException', 'NullPointerException',
   'IllegalArgumentException', 'IllegalStateException', 'IllegalMonitorStateException', 'ClassCastException', 'IndexOutOfBoundsException',
   'ArrayIndexOutOfBoundsException', 'ArithmeticException', 'UnsupportedOperationException']) {
@@ -1963,15 +1963,15 @@ export class APKRuntime {
     // Class initialization precedes reflective construction and is not a target-method exception.
     if (constructor) { receiver = this.allocate(method.owner); words.unshift(receiver); }
     else if (staticCall) this.initialize(method.owner);
-    try {
-      const result = this.dispatch(method, words, constructor || member.flags & 2 ? 'direct' : staticCall ? 'static' : 'virtual');
-      return constructor ? receiver : this.boxPrimitive(method.result, result);
-    } catch (error) {
+    // The target runs as a continuation of the calling green thread (an Invoke), not through a nested dispatch on the JavaScript stack: a reflective call that blocks (a lock, a
+    // Future.get, a park) then parks only this thread, and the scheduler can resume every other one, including the thread that holds what this one waits for.
+    const wrapError = error => {
       if (!wrap || !(error instanceof JavaException)) throw error;
       const value = this.makeObject('Ljava/lang/reflect/InvocationTargetException;'), obj = this.object(value);
       obj.cause = error.value; obj.message = error.message; obj.exceptionDetails = error.details;
       throw new JavaException(value, error.message, error.details);
-    }
+    };
+    return new Invoke(method, words, constructor || member.flags & 2 ? 'direct' : staticCall ? 'static' : 'virtual', result => constructor ? receiver : this.boxPrimitive(method.result, result), wrapError);
   }
   argumentWords(parameters, values, { receiver = undefined } = {}) {
     if (parameters.length !== values.length) fail('Argument packing count mismatch');
@@ -2638,6 +2638,7 @@ export class APKRuntime {
         if (interrupted) this.dispatch({ owner: 'Ljava/lang/Thread;', name: 'interrupt', parameters: [], result: 'V', signature: '()V' }, [this.dispatch({ owner: 'Ljava/lang/Thread;', name: 'currentThread', parameters: [], result: 'Ljava/lang/Thread;', signature: '()Ljava/lang/Thread;' }, [], 'static')], 'virtual');
         return undefined;
       }
+      if (name === 'currentNetworkTimeClock') { const clock = this.allocate('Ldev/apkweb/os/NetworkTimeClock;'); this.dispatch({ owner: 'Ldev/apkweb/os/NetworkTimeClock;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [clock], 'direct'); return clock; }   // no network time source: millis() throws DateTimeException, as the platform's does before an NTP sync
       // The VM has one clock and no per-thread CPU accounting: thread time is bounded by (and reported as) the uptime of the VM clock.
       return name === 'elapsedRealtimeNanos' || name === 'uptimeNanos' ? this.clock.nanos() : BigInt(Math.floor(this.clock.now()));
     }

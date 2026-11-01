@@ -1,6 +1,6 @@
-import { Blocked } from './scheduler.js?v=45f4fd6b930a';
-import { bitsFloat } from './host-contract.js?v=45f4fd6b930a';
-import { readNativeBytes } from './unsafe-native.js?v=45f4fd6b930a';
+import { Blocked } from './scheduler.js?v=0b42079f5fd6';
+import { bitsFloat } from './host-contract.js?v=0b42079f5fd6';
+import { readNativeBytes } from './unsafe-native.js?v=0b42079f5fd6';
 
 // The mixer behind android.media.AudioTrack (framework-aosp/lab-java/android/media/AudioTrack.java): one software track per Java AudioTrack.
 //   * written PCM is converted to float32 and queued (stream mode) or kept in the static buffer (static mode);
@@ -68,8 +68,9 @@ export function createAudioMixer({ now, schedule, sink, notify }) {
   /** Brings the track up to the VM time `at`: consumes what the clock says was played. */
   const advance = (t, at) => {
     if (t.state === 'playing' || t.state === 'draining') {
-      const elapsed = Math.max(0, at - t.lastTime); t.lastTime = at;
-      t.fraction += elapsed * effectiveRate(t) / 1000; const want = Math.floor(t.fraction); t.fraction -= want;
+      // The VM clock has a 1 microsecond resolution (System.nanoTime); the elapsed time is taken in whole microseconds so that floating-point noise in two large timestamps never loses a frame.
+      const elapsedUs = Math.max(0, Math.round((at - t.lastTime) * 1000)); t.lastTime += elapsedUs / 1000;
+      t.fraction += elapsedUs * effectiveRate(t) / 1e6; const want = Math.floor(t.fraction); t.fraction -= want;
       if (t.mode === 'stream') {
         const take = Math.min(want, t.queued);
         t.consumed += take; t.queued -= take;

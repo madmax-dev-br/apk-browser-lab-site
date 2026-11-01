@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=45f4fd6b930a';
-import { throwNew } from './java-throw.js?v=45f4fd6b930a';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=45f4fd6b930a';
-import { networkOf, isIpLiteral } from './network-native.js?v=45f4fd6b930a';
-import { Blocked } from './scheduler.js?v=45f4fd6b930a';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=45f4fd6b930a';
+import { APKError } from './apk-error.js?v=0b42079f5fd6';
+import { throwNew } from './java-throw.js?v=0b42079f5fd6';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=0b42079f5fd6';
+import { networkOf, isIpLiteral } from './network-native.js?v=0b42079f5fd6';
+import { Blocked } from './scheduler.js?v=0b42079f5fd6';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=0b42079f5fd6';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -79,7 +79,9 @@ function allocateFd(runtime, desc, minimum = 0, cloexec = false) {
   const table = state(runtime).table; let number = minimum;
   while (table.has(number)) number++;
   if (number >= 1024) return -1;
-  table.set(number, { desc, cloexec }); desc.refs++; return number;
+  table.set(number, { desc, cloexec }); desc.refs++;
+  if (desc.node && (desc.kind === 'file' || desc.kind === 'dir')) files(runtime).notify(0x20, desc.node);   // IN_OPEN
+  return number;
 }
 function entryOf(runtime, functionName, reference) {
   const number = fdNumber(runtime, reference), entry = state(runtime).table.get(number);
@@ -108,9 +110,9 @@ const stdLog = (runtime, desc, bytes) => {
 // ---- the syscalls -----------------------------------------------------------------------------------------------------------------------------
 function open(runtime, path, flags, mode) {
   const fs = files(runtime), name = requireString(runtime, path), found = lookup(fs, name), acc = flags & C.O_ACCMODE;
-  let node = found.node;
+  let node = found.node, created = false;
   if (!node) {
-    if (!(flags & C.O_CREAT)) err(runtime, 'open', found.error);
+    if (!(flags & C.O_CREAT)) err(runtime, 'open', found.error); created = true;
     const code = fs.createFile(found.path); if (code !== 'ok') err(runtime, 'open', code);
     node = fs.nodes.get(found.path); node.mode = mode & ~state(runtime).umask & 0o7777;
   } else if ((flags & C.O_CREAT) && (flags & C.O_EXCL)) err(runtime, 'open', 'EEXIST');
@@ -119,7 +121,7 @@ function open(runtime, path, flags, mode) {
     return allocateFd(runtime, { kind: 'dir', node, path: found.path, acc, offset: 0, append: false, ownerTag: 0n, refs: 0 }, 0, !!(flags & C.O_CLOEXEC));
   }
   if ((acc !== C.O_RDONLY && (fs.isReadOnly(found.path) || !(node.mode & 0o200))) || (acc !== C.O_WRONLY && !(node.mode & 0o400))) err(runtime, 'open', 'EACCES');
-  if ((flags & C.O_TRUNC) && acc !== C.O_RDONLY) { node.size = 0; node.mtime = fs.now(); }
+  if ((flags & C.O_TRUNC) && acc !== C.O_RDONLY) { node.size = 0; node.mtime = fs.now(); if (!created) fs.notify(0x2, node); }   // a file the open just created is not truncated (O_TRUNC is dropped for FMODE_CREATED)
   const number = allocateFd(runtime, { kind: 'file', node, path: found.path, acc, offset: 0, append: !!(flags & C.O_APPEND), ownerTag: 0n, refs: 0 }, 0, !!(flags & C.O_CLOEXEC));
   if (number < 0) err(runtime, 'open', 'EMFILE');
   return number;
@@ -127,7 +129,10 @@ function open(runtime, path, flags, mode) {
 function release(runtime, number) {
   const table = state(runtime).table, entry = table.get(number);
   table.delete(number); entry.desc.refs--;
-  if (entry.desc.refs === 0) entry.desc.onLastClose?.();
+  if (entry.desc.refs === 0) {
+    entry.desc.onLastClose?.();
+    const desc = entry.desc; if (desc.node && (desc.kind === 'file' || desc.kind === 'dir')) files(runtime).notify(desc.kind === 'file' && desc.acc !== C.O_RDONLY ? 0x8 : 0x10, desc.node);   // IN_CLOSE_WRITE / IN_CLOSE_NOWRITE
+  }
 }
 function readInto(runtime, fn, fdRef, buffer, offset, count, position) {
   const entry = entryOf(runtime, fn, fdRef), desc = entry.desc;
@@ -344,7 +349,7 @@ export function createLibcoreIoNativeBindings() {
     if (target.error === 'ENOTDIR') err(runtime, 'rename', 'ENOTDIR');
     const code = fs.rename(source, target.path); if (code !== 'ok') err(runtime, 'rename', code);
   });
-  L('chmod(Ljava/lang/String;I)V', (runtime, [, path, mode]) => { const { fs, node, path: resolved } = mutate(runtime, 'chmod', path); if (fs.isReadOnly(resolved)) err(runtime, 'chmod', 'EPERM'); node.mode = mode & 0o7777; });
+  L('chmod(Ljava/lang/String;I)V', (runtime, [, path, mode]) => { const { fs, node, path: resolved } = mutate(runtime, 'chmod', path); if (fs.isReadOnly(resolved)) err(runtime, 'chmod', 'EPERM'); node.mode = mode & 0o7777; fs.notify(0x4, node); });   // IN_ATTRIB
   L('fchmod(Ljava/io/FileDescriptor;I)V', (runtime, [, fdRef, mode]) => { const desc = entryOf(runtime, 'fchmod', fdRef).desc; if (desc.kind === 'std') err(runtime, 'fchmod', 'EINVAL'); desc.node.mode = mode & 0o7777; });
   L('realpath(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, path]) => mutate(runtime, 'realpath', path).path);
   L('readlink(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, path]) => { mutate(runtime, 'readlink', path); err(runtime, 'readlink', 'EINVAL'); });   // exists, but no path is a symbolic link here
@@ -398,7 +403,7 @@ export function createLibcoreIoNativeBindings() {
   add(UFS, 'canonicalize0(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, path]) => files(runtime).canonical(requireString(runtime, path)));
   add(UFS, 'getBooleanAttributes0(Ljava/lang/String;)I', (runtime, [, path]) => { const { node } = find(runtime, requireString(runtime, path)); return node ? BA_EXISTS | (node.type === 'dir' ? BA_DIRECTORY : BA_REGULAR) : 0; });
   add(UFS, 'getLastModifiedTime0(Ljava/io/File;)J', (runtime, [, file]) => { const { node } = find(runtime, fileOf(runtime, file)); return node ? BigInt(Math.trunc(node.mtime)) : 0n; });
-  add(UFS, 'setLastModifiedTime0(Ljava/io/File;J)Z', (runtime, [, file, time]) => { const { node, path } = find(runtime, fileOf(runtime, file)); if (!node || files(runtime).isReadOnly(path)) return 0; node.mtime = Number(time); return 1; });
+  add(UFS, 'setLastModifiedTime0(Ljava/io/File;J)Z', (runtime, [, file, time]) => { const { node, path } = find(runtime, fileOf(runtime, file)); if (!node || files(runtime).isReadOnly(path)) return 0; node.mtime = Number(time); files(runtime).notify(0x4, node); return 1; });   // IN_ATTRIB
   add(UFS, 'setPermission0(Ljava/io/File;IZZ)Z', (runtime, [, file, access, enable, ownerOnly]) => {
     const { node, path } = find(runtime, fileOf(runtime, file)); if (!node || files(runtime).isReadOnly(path)) return 0;
     let bits = 0; if (access & 4) bits |= ownerOnly ? 0o400 : 0o444; if (access & 2) bits |= ownerOnly ? 0o200 : 0o222; if (access & 1) bits |= ownerOnly ? 0o100 : 0o111;
@@ -468,8 +473,8 @@ export function createLibcoreIoNativeBindings() {
     return 0;
   });
   add(FILE_DISPATCHER, 'size0(Ljava/io/FileDescriptor;)J', (runtime, [fdRef]) => { const entry = state(runtime).table.get(fdNumber(runtime, fdRef)); if (!entry || entry.desc.kind === 'closed') ioError(runtime, 'EBADF'); return BigInt(sizeOf(entry.desc)); });
-  add(FILE_DISPATCHER, 'lock0(Ljava/io/FileDescriptor;ZJJZ)I', (runtime, [fdRef]) => { descOf(runtime, fdRef, false); return 0; });      // LOCKED: fcntl record locks never conflict inside one process, and the VM is one process
-  add(FILE_DISPATCHER, 'release0(Ljava/io/FileDescriptor;JJ)V', (runtime, [fdRef]) => { descOf(runtime, fdRef, false); });
+  add(FILE_DISPATCHER, 'lock0(Ljava/io/FileDescriptor;ZJJZ)I', (runtime, [fdRef, , , , shared]) => { descOf(runtime, fdRef, !shared); return 0; });      // LOCKED: fcntl record locks never conflict inside one process, and the VM is one process
+  add(FILE_DISPATCHER, 'release0(Ljava/io/FileDescriptor;JJ)V', (runtime, [fdRef]) => { if (!state(runtime).table.has(fdNumber(runtime, fdRef))) ioError(runtime, 'EBADF'); });   // unlocking needs no access mode
   add(FILE_DISPATCHER, 'closeIntFD(I)V', (runtime, [number]) => { if (!state(runtime).table.has(number)) ioError(runtime, 'EBADF'); release(runtime, number); });
   add(FILE_DISPATCHER, 'close0(Ljava/io/FileDescriptor;)V', (runtime, [fdRef]) => { const number = fdNumber(runtime, fdRef); if (number >= 0) { if (!state(runtime).table.has(number)) ioError(runtime, 'EBADF'); release(runtime, number); } });
   add(FILE_DISPATCHER, 'preClose0(Ljava/io/FileDescriptor;)V', (runtime, [fdRef]) => {      // FileDispatcherImpl.c dup2()s a closed socket over the descriptor so that blocked I/O fails; nothing blocks here, but later I/O must fail with EBADF

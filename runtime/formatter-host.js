@@ -1,8 +1,8 @@
-import { createHostRegistry, bitsDouble, bitsFloat } from './host-contract.js?v=45f4fd6b930a';
+import { createHostRegistry, bitsDouble, bitsFloat } from './host-contract.js?v=0b42079f5fd6';
 
 // java.lang.String.format(...) / java.util.Formatter conversions: %s %S %d %x %X %o %c %b %B %h %n %% %f %e %E %g %G with the flags - # + space 0 , ( and
 // argument indices (%1$s, %<s). Number formatting uses ASCII digits with the locale's decimal/grouping separators from Intl. Date/time (%t) and
-// BigDecimal/BigInteger arguments are not implemented and fail explicitly. Contract: java.util.Formatter (android-13.0.0_r1 libcore).
+// BigInteger arguments (%d %x %X %o, with their sign / '#' / ',' / '(' flags) and BigDecimal arguments (%f %e %E %g %G, HALF_UP like java.util.Formatter) use the original math classes. Contract: java.util.Formatter (android-13.0.0_r1 libcore).
 const STRING = 'Ljava/lang/String;', LOCALE = 'Ljava/util/Locale;', OBJECTS = '[Ljava/lang/Object;';
 const SPEC = /%(\d+\$|<)?([-#+ 0,(]*)(\d+)?(?:\.(\d+))?([tT]?[a-zA-Z%])/g;
 
@@ -30,7 +30,10 @@ export function createFormatterHost(platform) {
       last = argIndex; const arg = args[argIndex]; index++;
       let text = convert(r, c, flags, precision, arg, whole, { group, decimal });
       if (upper) text = text.toUpperCase();
-      if (width >= 0 && flags.includes('0') && /[dxofeg]/.test(c) && arg !== null && !flags.includes('-')) { const sign = /^[+\- (]/.test(text) ? text[0] : ''; text = sign + text.slice(sign.length).padStart(width - sign.length, '0'); }
+      if (width >= 0 && flags.includes('0') && /[dxofeg]/.test(c) && arg !== null && !flags.includes('-')) {   // zeros go after the sign and the 0x prefix, inside a '(' ... ')' pair
+        const sign = /^[+\- (]/.test(text) ? text[0] : '', close = sign === '(' && text.endsWith(')') ? ')' : '', rest = text.slice(sign.length, text.length - close.length), prefix = /^0[xX]/.test(rest) ? rest.slice(0, 2) : '';
+        text = sign + prefix + rest.slice(prefix.length).padStart(width - sign.length - prefix.length - close.length, '0') + close;
+      }
       out += pad(text, width, flags.includes('-'));
     }
     return out + pattern.slice(position);
@@ -45,14 +48,17 @@ export function createFormatterHost(platform) {
       case 'h': return arg === null ? 'null' : (Number(r.dispatch({ owner: 'Ljava/lang/Object;', name: 'hashCode', parameters: [], result: 'I', signature: '()I' }, [arg], 'virtual')) >>> 0).toString(16);
       case 'c': { if (arg === null) return 'null'; const b = boxed(r, arg); if (!b || !['char', 'int'].includes(b.kind[0])) mismatch(r, 'c', arg); return String.fromCodePoint(Number(b.value)); }
       case 'd': case 'x': case 'o': {
-        if (arg === null) return 'null'; const b = boxed(r, arg); if (!b || b.kind[0] !== 'int') { if (b && b.kind[0] === 'float' || !b) mismatch(r, c, arg); }
+        if (arg === null) return 'null';
+        if (r.typeOf(arg) === BIG_INTEGER) return bigInteger(r, c, flags, arg, sep);
+        const b = boxed(r, arg); if (!b || b.kind[0] !== 'int') { if (b && b.kind[0] === 'float' || !b) mismatch(r, c, arg); }
         let n = BigInt(b.value);
         if (c === 'd') { const neg = n < 0n; let digits = (neg ? -n : n).toString(); if (flags.includes(',')) digits = digits.replace(/\B(?=(\d{3})+(?!\d))/g, sep.group);
           return (neg ? (flags.includes('(') ? '(' : '-') : flags.includes('+') ? '+' : flags.includes(' ') ? ' ' : '') + digits + (neg && flags.includes('(') ? ')' : ''); }
         if (n < 0n) n = BigInt.asUintN(b.kind[1], n); const t = n.toString(c === 'x' ? 16 : 8); return (flags.includes('#') ? (c === 'x' ? '0x' : '0') : '') + t;
       }
       case 'f': case 'e': case 'g': {
-        if (arg === null) return 'null'; const b = boxed(r, arg); if (!b || b.kind[0] !== 'float') mismatch(r, c, arg);
+        if (arg === null) return 'null'; if (r.typeOf(arg) === BIG_DECIMAL) return bigDecimal(r, c, flags, precision, arg, sep);
+        const b = boxed(r, arg); if (!b || b.kind[0] !== 'float') mismatch(r, c, arg);
         const v = b.type === 'Ljava/lang/Float;' ? bitsFloat(b.value) : bitsDouble(b.value);
         if (!Number.isFinite(v)) return Number.isNaN(v) ? 'NaN' : v > 0 ? (flags.includes('+') ? '+Infinity' : 'Infinity') : (flags.includes('(') ? '(Infinity)' : '-Infinity');
         const neg = v < 0 || Object.is(v, -0), a = Math.abs(v), p = precision < 0 ? 6 : precision; let body;
@@ -63,6 +69,42 @@ export function createFormatterHost(platform) {
       }
       default: r.throwJava('Ljava/util/UnknownFormatConversionException;', `Conversion = '${c}'`);
     }
+  }
+  // ---- java.math arguments ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  const BIG_INTEGER = 'Ljava/math/BigInteger;', BIG_DECIMAL = 'Ljava/math/BigDecimal;';
+  const sayString = (r, receiver, owner, name, parameters = [], args = []) => r.stringCharacters(r.dispatch({ owner, name, parameters, result: STRING, signature: `(${parameters.join('')})${STRING}` }, r.argumentWords(parameters, args, { receiver }), 'virtual'));
+  const callI = (r, receiver, owner, name) => r.dispatch({ owner, name, parameters: [], result: 'I', signature: '()I' }, [receiver], 'virtual');
+  const signed = (neg, flags, body) => (neg ? (flags.includes('(') ? '(' : '-') : flags.includes('+') ? '+' : flags.includes(' ') ? ' ' : '') + body + (neg && flags.includes('(') ? ')' : '');
+  function bigInteger(r, c, flags, arg, sep) {
+    const neg = callI(r, arg, BIG_INTEGER, 'signum') < 0, radix = c === 'd' ? 10 : c === 'x' ? 16 : 8;
+    let digits = sayString(r, arg, BIG_INTEGER, 'toString', ['I'], [radix]).replace(/^-/, '');   // BigInteger prints the magnitude with a sign: no two's complement, whatever the radix
+    if (c === 'd' && flags.includes(',')) digits = digits.replace(/\B(?=(\d{3})+(?!\d))/g, sep.group);
+    if (flags.includes('#')) digits = (c === 'x' ? '0x' : c === 'o' ? '0' : '') + digits;
+    return signed(neg, flags, digits);
+  }
+  /** java.util.Formatter's BigDecimal conversions: the exact value rounded HALF_UP to the precision (%f: decimals, %e: significant digits - 1, %g: significant digits). */
+  function bigDecimal(r, c, flags, precision, arg, sep) {
+    const unscaled = BigInt(sayString(r, r.dispatch({ owner: BIG_DECIMAL, name: 'unscaledValue', parameters: [], result: BIG_INTEGER, signature: `()${BIG_INTEGER}` }, [arg], 'virtual'), BIG_INTEGER, 'toString')), scale = callI(r, arg, BIG_DECIMAL, 'scale');
+    const neg = unscaled < 0n, magnitude = neg ? -unscaled : unscaled;
+    const roundTo = (value, from, to) => { if (to >= from) return value * 10n ** BigInt(to - from); const divisor = 10n ** BigInt(from - to), quotient = value / divisor, rest = value % divisor; return rest * 2n >= divisor ? quotient + 1n : quotient; };   // HALF_UP on a magnitude
+    const fixed = p => { let digits = roundTo(magnitude, scale, p).toString().padStart(p + 1, '0'); const integer = digits.slice(0, digits.length - p), fraction = digits.slice(digits.length - p);
+      return (flags.includes(',') ? integer.replace(/\B(?=(\d{3})+(?!\d))/g, sep.group) : integer) + (p > 0 ? sep.decimal + fraction : flags.includes('#') ? sep.decimal : ''); };
+    const scientific = p => {
+      if (magnitude === 0n) return (p > 0 ? '0' + sep.decimal + '0'.repeat(p) : '0') + 'e+00';
+      let exponent = magnitude.toString().length - 1 - scale, digits = roundTo(magnitude, scale, p - exponent).toString();
+      if (digits.length > p + 1) { exponent += 1; digits = digits.slice(0, p + 1); }
+      return digits[0] + (p > 0 ? sep.decimal + digits.slice(1) : '') + 'e' + (exponent < 0 ? '-' : '+') + String(Math.abs(exponent)).padStart(2, '0');
+    };
+    const p = precision < 0 ? 6 : precision;
+    let body;
+    if (c === 'f') body = fixed(p);
+    else if (c === 'e') body = scientific(p);
+    else {   // %g
+      const sig = p === 0 ? 1 : p, rounded = magnitude === 0n ? 0n : roundTo(magnitude, scale, sig - 1 - (magnitude.toString().length - 1 - scale));
+      const exponent = magnitude === 0n ? 0 : magnitude.toString().length - 1 - scale + (rounded.toString().length > sig ? 1 : 0);
+      body = magnitude !== 0n && (exponent < -4 || exponent >= sig) ? scientific(sig - 1) : fixed(Math.max(0, sig - 1 - exponent));
+    }
+    return signed(neg, flags, body);
   }
   const trunc = (t, p) => p >= 0 ? t.slice(0, p) : t;
   const localeTag = (r, locale) => { const tag = locale ? r.object(locale).localeData?.tag : null; return tag && tag !== 'und' ? tag : 'en-US'; };

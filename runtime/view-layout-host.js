@@ -1,6 +1,7 @@
-import { APKError } from './apk-runtime.js?v=45f4fd6b930a';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=45f4fd6b930a';
-import { gcRoot } from './heap-gc.js?v=45f4fd6b930a';
+import { APKError } from './apk-runtime.js?v=0b42079f5fd6';
+import { breakParagraphs } from './text-layout-native.js?v=0b42079f5fd6';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=0b42079f5fd6';
+import { gcRoot } from './heap-gc.js?v=0b42079f5fd6';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -118,9 +119,13 @@ export function createViewLayoutHost(platform) {
     let height = textHeight + (padding.top || 0) + (padding.bottom || 0), width = textWidth + (padding.left || 0) + (padding.right || 0);
     view.textRaster = null; view.textParagraph = null;
     let paragraph = null;
+    view.textBreakText = null;
     if (mode && width > available && !view.singleLine && !view.horizontallyScrolling || view.maxLines != null && lines.length > view.maxLines) {
       const desiredWidth = width, paragraphWidth = mode === 0x40000000 || mode && desiredWidth > available ? available : desiredWidth, contentWidth = paragraphWidth - (padding.left || 0) - (padding.right || 0);
-      paragraph = measureSkiaParagraph(runtime.skia, text, { width: contentWidth, textSize: font.textSize, weight: info.weight, italic: info.italic, direction: view.layoutDirection || 0, maxLines: view.maxLines ?? null, ellipsis: where === 'END' && view.maxLines != null ? '\u2026' : null, color: view.textColor == null ? 0xff757575 : typeof view.textColor === 'string' ? parseInt(view.textColor.replace('#', ''), 16) : view.textColor, raster: true });
+      // Layout.BREAK_STRATEGY_HIGH_QUALITY / BALANCED: Minikin's optimal breaker decides the lines, SkParagraph then lays out one hard line per entry
+      const strategy = platform.textViewApi.breakStrategy(runtime, receiver), brokenText = strategy > 0 && !text.includes('\t') ? breakParagraphs(runtime, text, { textSize: font.textSize, weight: info.weight, italic: info.italic, locale: 'en-US' }, contentWidth, strategy, platform.textViewApi.hyphenationFrequency(runtime, receiver)).join('\n') : null;
+      if (brokenText !== null) view.textBreakText = brokenText;
+      paragraph = measureSkiaParagraph(runtime.skia, brokenText ?? text, { width: contentWidth, textSize: font.textSize, weight: info.weight, italic: info.italic, direction: view.layoutDirection || 0, maxLines: view.maxLines ?? null, ellipsis: where === 'END' && view.maxLines != null ? '\u2026' : null, color: view.textColor == null ? 0xff757575 : typeof view.textColor === 'string' ? parseInt(view.textColor.replace('#', ''), 16) : view.textColor, raster: true });
       width = paragraphWidth;
       height = Math.ceil(paragraph.height) + (padding.top || 0) + (padding.bottom || 0);
       view.textRaster = paragraph.raster;

@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=45f4fd6b930a';
-import {getVectorGraphics} from './vector-native.js?v=45f4fd6b930a';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=45f4fd6b930a';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=45f4fd6b930a';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=45f4fd6b930a';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=45f4fd6b930a';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=45f4fd6b930a';
-import {createBitmapHost} from './bitmap-host.js?v=45f4fd6b930a';
-import { gcRoot } from './heap-gc.js?v=45f4fd6b930a';
+import {APKError} from './apk-runtime.js?v=0b42079f5fd6';
+import {getVectorGraphics} from './vector-native.js?v=0b42079f5fd6';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=0b42079f5fd6';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=0b42079f5fd6';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=0b42079f5fd6';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=0b42079f5fd6';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=0b42079f5fd6';
+import {createBitmapHost} from './bitmap-host.js?v=0b42079f5fd6';
+import { gcRoot } from './heap-gc.js?v=0b42079f5fd6';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -162,7 +162,10 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
    try{canvas.drawShadow(path,[0,0,z],[light.x,light.y,light.z],light.radius,color(node.ambientShadowColor,light.ambientShadowAlpha*casterAlpha),color(node.spotShadowColor,light.spotShadowAlpha*casterAlpha),casterAlpha<1?1:0);}finally{canvas.restore();path.delete();}
  };
  const run=(command,shadow=false)=>{
-   if(command.op==='layerBegin'){const paint=command.paint?makePaint(CK,command.paint):null;canvas.saveLayer(paint);paint?.delete();return;}
+   if(command.op==='layerBegin'){
+    const paint=command.paint?(command.paint.isLayerAlpha?(()=>{const p=new CK.Paint();p.setAlphaf(command.paint.alpha);return p;})():makePaint(CK,command.paint)):null;
+    if(command.bounds)canvas.saveLayer(paint,CK.LTRBRect(...command.bounds));else canvas.saveLayer(paint);paint?.delete();return;
+   }
    if(command.op==='layerEnd'){canvas.restore();return;}
    canvas.save();applyClips(CK,canvas,command.clips);canvas.concat(matrix(command.matrix));
    if(command.op==='picture'){replay(command.draws);}
@@ -285,6 +288,8 @@ export function createSkiaCanvasHost(runtime,backend){
  add(CANVAS,['clipRect(FFFFLandroid/graphics/Region$Op;)Z','clipRect(IIIILandroid/graphics/Region$Op;)Z','clipRect(Landroid/graphics/Rect;Landroid/graphics/Region$Op;)Z','clipRect(Landroid/graphics/RectF;Landroid/graphics/Region$Op;)Z',`clipPath(${PATH}Landroid/graphics/Region$Op;)Z`,'clipOutRect(FFFF)Z','clipOutRect(IIII)Z',`clipOutPath(${PATH})Z`]);
  add(CANVAS,['concat(Landroid/graphics/Matrix;)V','clipRect(IIII)Z','save(I)I']);
  add(CANVAS,['clipRect(Landroid/graphics/RectF;)Z']);
+ // Canvas.saveLayer / saveLayerAlpha: a real offscreen layer (SkCanvas::saveLayer) bounded by the rectangle when one is given, composited back with the paint's alpha / blend / color filter on restore.
+ add(CANVAS,[`saveLayer(${RF}Landroid/graphics/Paint;)I`,`saveLayer(${RF}Landroid/graphics/Paint;I)I`,'saveLayer(FFFFLandroid/graphics/Paint;I)I',`saveLayerAlpha(${RF}I)I`,`saveLayerAlpha(${RF}II)I`,'saveLayerAlpha(FFFFI)I','saveLayerAlpha(FFFFII)I',`getMatrix(${MATRIX})V`,`getMatrix()${MATRIX}`]);
  // android.graphics.PathMeasure over CanvasKit's ContourMeasure (SkContourMeasureIter): the current contour of the path set with setPath, advanced by nextContour().
  const PATH_MEASURE='Landroid/graphics/PathMeasure;',measures=new Map(),floatBitsOf=x=>{bits.setFloat32(0,x,true);return bits.getInt32(0,true);};
  add(PATH_MEASURE,['<init>()V',`<init>(${PATH}Z)V`,`setPath(${PATH}Z)V`,'getLength()F','isClosed()Z','nextContour()Z','getPosTan(F[F[F)Z',`getSegment(FF${PATH}Z)Z`,'getMatrix(FLandroid/graphics/Matrix;I)Z']);
@@ -455,11 +460,28 @@ export function createSkiaCanvasHost(runtime,backend){
     try{const canvas=surface.getCanvas();canvas.concat(matrix(state.matrix));canvas.concat(transform);const result=canvas.getTotalMatrix();state.matrix=finite([result[0],result[3],result[1],result[4],result[2],result[5]]);}finally{surface.dispose();}return;
    }
    if(name==='getSaveCount')return state.stack.length+1;
-   if(name==='save'||name==='saveLayer'){
+   if(name==='getMatrix'){   // Canvas.getMatrix(Matrix): the current transform as a 3x3 (the canvas keeps [a,b,c,d,e,f]); getMatrix() is the deprecated allocating form
+    const m=state.matrix,rows=[m[0],m[2],m[4],m[1],m[3],m[5],0,1*0,1];
+    const target=method.parameters.length?args[1]:(()=>{const ref=vm.allocate(MATRIX);vm.dispatch({owner:MATRIX,name:'<init>',parameters:[],result:'V',signature:'()V'},[ref],'direct');return ref;})();
+    if(target===null||target===0)vm.throwJava('Ljava/lang/NullPointerException;','ctm is null');
+    const array=vm.newArray('[F',9);vm.array(array).elements=rows.map(value=>{bits.setFloat32(0,value,true);return bits.getInt32(0,true);});
+    vm.dispatch({owner:MATRIX,name:'setValues',parameters:['[F'],result:'V',signature:'([F)V'},[target,array],'virtual');return method.parameters.length?undefined:target;
+   }
+   if(name==='save'||name==='saveLayer'||name==='saveLayerAlpha'){
     if(state.stack.length>=256)fail('Canvas save stack limit exceeded');const count=state.stack.length+1;
-    if(name==='saveLayer'){finite(values.slice(0,4));const paint=args[5]?getSolidPaint(vm,args[5]):null;record(receiver,{op:'layerBegin',paint});}
-    const flags=name==='save'&&method.parameters.length?args[1]:3;
-    state.stack.push({matrix:state.matrix.slice(),clips:(state.clips??[]).slice(),saveMatrix:!!(flags&1),saveClips:!!(flags&2),layer:name==='saveLayer'});return count;
+    let layerFlags=3;
+    if(name!=='save'){
+     // bounds: a RectF (null = unbounded) or four floats; then the Paint (saveLayer) or the 0..255 alpha (saveLayerAlpha); an optional trailing int is the deprecated save-flags word
+     const byRect=method.parameters[0]===RF,bounds=byRect?(args[1]===null||args[1]===0?null:rectF(args[1])):finite(values.slice(0,4)),at=byRect?2:5;
+     if(bounds)finite(bounds);
+     let paint;
+     if(name==='saveLayerAlpha'){const alpha=Math.max(0,Math.min(255,args[at]|0));paint={argb:(alpha<<24)>>>0|0x00ffffff,flags:1,style:0,strokeWidth:0,blendMode:3,alpha:alpha/255,isLayerAlpha:true};}
+     else paint=args[at]?getSolidPaint(vm,args[at]):null;
+     if(method.parameters.length>at+1&&method.parameters[at+1]==='I')layerFlags=args[at+1];
+     record(receiver,{op:'layerBegin',paint,bounds});
+    }
+    const flags=name==='save'&&method.parameters.length?args[1]:layerFlags;
+    state.stack.push({matrix:state.matrix.slice(),clips:(state.clips??[]).slice(),saveMatrix:!!(flags&1),saveClips:!!(flags&2),layer:name!=='save'});return count;
    }
    if(name==='restore'||name==='restoreToCount'){
     const count=name==='restore'?state.stack.length:args[1];if(count<1||count>state.stack.length+1)vm.throwJava('Ljava/lang/IllegalStateException;','Underflow in restore');

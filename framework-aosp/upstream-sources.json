@@ -27255,5 +27255,65 @@
     "sha256": "5fe846e3f6dfbbed0811dc65aec06ad0aaaf23c3e946cdabd1d692259e89f831",
     "bytes": 2289,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/FileObserver.java",
+    "localPath": "framework-aosp/upstream/android/os/FileObserver.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/FileObserver.java?format=TEXT",
+    "sha256": "9ac67b9d97acbf3af782405be0d241e3dbacdba8f46823f7a8b3afa43a14ca5c",
+    "bytes": 11282,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/provider/ContactsContract.java",
+    "localPath": "framework-aosp/upstream/android/provider/ContactsContract.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/provider/ContactsContract.java?format=TEXT",
+    "sha256": "a30516d22b85b26dc8ef6ebda59ef2ebf7e35b4b0a61aa9ad63b3d3ab907151b",
+    "bytes": 420167,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/content/CursorEntityIterator.java",
+    "localPath": "framework-aosp/upstream/android/content/CursorEntityIterator.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/CursorEntityIterator.java?format=TEXT",
+    "sha256": "1e4a37cb218ac259d356bb84b90c068d20f885cdf9ab2c14f231e89a111a07e2",
+    "bytes": 3995,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/com/google/android/collect/Sets.java",
+    "localPath": "framework-aosp/upstream/com/google/android/collect/Sets.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/google/android/collect/Sets.java?format=TEXT",
+    "sha256": "f22c260a0c16d0b57d353c04b110fe3438d1f334fc26285df3ae3c5fc38d8513",
+    "bytes": 3793,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/provider/ContactsInternal.java",
+    "localPath": "framework-aosp/upstream/android/provider/ContactsInternal.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/provider/ContactsInternal.java?format=TEXT",
+    "sha256": "ab7c8c84e26d90c5aa9c0a5a2de7f40e54f8f2becc023b51b1e4478cf4048379",
+    "bytes": 5438,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/util/CloseGuard.java",
+    "localPath": "framework-aosp/upstream/android/util/CloseGuard.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/util/CloseGuard.java?format=TEXT",
+    "sha256": "e812e00d8497c588aba0f0e2ebfcbe2ed40f4e973f57bab2b1f36ef81ef74c54",
+    "bytes": 4493,
+    "license": "Apache-2.0"
   }
 ]

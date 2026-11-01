@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=45f4fd6b930a';
+import { APKError } from './apk-error.js?v=0b42079f5fd6';
 
 // Green-thread scheduler for the VM.
 //
@@ -27,8 +27,9 @@ export class VMThread {
 
 export const QUANTUM = 20000;   // instructions a thread runs before another runnable thread gets the processor
 
+const QUIET_IDLE_LIMIT = 5000;   // consecutive clock skips with no host event in between
 export class Scheduler {
-  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0 }; }
+  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0 }; this.quietIdles = 0; }
   get clock() { return this.rt.platform.clock; }
 
   /** The thread that runs host events (Looper/main). */
@@ -99,7 +100,7 @@ export class Scheduler {
     // Readiness can change asynchronously now (a network worker thread writes shared memory while this run loop is deciding): look once more before concluding that nothing can run.
     this.wake(); if (this.threads.some(thread => thread.state === 'runnable' && (thread.nestedDepth === 0 || this.waitingNested.has(thread)))) return;
     const processed = platform.drainEvents?.(this.rt)?.processed ?? 0;
-    if (processed) { this.stats.events += processed; return; }
+    if (processed) { this.stats.events += processed; this.quietIdles = 0; return; }
     const network = this.rt.network;
     if (network && network.pending > 0) {
       // Exchanges are in flight but this run loop sits on the JavaScript stack of host code (a class initializer, a native that called back into Java): it cannot return to the
@@ -111,6 +112,10 @@ export class Scheduler {
     const delay = platform.nextEventDelay?.() ?? null, now = this.clock.now();
     const next = Math.min(earliest === Infinity ? Infinity : Math.max(0, earliest - now), delay === null ? Infinity : delay);
     if (next === Infinity) throw new APKError(`Deadlock: ${why}; no thread is runnable and no timer or event is pending (threads: ${this.describe()})`, { kind: 'cooperative-deadlock' });
+    // Time may only be skipped to a wake-up that can lead somewhere. Threads that merely re-park on a timer (an idle pool worker's keep-alive) wake, find nothing and sleep again
+    // forever; when that is all that happens, virtual time advances without end while the waiter never gets what it needs. That is a deadlock, reported as one.
+    if (++this.quietIdles > QUIET_IDLE_LIMIT) throw new APKError(`Deadlock: ${why}; ${this.quietIdles} consecutive idle rounds advanced the clock by ${Math.round(this.stats.skippedMs - (this.quietSkipStart ?? 0))} ms without an event, a network response or a thread completing a wait (threads: ${this.describe()})`, { kind: 'cooperative-deadlock' });
+    if (this.quietIdles === 1) this.quietSkipStart = this.stats.skippedMs;
     this.stats.idles++; this.stats.skippedMs += next; this.clock.skip(next);
   }
   /**

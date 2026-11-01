@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=45f4fd6b930a';
-import { createHostRegistry } from './host-contract.js?v=45f4fd6b930a';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=45f4fd6b930a';
+import { APKError } from './apk-error.js?v=0b42079f5fd6';
+import { createHostRegistry } from './host-contract.js?v=0b42079f5fd6';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=0b42079f5fd6';
 
 // android.app.job: JobScheduler, JobInfo (+ Builder), JobParameters and the JobService base class, with the scheduling rules of Android 13's JobSchedulerService for the
 // constraints a virtual device can answer. AOSP references: frameworks/base/apex/jobscheduler (JobSchedulerService.validateJob, JobStatus.isReady / wouldBeReadyWithConstraint,
@@ -231,7 +231,16 @@ export function createJobSchedulerHost(platform) {
     if (spec.persisted && !platform.holdsPermission?.(r, 'android.permission.RECEIVE_BOOT_COMPLETED')) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Error: requested job be persisted without holding RECEIVE_BOOT_COMPLETED permission.');
   }
   const SCHEDULER_STUB = SCHEDULER;
-  def(SCHEDULER_STUB, 'schedule', `(${INFO})I`, (r, _m, [, info]) => {
+  // JobScheduler.scheduleAsPackage(job, packageName, userId, tag): the hidden system-API overload (Firebase/Play Services measurement uses it with its own package). JobSchedulerService
+  // accepts a request on behalf of the caller's own package and user only; the tag merely labels the work for attribution.
+  def(SCHEDULER_STUB, 'scheduleAsPackage', `(${INFO}${STRING}I${STRING})I`, (r, m, [self, info, packageName, userId, tag]) => {
+    if (packageName === null || packageName === 0) r.throwJava('Ljava/lang/NullPointerException;', 'packageName');
+    const wanted = r.stringCharacters(packageName);
+    if (wanted !== platform.packageName || userId !== 0) r.throwJava('Ljava/lang/SecurityException;', `Caller uid ${platform.virtualProcess.uid} cannot schedule jobs for package ${wanted} (user ${userId})`);
+    return schedule(r, info);
+  });
+  def(SCHEDULER_STUB, 'schedule', `(${INFO})I`, (r, _m, [, info]) => schedule(r, info));
+  function schedule(r, info) {
     if (info === null || info === 0) r.throwJava('Ljava/lang/NullPointerException;', 'job');
     const spec = specOf(r, info); validate(r, spec);
     const now = clock(), previous = jobs.get(spec.id);
@@ -239,7 +248,7 @@ export function createJobSchedulerHost(platform) {
     const job = { spec, info, submitted: now, periodStart: now, earliest: spec.periodic ? now + spec.interval - spec.flex : now + (spec.hasLatency ? spec.minLatency : 0), deadline: spec.periodic ? now + spec.interval : spec.hasDeadline ? now + spec.maxDelay : null, running: false, backoffAttempts: 0, params: null };
     jobs.set(spec.id, job); stats.scheduled++; r.record(`JOB schedule ${describe(spec)} network=${spec.networkType} charging=${spec.requiresCharging} periodic=${spec.periodic}`);
     kick(r); return RESULT_SUCCESS;
-  });
+  }
   def(SCHEDULER_STUB, 'cancel', '(I)V', (r, _m, [, id]) => { const job = jobs.get(id); if (!job) return; if (job.running) stop(r, job, STOP_CANCELLED, false); jobs.delete(id); stats.cancelled++; });
   def(SCHEDULER_STUB, 'cancelAll', '()V', r => { for (const job of [...jobs.values()]) { if (job.running) stop(r, job, STOP_CANCELLED, false); jobs.delete(job.spec.id); stats.cancelled++; } });
   def(SCHEDULER_STUB, 'getAllPendingJobs', `()${LIST}`, r => {

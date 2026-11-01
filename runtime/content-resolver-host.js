@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=45f4fd6b930a';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=45f4fd6b930a';
+import { APKError } from './apk-runtime.js?v=0b42079f5fd6';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=0b42079f5fd6';
 const RESOLVER = 'Landroid/content/ContentResolver;', URI = 'Landroid/net/Uri;', GLOBAL = 'Landroid/provider/Settings$Global;', OBSERVER = 'Landroid/database/ContentObserver;';
 const fail = message => { throw new APKError(message, { kind: 'virtual-content-provider-unsupported' }); };
 const keys = new Set();
@@ -13,7 +13,8 @@ add('Landroid/net/Uri;', ['buildUpon()Landroid/net/Uri$Builder;']);
 for (const owner of ['Landroid/content/Context;', 'Landroid/content/ContextWrapper;', 'Landroid/app/Application;', 'Landroid/app/Activity;']) add(owner, ['getContentResolver()Landroid/content/ContentResolver;']);
 add(GLOBAL, ['getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I', 'getInt(Landroid/content/ContentResolver;Ljava/lang/String;)I', 'getLong(Landroid/content/ContentResolver;Ljava/lang/String;J)J', 'getLong(Landroid/content/ContentResolver;Ljava/lang/String;)J', 'getFloat(Landroid/content/ContentResolver;Ljava/lang/String;)F',
   'getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;', 'getFloat(Landroid/content/ContentResolver;Ljava/lang/String;F)F', 'putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z', 'putFloat(Landroid/content/ContentResolver;Ljava/lang/String;F)Z', 'getUriFor(Ljava/lang/String;)Landroid/net/Uri;']);
-add(RESOLVER, ['registerContentObserver(Landroid/net/Uri;ZLandroid/database/ContentObserver;)V', 'unregisterContentObserver(Landroid/database/ContentObserver;)V', 'notifyChange(Landroid/net/Uri;Landroid/database/ContentObserver;)V', 'notifyChange(Landroid/net/Uri;Landroid/database/ContentObserver;Z)V']);
+add(RESOLVER, ['registerContentObserver(Landroid/net/Uri;ZLandroid/database/ContentObserver;)V', 'unregisterContentObserver(Landroid/database/ContentObserver;)V', 'notifyChange(Landroid/net/Uri;Landroid/database/ContentObserver;)V', 'notifyChange(Landroid/net/Uri;Landroid/database/ContentObserver;Z)V',
+  ...['acquireContentProviderClient', 'acquireUnstableContentProviderClient'].flatMap(name => [`${name}(Landroid/net/Uri;)Landroid/content/ContentProviderClient;`, `${name}(Ljava/lang/String;)Landroid/content/ContentProviderClient;`])]);
 add('Landroid/os/Binder;', ['getCallingUid()I']);
 add('Landroid/os/Process;', ['myUid()I', 'myPid()I']);
 add('Landroid/app/compat/CompatChanges;', ['isChangeEnabled(J)Z']);
@@ -231,6 +232,15 @@ export function createContentResolverHost(platform) {
       if (owner === RESOLVER) {
         if (args[0]?.ref !== resolver?.ref) fail('ContentResolver is not attached to this VM');
         if (name === 'registerContentObserver') { if (observers.length >= 1024) fail('Content observer limit exceeded'); runtime.object(args[3]); observers.push({ uri: textOf(runtime, args[1]), descendants: !!args[2], observer: args[3] }); return; }
+        if (name.startsWith('acquire') && name.endsWith('ContentProviderClient')) {
+          // ContentResolver.acquire*ContentProviderClient: null when no provider owns the authority. The virtual device has no system providers, so only this app's own enabled
+          // providers could answer, and a client for one of them is not modeled: that is reported instead of invented.
+          if (args[1] === null || args[1] === undefined || args[1] === 0) runtime.throwJava('Ljava/lang/NullPointerException;', 'uri');
+          const authority = method.parameters[0] === URI ? runtime.object(args[1]).uriAuthority ?? parseUriParts(textOf(runtime, args[1])).authority : runtime.stringCharacters(args[1]);
+          const owned = (platform.manifest?.providerDetails ?? []).some(p => String(p.enabled) !== 'false' && String(p.authorities ?? '').split(';').includes(authority));
+          if (owned) fail(`ContentProviderClient for the app's own provider ${authority} is not modeled`);
+          return null;
+        }
         if (name === 'unregisterContentObserver') { for (let i = observers.length - 1; i >= 0; i--) if (observers[i].observer.ref === args[1]?.ref) observers.splice(i, 1); return; }
         if (name === 'notifyChange') return notify(runtime, textOf(runtime, args[1]), args[2]);
       }

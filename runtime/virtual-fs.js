@@ -18,15 +18,24 @@ export function normalizePath(path) {
 
 export class VirtualFileSystem {
   constructor({ packageName = 'app', now = () => Date.now(), codePath = null } = {}) {
-    this.packageName = packageName; this.now = now; this.nodes = new Map(); this.codePath = codePath ?? `/data/app/~~apkweb/${packageName}-1`;
+    this.packageName = packageName; this.now = now; this.nodes = new Map(); this.observers = new Set(); this.codePath = codePath ?? `/data/app/~~apkweb/${packageName}-1`;
     this.readOnly = new Set([this.codePath, '/system']);
     for (const dir of ['/', '/data', '/data/user', '/data/user/0', `/data/user/0/${packageName}`, `/data/user/0/${packageName}/cache`, `/data/user/0/${packageName}/code_cache`, '/data/app', this.codePath, '/data/local', '/data/local/tmp',
       '/storage', '/storage/emulated', '/storage/emulated/0', '/storage/emulated/0/Android', '/storage/emulated/0/Android/data', `/storage/emulated/0/Android/data/${packageName}`,
-      '/system', '/system/bin', '/system/lib64', '/system/etc', '/system/fonts', '/proc']) this.nodes.set(dir, this.directory());
+      '/system', '/system/bin', '/system/lib64', '/system/etc', '/system/fonts', '/proc']) this.put(dir, this.directory());
     // /proc and its entries are deliberately empty: nothing in the browser VM backs them.
   }
   /** Mounts immutable bytes (zero-copy) at path, e.g. the installed APK at <codePath>/base.apk. */
-  mount(path, bytes) { this.nodes.set(path, { type: 'file', buf: bytes, size: bytes.length, mtime: this.now(), mode: 0o644, mounted: true }); }
+  /** Stores a node under its canonical path; the node remembers it (inotify events name the node, and a rename updates it). */
+  put(path, node) { node.path = path; this.nodes.set(path, node); return node; }
+  /** inotify-style change notification (src/inotify.js): `mask` is an IN_* bit set, `node` the node it happened to and `{ child, self }` which watches see it: a watch on the node itself, a watch on its
+   *  parent directory (with the entry name), or both (a modification, an open or a close). */
+  notify(mask, node, { child = true, self = true, cookie = 0, path = node.path, parent = null } = {}) {
+    if (!this.observers.size) return;
+    const directory = parent ?? this.nodes.get(this.parentOf(path)) ?? null, name = path.slice(path.lastIndexOf('/') + 1);
+    for (const observer of this.observers) observer({ mask: mask | (node.type === 'dir' ? 0x40000000 : 0), node, parent: directory, name, cookie, child, self });
+  }
+  mount(path, bytes) { this.put(path, { type: 'file', buf: bytes, size: bytes.length, mtime: this.now(), mode: 0o644, mounted: true }); }
   directory() { return { type: 'dir', mtime: this.now(), mode: 0o771 }; }
   canonical(path) {
     const absolute = path.startsWith('/') ? path : '/' + path, parts = [];
@@ -47,7 +56,7 @@ export class VirtualFileSystem {
     const p = this.canonical(path); if (this.nodes.has(p)) return 'EEXIST';
     const parent = this.nodes.get(this.parentOf(p)); if (!parent) return 'ENOENT'; if (parent.type !== 'dir') return 'ENOTDIR';
     if (this.isReadOnly(p)) return 'EACCES';
-    this.nodes.set(p, this.directory()); parent.mtime = this.now(); return 'ok';
+    const created = this.put(p, this.directory()); parent.mtime = this.now(); this.notify(0x100, created, { self: false }); return 'ok';   // IN_CREATE | IN_ISDIR
   }
   mkdirs(path) {
     const p = this.canonical(path); const chain = []; let cursor = p;
@@ -59,7 +68,7 @@ export class VirtualFileSystem {
   createFile(path) {
     const p = this.canonical(path); if (this.nodes.has(p)) return 'EEXIST';
     const parent = this.nodes.get(this.parentOf(p)); if (!parent) return 'ENOENT'; if (parent.type !== 'dir') return 'ENOTDIR'; if (this.isReadOnly(p)) return 'EACCES';
-    this.nodes.set(p, { type: 'file', buf: new Uint8Array(0), size: 0, mtime: this.now(), mode: 0o660 }); parent.mtime = this.now(); return 'ok';
+    const created = this.put(p, { type: 'file', buf: new Uint8Array(0), size: 0, mtime: this.now(), mode: 0o660 }); parent.mtime = this.now(); this.notify(0x100, created, { self: false }); return 'ok';   // IN_CREATE
   }
   list(path) {
     const p = this.canonical(path), node = this.nodes.get(p); if (!node) return null; if (node.type !== 'dir') return null;
@@ -70,7 +79,10 @@ export class VirtualFileSystem {
   delete(path) {
     const p = this.canonical(path), node = this.nodes.get(p); if (!node) return 'ENOENT'; if (p === '/' || this.isReadOnly(p)) return 'EACCES';
     if (node.type === 'dir' && this.list(p).length) return 'ENOTEMPTY';
-    this.nodes.delete(p); const parent = this.nodes.get(this.parentOf(p)); if (parent) parent.mtime = this.now(); return 'ok';
+    const parentNode = this.nodes.get(this.parentOf(p)); this.nodes.delete(p); if (parentNode) parentNode.mtime = this.now();
+    this.notify(0x200, node, { self: false, path: p, parent: parentNode });   // IN_DELETE for the watches on the directory
+    this.notify(0x400, node, { child: false, path: p, parent: parentNode });  // IN_DELETE_SELF for the watches on the node (they are then removed: IN_IGNORED)
+    return 'ok';
   }
   rename(from, to) {
     const a = this.canonical(from), b = this.canonical(to), node = this.nodes.get(a); if (!node) return 'ENOENT';
@@ -80,7 +92,12 @@ export class VirtualFileSystem {
     if (node.type === 'dir' && b.startsWith(a + '/')) return 'EINVAL';
     const moved = [];
     for (const key of [...this.nodes.keys()]) if (key === a || key.startsWith(a + '/')) moved.push(key);
-    for (const key of moved) { const value = this.nodes.get(key); this.nodes.delete(key); this.nodes.set(b + key.slice(a.length), value); }
+    const cookie = this.nextCookie = (this.nextCookie ?? 0) + 1, fromParent = this.nodes.get(this.parentOf(a)), replaced = target ?? null;
+    for (const key of moved) { const value = this.nodes.get(key); this.nodes.delete(key); this.put(b + key.slice(a.length), value); }
+    if (replaced) this.notify(0x200, replaced, { self: false, path: b, parent });                                  // the node renamed over is deleted
+    this.notify(0x40, node, { self: false, cookie, path: a, parent: fromParent });                                      // IN_MOVED_FROM
+    this.notify(0x80, node, { self: false, cookie, path: b, parent });                                                  // IN_MOVED_TO
+    this.notify(0x800, node, { child: false, path: b });                                                                  // IN_MOVE_SELF
     return 'ok';
   }
   /** Ensures a regular file at path exists (creating when `create`), truncating when `truncate`. Returns the node or an error name. */
@@ -89,19 +106,19 @@ export class VirtualFileSystem {
     if (!node) { if (!create) return 'ENOENT'; const result = this.createFile(p); if (result !== 'ok') return result; node = this.nodes.get(p); }
     if (node.type === 'dir') return 'EISDIR';
     if (write && this.isReadOnly(p)) return 'EACCES';
-    if (truncate) { node.size = 0; node.mtime = this.now(); node.rev = (node.rev ?? 0) + 1; }
+    if (truncate) { node.size = 0; node.mtime = this.now(); node.rev = (node.rev ?? 0) + 1; this.notify(0x2, node); }   // IN_MODIFY
     return node;
   }
   readAt(node, position, target, offset, length) {
     if (position >= node.size) return -1;
-    const count = Math.min(length, node.size - position); target.set(node.buf.subarray(position, position + count), offset); return count;
+    const count = Math.min(length, node.size - position); target.set(node.buf.subarray(position, position + count), offset); if (this.observers.size && node.path) this.notify(0x1, node); return count;   // IN_ACCESS
   }
   writeAt(node, position, source, offset, length) {
     const end = position + length;
     if (end > 256 * 1024 * 1024) throw new RangeError('Virtual filesystem file size limit (256 MiB) exceeded');
     if (end > node.buf.length) { const grown = new Uint8Array(Math.max(end, node.buf.length * 2, 64)); grown.set(node.buf.subarray(0, node.size)); node.buf = grown; }
     if (position > node.size) node.buf.fill(0, node.size, position);
-    node.buf.set(source.subarray(offset, offset + length), position); node.size = Math.max(node.size, end); node.mtime = this.now(); node.rev = (node.rev ?? 0) + 1; return length;   // `rev` lets src/app-data-store.js see a change made within the same millisecond
+    node.buf.set(source.subarray(offset, offset + length), position); node.size = Math.max(node.size, end); node.mtime = this.now(); node.rev = (node.rev ?? 0) + 1; if (this.observers.size && node.path) this.notify(0x2, node); return length;   // `rev` lets src/app-data-store.js see a change made within the same millisecond
   }
   bytes(path) { const node = this.node(path); return node?.type === 'file' ? node.buf.slice(0, node.size) : null; }
   setBytes(path, bytes) { const node = this.open(path, { create: true, truncate: true, write: true }); if (typeof node === 'string') return node; this.writeAt(node, 0, bytes, 0, bytes.length); return 'ok'; }
@@ -114,8 +131,8 @@ export class VirtualFileSystem {
   restore(snapshot) {
     if (snapshot?.version !== 1 || snapshot.packageName !== this.packageName) throw new Error('Incompatible filesystem snapshot');
     for (const entry of snapshot.entries) {
-      if (entry.dir) { if (!this.nodes.has(entry.path)) this.nodes.set(entry.path, { type: 'dir', mtime: entry.mtime, mode: entry.mode }); }
-      else this.nodes.set(entry.path, { type: 'file', buf: Uint8Array.from(entry.data), size: entry.data.length, mtime: entry.mtime, mode: entry.mode });
+      if (entry.dir) { if (!this.nodes.has(entry.path)) this.put(entry.path, { type: 'dir', mtime: entry.mtime, mode: entry.mode }); }
+      else this.put(entry.path, { type: 'file', buf: Uint8Array.from(entry.data), size: entry.data.length, mtime: entry.mtime, mode: entry.mode });
     }
   }
 }

@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=45f4fd6b930a';
-import { gcRoot } from './heap-gc.js?v=45f4fd6b930a';
-import { APKError } from './apk-error.js?v=45f4fd6b930a';
+import { createHostRegistry } from './host-contract.js?v=0b42079f5fd6';
+import { gcRoot } from './heap-gc.js?v=0b42079f5fd6';
+import { APKError } from './apk-error.js?v=0b42079f5fd6';
 
 // Public android.widget.TextView API (API 33) beyond what the platform's native text model carries, with the semantics of android-13.0.0_r1 TextView.java.
 // The lab renders TextView / Button / EditText text through its native SkParagraph path (view-layout-host measure, compose-canvas-host draw), which honours the text, size, colour, typeface,
@@ -638,10 +638,12 @@ export function createTextViewApiHost(platform) {
     // MARQUEE at rest lays the line out unbounded and clips it at the view (the fading edge is not drawn); only the running scroll (the view is selected or focused) needs an animation.
     return (where === 'MARQUEE' && !!(view.selected || view.focused)) || (where !== 'MARQUEE' && !single && where !== 'END');
   };
+  registry.breakStrategy = (r, self) => r.object(self).tv?.breakStrategy ?? 0;
+  registry.hyphenationFrequency = (r, self) => r.object(self).tv?.hyphenationFrequency ?? 0;
   registry.unsupportedRendering = (r, self) => {
     const s = r.object(self).tv; if (!s) return null;
     const checks = [[s.letterSpacing !== 0, 'letterSpacing'], [s.lineSpacingExtra !== 0 || s.lineSpacingMult !== 1, 'lineSpacing'], [s.shadowRadius !== 0, 'shadowLayer'], [ellipsizeUnsupported(r, self, s), 'ellipsize (a running marquee, or start / middle on more than one line)'],
-      [s.breakStrategy !== 0, 'breakStrategy'], [s.hyphenationFrequency !== 0, 'hyphenationFrequency'], [s.justificationMode !== 0, 'justificationMode'], [s.fontFeatureSettings !== null, 'fontFeatureSettings'],
+      [s.justificationMode !== 0, 'justificationMode'], [s.fontFeatureSettings !== null, 'fontFeatureSettings'],
       [s.fontVariationSettings !== null, 'fontVariationSettings'], [s.textScaleX !== 1, 'textScaleX'], [s.paint && (call(r, s.paint, PAINT, 'getFlags', [], 'I') & 0x38) !== 0, 'paintFlags (underline / strike-through / fake bold)'],
       [s.lineBreakStyle !== 0 || s.lineBreakWordStyle !== 0, 'lineBreak']];
     const hit = checks.find(([on]) => on); return hit ? hit[1] : null;

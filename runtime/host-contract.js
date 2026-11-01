@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=45f4fd6b930a';
+import { APKError } from './apk-error.js?v=0b42079f5fd6';
 
 // Registry for "contract hosts": JS reimplementations of named platform methods, each registered with its exact JVM
 // signature. The registry answers the runtime's supports()/invoke()/parent()/reflection queries uniformly so that
@@ -60,6 +60,9 @@ export function createHostRegistry() {
     invoke(runtime, method, args) {
       const fn = methods.get(`${method.owner}->${method.name}${method.signature}`);
       if (!fn) throw new APKError(`Unsupported contract-host method ${method.owner}->${method.name}${method.signature}`);
+      // Bytecode passes a null reference as the register value 0; a host body tests references with `=== null`. Reference parameters are normalised here, once for every contract host.
+      const offset = args.length - method.parameters.length;
+      for (let i = 0; i < method.parameters.length; i++) { const kind = method.parameters[i][0]; if (args[offset + i] === 0 && (kind === 'L' || kind === '[')) { if (args === undefined) break; args = Array.isArray(args) && Object.isFrozen(args) ? [...args] : args; args[offset + i] = null; } }
       return fn(runtime, method, args);
     },
   };

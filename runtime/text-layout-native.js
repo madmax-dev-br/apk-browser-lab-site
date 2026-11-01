@@ -1,6 +1,7 @@
-import {APKError} from './apk-error.js?v=45f4fd6b930a';
-import {getPaintStateByHandle} from './paint-host.js?v=45f4fd6b930a';
-import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=45f4fd6b930a';
+import {APKError} from './apk-error.js?v=0b42079f5fd6';
+import {getPaintStateByHandle} from './paint-host.js?v=0b42079f5fd6';
+import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=0b42079f5fd6';
+import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=0b42079f5fd6';
 
 const MT='Landroid/graphics/text/MeasuredText;',BUILDER=MT.slice(0,-1)+'$Builder;',LB='Landroid/graphics/text/LineBreaker;';
 const REG='Llibcore/util/NativeAllocationRegistry;';
@@ -105,7 +106,7 @@ export function createTextLayoutNativeBindings(){
  });
  add(BUILDER,'nAddReplacementRun',['J','J','I','I','F'],'V',()=>fail('ReplacementSpan native measured-text runs are unavailable'));
  add(BUILDER,'nBuildMeasuredText',['J','J','[C','Z','Z','Z'],'J',(r,[h,hint,buffer,hyphenation,layout,fast])=>{
-  const b=get(r,h,'builder'),text=chars(r,buffer);validateText(text);if(hyphenation||fast)fail('Android Minikin hyphenation is unavailable');if(hint)get(r,hint,'measured');
+  const b=get(r,h,'builder'),text=chars(r,buffer);validateText(text);if(fast)fail('MeasuredText without kerning (fast mode) is unavailable');   // hyphenation points would come from Minikin's pattern files, which the virtual device does not have: computing them finds noneif(hint)get(r,hint,'measured');
   if((b.runs.at(-1)?.end??0)!==text.length)fail('Measured-text styles do not cover the actual text');
   const m={text,runs:b.runs.map(run=>({...run,paint:{...run.paint}})),computeLayout:!!layout};m.paragraph=nativeParagraph(r,m,1073741824);
   try{return allocate(r,'measured',m);}catch(error){m.paragraph.delete();throw error;}
@@ -123,11 +124,19 @@ export function createTextLayoutNativeBindings(){
   const values=inkBounds(r,m,start,end);for(const [i,name]of ['left','top','right','bottom'].entries())r.storeField(r.object(rect).fields,`Landroid/graphics/Rect;->${name}:I`,values[i]);
  });
  add(LB,'nInit',['I','I','Z','[I'],'J',(r,[strategy,hyphenation,justify,indents])=>{
-  backend(r);if(strategy||hyphenation||justify||(indents&&r.array(indents).elements.some(Boolean)))fail('Only simple, unhyphenated, unjustified line breaking without indents is available');
-  return allocate(r,'breaker',{});
+  backend(r);if(justify||(indents&&r.array(indents).elements.some(Boolean)))fail('Justified line breaking and paragraph indents are not available');
+  if(![0,1,2].includes(strategy)||![0,1,2].includes(hyphenation))fail('Invalid line-break strategy or hyphenation frequency');
+  // SIMPLE is the SkParagraph greedy breaker; HIGH_QUALITY and BALANCED are Minikin's optimal breaker (src/minikin-line-breaker.js). No hyphenation patterns exist on the virtual device, so the frequency only scales penalties.
+  return allocate(r,'breaker',{strategy,hyphenation});
  });
  add(LB,'nComputeLineBreaks',['J','[C','J','I','F','I','F','[F','F','I'],'J',(r,[h,buffer,mh,length,first,count,rest,tabs])=>{
-  get(r,h,'breaker');const m=get(r,mh,'measured');if(chars(r,buffer)!==m.text||length!==m.text.length)fail('LineBreaker input differs from measured text');
+  const breaker=get(r,h,'breaker');const m=get(r,mh,'measured');
+  if(breaker.strategy>0&&!m.text.includes('\t')){
+   if(chars(r,buffer)!==m.text||length!==m.text.length)fail('LineBreaker input differs from measured text');
+   if(![first,rest].every(v=>Number.isFinite(v)&&v>=0&&v<=2147483648))fail('Line-break width must be finite and within0..2^31 (including Android UNSPECIFIED width)');
+   if(tabs&&r.array(tabs).elements.length)fail('Variable tab stops are outside the Latin text backend');
+   return allocate(r,'result',{lines:optimalLines(r,m,breaker,first,count,rest)});
+  }if(chars(r,buffer)!==m.text||length!==m.text.length)fail('LineBreaker input differs from measured text');
   if(![first,rest].every(v=>Number.isFinite(v)&&v>=0&&v<=2147483648))fail('Line-break width must be finite and within0..2^31 (including Android UNSPECIFIED width)');
   if(count>0&&first!==rest)fail('Different first/rest widths require a native leading-margin backend');
   if(tabs&&r.array(tabs).elements.length)fail('Variable tab stops are outside the Latin text backend');
@@ -139,6 +148,33 @@ export function createTextLayoutNativeBindings(){
  });
  add(LB,'nGetLineCount',['J'],'I',(r,[h])=>get(r,h,'result').lines.length);
  for(const[name,key,type]of [['nGetLineBreakOffset','offset','I'],['nGetLineWidth','width','F'],['nGetLineAscent','ascent','F'],['nGetLineDescent','descent','F'],['nGetLineFlag','flags','I']])add(LB,name,['J','I'],type,(r,[h,index])=>{const lines=get(r,h,'result').lines;if(!Number.isInteger(index)||index<0||index>=lines.length)fail('Line-break result index is out of bounds');return lines[index][key];});
+ return out;
+}
+
+/** HIGH_QUALITY / BALANCED: Minikin's OptimalLineBreaker over the measured text. Widths are the SkParagraph cluster advances (a cluster's width at its first code unit, 0 elsewhere). */
+function optimalLines(r,m,breaker,first,count,rest){
+ const icu=r.icuBreakBackend;if(typeof icu?.breaks!=='function')fail('Optimal line breaking needs the original ICU line-break iterator');
+ const widths=new Array(m.text.length).fill(0);
+ for(const {index,segment} of new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(m.text))widths[index]=rangeWidth(r,m,index,index+segment.length);
+ const runs=m.runs.map(run=>({start:run.start,end:run.end,size:run.paint.textSize,scaleX:run.paint.textScaleX??1,locale:run.paint.textLocaleTag??'en-US',canBreak:true}));
+ const cache=new Map(),boundariesFor=locale=>{if(!cache.has(locale))cache.set(locale,icu.breaks(m.text,String(locale).replace('-','_'),'line'));return cache.get(locale);};
+ const result=breakLineOptimal(m.text,{widths,runs,extent:(start,end)=>metrics(r,m,start,end)},lineWidthOf(first,count,rest),breaker.strategy,breaker.hyphenation,false,boundariesFor);
+ return result.breakPoints.map((offset,i)=>({offset,width:result.widths[i],ascent:result.ascents[i],descent:result.descents[i],flags:result.flags[i]}));
+}
+
+/** The lines of a TextView's text under Layout.BREAK_STRATEGY_HIGH_QUALITY / BALANCED at `width` (one entry per line, line-end spaces dropped), paragraph by paragraph like StaticLayout. */
+export function breakParagraphs(r,text,style,width,strategy,frequency){
+ const out=[];
+ for(const paragraph of text.split('\n')){
+  if(!paragraph){out.push('');continue;}
+  validateText(paragraph);
+  const paint={textSize:style.textSize,weight:style.weight,italic:style.italic,letterSpacing:0,wordSpacing:0,flags:0x100,hinting:1,textLocaleTag:style.locale??'en-US',textScaleX:1};
+  const m={text:paragraph,runs:[{start:0,end:paragraph.length,paint,rtl:false}],computeLayout:false};m.paragraph=nativeParagraph(r,m,1073741824);
+  try{
+   const breaker={strategy,hyphenation:frequency},lines=optimalLines(r,m,breaker,width,0,width);
+   let from=0;for(const line of lines){out.push(paragraph.slice(from,line.offset).replace(/[ \u1680\u2000-\u2006\u2008-\u200a\u205f\u3000]+$/,''));from=line.offset;}
+  }finally{m.paragraph.delete();}
+ }
  return out;
 }
 

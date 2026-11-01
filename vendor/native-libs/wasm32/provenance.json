@@ -249,10 +249,11 @@
       "soname": "libappmodules.so",
       "abi": "wasm32",
       "file": "apps/cff0c355aef6/libappmodules.wasm",
-      "bytes": 1569160,
-      "sha256": "944ffb1f02b835c8bf05791cfe21be13f53ed499e25be91b54ea9e036397ccbb",
+      "bytes": 1995476,
+      "sha256": "eaa38aa4719515cce4e4a6d2f52020d3bd173eb0eed4bd658a73fdec372983d5",
       "needed": [
         "libreact_codegen_rnsvg.so",
+        "libreact_codegen_rnscreens.so",
         "libfbjni.so",
         "libjsi.so",
         "libreactnative.so",
@@ -265,7 +266,7 @@
       "sources": [
         "packages/react-native/ReactAndroid/cmake-utils/default-app-setup/OnLoad.cpp",
         "autolinking.cpp and autolinking.h written by scripts/wasm/gen-app-autolinking.mjs with the templates of GenerateAutolinkingNewArchitecturesFileTask.kt (@react-native/gradle-plugin 0.79.4) for the packages of scripts/wasm/rn-libs/packages.json that have codegen",
-        "react-native-gesture-handler 2.22.1 generated codegen project (@react-native/codegen 0.79.4 over src/specs, scripts/wasm/prepare-rn-libs.py): TurboModule spec and the Button/RootView component descriptors"
+        "react-native-gesture-handler 2.22.1, @react-native-async-storage/async-storage and @react-native-clipboard/clipboard generated codegen projects (@react-native/codegen 0.79.4 over their src specs, scripts/wasm/prepare-rn-libs.py): TurboModule specs and the gesture-handler component descriptors; the async-storage and clipboard releases are representative (their generated C++ is byte-identical across the plausible range: docs/WELLHUB-NATIVE-VERSIONS.md)"
       ],
       "ports": [
         "scripts/wasm/rn-libs/app-driver: the app-level project (ReactNative-application.cmake's compile options and link line) that builds libappmodules.so next to react_codegen_rnsvg",
@@ -273,7 +274,7 @@
         "scripts/wasm/lab-link.mjs: shared-library link rule (DT_NEEDED in link order)"
       ],
       "apkSha256": "cff0c355aef64b259003ea70dee76ce7882058b8ecca1fd4be960aadab80e0a3",
-      "scope": "APK cff0c355aef6 only. NOT the app's own libappmodules.so (generated app code, never read or reproduced): React Native's template (cmake-utils/default-app-setup/OnLoad.cpp: core TurboModules through rncore_ModuleProvider) plus the autolinking of the open-source libraries the lab builds for this APK: react-native-svg (its codegen library, a separate libreact_codegen_rnsvg.so as in the app) and react-native-gesture-handler (its codegen project, compiled into libappmodules.so as React Native's autolinking does). A TurboModule or Fabric component the app has from any other library, or its own, is not provided: React Native reports it by name (TurboModuleRegistry.getEnforcing ... could not be found)."
+      "scope": "APK cff0c355aef6 only. NOT the app's own libappmodules.so (generated app code, never read or reproduced): React Native's template (cmake-utils/default-app-setup/OnLoad.cpp: core TurboModules through rncore_ModuleProvider) plus the autolinking of the open-source libraries the lab builds for this APK (react-native-svg, react-native-screens: separate codegen libraries as in React Native's autolinking; react-native-gesture-handler, @react-native-async-storage/async-storage, @react-native-clipboard/clipboard: their generated codegen projects compiled into this library). A TurboModule or Fabric component the app has from any other library, or its own, is not provided: React Native reports it by name (TurboModuleRegistry.getEnforcing ... could not be found)."
     },
     "libworklets.so": {
       "soname": "libworklets.so",
@@ -360,6 +361,64 @@
       ],
       "apkSha256": "cff0c355aef64b259003ea70dee76ce7882058b8ecca1fd4be960aadab80e0a3",
       "scope": "Wellhub 10.22.1 only: the version is the one identified from that APK (docs/WELLHUB-NATIVE-VERSIONS.md); another app may ship another version of the same soname."
+    },
+    "librnscreens.so": {
+      "soname": "librnscreens.so",
+      "abi": "wasm32",
+      "file": "apps/cff0c355aef6/librnscreens.wasm",
+      "bytes": 48885,
+      "sha256": "1acf176afb02c788a3899187e32d0fbde5a5fa4db06dbed9b46f9797e551aa86",
+      "needed": [
+        "libreactnative.so",
+        "libjsi.so",
+        "libfbjni.so",
+        "libandroid.so",
+        "libc++_shared.so"
+      ],
+      "upstream": "https://registry.npmjs.org/react-native-screens/-/react-native-screens-3.37.0.tgz",
+      "tag": "3.37.0",
+      "commit": "sha512-vEi4qZqWYoGuVGuHTv1K2XA90rgSydksmR5+tb5uhL93whl6Bch6EEXzC+8eEfj4SimiCgXBPY7r/xTXJxvnUg==",
+      "license": "licenses/react-native-screens-MIT.txt",
+      "sources": [
+        "react-native-screens 3.37.0 android/CMakeLists.txt with RNS_NEW_ARCH_ENABLED=ON (cpp/RNScreensTurboModule.cpp, cpp/RNSScreenRemovalListener.cpp, android/src/main/cpp/jni-adapter.cpp, NativeProxy.cpp, OnLoad.cpp)"
+      ],
+      "ports": [
+        "scripts/wasm/rn-libs/shim.cmake: Emscripten toolchain, -DANDROID, imported ReactAndroid/fbjni/hermes-engine prefab targets over the lab-built libraries, `android`/`log` ports, ANDROID_ABI=wasm32",
+        "scripts/wasm/lab-link.mjs: shared-library link rule (DT_NEEDED in link order)",
+        "scripts/wasm/ports/include/lab-bionic.h (force-included), -Wno-error appended through EMCC_CFLAGS",
+        "scripts/wasm/prepare-rn-libs.py: lab port of android/src/main/cpp/jni-adapter.cpp (packages.json `patches`): the three JavaVM::AttachCurrentThread call sites cast to void** (Android's jni.h takes JNIEnv**, the OpenJDK jni.h the lab compiles against takes void**; identical ABI)",
+        "scripts/wasm/build-rn-libs.sh screens"
+      ],
+      "apkSha256": "cff0c355aef64b259003ea70dee76ce7882058b8ecca1fd4be960aadab80e0a3",
+      "scope": "APK cff0c355aef6 only: the release is the one identified from that APK's DEX (docs/WELLHUB-NATIVE-VERSIONS.md); another app may ship another version of the same soname."
+    },
+    "libreact_codegen_rnscreens.so": {
+      "soname": "libreact_codegen_rnscreens.so",
+      "abi": "wasm32",
+      "file": "apps/cff0c355aef6/libreact_codegen_rnscreens.wasm",
+      "bytes": 530855,
+      "sha256": "4232c8cf63cf3026951850d414d80cb4e53b759eaedb884651acd3c3d320ff8e",
+      "needed": [
+        "libreactnative.so",
+        "libjsi.so",
+        "libfbjni.so",
+        "libc++_shared.so"
+      ],
+      "upstream": "https://registry.npmjs.org/react-native-screens/-/react-native-screens-3.37.0.tgz",
+      "tag": "3.37.0",
+      "commit": "sha512-vEi4qZqWYoGuVGuHTv1K2XA90rgSydksmR5+tb5uhL93whl6Bch6EEXzC+8eEfj4SimiCgXBPY7r/xTXJxvnUg==",
+      "license": "licenses/react-native-screens-MIT.txt",
+      "sources": [
+        "react-native-screens 3.37.0 android/src/main/jni/CMakeLists.txt + common/cpp/react/renderer/components/rnscreens + the rnscreens codegen output (@react-native/codegen 0.79.4 over src/fabric)"
+      ],
+      "ports": [
+        "scripts/wasm/rn-libs/shim.cmake: Emscripten toolchain, -DANDROID, imported ReactAndroid/fbjni/hermes-engine prefab targets over the lab-built libraries, `android`/`log` ports, ANDROID_ABI=wasm32",
+        "scripts/wasm/lab-link.mjs: shared-library link rule (DT_NEEDED in link order)",
+        "scripts/wasm/ports/include/lab-bionic.h (force-included), -Wno-error appended through EMCC_CFLAGS",
+        "scripts/wasm/rn-libs/app-driver: the app-level project that add_subdirectory()s the library, with folly-flags.cmake compile options as ReactNative-application.cmake applies them"
+      ],
+      "apkSha256": "cff0c355aef64b259003ea70dee76ce7882058b8ecca1fd4be960aadab80e0a3",
+      "scope": "APK cff0c355aef6 only: the release is the one identified from that APK's DEX (docs/WELLHUB-NATIVE-VERSIONS.md); another app may ship another version of the same soname."
     },
     "libreact_codegen_rnsvg.so": {
       "soname": "libreact_codegen_rnsvg.so",

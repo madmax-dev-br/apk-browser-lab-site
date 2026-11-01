@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 7029280,
-  "sha256": "e66f234913d1b35bf96280834cbc682bad4971003e4d01047524e16d8a156c2d",
-  "classCount": 5412,
+  "bytes": 7032556,
+  "sha256": "43062a868df31e7dd9b672269fd5d6552e1f4506507c2a909f5fe9dfb1196bd8",
+  "classCount": 5417,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -1092,6 +1092,9 @@
     "Landroid/os/RemoteException;",
     "Landroid/os/DeadObjectException;",
     "Landroid/os/DeadSystemRuntimeException;",
+    "Landroid/os/FileObserver$NotifyEventType;",
+    "Landroid/os/FileObserver$ObserverThread;",
+    "Landroid/os/FileObserver;",
     "Landroid/os/HandlerThread;",
     "Landroid/os/IBinder$DeathRecipient;",
     "Landroid/os/IBinder;",
@@ -1703,6 +1706,7 @@
     "Ljava/util/Collection;",
     "Ljava/util/Set;",
     "Landroid/util/ArraySet;",
+    "Landroid/util/CloseGuard;",
     "Landroid/util/ContainerHelpers;",
     "Landroid/util/DisplayMetrics;",
     "Landroid/util/ExceptionUtils;",
@@ -3647,6 +3651,8 @@
     "Ldev/apkweb/net/NetBridge;",
     "Ldev/apkweb/os/BundleHidden;",
     "Ldev/apkweb/os/FileUtilsHidden;",
+    "Ljava/time/Clock;",
+    "Ldev/apkweb/os/NetworkTimeClock;",
     "Ldev/apkweb/pm/PmHidden;",
     "Ldev/apkweb/util/ArraysOps;",
     "Ldev/apkweb/util/AtomicBooleanOps;",
@@ -4229,7 +4235,6 @@
     "Ljava/text/Normalizer;",
     "Ljava/text/ParsePosition;",
     "Ljava/text/StringCharacterIterator;",
-    "Ljava/time/Clock;",
     "Ljava/time/Clock$FixedClock;",
     "Ljava/time/Clock$OffsetClock;",
     "Ljava/time/Clock$SystemClock;",
@@ -33709,6 +33714,26 @@
       "sha256": "6af3f17c5011f30f7502306c4a79d33a9c1487ab4c53b30559a05114de892484",
       "bytes": 5079,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/FileObserver.java",
+      "localPath": "framework-aosp/upstream/android/os/FileObserver.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/FileObserver.java?format=TEXT",
+      "sha256": "9ac67b9d97acbf3af782405be0d241e3dbacdba8f46823f7a8b3afa43a14ca5c",
+      "bytes": 11282,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/util/CloseGuard.java",
+      "localPath": "framework-aosp/upstream/android/util/CloseGuard.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/util/CloseGuard.java?format=TEXT",
+      "sha256": "e812e00d8497c588aba0f0e2ebfcbe2ed40f4e973f57bab2b1f36ef81ef74c54",
+      "bytes": 4493,
+      "license": "Apache-2.0"
     }
   ],
   "algorithmPatches": [],
@@ -34027,6 +34052,10 @@
       {
         "path": "framework-aosp/lab-java/dev/apkweb/os/FileUtilsHidden.java",
         "sha256": "4377b883537594110661ee7c8952fcd182abe289bf3d2428d513045d1ecfa588"
+      },
+      {
+        "path": "framework-aosp/lab-java/dev/apkweb/os/NetworkTimeClock.java",
+        "sha256": "ac671fcceddc6f54b09a8657e5037647610a45f9415d53763ee2bd2229377d99"
       },
       {
         "path": "framework-aosp/lab-java/dev/apkweb/pm/PmHidden.java",

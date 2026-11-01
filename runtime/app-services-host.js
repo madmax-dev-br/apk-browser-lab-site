@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=45f4fd6b930a';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=45f4fd6b930a';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=45f4fd6b930a';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=45f4fd6b930a';
+import { APKError } from './apk-error.js?v=0b42079f5fd6';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=0b42079f5fd6';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=0b42079f5fd6';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=0b42079f5fd6';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -188,6 +188,12 @@ export function createAppServicesHost(platform) {
   defContext('getFileStreamPath', `(${STRING})${FILE}`, (r, _m, [, name]) => { const n = text(r, name); if (n.includes('/')) r.throwJava('Ljava/lang/IllegalArgumentException;', `File ${n} contains a path separator`); ensure(r, `${dataDir()}/files`); return file(r, `${dataDir()}/files/${n}`); });
   defContext('getExternalFilesDir', `(${STRING})${FILE}`, (r, _m, [, sub]) => ensure(r, `${external()}/files${sub === null ? '' : '/' + r.stringCharacters(sub)}`));
   defContext('getExternalCacheDir', `()${FILE}`, r => ensure(r, `${external()}/cache`));
+  // The device has one shared-storage volume, so each *Dirs variant is the one-element array of the primary-volume directory (ContextImpl.getExternalFilesDirs / getExternalCacheDirs / getObbDirs / getExternalMediaDirs).
+  const fileArray = (r, files) => { const array = r.newArray(`[${FILE}`, files.length); r.array(array).elements = files; return array; };
+  defContext('getExternalFilesDirs', `(${STRING})[${FILE}`, (r, _m, [, sub]) => fileArray(r, [ensure(r, `${external()}/files${sub === null ? '' : '/' + r.stringCharacters(sub)}`)]));
+  defContext('getExternalCacheDirs', `()[${FILE}`, r => fileArray(r, [ensure(r, `${external()}/cache`)]));
+  defContext('getObbDirs', `()[${FILE}`, r => fileArray(r, [ensure(r, `/storage/emulated/0/Android/obb/${pkg()}`)]));
+  defContext('getExternalMediaDirs', `()[${FILE}`, r => fileArray(r, [ensure(r, `/storage/emulated/0/Android/media/${pkg()}`)]));
   defContext('getObbDir', `()${FILE}`, r => ensure(r, `/storage/emulated/0/Android/obb/${pkg()}`));
   defContext('deleteFile', `(${STRING})Z`, (r, _m, [, name]) => fs().delete(`${dataDir()}/files/${text(r, name)}`) === 'ok' ? 1 : 0);
   defContext('fileList', '()[Ljava/lang/String;', r => { ensure(r, `${dataDir()}/files`); const names = fs().list(`${dataDir()}/files`) ?? [], array = r.newArray('[Ljava/lang/String;', names.length); r.array(array).elements = names; return array; });
@@ -332,9 +338,13 @@ export function createAppServicesHost(platform) {
     for (const { name, value, valueType, resource } of entries) {
       if (resource !== undefined) { dispatchBundle(r, bundle, 'putInt', [STRING, 'I'], [name, resource | 0]); continue; }
       if (valueType === 3) dispatchBundle(r, bundle, 'putString', [STRING, STRING], [name, value]);
-      else if (valueType === 1) { // reference: PackageParser resolves it to the final typed value
-        let resolved; try { resolved = platform.resource(value, ['string']).value; } catch { resolved = undefined; }
-        if (typeof resolved === 'string') dispatchBundle(r, bundle, 'putString', [STRING, STRING], [name, resolved]); else dispatchBundle(r, bundle, 'putInt', [STRING, 'I'], [name, value | 0]);
+      else if (valueType === 1) {   // android:value="@type/name": PackageParser reads the final typed value (TypedArray.peekValue resolves the reference), then stores it by its type
+        const resolved = platform.resource(value), data = resolved.rawData ?? resolved.data, type = resolved.dataType;
+        if (type === 3) dispatchBundle(r, bundle, 'putString', [STRING, STRING], [name, resolved.value]);          // TYPE_STRING
+        else if (type === 0x12) dispatchBundle(r, bundle, 'putBoolean', [STRING, 'Z'], [name, (data | 0) !== 0 ? 1 : 0]);                              // TYPE_INT_BOOLEAN
+        else if (type === 4) dispatchBundle(r, bundle, 'putFloat', [STRING, 'F'], [name, data | 0]);                                                   // TYPE_FLOAT
+        else if (type >= 0x10 && type <= 0x1f) dispatchBundle(r, bundle, 'putInt', [STRING, 'I'], [name, data | 0]);                                   // TYPE_FIRST_INT..TYPE_LAST_INT: integers, hex, colors
+        else throw new APKError(`<meta-data> ${name}: only string, integer, float, color, boolean and resource reference types are supported (resource type ${type})`, { kind: 'manifest-meta-data-unsupported' });
       } else if (valueType === 0x12) dispatchBundle(r, bundle, 'putBoolean', [STRING, 'Z'], [name, isTrue(value) ? 1 : 0]);
       else if (valueType === 4) dispatchBundle(r, bundle, 'putFloat', [STRING, 'F'], [name, value | 0]);
       else dispatchBundle(r, bundle, 'putInt', [STRING, 'I'], [name, value | 0]);

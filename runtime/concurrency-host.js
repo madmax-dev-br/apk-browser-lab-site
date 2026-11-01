@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=45f4fd6b930a';
-import { createHostRegistry } from './host-contract.js?v=45f4fd6b930a';
-import { Blocked, VMThread } from './scheduler.js?v=45f4fd6b930a';
-import { Invoke } from './interpreter.js?v=45f4fd6b930a';
-import { GC_ROOTS } from './heap-gc.js?v=45f4fd6b930a';
+import { APKError } from './apk-error.js?v=0b42079f5fd6';
+import { createHostRegistry } from './host-contract.js?v=0b42079f5fd6';
+import { Blocked, VMThread } from './scheduler.js?v=0b42079f5fd6';
+import { Invoke } from './interpreter.js?v=0b42079f5fd6';
+import { GC_ROOTS } from './heap-gc.js?v=0b42079f5fd6';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -49,8 +49,9 @@ export function createConcurrencyHost(platform) {
 
   // ---- java.lang.Thread ---------------------------------------------------------------------------------------------------------------------
   type(THREAD, OBJECT, [RUNNABLE], { allocatable: true });
-  type('Ljava/lang/ThreadGroup;', OBJECT, [], { allocatable: true }); type('Ljava/lang/IllegalThreadStateException;', 'Ljava/lang/IllegalArgumentException;'); type(UEH, OBJECT); registry.interfaces.set(UEH, []);
+  type('Ljava/lang/ThreadGroup;', OBJECT, [UEH], { allocatable: true }); type('Ljava/lang/IllegalThreadStateException;', 'Ljava/lang/IllegalArgumentException;'); type(UEH, OBJECT); registry.interfaces.set(UEH, []);
   let defaultHandler = null, current = null;
+  const nullish = v => v === null || v === undefined || v === 0;
   const mainThread = r => {
     r.mainThread ??= r.makeObject(THREAD); const o = r.object(r.mainThread);
     if (!o.thread) { const t = r.scheduler.mainThread(); t.javaObject = r.mainThread; o.thread = t; }
@@ -80,15 +81,23 @@ export function createConcurrencyHost(platform) {
       values.set(child.ref, r.dispatch({ owner: r.typeOf(local), name: 'childValue', parameters: [OBJECT], result: OBJECT, signature: `(${OBJECT})${OBJECT}` }, [local, values.get(parent.ref)], 'virtual'));
     }
   };
-  const init = (r, self, target, name) => { const st = state(r, self); st.target = target ?? null; if (name !== undefined && name !== null) st.name = r.stringCharacters(name); inheritLocals(r, self); };
+  // ---- java.lang.ThreadGroup: "system" > "main"; a thread belongs to the group it was created in (its creator's), and its default uncaught-exception handler is that group ----------------
+  const GROUP = 'Ljava/lang/ThreadGroup;';
+  const groupState = (r, g) => r.object(g).group;
+  const systemGroup = r => (r.systemThreadGroup ??= (() => { const g = r.allocate(GROUP); r.object(g).group = { name: 'system', parent: null, maxPriority: 10, daemon: false }; return g; })());
+  const mainGroup = r => (r.mainThreadGroup ??= (() => { const g = r.allocate(GROUP); r.object(g).group = { name: 'main', parent: systemGroup(r), maxPriority: 10, daemon: false }; return g; })());
+  const init = (r, self, target, name, group = null) => {
+    const st = state(r, self); st.target = target ?? null; if (name !== undefined && name !== null) st.name = r.stringCharacters(name);
+    st.group = group ?? (current ? state(r, current).group : null) ?? mainGroup(r); inheritLocals(r, self);
+  };
   def(THREAD, '<init>', '()V', (r, _m, [self]) => init(r, self, null));
   def(THREAD, '<init>', `(${RUNNABLE})V`, (r, _m, [self, t]) => init(r, self, t));
   def(THREAD, '<init>', `(${RUNNABLE}${STRING})V`, (r, _m, [self, t, n]) => init(r, self, t, n ?? r.throwJava('Ljava/lang/NullPointerException;', 'name == null')));
   def(THREAD, '<init>', `(${STRING})V`, (r, _m, [self, n]) => init(r, self, null, n ?? r.throwJava('Ljava/lang/NullPointerException;', 'name == null')));
-  def(THREAD, '<init>', `(Ljava/lang/ThreadGroup;${RUNNABLE}${STRING})V`, (r, _m, [self, , t, n]) => init(r, self, t, n));
-  def(THREAD, '<init>', `(Ljava/lang/ThreadGroup;${RUNNABLE}${STRING}J)V`, (r, _m, [self, , t, n]) => init(r, self, t, n));
-  def(THREAD, '<init>', `(Ljava/lang/ThreadGroup;${STRING})V`, (r, _m, [self, , n]) => init(r, self, null, n));
-  def(THREAD, '<init>', `(Ljava/lang/ThreadGroup;${RUNNABLE})V`, (r, _m, [self, , t]) => init(r, self, t));
+  def(THREAD, '<init>', `(Ljava/lang/ThreadGroup;${RUNNABLE}${STRING})V`, (r, _m, [self, g, t, n]) => init(r, self, t, n, nullish(g) ? null : g));
+  def(THREAD, '<init>', `(Ljava/lang/ThreadGroup;${RUNNABLE}${STRING}J)V`, (r, _m, [self, g, t, n]) => init(r, self, t, n, nullish(g) ? null : g));
+  def(THREAD, '<init>', `(Ljava/lang/ThreadGroup;${STRING})V`, (r, _m, [self, g, n]) => init(r, self, null, n, nullish(g) ? null : g));
+  def(THREAD, '<init>', `(Ljava/lang/ThreadGroup;${RUNNABLE})V`, (r, _m, [self, g, t]) => init(r, self, t, undefined, nullish(g) ? null : g));
   def(THREAD, 'run', '()V', (r, _m, [self]) => { const t = state(r, self).target; if (t !== null) vcall(r, t, RUNNABLE, 'run', [], 'V'); });
   function runThread(r, ref) {
     const st = state(r, ref), previous = current; current = ref;
@@ -96,9 +105,12 @@ export function createConcurrencyHost(platform) {
     catch (error) { if (!(error instanceof Object) || !error.value) throw error; uncaught(r, ref, error.value); }
     finally { current = previous; if (!st.keepAlive) { st.finished = true; } }
   }
+  /** Thread.dispatchUncaughtException: the thread's own handler, else its ThreadGroup. */
   function uncaught(r, ref, throwable) {
-    const handler = state(r, ref).handler ?? defaultHandler;
-    if (handler) { vcall(r, handler, UEH, 'uncaughtException', [THREAD, THROWABLE], 'V', [ref, throwable]); return; }
+    const st = state(r, ref), handler = st.handler ?? st.group ?? mainGroup(r);
+    vcall(r, handler, UEH, 'uncaughtException', [THREAD, THROWABLE], 'V', [ref, throwable]);
+  }
+  function fatal(r, ref, throwable) {
     r.record(`LOG E AndroidRuntime: FATAL EXCEPTION: ${state(r, ref).name}: ${r.typeOf(throwable)}: ${r.object(throwable).message ?? ''}`);
     throw new APKError(`Uncaught exception in thread "${state(r, ref).name}": ${r.typeOf(throwable)}${r.object(throwable).message ? ': ' + r.object(throwable).message : ''}`, { kind: 'uncaught-thread-exception' });
   }
@@ -149,7 +161,8 @@ export function createConcurrencyHost(platform) {
   def(THREAD, 'isInterrupted', '()Z', (r, _m, [self]) => state(r, self).interrupted ? 1 : 0);
   def(THREAD, 'interrupted', '()Z', r => { const st = state(r, currentThread(r)), was = st.interrupted; st.interrupted = false; return was ? 1 : 0; }, { static: true });
   def(THREAD, 'setUncaughtExceptionHandler', `(${UEH})V`, (r, _m, [self, h]) => { state(r, self).handler = h; });
-  def(THREAD, 'getUncaughtExceptionHandler', `()${UEH}`, (r, _m, [self]) => state(r, self).handler);
+  // A live thread always has a handler on Android: its own, else its ThreadGroup, which forwards to the default handler (apps call it: `thread.getUncaughtExceptionHandler().uncaughtException(t, e)`).
+  def(THREAD, 'getUncaughtExceptionHandler', `()${UEH}`, (r, _m, [self]) => { const st = state(r, self); return st.finished ? null : st.handler ?? st.group ?? mainGroup(r); });   // Thread.exit() clears the handler and the group of a terminated thread
   def(THREAD, 'setDefaultUncaughtExceptionHandler', `(${UEH})V`, (r, _m, [h]) => { defaultHandler = h; }, { static: true });
   def(THREAD, 'getDefaultUncaughtExceptionHandler', `()${UEH}`, () => defaultHandler, { static: true });
   // ---- java.util.concurrent.locks.LockSupport over the cooperative scheduler: park() runs the other queued tasks until unpark()/interrupt (or, with a timeout, the
@@ -188,7 +201,27 @@ export function createConcurrencyHost(platform) {
     if (st.state === 'blocked' && st.blocked) return stateConstant(r, st.blocked.reason === 'monitor' ? 'BLOCKED' : st.blocked.deadline === Infinity ? 'WAITING' : 'TIMED_WAITING');
     return stateConstant(r, 'RUNNABLE');
   });
-  def(THREAD, 'getThreadGroup', '()Ljava/lang/ThreadGroup;', () => null);
+  def(THREAD, 'getThreadGroup', '()Ljava/lang/ThreadGroup;', (r, _m, [self]) => { const st = state(r, self); return st.finished ? null : st.group ?? mainGroup(r); });
+  // ThreadGroup.uncaughtException: the parent group first; the root group hands it to the default handler, and with none installed the process dies the way Android's does (FATAL EXCEPTION).
+  def(GROUP, 'uncaughtException', `(${THREAD}${THROWABLE})V`, (r, _m, [self, thread, throwable]) => {
+    const g = groupState(r, self);
+    if (g.parent) { vcall(r, g.parent, GROUP, 'uncaughtException', [THREAD, THROWABLE], 'V', [thread, throwable]); return; }
+    if (defaultHandler) { vcall(r, defaultHandler, UEH, 'uncaughtException', [THREAD, THROWABLE], 'V', [thread, throwable]); return; }
+    fatal(r, thread, throwable);
+  });
+  def(GROUP, '<init>', `(${STRING})V`, (r, _m, [self, n]) => { r.object(self).group = { name: nullish(n) ? null : r.stringCharacters(n), parent: current ? state(r, current).group : mainGroup(r), maxPriority: 10, daemon: false }; });
+  def(GROUP, '<init>', `(${GROUP}${STRING})V`, (r, _m, [self, parent, n]) => {
+    if (nullish(parent)) r.throwJava('Ljava/lang/NullPointerException;', 'parent == null');
+    r.object(self).group = { name: nullish(n) ? null : r.stringCharacters(n), parent, maxPriority: groupState(r, parent).maxPriority, daemon: false };
+  });
+  def(GROUP, 'getName', `()${STRING}`, (r, _m, [self]) => groupState(r, self).name);
+  def(GROUP, 'getParent', `()${GROUP}`, (r, _m, [self]) => groupState(r, self).parent);
+  def(GROUP, 'getMaxPriority', '()I', (r, _m, [self]) => groupState(r, self).maxPriority);
+  def(GROUP, 'setMaxPriority', '(I)V', (r, _m, [self, p]) => { if (p >= 1 && p <= 10) groupState(r, self).maxPriority = Math.min(p, groupState(r, self).parent ? groupState(r, groupState(r, self).parent).maxPriority : 10); });
+  def(GROUP, 'isDaemon', '()Z', (r, _m, [self]) => (groupState(r, self).daemon ? 1 : 0));
+  def(GROUP, 'setDaemon', '(Z)V', (r, _m, [self, d]) => { groupState(r, self).daemon = !!d; });
+  def(GROUP, 'parentOf', `(${GROUP})Z`, (r, _m, [self, other]) => { for (let g = other; !nullish(g); g = groupState(r, g).parent) if (g.ref === self.ref) return 1; return 0; });
+  def(GROUP, 'toString', `()${STRING}`, (r, _m, [self]) => { const g = groupState(r, self); return `java.lang.ThreadGroup[name=${g.name},maxpri=${g.maxPriority}]`; });
   const checkInterrupt = r => { const st = state(r, currentThread(r)); if (st.interrupted) { st.interrupted = false; throwNew(r, 'Ljava/lang/InterruptedException;'); } };
   const sleep = (r, ms) => {
     checkInterrupt(r);

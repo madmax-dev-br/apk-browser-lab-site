@@ -7,7 +7,12 @@ export class VMClock {
   /** Monotonic milliseconds (performance.now() timeline). While a Choreographer frame is dispatched (freeze/thaw) the clock is the frame's start time, advanced one microsecond
    *  per read and never past real time: a simulated device runs a frame's callbacks in no time, so work that checks "how much of this frame is left"
    *  (Compose's prefetch scheduler against the vsync deadline) sees the budget a fast device would, not the host interpreter's slowness. A spin on nanoTime still ends. */
+  /** Deterministic mode (tests, recorded runs): the host's elapsed time is not part of the clock. Time stands still while code runs and moves only by skip() (a sleep, a timed wait or a
+   *  timer the scheduler jumps to), so the position of anything driven by the clock (an audio track's playback head, an animation, a timeout) depends on the program alone. System.nanoTime
+   *  still moves one microsecond per read, so a spin on it ends. */
+  makeDeterministic() { this.base = performance.now(); this.nanoReads = 0; return this; }
   now() {
+    if (this.base !== undefined) return this.base + this.skew + this.nanoReads * 0.001;
     if (this.frozenAt === null) return performance.now() + this.skew;
     this.reads++; return Math.min(performance.now(), this.frozenAt + this.reads * 0.001) + this.skew;
   }
@@ -15,9 +20,9 @@ export class VMClock {
   freeze() { if (this.frozenAt === null) { this.frozenAt = performance.now(); this.reads = 0; return true; } return false; }
   thaw() { this.frozenAt = null; this.reads = 0; }
   /** Wall-clock milliseconds since the epoch. */
-  wall() { return Date.now() + this.skew; }
+  wall() { return this.base !== undefined ? Math.floor(performance.timeOrigin + this.base) + this.skew + this.nanoReads * 0.001 : Date.now() + this.skew; }
   /** Monotonic nanoseconds as a BigInt. */
-  nanos() { return BigInt(Math.floor(this.now() * 1000)) * 1000n; }
+  nanos() { if (this.base !== undefined) this.nanoReads++; return BigInt(Math.floor(this.now() * 1000)) * 1000n; }
   /** Wall-clock nanoseconds since the epoch as a BigInt. */
   wallNanos() { return BigInt(Math.round((performance.timeOrigin + this.now()) * 1000)) * 1000n; }
   /** Advances the clock by `ms` (no real waiting). */

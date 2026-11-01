@@ -1,6 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=45f4fd6b930a';
-import { APKError } from './apk-error.js?v=45f4fd6b930a';
-import { createHostRegistry } from './host-contract.js?v=45f4fd6b930a';
+import { gcRoot } from './heap-gc.js?v=0b42079f5fd6';
+import { APKError } from './apk-error.js?v=0b42079f5fd6';
+import { Invoke } from './interpreter.js?v=0b42079f5fd6';
+import { createHostRegistry } from './host-contract.js?v=0b42079f5fd6';
 
 // Generic-type reflection and java.lang.reflect.Proxy for the libraries that wire themselves up with reflection at launch (Retrofit, Gson, Moshi, Koin, Dagger,
 // Room, WorkManager). Contracts: java.lang.Class / java.lang.reflect.{Method,Constructor,Field,Proxy,Type,ParameterizedType,TypeVariable,WildcardType,GenericArrayType}
@@ -285,9 +286,8 @@ export function createReflectionHost(platform) {
     try { member = owner === OBJECT ? null : r.reflectionLookup(owner, 'method', method.name, method.parameters, false); } catch { member = null; }
     const reflected = r.reflectionObject('method', member ?? { method: { owner, name: method.name, parameters: method.parameters, result: method.result, signature: method.signature, key: `${owner}->${method.name}${method.signature}` }, flags: 1 });
     const boxed = method.parameters.length ? array(r, OBJECT, method.parameters.map((t, i) => r.boxPrimitive(t, args[1 + i + method.parameters.slice(0, i).filter(x => x === 'J' || x === 'D').length]))) : null;
-    let result;
-    try { result = dispatchVirtual(r, INVOCATION_HANDLER, 'invoke', [OBJECT, METHOD, `[${OBJECT}`], OBJECT, [handler, self, reflected, boxed]); }
-    catch (error) {
+    // The handler runs as a continuation of the calling green thread (an Invoke): a handler that blocks (a lock, a Future, a park) parks only this thread.
+    const failed = error => {
       const thrown = error?.value;
       if (thrown && !r.isSubtype(r.typeOf(thrown), 'Ljava/lang/RuntimeException;') && !r.isSubtype(r.typeOf(thrown), 'Ljava/lang/Error;')) {
         const throwsAnnotation = member?.method?.dex?.memberAnnotations(member, 2).find(a => a.type === 'Ldalvik/annotation/Throws;'), declared = throwsAnnotation ? throwsAnnotation.values.get('value').values.map(v => v.value) : [];
@@ -297,11 +297,14 @@ export function createReflectionHost(platform) {
         }
       }
       throw error;
-    }
-    if (method.result === 'V') return undefined;
-    if (method.result.length === 1) { if (result === null) r.throwJava('Ljava/lang/NullPointerException;', `null returned from invocation handler for primitive ${method.result}`); return r.unboxReflection(result, method.result); }
-    if (result !== null && !r.isSubtype(r.typeOf(result), method.result)) r.throwJava('Ljava/lang/ClassCastException;', `${r.className(r.typeOf(result), 'binary')} cannot be cast to ${r.className(method.result, 'binary')}`);
-    return result;
+    };
+    const done = result => {
+      if (method.result === 'V') return undefined;
+      if (method.result.length === 1) { if (result === null) r.throwJava('Ljava/lang/NullPointerException;', `null returned from invocation handler for primitive ${method.result}`); return r.unboxReflection(result, method.result); }
+      if (result !== null && !r.isSubtype(r.typeOf(result), method.result)) r.throwJava('Ljava/lang/ClassCastException;', `${r.className(r.typeOf(result), 'binary')} cannot be cast to ${r.className(method.result, 'binary')}`);
+      return result;
+    };
+    return new Invoke({ owner: INVOCATION_HANDLER, name: 'invoke', parameters: [OBJECT, METHOD, `[${OBJECT}`], result: OBJECT, signature: `(${OBJECT}${METHOD}[${OBJECT})${OBJECT}` }, [handler, self, reflected, boxed], 'virtual', done, failed);
   }
   return { ...registry, interfaces: registry.interfacesOf, invokeProxy, forwarded };
 }
