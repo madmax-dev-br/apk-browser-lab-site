@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=da1f75bcefcc';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=da1f75bcefcc';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=da1f75bcefcc';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=da1f75bcefcc';
+import { APKError } from './apk-error.js?v=c925763606ec';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=c925763606ec';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=c925763606ec';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=c925763606ec';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -831,23 +831,93 @@ export function createAppServicesHost(platform) {
   const APP_INFO_FLAGS = 'Landroid/content/pm/PackageManager$ApplicationInfoFlags;'; type(APP_INFO_FLAGS, OBJECT, [], { allocatable: true });
   def(APP_INFO_FLAGS, 'of', `(J)${APP_INFO_FLAGS}`, (r, _m, [value]) => { const holder = r.makeObject(APP_INFO_FLAGS); r.object(holder).flagsValue = BigInt(value); return holder; }, { static: true });
   def(APP_INFO_FLAGS, 'getValue', '()J', (r, _m, [self]) => r.object(self).flagsValue ?? 0n);
-  def(PACKAGE_MANAGER, 'getApplicationInfo', `(${STRING}${APP_INFO_FLAGS})${APPLICATION_INFO}`, (r, _m, [, name, flags]) => {
-    const n = text(r, name); if (n !== pkg()) r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', n);
-    return platform.applicationInfo(r, (Number((flags === null ? 0n : r.object(flags).flagsValue ?? 0n) & 128n)) !== 0);
-  });
-  const packageInfoDef = (r, _m, [, name, flags]) => {
-    const n = text(r, name); if (n !== pkg()) r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', n);
+  // ---- the packages of the virtual device ------------------------------------------------------------------------------------------------------------
+  // A stock Android 13 image without Google services: this app plus a small, generic set of system packages (framework resources, System UI, the AOSP launcher). Nothing else is installed (no store,
+  // no root or hooking framework). System packages carry what the image would: FLAG_SYSTEM, a /system* code path, the platform version, no installer. Their signing certificates, components and
+  // permission lists are not modeled (signatures / signingInfo / activities stay null). Package visibility (API 30+) applies: an app targeting 30 or later without QUERY_ALL_PACKAGES sees itself and the
+  // always-visible "android" package; <queries> declarations are not parsed, so packages they would add are not listed.
+  const SYSTEM_PACKAGES = [
+    { name: 'android', uid: () => 1000, label: 'Android System', sourceDir: '/system/framework/framework-res.apk', dataDir: '/data/system', process: 'system', flags: 1 | 4 | 8 | (1 << 23), always: true },
+    { name: 'com.android.systemui', uid: app => app === 10037 ? 10039 : 10037, label: 'System UI', sourceDir: '/system_ext/priv-app/SystemUI/SystemUI.apk', process: 'com.android.systemui', flags: 1 | 4 | 8 | (1 << 23) },
+    { name: 'com.android.launcher3', uid: app => app === 10038 ? 10040 : 10038, label: 'Quickstep', sourceDir: '/system_ext/priv-app/Launcher3QuickStep/Launcher3QuickStep.apk', process: 'com.android.launcher3', flags: 1 | 4 | 0x40 | (1 << 23) },
+  ];
+  const systemInfos = new WeakMap();
+  const systemApplicationInfo = (r, entry) => {
+    const cache = systemInfos.get(r) ?? systemInfos.set(r, new Map()).get(r);
+    if (cache.has(entry.name)) return cache.get(entry.name);
+    const info = r.makeObject(APPLICATION_INFO), put = (name, type, value) => platform.infoField(r, info, APPLICATION_INFO, name, type, value), data = entry.dataDir ?? `/data/user/0/${entry.name}`;
+    put('packageName', STRING, entry.name); put('name', STRING, null); put('processName', STRING, entry.process); put('taskAffinity', STRING, entry.name); put('uid', 'I', entry.uid(platform.virtualProcess.uid));
+    put('labelRes', 'I', 0); put('nonLocalizedLabel', 'Ljava/lang/CharSequence;', entry.label); put('icon', 'I', 0); put('theme', 'I', 0);
+    put('sourceDir', STRING, entry.sourceDir); put('publicSourceDir', STRING, entry.sourceDir); put('dataDir', STRING, data); put('deviceProtectedDataDir', STRING, entry.dataDir ? entry.dataDir : `/data/user_de/0/${entry.name}`); put('credentialProtectedDataDir', STRING, data); put('nativeLibraryDir', STRING, null);
+    put('flags', 'I', entry.flags); put('targetSdkVersion', 'I', 33); put('minSdkVersion', 'I', 33); put('enabled', 'Z', 1);
+    cache.set(entry.name, info); return info;
+  };
+  const targetSdk = () => Number(platform.manifest?.usesSdk?.targetSdkVersion ?? 1);
+  const seesAll = r => targetSdk() < 30 || holdsPermission(r, 'android.permission.QUERY_ALL_PACKAGES');
+  /** The installed, visible packages in install order: [{ name, system }]. */
+  const packages = r => [{ name: pkg(), system: null }, ...SYSTEM_PACKAGES.filter(entry => seesAll(r) || entry.always).map(entry => ({ name: entry.name, system: entry }))];
+  const findPackage = (r, name) => packages(r).find(entry => entry.name === name) ?? r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', name);
+  const applicationInfoOf = (r, entry, meta) => entry.system ? systemApplicationInfo(r, entry.system) : platform.applicationInfo(r, meta);
+  const holderValue = (r, holder) => holder === null ? 0n : r.object(holder).flagsValue ?? 0n;
+  const getApplicationInfo = (r, name, flags) => { const n = text(r, name); return applicationInfoOf(r, findPackage(r, n), (Number(BigInt.asIntN(32, BigInt(flags))) & 128) !== 0); };
+  def(PACKAGE_MANAGER, 'getApplicationInfo', `(${STRING}${APP_INFO_FLAGS})${APPLICATION_INFO}`, (r, _m, [, name, flags]) => getApplicationInfo(r, name, holderValue(r, flags)));
+  def(PACKAGE_MANAGER, 'getApplicationInfo', `(${STRING}I)${APPLICATION_INFO}`, (r, _m, [, name, flags]) => getApplicationInfo(r, name, flags));
+  const packageInfoFor = (r, entry, flags) => {
     const info = r.allocate(PACKAGE_INFO), put = (name2, ftype, value) => r.storeField(r.object(info).fields, `${PACKAGE_INFO}->${name2}:${ftype}`, value), attrs = platform.manifest?.manifestAttrs ?? {};
-    const code = Number(attrs.versionCode ?? 0) | 0;
-    put('packageName', STRING, pkg()); put('versionName', STRING, typeof attrs.versionName === 'string' ? attrs.versionName : null); put('versionCode', 'I', code); put('longVersionCode', 'J', BigInt(code));
-    put('firstInstallTime', 'J', BigInt(installTime)); put('lastUpdateTime', 'J', BigInt(installTime)); put('applicationInfo', APPLICATION_INFO, platform.applicationInfo(r));
-    // GET_SIGNATURES (0x40) / GET_SIGNING_CERTIFICATES (0x08000000): the APK's real signer certificates (v3, v2 or v1 block).
-    if (flags & 0x40) put('signatures', SIGNATURES, signatureArray(r));
-    if (flags & 0x08000000) { const signing = r.allocate(SIGNING_INFO); r.object(signing).signers = signatureArray(r); put('signingInfo', SIGNING_INFO, signing); }
+    const system = entry.system, code = system ? 33 : Number(attrs.versionCode ?? 0) | 0;
+    put('packageName', STRING, entry.name); put('versionName', STRING, system ? '13' : typeof attrs.versionName === 'string' ? attrs.versionName : null); put('versionCode', 'I', code); put('longVersionCode', 'J', BigInt(code));
+    put('firstInstallTime', 'J', BigInt(installTime)); put('lastUpdateTime', 'J', BigInt(installTime)); put('applicationInfo', APPLICATION_INFO, applicationInfoOf(r, entry, (flags & 128) !== 0));
+    if (!system) {
+      // GET_SIGNATURES (0x40) / GET_SIGNING_CERTIFICATES (0x08000000): the APK's real signer certificates (v3, v2 or v1 block).
+      if (flags & 0x40) put('signatures', SIGNATURES, signatureArray(r));
+      if (flags & 0x08000000) { const signing = r.allocate(SIGNING_INFO); r.object(signing).signers = signatureArray(r); put('signingInfo', SIGNING_INFO, signing); }
+    }
     return info;
   };
+  const packageInfoDef = (r, _m, [, name, flags]) => packageInfoFor(r, findPackage(r, text(r, name)), flags);
+
   def(PACKAGE_MANAGER, 'getPackageInfo', `(${STRING}I)${PACKAGE_INFO}`, packageInfoDef);
   def(PACKAGE_MANAGER, 'getPackageInfo', `(${STRING}${INFO_FLAGS})${PACKAGE_INFO}`, (r, m, [self, name, holder]) => { if (holder === null) r.throwJava('Ljava/lang/NullPointerException;', 'flags'); return packageInfoDef(r, m, [self, name, Number(BigInt.asIntN(32, r.object(holder).flagsValue ?? 0n))]); });
+
+  // PackageManager listings: the same package set, ApplicationInfo / PackageInfo objects as getApplicationInfo / getPackageInfo return for each name.
+  const MATCH_SYSTEM_ONLY = 0x00100000;
+  const listPackages = (r, flags, build) => {
+    const list = newEmptyList(r);
+    for (const entry of packages(r)) {
+      if ((flags & MATCH_SYSTEM_ONLY) && !entry.system) continue;
+      r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, build(entry)], 'virtual');
+    }
+    return list;
+  };
+  const int32 = value => Number(BigInt.asIntN(32, BigInt(value)));
+  def(PACKAGE_MANAGER, 'getInstalledApplications', '(I)Ljava/util/List;', (r, _m, [, flags]) => listPackages(r, flags, entry => applicationInfoOf(r, entry, (flags & 128) !== 0)));
+  def(PACKAGE_MANAGER, 'getInstalledApplications', `(${APP_INFO_FLAGS})Ljava/util/List;`, (r, _m, [, holder]) => { const flags = int32(holderValue(r, holder)); return listPackages(r, flags, entry => applicationInfoOf(r, entry, (flags & 128) !== 0)); });
+  def(PACKAGE_MANAGER, 'getInstalledPackages', '(I)Ljava/util/List;', (r, _m, [, flags]) => listPackages(r, flags, entry => packageInfoFor(r, entry, flags)));
+  def(PACKAGE_MANAGER, 'getInstalledPackages', `(${INFO_FLAGS})Ljava/util/List;`, (r, _m, [, holder]) => { const flags = int32(holderValue(r, holder)); return listPackages(r, flags, entry => packageInfoFor(r, entry, flags)); });
+  // getPackagesHoldingPermissions: the packages holding at least one of the permissions. Only this app's permissions are modeled, so system packages never match.
+  const holding = (r, permissions, flags) => {
+    if (permissions === null) r.throwJava('Ljava/lang/NullPointerException;', 'permissions');
+    const wanted = r.array(permissions).elements.map(name => text(r, name)), list = newEmptyList(r);
+    if (wanted.some(name => holdsPermission(r, name))) r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, packageInfoFor(r, packages(r)[0], flags)], 'virtual');
+    return list;
+  };
+  def(PACKAGE_MANAGER, 'getPackagesHoldingPermissions', '([Ljava/lang/String;I)Ljava/util/List;', (r, _m, [, permissions, flags]) => holding(r, permissions, flags));
+  def(PACKAGE_MANAGER, 'getPackagesHoldingPermissions', `([Ljava/lang/String;${INFO_FLAGS})Ljava/util/List;`, (r, _m, [, permissions, holder]) => holding(r, permissions, int32(holderValue(r, holder))));
+  const uidOf = (r, entry) => entry.system ? entry.system.uid(platform.virtualProcess.uid) : platform.virtualProcess.uid;
+  def(PACKAGE_MANAGER, 'getPackageUid', `(${STRING}I)I`, (r, _m, [, name]) => uidOf(r, findPackage(r, text(r, name))));
+  def(PACKAGE_MANAGER, 'getPackageUid', `(${STRING}${INFO_FLAGS})I`, (r, _m, [, name]) => uidOf(r, findPackage(r, text(r, name))));
+  def(PACKAGE_MANAGER, 'getPackagesForUid', '(I)[Ljava/lang/String;', (r, _m, [, uid]) => {
+    const names = packages(r).filter(entry => uidOf(r, entry) === uid).map(entry => entry.name); if (!names.length) return null;
+    const array = r.newArray('[Ljava/lang/String;', names.length); r.array(array).elements = names; return array;
+  });
+  def(PACKAGE_MANAGER, 'getNameForUid', `(I)${STRING}`, (r, _m, [, uid]) => { const entry = packages(r).find(candidate => uidOf(r, candidate) === uid); return entry ? (uid === 1000 ? 'android.uid.system:1000' : entry.name) : null; });
+  // API 33 ResolveInfoFlags overloads of the query/resolve calls: the flag value is the same long.
+  const RESOLVE_FLAGS = 'Landroid/content/pm/PackageManager$ResolveInfoFlags;'; type(RESOLVE_FLAGS, OBJECT, [], { allocatable: true });
+  def(RESOLVE_FLAGS, 'of', `(J)${RESOLVE_FLAGS}`, (r, _m, [value]) => { const holder = r.makeObject(RESOLVE_FLAGS); r.object(holder).flagsValue = BigInt(value); return holder; }, { static: true });
+  def(RESOLVE_FLAGS, 'getValue', '()J', (r, _m, [self]) => r.object(self).flagsValue ?? 0n);
+  for (const [name, kind] of [['queryIntentActivities', 'activity'], ['queryIntentServices', 'service'], ['queryBroadcastReceivers', 'receiver']]) {
+    def(PACKAGE_MANAGER, name, `(${INTENT_TYPE}${RESOLVE_FLAGS})Ljava/util/List;`, (r, _m, [, intent, holder]) => resolveInfos(r, intent, kind, kind !== 'activity' && (int32(holderValue(r, holder)) & 128) !== 0));
+  }
 
   // The lab installs the APK itself: no store recorded it, so the installer package is null (what adb/sideloaded installs report).
   def(PACKAGE_MANAGER, 'checkPermission', `(${STRING}${STRING})I`, (r, _m, [, permission, name]) => { const permissionName = needPermission(r, permission); if (name === null) r.throwJava('Ljava/lang/NullPointerException;', null); return text(r, name) === pkg() && holdsPermission(r, permissionName) ? PERMISSION_GRANTED : PERMISSION_DENIED; });   // other packages are not installed on the virtual device

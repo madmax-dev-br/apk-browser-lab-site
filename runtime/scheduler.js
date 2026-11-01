@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=da1f75bcefcc';
+import { APKError } from './apk-error.js?v=c925763606ec';
 
 // Green-thread scheduler for the VM.
 //
@@ -29,13 +29,27 @@ export const QUANTUM = 20000;   // instructions a thread runs before another run
 
 const QUIET_IDLE_LIMIT = 50000;   // consecutive clock skips with no host event in between
 export class Scheduler {
-  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0 }; this.quietIdles = 0; }
+  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0 }; this.quietIdles = 0; this.eventTotal = 0; this.lastSteps = 0; }
   get clock() { return this.rt.platform.clock; }
 
   /** The thread that runs host events (Looper/main). */
   mainThread() {
     if (!this.main) { this.main = new VMThread('main', null, 1n); this.main.state = 'runnable'; this.main.started = true; this.threads.push(this.main); this.rt.thread = this.main; }
     return this.main;
+  }
+  /**
+   * Instruction budget accounting. `rt.steps` is the budget of the thread that is running: the instructions it has executed since it last blocked (waiting for a lock, a future, a timer or
+   * an event is progress, and resets it; preemption by the scheduler is not). A runaway thread therefore trips the per-thread fuse (maxInstructionsPerEvent) wherever it is preempted, while
+   * a startup that runs many threads, none of them spinning, does not pool their work into one thread's budget. The sum over all threads for one host event is capped separately
+   * (maxEventInstructions) so threads that keep waking each other cannot run forever.
+   */
+  beginEvent(rt) { if (rt.steps === 0) { this.eventTotal = 0; this.lastSteps = 0; for (const thread of this.threads) thread.budget = 0; } }
+  switching(rt, previous, next) {
+    const steps = rt.steps;
+    this.eventTotal += steps >= this.lastSteps ? steps - this.lastSteps : steps;
+    if (previous) previous.budget = previous.state === 'runnable' ? steps : 0;
+    if (this.eventTotal > rt.maxEventInstructions) throw new APKError(`Instruction budget (${rt.maxEventInstructions} across all threads of one event) exceeded; threads: ${this.describe()}`, { kind: 'event-instruction-budget' });
+    rt.steps = this.lastSteps = next.budget ?? 0;
   }
   add(thread) { if (!this.threads.includes(thread)) this.threads.push(thread); }
   /** Makes a started thread runnable. `driver(rt, thread)` supplies its work: a PendingCall (run this Java method), an Invoke, a Blocked, or undefined when the thread is done. */

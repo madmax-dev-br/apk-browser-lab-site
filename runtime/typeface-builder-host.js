@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=da1f75bcefcc';
+import { createHostRegistry } from './host-contract.js?v=c925763606ec';
 
 // android.graphics.Typeface.Builder / Typeface.CustomFallbackBuilder and android.graphics.fonts.{Font, Font.Builder, FontFamily, FontFamily.Builder, FontStyle} (android-13.0.0_r1
 // contracts). Font bytes come from the app's virtual filesystem (File), the APK's assets/ (AssetManager) or a ByteBuffer, are validated and shaped by Skia's FreeType, and the
@@ -174,6 +174,26 @@ export function createTypefaceBuilderHost(platform) {
     if (face === undefined) r.throwJava('Ljava/lang/UnsupportedOperationException;', 'Custom typefaces need the Skia graphics backend');
     return face ?? (state.fallback === null ? null : systemFallback(r, state.fallback, state.weight ?? 400, state.italic ?? false));
   });
+
+  // Typeface.createFromAsset / createFromFile (android-13.0.0_r1 Typeface.java): the Builder decides; a font that cannot be loaded is a RuntimeException naming it, except a file that exists but is not a
+  // font, which answers Typeface.DEFAULT for backward compatibility.
+  const buildWith = (r, ctorSignature, args) => { const builder = r.allocate(TB); r.dispatch({ owner: TB, name: '<init>', parameters: ctorSignature, result: 'V', signature: `(${ctorSignature.join('')})V` }, [builder, ...args], 'direct'); return call(r, builder, TB, 'build', [], TYPEFACE); };
+  def(TYPEFACE, 'createFromAsset', `(${ASSETS}${STRING})${TYPEFACE}`, (r, _m, [mgr, path]) => {
+    if (path === null) npe(r, 'path');
+    const face = buildWith(r, [ASSETS, STRING], [mgr, path]); if (face !== null) return face;
+    r.throwJava('Ljava/lang/RuntimeException;', `Font asset not found ${text(r, path)}`);
+  }, { static: true });
+  const fromFile = (r, file) => {
+    if (file === null) npe(r, 'path');
+    const face = buildWith(r, [FILE], [file]); if (face !== null) return face;
+    if (!call(r, file, FILE, 'exists', [], 'Z')) r.throwJava('Ljava/lang/RuntimeException;', `Font asset not found ${text(r, call(r, file, FILE, 'getAbsolutePath', [], STRING))}`);
+    return r.readStatic({ owner: TYPEFACE, name: 'DEFAULT', type: TYPEFACE, key: `${TYPEFACE}->DEFAULT:${TYPEFACE}` });
+  };
+  def(TYPEFACE, 'createFromFile', `(${FILE})${TYPEFACE}`, (r, _m, [file]) => fromFile(r, file), { static: true });
+  def(TYPEFACE, 'createFromFile', `(${STRING})${TYPEFACE}`, (r, _m, [path]) => {
+    if (path === null) npe(r, 'path'); const file = r.allocate(FILE);
+    r.dispatch({ owner: FILE, name: '<init>', parameters: [STRING], result: 'V', signature: `(${STRING})V` }, [file, path], 'direct'); return fromFile(r, file);
+  }, { static: true });
 
   // ---- Typeface.CustomFallbackBuilder -------------------------------------------------------------------------------------------------------------
   type(CFB, OBJECT, [], { allocatable: true });

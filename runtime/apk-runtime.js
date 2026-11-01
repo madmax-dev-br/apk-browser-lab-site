@@ -1,20 +1,20 @@
-import { VMClock } from './vm-clock.js?v=da1f75bcefcc';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=da1f75bcefcc';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=da1f75bcefcc';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=da1f75bcefcc';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=da1f75bcefcc';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=da1f75bcefcc';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=da1f75bcefcc';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=da1f75bcefcc';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=da1f75bcefcc';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=da1f75bcefcc';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=da1f75bcefcc';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=da1f75bcefcc';
-import { APKError } from './apk-error.js?v=da1f75bcefcc';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=da1f75bcefcc';
-import { Scheduler, Blocked } from './scheduler.js?v=da1f75bcefcc';
-import { bootClassLacksMember } from './boot-class-members.js?v=da1f75bcefcc';
-export { APKError } from './apk-error.js?v=da1f75bcefcc';
+import { VMClock } from './vm-clock.js?v=c925763606ec';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=c925763606ec';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=c925763606ec';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=c925763606ec';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=c925763606ec';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=c925763606ec';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=c925763606ec';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=c925763606ec';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=c925763606ec';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=c925763606ec';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=c925763606ec';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=c925763606ec';
+import { APKError } from './apk-error.js?v=c925763606ec';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=c925763606ec';
+import { Scheduler, Blocked } from './scheduler.js?v=c925763606ec';
+import { bootClassLacksMember } from './boot-class-members.js?v=c925763606ec';
+export { APKError } from './apk-error.js?v=c925763606ec';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -715,11 +715,8 @@ EXTERNAL_INTERFACES.set('Ljava/util/concurrent/CopyOnWriteArrayList;', ['Ljava/u
 for (const key of [...SHIMS]) if (key.startsWith('Ljava/util/ArrayList;->')) SHIMS.add(key.replace('Ljava/util/ArrayList;', 'Ljava/util/concurrent/CopyOnWriteArrayList;'));
 addBridge('java/util/concurrent/CopyOnWriteArrayList', ['<init>([Ljava/lang/Object;)V']);
 EXTERNAL_PARENTS.set('Ljava/util/Vector;', 'Ljava/util/AbstractList;');
-EXTERNAL_PARENTS.set('Ljava/util/Stack;', 'Ljava/util/Vector;');
 EXTERNAL_INTERFACES.set('Ljava/util/Vector;', ['Ljava/util/List;', 'Ljava/util/Collection;', 'Ljava/lang/Iterable;']);
 for (const key of [...SHIMS]) if (key.startsWith('Ljava/util/ArrayList;->')) SHIMS.add(key.replace('Ljava/util/ArrayList;', 'Ljava/util/Vector;'));
-addBridge('java/util/Stack', ['<init>()V', 'push(Ljava/lang/Object;)Ljava/lang/Object;', 'pop()Ljava/lang/Object;', 'peek()Ljava/lang/Object;', 'empty()Z', 'search(Ljava/lang/Object;)I']);
-EXTERNAL_PARENTS.set('Ljava/util/EmptyStackException;', 'Ljava/lang/RuntimeException;');
 for (const name of ['Buffer', 'ByteBuffer', 'ByteOrder']) EXTERNAL_PARENTS.set(`Ljava/nio/${name};`, name === 'ByteBuffer' ? 'Ljava/nio/Buffer;' : 'Ljava/lang/Object;');
 EXTERNAL_PARENTS.set('Ljava/nio/CharBuffer;', 'Ljava/nio/Buffer;');
 EXTERNAL_INTERFACES.set('Ljava/nio/CharBuffer;', ['Ljava/lang/CharSequence;']);
@@ -907,7 +904,7 @@ export class APKRuntime {
     this.tolerateMissing = tolerateMissing; this.missingVoid = new Map(); this.missingReturns = new Map(); this.missingClasses = new Map(); this.missingLibraries = new Map(); this.refusedProtectedLibrary = null;
     this.maxCallDepth = maxCallDepth; this.peakCallDepth = 0;
     if (!Number.isInteger(maxInstructionsPerEvent) || maxInstructionsPerEvent < 1000 || maxInstructionsPerEvent > 20000000) fail('VM maxInstructionsPerEvent must be an integer from 1000 to 20000000');
-    this.maxInstructionsPerEvent = maxInstructionsPerEvent;
+    this.maxInstructionsPerEvent = maxInstructionsPerEvent; this.maxEventInstructions = maxInstructionsPerEvent * 8;   // per thread / across the threads of one host event
     this.dex = dex;
     this.classes = dex.resolvedClasses ?? dex.classes;
     this.launcherActivity = launcherActivity;
@@ -3322,15 +3319,6 @@ export class APKRuntime {
       if (name === 'getKey') return obj.entry.key;
       if (name === 'getValue') return obj.entry.value;
       const previous = obj.entry.value; obj.entry.value = args[1]; return previous;
-    }
-    if (method.owner === 'Ljava/util/Stack;') {
-      if (name === '<init>') {obj.list=[];obj.modCount=0;return undefined;}
-      const values=this.collectionValues(obj);
-      if(name==='empty')return values.length?0:1;
-      if(name==='push'){if(values.length>=1000000)fail('Stack size limit exceeded');this.reserveCollection(1);values.push(args[1]);this.bumpModCount(obj);return args[1];}
-      if(name==='search'){for(let i=values.length-1;i>=0;i--)if(this.javaEquals(args[1],values[i]))return values.length-i;return -1;}
-      if(!values.length)this.throwJava('Ljava/util/EmptyStackException;', 'Empty stack');
-      if(name==='peek')return values.at(-1);this.reserveCollection(-1);this.bumpModCount(obj);return values.pop();
     }
     if (['Ljava/util/ArrayList;', 'Ljava/util/Vector;', 'Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/Collection;', 'Ljava/util/Set;', 'Ljava/util/Arrays$ArrayList;'].includes(method.owner)) {
       if (name === '<init>') {

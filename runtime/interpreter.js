@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=da1f75bcefcc';
-import { Blocked, QUANTUM } from './scheduler.js?v=da1f75bcefcc';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=da1f75bcefcc';
+import { APKError } from './apk-error.js?v=c925763606ec';
+import { Blocked, QUANTUM } from './scheduler.js?v=c925763606ec';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=c925763606ec';
 
 // Frame-based DEX interpreter.
 //
@@ -278,6 +278,7 @@ export function runNested(rt, method, code, args) {
   if (args.length !== code.incoming) fail(`Argument/register mismatch: ${method.key}`);
   if (base >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
   if (++rt.nestedRuns > rt.maxNestedRuns) { rt.nestedRuns--; rt.throwJava('Ljava/lang/StackOverflowError;', 'native re-entry depth exceeded'); }
+  if (rt.nestedRuns === 1) rt.scheduler.beginEvent(rt);
   thread.frames.push(makeFrame(rt, method, code, args));
   thread.nestedDepth++;
   // A non-Java failure that escapes the outermost run leaves monitors in an undefined state; reset them to what they were when the event began.
@@ -290,6 +291,7 @@ export function runNested(rt, method, code, args) {
 /** One scheduling slice with no owner: runs whichever thread the scheduler picks until it blocks, ends or uses its quantum (used by drainEvents and nested waits). */
 export function runSlice(rt) {
   if (++rt.nestedRuns > rt.maxNestedRuns) { rt.nestedRuns--; rt.throwJava('Ljava/lang/StackOverflowError;', 'native re-entry depth exceeded'); }
+  if (rt.nestedRuns === 1) rt.scheduler.beginEvent(rt);
   const previous = rt.thread;
   try { return runLoop(rt, null, 0); } finally { rt.nestedRuns--; rt.thread = previous; }
 }
@@ -334,6 +336,7 @@ function runLoop(rt, owner, base) {
           sched.idle(choice.earliest, `${owner.name} is blocked (${owner.blocked?.reason ?? 'unknown'})`);
           rt.thread = thread ?? owner;
         }
+        if (picked !== thread) sched.switching(rt, thread, picked);
         thread = picked; rt.thread = thread; frames = thread.frames; quantum = QUANTUM; rt.q = QUANTUM; ran = true;
         const top = frames[frames.length - 1];
         if (thread.blocked !== null) {                                  // a parked thread woke up: finish the wait it was in

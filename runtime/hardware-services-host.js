@@ -1,6 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=da1f75bcefcc';
-import { createHostRegistry } from './host-contract.js?v=da1f75bcefcc';
-import { GC_ROOTS } from './heap-gc.js?v=da1f75bcefcc';
+import { gcRoot } from './heap-gc.js?v=c925763606ec';
+import { installAudioManager } from './audio-manager-host.js?v=c925763606ec';
+import { createHostRegistry } from './host-contract.js?v=c925763606ec';
+import { GC_ROOTS } from './heap-gc.js?v=c925763606ec';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
 // contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes, and an AlarmManager that
@@ -43,21 +44,8 @@ export function createHardwareServicesHost(platform) {
   registry.staticField(EFFECT, 'DEFAULT_AMPLITUDE', 'I', () => -1);
   for (const [name, value] of Object.entries({ EFFECT_CLICK: 0, EFFECT_DOUBLE_CLICK: 1, EFFECT_TICK: 2, EFFECT_HEAVY_CLICK: 5 })) registry.staticField(EFFECT, name, 'I', () => value);
 
-  // ---- AudioManager: a mixer with Android's default stream maxima and volumes; focus requests are granted ------------------------------------------------------
-  const AUDIO = service('audio', 'Landroid/media/AudioManager;');
-  const STREAMS = { 0: [5, 4], 1: [7, 5], 2: [7, 5], 3: [15, 7], 4: [7, 6], 5: [7, 5], 6: [15, 7], 8: [15, 7], 9: [15, 7], 10: [15, 7] };   // stream -> [max, default volume]
-  const volumes = new Map();
-  const stream = (r, id) => { if (!STREAMS[id]) r.throwJava('Ljava/lang/IllegalArgumentException;', `Bad stream type ${id}`); return STREAMS[id]; };
-  def(AUDIO, 'getStreamMaxVolume', '(I)I', (r, _m, [, id]) => stream(r, id)[0]);
-  def(AUDIO, 'getStreamMinVolume', '(I)I', (r, _m, [, id]) => { stream(r, id); return id === 0 ? 1 : 0; });
-  def(AUDIO, 'getStreamVolume', '(I)I', (r, _m, [, id]) => volumes.get(id) ?? stream(r, id)[1]);
-  def(AUDIO, 'setStreamVolume', '(III)V', (r, _m, [, id, index]) => { const [max] = stream(r, id); volumes.set(id, Math.max(0, Math.min(max, index))); });
-  def(AUDIO, 'getRingerMode', '()I', () => 2); def(AUDIO, 'getMode', '()I', () => 0);
-  for (const name of ['isMusicActive', 'isSpeakerphoneOn', 'isMicrophoneMute', 'isBluetoothScoOn', 'isWiredHeadsetOn', 'isBluetoothA2dpOn']) def(AUDIO, name, '()Z', () => 0);
-  def(AUDIO, 'isStreamMute', '(I)Z', () => 0);
-  def(AUDIO, 'requestAudioFocus', `(Landroid/media/AudioManager$OnAudioFocusChangeListener;II)I`, () => 1);   // AUDIOFOCUS_REQUEST_GRANTED
-  def(AUDIO, 'abandonAudioFocus', `(Landroid/media/AudioManager$OnAudioFocusChangeListener;)I`, () => 1);
-  def(AUDIO, 'getParameters', `(${STRING})${STRING}`, () => '');
+  // ---- AudioManager: src/audio-manager-host.js (volumes, ringer/DND rule, focus stack, devices, session ids) ---------------------------------------------------
+  const audioManager = installAudioManager({ platform, def, service, call, holds, emptyList });
 
   // ---- AlarmManager: alarms fire as PendingIntent.send() when the VM clock reaches them (RTC types on the wall clock, ELAPSED types on the monotonic one) --------------
   const ALARM = service('alarm', 'Landroid/app/AlarmManager;'), CLOCK_INFO = 'Landroid/app/AlarmManager$AlarmClockInfo;';
@@ -139,5 +127,5 @@ export function createHardwareServicesHost(platform) {
   const FINGERPRINT = service('fingerprint', 'Landroid/hardware/fingerprint/FingerprintManager;');
   def(FINGERPRINT, 'isHardwareDetected', '()Z', () => 0); def(FINGERPRINT, 'hasEnrolledFingerprints', '()Z', () => 0);
 
-  return { ...registry, getService, serviceNameForClass: classType => byClass.get(classType) ?? null, [GC_ROOTS](visit) { for (const alarm of alarms.values()) visit(alarm); } };
+  return { ...registry, getService, serviceNameForClass: classType => byClass.get(classType) ?? null, [GC_ROOTS](visit) { for (const alarm of alarms.values()) visit(alarm); audioManager.roots(visit); } };
 }

@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=da1f75bcefcc';
-import { throwNew } from './java-throw.js?v=da1f75bcefcc';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=da1f75bcefcc';
-import { networkOf, isIpLiteral } from './network-native.js?v=da1f75bcefcc';
-import { Blocked } from './scheduler.js?v=da1f75bcefcc';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=da1f75bcefcc';
+import { APKError } from './apk-error.js?v=c925763606ec';
+import { throwNew } from './java-throw.js?v=c925763606ec';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=c925763606ec';
+import { networkOf, isIpLiteral } from './network-native.js?v=c925763606ec';
+import { Blocked } from './scheduler.js?v=c925763606ec';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=c925763606ec';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -21,7 +21,7 @@ const decoder = new TextDecoder('utf-8');
 let inodeCounter = 0x4000;
 
 /** Per-runtime process state: descriptor table, umask, stdio line buffers. Descriptors 0-2 exist as on every Android process. */
-function state(runtime) {
+export function state(runtime) {
   if (runtime.libcoreIo) return runtime.libcoreIo;
   const std = (name, acc) => ({ kind: 'std', name, acc, offset: 0, append: false, ownerTag: 0n, refs: 1 });
   return runtime.libcoreIo = { table: new Map([[0, { desc: std('stdin', C.O_RDONLY), cloexec: false }], [1, { desc: std('stdout', C.O_WRONLY), cloexec: false }], [2, { desc: std('stderr', C.O_WRONLY), cloexec: false }]]), umask: 0o077, lines: new Map() };
@@ -46,7 +46,7 @@ const requireString = (runtime, value) => { if (value === null) runtime.throwJav
 
 // ---- path / node helpers ----------------------------------------------------------------------------------------------------------------------
 /** Resolves a path against the VFS: the node, or the errno name a lookup would fail with (ENOENT, or ENOTDIR when a parent component is a regular file). */
-function lookup(fs, path) {
+export function lookup(fs, path) {
   const canonical = fs.canonical(path.startsWith('/') ? path : '/' + path), node = fs.nodes.get(canonical);
   if (node) return { node, path: canonical };
   for (let cursor = fs.parentOf(canonical); ; cursor = fs.parentOf(cursor)) {
@@ -56,7 +56,7 @@ function lookup(fs, path) {
   }
 }
 const modeOf = (runtime, node) => (node.type === 'dir' ? C.S_IFDIR : node.type === 'fifo' ? C.S_IFIFO : C.S_IFREG) | (node.mode & 0o7777);
-const inode = node => node.ino ??= ++inodeCounter;
+export const inode = node => node.ino ??= ++inodeCounter;
 function makeStat(runtime, node, std = false) {
   const uid = runtime.platform.virtualProcess.uid, sec = Math.floor(node.mtime / 1000), ns = (node.mtime % 1000) * 1_000_000;
   const TS = 'Landroid/system/StructTimespec;', spec = () => construct(runtime, TS, ['J', 'J'], [BigInt(sec), BigInt(ns)]);
@@ -75,7 +75,7 @@ function newFileDescriptor(runtime, number) {
   const reference = construct(runtime, FD, [], []);
   setFdNumber(runtime, reference, number); return reference;
 }
-function allocateFd(runtime, desc, minimum = 0, cloexec = false) {
+export function allocateFd(runtime, desc, minimum = 0, cloexec = false) {
   const table = state(runtime).table; let number = minimum;
   while (table.has(number)) number++;
   if (number >= 1024) return -1;
@@ -126,7 +126,7 @@ function open(runtime, path, flags, mode) {
   if (number < 0) err(runtime, 'open', 'EMFILE');
   return number;
 }
-function release(runtime, number) {
+export function release(runtime, number) {
   const table = state(runtime).table, entry = table.get(number);
   table.delete(number); entry.desc.refs--;
   if (entry.desc.refs === 0) {

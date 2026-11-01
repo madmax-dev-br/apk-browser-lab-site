@@ -249,11 +249,14 @@
       "soname": "libappmodules.so",
       "abi": "wasm32",
       "file": "apps/cff0c355aef6/libappmodules.wasm",
-      "bytes": 1996002,
-      "sha256": "68abfaad13af06c1f84a51afd6d55a1001c2c522648110445cf0683d4ffb312e",
+      "bytes": 2202242,
+      "sha256": "9dc5f61f9c76836c7bb5f5a4af6d5d0984f7e357efdead5427768dde2e91b87b",
       "needed": [
         "libreact_codegen_rnsvg.so",
+        "libreact-native-mmkv.so",
         "libreact_codegen_rnscreens.so",
+        "liblog.so",
+        "libandroid.so",
         "libfbjni.so",
         "libjsi.so",
         "libreactnative.so",
@@ -391,6 +394,37 @@
       ],
       "apkSha256": "cff0c355aef64b259003ea70dee76ce7882058b8ecca1fd4be960aadab80e0a3",
       "scope": "APK cff0c355aef6 only: the release is the one identified from that APK's DEX (docs/WELLHUB-NATIVE-VERSIONS.md); another app may ship another version of the same soname."
+    },
+    "libreact-native-mmkv.so": {
+      "soname": "libreact-native-mmkv.so",
+      "abi": "wasm32",
+      "file": "apps/cff0c355aef6/libreact-native-mmkv.wasm",
+      "bytes": 264797,
+      "sha256": "5263c7a0eea1f702716ab73f59e5f032a8ff0e6ac173a9ada60a8ff636faf259",
+      "needed": [
+        "liblog.so",
+        "libandroid.so",
+        "libfbjni.so",
+        "libjsi.so",
+        "libreactnative.so",
+        "libc++_shared.so"
+      ],
+      "upstream": "https://registry.npmjs.org/react-native-mmkv/-/react-native-mmkv-3.2.0.tgz",
+      "tag": "3.2.0",
+      "commit": "sha512-9y7K//1MaU46TFrXkyU0wT5VGk9Y2FDLFV6NPl+z3jTbm2G7SC1UIxneF6CfhSmBX5CfKze9SO7kwDuRx7flpQ==",
+      "license": "licenses/react-native-mmkv-MIT-and-BSD-3-Clause.txt",
+      "sources": [
+        "react-native-mmkv 3.2.0 android/CMakeLists.txt (src/main/cpp/AndroidLogger.cpp, cpp/MmkvHostObject.cpp, cpp/NativeMmkvModule.cpp), MMKV/Core (Tencent MMKV, bundled in the package), the react_codegen_RNMmkvSpec codegen output (@react-native/codegen 0.79.4 over src)"
+      ],
+      "ports": [
+        "scripts/wasm/rn-libs/shim.cmake: Emscripten toolchain, -DANDROID, imported ReactAndroid/fbjni prefab targets over the lab-built libraries, `android`/`log` ports (find_library(log-lib log) resolves to the log port), ANDROID_ABI=wasm32",
+        "scripts/wasm/prepare-rn-libs.py: lab port of MMKV/Core/MMKVPredef.h (packages.json `patches`): `#ifdef __ANDROID__` becomes `#if defined(__ANDROID__) || defined(ANDROID)` so MMKV_ANDROID is selected (the NDK clang defines __ANDROID__, Emscripten does not; the lab builds with -DANDROID)",
+        "scripts/wasm/ports/include: sys/sendfile.h and the __ANDROID_API_x__ names in android/api-level.h (force-included through lab-bionic.h), which the NDK headers provide",
+        "scripts/wasm/rn-libs/app-driver/lab-mmkv-load-log.cpp: a load-time constructor that logs, with tag APKWebLab, that the release is chosen from size evidence",
+        "scripts/wasm/rn-libs/app-driver: the app-level project that add_subdirectory()s the generated codegen project and then the package (cxxModuleCMakeListsPath), and links libappmodules to it"
+      ],
+      "apkSha256": "cff0c355aef64b259003ea70dee76ce7882058b8ecca1fd4be960aadab80e0a3",
+      "scope": "APK cff0c355aef6 only. THE RELEASE IS NOT DETERMINED: the library size in the APK's ZIP central directory (metadata) narrows it to react-native-mmkv 3.1.0, 3.2.0 or 3.3.0 (scripts/ndk-size-probe.sh, docs/WELLHUB-NATIVE-VERSIONS.md); the built group is the 3.2.0 native sources, byte-identical to 3.1.0. The one known semantic difference to 3.3.0 is MmkvHostObject.cpp: asString/asObject (a wrong argument type throws) here, getString/getObject (the type is assumed) in 3.3.0, which only matters for invalid arguments. If the app's lockfile version is outside {3.1.0, 3.2.0} this library does not match it. Not offered to any other APK."
     },
     "libreact_codegen_rnscreens.so": {
       "soname": "libreact_codegen_rnscreens.so",

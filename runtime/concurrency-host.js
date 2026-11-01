@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=da1f75bcefcc';
-import { createHostRegistry } from './host-contract.js?v=da1f75bcefcc';
-import { Blocked, VMThread } from './scheduler.js?v=da1f75bcefcc';
-import { Invoke } from './interpreter.js?v=da1f75bcefcc';
-import { GC_ROOTS } from './heap-gc.js?v=da1f75bcefcc';
+import { APKError } from './apk-error.js?v=c925763606ec';
+import { createHostRegistry } from './host-contract.js?v=c925763606ec';
+import { Blocked, VMThread } from './scheduler.js?v=c925763606ec';
+import { Invoke } from './interpreter.js?v=c925763606ec';
+import { GC_ROOTS } from './heap-gc.js?v=c925763606ec';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -134,6 +134,26 @@ export function createConcurrencyHost(platform) {
   def(THREAD, 'getName', `()${STRING}`, (r, _m, [self]) => state(r, self).name);
   def(THREAD, 'setName', `(${STRING})V`, (r, _m, [self, n]) => { state(r, self).name = n === null ? throwNew(r, 'Ljava/lang/NullPointerException;', 'name == null') : r.stringCharacters(n); });
   def(THREAD, 'getId', '()J', (r, _m, [self]) => state(r, self).id); def(THREAD, 'threadId', '()J', (r, _m, [self]) => state(r, self).id);
+  // Thread.getStackTrace / getAllStackTraces (libcore): the Java frames of a live thread, innermost first; a thread that is not started or has terminated has an empty trace. The calling thread's own
+  // trace starts with the two frames ART reports for the call itself (VMStack.getThreadStackTrace, Thread.getStackTrace).
+  const STE = 'Ljava/lang/StackTraceElement;';
+  const element = (r, cls, method) => { const e = r.makeObject(STE); r.object(e).ste = { cls, method, file: null, line: -1 }; return e; };
+  const traceOf = (r, thread, own) => {
+    const list = [];
+    if (own) list.push(element(r, 'dalvik.system.VMStack', 'getThreadStackTrace'), element(r, 'java.lang.Thread', 'getStackTrace'));
+    if (thread.started && !thread.finished) for (let i = thread.frames.length - 1; i >= 0 && list.length < 1024; i--) { const method = thread.frames[i].method; if (method) list.push(element(r, method.owner.slice(1, -1).replace(/\//g, '.'), method.name)); }
+    const array = r.newArray(`[${STE}`, list.length); r.array(array).elements = list; return array;
+  };
+  def(THREAD, 'getStackTrace', `()[${STE}`, (r, _m, [self]) => traceOf(r, state(r, self), state(r, self) === state(r, currentThread(r))));
+  def(THREAD, 'getAllStackTraces', '()Ljava/util/Map;', r => {
+    const map = r.allocate('Ljava/util/HashMap;'); r.dispatch({ owner: 'Ljava/util/HashMap;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [map], 'direct');
+    const me = state(r, currentThread(r)); mainThread(r);
+    for (const thread of [...r.scheduler.threads]) {
+      if (!thread.javaObject || !thread.started || thread.finished) continue;
+      r.dispatch({ owner: 'Ljava/util/HashMap;', name: 'put', parameters: [OBJECT, OBJECT], result: OBJECT, signature: `(${OBJECT}${OBJECT})${OBJECT}` }, [map, thread.javaObject, traceOf(r, thread, thread === me)], 'virtual');
+    }
+    return map;
+  }, { static: true });
   def(THREAD, 'isAlive', '()Z', (r, _m, [self]) => { const st = state(r, self); return st.started && !st.finished ? 1 : 0; });
   // Runtime.addShutdownHook/removeShutdownHook (libcore ApplicationShutdownHooks): same argument checks; hooks are held (GC-rooted) but never
   // started, because this VM has no process exit. Android itself does not promise to run them when an app process is killed.

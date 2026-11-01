@@ -1,16 +1,17 @@
-import { APKError } from './apk-error.js?v=da1f75bcefcc';
-import { JavaException } from './apk-runtime.js?v=da1f75bcefcc';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=da1f75bcefcc';
-import { buildElfDescriptor } from './native-descriptor.js?v=da1f75bcefcc';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=da1f75bcefcc';
-import { NativeLinker, LinkError } from './native-linker.js?v=da1f75bcefcc';
-import { hostFunction } from './wasm-host-function.js?v=da1f75bcefcc';
-import { parseWasm } from './wasm-dylink.js?v=da1f75bcefcc';
-import { formatVersion } from './rn-version.js?v=da1f75bcefcc';
-import { registerWasmMemory } from './unsafe-native.js?v=da1f75bcefcc';
-import { writeSkPath } from './skia-path-layout.js?v=da1f75bcefcc';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=da1f75bcefcc';
-import { withVariants } from './native-provider-variants.js?v=da1f75bcefcc';
+import { APKError } from './apk-error.js?v=c925763606ec';
+import { JavaException } from './apk-runtime.js?v=c925763606ec';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=c925763606ec';
+import { buildElfDescriptor } from './native-descriptor.js?v=c925763606ec';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=c925763606ec';
+import { NativeLinker, LinkError } from './native-linker.js?v=c925763606ec';
+import { hostFunction } from './wasm-host-function.js?v=c925763606ec';
+import { parseWasm } from './wasm-dylink.js?v=c925763606ec';
+import { formatVersion } from './rn-version.js?v=c925763606ec';
+import { registerWasmMemory } from './unsafe-native.js?v=c925763606ec';
+import { writeSkPath } from './skia-path-layout.js?v=c925763606ec';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=c925763606ec';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=c925763606ec';
+import { withVariants } from './native-provider-variants.js?v=c925763606ec';
 
 // JNI -> WebAssembly bridge.
 //
@@ -178,10 +179,12 @@ export class JniBridge {
   /** Functions the linker cannot take from a library: WASI, the few Emscripten runtime hooks, and syscalls (which report ENOSYS: there is no kernel). */
   /** Lab implementations of libc functions a library imports (src/native-file-syscalls.js): file-backed mmap/munmap/msync/mprotect and ftruncate over the VM's file system. */
   #override(name, soname, type) {
-    const wanted = SYSCALLS[name]; if (!wanted || !type) return undefined;
+    const wanted = SYSCALLS[name] ?? POSIX_SYSCALLS[name]; if (!wanted || !type) return undefined;
     if (wanted.params.join() !== type.params.join() || wanted.result !== (type.results[0] ?? null)) return undefined;   // a different signature is not the libc function
-    this.fileSyscalls ??= createFileSyscalls({ runtime: this.runtime, memory: this.linker.memory, base: new Proxy({}, { get: (_target, key) => this.linker.symbol(BASE_SONAME, key)?.fn }) });
-    const implementation = this.fileSyscalls.implementations[name];
+    const base = new Proxy({}, { get: (_target, key) => this.linker.symbol(BASE_SONAME, key)?.fn });
+    const implementation = SYSCALLS[name]
+      ? (this.fileSyscalls ??= createFileSyscalls({ runtime: this.runtime, memory: this.linker.memory, base })).implementations[name]
+      : (this.posixFiles ??= createPosixFileSyscalls({ runtime: this.runtime, memory: this.linker.memory, base })).implementations[name];
     return hostFunction(type.params, type.results[0] ?? null, (...args) => implementation(...args));
   }
   #hostImport(module, name, soname) {

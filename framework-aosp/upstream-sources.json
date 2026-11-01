@@ -27365,5 +27365,35 @@
     "sha256": "d39efda64fec130c35e9d25be42315744796e9154db34bcf070b97163155ad6c",
     "bytes": 8313,
     "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/Stack.java",
+    "localPath": "framework-aosp/upstream/java/util/Stack.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/Stack.java?format=TEXT",
+    "sha256": "66aa795c6c4d4f1b81cd3f9e06643f1bfc886cb8b6ed7244bdd972f90c21b235",
+    "bytes": 4845,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/EmptyStackException.java",
+    "localPath": "framework-aosp/upstream/java/util/EmptyStackException.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/EmptyStackException.java?format=TEXT",
+    "sha256": "cd1fadce7a8532765c86fb09a25049a52eff5ed6b896b5596fd0eb9ba63d241b",
+    "bytes": 1701,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/AudioDeviceCallback.java",
+    "localPath": "framework-aosp/upstream/android/media/AudioDeviceCallback.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/AudioDeviceCallback.java?format=TEXT",
+    "sha256": "ab7071432b433ca47945b92430b6737ca8f38ae28b37ed89b84d65bf12d1c536",
+    "bytes": 1613,
+    "license": "Apache-2.0"
   }
 ]

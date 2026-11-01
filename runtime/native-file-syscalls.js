@@ -1,4 +1,5 @@
-import { createFileMappings, MappingError, MAP } from './file-mapping.js?v=da1f75bcefcc';
+import { createFileMappings, MappingError, MAP } from './file-mapping.js?v=c925763606ec';
+import { WASI_ERRNO as ERRNO } from './native-posix-files.js?v=c925763606ec';   // the Emscripten libc ABI's errno numbers (WASI values), not Linux's
 
 // mmap, munmap, msync, mprotect and ftruncate for lab-built native libraries (androidx datastore's SharedCounter, ...): the file-backed part goes to src/file-mapping.js over the
 // VM's virtual file system, everything anonymous stays with the base module's own libc. The NativeLinker consults `override` before it binds a library's import to the base
@@ -6,7 +7,6 @@ import { createFileMappings, MappingError, MAP } from './file-mapping.js?v=da1f7
 //
 // Descriptors are the VM's: the fd a library gets from Java (FileDescriptor.getInt$) is a key of `runtime.libcoreIo.table`. Failures return -1 with errno set in the base module's
 // errno slot, exactly as libc does; MappingError.errno names the error (ENOTSUP, EINVAL, EACCES, ...).
-const ERRNO = { EPERM: 1, ENOENT: 2, EBADF: 9, ENOMEM: 12, EACCES: 13, EINVAL: 22, ENODEV: 19, ENOTSUP: 95 };
 const O_ACCMODE = 3, O_RDONLY = 0, O_WRONLY = 1;
 const FAILED = -1;   // MAP_FAILED as an i32
 
