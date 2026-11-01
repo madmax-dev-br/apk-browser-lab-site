@@ -3,6 +3,23 @@
 // The page sends coordinates relative to the Compose owner View it touched; one pointer, one gesture at a time (DOWN ... MOVE* ... UP/CANCEL).
 export const ACTION_DOWN = 0, ACTION_UP = 1, ACTION_MOVE = 2, ACTION_CANCEL = 3, ACTION_SCROLL = 8;
 const MOTION = 'Landroid/view/MotionEvent;', OWNER = 'Landroidx/compose/ui/platform/AndroidComposeView;', P = ['J', 'J', 'I', 'F', 'F', 'I'];
+const ACTIVITY = 'Landroid/app/Activity;';
+/**
+ * Android delivers input to the window's callback first: ViewRootImpl -> DecorView.dispatchTouchEvent -> Activity.dispatchTouchEvent (onUserInteraction, the decor view's tree, onTouchEvent).
+ * When the foreground Activity overrides any of those, the sample goes through the Activity in window coordinates (the page sends owner-relative ones); otherwise the Activity's own
+ * default body would only forward it to the same view, so it is delivered to the owner directly.
+ */
+function activityRoute(runtime, names) {
+  const activity = runtime.activity; if (!activity || !runtime.heap.has(activity.ref)) return null;
+  const type = runtime.object(activity).type;
+  if (!names.some(signature => runtime.objectOverride(type, signature))) return null;
+  return activity;
+}
+function windowOffset(runtime, ownerViewId) {
+  const out = runtime.newArray('[I', 2);
+  runtime.dispatch({ owner: 'Landroid/view/View;', name: 'getLocationInWindow', parameters: ['[I'], result: 'V', signature: '([I)V' }, [{ ref: ownerViewId }, out], 'virtual');
+  const [ox = 0, oy = 0] = runtime.array(out).elements; return [ox, oy];
+}
 const bits = value => { const view = new DataView(new ArrayBuffer(4)); view.setFloat32(0, value, true); return view.getInt32(0, true); };
 
 /** Delivers one pointer sample. Returns { handled, dropped?: reason }. Samples outside a gesture (MOVE/UP without DOWN, a different owner) are dropped like Android's input dispatcher does. */
@@ -18,9 +35,11 @@ export function dispatchPointer(runtime, { ownerViewId, action, x, y, t = 0, dx 
   gesture.last = { x, y };
   const eventTime = gesture.downTime + BigInt(Math.max(0, Math.round(t - gesture.pageStart))); runtime.lastPointerTime = Number(eventTime);
   const call = (owner, name, signature, parameters, result, values, mode = 'virtual') => runtime.dispatch({ owner, name, signature, parameters, result }, values, mode);
-  const event = call(MOTION, 'obtain', '(JJIFFI)Landroid/view/MotionEvent;', P, MOTION, runtime.argumentWords(P, [gesture.downTime, eventTime, action, bits(x), bits(y), 0]), 'static');
+  const activity = activityRoute(runtime, ['dispatchTouchEvent(Landroid/view/MotionEvent;)Z', 'onTouchEvent(Landroid/view/MotionEvent;)Z', 'onUserInteraction()V']);
+  const [ox, oy] = activity ? windowOffset(runtime, ownerViewId) : [0, 0];
+  const event = call(MOTION, 'obtain', '(JJIFFI)Landroid/view/MotionEvent;', P, MOTION, runtime.argumentWords(P, [gesture.downTime, eventTime, action, bits(x + ox), bits(y + oy), 0]), 'static');
   let handled;
-  try { handled = call(OWNER, 'dispatchTouchEvent', `(${MOTION})Z`, [MOTION], 'Z', [{ ref: ownerViewId }, event]); }
+  try { handled = activity ? call(ACTIVITY, 'dispatchTouchEvent', `(${MOTION})Z`, [MOTION], 'Z', [activity, event]) : call(OWNER, 'dispatchTouchEvent', `(${MOTION})Z`, [MOTION], 'Z', [{ ref: ownerViewId }, event]); }
   finally { try { call(MOTION, 'recycle', '()V', [], 'V', [event]); } catch { /* the app may have recycled it */ } if (action === ACTION_UP || action === ACTION_CANCEL) runtime.pointerGesture = null; }
   return { handled: !!handled };
 }

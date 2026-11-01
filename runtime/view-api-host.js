@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=922cd5cf3ad7';
-import { APKError } from './apk-error.js?v=922cd5cf3ad7';
+import { createHostRegistry } from './host-contract.js?v=4ca1bd96a090';
+import { APKError } from './apk-error.js?v=4ca1bd96a090';
 
 // Public android.view.View API (API 33) that the platform View model did not carry, with the semantics of android-13.0.0_r1 View.java. Grouped by topic below; state lives on the
 // View's host object (`r.object(view)`), the same place the other view hosts keep theirs.
@@ -1019,9 +1019,24 @@ export function createViewApiHost(platform) {
   const ANIMATION = 'Landroid/view/animation/Animation;', TRANSFORMATION = 'Landroid/view/animation/Transformation;', ANIMATION_UTILS = 'Landroid/view/animation/AnimationUtils;';
   const currentAnimationTime = r => Number(callStatic(r, ANIMATION_UTILS, 'currentAnimationTimeMillis', [], 'J'));
   def(VIEW, 'getAnimation', `()${ANIMATION}`, (r, _m, [self]) => r.object(self).currentAnimation ?? null);
+  /** The frame clock of a legacy Animation: View.draw asks the Animation for its Transformation on every frame, and the page composes views from their own layers, so the same ask
+   *  is made on a 16 ms timer while the view has an Animation. The alpha of the Transformation multiplies into the view's rendered alpha; when the Animation is over it fires its
+   *  listener (the usual way an app removes a faded-out overlay) and the view is cleared (unless fillAfter). */
+  const tickAnimation = (r, viewRef) => {
+    const view = r.object(viewRef); view.animationTicking = false;
+    if (nullish(view.currentAnimation)) return;
+    const parent = isView(r, view.parent) ? view.parent : viewRef, result = registry.legacyAnimation(r, parent, viewRef);
+    setAnimationAlpha(r, view, view.currentAnimation === null ? 1 : result?.alpha ?? 1);
+    if (!nullish(view.currentAnimation)) scheduleTick(r, viewRef);
+  };
+  const setAnimationAlpha = (r, view, alpha) => {
+    if ((view.animationAlpha ?? 1) === alpha) return; view.animationAlpha = alpha;
+    if (!view.alphaHandledByView) view.renderAlpha = Math.fround((view.alpha ?? 1) * (view.transitionAlpha ?? 1) * alpha);
+  };
+  const scheduleTick = (r, viewRef) => { const view = r.object(viewRef); if (view.animationTicking) return; view.animationTicking = true; platform.queueTask(() => tickAnimation(r, viewRef), 16, [viewRef]); };
   def(VIEW, 'setAnimation', `(${ANIMATION})V`, (r, _m, [self, animation]) => {
     r.object(self).currentAnimation = nullish(animation) ? null : animation;
-    if (!nullish(animation)) call(r, animation, ANIMATION, 'reset', [], 'V');
+    if (!nullish(animation)) { call(r, animation, ANIMATION, 'reset', [], 'V'); scheduleTick(r, self); } else setAnimationAlpha(r, r.object(self), 1);
   });
   def(VIEW, 'startAnimation', `(${ANIMATION})V`, (r, _m, [self, animation]) => {
     if (nullish(animation)) npe(r);
@@ -1031,7 +1046,7 @@ export function createViewApiHost(platform) {
   });
   def(VIEW, 'clearAnimation', '()V', (r, _m, [self]) => {
     const view = r.object(self); if (!nullish(view.currentAnimation)) call(r, view.currentAnimation, ANIMATION, 'detach', [], 'V');
-    view.currentAnimation = null; const parent = view.parent; if (isView(r, parent)) platform.requestDraw?.(r, parent);
+    view.currentAnimation = null; setAnimationAlpha(r, view, 1); const parent = view.parent; if (isView(r, parent)) platform.requestDraw?.(r, parent);
   });
   /** ViewGroup.drawChild for a child with an Animation: initialise it on its first frame, ask it for this frame's Transformation, finish it (listener, onAnimationEnd, clearAnimation unless fillAfter)
    *  when it is over, and keep the parent redrawing every frame while it runs. Returns { matrix, alpha } to apply to the child's canvas, or null. */

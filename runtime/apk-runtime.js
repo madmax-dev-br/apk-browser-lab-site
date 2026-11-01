@@ -1,22 +1,22 @@
-import { VMClock } from './vm-clock.js?v=922cd5cf3ad7';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=922cd5cf3ad7';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=922cd5cf3ad7';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=922cd5cf3ad7';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=922cd5cf3ad7';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=922cd5cf3ad7';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=922cd5cf3ad7';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=922cd5cf3ad7';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=922cd5cf3ad7';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=922cd5cf3ad7';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=922cd5cf3ad7';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=922cd5cf3ad7';
-import { APKError } from './apk-error.js?v=922cd5cf3ad7';
-import { collectGarbage } from './heap-gc.js?v=922cd5cf3ad7';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=922cd5cf3ad7';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=922cd5cf3ad7';
-import { Scheduler, Blocked } from './scheduler.js?v=922cd5cf3ad7';
-import { bootClassLacksMember } from './boot-class-members.js?v=922cd5cf3ad7';
-export { APKError } from './apk-error.js?v=922cd5cf3ad7';
+import { VMClock } from './vm-clock.js?v=4ca1bd96a090';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=4ca1bd96a090';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=4ca1bd96a090';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=4ca1bd96a090';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=4ca1bd96a090';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=4ca1bd96a090';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=4ca1bd96a090';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=4ca1bd96a090';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=4ca1bd96a090';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=4ca1bd96a090';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=4ca1bd96a090';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=4ca1bd96a090';
+import { APKError } from './apk-error.js?v=4ca1bd96a090';
+import { collectGarbage } from './heap-gc.js?v=4ca1bd96a090';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=4ca1bd96a090';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=4ca1bd96a090';
+import { Scheduler, Blocked } from './scheduler.js?v=4ca1bd96a090';
+import { bootClassLacksMember } from './boot-class-members.js?v=4ca1bd96a090';
+export { APKError } from './apk-error.js?v=4ca1bd96a090';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -871,7 +871,7 @@ const LAB_HELPERS = new Map([
 ]);
 
 export class APKRuntime {
-  constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 10000000, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off' } = {}) {
+  constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off' } = {}) {
     if (!Number.isInteger(maxCallDepth) || maxCallDepth < 16 || maxCallDepth > 100000) fail('VM maxCallDepth must be an integer from 16 to 100000');
     if(!Number.isInteger(maxHeapObjects)||maxHeapObjects<1024||maxHeapObjects>262144)fail('VM maxHeapObjects must be an integer from 1024 to 262144');
     this.maxHeapObjects=maxHeapObjects; this.gcSafepointFloor=Math.floor(maxHeapObjects*0.5); this.apkEntries=apkEntries; this.apkReader=apkReader;
@@ -881,8 +881,14 @@ export class APKRuntime {
     if (!['off', 'void', 'primitives', 'all'].includes(tolerateMissing)) fail('VM tolerateMissing must be off, void, primitives or all');
     this.tolerateMissing = tolerateMissing; this.missingVoid = new Map(); this.missingReturns = new Map(); this.missingClasses = new Map(); this.missingLibraries = new Map(); this.refusedProtectedLibrary = null;
     this.maxCallDepth = maxCallDepth; this.peakCallDepth = 0;
-    if (!Number.isInteger(maxInstructionsPerEvent) || maxInstructionsPerEvent < 1000 || maxInstructionsPerEvent > 20000000) fail('VM maxInstructionsPerEvent must be an integer from 1000 to 20000000');
-    this.maxInstructionsPerEvent = maxInstructionsPerEvent; this.maxEventInstructions = maxInstructionsPerEvent * 8;   // per thread / across the threads of one host event
+    if (!Number.isInteger(maxInstructionsPerEvent) || maxInstructionsPerEvent < 1000 || maxInstructionsPerEvent > 200000000) fail('VM maxInstructionsPerEvent must be an integer from 1000 to 200000000');
+    // Default fuse: 100M instructions per thread between blocking points, x8 across the threads of one host event. Measured on React Native 0.79 startup (Wellhub 10.22): one
+    // dispatchMessage on the native module thread runs ~1,300 getRandomBase64 lookups, each a TurboModuleManager walk (getTurboJavaModule, getTurboLegacyCxxModule,
+    // getLegacyJavaModule; RN has no negative cache), and the whole launch is 80-89M instructions with the longest uninterrupted thread run well under 100M. The former 10M limit
+    // stopped that legitimate work. A spinning thread still hits the fuse (tests/instruction-budget.test.mjs sets its own small fuse); `maxEventWallMs` bounds host time too.
+    this.maxInstructionsPerEvent = maxInstructionsPerEvent; this.maxEventInstructions = maxInstructionsPerEvent * 8;
+    // Wall-clock watchdog (host time of one event); 0 = off (tests and probes are deterministic), the Worker turns it on. Checked at every scheduling quantum, so it also trips for code that never switches threads.
+    this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
     this.dex = dex;
     this.classes = dex.resolvedClasses ?? dex.classes;
     this.launcherActivity = launcherActivity;
@@ -1431,6 +1437,14 @@ export class APKRuntime {
     return this.finishHostStep(outcome);
   }
   /** Heap-pressure collection at a thread-switch safepoint of a scheduling run (no host native is in flight there; see heap-gc.js). A no-op unless collection is enabled and the heap passed half its limit. */
+  /** Called every scheduling quantum by the interpreter: records the peak budget use of one thread and enforces the wall-clock limit of an event. */
+  budgetTick() {
+    if (this.steps > this.peakThreadSteps) this.peakThreadSteps = this.steps;
+    if (this.maxEventWallMs > 0 && this.eventWallStart > 0) {
+      const elapsed = performance.now() - this.eventWallStart;
+      if (elapsed > this.maxEventWallMs) throw new APKError(`Instruction budget exceeded: the event ran ${Math.round(elapsed)} ms of host time (limit ${this.maxEventWallMs} ms); ${this.steps} instructions on the running thread; threads: ${this.scheduler?.describe?.() ?? 'n/a'}`, { kind: 'event-wall-budget' });
+    }
+  }
   safepointCollect() {
     if (!this.gcEnabled || (!this.gcPressure && this.heap.size < Math.max(Math.floor(this.maxHeapObjects * 0.5), this.gcNextAt ?? 0))) return;
     collectGarbage(this, { reason: 'safepoint', safepoint: true });

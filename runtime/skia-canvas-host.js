@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=922cd5cf3ad7';
-import {getVectorGraphics} from './vector-native.js?v=922cd5cf3ad7';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=922cd5cf3ad7';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=922cd5cf3ad7';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=922cd5cf3ad7';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=922cd5cf3ad7';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=922cd5cf3ad7';
-import {createBitmapHost} from './bitmap-host.js?v=922cd5cf3ad7';
-import { gcRoot } from './heap-gc.js?v=922cd5cf3ad7';
+import {APKError} from './apk-runtime.js?v=4ca1bd96a090';
+import {getVectorGraphics} from './vector-native.js?v=4ca1bd96a090';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=4ca1bd96a090';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=4ca1bd96a090';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=4ca1bd96a090';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=4ca1bd96a090';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=4ca1bd96a090';
+import {createBitmapHost} from './bitmap-host.js?v=4ca1bd96a090';
+import { gcRoot } from './heap-gc.js?v=4ca1bd96a090';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -253,7 +253,7 @@ export function createSkiaCanvasHost(runtime,backend){
  const CK=backend.CanvasKit,paths=new Map(),pathHandles=new Map(),keys=new Set();let nextPathHandle=0x620000000n;let pathCells=0,clipCells=0;const add=(owner,signatures)=>signatures.forEach(s=>keys.add(owner+'->'+s));
  const TYPEFACE='Landroid/graphics/Typeface;',PAINT='Landroid/graphics/Paint;',typefaces=gcRoot(new Map()),faceCache=gcRoot(new Map());
  add(TYPEFACE,[`create(Ljava/lang/String;I)${TYPEFACE}`,`create(${TYPEFACE}I)${TYPEFACE}`,`create(${TYPEFACE}IZ)${TYPEFACE}`,`defaultFromStyle(I)${TYPEFACE}`,'getStyle()I','getWeight()I','isBold()Z','isItalic()Z']);
- add(PAINT,[`setTypeface(${TYPEFACE})${TYPEFACE}`,`getTypeface()${TYPEFACE}`]);
+ add(PAINT,[`setTypeface(${TYPEFACE})${TYPEFACE}`,`getTypeface()${TYPEFACE}`,'getFillPath(Landroid/graphics/Path;Landroid/graphics/Path;)Z']);
  const makeTypeface=(family='sans-serif',style=0,weight=null,italic=null)=>{
   const name=family??'sans-serif';if(!['sans-serif','sans','Roboto','sans-serif-medium','arial','helvetica','tahoma','verdana'].includes(name))fail(`Font family ${name} is not installed in the VM`);
   style&=3;weight??=name==='sans-serif-medium'&&style===0?500:style&1?700:400;italic??=!!(style&2);
@@ -285,7 +285,7 @@ export function createSkiaCanvasHost(runtime,backend){
  add(CANVAS,['drawColor(ILandroid/graphics/PorterDuff$Mode;)V','drawDoubleRoundRect(Landroid/graphics/RectF;FFLandroid/graphics/RectF;FFLandroid/graphics/Paint;)V','drawDoubleRoundRect(Landroid/graphics/RectF;[FLandroid/graphics/RectF;[FLandroid/graphics/Paint;)V']);
  add(CANVAS,[`drawPath(${PATH}Landroid/graphics/Paint;)V`,'drawCircle(FFFLandroid/graphics/Paint;)V','drawOval(FFFFLandroid/graphics/Paint;)V','drawRoundRect(FFFFFFLandroid/graphics/Paint;)V','drawColor(I)V','drawText(Ljava/lang/String;FFLandroid/graphics/Paint;)V','drawText(Ljava/lang/String;IIFFLandroid/graphics/Paint;)V','drawText(Ljava/lang/CharSequence;IIFFLandroid/graphics/Paint;)V','drawText([CIIFFLandroid/graphics/Paint;)V','clipRect(FFFF)Z','clipRect(Landroid/graphics/Rect;)Z',`clipPath(${PATH})Z`]);
  add(CANVAS,['drawRect(Landroid/graphics/RectF;Landroid/graphics/Paint;)V','drawRoundRect(Landroid/graphics/RectF;FFLandroid/graphics/Paint;)V','drawOval(Landroid/graphics/RectF;Landroid/graphics/Paint;)V','saveLayer(FFFFLandroid/graphics/Paint;)I','save()I','restore()V','restoreToCount(I)V','getSaveCount()I']);
- add(CANVAS,['setCompatibilityVersion(I)V','<init>(J)V','getClipBounds(Landroid/graphics/Rect;)Z']);
+ add(CANVAS,['setCompatibilityVersion(I)V','<init>(J)V','getClipBounds(Landroid/graphics/Rect;)Z','getClipBounds()Landroid/graphics/Rect;']);
  add(CANVAS,['drawLine(FFFFLandroid/graphics/Paint;)V','drawPoint(FFLandroid/graphics/Paint;)V','drawArc(FFFFFFZLandroid/graphics/Paint;)V','drawArc(Landroid/graphics/RectF;FFZLandroid/graphics/Paint;)V']);
  add(CANVAS,['drawTextRun(Ljava/lang/CharSequence;IIIIFFZLandroid/graphics/Paint;)V','drawTextRun(Ljava/lang/String;IIIIFFZLandroid/graphics/Paint;)V','drawTextRun([CIIIIFFZLandroid/graphics/Paint;)V']);
  add(CANVAS,['clipRect(FFFFLandroid/graphics/Region$Op;)Z','clipRect(IIIILandroid/graphics/Region$Op;)Z','clipRect(Landroid/graphics/Rect;Landroid/graphics/Region$Op;)Z','clipRect(Landroid/graphics/RectF;Landroid/graphics/Region$Op;)Z',`clipPath(${PATH}Landroid/graphics/Region$Op;)Z`,'clipOutRect(FFFF)Z','clipOutRect(IIII)Z',`clipOutPath(${PATH})Z`]);
@@ -330,6 +330,20 @@ export function createSkiaCanvasHost(runtime,backend){
     if(name==='create'){if(method.parameters[0]==='Ljava/lang/String;')return makeTypeface(args[0],args[1]);const source=resolveTypeface(args[0]);if(method.parameters.length===3){if(args[1]<0||args[1]>1000)vm.throwJava('Ljava/lang/IllegalArgumentException;','Typeface weight must be0..1000');return makeTypeface(source.family,0,args[1],!!args[2]);}return (args[1]&3)===source.style?source.reference:makeTypeface(source.family,args[1]);}
     if(name==='defaultFromStyle')return makeTypeface('sans-serif',args[0]);
     const info=resolveTypeface(receiver);return name==='getStyle'?info.style:name==='getWeight'?info.weight:name==='isBold'?(info.style&1?1:0):info.italic?1:0;
+   }
+   if(method.owner===PAINT&&name==='getFillPath'){
+    // Paint.getFillPath(src, dst): the outline the paint would draw (SkPaint::getFillPath). A fill paint gives the source path; a stroke paint gives its stroked outline (width, cap, join,
+    // miter); a zero-width stroke is a hairline: dst is the source and the result is false. Path effects (dashes) are not applied: the paint host does not hold them.
+    const state=getPaintState(vm,receiver);if(args[1]==null||args[1]===0||args[2]==null||args[2]===0)vm.throwJava('Ljava/lang/NullPointerException;',null);
+    const source=path(args[1]).builder.snapshot();let outline=null,filled=1;
+    try{
+     const style=state.style|0,width=Number(state.strokeWidth??0);
+     if(style!==0&&width>0){const caps=[CK.StrokeCap.Butt,CK.StrokeCap.Round,CK.StrokeCap.Square],joins=[CK.StrokeJoin.Miter,CK.StrokeJoin.Round,CK.StrokeJoin.Bevel];
+      outline=source.makeStroked({width,miter_limit:Number(state.strokeMiter??4),cap:caps[state.strokeCap|0]??caps[0],join:joins[state.strokeJoin|0]??joins[0]});if(!outline)filled=0;}
+     else if(style!==0)filled=0;   // hairline
+     const target=path(args[2]),replacement=new CK.PathBuilder(outline??source);target.builder.delete();target.builder=replacement;pathCells+=replacement.countPoints();
+    }finally{source.delete();outline?.delete();}
+    return filled;
    }
    if(method.owner===PAINT){const state=getPaintState(vm,receiver);if(name==='getTypeface')return state.typefaceRef??null;const value=args[1]==null||args[1]===0?null:args[1];if(value)resolveTypeface(value);state.typefaceRef=value;return value;}
    if(method.owner===CANVAS&&name==='<init>'){const handle=args[1];getVectorGraphics(vm).get(handle,'canvas');const object=vm.object(receiver);object.nativeCanvasHandle=handle;for(const[field,type,value]of [['mNativeCanvasWrapper','J',handle],['mDensity','I',0],['mScreenDensity','I',0]])vm.storeField(object.fields,`${CANVAS}->${field}:${type}`,value);object.canvasDensity=0;return;}
@@ -467,6 +481,10 @@ export function createSkiaCanvasHost(runtime,backend){
     const before=builder.countPoints(),values=finite(args.slice(1).map(number));if(typeof builder[name]!=='function')fail('Unsupported Path operation '+name);builder[name](...values);pathCells+=Math.max(0,builder.countPoints()-before);if(pathCells>1000000)fail('Aggregate Skia Path point limit exceeded');return;
    }
    const state=canvasState(receiver),values=args.slice(1).map((value,index)=>method.parameters[index]==='F'?number(value):value);
+   if(name==='getClipBounds'&&method.parameters.length===0){   // Canvas.getClipBounds(): a new Rect filled by getClipBounds(Rect)
+    const rect=vm.allocate('Landroid/graphics/Rect;');vm.dispatch({owner:'Landroid/graphics/Rect;',name:'<init>',parameters:[],result:'V',signature:'()V'},[rect],'direct');
+    vm.dispatch({owner:CANVAS,name:'getClipBounds',parameters:['Landroid/graphics/Rect;'],result:'Z',signature:'(Landroid/graphics/Rect;)Z'},[receiver,rect],'virtual');return rect;
+   }
    if(name==='getClipBounds'){
     if(args[1]===null||args[1]===0)vm.throwJava('Ljava/lang/NullPointerException;','Clip bounds Rect is null');const target=vm.object(args[1]);let bounds=[0,0,0,0],nonempty=false;
     if(state.width>0&&state.height>0){const surface=CK.MakeSurface(state.width,state.height);if(!surface)fail('Skia clip scratch allocation failed');try{const c=surface.getCanvas();applyClips(CK,c,state.clips);c.concat(matrix(state.matrix));const device=c.getDeviceClipBounds(),inverse=CK.Matrix.invert(c.getTotalMatrix());if(device[2]>device[0]&&device[3]>device[1]&&inverse){const points=CK.Matrix.mapPoints(inverse,[device[0],device[1],device[2],device[1],device[2],device[3],device[0],device[3]]);finite(points);bounds=[Math.min(points[0],points[2],points[4],points[6]),Math.min(points[1],points[3],points[5],points[7]),Math.max(points[0],points[2],points[4],points[6]),Math.max(points[1],points[3],points[5],points[7])].map(v=>Math.max(-2147483648,Math.min(2147483647,Math.floor(v+.5)))|0);nonempty=true;}}finally{surface.dispose();}}

@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=922cd5cf3ad7';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=922cd5cf3ad7';
-import { inspectELF } from './native-inspector.js?v=922cd5cf3ad7';
-import { inflateRaw } from './inflate.js?v=922cd5cf3ad7';
-import { resolveDevice } from './device-profile.js?v=922cd5cf3ad7';
-import { resourceProfileFor } from './device-configuration.js?v=922cd5cf3ad7';
-import { JniBridge } from './jni-host.js?v=922cd5cf3ad7';
-import { providerForApk } from './native-provider-variants.js?v=922cd5cf3ad7';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=922cd5cf3ad7';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=922cd5cf3ad7';
-import { AndroidResources } from './android-resources.js?v=922cd5cf3ad7';
-import { AndroidPlatform } from './android-platform.js?v=922cd5cf3ad7';
-import { FrameworkProvider } from './framework-provider.js?v=922cd5cf3ad7';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=4ca1bd96a090';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=4ca1bd96a090';
+import { inspectELF } from './native-inspector.js?v=4ca1bd96a090';
+import { inflateRaw } from './inflate.js?v=4ca1bd96a090';
+import { resolveDevice } from './device-profile.js?v=4ca1bd96a090';
+import { resourceProfileFor } from './device-configuration.js?v=4ca1bd96a090';
+import { JniBridge } from './jni-host.js?v=4ca1bd96a090';
+import { providerForApk } from './native-provider-variants.js?v=4ca1bd96a090';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=4ca1bd96a090';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=4ca1bd96a090';
+import { AndroidResources } from './android-resources.js?v=4ca1bd96a090';
+import { AndroidPlatform } from './android-platform.js?v=4ca1bd96a090';
+import { FrameworkProvider } from './framework-provider.js?v=4ca1bd96a090';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -591,7 +591,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const deviceSdk = options.apiLevel ?? 33, minSdk = Number(manifest.usesSdk?.minSdkVersion ?? 1);
   if (Number.isFinite(minSdk) && minSdk > deviceSdk) throw new APKError(`INSTALL_FAILED_OLDER_SDK: Requires newer sdk version #${minSdk} (current version is #${deviceSdk})`, { kind: 'install-failed-older-sdk', minSdkVersion: minSdk, deviceSdk });
   const runtime = new APKRuntime(program, { apkEntries: new Set(names), apkReader: name => archive.extractSync(name, 256 * 1024 * 1024), launcherActivity: manifest.launcherActivity, unsupportedFeatures,
-    maxInstructionsPerEvent: options.maxInstructionsPerEvent,
+    maxInstructionsPerEvent: options.maxInstructionsPerEvent, maxEventWallMs: options.maxEventWallMs,
     maxCallDepth: options.maxCallDepth,
     maxHeapObjects: options.maxHeapObjects, apiLevel: deviceSdk, tolerateMissingVoid: !!options.tolerateMissingVoid, tolerateMissing: options.tolerateMissing ?? (options.tolerateMissingVoid ? 'void' : 'off'),
     icuBreakBackend,sqliteBackend,tzdata,zlibBackend,icuConverterBackend,

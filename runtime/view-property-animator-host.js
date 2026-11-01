@@ -1,5 +1,5 @@
-import {APKError} from './apk-error.js?v=922cd5cf3ad7';
-import {renderNodeProperties} from './rendernode-native.js?v=922cd5cf3ad7';
+import {APKError} from './apk-error.js?v=4ca1bd96a090';
+import {renderNodeProperties} from './rendernode-native.js?v=4ca1bd96a090';
 const VIEW='Landroid/view/View;',VPA='Landroid/view/ViewPropertyAnimator;',NODE='Landroid/view/RenderNode;',INFO='Landroid/view/View$TransformationInfo;',PAINT='Landroid/graphics/Paint;',RUNNABLE='Ljava/lang/Runnable;';
 const bits=new DataView(new ArrayBuffer(4)),encode=v=>{bits.setFloat32(0,v,true);return bits.getInt32(0,true);},decode=v=>{bits.setInt32(0,v,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'view-property-animator-boundary'});};
@@ -45,7 +45,7 @@ export function createViewPropertyAnimatorHost(platform){
     if(old===alpha)return 0;
     r.storeField(info.fields,`${INFO}->mAlpha:F`,encode(alpha));view.alpha=alpha;
     view.alphaHandledByView=!!call(r,receiver,VIEW,'onSetAlpha',['I'],'Z',[Math.max(-2147483648,Math.min(2147483647,Math.trunc(Math.fround(alpha*255))))]);
-    view.renderAlpha=view.alphaHandledByView?1:Math.fround(alpha*(view.transitionAlpha??1));
+    view.renderAlpha=view.alphaHandledByView?1:Math.fround(alpha*(view.transitionAlpha??1)*(view.animationAlpha??1));
     renderNodeProperties(r,view.viewRenderNode).alpha=Math.max(0,Math.min(1,view.renderAlpha));
     return view.alphaHandledByView?1:0;
    }

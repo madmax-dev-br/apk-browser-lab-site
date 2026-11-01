@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=922cd5cf3ad7';
-import { gcRoot } from './heap-gc.js?v=922cd5cf3ad7';
+import { APKError } from './apk-runtime.js?v=4ca1bd96a090';
+import { gcRoot } from './heap-gc.js?v=4ca1bd96a090';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;';
 const SUPER_ERROR = 'Landroid/util/SuperNotCalledException;';
@@ -68,7 +68,7 @@ export function createViewInputHost(platform) {
         if ((view[field] ?? 1) === alpha) return;
         view[field] = alpha;
         view.alphaHandledByView = name === 'setAlpha' && !!dispatch(runtime, receiver, 'onSetAlpha', ['I'], 'Z', [Math.max(-2147483648, Math.min(2147483647, Math.trunc(Math.fround(alpha * 255))))]);
-        view.renderAlpha = view.alphaHandledByView ? 1 : Math.fround((view.alpha ?? 1) * (view.transitionAlpha ?? 1));
+        view.renderAlpha = view.alphaHandledByView ? 1 : Math.fround((view.alpha ?? 1) * (view.transitionAlpha ?? 1) * (view.animationAlpha ?? 1));
         platform.requestDraw(runtime, receiver);
         return;
       }

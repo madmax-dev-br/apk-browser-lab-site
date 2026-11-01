@@ -1,36 +1,36 @@
-import { createMessageSink } from './audio-native.js?v=922cd5cf3ad7';
-import { loadAPK } from './apk-loader.js?v=922cd5cf3ad7';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=922cd5cf3ad7';
-import { createWebViewBackend } from './webview-backend.js?v=922cd5cf3ad7';
-import { FrameworkProvider } from './framework-provider.js?v=922cd5cf3ad7';
-import { createRasterSender } from './raster-cache.js?v=922cd5cf3ad7';
-import { isFreedId } from './heap-gc.js?v=922cd5cf3ad7';
-import { dispatchPointer } from './pointer-input-host.js?v=922cd5cf3ad7';
-import { resolveDevice } from './device-profile.js?v=922cd5cf3ad7';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=922cd5cf3ad7';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=922cd5cf3ad7';
-import { SkiaProvider } from './skia-provider.js?v=922cd5cf3ad7';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=922cd5cf3ad7';
-import { disposeTextLayout } from './text-layout-native.js?v=922cd5cf3ad7';
-import { IcuBreakProvider } from './icu-break-provider.js?v=922cd5cf3ad7';
-import { SqliteProvider } from './sqlite-native.js?v=922cd5cf3ad7';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=922cd5cf3ad7';
-import { TzdataProvider } from './java-time-native.js?v=922cd5cf3ad7';
-import { ZlibProvider } from './zip-native.js?v=922cd5cf3ad7';
-import { IcuConverterProvider } from './icu-converter-native.js?v=922cd5cf3ad7';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=922cd5cf3ad7';
-import { JavacryptoProvider } from './javacrypto-native.js?v=922cd5cf3ad7';
-import { disposeColorFilters } from './color-filter-native.js?v=922cd5cf3ad7';
-import { disposeRegex } from './regex-native.js?v=922cd5cf3ad7';
-import { disposeRenderNodes } from './rendernode-native.js?v=922cd5cf3ad7';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=922cd5cf3ad7';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=922cd5cf3ad7';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=922cd5cf3ad7';
+import { createMessageSink } from './audio-native.js?v=4ca1bd96a090';
+import { loadAPK } from './apk-loader.js?v=4ca1bd96a090';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=4ca1bd96a090';
+import { createWebViewBackend } from './webview-backend.js?v=4ca1bd96a090';
+import { FrameworkProvider } from './framework-provider.js?v=4ca1bd96a090';
+import { createRasterSender } from './raster-cache.js?v=4ca1bd96a090';
+import { isFreedId } from './heap-gc.js?v=4ca1bd96a090';
+import { dispatchPointer } from './pointer-input-host.js?v=4ca1bd96a090';
+import { resolveDevice } from './device-profile.js?v=4ca1bd96a090';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=4ca1bd96a090';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=4ca1bd96a090';
+import { SkiaProvider } from './skia-provider.js?v=4ca1bd96a090';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=4ca1bd96a090';
+import { disposeTextLayout } from './text-layout-native.js?v=4ca1bd96a090';
+import { IcuBreakProvider } from './icu-break-provider.js?v=4ca1bd96a090';
+import { SqliteProvider } from './sqlite-native.js?v=4ca1bd96a090';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=4ca1bd96a090';
+import { TzdataProvider } from './java-time-native.js?v=4ca1bd96a090';
+import { ZlibProvider } from './zip-native.js?v=4ca1bd96a090';
+import { IcuConverterProvider } from './icu-converter-native.js?v=4ca1bd96a090';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=4ca1bd96a090';
+import { JavacryptoProvider } from './javacrypto-native.js?v=4ca1bd96a090';
+import { disposeColorFilters } from './color-filter-native.js?v=4ca1bd96a090';
+import { disposeRegex } from './regex-native.js?v=4ca1bd96a090';
+import { disposeRenderNodes } from './rendernode-native.js?v=4ca1bd96a090';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=4ca1bd96a090';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=4ca1bd96a090';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=4ca1bd96a090';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=922cd5cf3ad7';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=922cd5cf3ad7';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=922cd5cf3ad7';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '922cd5cf3ad7';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=4ca1bd96a090';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=4ca1bd96a090';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=4ca1bd96a090';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '4ca1bd96a090';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -57,6 +57,9 @@ function currentSnapshot() {
   snapshot.vmHealth = { liveObjects: runtime.heap.size, limit: runtime.maxHeapObjects, lastEventMs, collections: runtime.gcStats?.collections ?? 0, freedObjects: runtime.gcStats?.freed ?? 0, oomCount: runtime.oomCount ?? 0, lastOom: runtime.lastOom ?? null };
   return rasterSender.intern(snapshot); // repeated PNGs travel once; the page resolves rasterId to a cached Blob URL
 }
+// Host-time limit of one VM event in the Worker. The instruction fuse (100M per thread: a React Native startup needs ~3.4M-85M in one dispatch, see the comment at
+// APKRuntime.maxInstructionsPerEvent) bounds work, this bounds time: a hot loop that is cheap per instruction can never freeze the page for more than this.
+const EVENT_WALL_LIMIT_MS = 30000;
 function drainReadyEvents() {
   let processed = 0, result;
   for (let round = 0; round < 32; round++) {
@@ -122,7 +125,7 @@ self.onmessage = async ({ data }) => {
       // Lab-built wasm32 native libraries (libreactnative, Hermes, ...): provenance now, each module only when the app's SoLoader links it
       const nativeLibraryProvider = NATIVE_LIBS_URL ? (sharedNativeLibraryProvider ??= await LazyNativeLibraryProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
       const javacryptoProvider = NATIVE_LIBS_URL ? (sharedJavacryptoProvider ??= await JavacryptoProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
-      const result = await loadAPK(data.buffer, { nativeLibraryProvider, javacryptoProvider, device: resolveDevice(data.device || {}), tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
+      const result = await loadAPK(data.buffer, { maxEventWallMs: EVENT_WALL_LIMIT_MS, nativeLibraryProvider, javacryptoProvider, device: resolveDevice(data.device || {}), tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
       runtime = result.runtime; archive = result.archive; inventory = result.inventory;
       runtime.platform.audioSink = createMessageSink((message, transfer) => self.postMessage(message, transfer));   // android.media.AudioTrack PCM goes to the page's Web Audio output
       // WebView content lives in iframes of the page: without a page that wants them (the embedded player's default) the WebView has no backend and fails explicitly

@@ -1,6 +1,6 @@
-import {APKError} from './apk-runtime.js?v=922cd5cf3ad7';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=922cd5cf3ad7';
-import {getVectorGraphics} from './vector-native.js?v=922cd5cf3ad7';
+import {APKError} from './apk-runtime.js?v=4ca1bd96a090';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=4ca1bd96a090';
+import {getVectorGraphics} from './vector-native.js?v=4ca1bd96a090';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -159,7 +159,20 @@ export function createComposeCanvasHost(platform){
       const visit=(receiver,depth=0)=>{
         const view=r.object(receiver);if(seen.has(view.id)||seen.size>=4096||depth>64)fail('Cyclic/excessive custom Canvas View tree');seen.add(view.id);
         if(view.visibility===4||view.visibility===8)return;
-        const customLeaf=!r.isSubtype(view.type,GROUP)&&r.dex.classes.has(view.type)&&!!r.objectOverride(view.type,'onDraw(Landroid/graphics/Canvas;)V');
+        // A View whose class (in the app's DEX) overrides onDraw paints itself through the original Canvas callbacks. A ViewGroup that does so (react-native-svg's SvgView draws its whole
+        // vector output from onDraw) keeps its children as separate layers: only its own onDraw runs here, and the walk continues into the children.
+        const isGroup=r.isSubtype(view.type,GROUP),overridesDraw=r.dex.classes.has(view.type)&&!!r.objectOverride(view.type,'onDraw(Landroid/graphics/Canvas;)V');
+        const customLeaf=overridesDraw&&!isGroup,customGroup=overridesDraw&&isGroup&&!view.willNotDraw&&!r.isSubtype(view.type,OWNER);
+        if(customGroup){
+          const [gw,gh]=dimensions(view);
+          if(view.laidOut&&gw&&gh&&r.skiaHost){
+            const target=view.contentCanvas??=r.allocate(CANVAS);
+            if(!view.contentCanvasInitialized){call(r,target,CANVAS,'<init>',[],'V',[],'direct');view.contentCanvasInitialized=true;}
+            const graphics=getVectorGraphics(r);graphics.resetCanvas(target,gw,gh);
+            call(r,receiver,VIEW,'onDraw',[CANVAS],'V',[target]);
+            view.contentRaster=graphics.snapshotCanvas(target,gw,gh);r.record(`DRAW custom ViewGroup onDraw: original ${view.type} -> Skia CPU`);
+          }
+        }
         if(r.isSubtype(view.type,OWNER)||customLeaf){
           const [width,height]=dimensions(view);if(!view.laidOut||!width||!height)return;
           if(!r.skiaHost)fail('Compose drawing requires the verified Skia Canvas backend');
