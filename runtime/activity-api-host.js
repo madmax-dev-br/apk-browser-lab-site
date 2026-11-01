@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=64ce1d942f1e';
-import { APKError } from './apk-error.js?v=64ce1d942f1e';
-import { gcRoot } from './heap-gc.js?v=64ce1d942f1e';
+import { createHostRegistry } from './host-contract.js?v=b6af1ec5264d';
+import { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { gcRoot } from './heap-gc.js?v=b6af1ec5264d';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -80,6 +80,23 @@ export function createActivityApiHost(platform) {
     const value = text(r, str), sep = value.indexOf('/'); if (sep < 0 || sep + 1 >= value.length) return null;
     const pkg = value.slice(0, sep); let cls = value.slice(sep + 1); if (cls.length > 0 && cls[0] === '.') cls = pkg + cls; return newComponent(r, pkg, cls);
   }, { static: true });
+
+  // ---- ViewGroup.MarginLayoutParams: relative (start / end) margins and their resolution by layout direction (android-13.0.0_r1 MarginLayoutParams). Undefined is Integer.MIN_VALUE; once a relative
+  // margin is set the left / right margins follow the layout direction when it is resolved (RTL: start is the right margin).
+  const MARGIN = 'Landroid/view/ViewGroup$MarginLayoutParams;', UNDEFINED = -2147483648;
+  const margin = (r, self) => r.object(self).marginState ??= { start: UNDEFINED, end: UNDEFINED, dir: 0, relative: false };
+  const marginField = (r, self, edge, value) => { const key = `${MARGIN}->${edge}Margin:I`; if (value === undefined) return r.object(self).fields.get(key) ?? 0; r.storeField(r.object(self).fields, key, value); return undefined; };
+  const applyRelative = (r, self) => {
+    const m = margin(r, self); if (!m.relative) return; const rtl = m.dir === 1;
+    if (rtl) { if (m.end !== UNDEFINED) marginField(r, self, 'left', m.end); if (m.start !== UNDEFINED) marginField(r, self, 'right', m.start); } else { if (m.start !== UNDEFINED) marginField(r, self, 'left', m.start); if (m.end !== UNDEFINED) marginField(r, self, 'right', m.end); }
+  };
+  def(MARGIN, 'resolveLayoutDirection', '(I)V', (r, _m, [self, dir]) => { margin(r, self).dir = dir; applyRelative(r, self); });
+  def(MARGIN, 'setLayoutDirection', '(I)V', (r, _m, [self, dir]) => { margin(r, self).dir = dir; }); def(MARGIN, 'getLayoutDirection', '()I', (r, _m, [self]) => margin(r, self).dir);
+  def(MARGIN, 'setMarginStart', '(I)V', (r, _m, [self, v]) => { const m = margin(r, self); m.start = v; m.relative = true; applyRelative(r, self); });
+  def(MARGIN, 'setMarginEnd', '(I)V', (r, _m, [self, v]) => { const m = margin(r, self); m.end = v; m.relative = true; applyRelative(r, self); });
+  def(MARGIN, 'getMarginStart', '()I', (r, _m, [self]) => { const m = margin(r, self); return m.start !== UNDEFINED ? m.start : marginField(r, self, m.dir === 1 ? 'right' : 'left'); });
+  def(MARGIN, 'getMarginEnd', '()I', (r, _m, [self]) => { const m = margin(r, self); return m.end !== UNDEFINED ? m.end : marginField(r, self, m.dir === 1 ? 'left' : 'right'); });
+  def(MARGIN, 'isMarginRelative', '()Z', (r, _m, [self]) => margin(r, self).relative ? 1 : 0);
 
   // ---- Orientation -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   def(ACTIVITY, 'setRequestedOrientation', '(I)V', (r, _m, [self, request]) => {

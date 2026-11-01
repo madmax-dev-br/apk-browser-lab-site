@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=64ce1d942f1e';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=64ce1d942f1e';
-import { inspectELF } from './native-inspector.js?v=64ce1d942f1e';
-import { inflateRaw } from './inflate.js?v=64ce1d942f1e';
-import { resolveDevice } from './device-profile.js?v=64ce1d942f1e';
-import { resourceProfileFor } from './device-configuration.js?v=64ce1d942f1e';
-import { JniBridge } from './jni-host.js?v=64ce1d942f1e';
-import { providerForApk } from './native-provider-variants.js?v=64ce1d942f1e';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=64ce1d942f1e';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=64ce1d942f1e';
-import { AndroidResources } from './android-resources.js?v=64ce1d942f1e';
-import { AndroidPlatform } from './android-platform.js?v=64ce1d942f1e';
-import { FrameworkProvider } from './framework-provider.js?v=64ce1d942f1e';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=b6af1ec5264d';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=b6af1ec5264d';
+import { inspectELF } from './native-inspector.js?v=b6af1ec5264d';
+import { inflateRaw } from './inflate.js?v=b6af1ec5264d';
+import { resolveDevice } from './device-profile.js?v=b6af1ec5264d';
+import { resourceProfileFor } from './device-configuration.js?v=b6af1ec5264d';
+import { JniBridge } from './jni-host.js?v=b6af1ec5264d';
+import { providerForApk } from './native-provider-variants.js?v=b6af1ec5264d';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=b6af1ec5264d';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=b6af1ec5264d';
+import { AndroidResources } from './android-resources.js?v=b6af1ec5264d';
+import { AndroidPlatform } from './android-platform.js?v=b6af1ec5264d';
+import { FrameworkProvider } from './framework-provider.js?v=b6af1ec5264d';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -315,8 +315,8 @@ async function prepareResources(archive, names, options, report, yieldControl, w
   }
   summary.parsedLayouts = layouts.size; summary.skippedLayouts = layoutFiles.length - layouts.size;
   const xmlTrees = new Map(layouts), xmlErrors = new Map(layoutErrors), candidates = new Set(layoutFiles);
-  const xmlTypes = new Set(['navigation', 'drawable', 'color', 'animator', 'anim', 'xml', 'menu', 'transition', 'font', 'mipmap']);
-  const alwaysXML = new Set(['navigation', 'color', 'animator', 'anim', 'xml', 'menu', 'transition']);
+  const xmlTypes = new Set(['navigation', 'drawable', 'color', 'animator', 'anim', 'interpolator', 'xml', 'menu', 'transition', 'font', 'mipmap']);
+  const alwaysXML = new Set(['navigation', 'color', 'animator', 'anim', 'interpolator', 'xml', 'menu', 'transition']);
   for (const variants of table.entries.values()) for (const entry of variants) {
     if (xmlTypes.has(entry.resourceType) && entry.kind === 'string' && typeof entry.value === 'string' &&
       (entry.value.endsWith('.xml') || alwaysXML.has(entry.resourceType)) && archive.entries.has(entry.value)) candidates.add(entry.value);
@@ -534,6 +534,9 @@ export async function loadAPK(arrayBuffer, options = {}) {
     usesViewTransforms || program.methods.some(method=>method.name==='onMeasure'&&method.signature==='(II)V')&&program.types.some(type=>['Landroid/widget/TextView;','Landroid/widget/Button;'].includes(type));
   let skia=options.skiaBackend??null;
   if(!skia&&options.skiaProvider&&(needsSkia||options.forceSkia===true)){const source=options.skiaProvider;skia=typeof source==='function'?await source({onProgress:options.onProgress}):await source.load({onProgress:options.onProgress});}
+  // JPEG/WebP/AVIF codecs (vendor/lab-codecs) load only for an APK that can decode or encode images: it references BitmapFactory / ImageDecoder / Bitmap.CompressFormat, or ships image files.
+  const usesImageCodecs=program.types.some(type=>/^Landroid\/graphics\/(BitmapFactory|ImageDecoder)(\$|;)/.test(type)||type==='Landroid/graphics/Bitmap$CompressFormat;')||[...archive.entries.keys()].some(name=>/\.(jpe?g|webp|avif)$/i.test(name));
+  if(skia&&usesImageCodecs&&typeof skia.prepareCodecs==='function')await skia.prepareCodecs();
   if(skia&&(typeof skia.createHost!=='function'||typeof skia.rasterizeCanvas!=='function'))fail('Invalid official Skia provider result');
   let frameworkResources = null;
   if (options.frameworkResourceProvider) {

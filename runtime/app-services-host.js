@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=64ce1d942f1e';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=64ce1d942f1e';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=64ce1d942f1e';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=64ce1d942f1e';
+import { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=b6af1ec5264d';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=b6af1ec5264d';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=b6af1ec5264d';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -816,10 +816,12 @@ export function createAppServicesHost(platform) {
   const matchingComponents = (r, intent, kind) => {
     const call = (name, result) => r.dispatch({ owner: INTENT_TYPE, name, parameters: [], result, signature: `()${result}` }, [intent], 'virtual');
     const component = call('getComponent', COMPONENT_NAME), wantedPackage = call('getPackage', STRING), action = call('getAction', STRING);
-    const details = (platform.manifest?.componentDetails ?? []).filter(d => d.kind === kind && !isFalse(d.enabled));
+    // activities come from the manifest's activity list (name, exported flag, launcher); the launcher activity answers MAIN with the LAUNCHER category (its intent filter), the rest by explicit component only
+    const details = kind === 'activity' ? (platform.manifest?.activities ?? []).map(a => ({ ...a, kind: 'activity', actions: a.launcher ? ['android.intent.action.MAIN'] : [], categories: a.launcher ? ['android.intent.category.LAUNCHER', 'android.intent.category.DEFAULT'] : [] })) : (platform.manifest?.componentDetails ?? []).filter(d => d.kind === kind && !isFalse(d.enabled));
     if (component !== null) { const c = r.object(component); return c.packageName === pkg() ? details.filter(d => d.name === c.className) : []; }
     if (wantedPackage !== null && r.stringCharacters(wantedPackage) !== pkg()) return [];
-    return action === null ? [] : details.filter(d => d.actions?.includes(r.stringCharacters(action)));
+    const categories = call('getCategories', 'Ljava/util/Set;'), asArray = categories === null ? null : r.dispatch({ owner: 'Ljava/util/Set;', name: 'toArray', parameters: [], result: '[Ljava/lang/Object;', signature: '()[Ljava/lang/Object;' }, [categories], 'interface'), wanted = asArray === null ? [] : r.array(asArray).elements.map(c => r.stringCharacters(c));
+    return action === null ? [] : details.filter(d => d.actions?.includes(r.stringCharacters(action)) && (kind !== 'activity' || wanted.every(c => d.categories?.includes(c))));
   };
   const resolveInfos = (r, intent, kind, withMeta) => {
     const list = newEmptyList(r);
@@ -1075,5 +1077,5 @@ export function createAppServicesHost(platform) {
     }
   }
 
-  return { ...registry, [GC_ROOTS](visit) { visit(currentContext); }, interfaces: registry.interfacesOf, getService, metaDataBundle, serviceNameForClass: classType => serviceByClass.get(classType) ?? null, installContentProviders, preferenceInstances: instances };
+  return { ...registry, [GC_ROOTS](visit) { visit(currentContext); }, interfaces: registry.interfacesOf, getService, metaDataBundle, serviceNameForClass: classType => serviceByClass.get(classType) ?? null, installContentProviders, providerByAuthority: authority => { const detail = (platform.manifest?.providerDetails ?? []).find(p => !isFalse(p.enabled) && String(p.authorities ?? '').split(';').includes(authority)); return detail ? installedProviders.get(detail.name) ?? null : null; }, preferenceInstances: instances, findPackage, packageNames: r => packages(r).map(entry => entry.name) };
 }

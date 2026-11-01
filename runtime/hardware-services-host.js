@@ -1,7 +1,8 @@
-import { gcRoot } from './heap-gc.js?v=64ce1d942f1e';
-import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=64ce1d942f1e';
-import { createHostRegistry } from './host-contract.js?v=64ce1d942f1e';
-import { GC_ROOTS } from './heap-gc.js?v=64ce1d942f1e';
+import { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { gcRoot } from './heap-gc.js?v=b6af1ec5264d';
+import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=b6af1ec5264d';
+import { createHostRegistry } from './host-contract.js?v=b6af1ec5264d';
+import { GC_ROOTS } from './heap-gc.js?v=b6af1ec5264d';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
 // contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes, and an AlarmManager that
@@ -84,17 +85,73 @@ export function createHardwareServicesHost(platform) {
   for (const [name, value] of Object.entries({ RTC_WAKEUP: 0, RTC: 1, ELAPSED_REALTIME_WAKEUP: 2, ELAPSED_REALTIME: 3 })) registry.staticField(ALARM, name, 'I', () => value);
   for (const [name, value] of Object.entries({ INTERVAL_FIFTEEN_MINUTES: 900000n, INTERVAL_HALF_HOUR: 1800000n, INTERVAL_HOUR: 3600000n, INTERVAL_HALF_DAY: 43200000n, INTERVAL_DAY: 86400000n })) registry.staticField(ALARM, name, 'J', () => value);
 
-  // ---- LocationManager: no GPS/network provider, location services off ------------------------------------------------------------------------------------
+  // ---- LocationManager: an emulator with location services off (android-13.0.0_r1 LocationManager / LocationManagerService) ----------------------------------------------------------------
+  // The providers exist (passive, gps, network, fused) but the user setting is off, so none is enabled and none ever produces a fix: isLocationEnabled/isProviderEnabled are false, there is no last
+  // location, getCurrentLocation answers null, GNSS callbacks register but never fire, and a listener registered on a disabled provider hears onProviderDisabled right away (documented in
+  // LocationListener). Permission checks throw SecurityException like LocationPermissions.enforceLocationPermission. Callbacks run on the main event queue (the Looper/Executor given is not honoured).
   const LOCATION = service('location', 'Landroid/location/LocationManager;');
-  def(LOCATION, 'isLocationEnabled', '()Z', () => 0); def(LOCATION, 'isProviderEnabled', `(${STRING})Z`, () => 0);
-  def(LOCATION, 'getAllProviders', '()Ljava/util/List;', r => { const list = emptyList(r); call(r, list, 'Ljava/util/ArrayList;', 'add', [OBJECT], 'Z', ['passive']); return list; });
-  def(LOCATION, 'getProviders', '(Z)Ljava/util/List;', r => emptyList(r));
-  def(LOCATION, 'getLastKnownLocation', `(${STRING})Landroid/location/Location;`, (r, _m, [, provider]) => {
-    if (provider === null) r.throwJava('Ljava/lang/IllegalArgumentException;', 'invalid provider: null');
-    if (!holds(r, 'android.permission.ACCESS_FINE_LOCATION') && !holds(r, 'android.permission.ACCESS_COARSE_LOCATION')) r.throwJava('Ljava/lang/SecurityException;', `uid ${platform.virtualProcess?.uid ?? 10000} does not have android.permission.ACCESS_COARSE_LOCATION or android.permission.ACCESS_FINE_LOCATION.`);
-    return null;
+  const LISTENER = 'Landroid/location/LocationListener;', LOC = 'Landroid/location/Location;', LOOPER = 'Landroid/os/Looper;', EXECUTOR = 'Ljava/util/concurrent/Executor;', CONSUMER = 'Ljava/util/function/Consumer;', SIGNAL = 'Landroid/os/CancellationSignal;', CRITERIA = 'Landroid/location/Criteria;', LREQUEST = 'Landroid/location/LocationRequest;', GNSS_CB = 'Landroid/location/GnssStatus$Callback;', HANDLER = 'Landroid/os/Handler;', INTENT = 'Landroid/content/Intent;';
+  const PROVIDERS = ['passive', 'gps', 'network', 'fused'], FINE_ONLY = new Set(['gps', 'passive']);
+  const registrations = gcRoot(new Map());   // listener / PendingIntent ref -> { provider, handle }
+  const iae = (r, m) => r.throwJava('Ljava/lang/IllegalArgumentException;', m);
+  const provider_ = (r, v) => { if (v === null || v === 0) iae(r, 'invalid provider: null'); return text(r, v); };
+  const enforce = (r, provider) => {
+    const fine = holds(r, 'android.permission.ACCESS_FINE_LOCATION'), coarse = holds(r, 'android.permission.ACCESS_COARSE_LOCATION'), uid = platform.virtualProcess?.uid ?? 10000;
+    if (FINE_ONLY.has(provider)) { if (!fine) r.throwJava('Ljava/lang/SecurityException;', `uid ${uid} does not have android.permission.ACCESS_FINE_LOCATION.`); }
+    else if (!fine && !coarse) r.throwJava('Ljava/lang/SecurityException;', `uid ${uid} does not have android.permission.ACCESS_COARSE_LOCATION or android.permission.ACCESS_FINE_LOCATION.`);
+  };
+  const providerOfRequest = (r, request) => { const name = call(r, request, LREQUEST, 'getProvider', [], STRING); return text(r, name); };
+  def(LOCATION, 'isLocationEnabled', '()Z', () => 0);
+  def(LOCATION, 'isProviderEnabled', `(${STRING})Z`, (r, _m, [, provider]) => { provider_(r, provider); return 0; });
+  def(LOCATION, 'hasProvider', `(${STRING})Z`, (r, _m, [, provider]) => PROVIDERS.includes(provider_(r, provider)) ? 1 : 0);
+  const providerList = (r, names) => { const list = emptyList(r); for (const name of names) call(r, list, 'Ljava/util/ArrayList;', 'add', [OBJECT], 'Z', [name]); return list; };
+  def(LOCATION, 'getAllProviders', '()Ljava/util/List;', r => providerList(r, PROVIDERS));
+  def(LOCATION, 'getProviders', '(Z)Ljava/util/List;', (r, _m, [, enabledOnly]) => providerList(r, enabledOnly ? [] : PROVIDERS));
+  def(LOCATION, 'getBestProvider', `(${CRITERIA}Z)${STRING}`, (r, _m, [, criteria, enabledOnly]) => {
+    if (criteria === null) iae(r, 'criteria must not be null');
+    if (enabledOnly) return null;   // no provider is enabled
+    throw new APKError('LocationManager.getBestProvider(criteria, false): matching Criteria against provider properties is not modelled', { kind: 'unsupported-location' });
   });
-  def(LOCATION, 'removeUpdates', '(Landroid/location/LocationListener;)V', () => {});
+  def(LOCATION, 'getLastKnownLocation', `(${STRING})${LOC}`, (r, _m, [, provider]) => { enforce(r, provider_(r, provider)); return null; });
+  // updates: validation order of LocationManager.requestLocationUpdates, then the registration; a disabled provider reports onProviderDisabled at once
+  const registerListener = (r, key, provider, notify) => {
+    if (key === null || key === 0) iae(r, 'invalid listener: null');
+    enforce(r, provider);
+    if (!PROVIDERS.includes(provider)) iae(r, `provider "${provider}" does not exist`);
+    const record = { provider, key, cancelled: false }; registrations.set(key.ref ?? key, record);
+    platform.queueTask(() => { if (!record.cancelled) notify(); }, 0, [key]);
+  };
+  const disabledToListener = (r, listener, provider) => () => call(r, listener, LISTENER, 'onProviderDisabled', [STRING], 'V', [provider]);
+  const disabledToIntent = (r, pending, provider) => () => {
+    const intent = r.allocate(INTENT); r.dispatch({ owner: INTENT, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [intent], 'direct');
+    call(r, intent, INTENT, 'putExtra', [STRING, 'Z'], INTENT, ['providerEnabled', 0]);
+    r.dispatch({ owner: PENDING, name: 'send', parameters: [CONTEXT, 'I', INTENT], result: 'V', signature: `(${CONTEXT}I${INTENT})V` }, [pending, platform.application, 0, intent], 'virtual');
+  };
+  const requestArgs = (r, provider, listener) => { const name = provider_(r, provider); return [name, listener]; };
+  def(LOCATION, 'requestLocationUpdates', `(${STRING}JF${LISTENER}${LOOPER})V`, (r, _m, [, provider, , , listener]) => { const [name] = requestArgs(r, provider, listener); registerListener(r, listener, name, disabledToListener(r, listener, name)); });
+  def(LOCATION, 'requestLocationUpdates', `(${STRING}JF${LISTENER})V`, (r, _m, [, provider, , , listener]) => { const [name] = requestArgs(r, provider, listener); registerListener(r, listener, name, disabledToListener(r, listener, name)); });
+  def(LOCATION, 'requestLocationUpdates', `(${STRING}JF${EXECUTOR}${LISTENER})V`, (r, _m, [, provider, , , , listener]) => { const [name] = requestArgs(r, provider, listener); registerListener(r, listener, name, disabledToListener(r, listener, name)); });
+  def(LOCATION, 'requestLocationUpdates', `(${STRING}JF${PENDING})V`, (r, _m, [, provider, , , pending]) => { const name = provider_(r, provider); registerListener(r, pending, name, disabledToIntent(r, pending, name)); });
+  def(LOCATION, 'requestLocationUpdates', `(${STRING}${LREQUEST}${EXECUTOR}${LISTENER})V`, (r, _m, [, provider, , , listener]) => { const name = provider_(r, provider); registerListener(r, listener, name, disabledToListener(r, listener, name)); });
+  def(LOCATION, 'requestLocationUpdates', `(${STRING}${LREQUEST}${PENDING})V`, (r, _m, [, provider, , pending]) => { const name = provider_(r, provider); registerListener(r, pending, name, disabledToIntent(r, pending, name)); });
+  def(LOCATION, 'requestLocationUpdates', `(${LREQUEST}${EXECUTOR}${LISTENER})V`, (r, _m, [, request, , listener]) => { if (request === null) iae(r, 'invalid null request'); const name = providerOfRequest(r, request); registerListener(r, listener, name, disabledToListener(r, listener, name)); });
+  def(LOCATION, 'requestSingleUpdate', `(${STRING}${LISTENER}${LOOPER})V`, (r, _m, [, provider, listener]) => { const name = provider_(r, provider); registerListener(r, listener, name, disabledToListener(r, listener, name)); });
+  def(LOCATION, 'requestSingleUpdate', `(${STRING}${PENDING})V`, (r, _m, [, provider, pending]) => { const name = provider_(r, provider); registerListener(r, pending, name, disabledToIntent(r, pending, name)); });
+  const remove = (r, _m, [, key]) => { if (key === null || key === 0) iae(r, 'invalid listener: null'); const record = registrations.get(key.ref ?? key); if (record) { record.cancelled = true; registrations.delete(key.ref ?? key); } };
+  def(LOCATION, 'removeUpdates', `(${LISTENER})V`, remove); def(LOCATION, 'removeUpdates', `(${PENDING})V`, remove);
+  // getCurrentLocation: the consumer gets null (no provider can produce a fix); a cancelled signal suppresses the answer
+  const currentLocation = (r, provider, signal, consumer) => {
+    if (consumer === null || consumer === 0) r.throwJava('Ljava/lang/NullPointerException;', null);
+    enforce(r, provider);
+    platform.queueTask(() => { if (signal !== null && signal !== 0 && call(r, signal, SIGNAL, 'isCanceled', [], 'Z')) return; call(r, consumer, CONSUMER, 'accept', [OBJECT], 'V', [null]); }, 0, [consumer, signal]);
+  };
+  def(LOCATION, 'getCurrentLocation', `(${STRING}${SIGNAL}${EXECUTOR}${CONSUMER})V`, (r, _m, [, provider, signal, , consumer]) => currentLocation(r, provider_(r, provider), signal, consumer));
+  def(LOCATION, 'getCurrentLocation', `(${STRING}${LREQUEST}${SIGNAL}${EXECUTOR}${CONSUMER})V`, (r, _m, [, provider, , signal, , consumer]) => currentLocation(r, provider_(r, provider), signal, consumer));
+  // GNSS: callbacks register (the status needs ACCESS_FINE_LOCATION) and are never invoked while location is off
+  const gnssRegister = (r, callback) => { if (callback === null || callback === 0) r.throwJava('Ljava/lang/NullPointerException;', null); enforce(r, 'gps'); registrations.set(callback.ref ?? callback, { provider: 'gps', key: callback, cancelled: false }); return 1; };
+  def(LOCATION, 'registerGnssStatusCallback', `(${GNSS_CB})Z`, (r, _m, [, cb]) => gnssRegister(r, cb)); def(LOCATION, 'registerGnssStatusCallback', `(${GNSS_CB}${HANDLER})Z`, (r, _m, [, cb]) => gnssRegister(r, cb)); def(LOCATION, 'registerGnssStatusCallback', `(${EXECUTOR}${GNSS_CB})Z`, (r, _m, [, , cb]) => gnssRegister(r, cb));
+  def(LOCATION, 'unregisterGnssStatusCallback', `(${GNSS_CB})V`, (r, _m, [, cb]) => { if (cb !== null && cb !== 0) registrations.delete(cb.ref ?? cb); });
+  def(LOCATION, 'getGnssYearOfHardware', '()I', () => 0); def(LOCATION, 'getGnssHardwareModelName', `()${STRING}`, () => null);
 
   // ---- SensorManager: a device without sensors ------------------------------------------------------------------------------------------------------------
   const SENSOR = service('sensor', 'Landroid/hardware/SensorManager;');
@@ -127,5 +184,5 @@ export function createHardwareServicesHost(platform) {
   const FINGERPRINT = service('fingerprint', 'Landroid/hardware/fingerprint/FingerprintManager;');
   def(FINGERPRINT, 'isHardwareDetected', '()Z', () => 0); def(FINGERPRINT, 'hasEnrolledFingerprints', '()Z', () => 0);
 
-  return { ...registry, getService, serviceNameForClass: classType => byClass.get(classType) ?? null, [GC_ROOTS](visit) { for (const alarm of alarms.values()) visit(alarm); audioManager.roots(visit); ringtones.roots(visit); } };
+  return { ...registry, getService, serviceNameForClass: classType => byClass.get(classType) ?? null, [GC_ROOTS](visit) { for (const alarm of alarms.values()) visit(alarm); for (const entry of registrations.values()) visit(entry); audioManager.roots(visit); ringtones.roots(visit); } };
 }

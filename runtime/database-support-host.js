@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=64ce1d942f1e';
-import { fieldOffset } from './unsafe-native.js?v=64ce1d942f1e';
+import { createHostRegistry } from './host-contract.js?v=b6af1ec5264d';
+import { fieldOffset } from './unsafe-native.js?v=b6af1ec5264d';
 
 // Platform contract for the hidden/internal framework APIs that android.database and android.database.sqlite (Android 13 sources, compiled into the
 // framework DEX) call: dalvik.system.CloseGuard, dalvik.system.BlockGuard, android.os.FileUtils.setPermissions, android.os.StrictMode SQLite leak
@@ -34,6 +34,17 @@ export function createDatabaseSupportHost(platform) {
     if (files.isReadOnly(path)) return 1; // EPERM
     node.mode = mode & 0o7777; return 0;
   }, { static: true });
+
+  // FileUtils.sync(FileOutputStream): fsync the stream's descriptor; false when the descriptor cannot be synced (the framework catches the IOException and answers false).
+  def(FILE_UTILS, 'sync', '(Ljava/io/FileOutputStream;)Z', (r, _m, [stream]) => {
+    if (stream === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    const fd = r.dispatch({ owner: 'Ljava/io/FileOutputStream;', name: 'getFD', parameters: [], result: 'Ljava/io/FileDescriptor;', signature: '()Ljava/io/FileDescriptor;' }, [stream], 'virtual');
+    try { r.dispatch({ owner: 'Ljava/io/FileDescriptor;', name: 'sync', parameters: [], result: 'V', signature: '()V' }, [fd], 'virtual'); return 1; }
+    catch (error) { if (error?.constructor?.name === 'JavaException') return 0; throw error; }
+  }, { static: true });
+  // FileUtils.convertToModernFd(fd): MediaProvider's redirected (FUSE) descriptor for a legacy external-storage file; the virtual device has no MediaProvider redirection, so the answer is the documented "none" (null).
+  def(FILE_UTILS, 'convertToModernFd', '(Ljava/io/FileDescriptor;)Landroid/os/ParcelFileDescriptor;', () => null, { static: true });
+  for (const [name, value] of Object.entries({ S_IRWXU: 0o700, S_IRWXG: 0o70, S_IRWXO: 0o7, S_IRUSR: 0o400, S_IWUSR: 0o200, S_IXUSR: 0o100, S_IRGRP: 0o40, S_IWGRP: 0o20, S_IXGRP: 0o10, S_IROTH: 0o4, S_IWOTH: 0o2, S_IXOTH: 0o1 })) staticField(FILE_UTILS, name, 'I', () => value);
 
   // ---- android.app.ActivityManager.isLowRamDeviceStatic(): SystemProperties.getBoolean("ro.config.low_ram", false) on a device that does not set it.
   def('Landroid/app/ActivityManager;', 'isLowRamDeviceStatic', '()Z', () => 0, { static: true });

@@ -1,6 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=64ce1d942f1e';
-import { createHostRegistry, parseSignature } from './host-contract.js?v=64ce1d942f1e';
-import { JavaException } from './apk-runtime.js?v=64ce1d942f1e';
+import { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { gcRoot } from './heap-gc.js?v=b6af1ec5264d';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=b6af1ec5264d';
+import { JavaException } from './apk-runtime.js?v=b6af1ec5264d';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).
@@ -28,7 +29,7 @@ export function createDateTimeHost(platform) {
   def(DATE, 'equals', `(${OBJECT})Z`, (r, _m, [self, o]) => o !== null && typeof o === 'object' && r.object(o).dateMillis !== undefined && r.object(o).dateMillis === time(r, self) ? 1 : 0);
   def(DATE, 'hashCode', '()I', (r, _m, [self]) => { const t = BigInt.asUintN(64, time(r, self)); return Number(BigInt.asIntN(32, t ^ (t >> 32n))); });
   def(DATE, 'clone', `()${OBJECT}`, (r, _m, [self]) => { const c = r.allocate(DATE); r.object(c).dateMillis = time(r, self); return c; });
-  def(DATE, 'toString', `()${STRING}`, (r, _m, [self]) => { const t = Number(time(r, self)), tz = defaultZone(); const p = parts(t, tz.id); return `${p.weekday.slice(0, 3)} ${p.monthName.slice(0, 3)} ${String(p.day).padStart(2, '0')} ${two(p.hour)}:${two(p.minute)}:${two(p.second)} ${gmtName(tz.id, t)} ${p.year}`; });
+  def(DATE, 'toString', `()${STRING}`, (r, _m, [self]) => { const t = Number(time(r, self)), tz = defaultZone(); const p = parts(t, tz.id); return `${p.weekday.slice(0, 3)} ${p.monthName.slice(0, 3)} ${String(p.day).padStart(2, '0')} ${two(p.hour)}:${two(p.minute)}:${two(p.second)} ${zoneName({ zone: tz.id }, t, false)} ${p.year}`; });
 
   // ---- java.time interplay (libcore Date.toInstant/from, TimeZone.toZoneId; the java.time classes themselves are the original libcore sources in the framework DEX)
   const INSTANT = 'Ljava/time/Instant;', ZONE_ID = 'Ljava/time/ZoneId;';
@@ -56,7 +57,6 @@ export function createDateTimeHost(platform) {
   }
   // 'z' / 'zzzz': the zone's short / long display name (UTC, GMT, Coordinated Universal Time, Pacific Standard Time ...); a zone the platform data names only by offset prints GMT+hh:mm.
   const zoneName = (f, t, long) => {
-    if (f.zone === 'UTC' || f.zone === 'GMT') return long ? (f.zone === 'UTC' ? 'Coordinated Universal Time' : 'Greenwich Mean Time') : f.zone;
     if (/^GMT[+-]/.test(f.zone)) return gmtName(f.zone, t);
     try { const name = new Intl.DateTimeFormat('en-US', { timeZone: f.zone, timeZoneName: long ? 'long' : 'short' }).formatToParts(new Date(t)).find(p => p.type === 'timeZoneName')?.value; if (name && !/^GMT[+-]\d/.test(name)) return name; } catch { /* unknown zone id */ }
     return gmtName(f.zone, t);
@@ -81,9 +81,28 @@ export function createDateTimeHost(platform) {
   def(DATE, 'getTimezoneOffset', '()I', (r, _m, [self]) => -offsetOf(defaultZone().id, Number(time(r, self))) / 60000 | 0);
   /** Wall-clock fields in the default zone -> epoch milliseconds (fields may overflow, as the lenient java.util.Date constructors allow). */
   const localToEpoch = (year, month, day, hour, minute, second) => {
-    const wall = Date.UTC(1970, 0, 1) + new Date(Date.UTC(2000, 0, 1)).setUTCFullYear(year, month, day) - Date.UTC(2000, 0, 1) + ((hour * 60 + minute) * 60 + second) * 1000;
+    const wall = new Date(Date.UTC(2000, 0, 1)).setUTCFullYear(year, month, day) + ((hour * 60 + minute) * 60 + second) * 1000;   // the fields as if they were UTC; the zone offset is removed below
     const zoneId = defaultZone().id; let guess = wall - offsetOf(zoneId, wall); guess = wall - offsetOf(zoneId, guess); return guess;
   };
+  // Deprecated setters (java.util.Date): the field is replaced and the date renormalised leniently (month 13 rolls into the next year, second 60 into the next minute); the milliseconds stay.
+  // java.util.Date keeps the fields of the last setter un-normalised (BaseCalendar.Date) until the date is read, so setDate(31) on a month-13 date stays "Feb 31" while the next setters run; a month
+  // overflow, however, is carried into the year at once (Date.setMonth). The pending fields are used while the date still holds the epoch value they produced.
+  const setDateField = (r, self, field, value) => {
+    const o = r.object(self), t = Number(time(r, self)), ms = ((t % 1000) + 1000) % 1000;
+    const base = o.pendingFields && o.pendingEpoch === o.dateMillis ? { ...o.pendingFields } : (({ year, month, day, hour, minute, second }) => ({ year, month, day, hour, minute, second }))(parts(t, defaultZone().id));
+    if (field === 'year') base.year = value + 1900; else if (field === 'month') { base.year += Math.floor(value / 12); base.month = ((value % 12) + 12) % 12; } else base[field] = value;
+    o.dateMillis = BigInt(localToEpoch(base.year, base.month, base.day, base.hour, base.minute, base.second) + ms); o.pendingFields = base; o.pendingEpoch = o.dateMillis;
+  };
+  for (const [name, field] of [['setYear', 'year'], ['setMonth', 'month'], ['setDate', 'day'], ['setHours', 'hour'], ['setMinutes', 'minute'], ['setSeconds', 'second']]) def(DATE, name, '(I)V', (r, _m, [self, value]) => setDateField(r, self, field, value));
+  def(DATE, 'UTC', '(IIIIII)J', (r, _m, [y, mo, d, h, mi, s]) => BigInt(new Date(Date.UTC(2000, 0, 1)).setUTCFullYear(y + 1900, mo, d) + ((h * 60 + mi) * 60 + s) * 1000), { static: true });
+  def(DATE, 'toGMTString', '()Ljava/lang/String;', (r, _m, [self]) => { const p = parts(Number(time(r, self)), 'UTC'); return `${p.day} ${p.monthName.slice(0, 3)} ${p.year} ${two(p.hour)}:${two(p.minute)}:${two(p.second)} GMT`; });
+  def(DATE, 'parse', '(Ljava/lang/String;)J', (r, _m, [text]) => {
+    if (text === null) r.throwJava('Ljava/lang/NullPointerException;', null); const s = r.stringCharacters(text).trim();
+    const zoned = /\b(GMT|UTC|UT|Z)\b|[+-]\d{2}:?\d{2}\b/.test(s); let ms = Date.parse(zoned ? s : `${s} GMT`);
+    if (Number.isNaN(ms)) r.throwJava('Ljava/lang/IllegalArgumentException;', null);
+    if (!zoned) { const w = new Date(ms); ms = localToEpoch(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate(), w.getUTCHours(), w.getUTCMinutes(), w.getUTCSeconds()); }   // no zone in the text: the default zone
+    return BigInt(ms);
+  }, { static: true });
   for (const signature of ['(III)V', '(IIIII)V', '(IIIIII)V']) def(DATE, '<init>', signature, (r, _m, [self, y, mo, d, h = 0, mi = 0, sec = 0]) => { r.object(self).dateMillis = BigInt(localToEpoch(y + 1900, mo, d, h, mi, sec)); });
 
   def(ZONE, 'getTimeZone', `(${STRING})${ZONE}`, (r, _m, [id]) => { const n = r.stringCharacters(id); return zone(r, validZone(n) || /^GMT[+-]\d{1,2}(:?\d{2})?$/.test(n) ? n : 'GMT'); }, { static: true }); // unknown ids fall back to GMT, like TimeZone.getTimeZone
@@ -95,7 +114,39 @@ export function createDateTimeHost(platform) {
   def(ZONE, 'getOffset', '(J)I', (r, _m, [self, t]) => offsetOf(zid(r, self), Number(t)));
   def(ZONE, 'useDaylightTime', '()Z', (r, _m, [self]) => { const id = zid(r, self), y = new Date().getUTCFullYear(); return offsetOf(id, Date.UTC(y, 0, 1)) !== offsetOf(id, Date.UTC(y, 6, 1)) ? 1 : 0; });
   def(ZONE, 'inDaylightTime', `(${DATE})Z`, (r, _m, [self, d]) => { const id = zid(r, self), t = Number(time(r, d)), y = new Date(t).getUTCFullYear(); return offsetOf(id, t) !== Math.min(offsetOf(id, Date.UTC(y, 0, 1)), offsetOf(id, Date.UTC(y, 6, 1))) ? 1 : 0; });
-  def(ZONE, 'getDisplayName', `()${STRING}`, (r, _m, [self]) => zid(r, self)); def(ZONE, 'toString', `()${STRING}`, (r, _m, [self]) => `libcore.util.ZoneInfo[id="${zid(r, self)}"]`);
+  // ---- TimeZone: names, offsets, listings (platform tz data through Intl; names are the CLDR/ICU ones Android shows) --------------------------------------------------------------------------------
+  const rawOf = id => { const y = new Date().getUTCFullYear(); return Math.min(offsetOf(id, Date.UTC(y, 0, 1)), offsetOf(id, Date.UTC(y, 6, 1))); };
+  const savingsOf = id => { const y = new Date().getUTCFullYear(), a = offsetOf(id, Date.UTC(y, 0, 1)), b = offsetOf(id, Date.UTC(y, 6, 1)); return Math.abs(a - b); };
+  const zoneDisplay = (id, daylight, long, tag) => {
+    const y = new Date().getUTCFullYear(), jan = Date.UTC(y, 0, 1), jul = Date.UTC(y, 6, 1), dstInstant = offsetOf(id, jan) >= offsetOf(id, jul) ? jan : jul, stdInstant = dstInstant === jan ? jul : jan;
+    const instant = daylight && savingsOf(id) !== 0 ? dstInstant : stdInstant;   // a zone without daylight time answers its standard name for daylight=true
+    if (/^GMT[+-]/.test(id)) return gmtName(id, instant);
+    try { const name = new Intl.DateTimeFormat(tag, { timeZone: id, timeZoneName: long ? 'long' : 'short' }).formatToParts(new Date(instant)).find(p => p.type === 'timeZoneName')?.value; if (name) return name; } catch { /* unknown id */ }
+    return gmtName(id, instant);
+  };
+  def(ZONE, 'getDisplayName', `()${STRING}`, (r, _m, [self]) => zoneDisplay(zid(r, self), false, true, localeTag(r, null)));
+  def(ZONE, 'getDisplayName', `(${LOCALE})${STRING}`, (r, _m, [self, locale]) => { if (locale === null) r.throwJava('Ljava/lang/NullPointerException;', 'locale == null'); return zoneDisplay(zid(r, self), false, true, localeTag(r, locale)); });
+  const styleCheck = (r, style) => { if (style !== 0 && style !== 1) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Illegal style: ' + style); };
+  def(ZONE, 'getDisplayName', '(ZI)Ljava/lang/String;', (r, _m, [self, daylight, style]) => { styleCheck(r, style); return zoneDisplay(zid(r, self), !!daylight, style === 1, localeTag(r, null)); });
+  def(ZONE, 'getDisplayName', `(ZI${LOCALE})${STRING}`, (r, _m, [self, daylight, style, locale]) => { styleCheck(r, style); if (locale === null) r.throwJava('Ljava/lang/NullPointerException;', 'locale == null'); return zoneDisplay(zid(r, self), !!daylight, style === 1, localeTag(r, locale)); });
+  registry.staticField(ZONE, 'SHORT', 'I', () => 0); registry.staticField(ZONE, 'LONG', 'I', () => 1);
+  def(ZONE, 'getDSTSavings', '()I', (r, _m, [self]) => savingsOf(zid(r, self)));
+  def(ZONE, 'observesDaylightTime', '()Z', (r, _m, [self]) => { const id = zid(r, self), y = new Date().getUTCFullYear(); for (let k = 0; k < 3; k++) if (offsetOf(id, Date.UTC(y + k, 0, 1)) !== offsetOf(id, Date.UTC(y + k, 6, 1))) return 1; return 0; });
+  // hasSameRules: equal raw offsets and equal offsets at the first of every month over five years (the tz database's rules are not exposed as such)
+  def(ZONE, 'hasSameRules', `(${ZONE})Z`, (r, _m, [self, other]) => { if (other === null) return 0; const a = zid(r, self), b = zid(r, other), y = new Date().getUTCFullYear(); if (rawOf(a) !== rawOf(b)) return 0; for (let m = 0; m < 60; m++) { const t = Date.UTC(y + Math.floor(m / 12), m % 12, 1); if (offsetOf(a, t) !== offsetOf(b, t)) return 0; } return 1; });
+  // getOffset(era, year, month, day, dayOfWeek, millis): the offset in effect at that local wall-clock time of the zone
+  def(ZONE, 'getOffset', '(IIIIII)I', (r, _m, [self, era, year, month, day, dayOfWeek, millis]) => {
+    if (era !== 0 && era !== 1) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Illegal era ' + era);
+    if (month < 0 || month > 11) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Illegal month ' + month); if (day < 1 || day > 31) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Illegal day ' + day);
+    if (dayOfWeek < 1 || dayOfWeek > 7) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Illegal day of week ' + dayOfWeek); if (millis < 0 || millis >= 86400000) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Illegal millis ' + millis);
+    const id = zid(r, self), wall = new Date(Date.UTC(2000, 0, 1)); wall.setUTCFullYear(era === 0 ? 1 - year : year, month, day); const local = wall.getTime() + millis;
+    return offsetOf(id, local - rawOf(id));
+  });
+  def(ZONE, 'getAvailableIDs', `()[${STRING}`, r => { const ids = [...new Set([...Intl.supportedValuesOf('timeZone'), 'GMT', 'UTC'])].sort(), array = r.newArray(`[${STRING}`, ids.length); r.array(array).elements = ids; return array; }, { static: true });
+  def(ZONE, 'getAvailableIDs', `(I)[${STRING}`, (r, _m, [raw]) => { const ids = [...new Set([...Intl.supportedValuesOf('timeZone'), 'GMT', 'UTC'])].filter(id => rawOf(id) === raw).sort(), array = r.newArray(`[${STRING}`, ids.length); r.array(array).elements = ids; return array; }, { static: true });
+  def(ZONE, 'getTimeZone', `(${ZONE_ID})${ZONE}`, (r, _m, [zoneId]) => { if (zoneId === null) r.throwJava('Ljava/lang/NullPointerException;', 'zoneId == null'); const id = r.stringCharacters(call(r, ZONE_ID, 'getId', `()${STRING}`, [zoneId], 'virtual')); return zone(r, validZone(id) ? id : 'GMT'); }, { static: true });
+  for (const [name, signature] of [['setID', `(${STRING})V`], ['setRawOffset', '(I)V']]) def(ZONE, name, signature, () => { throw new APKError(`TimeZone.${name}: the virtual device shares one TimeZone object per id; mutating a zone is not modelled`, { kind: 'unsupported-timezone-mutation' }); });
+  def(ZONE, 'toString', `()${STRING}`, (r, _m, [self]) => `libcore.util.ZoneInfo[id="${zid(r, self)}"]`);
   def(ZONE, 'equals', `(${OBJECT})Z`, (r, _m, [self, o]) => o !== null && typeof o === 'object' && r.object(o).tzId === zid(r, self) ? 1 : 0); def(ZONE, 'hashCode', '()I', (r, _m, [self]) => [...zid(r, self)].reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0));
   def(ZONE, 'clone', `()${OBJECT}`, (r, _m, [self]) => self);
 
@@ -110,6 +161,28 @@ export function createDateTimeHost(platform) {
   };
   const sdf = (r, ref) => r.object(ref).sdf ?? r.throwJava('Ljava/lang/IllegalStateException;', 'SimpleDateFormat used before construction');
   const localeTag = (r, locale) => { const tag = locale ? r.object(locale).localeData?.tag : null; return tag && tag !== 'und' ? tag : platform.device?.locale || 'en-US'; };   // no Locale given: Locale.getDefault(), the device's
+  // ---- java.text.DateFormatSymbols: the locale's month / weekday / am-pm / era names from the platform's CLDR data (Intl); months have 13 entries (a blank 13th), weekdays are indexed 1..7 from Sunday.
+  const DFS = 'Ljava/text/DateFormatSymbols;', LOCALE_TYPE = 'Ljava/util/Locale;';
+  type(DFS, OBJECT, ['Ljava/io/Serializable;', 'Ljava/lang/Cloneable;'], { allocatable: true });
+  const symbols = (r, self) => r.object(self).symbols ?? r.throwJava('Ljava/lang/IllegalStateException;', 'DateFormatSymbols used before construction');
+  const makeSymbols = (r, locale) => {
+    const tag = localeTag(r, locale), fmt = (options, date) => new Intl.DateTimeFormat(tag, { timeZone: 'UTC', ...options }).format(date);
+    const months = style => Array.from({ length: 12 }, (_, i) => fmt({ month: style }, new Date(Date.UTC(2021, i, 15)))).concat(['']);
+    const weekdays = style => [''].concat(Array.from({ length: 7 }, (_, i) => fmt({ weekday: style }, new Date(Date.UTC(2021, 7, 1 + i)))));   // 2021-08-01 is a Sunday
+    const part = (options, date, type) => new Intl.DateTimeFormat(tag, { timeZone: 'UTC', hour: 'numeric', hour12: true, ...options }).formatToParts(date).find(p => p.type === type)?.value ?? '';
+    const eraNames = [fmt({ era: 'short', year: 'numeric' }, new Date(Date.UTC(-100, 0, 1))), fmt({ era: 'short', year: 'numeric' }, new Date(Date.UTC(2021, 0, 1)))].map(t => t.replace(/[\d\s,.]/g, '') || t);
+    return { tag, months: months('long'), shortMonths: months('short'), weekdays: weekdays('long'), shortWeekdays: weekdays('short'), amPm: [part({}, new Date(Date.UTC(2021, 0, 1, 1)), 'dayPeriod'), part({}, new Date(Date.UTC(2021, 0, 1, 13)), 'dayPeriod')], eras: eraNames };
+  };
+  const stringArray = (r, values) => { const array = r.newArray('[Ljava/lang/String;', values.length); r.array(array).elements = [...values]; return array; };
+  def(DFS, '<init>', '()V', (r, _m, [self]) => { r.object(self).symbols = makeSymbols(r, null); });
+  def(DFS, '<init>', `(${LOCALE_TYPE})V`, (r, _m, [self, locale]) => { if (locale === null) r.throwJava('Ljava/lang/NullPointerException;', null); r.object(self).symbols = makeSymbols(r, locale); });
+  def(DFS, 'getInstance', `()${DFS}`, r => { const o = r.allocate(DFS); r.object(o).symbols = makeSymbols(r, null); return o; }, { static: true });
+  def(DFS, 'getInstance', `(${LOCALE_TYPE})${DFS}`, (r, _m, [locale]) => { if (locale === null) r.throwJava('Ljava/lang/NullPointerException;', null); const o = r.allocate(DFS); r.object(o).symbols = makeSymbols(r, locale); return o; }, { static: true });
+  def('Ljava/text/DateFormat;', 'getAvailableLocales', `()[${LOCALE_TYPE}`, r => r.dispatch({ owner: DFS, name: 'getAvailableLocales', parameters: [], result: `[${LOCALE_TYPE}`, signature: `()[${LOCALE_TYPE}` }, [], 'static'), { static: true });
+  def(DFS, 'getAvailableLocales', `()[${LOCALE_TYPE}`, r => { const tags = Intl.DateTimeFormat.supportedLocalesOf(['en-US', 'pt-BR', 'es-ES', 'fr-FR', 'de-DE', 'it-IT', 'ja-JP']), array = r.newArray(`[${LOCALE_TYPE}`, tags.length); r.array(array).elements = tags.map(tag => r.dispatch({ owner: LOCALE_TYPE, name: 'forLanguageTag', parameters: [STRING], result: LOCALE_TYPE, signature: `(${STRING})${LOCALE_TYPE}` }, [tag], 'static')); return array; }, { static: true });
+  for (const [name, key] of [['getMonths', 'months'], ['getShortMonths', 'shortMonths'], ['getWeekdays', 'weekdays'], ['getShortWeekdays', 'shortWeekdays'], ['getAmPmStrings', 'amPm'], ['getEras', 'eras']]) def(DFS, name, `()[${STRING}`, (r, _m, [self]) => stringArray(r, symbols(r, self)[key]));   // a fresh copy each call, like the real getters
+  def(DFS, 'getZoneStrings', '()[[Ljava/lang/String;', () => { throw new APKError('DateFormatSymbols.getZoneStrings: the per-zone name table is not modelled (SimpleDateFormat z / zzzz use the platform names)', { kind: 'zone-strings-unsupported' }); });
+
   // ---- DateFormat.getDateInstance / getTimeInstance / getDateTimeInstance / getInstance: the locale's pattern for a style, taken from the platform's CLDR data (Intl) and turned into the
   // SimpleDateFormat pattern the formatter below runs. DateFormat.FULL=0, LONG=1, MEDIUM=2, SHORT=3 (DEFAULT=MEDIUM). U+202F / U+00A0 before AM/PM become plain spaces (Android 13 / CLDR 41).
   const DATE_FORMAT = 'Ljava/text/DateFormat;', STYLE_NAMES = ['full', 'long', 'medium', 'short'];
@@ -182,9 +255,11 @@ export function createDateTimeHost(platform) {
   def(SDF, 'format', `(${DATE})${STRING}`, (r, _m, [self, d]) => { if (d === null) r.throwJava('Ljava/lang/NullPointerException;', null); return formatDate(r, sdf(r, self), Number(time(r, d))); });
   def(SDF, 'format', `(${OBJECT})${STRING}`, (r, _m, [self, d]) => formatDate(r, sdf(r, self), Number(time(r, d))));
   const monthNames = tag => Array.from({ length: 12 }, (_, i) => ({ long: new Intl.DateTimeFormat(tag, { month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2021, i, 1))), short: new Intl.DateTimeFormat(tag, { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2021, i, 1))) }));
-  const parseText = (r, f, text) => {
-    const fail = (at = 0) => { const e = r.allocate(PARSE); r.dispatch({ owner: PARSE, name: '<init>', parameters: [STRING, 'I'], result: 'V', signature: `(${STRING}I)V` }, r.argumentWords([STRING, 'I'], [`Unparseable date: "${text}"`, at], { receiver: e }), 'direct'); r.object(e).errorOffset = at; r.throwJavaReference(e, `Unparseable date: "${text}"`); };
-    let pos = 0; const f_ = { year: 1970, month: 0, day: 1, hour: 0, minute: 0, second: 0, millis: 0, pm: null, hour12: false, offset: null, era: 1 };
+  class SoftParseFailure { constructor(at) { this.at = at; } }
+  const parseText = (r, f, text, start = 0, soft = false) => {
+    const fail = (at = 0) => { if (soft) throw new SoftParseFailure(at); hardFail(at); };
+    const hardFail = (at = 0) => { const e = r.allocate(PARSE); r.dispatch({ owner: PARSE, name: '<init>', parameters: [STRING, 'I'], result: 'V', signature: `(${STRING}I)V` }, r.argumentWords([STRING, 'I'], [`Unparseable date: "${text}"`, at], { receiver: e }), 'direct'); r.object(e).errorOffset = at; r.throwJavaReference(e, `Unparseable date: "${text}"`); };
+    let pos = start; const f_ = { year: 1970, month: 0, day: 1, hour: 0, minute: 0, second: 0, millis: 0, pm: null, hour12: false, offset: null, era: 1 };
     const digits = (min, max) => { const m = new RegExp(`^[+-]?\\d{${min},${max}}`).exec(text.slice(pos)); if (!m) fail(pos); pos += m[0].length; return Number(m[0]); };
     const names = monthNames(f.tag);
     for (let i = 0; i < f.tokens.length; i++) {
@@ -207,10 +282,21 @@ export function createDateTimeHost(platform) {
     if (f_.hour12 && f_.pm) f_.hour += 12;
     if (!f.lenient && (f_.month < 0 || f_.month > 11 || f_.day < 1 || f_.day > 31 || f_.hour > 23 || f_.minute > 59 || f_.second > 59)) fail(0);
     const utc = Date.UTC(f_.era < 0 ? 1 - f_.year : f_.year, f_.month, f_.day, f_.hour, f_.minute, f_.second, f_.millis);
+    parseText.end = pos;   // where parsing stopped (parse(String, ParsePosition) advances the position there)
     if (f_.offset !== null) return utc - f_.offset;
     let guess = utc - offsetOf(f.zone, utc); guess = utc - offsetOf(f.zone, guess); return guess; // wall clock in the format's zone -> instant
   };
   def(SDF, 'parse', `(${STRING})${DATE}`, (r, _m, [self, s]) => { if (s === null) r.throwJava('Ljava/lang/NullPointerException;', null); const d = r.allocate(DATE); r.object(d).dateMillis = BigInt(parseText(r, sdf(r, self), r.stringCharacters(s))); return d; });
+  // parse(String, ParsePosition): parses from the position's index; success moves the index past the parsed text and returns the Date, failure leaves the index and sets the error index (null result)
+  const POSITION = 'Ljava/text/ParsePosition;', callV = (r, receiver, owner, name, parameters, result, args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...args], 'virtual');
+  def(SDF, 'parse', `(${STRING}${POSITION})${DATE}`, (r, _m, [self, s, position]) => {
+    if (s === null || position === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    const index = callV(r, position, POSITION, 'getIndex', [], 'I');
+    try { const millis = parseText(r, sdf(r, self), r.stringCharacters(s), index, true); callV(r, position, POSITION, 'setIndex', ['I'], 'V', [parseText.end]); const d = r.allocate(DATE); r.object(d).dateMillis = BigInt(millis); return d; }
+    catch (error) { if (!(error instanceof SoftParseFailure)) throw error; callV(r, position, POSITION, 'setErrorIndex', ['I'], 'V', [error.at]); return null; }
+  });
+  def(SDF, 'getCalendar', '()Ljava/util/Calendar;', (r, _m, [self]) => { const f = sdf(r, self), locale = r.dispatch({ owner: LOCALE_TYPE, name: 'forLanguageTag', parameters: [STRING], result: LOCALE_TYPE, signature: `(${STRING})${LOCALE_TYPE}` }, [f.tag], 'static'); return r.dispatch({ owner: 'Ljava/util/Calendar;', name: 'getInstance', parameters: [ZONE, LOCALE_TYPE], result: 'Ljava/util/Calendar;', signature: `(${ZONE}${LOCALE_TYPE})Ljava/util/Calendar;` }, [zone(r, f.zone), locale], 'static'); });
+  def(SDF, 'formatToCharacterIterator', `(${OBJECT})Ljava/text/AttributedCharacterIterator;`, () => { throw new APKError('DateFormat.formatToCharacterIterator: field attributes are not modelled', { kind: 'unsupported-dateformat' }); });
   def(PARSE, '<init>', `(${STRING}I)V`, (r, _m, [self, message, offset]) => { Object.assign(r.object(self), { message, errorOffset: offset }); });
   def(PARSE, 'getErrorOffset', '()I', (r, _m, [self]) => r.object(self).errorOffset ?? 0);
   // ---- java.util.Calendar / GregorianCalendar (the Gregorian calendar with java.util.Calendar's field model: set() marks fields, get()/getTime() resolve them leniently, add() works on

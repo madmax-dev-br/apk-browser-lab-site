@@ -1,5 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=64ce1d942f1e';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=64ce1d942f1e';
+import { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { createHostRegistry } from './host-contract.js?v=b6af1ec5264d';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=b6af1ec5264d';
 
 // android.icu.text.Bidi (the part android.text.AndroidBidi uses): the Unicode Bidirectional Algorithm (UAX #9, rules P2-P3, X1-X10,
 // W1-W7, N0-N2, I1-I2, L1) over the Android 13 Bidi_Class data of unicode-bidi-data.js. Levels are per UTF-16 unit.
@@ -145,16 +146,52 @@ export function createIcuBidiHost() {
   for (const [name, value] of [['LTR', 0], ['RTL', 1], ['MIXED', 2], ['NEUTRAL', 3], ['LEVEL_DEFAULT_LTR', LEVEL_DEFAULT_LTR], ['LEVEL_DEFAULT_RTL', LEVEL_DEFAULT_RTL], ['MAX_EXPLICIT_LEVEL', MAX_DEPTH]]) staticField(BIDI, name, 'B', () => value);
   const st = (r, self) => r.object(self).bidi ?? r.throwJava('Ljava/lang/IllegalStateException;', 'Bidi: setPara() was not called');
   def(BIDI, '<init>', '()V', () => {}); def(BIDI, '<init>', '(II)V', (r, _m, [self, maxLength, maxRuns]) => { if (maxLength < 0 || maxRuns < 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Bidi: negative size'); });
-  const setPara = (r, self, units, level) => { if (![0, 1, LEVEL_DEFAULT_LTR, LEVEL_DEFAULT_RTL].includes(level & 0xff)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Bidi: invalid paragraph level'); r.object(self).bidi = {...bidiLevels(units, level & 0xff), length: units.length}; };
+  const setPara = (r, self, units, level) => { if (![0, 1, LEVEL_DEFAULT_LTR, LEVEL_DEFAULT_RTL].includes(level & 0xff)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Bidi: invalid paragraph level'); r.object(self).bidi = {...bidiLevels(units, level & 0xff), length: units.length, units: Array.from(units)}; };
   def(BIDI, 'setPara', `(${CHARS}B${BYTES})V`, (r, _m, [self, chars, level, embedding]) => { if (nullish(chars)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Bidi: text is null'); if (!nullish(embedding)) r.throwJava('Ljava/lang/UnsupportedOperationException;', 'Bidi: explicit embedding levels are not supported'); setPara(r, self, r.array(chars).elements.map(v => v & 0xffff), level); });
   def(BIDI, 'setPara', `(Ljava/lang/String;B${BYTES})V`, (r, _m, [self, text, level, embedding]) => { if (nullish(text)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Bidi: text is null'); if (!nullish(embedding)) r.throwJava('Ljava/lang/UnsupportedOperationException;', 'Bidi: explicit embedding levels are not supported'); const s = r.stringCharacters(text); setPara(r, self, Array.from({length: s.length}, (_, i) => s.charCodeAt(i)), level); });
   def(BIDI, 'getLevelAt', '(I)B', (r, _m, [self, index]) => { const b = st(r, self); if (index < 0 || index >= b.length) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Bidi: index out of range'); return b.levels[index]; });
   def(BIDI, 'getParaLevel', '()B', (r, _m, [self]) => st(r, self).paraLevel);
   def(BIDI, 'getLength', '()I', (r, _m, [self]) => st(r, self).length);
-  const direction = b => { let any0 = false, any1 = false; for (const level of b.levels) { if (level & 1) any1 = true; else any0 = true; } return any0 && any1 ? 2 : any1 ? 1 : 0; };
+  // ICU UBiDiDirection (as in the JDK's ICU-derived BidiBase): LTR only for a level-0 paragraph whose levels are all 0, RTL only for a level-1 paragraph whose levels are all 1; Latin text in an RTL
+  // paragraph (levels 2) and Hebrew in an LTR paragraph are MIXED. Empty text follows the paragraph level.
+  const direction = b => { if (b.length === 0) return b.paraLevel & 1; let all0 = true, all1 = true; for (const level of b.levels) { if (level !== 0) all0 = false; if (level !== 1) all1 = false; } return all0 && b.paraLevel === 0 ? 0 : all1 && b.paraLevel === 1 ? 1 : 2; };
   def(BIDI, 'getDirection', '()B', (r, _m, [self]) => direction(st(r, self)));
   def(BIDI, 'isLeftToRight', '()Z', (r, _m, [self]) => direction(st(r, self)) === 0 ? 1 : 0);
   def(BIDI, 'isRightToLeft', '()Z', (r, _m, [self]) => direction(st(r, self)) === 1 ? 1 : 0);
   def(BIDI, 'isMixed', '()Z', (r, _m, [self]) => direction(st(r, self)) === 2 ? 1 : 0);
+  // ---- what java.text.Bidi (libcore, a thin layer over android.icu.text.Bidi) calls ---------------------------------------------------------------------------------------------------------
+  def(BIDI, '<init>', `(${CHARS}I${BYTES}III)V`, (r, _m, [self, text, textStart, embeddings, embStart, length, flags]) => {
+    if (nullish(text)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Bidi: text is null');
+    if (!nullish(embeddings)) r.throwJava('Ljava/lang/UnsupportedOperationException;', 'Bidi: explicit embedding levels are not supported');
+    if (textStart < 0 || length < 0 || textStart + length > r.array(text).elements.length) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Bidi: invalid text range');
+    setPara(r, self, r.array(text).elements.slice(textStart, textStart + length), flags);
+  });
+  def(BIDI, '<init>', '(Ljava/text/AttributedCharacterIterator;)V', () => { throw new APKError('android.icu.text.Bidi(AttributedCharacterIterator): embedding and run-direction attributes (java.awt.font.TextAttribute) are not supported', { kind: 'unsupported-bidi-attributes' }); });
+  def(BIDI, 'getBaseLevel', '()I', (r, _m, [self]) => st(r, self).paraLevel); def(BIDI, 'baseIsLeftToRight', '()Z', (r, _m, [self]) => (st(r, self).paraLevel & 1) === 0 ? 1 : 0);
+  const runsOf = b => { const runs = []; for (let i = 0; i < b.length;) { let j = i + 1; while (j < b.length && b.levels[j] === b.levels[i]) j++; runs.push({ start: i, limit: j, level: b.levels[i] }); i = j; } return runs; };
+  const run = (r, self, index) => { const runs = runsOf(st(r, self)); if (index < 0 || index >= runs.length) r.throwJava('Ljava/lang/IllegalArgumentException;', `Bidi: run index ${index} out of range`); return runs[index]; };
+  for (const name of ['getRunCount', 'countRuns']) def(BIDI, name, '()I', (r, _m, [self]) => { const b = st(r, self); return b.length === 0 ? 0 : runsOf(b).length; });
+  def(BIDI, 'getRunLevel', '(I)I', (r, _m, [self, index]) => run(r, self, index).level); def(BIDI, 'getRunStart', '(I)I', (r, _m, [self, index]) => run(r, self, index).start); def(BIDI, 'getRunLimit', '(I)I', (r, _m, [self, index]) => run(r, self, index).limit);
+  // a line of the paragraph: the levels of the range, with trailing white space and isolate/format controls at the line end reset to the paragraph level (rule L1)
+  def(BIDI, 'createLineBidi', `(II)${BIDI}`, (r, _m, [self, start, limit]) => {
+    const b = st(r, self); if (start < 0 || limit < 0 || start > limit || limit > b.length) r.throwJava('Ljava/lang/IllegalArgumentException;', `Bidi: invalid line range (start=${start}, limit=${limit}, length=${b.length})`);
+    const levels = b.levels.slice(start, limit), units = b.units.slice(start, limit);
+    for (let k = units.length - 1; k >= 0; k--) { const cp = units[k]; if (cp >= 0xdc00 && cp < 0xe000) { levels[k] = b.paraLevel; continue; } const c = classOf(cp); if (c === WS || c === B || c === S || c >= LRI || removed(c)) levels[k] = b.paraLevel; else break; }
+    const line = r.allocate(BIDI); r.object(line).bidi = { levels, paraLevel: b.paraLevel, length: limit - start, units }; return line;
+  });
+  def(BIDI, 'requiresBidi', `(${CHARS}II)Z`, (r, _m, [text, start, limit]) => {
+    if (nullish(text)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Bidi: text is null'); const units = r.array(text).elements;
+    for (let i = Math.max(0, start); i < Math.min(limit, units.length); i++) { const c = classOf(units[i]); if (c === R || c === AL || c === AN || (c >= LRE && c <= PDF) || c >= LRI) return 1; }
+    return 0;
+  }, { static: true });
+  def(BIDI, 'reorderVisually', `(${BYTES}I[Ljava/lang/Object;II)V`, (r, _m, [levels, levelStart, objects, objectStart, count]) => {
+    if (nullish(levels)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'levels is null'); if (nullish(objects)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'objects is null');
+    const lv = r.array(levels).elements, ob = r.array(objects).elements;
+    if (levelStart < 0 || levelStart >= lv.length || objectStart < 0 || objectStart >= ob.length || count < 0 || levelStart + count > lv.length || objectStart + count > ob.length) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Value out of range');
+    const order = Array.from({ length: count }, (_, i) => i), level = Array.from({ length: count }, (_, i) => lv[levelStart + i]);
+    let highest = 0, lowestOdd = 127; for (const l of level) { if (l > highest) highest = l; if ((l & 1) && l < lowestOdd) lowestOdd = l; }
+    for (let l = highest; l >= lowestOdd; l--) for (let i = 0; i < count; i++) if (level[i] >= l) { let j = i; while (j + 1 < count && level[j + 1] >= l) j++; for (let a = i, z = j; a < z; a++, z--) { [order[a], order[z]] = [order[z], order[a]]; [level[a], level[z]] = [level[z], level[a]]; } i = j; }
+    const copy = ob.slice(objectStart, objectStart + count); for (let i = 0; i < count; i++) ob[objectStart + i] = copy[order[i]];
+  }, { static: true });
   return { ...registry, interfaces: registry.interfacesOf };
 }

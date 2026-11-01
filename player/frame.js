@@ -1,9 +1,9 @@
 // Entry of dist/player/frame.html: device frame + system bars + rendering, driven by postMessage from the embedding page.
-import { APKWorkerClient } from '../apk-worker-client.js?v=64ce1d942f1e';
-import { createDeviceView, createViewState } from '../device-view.js?v=64ce1d942f1e';
-import { sanitizeSettings } from '../device-settings.js?v=64ce1d942f1e';
-import { createFrameController } from './frame-controller.js?v=64ce1d942f1e';
-import { validateHostMessage, envelope } from './protocol.js?v=64ce1d942f1e';
+import { APKWorkerClient } from '../apk-worker-client.js?v=b6af1ec5264d';
+import { createDeviceView, createViewState } from '../device-view.js?v=b6af1ec5264d';
+import { sanitizeSettings } from '../device-settings.js?v=b6af1ec5264d';
+import { createFrameController } from './frame-controller.js?v=b6af1ec5264d';
+import { validateHostMessage, envelope } from './protocol.js?v=b6af1ec5264d';
 
 const parentOrigin = new URLSearchParams(location.search).get('parent');
 const $ = id => document.getElementById(id) ?? (frameStub[id] ??= Object.assign(document.createElement('div'), { id }));
@@ -58,4 +58,4 @@ if (!parentOrigin || parentOrigin === 'null') status('Missing or opaque ?parent=
 else post(envelope('hello'));
 
 // Read-only introspection for automated checks (scripts/validation/browser-driver.mjs): true when no VM request, queued input or frame is in flight.
-window.__apkPlayer = { idle: () => (lastPendingDelay === null || performance.now() - lastRenderAt >= Math.min(lastPendingDelay + 40, 120)) && !view.runtimeFrames.vmBusy && !state.busy && !controller.inflight && !state.inputPromise && !state.inputInFlight && !state.pendingInputs.size && !state.pendingFocus.length && !state.pendingComposeActions.length && !state.pendingScrolls.size && !state.pendingPointers.length && !state.pendingScrollBys.size && !state.composeInFlight && !view.runtimeFrames.requested && !view.runtimeFrames.pending, running: () => state.apkRunning, debug: () => ({ droppedCount: controller.dropped.length, dropped: controller.dropped.slice(-3), health: lastHealth, vmBusy: view.runtimeFrames.vmBusy, sinceRender: Math.round(performance.now() - lastRenderAt), rendered: view.runtimeFrames.rendered, pendingDelay: lastPendingDelay, frames: { requested: view.runtimeFrames.requested, pending: !!view.runtimeFrames.pending }, pendingPointers: state.pendingPointers.length, pointerInFlight: state.pointerInFlight ?? null, pointerLog: state.pointerLog ?? [], busy: state.busy, lastError: state.lastAPKError ? String(state.lastAPKError.error?.message).slice(0, 300) : null }) };
+window.__apkPlayer = { inputsDrained: () => !state.busy && !controller.inflight && !state.inputPromise && !state.inputInFlight && !state.composeInFlight && !state.pointerInFlight && !state.pendingInputs.size && !state.pendingFocus.length && !state.pendingComposeActions.length && !state.pendingScrolls.size && !state.pendingPointers.length && !state.pendingScrollBys.size, idle: () => (lastPendingDelay === null || performance.now() - lastRenderAt >= Math.min(lastPendingDelay + 40, 120)) && !view.runtimeFrames.vmBusy && !state.busy && !controller.inflight && !state.inputPromise && !state.inputInFlight && !state.pendingInputs.size && !state.pendingFocus.length && !state.pendingComposeActions.length && !state.pendingScrolls.size && !state.pendingPointers.length && !state.pendingScrollBys.size && !state.composeInFlight && !view.runtimeFrames.requested && !view.runtimeFrames.pending, running: () => state.apkRunning, debug: () => ({ droppedCount: controller.dropped.length, dropped: controller.dropped.slice(-3), health: lastHealth, vmBusy: view.runtimeFrames.vmBusy, sinceRender: Math.round(performance.now() - lastRenderAt), rendered: view.runtimeFrames.rendered, pendingDelay: lastPendingDelay, frames: { requested: view.runtimeFrames.requested, pending: !!view.runtimeFrames.pending }, pendingPointers: state.pendingPointers.length, pointerInFlight: state.pointerInFlight ?? null, pointerLog: state.pointerLog ?? [], busy: state.busy, lastError: state.lastAPKError ? String(state.lastAPKError.error?.message).slice(0, 300) : null }) };

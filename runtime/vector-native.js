@@ -1,6 +1,7 @@
-import { APKError } from './apk-error.js?v=64ce1d942f1e';
-import { getSolidPaint } from './paint-host.js?v=64ce1d942f1e';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=64ce1d942f1e';
+import { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { getSolidPaint } from './paint-host.js?v=b6af1ec5264d';
+import { getMatrixValues } from './matrix-native.js?v=b6af1ec5264d';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=b6af1ec5264d';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -140,7 +141,7 @@ export function createVectorNativeBindings(){
 
 /** Software Canvas system boundary; drawable algorithms still execute their boot DEX. */
 export function createVectorCanvasHost(){
- const owner='Landroid/graphics/Canvas;',keys=new Set(['<init>()V','getNativeCanvasWrapper()J','isHardwareAccelerated()Z','save()I','restore()V','restoreToCount(I)V','getSaveCount()I','translate(FF)V','scale(FF)V','rotate(F)V','skew(FF)V','getDensity()I','setDensity(I)V','drawRect(Landroid/graphics/Rect;Landroid/graphics/Paint;)V','drawRect(FFFFLandroid/graphics/Paint;)V'].map(s=>owner+'->'+s));
+ const owner='Landroid/graphics/Canvas;',keys=new Set(['<init>()V','getNativeCanvasWrapper()J','isHardwareAccelerated()Z','save()I','restore()V','restoreToCount(I)V','getSaveCount()I','translate(FF)V','scale(FF)V','rotate(F)V','rotate(FFF)V','scale(FFFF)V','setMatrix(Landroid/graphics/Matrix;)V','skew(FF)V','getDensity()I','setDensity(I)V','drawRect(Landroid/graphics/Rect;Landroid/graphics/Paint;)V','drawRect(FFFFLandroid/graphics/Paint;)V'].map(s=>owner+'->'+s));
  return {
   supports:key=>keys.has(key),canAllocate:type=>type===owner,parent:type=>type===owner?'Ljava/lang/Object;':null,
   invoke(runtime,method,args){
@@ -167,6 +168,17 @@ export function createVectorCanvasHost(){
    if(name==='restore'||name==='restoreToCount'){
     const count=name==='restore'?canvas.stack.length:args[1];if(count<1||count>canvas.stack.length+1)runtime.throwJava('Ljava/lang/IllegalStateException;','Underflow in restore');
     while(canvas.stack.length+1>count){const state=canvas.stack.pop();canvas.matrix=state.matrix??state;canvas.clips=state.clips??[];}return;
+   }
+   if(name==='setMatrix'){   // Canvas.setMatrix(Matrix): replaces the current transform (null = identity); a perspective matrix needs a projective canvas-state backend
+    if(args[1]===null||args[1]===0){canvas.matrix[0]=1;canvas.matrix[1]=0;canvas.matrix[2]=0;canvas.matrix[3]=1;canvas.matrix[4]=0;canvas.matrix[5]=0;return;}
+    const v=getMatrixValues(runtime,args[1]);if(v[6]!==0||v[7]!==0||v[8]!==1)problem('Perspective Canvas transforms require a projective canvas-state backend');
+    canvas.matrix[0]=finite(v[0]);canvas.matrix[1]=finite(v[3]);canvas.matrix[2]=finite(v[1]);canvas.matrix[3]=finite(v[4]);canvas.matrix[4]=finite(v[2]);canvas.matrix[5]=finite(v[5]);return;
+   }
+   if((name==='rotate'&&method.parameters.length===3)||(name==='scale'&&method.parameters.length===4)){   // about a pivot: M * T(px,py) * op * T(-px,-py)
+    const v=args.slice(1).map(w=>finite(f32(w))),m=canvas.matrix;let n;
+    if(name==='rotate'){const radians=v[0]*Math.PI/180,s=Math.sin(radians),k=Math.cos(radians);n=[k,s,-s,k,v[1]-k*v[1]+s*v[2],v[2]-s*v[1]-k*v[2]];}
+    else n=[v[0],0,0,v[1],v[2]-v[0]*v[2],v[3]-v[1]*v[3]];
+    const [a0,b0,c0,d0,e0,f0]=m;m[0]=a0*n[0]+c0*n[1];m[1]=b0*n[0]+d0*n[1];m[2]=a0*n[2]+c0*n[3];m[3]=b0*n[2]+d0*n[3];m[4]=a0*n[4]+c0*n[5]+e0;m[5]=b0*n[4]+d0*n[5]+f0;return;
    }
    const matrix=canvas.matrix,[a,b,c,d,e,f]=matrix,x=finite(f32(args[1])),y=method.parameters.length>1?finite(f32(args[2])):0;
    if(name==='translate'){matrix[4]=a*x+c*y+e;matrix[5]=b*x+d*y+f;return;}

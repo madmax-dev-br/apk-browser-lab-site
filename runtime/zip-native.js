@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=64ce1d942f1e';
-import { throwNew } from './java-throw.js?v=64ce1d942f1e';
-import { readNativeBytes } from './unsafe-native.js?v=64ce1d942f1e';
+import { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { throwNew } from './java-throw.js?v=b6af1ec5264d';
+import { readNativeBytes } from './unsafe-native.js?v=b6af1ec5264d';
 
 // Natives of java.util.zip behind the original libcore classes (android-13.0.0_r1):
 //   Inflater / Deflater / CRC32 / Adler32  -- Android's external/zlib compiled to WebAssembly (vendor/zlib); the wrappers follow ojluni Inflater.c, Deflater.c, CRC32.c, Adler32.c
@@ -222,6 +222,19 @@ export function createZipNativeBindings() {
       if (message) zipError(runtime, message); else throwNew(runtime, 'Ljava/io/IOException;', 'errno: 5, error: Error reading ZIP file\n');
     }
     return result;
+  });
+  // JarFile.getMetaInfEntryNames (ZipFile.c JarFile_getMetaInfEntryNames): the names of the entries under "META-INF/" (case-sensitive prefix, as isMetaName), null when there are none
+  add('Ljava/util/jar/JarFile;', 'getMetaInfEntryNames()[Ljava/lang/String;', (runtime, [self]) => {
+    const zip = runtime.object(self).fields.get('Ljava/util/zip/ZipFile;->jzfile:J');
+    if (!zip) throwNew(runtime, 'Ljava/lang/IllegalStateException;', 'zip file closed');
+    const e = engineFor(runtime), names = [], total = e.x.zp_total(Number(zip));
+    for (let i = 0; i < total; i++) {
+      const entry = Number(e.x.zp_next_entry(Number(zip), i)); if (!entry) continue;
+      try { const name = e.x.zp_entry_name(entry), length = e.x.zp_entry_nlen(entry); if (name && length >= 9) { const text = decoder.decode(e.bytes().slice(name, name + length)); if (text.startsWith('META-INF/')) names.push(text); } }
+      finally { e.x.zp_free_entry(Number(zip), entry); }
+    }
+    if (!names.length) return null;
+    const array = runtime.newArray('[Ljava/lang/String;', names.length); runtime.array(array).elements = names; return array;
   });
   add(ZIPFILE, 'getZipMessage(J)Ljava/lang/String;', (runtime, [zip]) => { const e = engineFor(runtime); return e.cstr(e.x.zp_msg(Number(zip))); });
   return bindings;

@@ -1,17 +1,17 @@
-import { APKError } from './apk-error.js?v=64ce1d942f1e';
-import { JavaException } from './apk-runtime.js?v=64ce1d942f1e';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=64ce1d942f1e';
-import { buildElfDescriptor } from './native-descriptor.js?v=64ce1d942f1e';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=64ce1d942f1e';
-import { NativeLinker, LinkError } from './native-linker.js?v=64ce1d942f1e';
-import { hostFunction } from './wasm-host-function.js?v=64ce1d942f1e';
-import { parseWasm } from './wasm-dylink.js?v=64ce1d942f1e';
-import { formatVersion } from './rn-version.js?v=64ce1d942f1e';
-import { registerWasmMemory } from './unsafe-native.js?v=64ce1d942f1e';
-import { writeSkPath } from './skia-path-layout.js?v=64ce1d942f1e';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=64ce1d942f1e';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=64ce1d942f1e';
-import { withVariants } from './native-provider-variants.js?v=64ce1d942f1e';
+import { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { JavaException } from './apk-runtime.js?v=b6af1ec5264d';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=b6af1ec5264d';
+import { buildElfDescriptor } from './native-descriptor.js?v=b6af1ec5264d';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=b6af1ec5264d';
+import { NativeLinker, LinkError } from './native-linker.js?v=b6af1ec5264d';
+import { hostFunction } from './wasm-host-function.js?v=b6af1ec5264d';
+import { parseWasm } from './wasm-dylink.js?v=b6af1ec5264d';
+import { formatVersion } from './rn-version.js?v=b6af1ec5264d';
+import { registerWasmMemory } from './unsafe-native.js?v=b6af1ec5264d';
+import { writeSkPath } from './skia-path-layout.js?v=b6af1ec5264d';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=b6af1ec5264d';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=b6af1ec5264d';
+import { withVariants } from './native-provider-variants.js?v=b6af1ec5264d';
 
 // JNI -> WebAssembly bridge.
 //
@@ -51,6 +51,7 @@ export function briefValue(r, type, value) {
     if (typeof value === 'string') return JSON.stringify(value.slice(0, 120));
     const o = r.object(value);
     if (o.type === 'Ljava/lang/String;') return JSON.stringify(r.stringCharacters(value).slice(0, 120));
+    if (o.type === '[Ljava/lang/String;') { const items = r.array(value).elements.map(e => e === null ? 'null' : r.stringCharacters(e)); return `String[${items.length}]${JSON.stringify(items).slice(0, Number(globalThis.process?.env?.APKWEB_JNI_TRACE_WIDTH ?? 900))}`; }
     const name = String(o.type).replace(/^L|;$/g, '').split('/').pop();
     if (/^Readable(Native)?(Map|Array)$/.test(name)) {   // the data a JS call carried: ReadableNativeMap/Array.toString() lists it
       const text = r.dispatch({ owner: o.type, name: 'toString', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [value], 'virtual');

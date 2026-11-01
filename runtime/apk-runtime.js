@@ -1,22 +1,22 @@
-import { VMClock } from './vm-clock.js?v=64ce1d942f1e';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=64ce1d942f1e';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=64ce1d942f1e';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=64ce1d942f1e';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=64ce1d942f1e';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=64ce1d942f1e';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=64ce1d942f1e';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=64ce1d942f1e';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=64ce1d942f1e';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=64ce1d942f1e';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=64ce1d942f1e';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=64ce1d942f1e';
-import { APKError } from './apk-error.js?v=64ce1d942f1e';
-import { collectGarbage } from './heap-gc.js?v=64ce1d942f1e';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=64ce1d942f1e';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=64ce1d942f1e';
-import { Scheduler, Blocked } from './scheduler.js?v=64ce1d942f1e';
-import { bootClassLacksMember } from './boot-class-members.js?v=64ce1d942f1e';
-export { APKError } from './apk-error.js?v=64ce1d942f1e';
+import { VMClock } from './vm-clock.js?v=b6af1ec5264d';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=b6af1ec5264d';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=b6af1ec5264d';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=b6af1ec5264d';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=b6af1ec5264d';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=b6af1ec5264d';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=b6af1ec5264d';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=b6af1ec5264d';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=b6af1ec5264d';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=b6af1ec5264d';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=b6af1ec5264d';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=b6af1ec5264d';
+import { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { collectGarbage, collectionDue } from './heap-gc.js?v=b6af1ec5264d';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=b6af1ec5264d';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=b6af1ec5264d';
+import { Scheduler, Blocked } from './scheduler.js?v=b6af1ec5264d';
+import { bootClassLacksMember } from './boot-class-members.js?v=b6af1ec5264d';
+export { APKError } from './apk-error.js?v=b6af1ec5264d';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -268,7 +268,7 @@ export class DexProgram {
       if (bootBytes > 128 * 1024 * 1024) fail('Framework DEX layer exceeds 128 MiB');
       this.bootFiles.push({ filename, dex }); this.bootDexes.add(dex);
       for (const [name, cls] of dex.classes) {
-        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore)\/|com\/(?:android\/(?:internal|icu|okhttp|org\/(?:conscrypt|bouncycastle))|google\/android\/collect|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
+        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore)\/|com\/(?:android\/(?:internal|icu|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/collect|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
         if (this.bootClasses.has(name)) fail(`Duplicate framework class: ${name}`);
         this.bootClasses.set(name, cls);
       }
@@ -449,7 +449,7 @@ EXTERNAL_PARENTS.set('Ljava/util/Hashtable;', 'Ljava/util/Dictionary;');
 EXTERNAL_PARENTS.set('Ljava/util/Dictionary;', 'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set('Ljava/util/Hashtable;', ['Ljava/util/Map;', 'Ljava/lang/Cloneable;', 'Ljava/io/Serializable;']);
 addBridge('java/security/AccessController',['doPrivileged(Ljava/security/PrivilegedAction;)Ljava/lang/Object;','doPrivileged(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;','doPrivileged(Ljava/security/PrivilegedAction;Ljava/security/AccessControlContext;)Ljava/lang/Object;','doPrivileged(Ljava/security/PrivilegedExceptionAction;Ljava/security/AccessControlContext;)Ljava/lang/Object;']);
-addBridge('java/lang/System',['getSecurityManager()Ljava/lang/SecurityManager;']);
+addBridge('java/lang/System',['getSecurityManager()Ljava/lang/SecurityManager;','gc()V','runFinalization()V']);
 addBridge('libcore/util/NativeAllocationRegistry',['createMalloced(Ljava/lang/ClassLoader;J)Llibcore/util/NativeAllocationRegistry;','registerNativeAllocation(Ljava/lang/Object;J)Ljava/lang/Runnable;']);
 EXTERNAL_PARENTS.set(TEXT_LAYOUT_CLEANER,'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set(TEXT_LAYOUT_CLEANER,['Ljava/lang/Runnable;']);
@@ -477,7 +477,7 @@ for(const owner of ['Collection','Set','List','ArrayList','Vector','concurrent/C
 for(const [owner,type]of [['Float','F'],['Double','D']])addBridge('java/lang/'+owner,[`isNaN(${type})Z`,`isInfinite(${type})Z`,`isFinite(${type})Z`,`compare(${type}${type})I`]);
 addBridge('android/os/Trace', ['traceBegin(JLjava/lang/String;)V', 'traceEnd(J)V', 'isTagEnabled(J)Z']);
 addBridge('java/lang/Object',['notify()V','notifyAll()V','wait()V','wait(J)V','wait(JI)V']);
-addBridge('java/lang/Object', ['getClass()Ljava/lang/Class;', 'hashCode()I', 'equals(Ljava/lang/Object;)Z', 'toString()Ljava/lang/String;', 'clone()Ljava/lang/Object;']);
+addBridge('java/lang/Object', ['getClass()Ljava/lang/Class;', 'hashCode()I', 'equals(Ljava/lang/Object;)Z', 'toString()Ljava/lang/String;', 'clone()Ljava/lang/Object;', 'finalize()V']);
 addBridge('java/lang/Class', ['getName()Ljava/lang/String;', 'getSimpleName()Ljava/lang/String;', 'getSuperclass()Ljava/lang/Class;', 'isInterface()Z',
   'isArray()Z', 'isPrimitive()Z', 'getComponentType()Ljava/lang/Class;', 'isAssignableFrom(Ljava/lang/Class;)Z', 'isInstance(Ljava/lang/Object;)Z',
   'forName(Ljava/lang/String;)Ljava/lang/Class;', 'forName(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;',
@@ -1446,7 +1446,7 @@ export class APKRuntime {
     }
   }
   safepointCollect() {
-    if (!this.gcEnabled || (!this.gcPressure && this.heap.size < Math.max(Math.floor(this.maxHeapObjects * 0.5), this.gcNextAt ?? 0))) return;
+    if (!this.gcEnabled || !collectionDue(this)) return;
     collectGarbage(this, { reason: 'safepoint', safepoint: true });
   }
   /** Completes a native's Blocked / Invoke result synchronously for a host caller (nested waits and nested runs). */
@@ -1485,7 +1485,9 @@ export class APKRuntime {
       const epoch = this.dex.dynamicFiles?.length ?? 0;
       if (this.resolveEpoch !== epoch) { this.resolveEpoch = epoch; this.resolveCache = new Map(); }
       const ownerKey = mode === 'virtual' ? this.typeOf(args[0]) : mode === 'super' ? callerOwner : null;
-      let byMode = this.resolveCache.get(method); if (byMode === undefined) this.resolveCache.set(method, byMode = {});
+      // Host code builds method references as fresh literals ({ owner, name, signature, ... } without `key`): keying the cache by that object would add one entry per call (a leak that also never hits).
+      let cacheKey = method; if (method.key === undefined) { const text = `${method.owner}->${method.name}${method.signature}`; cacheKey = (this.hostMethodRefs ??= new Map()).get(text); if (cacheKey === undefined) this.hostMethodRefs.set(text, cacheKey = method); }
+      let byMode = this.resolveCache.get(cacheKey); if (byMode === undefined) this.resolveCache.set(cacheKey, byMode = {});
       let slot = byMode[mode]; if (slot === undefined) slot = byMode[mode] = new Map();
       let resolution = slot.get(ownerKey);
       if (resolution === undefined) { resolution = this.resolveInvoke(method, args, mode, callerOwner); slot.set(ownerKey, resolution); }
@@ -2478,6 +2480,8 @@ export class APKRuntime {
       }
       if (name === 'currentTimeMillis') return BigInt(Math.floor(this.clock.wall()));
       if (name === 'nanoTime') return this.clock.nanos();
+      if (name === 'gc') { this.gcPressure = true; return undefined; }   // a hint: the next safepoint or event boundary may collect (heap-gc.js collectionDue)
+      if (name === 'runFinalization') return undefined;
       if (name === 'identityHashCode') return isNull(args[0]) ? 0 : typeof args[0] === 'string' ? stringHash(args[0]) : this.object(args[0]).id;
       if (name === 'arraycopy') {
         const source=this.object(args[0]),target=this.object(args[2]),from=int(args[1]),to=int(args[3]),length=int(args[4]);
@@ -2871,6 +2875,7 @@ export class APKRuntime {
       if (name === 'equals') return equal(args[0], args[1]) ? 1 : 0;
       if (name === 'hashCode') return typeof args[0] === 'string' ? stringHash(args[0]) : this.object(args[0]).id;
       if (name === 'toString') return this.javaString(args[0]);
+      if (name === 'finalize') return undefined;   // Object.finalize() does nothing; the VM never runs finalizers on its own (the collector reclaims objects without them)
       if (name === 'clone') {
         const original = this.object(args[0]);
         if (original.elements) { const value = this.newArray(original.type, original.elements.length); this.object(value).elements = original.elements.slice(); return value; }

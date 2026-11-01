@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=64ce1d942f1e';
-import { throwNew } from './java-throw.js?v=64ce1d942f1e';
-import { Blocked } from './scheduler.js?v=64ce1d942f1e';
-import { OS_CONSTANTS } from './os-constants-data.js?v=64ce1d942f1e';
-import { openExchange, describeFailure } from './network-transport.js?v=64ce1d942f1e';
-import { WorkerExecutor } from './network-worker-executor.js?v=64ce1d942f1e';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=64ce1d942f1e';
+import { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { throwNew } from './java-throw.js?v=b6af1ec5264d';
+import { Blocked } from './scheduler.js?v=b6af1ec5264d';
+import { OS_CONSTANTS } from './os-constants-data.js?v=b6af1ec5264d';
+import { openExchange, describeFailure } from './network-transport.js?v=b6af1ec5264d';
+import { WorkerExecutor } from './network-worker-executor.js?v=b6af1ec5264d';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=b6af1ec5264d';
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
 //
@@ -289,15 +289,17 @@ export function createNetworkNativeBindings() {
       finish: timedOut => { const value = attempt(); if (value !== null) return value; if (timedOut) throwNew(runtime, 'Ljava/net/SocketTimeoutException;', 'timeout'); throw new APKError('network read woke without data', { kind: BOUNDARY }); },
     });
   });
-  add(NET, `cleartextPermitted(${STRING})Z`, (runtime, [host]) => {
-    // NetworkSecurityPolicy: a network_security_config (base-config / domain-config) wins; otherwise android:usesCleartextTraffic; otherwise cleartext is allowed only for
-    // apps targeting API 27 and lower. The decision is keyed off the APK's targetSdkVersion like ApplicationInfo.targetSdkVersion in the framework.
-    const manifest = runtime.platform.manifest ?? {}, target = Number(manifest.usesSdk?.targetSdkVersion ?? manifest.usesSdk?.minSdkVersion ?? 1), declared = manifest.application?.usesCleartextTraffic;
-    const byAttribute = declared !== undefined && declared !== null ? !(declared === false || declared === 'false' || Number(declared) === 0) : target < 28;
-    const config = networkSecurityConfigOf(runtime, byAttribute);
-    return (config ? cleartextPermittedFor(config, text(runtime, host)) : byAttribute) ? 1 : 0;
-  });
+  add(NET, `cleartextPermitted(${STRING})Z`, (runtime, [host]) => cleartextPermitted(runtime, text(runtime, host)) ? 1 : 0);
   add(NET, 'available(I)I', (runtime, [handle]) => opOf(runtime, handle).queued);
   add(NET, 'close(I)V', (runtime, [handle]) => { const net = networkOf(runtime), op = net.ops.get(handle); if (op) { net.discard(op); net.signal(); } });
   return bindings;
+}
+
+/** NetworkSecurityPolicy.isCleartextTrafficPermitted([host]): a network_security_config (base-config / domain-config) wins; otherwise android:usesCleartextTraffic; otherwise cleartext is allowed only for
+ * apps targeting API 27 and lower. The decision is keyed off the APK's targetSdkVersion like ApplicationInfo.targetSdkVersion in the framework. Without a host it answers for the base configuration. */
+export function cleartextPermitted(runtime, host = null) {
+  const manifest = runtime.platform.manifest ?? {}, target = Number(manifest.usesSdk?.targetSdkVersion ?? manifest.usesSdk?.minSdkVersion ?? 1), declared = manifest.application?.usesCleartextTraffic;
+  const byAttribute = declared !== undefined && declared !== null ? !(declared === false || declared === 'false' || Number(declared) === 0) : target < 28;
+  const config = networkSecurityConfigOf(runtime, byAttribute);
+  return config ? (host === null ? config.base : cleartextPermittedFor(config, host)) : byAttribute;
 }

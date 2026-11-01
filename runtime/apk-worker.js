@@ -1,36 +1,36 @@
-import { createMessageSink } from './audio-native.js?v=64ce1d942f1e';
-import { loadAPK } from './apk-loader.js?v=64ce1d942f1e';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=64ce1d942f1e';
-import { createWebViewBackend } from './webview-backend.js?v=64ce1d942f1e';
-import { FrameworkProvider } from './framework-provider.js?v=64ce1d942f1e';
-import { createRasterSender } from './raster-cache.js?v=64ce1d942f1e';
-import { isFreedId } from './heap-gc.js?v=64ce1d942f1e';
-import { dispatchPointer } from './pointer-input-host.js?v=64ce1d942f1e';
-import { resolveDevice } from './device-profile.js?v=64ce1d942f1e';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=64ce1d942f1e';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=64ce1d942f1e';
-import { SkiaProvider } from './skia-provider.js?v=64ce1d942f1e';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=64ce1d942f1e';
-import { disposeTextLayout } from './text-layout-native.js?v=64ce1d942f1e';
-import { IcuBreakProvider } from './icu-break-provider.js?v=64ce1d942f1e';
-import { SqliteProvider } from './sqlite-native.js?v=64ce1d942f1e';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=64ce1d942f1e';
-import { TzdataProvider } from './java-time-native.js?v=64ce1d942f1e';
-import { ZlibProvider } from './zip-native.js?v=64ce1d942f1e';
-import { IcuConverterProvider } from './icu-converter-native.js?v=64ce1d942f1e';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=64ce1d942f1e';
-import { JavacryptoProvider } from './javacrypto-native.js?v=64ce1d942f1e';
-import { disposeColorFilters } from './color-filter-native.js?v=64ce1d942f1e';
-import { disposeRegex } from './regex-native.js?v=64ce1d942f1e';
-import { disposeRenderNodes } from './rendernode-native.js?v=64ce1d942f1e';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=64ce1d942f1e';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=64ce1d942f1e';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=64ce1d942f1e';
+import { createMessageSink } from './audio-native.js?v=b6af1ec5264d';
+import { loadAPK } from './apk-loader.js?v=b6af1ec5264d';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=b6af1ec5264d';
+import { createWebViewBackend } from './webview-backend.js?v=b6af1ec5264d';
+import { FrameworkProvider } from './framework-provider.js?v=b6af1ec5264d';
+import { createRasterSender } from './raster-cache.js?v=b6af1ec5264d';
+import { isFreedId } from './heap-gc.js?v=b6af1ec5264d';
+import { dispatchPointer } from './pointer-input-host.js?v=b6af1ec5264d';
+import { resolveDevice } from './device-profile.js?v=b6af1ec5264d';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=b6af1ec5264d';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=b6af1ec5264d';
+import { SkiaProvider } from './skia-provider.js?v=b6af1ec5264d';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=b6af1ec5264d';
+import { disposeTextLayout } from './text-layout-native.js?v=b6af1ec5264d';
+import { IcuBreakProvider } from './icu-break-provider.js?v=b6af1ec5264d';
+import { SqliteProvider } from './sqlite-native.js?v=b6af1ec5264d';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=b6af1ec5264d';
+import { TzdataProvider } from './java-time-native.js?v=b6af1ec5264d';
+import { ZlibProvider } from './zip-native.js?v=b6af1ec5264d';
+import { IcuConverterProvider } from './icu-converter-native.js?v=b6af1ec5264d';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=b6af1ec5264d';
+import { JavacryptoProvider } from './javacrypto-native.js?v=b6af1ec5264d';
+import { disposeColorFilters } from './color-filter-native.js?v=b6af1ec5264d';
+import { disposeRegex } from './regex-native.js?v=b6af1ec5264d';
+import { disposeRenderNodes } from './rendernode-native.js?v=b6af1ec5264d';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=b6af1ec5264d';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=b6af1ec5264d';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=b6af1ec5264d';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=64ce1d942f1e';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=64ce1d942f1e';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=64ce1d942f1e';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '64ce1d942f1e';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=b6af1ec5264d';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=b6af1ec5264d';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=b6af1ec5264d';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'b6af1ec5264d';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -54,7 +54,7 @@ function currentSnapshot() {
   Object.assign(snapshot, runtime.executionSnapshot());
   // VM health the page can show: live Java objects, collections, and any OutOfMemoryError the VM raised (even if the app caught it).
   snapshot.pendingEventDelay = runtime.platform.nextEventDelay?.() ?? null;   // ms until the VM's next scheduled event (frame, timer); null when nothing is scheduled
-  snapshot.vmHealth = { liveObjects: runtime.heap.size, limit: runtime.maxHeapObjects, lastEventMs, collections: runtime.gcStats?.collections ?? 0, freedObjects: runtime.gcStats?.freed ?? 0, oomCount: runtime.oomCount ?? 0, lastOom: runtime.lastOom ?? null };
+  snapshot.vmHealth = { liveObjects: runtime.heap.size, limit: runtime.maxHeapObjects, lastEventMs, collections: runtime.gcStats?.collections ?? 0, freedObjects: runtime.gcStats?.freed ?? 0, gcMs: Math.round(runtime.gcStats?.totalMs ?? 0), oomCount: runtime.oomCount ?? 0, lastOom: runtime.lastOom ?? null };
   return rasterSender.intern(snapshot); // repeated PNGs travel once; the page resolves rasterId to a cached Blob URL
 }
 // Host-time limit of one VM event in the Worker. The instruction fuse (100M per thread: a React Native startup needs ~3.4M-85M in one dispatch, see the comment at

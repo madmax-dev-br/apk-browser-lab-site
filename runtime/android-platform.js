@@ -1,86 +1,94 @@
-import { Invoke } from './interpreter.js?v=64ce1d942f1e';
-import { createComposeCanvasHost } from './compose-canvas-host.js?v=64ce1d942f1e';
-import { createViewTransformHost } from './view-transform-host.js?v=64ce1d942f1e';
-import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=64ce1d942f1e';
-import { createViewOutlineHost } from './view-outline-host.js?v=64ce1d942f1e';
-import { createShaderHost } from './shader-host.js?v=64ce1d942f1e';
-import { createSystemBarsHost } from './system-bars-host.js?v=64ce1d942f1e';
-import { createDeviceStateHost } from './device-state-host.js?v=64ce1d942f1e';
-import { createJobSchedulerHost } from './job-scheduler-host.js?v=64ce1d942f1e';
-import { createPendingIntentHost } from './pending-intent-host.js?v=64ce1d942f1e';
-import { createBinderHost } from './binder-host.js?v=64ce1d942f1e';
-import { createInputManagerHost } from './input-native.js?v=64ce1d942f1e';
-import { createBackDispatcherHost } from './back-dispatcher-host.js?v=64ce1d942f1e';
-import { createRenderThreadAnimators } from './rt-animators.js?v=64ce1d942f1e';
-import { renderNodeByHandle } from './rendernode-native.js?v=64ce1d942f1e';
-import { resolveDevice } from './device-profile.js?v=64ce1d942f1e';
-import { configurationFor } from './device-configuration.js?v=64ce1d942f1e';
-import { createViewCoordinateHost } from './view-coordinate-host.js?v=64ce1d942f1e';
-import { createEditableTextHost } from './editable-text-host.js?v=64ce1d942f1e';
-import { createComponentCallbacksHost } from './component-callbacks-host.js?v=64ce1d942f1e';
-import { createViewStateHost } from './view-state-host.js?v=64ce1d942f1e';
-import { createLocaleServiceHost } from './locale-service-host.js?v=64ce1d942f1e';
-import { APKError } from './apk-runtime.js?v=64ce1d942f1e';
-import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=64ce1d942f1e';
-import { createViewTreeHost } from './view-tree-host.js?v=64ce1d942f1e';
-import { createDialogWindowHost } from './dialog-window-host.js?v=64ce1d942f1e';
-import { createProgressBarApiHost } from './progress-bar-api-host.js?v=64ce1d942f1e';
-import { createViewGroupApiHost } from './viewgroup-api-host.js?v=64ce1d942f1e';
-import { createViewInternalsHost } from './view-internals-host.js?v=64ce1d942f1e';
-import { createViewWindowHost } from './view-window-host.js?v=64ce1d942f1e';
-import { createVectorCanvasHost } from './vector-native.js?v=64ce1d942f1e';
-import { createPaintHost } from './paint-host.js?v=64ce1d942f1e';
-import { createContentResolverHost } from './content-resolver-host.js?v=64ce1d942f1e';
-import { createDrawableViewHost } from './drawable-view-host.js?v=64ce1d942f1e';
-import { createDeviceServicesHost } from './device-services-host.js?v=64ce1d942f1e';
-import { createSystemServicesHost } from './system-services-host.js?v=64ce1d942f1e';
-import { createJavaIoHost } from './java-io-host.js?v=64ce1d942f1e';
-import { createClassLoaderHost } from './class-loader-host.js?v=64ce1d942f1e';
-import { createAppServicesHost } from './app-services-host.js?v=64ce1d942f1e';
-import { createConcurrencyHost } from './concurrency-host.js?v=64ce1d942f1e';
-import { createDateTimeHost } from './datetime-host.js?v=64ce1d942f1e';
+import { Invoke } from './interpreter.js?v=b6af1ec5264d';
+import { createComposeCanvasHost } from './compose-canvas-host.js?v=b6af1ec5264d';
+import { createViewTransformHost } from './view-transform-host.js?v=b6af1ec5264d';
+import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=b6af1ec5264d';
+import { createViewOutlineHost } from './view-outline-host.js?v=b6af1ec5264d';
+import { createShaderHost } from './shader-host.js?v=b6af1ec5264d';
+import { createSystemBarsHost } from './system-bars-host.js?v=b6af1ec5264d';
+import { createDeviceStateHost } from './device-state-host.js?v=b6af1ec5264d';
+import { createJobSchedulerHost } from './job-scheduler-host.js?v=b6af1ec5264d';
+import { createPendingIntentHost } from './pending-intent-host.js?v=b6af1ec5264d';
+import { createBinderHost } from './binder-host.js?v=b6af1ec5264d';
+import { createInputManagerHost } from './input-native.js?v=b6af1ec5264d';
+import { createBackDispatcherHost } from './back-dispatcher-host.js?v=b6af1ec5264d';
+import { createRenderThreadAnimators } from './rt-animators.js?v=b6af1ec5264d';
+import { renderNodeByHandle } from './rendernode-native.js?v=b6af1ec5264d';
+import { resolveDevice } from './device-profile.js?v=b6af1ec5264d';
+import { configurationFor } from './device-configuration.js?v=b6af1ec5264d';
+import { createViewCoordinateHost } from './view-coordinate-host.js?v=b6af1ec5264d';
+import { createEditableTextHost } from './editable-text-host.js?v=b6af1ec5264d';
+import { createComponentCallbacksHost } from './component-callbacks-host.js?v=b6af1ec5264d';
+import { createViewStateHost } from './view-state-host.js?v=b6af1ec5264d';
+import { createLocaleServiceHost } from './locale-service-host.js?v=b6af1ec5264d';
+import { APKError } from './apk-runtime.js?v=b6af1ec5264d';
+import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=b6af1ec5264d';
+import { createViewTreeHost } from './view-tree-host.js?v=b6af1ec5264d';
+import { createDialogWindowHost } from './dialog-window-host.js?v=b6af1ec5264d';
+import { createProgressBarApiHost } from './progress-bar-api-host.js?v=b6af1ec5264d';
+import { createViewGroupApiHost } from './viewgroup-api-host.js?v=b6af1ec5264d';
+import { createViewInternalsHost } from './view-internals-host.js?v=b6af1ec5264d';
+import { createViewWindowHost } from './view-window-host.js?v=b6af1ec5264d';
+import { createVectorCanvasHost } from './vector-native.js?v=b6af1ec5264d';
+import { createPaintHost } from './paint-host.js?v=b6af1ec5264d';
+import { createContentResolverHost } from './content-resolver-host.js?v=b6af1ec5264d';
+import { createDrawableViewHost } from './drawable-view-host.js?v=b6af1ec5264d';
+import { createDeviceServicesHost } from './device-services-host.js?v=b6af1ec5264d';
+import { createSystemServicesHost } from './system-services-host.js?v=b6af1ec5264d';
+import { createJavaIoHost } from './java-io-host.js?v=b6af1ec5264d';
+import { createClassLoaderHost } from './class-loader-host.js?v=b6af1ec5264d';
+import { createAppServicesHost } from './app-services-host.js?v=b6af1ec5264d';
+import { createConcurrencyHost } from './concurrency-host.js?v=b6af1ec5264d';
+import { createDateTimeHost } from './datetime-host.js?v=b6af1ec5264d';
 const LOCALE_CONSTANTS = { US: 'en-US', UK: 'en-GB', ENGLISH: 'en', ROOT: 'und', CANADA: 'en-CA', CANADA_FRENCH: 'fr-CA', FRANCE: 'fr-FR', FRENCH: 'fr', GERMAN: 'de', GERMANY: 'de-DE', ITALIAN: 'it', ITALY: 'it-IT', JAPAN: 'ja-JP', JAPANESE: 'ja', KOREA: 'ko-KR', KOREAN: 'ko', CHINA: 'zh-CN', CHINESE: 'zh', PRC: 'zh-CN', SIMPLIFIED_CHINESE: 'zh-CN', TAIWAN: 'zh-TW', TRADITIONAL_CHINESE: 'zh-TW' };
-import { createNumberFormatHost } from './number-format-host.js?v=64ce1d942f1e';
-import { createCookieHost } from './cookie-host.js?v=64ce1d942f1e';
-import { createViewApiHost } from './view-api-host.js?v=64ce1d942f1e';
-import { createTextViewApiHost } from './textview-api-host.js?v=64ce1d942f1e';
-import { createIntentApiHost } from './intent-api-host.js?v=64ce1d942f1e';
-import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=64ce1d942f1e';
-import { createImageViewApiHost } from './image-view-api-host.js?v=64ce1d942f1e';
-import { createUriApiHost } from './uri-api-host.js?v=64ce1d942f1e';
-import { createFormatterHost } from './formatter-host.js?v=64ce1d942f1e';
-import { createJcaHost } from './jca-host.js?v=64ce1d942f1e';
-import { createIcuBidiHost } from './icu-bidi-host.js?v=64ce1d942f1e';
-import { createSecurityHost } from './security-host.js?v=64ce1d942f1e';
-import { createReflectionHost } from './reflection-host.js?v=64ce1d942f1e';
-import { createSerializationHost } from './serialization-host.js?v=64ce1d942f1e';
-import { createBitmapCodecHost } from './bitmap-codec-host.js?v=64ce1d942f1e';
-import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=64ce1d942f1e';
-import { createImageViewHost } from './image-view-host.js?v=64ce1d942f1e';
-import { createWebViewHost } from './webview-host.js?v=64ce1d942f1e';
-import { createContentExtrasHost } from './content-extras-host.js?v=64ce1d942f1e';
-import { createSettingsHost } from './settings-host.js?v=64ce1d942f1e';
-import { createHardwareServicesHost } from './hardware-services-host.js?v=64ce1d942f1e';
-import { createPeripheralServicesHost } from './peripheral-services-host.js?v=64ce1d942f1e';
-import { createStorageServicesHost } from './storage-services-host.js?v=64ce1d942f1e';
-import { createSystemManagersHost } from './system-managers-host.js?v=64ce1d942f1e';
-import { DEVICE_FEATURES } from './service-kit.js?v=64ce1d942f1e';
-import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=64ce1d942f1e';
-import { createViewTouchHost } from './view-touch-host.js?v=64ce1d942f1e';
-import { createMagnifierHost } from './magnifier-host.js?v=64ce1d942f1e';
-import { createDisplayHost } from './display-host.js?v=64ce1d942f1e';
-import { createNotificationHost } from './notification-host.js?v=64ce1d942f1e';
-import { createDatabaseSupportHost } from './database-support-host.js?v=64ce1d942f1e';
-import { VMClock } from './vm-clock.js?v=64ce1d942f1e';
-import { createWindowInsetsHost } from './window-insets-host.js?v=64ce1d942f1e';
-import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=64ce1d942f1e';
-import { createViewLayoutHost } from './view-layout-host.js?v=64ce1d942f1e';
-import { createInputMethodServiceHost } from './input-method-service-host.js?v=64ce1d942f1e';
-import { createAutofillServiceHost } from './autofill-service-host.js?v=64ce1d942f1e';
-import { createClipboardServiceHost } from './clipboard-service-host.js?v=64ce1d942f1e';
-import { createViewInputHost } from './view-input-host.js?v=64ce1d942f1e';
-import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=64ce1d942f1e';
-import { maybeCollect } from './heap-gc.js?v=64ce1d942f1e';
+import { createNumberFormatHost } from './number-format-host.js?v=b6af1ec5264d';
+import { createCookieHost } from './cookie-host.js?v=b6af1ec5264d';
+import { createViewApiHost } from './view-api-host.js?v=b6af1ec5264d';
+import { createTextViewApiHost } from './textview-api-host.js?v=b6af1ec5264d';
+import { createIntentApiHost } from './intent-api-host.js?v=b6af1ec5264d';
+import { createImageDecoderHost } from './image-decoder-host.js?v=b6af1ec5264d';
+import { createPlatformDataClassesHost } from './platform-data-classes-host.js?v=b6af1ec5264d';
+import { createToastHost } from './toast-host.js?v=b6af1ec5264d';
+import { createIcuTextHost } from './icu-text-host.js?v=b6af1ec5264d';
+import { createMiscPlatformHost } from './misc-platform-host.js?v=b6af1ec5264d';
+import { createRemoteViewsHost } from './remote-views-host.js?v=b6af1ec5264d';
+import { createPackageManagerApiHost } from './package-manager-api-host.js?v=b6af1ec5264d';
+import { createContentResolverApiHost } from './content-resolver-api-host.js?v=b6af1ec5264d';
+import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=b6af1ec5264d';
+import { createImageViewApiHost } from './image-view-api-host.js?v=b6af1ec5264d';
+import { createUriApiHost } from './uri-api-host.js?v=b6af1ec5264d';
+import { createFormatterHost } from './formatter-host.js?v=b6af1ec5264d';
+import { createJcaHost } from './jca-host.js?v=b6af1ec5264d';
+import { createIcuBidiHost } from './icu-bidi-host.js?v=b6af1ec5264d';
+import { createSecurityHost } from './security-host.js?v=b6af1ec5264d';
+import { createReflectionHost } from './reflection-host.js?v=b6af1ec5264d';
+import { createSerializationHost } from './serialization-host.js?v=b6af1ec5264d';
+import { createBitmapCodecHost } from './bitmap-codec-host.js?v=b6af1ec5264d';
+import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=b6af1ec5264d';
+import { createImageViewHost } from './image-view-host.js?v=b6af1ec5264d';
+import { createWebViewHost } from './webview-host.js?v=b6af1ec5264d';
+import { createContentExtrasHost } from './content-extras-host.js?v=b6af1ec5264d';
+import { createSettingsHost } from './settings-host.js?v=b6af1ec5264d';
+import { createHardwareServicesHost } from './hardware-services-host.js?v=b6af1ec5264d';
+import { createPeripheralServicesHost } from './peripheral-services-host.js?v=b6af1ec5264d';
+import { createStorageServicesHost } from './storage-services-host.js?v=b6af1ec5264d';
+import { createSystemManagersHost } from './system-managers-host.js?v=b6af1ec5264d';
+import { DEVICE_FEATURES } from './service-kit.js?v=b6af1ec5264d';
+import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=b6af1ec5264d';
+import { createViewTouchHost } from './view-touch-host.js?v=b6af1ec5264d';
+import { createMagnifierHost } from './magnifier-host.js?v=b6af1ec5264d';
+import { createDisplayHost } from './display-host.js?v=b6af1ec5264d';
+import { createNotificationHost } from './notification-host.js?v=b6af1ec5264d';
+import { createDatabaseSupportHost } from './database-support-host.js?v=b6af1ec5264d';
+import { VMClock } from './vm-clock.js?v=b6af1ec5264d';
+import { createWindowInsetsHost } from './window-insets-host.js?v=b6af1ec5264d';
+import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=b6af1ec5264d';
+import { createViewLayoutHost } from './view-layout-host.js?v=b6af1ec5264d';
+import { createInputMethodServiceHost } from './input-method-service-host.js?v=b6af1ec5264d';
+import { createAutofillServiceHost } from './autofill-service-host.js?v=b6af1ec5264d';
+import { createClipboardServiceHost } from './clipboard-service-host.js?v=b6af1ec5264d';
+import { createViewInputHost } from './view-input-host.js?v=b6af1ec5264d';
+import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=b6af1ec5264d';
+import { maybeCollect } from './heap-gc.js?v=b6af1ec5264d';
 
 const ACTIVITY = 'Landroid/app/Activity;', INTENT = 'Landroid/content/Intent;', BUNDLE = 'Landroid/os/Bundle;';
 const APPLICATION = 'Landroid/app/Application;', APP_CONTEXT = 'Landroid/app/ContextImpl;';
@@ -123,7 +131,7 @@ add(HANDLER, ['<init>(Z)V','<init>()V', '<init>(Landroid/os/Looper;)V', '<init>(
 add(MESSAGE, ['<init>()V', 'obtain()Landroid/os/Message;', 'obtain(Landroid/os/Message;)Landroid/os/Message;', 'obtain(Landroid/os/Handler;)Landroid/os/Message;', 'obtain(Landroid/os/Handler;Ljava/lang/Runnable;)Landroid/os/Message;', 'obtain(Landroid/os/Handler;I)Landroid/os/Message;', 'obtain(Landroid/os/Handler;ILjava/lang/Object;)Landroid/os/Message;', 'obtain(Landroid/os/Handler;III)Landroid/os/Message;', 'obtain(Landroid/os/Handler;IIILjava/lang/Object;)Landroid/os/Message;', 'setTarget(Landroid/os/Handler;)V', 'getTarget()Landroid/os/Handler;', 'getCallback()Ljava/lang/Runnable;', 'sendToTarget()V', 'getWhen()J', 'getData()Landroid/os/Bundle;', 'peekData()Landroid/os/Bundle;', 'setData(Landroid/os/Bundle;)V', 'copyFrom(Landroid/os/Message;)V', 'recycle()V', 'setAsynchronous(Z)V', 'isAsynchronous()Z']);
 add(ACTIVITY, ['getLocalClassName()Ljava/lang/String;', 'getComponentName()Landroid/content/ComponentName;', 'getLayoutInflater()Landroid/view/LayoutInflater;']);
 for (const owner of ['Landroid/view/View;', 'Landroid/view/ViewGroup;', ...['LinearLayout', 'FrameLayout', 'ScrollView', 'TextView', 'Button', 'EditText', 'CheckBox', 'Switch', 'ProgressBar'].map(name => `Landroid/widget/${name};`)]) add(owner, ['<init>(Landroid/content/Context;)V', '<init>(Landroid/content/Context;Landroid/util/AttributeSet;)V', '<init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V', '<init>(Landroid/content/Context;Landroid/util/AttributeSet;II)V']);
-add('Landroid/content/res/Resources;', ['getConfiguration()Landroid/content/res/Configuration;', 'getDisplayMetrics()Landroid/util/DisplayMetrics;']);
+add('Landroid/content/res/Resources;', ['getConfiguration()Landroid/content/res/Configuration;', 'getDisplayMetrics()Landroid/util/DisplayMetrics;', 'updateConfiguration(Landroid/content/res/Configuration;Landroid/util/DisplayMetrics;)V']);
 add(PACKAGE_MANAGER, ['getServiceInfo(Landroid/content/ComponentName;I)Landroid/content/pm/ServiceInfo;', 'getActivityInfo(Landroid/content/ComponentName;I)Landroid/content/pm/ActivityInfo;', 'getApplicationInfo(Ljava/lang/String;I)Landroid/content/pm/ApplicationInfo;', 'hasSystemFeature(Ljava/lang/String;)Z', 'hasSystemFeature(Ljava/lang/String;I)Z']);
 add(COMPONENT, ['<init>(Landroid/content/Context;Ljava/lang/Class;)V', '<init>(Landroid/content/Context;Ljava/lang/String;)V', '<init>(Ljava/lang/String;Ljava/lang/String;)V', 'getClassName()Ljava/lang/String;', 'getPackageName()Ljava/lang/String;', 'flattenToString()Ljava/lang/String;', 'flattenToShortString()Ljava/lang/String;']);
 add('Landroid/view/ViewGroup;', ['onViewAdded(Landroid/view/View;)V', 'onViewRemoved(Landroid/view/View;)V', 'generateDefaultLayoutParams()Landroid/view/ViewGroup$LayoutParams;', 'generateLayoutParams(Landroid/util/AttributeSet;)Landroid/view/ViewGroup$LayoutParams;']);
@@ -170,7 +178,7 @@ add('Landroid/widget/CompoundButton;', ['setChecked(Z)V', 'isChecked()Z', 'toggl
 add('Landroid/widget/ProgressBar;', ['setProgress(I)V', 'getProgress()I', 'setMax(I)V', 'getMax()I', 'setIndeterminate(Z)V', 'isIndeterminate()Z']);
 add('Landroid/view/View;', ['setVisibility(I)V', 'getVisibility()I', 'setBackgroundColor(I)V']);
 add(EDITABLE, ['toString()Ljava/lang/String;', 'length()I', 'charAt(I)C', 'subSequence(II)Ljava/lang/CharSequence;']);
-const VALUE_TYPES = new Map([['String', 'Ljava/lang/String;'], ['CharSequence', 'Ljava/lang/CharSequence;'], ['Int', 'I'], ['Long', 'J'], ['Boolean', 'Z'], ['Float', 'F'], ['Double', 'D'], ['Bundle', BUNDLE], ['Parcelable', 'Landroid/os/Parcelable;'], ['Serializable', 'Ljava/io/Serializable;'], ['StringArray', '[Ljava/lang/String;'], ['IntArray', '[I'], ['ByteArray', '[B'], ['StringArrayList', 'Ljava/util/ArrayList;'], ['IntegerArrayList', 'Ljava/util/ArrayList;'], ['ParcelableArrayList', 'Ljava/util/ArrayList;'], ['ParcelableArray', '[Landroid/os/Parcelable;'], ['SparseParcelableArray', 'Landroid/util/SparseArray;'], ['LongArray', '[J'], ['FloatArray', '[F'], ['DoubleArray', '[D'], ['BooleanArray', '[Z'], ['CharArray', '[C'], ['ShortArray', '[S'], ['Byte', 'B'], ['Char', 'C'], ['Short', 'S'], ['Binder', 'Landroid/os/IBinder;'], ['CharSequenceArray', '[Ljava/lang/CharSequence;'], ['CharSequenceArrayList', 'Ljava/util/ArrayList;'], ['Size', 'Landroid/util/Size;'], ['SizeF', 'Landroid/util/SizeF;']]);
+const VALUE_TYPES = new Map([['String', 'Ljava/lang/String;'], ['CharSequence', 'Ljava/lang/CharSequence;'], ['Int', 'I'], ['Long', 'J'], ['Boolean', 'Z'], ['Float', 'F'], ['Double', 'D'], ['Bundle', BUNDLE], ['PersistableBundle', 'Landroid/os/PersistableBundle;'], ['Parcelable', 'Landroid/os/Parcelable;'], ['Serializable', 'Ljava/io/Serializable;'], ['StringArray', '[Ljava/lang/String;'], ['IntArray', '[I'], ['ByteArray', '[B'], ['StringArrayList', 'Ljava/util/ArrayList;'], ['IntegerArrayList', 'Ljava/util/ArrayList;'], ['ParcelableArrayList', 'Ljava/util/ArrayList;'], ['ParcelableArray', '[Landroid/os/Parcelable;'], ['SparseParcelableArray', 'Landroid/util/SparseArray;'], ['LongArray', '[J'], ['FloatArray', '[F'], ['DoubleArray', '[D'], ['BooleanArray', '[Z'], ['CharArray', '[C'], ['ShortArray', '[S'], ['Byte', 'B'], ['Char', 'C'], ['Short', 'S'], ['Binder', 'Landroid/os/IBinder;'], ['CharSequenceArray', '[Ljava/lang/CharSequence;'], ['CharSequenceArrayList', 'Ljava/util/ArrayList;'], ['Size', 'Landroid/util/Size;'], ['SizeF', 'Landroid/util/SizeF;']]);
 for (const owner of [BUNDLE, 'Landroid/os/BaseBundle;', 'Landroid/os/PersistableBundle;']) {
   add(owner, ['<init>()V', '<init>(I)V', `<init>(${BUNDLE})V`, 'size()I', 'isEmpty()Z', 'containsKey(Ljava/lang/String;)Z', 'remove(Ljava/lang/String;)V', 'clear()V', `putAll(${BUNDLE})V`, 'keySet()Ljava/util/Set;', 'get(Ljava/lang/String;)Ljava/lang/Object;', 'clone()Ljava/lang/Object;', 'deepCopy()Landroid/os/Bundle;', 'setClassLoader(Ljava/lang/ClassLoader;)V', 'getClassLoader()Ljava/lang/ClassLoader;']);
   for (const [name, type] of VALUE_TYPES) {
@@ -213,7 +221,7 @@ function checkString(value, context) { if (typeof value !== 'string') error(`${c
 /** Explicit local Activity/Intent/Bundle and basic XML Views subset. Never bridges AndroidX. */
 const CORE_SERVICE_CLASSES = { 'Landroid/view/LayoutInflater;': 'layout_inflater', 'Landroid/view/WindowManager;': 'window', 'Landroid/view/accessibility/AccessibilityManager;': 'accessibility', 'Landroid/view/autofill/AutofillManager;': 'autofill', 'Landroid/content/ClipboardManager;': 'clipboard', 'Landroid/view/inputmethod/InputMethodManager;': 'input_method', 'Landroid/os/BatteryManager;': 'batterymanager', 'Landroid/net/ConnectivityManager;': 'connectivity', 'Landroid/app/job/JobScheduler;': 'jobscheduler', 'Landroid/telephony/TelephonyManager;': 'phone' };
 export class AndroidPlatform {
-  constructor({ resources = null, applicationName = null, packageName = null, manifest = null, apkBytes = null, device = null } = {}) { this.device = resolveDevice(device || {}); this.userDevice = this.device; this.clock = new VMClock(); this.apkBytes = apkBytes; this.manifest = manifest; this.resources = resources; this.applicationName = applicationName; this.packageName = packageName; this.application = null; this.applicationState = 'new'; this.frames = []; this.taskClosed = false; this.resourceObject = null; this.finishedActivities = new Set(); this.eventQueue = []; this.eventSequence = 0; this.virtualProcess = { source: 'browser-vm', pid: 1, uid: 10000, foreground: true }; this.transactionSequence = 0; this.porterModes = new Map(); this.inflaters = new Map(); this.applicationCallbacks = []; this.styleBackend = new AndroidStyleBackend(this); this.viewTreeHost = createViewTreeHost(this); this.viewWindowHost = createViewWindowHost(this); this.canvasHost = createVectorCanvasHost(); this.paintHost = createPaintHost(); this.contentHost = createContentResolverHost(this); this.drawableViewHost = createDrawableViewHost(this); this.deviceServices = createDeviceServicesHost(this); this.insetsHost = createWindowInsetsHost(this); this.accessibilityService = createAccessibilityServiceHost(this); this.viewLayoutHost = createViewLayoutHost(this); this.autofillService = createAutofillServiceHost(this); this.inputMethodService = createInputMethodServiceHost(this); this.clipboardService = createClipboardServiceHost(this); this.viewInputHost = createViewInputHost(this); this.xmlHost = new AndroidXmlHost(this); this.localeService = createLocaleServiceHost(this); this.viewStateHost = createViewStateHost(); this.componentCallbacksHost = createComponentCallbacksHost(this); this.editableTextHost = createEditableTextHost(this); this.viewCoordinateHost = createViewCoordinateHost(this); this.viewTransformHost = createViewTransformHost(this); this.viewPropertyAnimatorHost = createViewPropertyAnimatorHost(this); this.viewOutlineHost = createViewOutlineHost(this); this.composeCanvasHost = createComposeCanvasHost(this); this.dialogWindowHost = createDialogWindowHost(this); this.systemServices = createSystemServicesHost(this); this.javaIo = createJavaIoHost(this); this.classLoaders = createClassLoaderHost(this); this.appServices = createAppServicesHost(this); this.concurrency = createConcurrencyHost(this); this.dateTime = createDateTimeHost(this); this.numberFormat = createNumberFormatHost(this); this.cookies = createCookieHost(this); this.viewApi = createViewApiHost(this); this.textViewApi = createTextViewApiHost(this); this.intentApi = createIntentApiHost(this); this.activityApi = createActivityApiHost(this); this.imageViewApi = createImageViewApiHost(this); this.progressBarApi = createProgressBarApiHost(this); this.viewGroupApi = createViewGroupApiHost(this); this.viewInternals = createViewInternalsHost(this); this.uriApi = createUriApiHost(this); this.formatter = createFormatterHost(this); this.security = createSecurityHost(this); this.jca = createJcaHost(this); this.reflection = createReflectionHost(this); this.serialization = createSerializationHost(this); this.bitmapCodec = createBitmapCodecHost(this); this.bitmapDrawable = createBitmapDrawableHost(this); this.imageView = createImageViewHost(this); this.webView = createWebViewHost(this); this.contentExtras = createContentExtrasHost(this); this.settings = createSettingsHost(this); this.systemFeatures = new Set(DEVICE_FEATURES); this.hardwareServices = createHardwareServicesHost(this); this.peripheralServices = createPeripheralServicesHost(this); this.storageServices = createStorageServicesHost(this); this.systemManagers = createSystemManagersHost(this); this.typefaceBuilder = createTypefaceBuilderHost(this); this.viewTouch = createViewTouchHost(this); this.magnifier = createMagnifierHost(this); this.displayHost = createDisplayHost(this); this.notifications = createNotificationHost(this); this.databaseSupport = createDatabaseSupportHost(this); this.shaderHost = createShaderHost(this); this.systemBarsHost = createSystemBarsHost(this); this.deviceState = createDeviceStateHost(this); this.jobScheduler = createJobSchedulerHost(this); this.pendingIntents = createPendingIntentHost(this); this.binderHost = createBinderHost(this); this.inputManagerHost = createInputManagerHost(this); this.backDispatcher = createBackDispatcherHost(this); this.rtAnimators = createRenderThreadAnimators(this); this.icuBidi = createIcuBidiHost(this); this.contractHosts = [this.systemServices, this.javaIo, this.classLoaders, this.appServices, this.concurrency, this.dateTime, this.numberFormat, this.cookies, this.viewApi, this.textViewApi, this.intentApi, this.activityApi, this.imageViewApi, this.progressBarApi, this.viewGroupApi, this.viewInternals, this.uriApi, this.formatter, this.icuBidi, this.security, this.jca, this.reflection, this.serialization, this.bitmapCodec, this.bitmapDrawable, this.imageView, this.webView, this.contentExtras, this.settings, this.hardwareServices, this.peripheralServices, this.storageServices, this.systemManagers, this.typefaceBuilder, this.viewTouch, this.magnifier, this.displayHost, this.notifications, this.databaseSupport, this.shaderHost, this.deviceState, this.jobScheduler, this.pendingIntents, this.binderHost, this.inputManagerHost, this.backDispatcher]; }
+  constructor({ resources = null, applicationName = null, packageName = null, manifest = null, apkBytes = null, device = null } = {}) { this.device = resolveDevice(device || {}); this.userDevice = this.device; this.clock = new VMClock(); this.apkBytes = apkBytes; this.manifest = manifest; this.resources = resources; this.applicationName = applicationName; this.packageName = packageName; this.application = null; this.applicationState = 'new'; this.frames = []; this.taskClosed = false; this.resourceObject = null; this.finishedActivities = new Set(); this.eventQueue = []; this.eventSequence = 0; this.virtualProcess = { source: 'browser-vm', pid: 1, uid: 10000, foreground: true }; this.transactionSequence = 0; this.porterModes = new Map(); this.inflaters = new Map(); this.applicationCallbacks = []; this.styleBackend = new AndroidStyleBackend(this); this.viewTreeHost = createViewTreeHost(this); this.viewWindowHost = createViewWindowHost(this); this.canvasHost = createVectorCanvasHost(); this.paintHost = createPaintHost(); this.contentHost = createContentResolverHost(this); this.drawableViewHost = createDrawableViewHost(this); this.deviceServices = createDeviceServicesHost(this); this.insetsHost = createWindowInsetsHost(this); this.accessibilityService = createAccessibilityServiceHost(this); this.viewLayoutHost = createViewLayoutHost(this); this.autofillService = createAutofillServiceHost(this); this.inputMethodService = createInputMethodServiceHost(this); this.clipboardService = createClipboardServiceHost(this); this.viewInputHost = createViewInputHost(this); this.xmlHost = new AndroidXmlHost(this); this.localeService = createLocaleServiceHost(this); this.viewStateHost = createViewStateHost(); this.componentCallbacksHost = createComponentCallbacksHost(this); this.editableTextHost = createEditableTextHost(this); this.viewCoordinateHost = createViewCoordinateHost(this); this.viewTransformHost = createViewTransformHost(this); this.viewPropertyAnimatorHost = createViewPropertyAnimatorHost(this); this.viewOutlineHost = createViewOutlineHost(this); this.composeCanvasHost = createComposeCanvasHost(this); this.dialogWindowHost = createDialogWindowHost(this); this.systemServices = createSystemServicesHost(this); this.javaIo = createJavaIoHost(this); this.classLoaders = createClassLoaderHost(this); this.appServices = createAppServicesHost(this); this.concurrency = createConcurrencyHost(this); this.dateTime = createDateTimeHost(this); this.numberFormat = createNumberFormatHost(this); this.cookies = createCookieHost(this); this.viewApi = createViewApiHost(this); this.textViewApi = createTextViewApiHost(this); this.intentApi = createIntentApiHost(this); this.activityApi = createActivityApiHost(this); this.contentResolverApi = createContentResolverApiHost(this); this.packageManagerApi = createPackageManagerApiHost(this); this.remoteViews = createRemoteViewsHost(this); this.miscPlatform = createMiscPlatformHost(this); this.icuText = createIcuTextHost(this); this.toasts = createToastHost(this); this.platformData = createPlatformDataClassesHost(this); this.imageDecoder = createImageDecoderHost(this); this.imageViewApi = createImageViewApiHost(this); this.progressBarApi = createProgressBarApiHost(this); this.viewGroupApi = createViewGroupApiHost(this); this.viewInternals = createViewInternalsHost(this); this.uriApi = createUriApiHost(this); this.formatter = createFormatterHost(this); this.security = createSecurityHost(this); this.jca = createJcaHost(this); this.reflection = createReflectionHost(this); this.serialization = createSerializationHost(this); this.bitmapCodec = createBitmapCodecHost(this); this.bitmapDrawable = createBitmapDrawableHost(this); this.imageView = createImageViewHost(this); this.webView = createWebViewHost(this); this.contentExtras = createContentExtrasHost(this); this.settings = createSettingsHost(this); this.systemFeatures = new Set(DEVICE_FEATURES); this.hardwareServices = createHardwareServicesHost(this); this.peripheralServices = createPeripheralServicesHost(this); this.storageServices = createStorageServicesHost(this); this.systemManagers = createSystemManagersHost(this); this.typefaceBuilder = createTypefaceBuilderHost(this); this.viewTouch = createViewTouchHost(this); this.magnifier = createMagnifierHost(this); this.displayHost = createDisplayHost(this); this.notifications = createNotificationHost(this); this.databaseSupport = createDatabaseSupportHost(this); this.shaderHost = createShaderHost(this); this.systemBarsHost = createSystemBarsHost(this); this.deviceState = createDeviceStateHost(this); this.jobScheduler = createJobSchedulerHost(this); this.pendingIntents = createPendingIntentHost(this); this.binderHost = createBinderHost(this); this.inputManagerHost = createInputManagerHost(this); this.backDispatcher = createBackDispatcherHost(this); this.rtAnimators = createRenderThreadAnimators(this); this.icuBidi = createIcuBidiHost(this); this.contractHosts = [this.systemServices, this.javaIo, this.classLoaders, this.appServices, this.concurrency, this.dateTime, this.numberFormat, this.cookies, this.viewApi, this.textViewApi, this.intentApi, this.activityApi, this.contentResolverApi, this.packageManagerApi, this.remoteViews, this.miscPlatform, this.icuText, this.toasts, this.platformData, this.imageDecoder, this.imageViewApi, this.progressBarApi, this.viewGroupApi, this.viewInternals, this.uriApi, this.formatter, this.icuBidi, this.security, this.jca, this.reflection, this.serialization, this.bitmapCodec, this.bitmapDrawable, this.imageView, this.webView, this.contentExtras, this.settings, this.hardwareServices, this.peripheralServices, this.storageServices, this.systemManagers, this.typefaceBuilder, this.viewTouch, this.magnifier, this.displayHost, this.notifications, this.databaseSupport, this.shaderHost, this.deviceState, this.jobScheduler, this.pendingIntents, this.binderHost, this.inputManagerHost, this.backDispatcher]; }
   readStatic(runtime, field) {
     for (const host of this.contractHosts) { const hosted = host.readStatic(runtime, field); if (hosted) return hosted; }
     // Android 13 Bundle.EMPTY: one singleton whose mMap is the immutable ArrayMap.EMPTY; any insertion throws UnsupportedOperationException("ArrayMap is immutable").
@@ -846,6 +854,21 @@ export class AndroidPlatform {
       if (name === 'getConfiguration') return this.resourceConfiguration(runtime,receiver);
       if(runtime.object(receiver).resourceConfigurationDifference)error('Resource selection for this changed configuration is not installed',{kind:'configuration-resources-unsupported',changes:runtime.object(receiver).resourceConfigurationDifference});
       if (name === 'getDisplayMetrics') return this.metrics(runtime);
+      if (name === 'updateConfiguration') {
+        // Resources.updateConfiguration(config, metrics): the framework swaps the resources' configuration and re-selects every qualified resource. Resource selection here follows the virtual
+        // device (Dispositivo panel); a configuration that differs from it (a new locale, font scale, night mode...) would need a second selection pass, so it fails explicitly. The common
+        // "re-apply the current configuration" call is accepted and re-resolves live Themes.
+        const incoming = args[1], metricsArg = args[2];
+        if (incoming !== null && incoming !== 0 && incoming !== undefined) {
+          const current = this.resourceConfiguration(runtime, null), changes = runtime.dispatch({ owner: CONFIGURATION, name: 'diff', parameters: [CONFIGURATION], result: 'I', signature: `(${CONFIGURATION})I` }, [current, incoming], 'virtual');
+          if (changes !== 0) error('Resources.updateConfiguration with a configuration that differs from the virtual device is not installed (resource selection follows the device)', { kind: 'configuration-resources-unsupported', changes });
+        }
+        if (metricsArg !== null && metricsArg !== 0 && metricsArg !== undefined && metricsArg.ref !== this.metrics(runtime).ref) {
+          const mine = runtime.object(this.metrics(runtime)).fields, theirs = runtime.object(metricsArg).fields;
+          for (const field of ['widthPixels', 'heightPixels', 'densityDpi']) if (mine.get(`${METRICS}->${field}:I`) !== theirs.get(`${METRICS}->${field}:I`)) error('Resources.updateConfiguration with DisplayMetrics that differ from the virtual device is not installed', { kind: 'configuration-resources-unsupported', field });
+        }
+        this.styleBackend.refreshThemes(runtime); return;
+      }
       if (name === 'getIdentifier') {
         if (typeof args[1] !== 'string' || args[1].length > 4096) error('Resource name must be a bounded string');
         if (/^[0-9]+$/.test(args[1])) { const id = Number(args[1]); if (id > 0 && id <= 0x7fffffff) return id; }
@@ -918,6 +941,7 @@ export class AndroidPlatform {
         this.invoke(runtime, { owner: 'Landroid/view/View;', name: 'setLayoutParams' }, [args[1], params]); child.parent = receiver; object.children.splice(at, 0, args[1]); if (object.attached) this.attachTree(runtime, args[1], true);
         runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'onViewAdded', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [receiver, args[1]], 'virtual'); this.notifyHierarchyChange(runtime, receiver, args[1], true); this.requestDraw(runtime, receiver);
         if (inLayout && !preventLayout) this.viewLayoutHost.invoke(runtime, { name: 'requestLayout' }, [args[1]]);
+        else if (!inLayout && runtime.objectOverride(object.type, 'requestLayout()V')) runtime.dispatch({ owner: object.type, name: 'requestLayout', signature: '()V', parameters: [], result: 'V' }, [receiver], 'virtual');   // a Java ViewGroup (RelativeLayout) learns of the change through its own requestLayout, laid out yet or not
         else if (!inLayout && object.laidOut) this.viewLayoutHost.invoke(runtime, { name: 'requestLayout' }, [receiver]);
         return inLayout ? 1 : undefined;
       }

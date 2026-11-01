@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=64ce1d942f1e';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=64ce1d942f1e';
+import { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=b6af1ec5264d';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -61,6 +61,11 @@ for (const suffix of ['TextSize', 'TextScaleX', 'TextSkewX', 'LetterSpacing', 'W
 const flagMasks = [['AntiAlias', 1], ['Dither', 4], ['FilterBitmap', 2], ['UnderlineText', 8], ['StrikeThruText', 16], ['FakeBoldText', 32], ['LinearText', 64], ['SubpixelText', 128]];
 for (const [suffix] of flagMasks) { keys.add(`${PAINT}->is${suffix}()Z`); keys.add(`${PAINT}->set${suffix}(Z)V`); }
 const referenceEffects = ['Shader', 'PathEffect', 'MaskFilter'];
+// android.graphics.DashPathEffect(float[] intervals, float phase) and CornerPathEffect(float radius): path effects the Skia backend applies to stroked paths (android-13.0.0_r1 DashPathEffect.java:
+// "intervals array must contain at least 2 elements" and an even count). Other PathEffect subclasses fail explicitly when a paint carrying them draws.
+const PATH_EFFECT = 'Landroid/graphics/PathEffect;', DASH = 'Landroid/graphics/DashPathEffect;', CORNER = 'Landroid/graphics/CornerPathEffect;';
+for (const key of [`${DASH}-><init>([FF)V`, `${CORNER}-><init>(F)V`]) keys.add(key);
+const floatOf = bits => { const view = new DataView(new ArrayBuffer(4)); view.setInt32(0, bits | 0, true); return view.getFloat32(0, true); };
 for (const effect of referenceEffects) { const type = `Landroid/graphics/${effect};`; keys.add(`${PAINT}->get${effect}()${type}`); keys.add(`${PAINT}->set${effect}(${type})${type}`); }
 
 export function getPaintState(runtime, receiver) {
@@ -83,10 +88,16 @@ function initializeTextLocales(runtime,paint){
 export function createPaintHost() {
   return {
     supports: key => keys.has(key),
-    canAllocate: type => type === PAINT || type === PDX,
-    parent: type => type === PAINT ? 'Ljava/lang/Object;' : type === PDX ? XFERMODE : null,
+    canAllocate: type => type === PAINT || type === PDX || type === DASH || type === CORNER,
+    parent: type => type === PAINT || type === PATH_EFFECT ? 'Ljava/lang/Object;' : type === PDX ? XFERMODE : type === DASH || type === CORNER ? PATH_EFFECT : null,
     invoke(runtime, method, args) {
       const object = runtime.object(args[0]), name = method.name;
+      if (method.owner === DASH) {
+        const values = nullish(args[1]) ? null : runtime.array(args[1]).elements; if (values === null) runtime.throwJava('Ljava/lang/NullPointerException;', null);
+        if (values.length < 2 || values.length % 2 !== 0) runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', 'intervals array must contain at least 2 elements');
+        object.pathEffect = { dash: { intervals: values.map(floatOf), phase: floatOf(args[2]) } }; return;
+      }
+      if (method.owner === CORNER) { object.pathEffect = { corner: floatOf(args[1]) }; return; }
       if (method.owner === PDX) {
         // Original API28 PorterDuffXfermode(Mode): Xfermode.porterDuffMode = mode.nativeInt.
         if (nullish(args[1])) runtime.throwJava('Ljava/lang/NullPointerException;', 'mode is null');
@@ -322,11 +333,12 @@ export function createPaintHost() {
 /** A native Canvas may draw this state only when it can preserve the paint's meaning. */
 export function getSolidPaint(runtime, receiver) {
   const paint = getPaintState(runtime, receiver);
-  for (const effect of referenceEffects) if (effect !== 'Shader' && !nullish(paint[effect[0].toLowerCase() + effect.slice(1)])) fail(`This paint needs an implemented ${effect} drawing backend`);
+  for (const effect of referenceEffects) if (effect !== 'Shader' && effect !== 'PathEffect' && !nullish(paint[effect[0].toLowerCase() + effect.slice(1)])) fail(`This paint needs an implemented ${effect} drawing backend`);
+  const pathEffect = nullish(paint.pathEffect) ? null : (runtime.object(paint.pathEffect).pathEffect ?? fail('This paint needs an implemented PathEffect drawing backend (only DashPathEffect and CornerPathEffect are)'));
   const shader = nullish(paint.shader) ? null : (runtime.platform?.shaderHost?.snapshot?.(runtime, paint.shader) ?? fail('This paint needs an implemented Shader drawing backend'));
   const colorFilterSnapshot=snapshotPaintColorFilter(runtime,paint.colorFilter);
   const blendMode=nullish(paint.xfermode)?3:runtime.object(paint.xfermode).fields.get(`${XFERMODE}->porterDuffMode:I`);
   if(!Number.isInteger(blendMode)||blendMode<0||blendMode>28)fail('This paint needs a known original Skia transfer-mode value');
   if(blendMode!==3&&!runtime.skiaHost)fail('Nondefault Paint BlendMode requires the verified Skia CPU backend');
-  return { ...paint, shader, blendMode, colorFilterSnapshot, argb: paint.color >>> 0, color: '#' + (paint.color & 0xffffff).toString(16).padStart(6, '0'), alpha: (paint.color >>> 24) / 255 };
+  return { ...paint, shader, pathEffect, blendMode, colorFilterSnapshot, argb: paint.color >>> 0, color: '#' + (paint.color & 0xffffff).toString(16).padStart(6, '0'), alpha: (paint.color >>> 24) / 255 };
 }

@@ -30,7 +30,7 @@ const tracked = new Set();
 export function gcRoot(container) { tracked.add(new WeakRef(container)); return container; }
 
 const ID_KEY = /(^id$|Id$|Ids$|^ids$|^ref$|Ref$|Refs$|^view$|View$|^target$|Target$|^receiver$|Receiver$|^owner$|Owner$|^activity$|Activity$|^object$|Object$|^handle$)/;
-const SKIP_PROPS = new Set(['heap', 'dex', 'classes', 'resolvedClasses', 'resolveCache', 'subtypeMemo', 'ancestorSets', 'methodEvidence', 'nativeBindings', 'apkEntries', 'traceRing', 'trace', 'scheduler', 'resources']);
+const SKIP_PROPS = new Set(['heap', 'dex', 'classes', 'resolvedClasses', 'resolveCache', 'hostMethodRefs', 'subtypeMemo', 'ancestorSets', 'methodEvidence', 'nativeBindings', 'apkEntries', 'traceRing', 'trace', 'scheduler', 'resources']);
 const NUMERIC_ARRAY_LIMIT = 256;
 
 function tombstone(id, type) {
@@ -81,7 +81,10 @@ export function collectGarbage(runtime, { audit = globalThis.process?.env?.APKWE
   if (blocked) { const skips = (runtime.gcSkips ??= {}); skips[blocked] = (skips[blocked] ?? 0) + 1; return { collected: false, reason: blocked, before, after: before, freed: 0, ms: 0 }; }
   const limit = runtime.nextId, marked = new Uint8Array(limit), worklist = [];
   const visited = new WeakSet(), stack = [];
+  // The big tables are skipped by identity, not only by property name: a back-reference (jni.runtime, platform.runtime) reaches the runtime object from another root and would otherwise walk
+  // its resolveCache (millions of entries) and the other skipped tables on every collection.
   const skip = new WeakSet([heap, runtime.dex, runtime.classes, runtime.resources, runtime.platform?.resources, runtime.scheduler].filter(Boolean));
+  for (const name of SKIP_PROPS) { const table = runtime[name]; if (table !== null && typeof table === 'object') skip.add(table); }
   const violations = [];
   const markId = (id, strict = false) => {
     if (!(id > 0 && id < limit) || marked[id]) return; const record = heap.list[id]; if (record === undefined) return;
@@ -154,9 +157,20 @@ export function collectGarbage(runtime, { audit = globalThis.process?.env?.APKWE
     collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
   }
   runtime.gcNextAt = Math.min(Math.floor(runtime.maxHeapObjects * 0.85), heap.size + Math.floor(runtime.maxHeapObjects * 0.25));
+  // Minimum allocation between two collections: a collection scans the whole live set, so a live set that stays above the threshold (gcNextAt is capped at 85% of the limit) must not be
+  // re-scanned at every safepoint. A collection that freed little (< 10% of the heap) quadruples the wait.
+  const minAlloc = Math.max(1024, Math.floor(runtime.maxHeapObjects / 32));
+  runtime.gcMinAlloc = freed < before * 0.1 ? minAlloc * 4 : minAlloc;
   runtime.gcPressure = false; runtime.gcLastNextId = runtime.nextId; runtime.fieldSlots = fieldSlots; runtime.arrayCells = arrayCells; runtime.collectionCells = collectionCells;
-  runtime.gcStats = { collections: (runtime.gcStats?.collections ?? 0) + 1, freed: (runtime.gcStats?.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(runtime.gcStats?.peakLiveAfterGc ?? 0, heap.size), lastReason: reason };
+  runtime.gcStats = { collections: (runtime.gcStats?.collections ?? 0) + 1, freed: (runtime.gcStats?.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(runtime.gcStats?.peakLiveAfterGc ?? 0, heap.size), lastReason: reason, totalMs: (runtime.gcStats?.totalMs ?? 0) + (performance.now() - started), recent: [...(runtime.gcStats?.recent ?? []).slice(-15), { at: Math.round(started), ms: Math.round(performance.now() - started), markMs: Math.round(markMs), before, after: heap.size, nextId: runtime.nextId, reason }] };
   return { collected: true, reason, before, after: heap.size, freed, ms: Math.round(performance.now() - started), markMs: Math.round(markMs) };
+}
+
+/** True when a pressure-driven collection (thread-switch safepoint, event boundary) may run now: enough was allocated since the last one, and the heap passed the threshold or a native resource asked for it. */
+export function collectionDue(runtime, threshold = Math.floor(runtime.maxHeapObjects * 0.5)) {
+  const wait = Math.min(runtime.gcMinAlloc ?? 0, Math.max(64, (runtime.maxHeapObjects - runtime.heap.size) >> 1)), allocated = runtime.nextId - (runtime.gcLastNextId ?? 0);   // never wait past half the remaining headroom
+  if (runtime.gcPressure) return allocated >= Math.min(wait, Math.max(1024, wait >> 2));   // a native resource count asked for it (regex handles are capped at 16384): wait less, but not for every quantum
+  return allocated >= wait && runtime.heap.size >= Math.max(threshold, runtime.gcNextAt ?? 0);
 }
 
 /** Collects when the live heap passed `threshold` (default 40% of the limit) or in audit mode (every call). */
@@ -169,6 +183,6 @@ export function maybeCollect(runtime, options = {}) {
   if (audit && runtime.nextId - (runtime.gcLastNextId ?? 0) < Number(globalThis.process?.env?.APKWEB_GC_AUDIT_MIN ?? 200)) return { collected: false, reason: 'audit-small-event', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };
   if (!audit && !runtime.gcPressure && runtime.gcLastNextId === runtime.nextId) return { collected: false, reason: 'nothing-allocated', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // no allocation since the last collection: nothing new can be garbage
   // Hysteresis: after a collection the next one waits until the heap grew by 25% of the limit (a heap that is legitimately large must not be re-scanned on every event).
-  if (!audit && !runtime.gcPressure && runtime.heap.size < Math.max(threshold, runtime.gcNextAt ?? 0)) return { collected: false, reason: 'below-threshold', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };
+  if (!audit && !collectionDue(runtime, threshold)) return { collected: false, reason: 'below-threshold', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };
   return collectGarbage(runtime, { ...options, audit, reason: audit ? 'audit' : 'threshold' });
 }

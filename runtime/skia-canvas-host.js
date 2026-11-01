@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=64ce1d942f1e';
-import {getVectorGraphics} from './vector-native.js?v=64ce1d942f1e';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=64ce1d942f1e';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=64ce1d942f1e';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=64ce1d942f1e';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=64ce1d942f1e';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=64ce1d942f1e';
-import {createBitmapHost} from './bitmap-host.js?v=64ce1d942f1e';
-import { gcRoot } from './heap-gc.js?v=64ce1d942f1e';
+import {APKError} from './apk-runtime.js?v=b6af1ec5264d';
+import {getVectorGraphics} from './vector-native.js?v=b6af1ec5264d';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=b6af1ec5264d';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=b6af1ec5264d';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=b6af1ec5264d';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=b6af1ec5264d';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=b6af1ec5264d';
+import {createBitmapHost} from './bitmap-host.js?v=b6af1ec5264d';
+import { gcRoot } from './heap-gc.js?v=b6af1ec5264d';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -54,7 +54,7 @@ function buildGradientShader(CK,shader,overrides){
 }
 /** Android BitmapShader over a snapshot raster. ALPHA_8 bitmaps are coverage only: Skia exposes them as (0,0,0,a), later tinted by the Paint's color filter. */
 function attachShader(CK,paint,shader,overrides){const built=buildShader(CK,shader,overrides);paint.setShader(built);built.delete();}
-function makePaint(CK,state){const paint=new CK.Paint();paint.setAntiAlias(!!(state.flags&1));paint.setColor(argb(CK,state.argb));paint.setBlendMode({value:state.blendMode??3});paint.setStyle([CK.PaintStyle.Fill,CK.PaintStyle.Stroke,CK.PaintStyle.StrokeAndFill][state.style]);paint.setStrokeWidth(state.strokeWidth);paint.setStrokeMiter(state.strokeMiter);paint.setStrokeCap([CK.StrokeCap.Butt,CK.StrokeCap.Round,CK.StrokeCap.Square][state.strokeCap]);paint.setStrokeJoin([CK.StrokeJoin.Miter,CK.StrokeJoin.Round,CK.StrokeJoin.Bevel][state.strokeJoin]);if(state.colorFilterSnapshot){const filter=makeSkiaColorFilter(CK,state.colorFilterSnapshot);paint.setColorFilter(filter);filter?.delete();}if(state.shader)attachShader(CK,paint,state.shader);return paint;}
+function makePaint(CK,state){const paint=new CK.Paint();paint.setAntiAlias(!!(state.flags&1));paint.setColor(argb(CK,state.argb));paint.setBlendMode({value:state.blendMode??3});paint.setStyle([CK.PaintStyle.Fill,CK.PaintStyle.Stroke,CK.PaintStyle.StrokeAndFill][state.style]);paint.setStrokeWidth(state.strokeWidth);paint.setStrokeMiter(state.strokeMiter);paint.setStrokeCap([CK.StrokeCap.Butt,CK.StrokeCap.Round,CK.StrokeCap.Square][state.strokeCap]);paint.setStrokeJoin([CK.StrokeJoin.Miter,CK.StrokeJoin.Round,CK.StrokeJoin.Bevel][state.strokeJoin]);if(state.colorFilterSnapshot){const filter=makeSkiaColorFilter(CK,state.colorFilterSnapshot);paint.setColorFilter(filter);filter?.delete();}if(state.pathEffect){const effect=state.pathEffect.dash?CK.PathEffect.MakeDash(state.pathEffect.dash.intervals,state.pathEffect.dash.phase):CK.PathEffect.MakeCorner(state.pathEffect.corner);if(effect){paint.setPathEffect(effect);effect.delete();}}if(state.shader)attachShader(CK,paint,state.shader);return paint;}
 function makeFont(backend,state,text){
  const CK=backend.CanvasKit;if(typeof text!=='string'||text.length>65536)fail('Skia text run exceeds65536characters');
  const size=state.textSize??12,scale=state.textScaleX??1,skew=state.textSkewX??0;if(![size,scale,skew].every(Number.isFinite)||size<0||size>512||Math.abs(scale)>16||Math.abs(skew)>16)fail('Skia font extent exceeds VM limits');
@@ -288,7 +288,7 @@ export function createSkiaCanvasHost(runtime,backend){
  add(CANVAS,['setCompatibilityVersion(I)V','<init>(J)V','getClipBounds(Landroid/graphics/Rect;)Z','getClipBounds()Landroid/graphics/Rect;']);
  add(CANVAS,['drawLine(FFFFLandroid/graphics/Paint;)V','drawPoint(FFLandroid/graphics/Paint;)V','drawArc(FFFFFFZLandroid/graphics/Paint;)V','drawArc(Landroid/graphics/RectF;FFZLandroid/graphics/Paint;)V']);
  add(CANVAS,['drawTextRun(Ljava/lang/CharSequence;IIIIFFZLandroid/graphics/Paint;)V','drawTextRun(Ljava/lang/String;IIIIFFZLandroid/graphics/Paint;)V','drawTextRun([CIIIIFFZLandroid/graphics/Paint;)V']);
- add(CANVAS,['clipRect(FFFFLandroid/graphics/Region$Op;)Z','clipRect(IIIILandroid/graphics/Region$Op;)Z','clipRect(Landroid/graphics/Rect;Landroid/graphics/Region$Op;)Z','clipRect(Landroid/graphics/RectF;Landroid/graphics/Region$Op;)Z',`clipPath(${PATH}Landroid/graphics/Region$Op;)Z`,'clipOutRect(FFFF)Z','clipOutRect(IIII)Z',`clipOutPath(${PATH})Z`]);
+ add(CANVAS,['clipRect(FFFFLandroid/graphics/Region$Op;)Z','clipRect(IIIILandroid/graphics/Region$Op;)Z','clipRect(Landroid/graphics/Rect;Landroid/graphics/Region$Op;)Z','clipRect(Landroid/graphics/RectF;Landroid/graphics/Region$Op;)Z',`clipPath(${PATH}Landroid/graphics/Region$Op;)Z`,'clipOutRect(FFFF)Z','clipOutRect(IIII)Z','clipOutRect(Landroid/graphics/Rect;)Z','clipOutRect(Landroid/graphics/RectF;)Z',`clipOutPath(${PATH})Z`]);
  add(CANVAS,['concat(Landroid/graphics/Matrix;)V','clipRect(IIII)Z','save(I)I']);
  add(CANVAS,['clipRect(Landroid/graphics/RectF;)Z']);
  // Canvas.saveLayer / saveLayerAlpha: a real offscreen layer (SkCanvas::saveLayer) bounded by the rectangle when one is given, composited back with the paint's alpha / blend / color filter on restore.

@@ -1,13 +1,14 @@
-import { gcRoot } from './heap-gc.js?v=64ce1d942f1e';
-import { APKError } from './apk-error.js?v=64ce1d942f1e';
-import { createHostRegistry } from './host-contract.js?v=64ce1d942f1e';
-import { getVectorGraphics } from './vector-native.js?v=64ce1d942f1e';
+import { gcRoot } from './heap-gc.js?v=b6af1ec5264d';
+import { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { createHostRegistry } from './host-contract.js?v=b6af1ec5264d';
+import { getVectorGraphics } from './vector-native.js?v=b6af1ec5264d';
+import { jpegNativeScale, sampledDimension, samplePixels, premultiply, unpremultiply } from './image-codecs.js?v=b6af1ec5264d';
 
 // android.graphics.BitmapFactory (+ Options), Bitmap.CompressFormat and the Bitmap operations on top of the recorded-canvas Bitmap of bitmap-host.js: decoding PNG/JPEG/GIF/WebP/BMP
 // with the official Skia codecs (CanvasKit), inSampleSize / density scaling / inJustDecodeBounds / inBitmap reuse as in frameworks/base BitmapFactory.cpp, pixel access
 // (getPixel/getPixels/setPixel), scaled and cropped copies, and compress() through Skia's encoders.
 // Known limits (explicit, not hidden): Config RGB_565 / ARGB_4444 / RGBA_F16 requests decode to ARGB_8888 (outConfig reports it); HARDWARE requests produce an immutable bitmap that
-// denies pixel access like Android's; EXIF orientation is not applied (BitmapFactory does not either); animated GIF/WebP decode the first frame (as BitmapFactory does).
+// denies pixel access like Android's; EXIF orientation is never applied (BitmapFactory does not rotate): JPEG and WebP decode through the lab codec module (libjpeg-turbo, libwebp: src/image-codecs.js), which does not rotate, with libjpeg's DCT scaling for inSampleSize 2, 4 and 8 and Skia's sampler for the rest; PNG/GIF/BMP/ICO go through CanvasKit, whose decoder applies a PNG eXIf orientation (not corrected); animated GIF/WebP decode the first frame (as BitmapFactory does).
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', BITMAP = 'Landroid/graphics/Bitmap;', CONFIG = 'Landroid/graphics/Bitmap$Config;', CANVAS = 'Landroid/graphics/Canvas;', FACTORY = 'Landroid/graphics/BitmapFactory;';
 const OPTIONS = 'Landroid/graphics/BitmapFactory$Options;', COMPRESS = 'Landroid/graphics/Bitmap$CompressFormat;', INPUT = 'Ljava/io/InputStream;', OUTPUT = 'Ljava/io/OutputStream;', RECT = 'Landroid/graphics/Rect;', RESOURCES = 'Landroid/content/res/Resources;', MATRIX = 'Landroid/graphics/Matrix;', PAINT = 'Landroid/graphics/Paint;', TYPED_VALUE = 'Landroid/util/TypedValue;', SPACE = 'Landroid/graphics/ColorSpace;';
 const FORMATS = ['JPEG', 'PNG', 'WEBP', 'WEBP_LOSSY', 'WEBP_LOSSLESS'];
@@ -24,7 +25,20 @@ export function sniffMime(b) {
   if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
   if (b.length >= 2 && b[0] === 0x42 && b[1] === 0x4d) return 'image/bmp';
   if (b.length >= 4 && b[0] === 0 && b[1] === 0 && b[2] === 1 && b[3] === 0) return 'image/x-ico';
+  if (b.length >= 12 && b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {   // ISO BMFF 'ftyp': the major brand and the compatible brands tell AVIF from HEIF
+    const brands = []; for (let at = 8; at + 4 <= Math.min(b.length, 8 + Math.max(4, (((b[0] * 256 + b[1]) * 256 + b[2]) * 256 + b[3]) - 8)); at += at === 8 ? 8 : 4) brands.push(String.fromCharCode(b[at], b[at + 1], b[at + 2], b[at + 3]));
+    if (brands.includes('avif') || brands.includes('avis')) return 'image/avif';
+    if (brands.some(brand => ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1'].includes(brand))) return 'image/heif';
+  }
   return null;
+}
+
+/** SkWbmpCodec's header check: type 0, fixed-header 0, then two multi-byte integers (width, height) both non-zero, with exactly the packed 1-bit rows after them. */
+export function looksLikeWbmp(b) {
+  if (b.length < 4 || b[0] !== 0 || (b[1] & 0x9f) !== 0) return false;
+  let at = 2; const read = () => { let value = 0; for (let n = 0; n < 5 && at < b.length; n++) { const byte = b[at++]; value = value * 128 + (byte & 0x7f); if (!(byte & 0x80)) return value; } return -1; };
+  const width = read(), height = read(); if (width <= 0 || height <= 0 || width > 65535 || height > 65535) return false;
+  return b.length - at === Math.ceil(width / 8) * height;
 }
 
 export function createBitmapCodecHost(platform) {
@@ -63,16 +77,52 @@ export function createBitmapCodecHost(platform) {
 
   // ---- decoding -----------------------------------------------------------------------------------------------------------------------------
   /** Decodes encoded `bytes` the way BitmapFactory.cpp doDecode does; returns a Bitmap reference, or null when the data is not a supported image (or only the bounds were requested). */
+  /** JPEG and WebP through the lab codec module (libjpeg-turbo / libwebp). Returns null when CanvasKit should decode (other formats, animated WebP), false when the codec rejects the data, else
+   *  { image, width, height, srcWidth, srcHeight, alpha, label }: `image` is a CanvasKit image already at the sampled size (null for justBounds), width/height are outWidth/outHeight before density scaling. */
+  const labDecoder = (r, bytes, mime, sample, justBounds) => {
+    if (mime === 'image/heif') fail('HEIF/HEIC decoding is not available in the lab (it needs an HEVC decoder: libde265 is LGPL, Android uses MediaCodec); AVIF is supported', { mime });
+    if (mime !== 'image/jpeg' && mime !== 'image/webp' && mime !== 'image/avif') return null;
+    const codecs = r.skia?.codecs ?? fail(`${mime === 'image/jpeg' ? 'JPEG' : 'WebP'} decoding needs the lab codec module (vendor/lab-codecs)${r.skia?.codecsError ? ': ' + r.skia.codecsError.message : ''}`);
+    const canvasKit = CK(r);
+    if (mime === 'image/jpeg') {
+      const info = codecs.jpegInfo(bytes); if (!info) return false;
+      const { native, rest } = jpegNativeScale(sample), scaledWidth = Math.ceil(info.width / native), scaledHeight = Math.ceil(info.height / native);   // libjpeg's output size for scale 1/native
+      const width = sampledDimension(scaledWidth, rest), height = sampledDimension(scaledHeight, rest), base = { width, height, srcWidth: info.width, srcHeight: info.height, alpha: false, label: `libjpeg-turbo 2.1.0${native > 1 ? ` DCT 1/${native}` : ''}${rest > 1 ? ` sampled ${rest}` : ''}` };
+      if (justBounds) return { ...base, image: null };
+      const decoded = codecs.jpegDecode(bytes, native); if (!decoded) return false;
+      const picked = samplePixels(decoded.rgba, decoded.width, decoded.height, rest);
+      return { ...base, image: canvasKit.MakeImage({ width: picked.width, height: picked.height, alphaType: canvasKit.AlphaType.Opaque, colorType: canvasKit.ColorType.RGBA_8888, colorSpace: canvasKit.ColorSpace.SRGB }, picked.rgba, picked.width * 4) };
+    }
+    if (mime === 'image/avif') {   // libavif + dav1d; the sampler does inSampleSize (SkAvifCodec has no native scaling)
+      const info = codecs.avifInfo(bytes); if (!info) return false;
+      const width = sampledDimension(info.width, sample), height = sampledDimension(info.height, sample), base = { width, height, srcWidth: info.width, srcHeight: info.height, alpha: info.hasAlpha, label: `libavif 1.0.4 + dav1d 1.4.3${sample > 1 ? ` sampled ${sample}` : ''}` };
+      if (justBounds) return { ...base, image: null };
+      const decoded = codecs.avifDecode(bytes, true); if (!decoded) return false;
+      const picked = samplePixels(decoded.rgba, decoded.width, decoded.height, sample);
+      return { ...base, image: canvasKit.MakeImage({ width: picked.width, height: picked.height, alphaType: info.hasAlpha ? canvasKit.AlphaType.Premul : canvasKit.AlphaType.Opaque, colorType: canvasKit.ColorType.RGBA_8888, colorSpace: canvasKit.ColorSpace.SRGB }, picked.rgba, picked.width * 4) };
+    }
+    const info = codecs.webpInfo(bytes); if (!info) return false;
+    if (info.hasAnimation) return null;   // the first frame of an animated file: CanvasKit's decoder
+    const width = sampledDimension(info.width, sample), height = sampledDimension(info.height, sample), base = { width, height, srcWidth: info.width, srcHeight: info.height, alpha: info.hasAlpha, label: `libwebp 1.2.2${sample > 1 ? ` sampled ${sample}` : ''}` };
+    if (justBounds) return { ...base, image: null };
+    const decoded = codecs.webpDecode(bytes, true); if (!decoded) return false;
+    const picked = samplePixels(decoded.rgba, decoded.width, decoded.height, sample);
+    return { ...base, image: canvasKit.MakeImage({ width: picked.width, height: picked.height, alphaType: info.hasAlpha ? canvasKit.AlphaType.Premul : canvasKit.AlphaType.Opaque, colorType: canvasKit.ColorType.RGBA_8888, colorSpace: canvasKit.ColorSpace.SRGB }, picked.rgba, picked.width * 4) };
+  };
   function decode(r, bytes, optionsRef, paddingRef = null, defaultDensity = {}) {
     const o = readOptions(r, optionsRef), host = bitmaps(r), canvasKit = CK(r);
     if (paddingRef) { const f = r.object(paddingRef).fields; for (const edge of ['left', 'top', 'right', 'bottom']) r.storeField(f, `${RECT}->${edge}:I`, -1); }
-    const mime = sniffMime(bytes);
+    let mime = sniffMime(bytes);
+    if (!mime && looksLikeWbmp(bytes)) mime = 'image/vnd.wap.wbmp';   // WBMP has no signature: Skia tries its codec last, on a valid header (type 0, fixed header 0, sizes)
     if (!mime) { r.record('LOG E BitmapFactory: Unable to decode stream: SkImageDecoder::Factory returned null'); return null; }
     if (o.inPreferredColorSpace && r.object(o.inPreferredColorSpace).colorSpaceName !== 'SRGB') fail('inPreferredColorSpace other than sRGB is not implemented');
-    const image = canvasKit.MakeImageFromEncoded(bytes);
-    if (!image) { r.record('LOG E BitmapFactory: Unable to decode stream: codec rejected the data'); return null; }
+    const requested = Math.max(1, o.inSampleSize | 0), lab = labDecoder(r, bytes, mime, requested, o.justBounds);
+    if (lab === false) { r.record('LOG E BitmapFactory: Unable to decode stream: codec rejected the data'); return null; }
+    const image = lab ? lab.image : canvasKit.MakeImageFromEncoded(bytes);
+    if (!image && !(lab && o.justBounds)) { r.record('LOG E BitmapFactory: Unable to decode stream: codec rejected the data'); return null; }
     try {
-      const sample = Math.max(1, o.inSampleSize | 0), width = Math.max(1, Math.floor(image.width() / sample)), height = Math.max(1, Math.floor(image.height() / sample));
+      const sample = lab ? 1 : requested, srcWidth = lab ? lab.srcWidth : image.width(), srcHeight = lab ? lab.srcHeight : image.height();   // a lab decode is already at the sampled size
+      const width = lab ? lab.width : Math.max(1, Math.floor(image.width() / sample)), height = lab ? lab.height : Math.max(1, Math.floor(image.height() / sample));
       const density = o.inDensity || defaultDensity.inDensity || 0, target = o.inTargetDensity || defaultDensity.inTargetDensity || 0;
       const scale = o.inScaled && density && target && density !== o.inScreenDensity ? target / density : 1;
       const scaledWidth = scale === 1 ? width : Math.max(1, Math.trunc(width * scale + 0.5)), scaledHeight = scale === 1 ? height : Math.max(1, Math.trunc(height * scale + 0.5));
@@ -82,18 +132,19 @@ export function createBitmapCodecHost(platform) {
       if (o.justBounds) return null;
       if (scaledWidth > 4096 || scaledHeight > 4096 || scaledWidth * scaledHeight > 4 * 1024 * 1024) fail(`Decoded image ${scaledWidth}x${scaledHeight} exceeds the VM bitmap limit (4096px/4Mpixel); use inSampleSize to decode a smaller version`, { width: scaledWidth, height: scaledHeight });
       // the pixels: the encoded PNG itself when no resampling is needed, otherwise a Skia rendering at the output size
-      let png = mime === 'image/png' && scaledWidth === image.width() && scaledHeight === image.height() ? bytes : null;
+      let png = mime === 'image/png' && !lab && scaledWidth === image.width() && scaledHeight === image.height() ? bytes : null;
+      if (!png && lab && scaledWidth === image.width() && scaledHeight === image.height()) png = image.encodeToBytes(canvasKit.ImageFormat.PNG, 100);
       if (!png) {
         const surface = canvasKit.MakeSurface(scaledWidth, scaledHeight); if (!surface) fail('Skia raster allocation failed');
         try {
           const canvas = surface.getCanvas(), paint = new canvasKit.Paint();
           canvas.clear(canvasKit.TRANSPARENT);
-          canvas.drawImageRectOptions(image, canvasKit.LTRBRect(0, 0, image.width(), image.height()), canvasKit.LTRBRect(0, 0, scaledWidth, scaledHeight), sample > 1 && scale === 1 ? canvasKit.FilterMode.Nearest : canvasKit.FilterMode.Linear, canvasKit.MipmapMode.None, paint);
+          canvas.drawImageRectOptions(image, canvasKit.LTRBRect(0, 0, image.width(), image.height()), canvasKit.LTRBRect(0, 0, scaledWidth, scaledHeight), requested > 1 && scale === 1 ? canvasKit.FilterMode.Nearest : canvasKit.FilterMode.Linear, canvasKit.MipmapMode.None, paint);
           paint.delete(); surface.flush(); const snapshot = surface.makeImageSnapshot();
           try { png = snapshot.encodeToBytes(canvasKit.ImageFormat.PNG, 100); } finally { snapshot.delete(); }
         } finally { surface.dispose(); }
       }
-      const alpha = image.getImageInfo().alphaType.value !== canvasKit.AlphaType.Opaque.value;
+      const alpha = lab ? lab.alpha : image.getImageInfo().alphaType.value !== canvasKit.AlphaType.Opaque.value;
       let bitmap = o.inBitmap;
       if (bitmap) {
         const state = host.live(bitmap);
@@ -106,9 +157,9 @@ export function createBitmapCodecHost(platform) {
       if (hardware) { state.config = o.inPreferredConfig; state.hardware = true; state.mutable = false; }
       state.density = scale !== 1 ? target : density || DENSITY_DEFAULT; r.storeField(r.object(bitmap).fields, `${BITMAP}->mDensity:I`, state.density);
       host.recordNative(state.handle, { op: 'raster', raster: { kind: 'raster', dataURL: 'data:image/png;base64,' + base64(png), width: scaledWidth, height: scaledHeight }, args: [0, 0] });
-      r.record(`HOST BitmapFactory.decode ${mime} ${image.width()}x${image.height()} -> ${scaledWidth}x${scaledHeight} [official Skia codec]`);
+      r.record(`HOST BitmapFactory.decode ${mime} ${srcWidth}x${srcHeight} -> ${scaledWidth}x${scaledHeight} [${lab ? lab.label : 'official Skia codec'}]`);
       return bitmap;
-    } finally { image.delete(); }
+    } finally { image?.delete(); }
   }
   const bytesOf = (r, array, offset, length) => {
     if (array === null) r.throwJava('Ljava/lang/NullPointerException;', null);
@@ -262,13 +313,24 @@ export function createBitmapCodecHost(platform) {
     const a = state(r, self), b = state(r, other); if (a.width !== b.width || a.height !== b.height) return 0;
     const x = pixelsOf(r, self), y = pixelsOf(r, other); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return 0; return 1;
   });
+  /** Bitmap.compress as Bitmap.cpp / SkEncodeImage do it (android-13.0.0_r1): PNG through CanvasKit; JPEG and WebP through libjpeg-turbo / libwebp with Skia's options. `pixels` are the lab's straight RGBA. */
+  const encodeBitmap = (r, name, quality, pixels, width, height) => {
+    if (name === 'PNG') {
+      const canvasKit = CK(r), image = canvasKit.MakeImage({ width, height, alphaType: canvasKit.AlphaType.Unpremul, colorType: canvasKit.ColorType.RGBA_8888, colorSpace: canvasKit.ColorSpace.SRGB }, pixels, width * 4);
+      if (!image) fail('Skia rejected the pixel buffer');
+      try { return image.encodeToBytes(canvasKit.ImageFormat.PNG, 100); } finally { image.delete(); }
+    }
+    const codecs = r.skia?.codecs ?? fail(`${name} encoding needs the lab codec module (vendor/lab-codecs)${r.skia?.codecsError ? ': ' + r.skia.codecsError.message : ''}`);
+    if (name === 'JPEG') return codecs.jpegEncode(premultiply(pixels), width, height, quality);   // Android's bitmaps are premultiplied and SkJpegEncoder ignores alpha
+    // WEBP: lossless at quality 100 (SkEncodeImage), lossy otherwise; WEBP_LOSSY / WEBP_LOSSLESS are explicit; libwebp is handed unpremultiplied pixels converted from the premultiplied bitmap
+    const lossless = name === 'WEBP_LOSSLESS' || (name === 'WEBP' && quality === 100), effort = name === 'WEBP' && quality === 100 ? 75 : quality;
+    return codecs.webpEncode(unpremultiply(premultiply(pixels)), width, height, effort, lossless);
+  };
   def(BITMAP, 'compress', `(${COMPRESS}I${OUTPUT})Z`, (r, _m, [self, format, quality, stream]) => {
     if (format === null || stream === null) r.throwJava('Ljava/lang/NullPointerException;', null);
     if (quality < 0 || quality > 100) r.throwJava('Ljava/lang/IllegalArgumentException;', 'quality must be 0..100');
-    const s = state(r, self), canvasKit = CK(r), name = r.object(format).enumName, pixels = pixelsOf(r, self);
-    const image = canvasKit.MakeImage({ width: s.width, height: s.height, alphaType: canvasKit.AlphaType.Unpremul, colorType: canvasKit.ColorType.RGBA_8888, colorSpace: canvasKit.ColorSpace.SRGB }, pixels, s.width * 4);
-    if (!image) fail('Skia rejected the pixel buffer');
-    let encoded; try { encoded = image.encodeToBytes(name === 'PNG' ? canvasKit.ImageFormat.PNG : name === 'JPEG' ? canvasKit.ImageFormat.JPEG : canvasKit.ImageFormat.WEBP, name === 'PNG' ? 100 : name === 'WEBP_LOSSLESS' ? 100 : quality); } finally { image.delete(); }
+    const s = state(r, self), name = r.object(format).enumName, pixels = pixelsOf(r, self);
+    const encoded = encodeBitmap(r, name, quality, pixels, s.width, s.height);
     if (!encoded) return 0;
     const array = r.newArray('[B', encoded.length); r.array(array).elements = Array.from(encoded, v => (v << 24) >> 24);
     vcall(r, stream, OUTPUT, 'write', ['[B', 'I', 'I'], 'V', [array, 0, encoded.length]); return 1;

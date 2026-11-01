@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=64ce1d942f1e';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=64ce1d942f1e';
-import { createHostRegistry } from './host-contract.js?v=64ce1d942f1e';
-import { resolveDevice } from './device-profile.js?v=64ce1d942f1e';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=64ce1d942f1e';
-import { gcRoot } from './heap-gc.js?v=64ce1d942f1e';
+import { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=b6af1ec5264d';
+import { createHostRegistry } from './host-contract.js?v=b6af1ec5264d';
+import { resolveDevice } from './device-profile.js?v=b6af1ec5264d';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=b6af1ec5264d';
+import { gcRoot } from './heap-gc.js?v=b6af1ec5264d';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -74,10 +74,12 @@ export function createDeviceStateHost(platform) {
   def(CAPABILITIES, 'getSignalStrength', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? -50 : -2147483648);
   def(CAPABILITIES, 'toString', `()${STRING}`, (r, _m, [self]) => `[ Transports: ${r.object(self).transport === 1 ? 'WIFI' : 'CELLULAR'} Capabilities: INTERNET${r.object(self).metered ? '' : '&NOT_METERED'}&VALIDATED ]`);
   const netInfo = r => { const network = activeNetwork(r); if (!network) return null; const info = r.makeObject(NET_INFO); r.object(info).transport = r.object(network).transport; return info; };
-  def(NET_INFO, 'isConnected', '()Z', () => 1); def(NET_INFO, 'isConnectedOrConnecting', '()Z', () => 1); def(NET_INFO, 'isAvailable', '()Z', () => 1); def(NET_INFO, 'getType', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? 1 : 0);
+  def(NET_INFO, 'isConnected', '()Z', (r, _m, [self]) => r.object(self).connected === false ? 0 : 1); def(NET_INFO, 'isConnectedOrConnecting', '()Z', (r, _m, [self]) => r.object(self).connected === false ? 0 : 1); def(NET_INFO, 'isAvailable', '()Z', (r, _m, [self]) => r.object(self).connected === false ? 0 : 1); def(NET_INFO, 'getType', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? 1 : 0);
   def(NET_INFO, 'getTypeName', `()${STRING}`, (r, _m, [self]) => r.object(self).transport === 1 ? 'WIFI' : 'MOBILE'); def(NET_INFO, 'isRoaming', '()Z', () => 0);
   def(CONNECTIVITY, 'getActiveNetwork', `()${NETWORK}`, r => activeNetwork(r)); def(CONNECTIVITY, 'getActiveNetworkInfo', `()${NET_INFO}`, r => netInfo(r));
   def(CONNECTIVITY, 'getNetworkInfo', `(${NETWORK})${NET_INFO}`, (r, _m, [, network]) => network ? netInfo(r) : null);   // deprecated since API 29, still called by NetInfo/Sentry-era code
+  // getNetworkInfo(type) (deprecated): the device has the Wi-Fi (1) and mobile (0) radios; the info is connected when that transport is the active network and disconnected otherwise. Other types do not exist (null).
+  def(CONNECTIVITY, 'getNetworkInfo', '(I)' + NET_INFO, (r, _m, [, type_]) => { if (type_ !== 0 && type_ !== 1) return null; const active = activeNetwork(r), info = r.makeObject(NET_INFO); r.object(info).transport = type_; r.object(info).connected = !!active && r.object(active).transport === type_; return info; });
   def(CONNECTIVITY, 'getNetworkCapabilities', `(${NETWORK})${CAPABILITIES}`, (r, _m, [, network]) => network ? capabilitiesFor(r, network) : null);
   def(CONNECTIVITY, 'isActiveNetworkMetered', '()Z', r => { const n = activeNetwork(r); return n && r.object(n).transport === 0 ? 1 : 0; });
   def(CONNECTIVITY, 'getAllNetworks', `()[${NETWORK}`, r => { const n = activeNetwork(r), array = r.newArray(`[${NETWORK}`, n ? 1 : 0); if (n) r.array(array).elements = [n]; return array; });

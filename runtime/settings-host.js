@@ -1,5 +1,5 @@
-import { createHostRegistry, floatBits } from './host-contract.js?v=64ce1d942f1e';
-import { DIGESTS } from './crypto-host.js?v=64ce1d942f1e';
+import { createHostRegistry, floatBits } from './host-contract.js?v=b6af1ec5264d';
+import { DIGESTS } from './crypto-host.js?v=b6af1ec5264d';
 
 // android.provider.Settings.Secure / Global / System as an app (not a system app) sees them: reads of the keys a stock Android 13 device exposes, taken from the virtual device
 // (font scale, animation scale, 24-hour clock, airplane mode follow the Dispositivo panel), ANDROID_ID derived per (package, device) like Android 8+'s per-app-signing-key value,
@@ -11,7 +11,9 @@ const RESOLVER = 'Landroid/content/ContentResolver;', STRING = 'Ljava/lang/Strin
 export function createSettingsHost(platform) {
   const registry = createHostRegistry(), { def, type } = registry;
   type(SETTINGS, 'Ljava/lang/Object;'); for (const owner of [SECURE, SYSTEM]) type(owner, 'Ljava/lang/Object;');   // Settings.Global belongs to content-resolver-host (a writable VM store with observers)
-  type('Landroid/util/AndroidException;', 'Ljava/lang/Exception;'); type(NOT_FOUND, 'Landroid/util/AndroidException;');
+  type('Landroid/util/AndroidException;', 'Ljava/lang/Exception;', [], { allocatable: true }); type(NOT_FOUND, 'Landroid/util/AndroidException;', [], { allocatable: true });
+  const ANDROID_EXCEPTION = 'Landroid/util/AndroidException;';
+  def(ANDROID_EXCEPTION, '<init>', '()V', () => {}); def(ANDROID_EXCEPTION, '<init>', `(${STRING})V`, (r, _m, [self, message]) => { r.object(self).message = message; });
   def(NOT_FOUND, '<init>', `(${STRING})V`, (r, _m, [self, message]) => { r.object(self).message = message; }); def(NOT_FOUND, '<init>', '()V', () => {});
   const device = () => platform.device ?? {};
   const androidId = r => { const bytes = DIGESTS['SHA-256'].fn(new TextEncoder().encode(`apkweb-device:${platform.packageName ?? 'app'}`)); return Array.from(bytes.slice(0, 8), b => b.toString(16).padStart(2, '0')).join(''); };
