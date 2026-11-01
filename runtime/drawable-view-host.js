@@ -1,8 +1,8 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=c925763606ec';
-import { APKError } from './apk-runtime.js?v=c925763606ec';
-import { getVectorGraphics } from './vector-native.js?v=c925763606ec';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=c925763606ec';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=c925763606ec';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=8455f781bc30';
+import { APKError } from './apk-runtime.js?v=8455f781bc30';
+import { getVectorGraphics } from './vector-native.js?v=8455f781bc30';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=8455f781bc30';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=8455f781bc30';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -43,6 +43,21 @@ export function createDrawableViewHost(platform) {
     runtime.skiaHost.recordNative(runtime.object(replay).nativeCanvasHandle, { op: 'renderNode', node: handle });
   };
   const rawFloat = n => { const d = new DataView(new ArrayBuffer(4)); d.setFloat32(0, n, true); return d.getInt32(0, true); };
+  /** Positions one View drawable (the background: the whole view; the image: inside the padding with the ImageView scale type / image matrix) and draws it into `canvas`. */
+  const placeAndDraw = (runtime, receiver, canvas, drawable, image, width, height) => {
+    const view = runtime.object(receiver), padding = view.padding || { left: 0, right: 0, top: 0, bottom: 0 };
+    if (!drawable) return;prepareCpuAnimatedVector(runtime,drawable);
+    let drawableMatrix = null; let left = image ? padding.left : 0, top = image ? padding.top : 0, right = image ? width - padding.right : width, bottom = image ? height - padding.bottom : height;
+    if (image && (view.imageScaleType ?? 3) !== 1) {
+      const iw = dispatch(runtime, DRAWABLE, 'getIntrinsicWidth', [], 'I', drawable), ih = dispatch(runtime, DRAWABLE, 'getIntrinsicHeight', [], 'I', drawable), type = view.imageScaleType ?? 3;
+      if (type === 0) { const matrix = platform.imageViewApi.imageMatrix(runtime, receiver); drawableMatrix = matrix; left = padding.left; top = padding.top; right = left + (iw > 0 ? iw : width); bottom = top + (ih > 0 ? ih : height); }   // ImageView MATRIX: the drawable keeps its intrinsic size, positioned by the image matrix
+      else if (iw > 0 && ih > 0) { const availableWidth = right - left, availableHeight = bottom - top; let scale = [5, 7].includes(type) ? 1 : type === 6 ? Math.max(availableWidth / iw, availableHeight / ih) : Math.min(availableWidth / iw, availableHeight / ih); if (type === 7) scale = Math.min(1, availableWidth / iw, availableHeight / ih); const w = iw * scale, h = ih * scale, align = type === 2 ? 0 : type === 4 ? 1 : .5; left += (availableWidth - w) * align; top += (availableHeight - h) * align; right = left + w; bottom = top + h; }
+    }
+    dispatch(runtime, DRAWABLE, 'setBounds', ['I', 'I', 'I', 'I'], 'V', drawable, [Math.round(left), Math.round(top), Math.round(right), Math.round(bottom)]);
+    if (drawableMatrix) { dispatch(runtime, CANVAS, 'save', [], 'I', canvas); dispatch(runtime, CANVAS, 'concat', ['Landroid/graphics/Matrix;'], 'V', canvas, [drawableMatrix]); }
+    dispatch(runtime, DRAWABLE, 'draw', [CANVAS], 'V', drawable, [canvas]);
+    if (drawableMatrix) dispatch(runtime, CANVAS, 'restore', [], 'V', canvas);
+  };
   const render = (runtime, receiver) => {
     const view = runtime.object(receiver); if (view.drawingDrawable) return;
     const padding = view.padding || { left: 0, right: 0, top: 0, bottom: 0 };
@@ -55,19 +70,7 @@ export function createDrawableViewHost(platform) {
       if (!view.drawableCanvas) { view.drawableCanvas = runtime.allocate(CANVAS); dispatch(runtime, CANVAS, '<init>', [], 'V', view.drawableCanvas); }
       const graphics = getVectorGraphics(runtime), replay = view.drawableCanvas;
       recordLayer(runtime, receiver, 'drawableNode', replay, width, height, canvas => {
-      for (const [drawable, image] of [[view.backgroundDrawable, false], [view.imageDrawable, true]]) {
-        if (!drawable) continue;prepareCpuAnimatedVector(runtime,drawable);
-        let drawableMatrix = null; let left = image ? padding.left : 0, top = image ? padding.top : 0, right = image ? width - padding.right : width, bottom = image ? height - padding.bottom : height;
-        if (image && (view.imageScaleType ?? 3) !== 1) {
-          const iw = dispatch(runtime, DRAWABLE, 'getIntrinsicWidth', [], 'I', drawable), ih = dispatch(runtime, DRAWABLE, 'getIntrinsicHeight', [], 'I', drawable), type = view.imageScaleType ?? 3;
-          if (type === 0) { const matrix = platform.imageViewApi.imageMatrix(runtime, receiver); drawableMatrix = matrix; left = padding.left; top = padding.top; right = left + (iw > 0 ? iw : width); bottom = top + (ih > 0 ? ih : height); }   // ImageView MATRIX: the drawable keeps its intrinsic size, positioned by the image matrix
-          else if (iw > 0 && ih > 0) { const availableWidth = right - left, availableHeight = bottom - top; let scale = [5, 7].includes(type) ? 1 : type === 6 ? Math.max(availableWidth / iw, availableHeight / ih) : Math.min(availableWidth / iw, availableHeight / ih); if (type === 7) scale = Math.min(1, availableWidth / iw, availableHeight / ih); const w = iw * scale, h = ih * scale, align = type === 2 ? 0 : type === 4 ? 1 : .5; left += (availableWidth - w) * align; top += (availableHeight - h) * align; right = left + w; bottom = top + h; }
-        }
-        dispatch(runtime, DRAWABLE, 'setBounds', ['I', 'I', 'I', 'I'], 'V', drawable, [Math.round(left), Math.round(top), Math.round(right), Math.round(bottom)]);
-        if (drawableMatrix) { dispatch(runtime, CANVAS, 'save', [], 'I', canvas); dispatch(runtime, CANVAS, 'concat', ['Landroid/graphics/Matrix;'], 'V', canvas, [drawableMatrix]); }
-        dispatch(runtime, DRAWABLE, 'draw', [CANVAS], 'V', drawable, [canvas]);
-        if (drawableMatrix) dispatch(runtime, CANVAS, 'restore', [], 'V', canvas);
-      }
+      for (const [drawable, image] of [[view.backgroundDrawable, false], [view.imageDrawable, true]]) placeAndDraw(runtime, receiver, canvas, drawable, image, width, height);
       // TextView.onDraw compound drawables (CheckedTextView's check indicator, icons beside text): drawn into the same layer, the text raster sits above it
       if (runtime.isSubtype(view.type, TEXT)) for (const { drawable, x, y } of platform.textViewApi.compoundPlacements(runtime, receiver, width, height)) {
         prepareCpuAnimatedVector(runtime, drawable); dispatch(runtime, CANVAS, 'save', [], 'I', canvas); dispatch(runtime, CANVAS, 'translate', ['F', 'F'], 'V', canvas, [rawFloat(x), rawFloat(y)]);
@@ -173,6 +176,8 @@ export function createDrawableViewHost(platform) {
     if(field==='foregroundDrawable'){platform.requestDraw(runtime,receiver);dispatch(runtime,VIEW,'requestLayout',[],'V',receiver);}
   };
   return {
+    /** ImageView.onDraw into an app-provided Canvas (View.draw(canvas) of a custom parent): the image drawable placed by the scale type. */
+    drawImage(runtime, receiver, canvas, width, height) { placeAndDraw(runtime, receiver, canvas, runtime.object(receiver).imageDrawable, true, width, height); },
     compoundPadding,drawButton,applyThemeDefaults,applyStyledTextSize,defaultStyleName,switchWidget:(runtime,receiver)=>switchHost.get(runtime,receiver),measureSwitch:(runtime,receiver)=>switchHost.measure(runtime,receiver),checkedChanged:(runtime,receiver,checked)=>switchHost.checkedChanged(runtime,receiver,checked),
     setForegroundFromXML(runtime,receiver,attribute,context){
       const theme=platform.styleBackend.theme(runtime,context),reference=attribute.kind==='attribute'?platform.styleBackend.resolved(attribute,runtime.object(theme).themeValues,false):attribute;

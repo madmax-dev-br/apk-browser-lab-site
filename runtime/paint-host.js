@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=c925763606ec';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=c925763606ec';
+import { APKError } from './apk-error.js?v=8455f781bc30';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=8455f781bc30';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -37,7 +37,7 @@ const keys = new Set([
 for (const signature of [
   'getFontFeatureSettings()Ljava/lang/String;', 'setFontFeatureSettings(Ljava/lang/String;)V', 'getFontVariationSettings()Ljava/lang/String;', 'setFontVariationSettings(Ljava/lang/String;)Z',
   'isElegantTextHeight()Z', 'setElegantTextHeight(Z)V', 'getShadowLayerRadius()F', 'getShadowLayerDx()F', 'getShadowLayerDy()F', 'getShadowLayerColor()I',
-  'measureText(Ljava/lang/String;)F', 'measureText(Ljava/lang/String;II)F', 'measureText(Ljava/lang/CharSequence;II)F', 'measureText([CII)F',
+  'hasGlyph(Ljava/lang/String;)Z', 'measureText(Ljava/lang/String;)F', 'measureText(Ljava/lang/String;II)F', 'measureText(Ljava/lang/CharSequence;II)F', 'measureText([CII)F',
 ]) keys.add(PAINT + '->' + signature);
 for (const signature of [
   `getFontMetrics()${METRICS}`, `getFontMetrics(${METRICS})F`,
@@ -234,6 +234,11 @@ export function createPaintHost() {
       if (name === 'getShadowLayerDx') return rawFloat(paint.shadowLayer?.dx ?? 0);
       if (name === 'getShadowLayerDy') return rawFloat(paint.shadowLayer?.dy ?? 0);
       if (name === 'getShadowLayerColor') return paint.shadowLayer?.color ?? 0;
+      if (name === 'hasGlyph') {   // Paint.hasGlyph(String): one grapheme cluster the paint's typeface or the fallback chain can draw
+        if (nullish(args[1])) runtime.throwJava('Ljava/lang/NullPointerException;', 'string');
+        if (!runtime.skiaHost?.hasGlyph) fail('Paint.hasGlyph requires the verified Skia font backend');
+        return runtime.skiaHost.hasGlyph(runtime.stringCharacters(args[1]), paint) ? 1 : 0;
+      }
       if (name === 'measureText') {
         // Paint.measureText = the advance of the whole run (Paint.getRunAdvance over [start, end) with the text as its own context); a null text is an NPE
         if (nullish(args[1])) runtime.throwJava('Ljava/lang/IllegalArgumentException;', 'text cannot be null');

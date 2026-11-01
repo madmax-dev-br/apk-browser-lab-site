@@ -1,4 +1,5 @@
-import { APKError } from './apk-runtime.js?v=c925763606ec';
+import { APKError } from './apk-runtime.js?v=8455f781bc30';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=8455f781bc30';
 // android.graphics.drawable.NinePatchDrawable for compiled 9-patch PNGs (aapt2 npTc chunk).
 // Layout contract (intrinsic size, getPadding) comes from the real compiled chunk; pixels are stretched with the
 // official Skia rasterizer (CanvasKit) exactly along the chunk's stretch regions. No platform-drawable look-alikes.
@@ -154,10 +155,12 @@ export function createNinePatchDrawableHost(platform) {
       if (name === 'isStateful') return st.tint && call(r, st.tint, COLOR_LIST, 'isStateful', [], 'Z') ? 1 : 0;
       if (name === 'onStateChange') { const previous = tintColor(r, st); st.drawState = args[1]; const next = tintColor(r, st); if (previous !== next) st.cache = null; return previous !== next ? 1 : 0; }
       if (name === 'draw') {
-        if (st.filter) fail('9-patch with an additional ColorFilter is not supported');
         const b = bounds(r, receiver), width = b.right - b.left, height = b.bottom - b.top; if (width <= 0 || height <= 0) return;
         const canvas = args[1], handle = r.object(canvas).nativeCanvasHandle; if (!handle) fail('9-patch draw needs a recording Canvas');
-        r.skiaHost.recordNative(handle, { op: 'raster', raster: render(r, st, width, height), args: [b.left, b.top] });
+        // Drawable.setColorFilter applies on top of the tint: the stretched raster is drawn through a Paint that carries the filter (SkCanvas draws the bitmap with it).
+        const snapshot = st.filter ? snapshotPaintColorFilter(r, st.filter) : null;
+        const paint = snapshot ? { argb: 0xffffffff, flags: 1, style: 0, strokeWidth: 0, strokeMiter: 4, strokeCap: 0, strokeJoin: 0, blendMode: 3, colorFilterSnapshot: snapshot } : undefined;
+        r.skiaHost.recordNative(handle, { op: 'raster', raster: render(r, st, width, height), args: [b.left, b.top], ...(paint ? { paint } : {}) });
         r.record('DRAW NinePatchDrawable: compiled npTc chunk -> Skia stretched raster'); return;
       }
       fail('Unsupported NinePatchDrawable method ' + name);

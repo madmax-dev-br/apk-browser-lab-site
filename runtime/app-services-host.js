@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=c925763606ec';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=c925763606ec';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=c925763606ec';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=c925763606ec';
+import { APKError } from './apk-error.js?v=8455f781bc30';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=8455f781bc30';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=8455f781bc30';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=8455f781bc30';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -126,7 +126,7 @@ export function createAppServicesHost(platform) {
       if (!(flags & 1)) { r.record(`SERVICE bind ${className}: not running and no BIND_AUTO_CREATE`); return 1; }
       const ref = r.allocate(descriptor); call(r, descriptor, '<init>', [], 'V', [ref], 'direct'); r.object(ref).baseContext = platform.application;
       call(r, descriptor, 'onCreate', [], 'V', [ref]);
-      service = { ref, binder: call(r, descriptor, 'onBind', [INTENT], 'Landroid/os/IBinder;', [ref, intent]), intent, component, connections: new Set() };
+      service = { ref, binder: call(r, descriptor, 'onBind', [INTENT], 'Landroid/os/IBinder;', [ref, intent]), intent, component, connections: new Set(), since: platform.clock.now() };
       boundServices.set(className, service); r.record(`SERVICE create+bind ${className}`);
     }
     service.connections.add(connection.ref); boundConnections.set(connection.ref, className);
@@ -627,6 +627,69 @@ export function createAppServicesHost(platform) {
     const total = 4n * 1024n * 1024n * 1024n, put = (name, ftype, value) => r.storeField(r.object(info).fields, `${MEM_INFO}->${name}:${ftype}`, value);
     put('totalMem', 'J', total); put('availMem', 'J', total / 2n); put('threshold', 'J', 200n * 1024n * 1024n); put('lowMemory', 'Z', 0);
   });
+  // ---- running services, tasks, app tasks, process memory (Android 13): a normal app sees only its own process, services and tasks (since API 26 / 21) -------------------------------------
+  const RUNNING_SERVICE = 'Landroid/app/ActivityManager$RunningServiceInfo;', RUNNING_TASK = 'Landroid/app/ActivityManager$RunningTaskInfo;', RECENT_TASK = 'Landroid/app/ActivityManager$RecentTaskInfo;', APP_TASK = 'Landroid/app/ActivityManager$AppTask;';
+  const MEMORY_INFO = 'Landroid/os/Debug$MemoryInfo;', COMPONENT_NAME_T = 'Landroid/content/ComponentName;', INTENT_T = 'Landroid/content/Intent;';
+  for (const t of [RUNNING_SERVICE, RUNNING_TASK, RECENT_TASK, APP_TASK, MEMORY_INFO]) type(t, OBJECT, [], { allocatable: true });
+  for (const t of [RUNNING_SERVICE, RUNNING_TASK, RECENT_TASK, MEMORY_INFO]) def(t, '<init>', '()V', () => {});
+  for (const [name, ftype] of [['service', COMPONENT_NAME_T], ['pid', 'I'], ['uid', 'I'], ['process', STRING], ['foreground', 'Z'], ['activeSince', 'J'], ['started', 'Z'], ['clientCount', 'I'], ['crashCount', 'I'], ['lastActivityTime', 'J'], ['restarting', 'J'], ['flags', 'I'], ['clientPackage', STRING], ['clientLabel', 'I']]) registry.instanceField(RUNNING_SERVICE, name, ftype, { reflect: true });
+  const taskFields = [['taskId', 'I'], ['persistentId', 'I'], ['baseIntent', INTENT_T], ['baseActivity', COMPONENT_NAME_T], ['topActivity', COMPONENT_NAME_T], ['origActivity', COMPONENT_NAME_T], ['numActivities', 'I'], ['isRunning', 'Z'], ['lastActiveTime', 'J'], ['description', 'Ljava/lang/CharSequence;']];
+  for (const t of [RUNNING_TASK, RECENT_TASK]) for (const [name, ftype] of taskFields) registry.instanceField(t, name, ftype, { reflect: true });
+  registry.instanceField(RUNNING_TASK, 'id', 'I', { reflect: true }); registry.instanceField(RUNNING_TASK, 'numRunning', 'I', { reflect: true });
+  for (const [name, ftype] of [['dalvikPss', 'I'], ['dalvikPrivateDirty', 'I'], ['dalvikSharedDirty', 'I'], ['nativePss', 'I'], ['nativePrivateDirty', 'I'], ['nativeSharedDirty', 'I'], ['otherPss', 'I'], ['otherPrivateDirty', 'I'], ['otherSharedDirty', 'I']]) registry.instanceField(MEMORY_INFO, name, ftype, { reflect: true });
+  const putField = (r, ref, owner, name, ftype, value) => r.storeField(r.object(ref).fields, `${owner}->${name}:${ftype}`, value);
+  const addTo = (r, list, item) => r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, item], 'virtual');
+  const componentFor = (r, className) => { const c = r.allocate(COMPONENT_NAME_T); call(r, COMPONENT_NAME_T, '<init>', [STRING, STRING], 'V', [c, pkg(), className], 'direct'); return c; };
+  def(ACTIVITY_MANAGER, 'getRunningServices', '(I)Ljava/util/List;', (r, _m, [, maxNum]) => {
+    const list = newEmptyList(r); if (maxNum <= 0) return list;
+    for (const [className, service] of boundServices) {
+      if (call(r, 'Ljava/util/List;', 'size', [], 'I', [list]) >= maxNum) break;
+      const info = r.allocate(RUNNING_SERVICE), put = (name, ftype, value) => putField(r, info, RUNNING_SERVICE, name, ftype, value);
+      put('service', COMPONENT_NAME_T, componentFor(r, className)); put('pid', 'I', platform.virtualProcess.pid); put('uid', 'I', platform.virtualProcess.uid); put('process', STRING, processName());
+      put('foreground', 'Z', 0); put('started', 'Z', 0); put('activeSince', 'J', BigInt(Math.floor(service.since ?? 0))); put('lastActivityTime', 'J', BigInt(Math.floor(service.since ?? 0)));
+      put('clientCount', 'I', service.connections.size); put('crashCount', 'I', 0); put('restarting', 'J', 0n); put('flags', 'I', 0); put('clientPackage', STRING, null); put('clientLabel', 'I', 0);
+      addTo(r, list, info);
+    }
+    return list;
+  });
+  const openActivities = () => platform.taskClosed ? [] : platform.frames.filter(frame => !frame.finished);
+  const fillTask = (r, info, owner, frames) => {
+    const put = (name, ftype, value) => putField(r, info, owner, name, ftype, value), base = frames[0], top = frames.at(-1);
+    const baseName = r.typeOf(base.activity).slice(1, -1).replaceAll('/', '.'), topName = r.typeOf(top.activity).slice(1, -1).replaceAll('/', '.');
+    const intent = r.allocate(INTENT_T); call(r, INTENT_T, '<init>', [STRING], 'V', [intent, 'android.intent.action.MAIN'], 'direct'); call(r, INTENT_T, 'addCategory', [STRING], INTENT_T, [intent, 'android.intent.category.LAUNCHER']); call(r, INTENT_T, 'setComponent', [COMPONENT_NAME_T], INTENT_T, [intent, componentFor(r, baseName)]);
+    put('taskId', 'I', 1); put('persistentId', 'I', 1); put('baseIntent', INTENT_T, intent); put('baseActivity', COMPONENT_NAME_T, componentFor(r, baseName)); put('topActivity', COMPONENT_NAME_T, componentFor(r, topName)); put('origActivity', COMPONENT_NAME_T, null);
+    put('numActivities', 'I', frames.length); put('isRunning', 'Z', 1); put('lastActiveTime', 'J', BigInt(Math.floor(platform.clock.now()))); put('description', 'Ljava/lang/CharSequence;', null);
+    if (owner === RUNNING_TASK) { put('id', 'I', 1); put('numRunning', 'I', frames.length); }
+  };
+  def(ACTIVITY_MANAGER, 'getRunningTasks', '(I)Ljava/util/List;', (r, _m, [, maxNum]) => {   // since API 21 the caller's own tasks only
+    const list = newEmptyList(r), frames = openActivities(); if (maxNum <= 0 || !frames.length) return list;
+    const info = r.allocate(RUNNING_TASK); fillTask(r, info, RUNNING_TASK, frames); addTo(r, list, info); return list;
+  });
+  def(ACTIVITY_MANAGER, 'getAppTasks', '()Ljava/util/List;', r => { const list = newEmptyList(r); if (openActivities().length) addTo(r, list, r.allocate(APP_TASK)); return list; });
+  def(APP_TASK, 'getTaskInfo', `()${RECENT_TASK}`, r => {
+    const frames = openActivities(); if (!frames.length) return null;   // a finished task has no info
+    const info = r.allocate(RECENT_TASK); fillTask(r, info, RECENT_TASK, frames); return info;
+  });
+  def(APP_TASK, 'finishAndRemoveTask', '()V', r => { for (const frame of openActivities().reverse()) call(r, 'Landroid/app/Activity;', 'finish', [], 'V', [frame.activity]); });
+  def(APP_TASK, 'moveToFront', '()V', () => {});   // the only task is already in front
+  def(APP_TASK, 'setExcludeFromRecents', '(Z)V', () => {});
+  // getProcessMemoryInfo: Debug.MemoryInfo per pid; this process's figures describe the VM's own heap (the same numbers Debug.getPss reports), other pids are not visible and read zero.
+  const kb = r => Math.floor(((r.heap?.size ?? 0) * 64) / 1024);
+  def(ACTIVITY_MANAGER, 'getProcessMemoryInfo', `([I)[${MEMORY_INFO}`, (r, _m, [, pids]) => {
+    if (pids === null) r.throwJava('Ljava/lang/NullPointerException;', 'pids');
+    const wanted = r.array(pids).elements, out = r.newArray(`[${MEMORY_INFO}`, wanted.length);
+    r.array(out).elements = wanted.map(pid => {
+      const info = r.allocate(MEMORY_INFO), own = pid === platform.virtualProcess.pid, put = (name, value) => putField(r, info, MEMORY_INFO, name, 'I', value);
+      for (const name of ['dalvikPss', 'dalvikPrivateDirty', 'dalvikSharedDirty', 'nativePss', 'nativePrivateDirty', 'nativeSharedDirty', 'otherPss', 'otherPrivateDirty', 'otherSharedDirty']) put(name, 0);
+      if (own) { put('dalvikPss', kb(r)); put('dalvikPrivateDirty', kb(r)); put('nativePss', kb(r)); put('nativePrivateDirty', kb(r)); }
+      return info;
+    });
+    return out;
+  });
+  const memField = (r, self, name) => r.object(self).fields.get(`${MEMORY_INFO}->${name}:I`) ?? 0;
+  def(MEMORY_INFO, 'getTotalPss', '()I', (r, _m, [self]) => memField(r, self, 'dalvikPss') + memField(r, self, 'nativePss') + memField(r, self, 'otherPss'));
+  def(MEMORY_INFO, 'getTotalPrivateDirty', '()I', (r, _m, [self]) => memField(r, self, 'dalvikPrivateDirty') + memField(r, self, 'nativePrivateDirty') + memField(r, self, 'otherPrivateDirty'));
+  def(MEMORY_INFO, 'getTotalSharedDirty', '()I', (r, _m, [self]) => memField(r, self, 'dalvikSharedDirty') + memField(r, self, 'nativeSharedDirty') + memField(r, self, 'otherSharedDirty'));
   def(ACTIVITY_MANAGER, 'isLowRamDevice', '()Z', () => 0); def(ACTIVITY_MANAGER, 'getMemoryClass', '()I', () => 256); def(ACTIVITY_MANAGER, 'getLargeMemoryClass', '()I', () => 512);
   def(ACTIVITY_MANAGER, 'isBackgroundRestricted', '()Z', () => 0);
   def(ACTIVITY_MANAGER, 'getHistoricalProcessExitReasons', `(${STRING}II)Ljava/util/List;`, r => newEmptyList(r)); // a fresh virtual process has no exit history

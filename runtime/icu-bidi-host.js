@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=c925763606ec';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=c925763606ec';
+import { createHostRegistry } from './host-contract.js?v=8455f781bc30';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=8455f781bc30';
 
 // android.icu.text.Bidi (the part android.text.AndroidBidi uses): the Unicode Bidirectional Algorithm (UAX #9, rules P2-P3, X1-X10,
 // W1-W7, N0-N2, I1-I2, L1) over the Android 13 Bidi_Class data of unicode-bidi-data.js. Levels are per UTF-16 unit.

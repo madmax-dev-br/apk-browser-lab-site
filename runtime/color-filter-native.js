@@ -1,4 +1,5 @@
-import { APKError } from './apk-error.js?v=c925763606ec';
+import { APKError } from './apk-error.js?v=8455f781bc30';
+import { bitsFloat } from './host-contract.js?v=8455f781bc30';
 
 const FILTER='Landroid/graphics/ColorFilter;',REGISTRY='Llibcore/util/NativeAllocationRegistry;',FINALIZER=0x43464c5401n;
 export const COLOR_FILTER_CLEANER='Lapkweb/bridge/ColorFilterCleaner;';
@@ -10,6 +11,10 @@ const release=(runtime,handle)=>{const state=stateFor(runtime),value=get(runtime
 
 export function makeSkiaColorFilter(CK,descriptor){
  if(!descriptor)return null;
+ if(descriptor.kind==='matrix'){   // Android's 4x5 matrix keeps its translation column in 0..255 units; Skia's takes 0..1
+  if(!Array.isArray(descriptor.values)||descriptor.values.length!==20||descriptor.values.some(v=>!Number.isFinite(v)))fail('Unsupported Skia color-filter descriptor');
+  const m=Float32Array.from(descriptor.values);for(const i of [4,9,14,19])m[i]/=255;return CK.ColorFilter.MakeMatrix(m);
+ }
  if(descriptor.kind!=='blend'||!Number.isInteger(descriptor.mode)||descriptor.mode<0||descriptor.mode>28)fail('Unsupported Skia color-filter descriptor');
  const color=descriptor.argb>>>0;
  return CK.ColorFilter.MakeBlend(CK.Color((color>>>16)&255,(color>>>8)&255,color&255,(color>>>24)/255),{value:descriptor.mode});
@@ -27,6 +32,13 @@ export function createColorFilterNativeBindings(){
   const descriptor={kind:'blend',argb:argb>>>0,mode},native=makeSkiaColorFilter(CK,descriptor);
   // Skia legitimately returns null for an identity filter (e.g. DST).
   if(!native)return 0n;
+  const state=stateFor(runtime);if(state.handles.size>=4096){native.delete();fail('Color-filter allocation limit exceeded');}
+  const handle=state.next++;state.handles.set(handle,{descriptor,native});return handle;
+ });
+ bindings.set('Landroid/graphics/ColorMatrixColorFilter;->nativeColorMatrixFilter([F)J',(runtime,[array])=>{
+  const CK=runtime.skia?.CanvasKit;if(!CK?.ColorFilter?.MakeMatrix)fail('Color filters require the verified Skia Wasm backend');
+  const elements=runtime.array(array).elements;if(elements.length<20)runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','The color matrix needs 20 values');
+  const values=elements.slice(0,20).map(bitsFloat),descriptor={kind:'matrix',values},native=makeSkiaColorFilter(CK,descriptor);
   const state=stateFor(runtime);if(state.handles.size>=4096){native.delete();fail('Color-filter allocation limit exceeded');}
   const handle=state.next++;state.handles.set(handle,{descriptor,native});return handle;
  });

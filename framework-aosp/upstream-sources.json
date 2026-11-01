@@ -27395,5 +27395,15 @@
     "sha256": "ab7071432b433ca47945b92430b6737ca8f38ae28b37ed89b84d65bf12d1c536",
     "bytes": 1613,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "graphics/java/android/graphics/ColorMatrixColorFilter.java",
+    "localPath": "framework-aosp/upstream/android/graphics/ColorMatrixColorFilter.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/ColorMatrixColorFilter.java?format=TEXT",
+    "sha256": "f7539cfb72365fbfef502c620af5ee7eda3bbeb81bc3af8392a6c5bea13f861d",
+    "bytes": 4354,
+    "license": "Apache-2.0"
   }
 ]

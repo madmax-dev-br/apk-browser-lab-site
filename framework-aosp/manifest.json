@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 7076060,
-  "sha256": "a0a1a480665f12a3a18a6d44f8723f563150202bec55531fec8b361c8797ebe0",
-  "classCount": 5451,
+  "bytes": 7078512,
+  "sha256": "5c9642b2b93be98ac8102b445cd27f42961b1814d373234b63d2534ab73284a8",
+  "classCount": 5453,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -770,6 +770,8 @@
     "Landroid/graphics/CanvasProperty;",
     "Landroid/graphics/Color;",
     "Landroid/graphics/ColorFilter$NoImagePreloadHolder;",
+    "Landroid/graphics/ColorMatrix;",
+    "Landroid/graphics/ColorMatrixColorFilter;",
     "Landroid/graphics/Compatibility;",
     "Landroid/graphics/ImageFormat$Format;",
     "Landroid/graphics/ImageFormat;",
@@ -33848,6 +33850,16 @@
       "sha256": "ab7071432b433ca47945b92430b6737ca8f38ae28b37ed89b84d65bf12d1c536",
       "bytes": 1613,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/ColorMatrixColorFilter.java",
+      "localPath": "framework-aosp/upstream/android/graphics/ColorMatrixColorFilter.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/ColorMatrixColorFilter.java?format=TEXT",
+      "sha256": "f7539cfb72365fbfef502c620af5ee7eda3bbeb81bc3af8392a6c5bea13f861d",
+      "bytes": 4354,
+      "license": "Apache-2.0"
     }
   ],
   "algorithmPatches": [],
@@ -34086,6 +34098,10 @@
       {
         "path": "framework-aosp/lab-java/android/audio/policy/configuration/V7_0/AudioUsage.java",
         "sha256": "f7ab02fd2ace7850ec6c323faa10e7098df7c8c674d990606a0d01ca061dcada"
+      },
+      {
+        "path": "framework-aosp/lab-java/android/graphics/ColorMatrix.java",
+        "sha256": "3a4f0f290a8ba1995b5a3532315ff5b44ae301c74158e60f45a9ce2338f9ea35"
       },
       {
         "path": "framework-aosp/lab-java/android/graphics/LeakyTypefaceStorage.java",

@@ -1,4 +1,5 @@
-import { mixerOf } from './audio-native.js?v=c925763606ec';
+import { mixerOf } from './audio-native.js?v=8455f781bc30';
+import { APKError } from './apk-error.js?v=8455f781bc30';
 
 // android.media.AudioManager on the virtual device (android-13.0.0_r1 AudioService / MediaFocusControl contracts), installed on the host type `AudioManagerImpl`:
 //   * stream volumes with Android's default maxima and indexes, adjust*() with mute/unmute/toggle, and the ringer mode with the Do Not Disturb rule: toggling silent mode changes the
@@ -197,4 +198,33 @@ export function installAudioManager({ platform, def, service, call, holds, empty
   callbackPair('registerAudioRecordingCallback', 'unregisterAudioRecordingCallback', recordingCallbacks, 'Landroid/media/AudioManager$AudioRecordingCallback;');
 
   return { roots(visit) { for (const entry of focus) { visit(entry.key); if (entry.listener) visit(entry.listener); if (entry.request) visit(entry.request); } for (const list of [deviceCallbacks, playbackCallbacks, recordingCallbacks]) for (const ref of list) visit(ref); for (const entry of communicationListeners) { visit(entry.executor); visit(entry.listener); } if (state.communication) visit(state.communication); }, state };
+}
+
+/**
+ * android.media.RingtoneManager (android-13.0.0_r1) over the settings provider: the default URIs are the settings URIs, the "actual default" of a type is whatever the app set (a clean image
+ * stores none of its own: the virtual device ships no media provider and no ring/notification/alarm sounds, so the lookups answer null). Opening a Ringtone needs the media stack and is refused
+ * explicitly instead of returning an object that cannot play.
+ */
+export function installRingtoneManager({ platform, def, type, holds }) {
+  const RM = 'Landroid/media/RingtoneManager;', URI = 'Landroid/net/Uri;', CONTEXT = 'Landroid/content/Context;';
+  type(RM, 'Ljava/lang/Object;', [], { allocatable: false });
+  const DEFAULTS = [[1, 'content://settings/system/ringtone'], [2, 'content://settings/system/notification_sound'], [4, 'content://settings/system/alarm_alert']];
+  const parse = (r, text) => r.dispatch({ owner: URI, name: 'parse', parameters: ['Ljava/lang/String;'], result: URI, signature: `(Ljava/lang/String;)${URI}` }, [text], 'static');
+  const uriText = (r, uri) => r.stringCharacters(r.dispatch({ owner: URI, name: 'toString', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [uri], 'virtual'));
+  const chosen = new Map();
+  def(RM, 'getDefaultUri', '(I)Landroid/net/Uri;', (r, _m, [kind]) => { const hit = DEFAULTS.find(([bit]) => kind & bit); return hit ? parse(r, hit[1]) : null; }, { static: true });
+  def(RM, 'getDefaultType', `(${URI})I`, (r, _m, [uri]) => {
+    if (uri === null || uri === undefined || uri === 0) return -1;
+    const text = uriText(r, uri), hit = DEFAULTS.find(([, value]) => value === text); return hit ? hit[0] : -1;
+  }, { static: true });
+  def(RM, 'isDefault', `(${URI})Z`, (r, _m, [uri]) => uri !== null && uri !== 0 && DEFAULTS.some(([, value]) => value === uriText(r, uri)) ? 1 : 0, { static: true });
+  def(RM, 'getActualDefaultRingtoneUri', `(${CONTEXT}I)${URI}`, (r, _m, [, kind]) => chosen.get(kind) ?? null, { static: true });
+  def(RM, 'setActualDefaultRingtoneUri', `(${CONTEXT}I${URI})V`, (r, _m, [, kind, uri]) => {
+    if (!holds(r, 'android.permission.WRITE_SETTINGS')) r.throwJava('Ljava/lang/SecurityException;', `uid ${platform.virtualProcess.uid} does not have android.permission.WRITE_SETTINGS.`);
+    if (!DEFAULTS.some(([bit]) => kind === bit)) r.throwJava('Ljava/lang/IllegalArgumentException;', `Invalid ringtone type ${kind}`);
+    if (uri === null || uri === 0) chosen.delete(kind); else chosen.set(kind, uri);
+  }, { static: true });
+  def(RM, 'getValidRingtoneUri', `(${CONTEXT})${URI}`, () => null, { static: true });   // no sounds installed
+  def(RM, 'getRingtone', `(${CONTEXT}${URI})Landroid/media/Ringtone;`, () => { throw new APKError('RingtoneManager.getRingtone needs the media stack, which the virtual device does not have', { kind: 'ringtone-unsupported' }); }, { static: true });
+  return { roots(visit) { for (const uri of chosen.values()) visit(uri); } };
 }

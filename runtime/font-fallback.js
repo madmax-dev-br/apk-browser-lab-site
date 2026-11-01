@@ -1,5 +1,5 @@
-import {APKError} from './apk-runtime.js?v=c925763606ec';
-import {DIGESTS} from './crypto-host.js?v=c925763606ec';
+import {APKError} from './apk-runtime.js?v=8455f781bc30';
+import {DIGESTS} from './crypto-host.js?v=8455f781bc30';
 
 /** Android font fallback (Minikin FontCollection) over the vendored Android 13 fallback chain.
  *
@@ -126,6 +126,24 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
         if (previous && previous.families === null && families === null) previous.end = run.end; else result.push({start: run.start, end: run.end, families});
       }
       return result.every(run => run.families === null) ? null : {runs: result};
+    },
+    /** Whether the Android 13 fallback chain (the primary face first) has a glyph for every character of `text`; never throws and never loads a font file. Layout controls need no glyph. */
+    covers(text, {weight = 400, italic = false} = {}) {
+      const face = primary(weight, italic); load();
+      for (let i = 0; i < text.length;) {
+        const cp = text.codePointAt(i), width = cp > 0xffff ? 2 : 1;
+        if (cp >= 0x23) {
+          SEQUENCE.lastIndex = i; const m = SEQUENCE.exec(text);
+          if (m && m[0].length > width) {
+            const parts = [...m[0]].map(c => c.codePointAt(0)).filter(c => c !== VS16 && c !== VS15 && c !== ZWJ);
+            if (manifest.families.some(family => family.color && family.files.some(f => parts.every(c => fileCovers(f, c))))) { i += m[0].length; continue; }
+          }
+        }
+        const next = text.codePointAt(i + width), vs = next === VS16 || next === VS15 ? next : null;
+        if (!LAYOUT_CONTROL(cp) && !NO_SUPPORT_NEEDED(cp) && pick(cp, vs, face) === undefined) return false;
+        i += width;
+      }
+      return true;
     },
     /** SkParagraph builder over the registered fonts (Roboto + every fallback file loaded so far). */
     makeBuilder(paragraphStyle) { return CK.ParagraphBuilder.MakeFromFontProvider(paragraphStyle, getProvider()); },

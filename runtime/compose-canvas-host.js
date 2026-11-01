@@ -1,6 +1,6 @@
-import {APKError} from './apk-runtime.js?v=c925763606ec';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=c925763606ec';
-import {getVectorGraphics} from './vector-native.js?v=c925763606ec';
+import {APKError} from './apk-runtime.js?v=8455f781bc30';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=8455f781bc30';
+import {getVectorGraphics} from './vector-native.js?v=8455f781bc30';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -196,7 +196,11 @@ export function createComposeCanvasHost(platform){
         // View.onDraw is empty in AOSP. Native widgets have their own paint
         // implementations and must never inherit that empty implementation.
         if(r.isSubtype(view.type,'Landroid/widget/TextView;'))return drawNativeText(r,receiver,target);
-        if(['ImageView','ProgressBar'].some(name=>r.isSubtype(view.type,`Landroid/widget/${name};`)))fail(`Native widget Canvas drawing is not connected: ${view.type}`);
+        if(r.isSubtype(view.type,'Landroid/widget/ImageView;')){   // ImageView.onDraw: nothing without a drawable, otherwise the drawable placed by padding / scale type / image matrix
+          if(view.imageDrawable){const [w,h]=dimensions(view);platform.drawableViewHost.drawImage(r,receiver,target,w,h);}
+          return;
+        }
+        if(r.isSubtype(view.type,'Landroid/widget/ProgressBar;'))fail(`Native widget Canvas drawing is not connected: ${view.type}`);
         return;
       }
       if(method.name==='dispatchDraw'&&method.owner===VIEW)return; // Empty original View hook.

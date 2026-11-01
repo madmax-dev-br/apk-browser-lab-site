@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=c925763606ec';
-import {getVectorGraphics} from './vector-native.js?v=c925763606ec';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=c925763606ec';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=c925763606ec';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=c925763606ec';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=c925763606ec';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=c925763606ec';
-import {createBitmapHost} from './bitmap-host.js?v=c925763606ec';
-import { gcRoot } from './heap-gc.js?v=c925763606ec';
+import {APKError} from './apk-runtime.js?v=8455f781bc30';
+import {getVectorGraphics} from './vector-native.js?v=8455f781bc30';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=8455f781bc30';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=8455f781bc30';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=8455f781bc30';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=8455f781bc30';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=8455f781bc30';
+import {createBitmapHost} from './bitmap-host.js?v=8455f781bc30';
+import { gcRoot } from './heap-gc.js?v=8455f781bc30';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -190,6 +190,7 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
     else if(command.op==='circle')canvas.drawCircle(...command.args,paint);
     else if(command.op==='oval')canvas.drawOval(command.args,paint);
     else if(command.op==='roundRect')canvas.drawRRect(CK.RRectXY(command.args.slice(0,4),command.args[4],command.args[5]),paint);
+    else if(command.op==='doubleRoundRect'){const rr=v=>command.pair?CK.RRectXY(v.slice(0,4),v[4],v[5]):new Float32Array(v);canvas.drawDRRect(rr(command.outer),rr(command.inner),paint);}
     else if(command.op==='rect')canvas.drawRect(command.args,paint);
     else if(command.op==='circleProps'||command.op==='roundRectProps'||command.op==='ripple'){
      // RecordingCanvas draws whose geometry/paint are CanvasProperty tokens: the values are read NOW, so RenderThread animators (RenderNodeAnimator) move them between frames.
@@ -280,6 +281,8 @@ export function createSkiaCanvasHost(runtime,backend){
  add(PATH,[`addRect(${RF}${DIR})V`,`addRect(FFFF${DIR})V`,`addOval(${RF}${DIR})V`,`addOval(FFFF${DIR})V`,`addCircle(FFF${DIR})V`,`addArc(${RF}FF)V`,'addArc(FFFFFF)V',`arcTo(${RF}FFZ)V`,`arcTo(${RF}FF)V`,'arcTo(FFFFFFZ)V',
   'offset(FF)V',`offset(FF${PATH})V`,`transform(${MATRIX})V`,`transform(${MATRIX}${PATH})V`,`addPath(${PATH}${MATRIX})V`,`addPath(${PATH}FF)V`,`computeBounds(${RF}Z)V`,'incReserve(I)V','toggleInverseFillType()V','isInverseFillType()Z']);
  add(PATH,['addRoundRect(Landroid/graphics/RectF;[FLandroid/graphics/Path$Direction;)V']);
+ add(PATH,['addRoundRect(Landroid/graphics/RectF;FFLandroid/graphics/Path$Direction;)V','addRoundRect(FFFF[FLandroid/graphics/Path$Direction;)V']);
+ add(CANVAS,['drawColor(ILandroid/graphics/PorterDuff$Mode;)V','drawDoubleRoundRect(Landroid/graphics/RectF;FFLandroid/graphics/RectF;FFLandroid/graphics/Paint;)V','drawDoubleRoundRect(Landroid/graphics/RectF;[FLandroid/graphics/RectF;[FLandroid/graphics/Paint;)V']);
  add(CANVAS,[`drawPath(${PATH}Landroid/graphics/Paint;)V`,'drawCircle(FFFLandroid/graphics/Paint;)V','drawOval(FFFFLandroid/graphics/Paint;)V','drawRoundRect(FFFFFFLandroid/graphics/Paint;)V','drawColor(I)V','drawText(Ljava/lang/String;FFLandroid/graphics/Paint;)V','drawText(Ljava/lang/String;IIFFLandroid/graphics/Paint;)V','drawText(Ljava/lang/CharSequence;IIFFLandroid/graphics/Paint;)V','drawText([CIIFFLandroid/graphics/Paint;)V','clipRect(FFFF)Z','clipRect(Landroid/graphics/Rect;)Z',`clipPath(${PATH})Z`]);
  add(CANVAS,['drawRect(Landroid/graphics/RectF;Landroid/graphics/Paint;)V','drawRoundRect(Landroid/graphics/RectF;FFLandroid/graphics/Paint;)V','drawOval(Landroid/graphics/RectF;Landroid/graphics/Paint;)V','saveLayer(FFFFLandroid/graphics/Paint;)I','save()I','restore()V','restoreToCount(I)V','getSaveCount()I']);
  add(CANVAS,['setCompatibilityVersion(I)V','<init>(J)V','getClipBounds(Landroid/graphics/Rect;)Z']);
@@ -314,6 +317,10 @@ export function createSkiaCanvasHost(runtime,backend){
   recordNative(handle,command){const graphics=getVectorGraphics(runtime),state=graphics.get(handle,'canvas');let rasterBytes=command.raster?.dataURL?.length??0;for(const value of graphics.handles.values())if(value.kind==='canvas')for(const draw of value.draws){rasterBytes+=draw.raster?.dataURL?.length??0;if(rasterBytes>32*1024*1024)fail('Recorded Canvas rasters exceed32MiB');}getVectorGraphics(runtime).reserveDrawStorage((command.commands?.length??0)*4+(command.text?.length??0));if(state.draws.length>=1024)fail('Skia command limit exceeded');state.draws.push({kind:'skia',...command,matrix:state.matrix.slice(),clips:(state.clips??[]).slice()});},
   textBounds(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaTextBounds(backend,text,{...state,weight:face.weight,italic:face.italic});},
   measureRun(text,options={},state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaRun(backend,text,{...state,...options,weight:face.weight,italic:face.italic});},
+  /** Paint.hasGlyph: the paint's typeface (else Roboto of its weight/style) has a glyph for every character, the Android fallback chain included. */
+  hasGlyph(text,state={}){if(!text.length)return false;const face=resolveTypeface(state.typefaceRef),CK=backend.CanvasKit,font=new CK.Font(face.face??backend.typeface,12);
+   try{const ids=font.getGlyphIDs(text);if(ids.length&&ids.every(id=>id!==0))return true;}finally{font.delete();}
+   return !!backend.fallback?.covers(text,{weight:face.weight,italic:face.italic});},
   measureText(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaText(backend,text,{...state,nativeTypeface:face.face,weight:face.weight,italic:face.italic});},
   readStatic(vm,field){const bitmapStatic=bitmaps.readStatic(field);if(bitmapStatic)return bitmapStatic;if(field.owner===OP&&OPS.includes(field.name))return{handled:true,value:bitmaps.enumValue(OP,OPS,field.name)};if(field.owner===TYPEFACE&&['DEFAULT','DEFAULT_BOLD','SANS_SERIF'].includes(field.name))return{handled:true,value:makeTypeface('sans-serif',field.name==='DEFAULT_BOLD'?1:0)};return null;},
   dispose(){runtime.rasterCache?.clear();runtime.rasterCacheBytes=0;for(const f of customFaces.splice(0))f.delete();for(const m of measures.values())releaseMeasure(m);measures.clear();for(const p of paths.values())p.builder.delete();paths.clear();pathHandles.clear();},
@@ -414,6 +421,17 @@ export function createSkiaCanvasHost(runtime,backend){
     if(name==='setFillType'){const index=vm.object(args[1]).fields.get('Landroid/graphics/Path$FillType;->nativeInt:I');if(!Number.isInteger(index)||index<0||index>3)fail('Path requires original FillType enum');builder.setFillType([CK.FillType.Winding,CK.FillType.EvenOdd,CK.FillType.InverseWinding,CK.FillType.InverseEvenOdd][index]);return;}
     if(name==='getFillType'){const shape=builder.snapshot();const index=shape.getFillType().value;shape.delete();const names=['WINDING','EVEN_ODD','INVERSE_WINDING','INVERSE_EVEN_ODD'],owner='Landroid/graphics/Path$FillType;',name=names[index];return vm.readStatic({owner,name,type:owner,key:`${owner}->${name}:${owner}`});}
     if(name==='addPath'){const shape=path(args[1]).builder.snapshot(),count=shape.countPoints();if(pathCells+count>1000000){shape.delete();fail('Aggregate Skia Path point limit exceeded');}builder.addPath(shape);shape.delete();pathCells+=count;return;}
+    if(name==='addRoundRect'&&method.parameters[0]==='F'&&method.parameters[4]==='[F'){   // addRoundRect(l, t, r, b, float[] radii, dir): eight radii, x then y per corner
+      const radii=vm.array(args[5]);if(radii.elements.length<8)vm.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','radii[] needs 8 values');
+      const direction=vm.object(args[6]).fields.get('Landroid/graphics/Path$Direction;->nativeInt:I');if(direction!==0&&direction!==1)fail('Path requires original Direction enum');
+      const before=builder.countPoints();builder.addRRect(new Float32Array([...finite(args.slice(1,5).map(number)),...finite(radii.elements.slice(0,8).map(number))]),direction===1);
+      pathCells+=builder.countPoints()-before;if(pathCells>1000000)fail('Aggregate Skia Path point limit exceeded');return;
+    }
+    if(name==='addRoundRect'&&method.parameters[0]==='Landroid/graphics/RectF;'&&method.parameters[1]==='F'){   // addRoundRect(RectF, rx, ry, dir)
+      const direction=vm.object(args[4]).fields.get('Landroid/graphics/Path$Direction;->nativeInt:I');if(direction!==0&&direction!==1)fail('Path requires original Direction enum');
+      const before=builder.countPoints();builder.addRRect(CK.RRectXY(rectF(args[1]),number(args[2]),number(args[3])),direction===1);
+      pathCells+=builder.countPoints()-before;if(pathCells>1000000)fail('Aggregate Skia Path point limit exceeded');return;
+    }
     if(name==='addRoundRect'&&method.parameters[0]==='F'){const values=finite(args.slice(1,7).map(number)),direction=vm.object(args[7]).fields.get('Landroid/graphics/Path$Direction;->nativeInt:I');if(direction!==0&&direction!==1)fail('Path requires original Direction enum');const before=builder.countPoints();builder.addRRect(CK.RRectXY(values.slice(0,4),values[4],values[5]),direction===1);pathCells+=builder.countPoints()-before;if(pathCells>1000000)fail('Aggregate Skia Path point limit exceeded');return;}
     if(name==='addRoundRect'){
       const radii=vm.array(args[2]);if(radii.type!=='[F')vm.throwJava('Ljava/lang/ClassCastException;','Round rectangle radii require float[]');
@@ -494,7 +512,15 @@ export function createSkiaCanvasHost(runtime,backend){
     clipCells+=clip.commands?.length??8;if(clipCells>1000000)fail('Aggregate Skia clip storage limit exceeded');if((state.clips??=[]).length>=128)fail('Skia clip limit exceeded');state.clips.push(clip);
     const surface=CK.MakeSurface(state.width??411,state.height??840);try{const canvas=surface.getCanvas();applyClips(CK,canvas,state.clips);return canvas.quickReject(CK.LTRBRect(0,0,state.width??411,state.height??840))?0:1;}finally{surface.dispose();}
    }
-   if(name==='drawColor'){record(receiver,{op:'color',color:args[1]});return;}
+   if(name==='drawColor'){
+    if(method.parameters.length===2){const mode=vm.object(args[2]).fields.get('Landroid/graphics/PorterDuff$Mode;->nativeInt:I');if(!Number.isInteger(mode)||mode<0||mode>28)fail('drawColor needs an original PorterDuff.Mode');record(receiver,{op:'color',color:args[1],blendMode:mode});return;}
+    record(receiver,{op:'color',color:args[1]});return;
+   }
+   if(name==='drawDoubleRoundRect'){   // an outer rounded rectangle minus an inner one (SkCanvas::drawDRRect); radii are either one rx/ry pair or eight values per rectangle
+    const paint=getSolidPaint(vm,args.at(-1)),shape=(rectRef,a,b)=>{const rect=rectF(rectRef);if(method.parameters[1]==='F')return [...rect,number(a),number(b)];const radii=vm.array(a);if(radii.elements.length<8)vm.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','radii[] needs 8 values');return [...rect,...radii.elements.slice(0,8).map(number)];};
+    const byPair=method.parameters[1]==='F',outer=byPair?shape(args[1],args[2],args[3]):shape(args[1],args[2]),inner=byPair?shape(args[4],args[5],args[6]):shape(args[3],args[4]);
+    finite(outer);finite(inner);record(receiver,{op:'doubleRoundRect',outer,inner,pair:byPair,paint});return;
+   }
    const paintFace=resolveTypeface(getPaintState(vm,args.at(-1)).typefaceRef),paint={...getSolidPaint(vm,args.at(-1)),nativeTypeface:paintFace.face,weight:paintFace.weight,italic:paintFace.italic};
    if(name==='drawPath'){record(receiver,{op:'path',...snapshot(args[1]),paint});return;}
    if(name==='drawArc'){const rect=method.parameters[0]==='Landroid/graphics/RectF;'?rectF(args[1]):finite(values.slice(0,4)),angles=method.parameters[0]==='Landroid/graphics/RectF;'?[number(args[2]),number(args[3])]:values.slice(4,6),useCenter=!!args[method.parameters[0]==='Landroid/graphics/RectF;'?4:7];record(receiver,{op:'arc',args:finite([...rect,...angles]),useCenter,paint});return;}

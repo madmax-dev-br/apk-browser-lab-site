@@ -1,6 +1,6 @@
-import { floatBits } from './host-contract.js?v=c925763606ec';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=c925763606ec';
-import { networkOf } from './network-native.js?v=c925763606ec';
+import { floatBits } from './host-contract.js?v=8455f781bc30';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=8455f781bc30';
+import { networkOf } from './network-native.js?v=8455f781bc30';
 
 // Storage-related system services over the app's virtual filesystem and the lab's network bridge (android-13.0.0_r1 StorageManager, StorageStatsManager, DownloadManager,
 // NetworkStatsManager). The device has one 8 GiB volume (the numbers StatFs reports); downloads are real HTTP(S) exchanges made through the network bridge under the device's
