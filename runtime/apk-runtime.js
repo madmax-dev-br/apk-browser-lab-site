@@ -1,22 +1,22 @@
-import { VMClock } from './vm-clock.js?v=b6af1ec5264d';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=b6af1ec5264d';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=b6af1ec5264d';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=b6af1ec5264d';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=b6af1ec5264d';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=b6af1ec5264d';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=b6af1ec5264d';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=b6af1ec5264d';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=b6af1ec5264d';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=b6af1ec5264d';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=b6af1ec5264d';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=b6af1ec5264d';
-import { APKError } from './apk-error.js?v=b6af1ec5264d';
-import { collectGarbage, collectionDue } from './heap-gc.js?v=b6af1ec5264d';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=b6af1ec5264d';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=b6af1ec5264d';
-import { Scheduler, Blocked } from './scheduler.js?v=b6af1ec5264d';
-import { bootClassLacksMember } from './boot-class-members.js?v=b6af1ec5264d';
-export { APKError } from './apk-error.js?v=b6af1ec5264d';
+import { VMClock } from './vm-clock.js?v=8f16f6152b47';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=8f16f6152b47';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=8f16f6152b47';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=8f16f6152b47';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=8f16f6152b47';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=8f16f6152b47';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=8f16f6152b47';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=8f16f6152b47';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=8f16f6152b47';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=8f16f6152b47';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=8f16f6152b47';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=8f16f6152b47';
+import { APKError } from './apk-error.js?v=8f16f6152b47';
+import { collectGarbage, collectionDue } from './heap-gc.js?v=8f16f6152b47';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=8f16f6152b47';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=8f16f6152b47';
+import { Scheduler, Blocked } from './scheduler.js?v=8f16f6152b47';
+import { bootClassLacksMember } from './boot-class-members.js?v=8f16f6152b47';
+export { APKError } from './apk-error.js?v=8f16f6152b47';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -943,7 +943,9 @@ export class APKRuntime {
     while (pending.length) {
       const [current, depth] = pending.pop();
       if (!current || seen.has(current)) continue;
-      if (depth > 64 || seen.size >= 512) fail('Excessive class/interface hierarchy');
+      // A JVM has no such limit short of a circular hierarchy (which `seen` already stops); obfuscated and generated code (R8 class merging, protobuf, Kotlin interface chains) has hierarchies far deeper
+      // than hand-written code, so the bounds only guard against corrupt data and name the type they stopped at.
+      if (depth > 4096 || seen.size >= 65536) fail(`Excessive class/interface hierarchy: ${type} reached ${current} at depth ${depth} with ${seen.size} ancestors`);
       seen.add(current);
       pending.push([this.parent(current), depth + 1]);
       for (const iface of this.interfaces(current)) pending.push([iface, depth + 1]);

@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=b6af1ec5264d';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=b6af1ec5264d';
-import { inspectELF } from './native-inspector.js?v=b6af1ec5264d';
-import { inflateRaw } from './inflate.js?v=b6af1ec5264d';
-import { resolveDevice } from './device-profile.js?v=b6af1ec5264d';
-import { resourceProfileFor } from './device-configuration.js?v=b6af1ec5264d';
-import { JniBridge } from './jni-host.js?v=b6af1ec5264d';
-import { providerForApk } from './native-provider-variants.js?v=b6af1ec5264d';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=b6af1ec5264d';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=b6af1ec5264d';
-import { AndroidResources } from './android-resources.js?v=b6af1ec5264d';
-import { AndroidPlatform } from './android-platform.js?v=b6af1ec5264d';
-import { FrameworkProvider } from './framework-provider.js?v=b6af1ec5264d';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=8f16f6152b47';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=8f16f6152b47';
+import { inspectELF } from './native-inspector.js?v=8f16f6152b47';
+import { inflateRaw } from './inflate.js?v=8f16f6152b47';
+import { resolveDevice } from './device-profile.js?v=8f16f6152b47';
+import { resourceProfileFor } from './device-configuration.js?v=8f16f6152b47';
+import { JniBridge } from './jni-host.js?v=8f16f6152b47';
+import { providerForApk } from './native-provider-variants.js?v=8f16f6152b47';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=8f16f6152b47';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=8f16f6152b47';
+import { AndroidResources } from './android-resources.js?v=8f16f6152b47';
+import { AndroidPlatform } from './android-platform.js?v=8f16f6152b47';
+import { FrameworkProvider } from './framework-provider.js?v=8f16f6152b47';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -420,7 +420,12 @@ export function nameFrameworkAttributes(node, nameOf) {
 export async function loadAPK(arrayBuffer, options = {}) {
   if (!(arrayBuffer instanceof ArrayBuffer) && !(arrayBuffer instanceof Uint8Array)) fail('loadAPK requires an APK ArrayBuffer');
   const archive = new APKArchive(arrayBuffer), names = [...archive.entries.keys()];
-  if (!archive.entries.has('classes.dex')) fail('APK has no root classes.dex');
+  if (!archive.entries.has('classes.dex')) {
+    const inner = names.filter(name => /\.apk$/i.test(name)), kind = names.includes('BundleConfig.pb') || names.includes('base/manifest/AndroidManifest.xml') ? 'an Android App Bundle (.aab), which is not installable and has no classes.dex at its root'
+      : inner.length ? `a bundle of APKs (XAPK/APKS: ${inner.slice(0, 4).join(', ')}${inner.length > 4 ? ', ...' : ''}); open its base APK` : names.some(name => /^classes\d*\.dex$/.test(name)) ? 'an APK whose dex files do not start at classes.dex'
+      : names.includes('AndroidManifest.xml') ? 'an APK without code (a configuration/resource split or a resource-only APK); open the base APK' : 'not an APK';
+    fail(`APK has no root classes.dex: the file is ${kind}`);
+  }
   // Same discovery as ART's DexFileLoader: classes.dex, then classes2.dex, classes3.dex, ... up to the first gap.
   const dexFiles = ['classes.dex'];
   for (let index = 2; archive.entries.has(`classes${index}.dex`); index++) {
