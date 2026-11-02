@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=75f101f3827d';
-import { Blocked, QUANTUM } from './scheduler.js?v=75f101f3827d';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=75f101f3827d';
+import { APKError } from './apk-error.js?v=fd8143b587e9';
+import { Blocked, QUANTUM } from './scheduler.js?v=fd8143b587e9';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=fd8143b587e9';
 
 // Frame-based DEX interpreter.
 //
@@ -358,11 +358,11 @@ function runLoop(rt, owner, base) {
           if (status === RET) { returnValue = f.rv; returning = true; break interp; }
           if (status === CALL) {
             f = frames[frames.length - 1]; regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc;
-            if (rt.q <= 0) { rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { need = true; break inner; } }
+            if (rt.q <= 0) { rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if ((rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) || (owner === null && rt.sliceDeadline !== 0 && performance.now() > rt.sliceDeadline)) { need = true; break inner; } }
             continue inner;
           }
           pc = f.pc;
-          if (status === YIELD) { if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { need = true; break inner; } rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); continue inner; }
+          if (status === YIELD) { if ((rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) || (owner === null && rt.sliceDeadline !== 0 && performance.now() > rt.sliceDeadline)) { need = true; break inner; } rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); continue inner; }
         }
         start = pc;
         if (++rt.steps > max) rt.budgetExceeded(`Instruction budget (${max}/event) exceeded`);

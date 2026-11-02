@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=75f101f3827d';
-import {getVectorGraphics} from './vector-native.js?v=75f101f3827d';
-import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=75f101f3827d';
-import { gcRoot } from './heap-gc.js?v=75f101f3827d';
+import {APKError} from './apk-error.js?v=fd8143b587e9';
+import {getVectorGraphics} from './vector-native.js?v=fd8143b587e9';
+import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=fd8143b587e9';
+import { gcRoot } from './heap-gc.js?v=fd8143b587e9';
 const BITMAP='Landroid/graphics/Bitmap;',CONFIG='Landroid/graphics/Bitmap$Config;',SPACE='Landroid/graphics/ColorSpace;',NAMED='Landroid/graphics/ColorSpace$Named;',CANVAS='Landroid/graphics/Canvas;';
 // android.graphics.Bitmap.Config / ColorSpace.Named declaration order (API 28 + API 34 HLG/PQ appended).
 const CONFIGS=['ALPHA_8','RGB_565','ARGB_4444','ARGB_8888','RGBA_F16','HARDWARE'];

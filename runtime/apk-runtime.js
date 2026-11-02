@@ -1,24 +1,24 @@
-import { VMClock } from './vm-clock.js?v=75f101f3827d';
-import { OperationMonitor } from './operation-monitor.js?v=75f101f3827d';
-import { ExecutionProfile } from './execution-profile.js?v=75f101f3827d';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=75f101f3827d';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=75f101f3827d';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=75f101f3827d';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=75f101f3827d';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=75f101f3827d';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=75f101f3827d';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=75f101f3827d';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=75f101f3827d';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=75f101f3827d';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=75f101f3827d';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=75f101f3827d';
-import { APKError } from './apk-error.js?v=75f101f3827d';
-import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=75f101f3827d';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=75f101f3827d';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=75f101f3827d';
-import { Scheduler, Blocked } from './scheduler.js?v=75f101f3827d';
-import { bootClassLacksMember } from './boot-class-members.js?v=75f101f3827d';
-export { APKError } from './apk-error.js?v=75f101f3827d';
+import { VMClock } from './vm-clock.js?v=fd8143b587e9';
+import { OperationMonitor } from './operation-monitor.js?v=fd8143b587e9';
+import { ExecutionProfile } from './execution-profile.js?v=fd8143b587e9';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=fd8143b587e9';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=fd8143b587e9';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=fd8143b587e9';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=fd8143b587e9';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=fd8143b587e9';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=fd8143b587e9';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=fd8143b587e9';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=fd8143b587e9';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=fd8143b587e9';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=fd8143b587e9';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=fd8143b587e9';
+import { APKError } from './apk-error.js?v=fd8143b587e9';
+import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=fd8143b587e9';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=fd8143b587e9';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=fd8143b587e9';
+import { Scheduler, Blocked } from './scheduler.js?v=fd8143b587e9';
+import { bootClassLacksMember } from './boot-class-members.js?v=fd8143b587e9';
+export { APKError } from './apk-error.js?v=fd8143b587e9';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -935,7 +935,7 @@ export class APKRuntime {
     // stopped that legitimate work. A spinning thread still hits the fuse (tests/instruction-budget.test.mjs sets its own small fuse); `maxEventWallMs` bounds host time too.
     this.maxInstructionsPerEvent = maxInstructionsPerEvent; this.maxEventInstructions = maxInstructionsPerEvent * 8;
     // Wall-clock watchdog (host time of one event); 0 = off (tests and probes are deterministic), the Worker turns it on. Checked at every scheduling quantum, so it also trips for code that never switches threads.
-    this.gcSafeDepth = 0; this.hostRoots = []; this.hostAllocs = []; this.vmDrainRuntime = null; this.bytecodeAlloc = false; this.profile = new ExecutionProfile(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
+    this.sliceDeadline = 0; this.gcSafeDepth = 0; this.hostRoots = []; this.hostAllocs = []; this.vmDrainRuntime = null; this.bytecodeAlloc = false; this.profile = new ExecutionProfile(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
     this.dex = dex;
     this.classes = dex.resolvedClasses ?? dex.classes;
     this.launcherActivity = launcherActivity;
