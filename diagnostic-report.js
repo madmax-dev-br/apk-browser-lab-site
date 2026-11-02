@@ -21,6 +21,7 @@ export function buildDiagnosticReport({ error, product = 'APK Browser Lab', pack
     `Erro: ${cause}`,
     error?.details?.heartbeatText ? error.details.heartbeatText : '',
     error?.details?.jsStack ? `Erro interno da VM (JavaScript) -- local:\n${error.details.jsStack}${error.details.vmContext ? `\nContexto: operação ${error.details.vmContext.operation ?? '?'}, thread ${error.details.vmContext.thread ?? '?'}, chamada do host: ${error.details.vmContext.hostCall ?? 'nenhuma'}, pilha Java: ${(error.details.vmContext.stack ?? []).join(' < ') || 'vazia'}` : ''}` : '',
+    error?.uncaught ? error.uncaught : '',
     error?.details?.heap?.text ? error.details.heap.text : '',
     frames.length ? `Pilha (mais interna por último):\n${frames.slice(-12).join('\n')}` : '',
     error?.details?.profile?.text ? error.details.profile.text : '',

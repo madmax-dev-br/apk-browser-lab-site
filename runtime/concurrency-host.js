@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=cee526e0bf77';
-import { queueObject } from './hidden-members.js?v=cee526e0bf77';
-import { createHostRegistry } from './host-contract.js?v=cee526e0bf77';
-import { Blocked, VMThread } from './scheduler.js?v=cee526e0bf77';
-import { Invoke } from './interpreter.js?v=cee526e0bf77';
-import { GC_ROOTS } from './heap-gc.js?v=cee526e0bf77';
+import { APKError } from './apk-error.js?v=172f078155c4';
+import { queueObject } from './hidden-members.js?v=172f078155c4';
+import { createHostRegistry } from './host-contract.js?v=172f078155c4';
+import { Blocked, VMThread } from './scheduler.js?v=172f078155c4';
+import { Invoke } from './interpreter.js?v=172f078155c4';
+import { GC_ROOTS } from './heap-gc.js?v=172f078155c4';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -109,6 +109,7 @@ export function createConcurrencyHost(platform) {
   /** Thread.dispatchUncaughtException: the thread's own handler, else its ThreadGroup. */
   function uncaughtInvoke(r, ref, throwable) {
     const st = state(r, ref), handler = st.handler ?? st.group ?? mainGroup(r);
+    try { r.noteUncaught(st.name, throwable); } catch { /* diagnostics only */ }
     r.record(`RUNTIME uncaught exception in thread "${st.name}": ${r.typeOf(throwable)}: ${r.object(throwable).message ?? ''}`);
     return new Invoke({ owner: UEH, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [handler, ref, throwable], 'virtual');
   }

@@ -93,6 +93,8 @@ const weakTypeCache = runtime => weakTypeCaches.get(runtime) ?? weakTypeCaches.s
  * boolean or bigint and none of whose names look like an id (a property that is a string today does not become a reference tomorrow). A container that holds references, nulls or
  * nested objects in its sample is walked in full. `markNoJavaRefs(object)` declares an object (and everything under it) reference-free explicitly.
  */
+/** Instances of these classes are code and metadata (DEX files, programs, compiled functions, frames, threads): never Java references, never walked. */
+const SKIP_CONSTRUCTORS = new Set(['DexFile', 'DexProgram', 'CompiledFunction', 'Frame', 'VMThread', 'ClassDefinition']);
 const FLAT_CONTAINER_MIN = 2048, FLAT_SAMPLE = 48;
 const noRefs = new WeakSet();
 export function markNoJavaRefs(object) { if (object !== null && typeof object === 'object') noRefs.add(object); return object; }
@@ -113,6 +115,8 @@ function flatSample(iterable, limit) {
   for (const item of iterable) { if (!flatRecord(item, 0, limit)) return false; if (++seen >= FLAT_SAMPLE) break; }
   return seen > 0;
 }
+const refArrayTypes = new Map();
+const refArrayType = type => { let v = refArrayTypes.get(type); if (v === undefined) { v = type.charCodeAt(0) === 91 && (type.charCodeAt(1) === 76 || type.charCodeAt(1) === 91); refArrayTypes.set(type, v); } return v; };
 export function createMarker(runtime) {
   const heap = runtime.heap, weakIds = [], weakTypes = weakTypeCache(runtime), weakMaps = [], traced = new WeakSet();
   /** java.lang.ref.WeakReference and its subclasses (WeakHashMap entries, ThreadLocal map entries ...): the referent does not keep its object alive. SoftReference and PhantomReference stay strong. */
@@ -130,6 +134,9 @@ export function createMarker(runtime) {
   // its resolveCache (millions of entries) and the other skipped tables on every collection.
   const skip = new WeakSet([heap, runtime.dex, runtime.classes, runtime.resources, runtime.platform?.resources, runtime.scheduler, ...(runtime.ephemeronMaps ?? [])].filter(Boolean));   // ephemeron maps are not roots (see ephemeronMap)
   for (const name of SKIP_PROPS) { const table = runtime[name]; if (table !== null && typeof table === 'object') skip.add(table); }
+  // Threads and their frames are roots only through the scheduler's structural enumeration (registers, results, continuations): a back-reference from the runtime or the platform must never lead the
+  // generic walk into a frame's program, method record or DEX tables (millions of nodes in a large app).
+  for (const thread of [runtime.thread, ...(runtime.scheduler?.threads ?? [])]) if (thread !== null && typeof thread === 'object') { skip.add(thread); if (Array.isArray(thread.frames)) { skip.add(thread.frames); for (const frame of thread.frames) if (frame !== null && typeof frame === 'object') skip.add(frame); } }
   const violations = [];
   const markId = (id, strict = false) => {
     if (!(id > 0 && id < limit) || isMarked(id)) return; const record = heap.get(id); if (record === undefined) return;
@@ -144,7 +151,8 @@ export function createMarker(runtime) {
       const value = stack.pop();
       if (value === null || typeof value !== 'object') continue;
       if (typeof value.ref === 'number' && Number.isSafeInteger(value.ref) && Object.keys(value).length === 1) { markId(value.ref, true); continue; }
-      if (visited.has(value) || skip.has(value) || noRefs.has(value)) continue; visited.add(value); nodes++;
+      if (visited.has(value) || skip.has(value) || noRefs.has(value)) continue;
+      { const ctor = value.constructor; if (ctor !== Object && ctor !== Array && ctor !== Map && ctor !== undefined && SKIP_CONSTRUCTORS.has(ctor.name)) { skip.add(value); continue; } } visited.add(value); nodes++;
       if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer || value instanceof WeakMap || value instanceof WeakSet || value instanceof Promise) continue;
       if (Array.isArray(value)) {
         if (value.length > NUMERIC_ARRAY_LIMIT && typeof value[0] === 'number') continue;   // primitive data (int[] elements, offsets), never a ref list
@@ -171,11 +179,11 @@ export function createMarker(runtime) {
     if (++sincePulse >= 2048) { sincePulse = 0; runtime.monitor?.pulse(`coleta de lixo (marcando ${count} objetos)`); }
     const record = heap.get(worklist.pop()), weak = isWeak(record.type);
     if (weak) weakIds.push(record.id);
-    for (const key of Object.keys(record)) {
+    for (const key in record) {
       const item = record[key];
       if (weak && key === 'fields' && item instanceof Map) { for (const [fieldKey, fieldValue] of item) { if (fieldKey === REFERENT_KEY) continue; if (fieldValue !== null && typeof fieldValue === 'object') stack.push(fieldValue); } continue; }
       if (key === 'map' && item instanceof Map && record.type === 'Ljava/util/WeakHashMap;') { weakMaps.push(record); continue; }   // WeakHashMap: keys are weak, a value is live only while its key is (see ephemerons)
-      if (key === 'elements') { if (Array.isArray(item) && /^\[(L|\[)/.test(record.type)) for (let i = 0; i < item.length; i++) { const element = item[i]; if (element !== null && typeof element === 'object') stack.push(element); } else if (Array.isArray(item) && typeof item[0] === 'object') scan(item); }
+      if (key === 'elements') { if (Array.isArray(item) && refArrayType(record.type)) for (let i = 0; i < item.length; i++) { const element = item[i]; if (element !== null && typeof element === 'object') stack.push(element); } else if (Array.isArray(item) && typeof item[0] === 'object') scan(item); }
       else if (item !== null && typeof item === 'object') stack.push(item);
       else if (typeof item === 'number' && idLike(key, item)) markId(item);
     }
@@ -241,6 +249,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   runtime.gcTopRoots = { byNodes: topBy('nodes'), byMs: topBy('ms') };
   const rootsMs = performance.now() - t0, tRoots = performance.now();
   runtime.scheduler?.enumerateRoots?.(item => scan(item));
+  for (const extra of [runtime.thread]) if (extra && Array.isArray(extra.frames) && runtime.scheduler && !runtime.scheduler.threads.includes(extra)) { const view = Object.create(runtime.scheduler); view.threads = [extra]; runtime.scheduler.enumerateRoots.call(view, item => scan(item)); }   // a thread record outside the scheduler's list (nested runs)
   // Host code up the JavaScript stack (a native that called back into Java, a class initializer, a nested wait) may hold values no Java frame references: what host code allocated and every result
   // handed back to it since the last fully quiescent collection stay alive. Outside a safepoint nothing is in flight and the set is dropped.
   const stackQuiet = runtime.depth === 0 && runtime.nestedRuns <= 1 && !runtime.initDepth && !runtime.scheduler?.waitingNested?.size && !runtime.scheduler?.threads.some(thread => thread.nestedDepth > 0 || thread.nestedBlock);

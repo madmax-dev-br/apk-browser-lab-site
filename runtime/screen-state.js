@@ -138,6 +138,7 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
   out.push(`Exceções capturadas pelo código do app e descartadas (${caught?.total ?? 0} no total; primeiras ${Math.min(15, caught?.distinct.size ?? 0)} distintas):`);
   for (const [, entry] of [...(caught?.distinct ?? [])].slice(0, 15)) out.push(`  ${entry.count}× ${entry.type}${entry.message ? ': ' + entry.message : ''}  (capturada em ${entry.where})`);
   if (!caught?.total) out.push('  (nenhuma)');
+  { const uncaught = runtime.uncaughtText?.(); if (uncaught) out.push(uncaught); }
   const blank = reasons.length > 0;
   if (blank) out.splice(1, 0, `primeiro quadro em branco — motivo(s): ${reasons.join('; ')}`);
   else out.splice(1, 0, 'a tela tem conteúdo: nenhum motivo de tela em branco encontrado');
