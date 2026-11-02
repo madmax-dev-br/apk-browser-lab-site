@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=8ab89c3fe95a';
-import { Blocked, QUANTUM } from './scheduler.js?v=8ab89c3fe95a';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=8ab89c3fe95a';
+import { APKError } from './apk-error.js?v=f6262415a5da';
+import { Blocked, QUANTUM } from './scheduler.js?v=f6262415a5da';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=f6262415a5da';
 
 // Frame-based DEX interpreter.
 //
@@ -358,11 +358,11 @@ function runLoop(rt, owner, base) {
           if (status === RET) { returnValue = f.rv; returning = true; break interp; }
           if (status === CALL) {
             f = frames[frames.length - 1]; regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc;
-            if (rt.q <= 0) { rt.q = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { need = true; break inner; } }
+            if (rt.q <= 0) { rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { need = true; break inner; } }
             continue inner;
           }
           pc = f.pc;
-          if (status === YIELD) { if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { need = true; break inner; } rt.q = QUANTUM; rt.budgetTick(); continue inner; }
+          if (status === YIELD) { if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { need = true; break inner; } rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); continue inner; }
         }
         start = pc;
         if (++rt.steps > max) rt.budgetExceeded(`Instruction budget (${max}/event) exceeded`);
@@ -407,8 +407,8 @@ function runLoop(rt, owner, base) {
           }
           case 0x20: { const type = dex.types[u[pc + 1]], value = regs[hi]; if (!type) fail('Invalid instanceof type'); regs[lo] = !isNull(value) && rt.isSubtype(rt.typeOf(value), type) ? 1 : 0; pc += 2; break; }
           case 0x21: regs[lo] = rt.array(regs[hi]).elements.length; pc++; break;
-          case 0x22: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid allocation type'); if (rt.initialized.get(type)?.status !== 'initialized') { const gate = rt.initStep(type); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } regs[a] = rt.allocate(type); pc += 2; break; }
-          case 0x23: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid array type'); regs[lo] = rt.newArray(type, int(regs[hi])); pc += 2; break; }
+          case 0x22: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid allocation type'); if (rt.initialized.get(type)?.status !== 'initialized') { const gate = rt.initStep(type); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.bytecodeAlloc = true; try { regs[a] = rt.allocate(type); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
+          case 0x23: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid array type'); rt.bytecodeAlloc = true; try { regs[lo] = rt.newArray(type, int(regs[hi])); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
           case 0x27: { const value = regs[a]; if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'throw null'); throw new JavaException(value, rt.object(value).message ?? rt.typeOf(value), rt.object(value).exceptionDetails); }
           case 0x28: { const target = pc + ((a << 24) >> 24); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
           case 0x29: { const target = pc + ((u[pc + 1] << 16) >> 16); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
@@ -656,7 +656,7 @@ function stepRare(rt, f, regs, u, dex, pc, op, a, lo, hi) {
       case 0x1c: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid class type'); regs[a] = rt.classObject(type); pc += 2; break; }
       case 0x24: case 0x25: {
         const type = dex.types[u[pc + 1]]; if (!type?.startsWith('[') || ['J', 'D'].includes(type.slice(1))) fail('Invalid filled-new-array type');
-        const registers = invokeRegisters(u, pc, regs, op, a, lo, hi), value = rt.newArray(type, registers.length), array = rt.object(value);
+        const registers = invokeRegisters(u, pc, regs, op, a, lo, hi); rt.bytecodeAlloc = true; let value; try { value = rt.newArray(type, registers.length); } finally { rt.bytecodeAlloc = false; } const array = rt.object(value);
         for (let i = 0; i < registers.length; i++) { const entry = regs[registers[i]]; rt.checkArrayValue(array, entry); array.elements[i] = narrow(entry, type.slice(1)); }
         f.result = value; pc += 3; break;
       }

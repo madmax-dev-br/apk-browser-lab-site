@@ -57,11 +57,15 @@ export function pinAll(runtime) {
 export function isFreedId(runtime, id) { return Number.isSafeInteger(id) && id > 0 && id < runtime.nextId && runtime.heap.list[id] === undefined; }
 
 function quiescent(runtime, safepoint = false) {
-  if (runtime.depth !== 0) return 'dispatch-in-flight';
-  if (runtime.nestedRuns > (safepoint ? 1 : 0)) return 'nested-run';   // a safepoint is inside the one scheduling run that owns the JavaScript stack
-  if (runtime.initDepth) return 'class-initializer-running';
+  // A safepoint (the interpreter's run loop at a quantum boundary or a thread switch) is collectable even inside nested runs, host waits and class initializers: every Java frame is a root, and what
+  // JavaScript code up the stack may still hold is protected by `runtime.hostAllocs` (everything host code allocated, and every result handed back to it, since the last fully quiescent
+  // collection) -- see collectGarbage. Event boundaries keep the strict check.
+  if (safepoint) return null;
+  if (runtime.depth > 0) return 'dispatch-in-flight';   // gcSafeDepth: the outermost dispatch of a known entry point (launch, a pumped event) whose JavaScript callers hold only rooted values
+  if (runtime.nestedRuns > 0) return 'nested-run';   // a safepoint is inside the one scheduling run that owns the JavaScript stack
+  if (runtime.initDepth && !safepoint) return 'class-initializer-running';   // at a safepoint the <clinit> frames are on a thread stack (roots); the initialization bookkeeping lives in rooted runtime tables
   const scheduler = runtime.scheduler;
-  if (scheduler) { if (scheduler.waitingNested?.size) return 'host-wait-in-flight'; for (const thread of scheduler.threads) if (thread.nestedDepth > 0 || thread.nestedBlock) return 'host-wait-in-flight'; }   // Scheduler.resolveNested: a host call (a native, a class initializer) is parked on the JS stack and may hold raw ids
+  if (scheduler) { if (scheduler.waitingNested?.size) return 'host-wait-in-flight'; { const allowed = safepoint ? (runtime.gcSafeDepth ?? 0) : 0; for (const thread of scheduler.threads) if (thread.nestedDepth > allowed || thread.nestedBlock) return 'host-wait-in-flight'; } }   // Scheduler.resolveNested: a host call (a native, a class initializer) is parked on the JS stack and may hold raw ids
   if (!safepoint && runtime.thread?.frames?.length) return 'main-thread-running';   // at a safepoint every frame is a root through the scheduler
   return null;
 }
@@ -86,7 +90,7 @@ const REFERENT_KEY = 'Ljava/lang/ref/Reference;->referent:Ljava/lang/Object;', Q
 export function createMarker(runtime) {
   const heap = runtime.heap, weakIds = [], weakTypes = new Map(), weakMaps = [], traced = new WeakSet();
   /** java.lang.ref.WeakReference and its subclasses (WeakHashMap entries, ThreadLocal map entries ...): the referent does not keep its object alive. SoftReference and PhantomReference stay strong. */
-  const isWeak = type => { let weak = weakTypes.get(type); if (weak === undefined) { try { weak = type === 'Ljava/lang/ref/WeakReference;' || runtime.isSubtype(type, 'Ljava/lang/ref/WeakReference;'); } catch { weak = false; } weakTypes.set(type, weak); } return weak; };
+  const isWeak = type => { let weak = weakTypes.get(type); if (weak === undefined) { weak = false; if (type.charCodeAt(0) === 76) try { for (let at = type, depth = 0; at && depth < 64; at = runtime.parent(at), depth++) if (at === 'Ljava/lang/ref/WeakReference;') { weak = true; break; } } catch { weak = false; } /* walks the superclass chain: runtime.isSubtype would memoize every type the collector meets */ weakTypes.set(type, weak); } return weak; };
   const limit = runtime.nextId, marked = new Uint8Array(limit), worklist = [];
   const visited = new WeakSet(), stack = [];
   // The big tables are skipped by identity, not only by property name: a back-reference (jni.runtime, platform.runtime) reaches the runtime object from another root and would otherwise walk
@@ -171,6 +175,10 @@ export function collectGarbage(runtime, { audit = globalThis.process?.env?.APKWE
     if (item !== null && typeof item === 'object') scan(item); else if (typeof item === 'number' && idLike(key, item)) markId(item);
   }
   runtime.scheduler?.enumerateRoots?.(item => scan(item));
+  // Host code up the JavaScript stack (a native that called back into Java, a class initializer, a nested wait) may hold values no Java frame references: what host code allocated and every result
+  // handed back to it since the last fully quiescent collection stay alive. Outside a safepoint nothing is in flight and the set is dropped.
+  const stackQuiet = runtime.depth === 0 && runtime.nestedRuns <= 1 && !runtime.initDepth && !runtime.scheduler?.waitingNested?.size && !runtime.scheduler?.threads.some(thread => thread.nestedDepth > 0 || thread.nestedBlock);
+  if (!safepoint || stackQuiet) runtime.hostAllocs.clear(); else for (const id of runtime.hostAllocs) markId(id);
   for (const weak of tracked) { const container = weak.deref(); if (container === undefined) tracked.delete(weak); else scan(container); }
   if (extraRoots) { const values = typeof extraRoots === 'function' ? extraRoots() : extraRoots; for (const item of values ?? []) scan(item); }
   // Heap closure: scan each reachable record's own state.
@@ -225,7 +233,10 @@ export function collectGarbage(runtime, { audit = globalThis.process?.env?.APKWE
 }
 
 /** True when a pressure-driven collection (thread-switch safepoint, event boundary) may run now: enough was allocated since the last one, and the heap passed the threshold or a native resource asked for it. */
-export function collectionDue(runtime, threshold = Math.floor(runtime.maxHeapObjects * 0.5)) {
+/** The first collection waits until the live heap passes this share of the object limit (then the hysteresis below applies). With the memory-budget limit (hundreds of thousands of objects) half the limit is
+ *  already ~500 MiB of host memory, so garbage must be collected earlier: a quarter of the limit. */
+export const GC_START_FRACTION = 0.25;
+export function collectionDue(runtime, threshold = Math.floor(runtime.maxHeapObjects * GC_START_FRACTION)) {
   const wait = Math.min(runtime.gcMinAlloc ?? 0, Math.max(64, (runtime.maxHeapObjects - runtime.heap.size) >> 1)), allocated = runtime.nextId - (runtime.gcLastNextId ?? 0);   // never wait past half the remaining headroom
   if (runtime.gcPressure) return allocated >= Math.min(wait, Math.max(1024, wait >> 2));   // a native resource count asked for it (regex handles are capped at 16384): wait less, but not for every quantum
   return allocated >= wait && runtime.heap.size >= Math.max(threshold, runtime.gcNextAt ?? 0);
@@ -235,7 +246,7 @@ export function collectionDue(runtime, threshold = Math.floor(runtime.maxHeapObj
 export function maybeCollect(runtime, options = {}) {
   const audit = options.audit ?? globalThis.process?.env?.APKWEB_GC_AUDIT === '1';
   if (!audit && !runtime.gcEnabled) return { collected: false, reason: 'disabled', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // opt-in until the audit suites are clean
-  const threshold = options.threshold ?? Math.floor(runtime.maxHeapObjects * 0.5);
+  const threshold = options.threshold ?? Math.floor(runtime.maxHeapObjects * GC_START_FRACTION);
   // Audit mode collects after every event that allocated at least APKWEB_GC_AUDIT_MIN (default 200) objects: a collection scans the whole live graph (~100 ms), and an event that allocates fewer
   // objects cannot have dropped a root; skipping them keeps full-suite audits to minutes instead of hours.
   if (audit && runtime.nextId - (runtime.gcLastNextId ?? 0) < Number(globalThis.process?.env?.APKWEB_GC_AUDIT_MIN ?? 200)) return { collected: false, reason: 'audit-small-event', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };

@@ -146,8 +146,8 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         case 0x1f: return `{ const v = r[${a}]; if (v !== null && v !== 0 && !rt.isSubtype(rt.typeOf(v), T[${u[pc + 1]}])) H.castFail(rt, v, T[${u[pc + 1]}]); }`;
         case 0x20: return `{ const v = r[${hi}]; r[${lo}] = v !== null && v !== 0 && rt.isSubtype(rt.typeOf(v), T[${u[pc + 1]}]) ? 1 : 0; }`;
         case 0x21: return `r[${lo}] = rt.array(r[${hi}]).elements.length;`;
-        case 0x22: return `r[${a}] = rt.allocate(T[${u[pc + 1]}]);`;
-        case 0x23: return `r[${lo}] = rt.newArray(T[${u[pc + 1]}], r[${hi}] | 0);`;
+        case 0x22: return `rt.bytecodeAlloc = true; try { r[${a}] = rt.allocate(T[${u[pc + 1]}]); } finally { rt.bytecodeAlloc = false; }`;
+        case 0x23: return `rt.bytecodeAlloc = true; try { r[${lo}] = rt.newArray(T[${u[pc + 1]}], r[${hi}] | 0); } finally { rt.bytecodeAlloc = false; }`;
         case 0x28: return jump(pc, pc + signed8(a));
         case 0x29: return jump(pc, pc + signed16(u[pc + 1]));
         case 0x2a: return jump(pc, pc + (u[pc + 1] | (u[pc + 2] << 16)));
