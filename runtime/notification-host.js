@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=ef714893ba48';
-import { createHostRegistry } from './host-contract.js?v=ef714893ba48';
+import { APKError } from './apk-error.js?v=6ef5184e1cfd';
+import { createHostRegistry } from './host-contract.js?v=6ef5184e1cfd';
 
 // android.app.Notification, Notification.Builder / Action / BigTextStyle / BigPictureStyle / InboxStyle, NotificationChannel and android.graphics.drawable.Icon (android-13.0.0_r1).
 // None of these is in the framework DEX. The Builder is a recorder, exactly as in Notification.java: every setter stores a value and build() writes the public fields of
@@ -154,11 +154,13 @@ export function createNotificationHost(platform) {
   def(ACTION_BUILDER, 'setAllowGeneratedReplies', `(Z)${ACTION_BUILDER}`, (r, _m, [self, v]) => { r.object(self).actionBuilder.allowGenerated = !!v; return self; });
   def(ACTION_BUILDER, 'setSemanticAction', `(I)${ACTION_BUILDER}`, (r, _m, [self, v]) => { r.object(self).actionBuilder.semantic = v; return self; });
   def(ACTION_BUILDER, 'setContextual', `(Z)${ACTION_BUILDER}`, (r, _m, [self, v]) => { r.object(self).actionBuilder.contextual = !!v; return self; });
+  def(ACTION_BUILDER, 'setAuthenticationRequired', `(Z)${ACTION_BUILDER}`, (r, _m, [self, v]) => { r.object(self).actionBuilder.authenticationRequired = !!v; return self; });   // Notification.Action.Builder (API 31)
   def(ACTION_BUILDER, 'build', `()${ACTION}`, (r, _m, [self]) => {
     const b = r.object(self).actionBuilder, ref = r.allocate(ACTION); r.object(ref).action = { ...b, extras: b.extras ?? platform.bundle(r), remoteInputs: b.remoteInputs ?? [] };
     r.storeField(r.object(ref).fields, ACTION_KEY('icon:I'), b.icon); r.storeField(r.object(ref).fields, ACTION_KEY(`title:${CHARS}`), b.title); r.storeField(r.object(ref).fields, ACTION_KEY(`actionIntent:${PENDING}`), b.intent); return ref;
   });
   def(ACTION, 'getExtras', `()${BUNDLE}`, (r, _m, [self]) => actionState(r, self).extras); def(ACTION, 'getTitle', `()${CHARS}`, (r, _m, [self]) => actionState(r, self).title); def(ACTION, 'getIcon', `()${ICON}`, (r, _m, [self]) => actionState(r, self).iconObject ?? null);
+  def(ACTION, 'isAuthenticationRequired', '()Z', (r, _m, [self]) => (actionState(r, self).authenticationRequired ? 1 : 0));
   def(ACTION, 'getAllowGeneratedReplies', '()Z', (r, _m, [self]) => actionState(r, self).allowGenerated ? 1 : 0); def(ACTION, 'getSemanticAction', '()I', (r, _m, [self]) => actionState(r, self).semantic); def(ACTION, 'isContextual', '()Z', (r, _m, [self]) => actionState(r, self).contextual ? 1 : 0);
   def(ACTION, 'getRemoteInputs', '()[Landroid/app/RemoteInput;', (r, _m, [self]) => { const inputs = actionState(r, self).remoteInputs; if (!inputs?.length) return null; const array = r.newArray('[Landroid/app/RemoteInput;', inputs.length); r.array(array).elements = [...inputs]; return array; });
   for (const [name, value] of Object.entries({ SEMANTIC_ACTION_NONE: 0, SEMANTIC_ACTION_REPLY: 1, SEMANTIC_ACTION_MARK_AS_READ: 2, SEMANTIC_ACTION_MARK_AS_UNREAD: 3, SEMANTIC_ACTION_DELETE: 4, SEMANTIC_ACTION_ARCHIVE: 5, SEMANTIC_ACTION_MUTE: 6, SEMANTIC_ACTION_UNMUTE: 7, SEMANTIC_ACTION_THUMBS_UP: 8, SEMANTIC_ACTION_THUMBS_DOWN: 9, SEMANTIC_ACTION_CALL: 10 })) registry.staticField(ACTION, name, 'I', () => value);

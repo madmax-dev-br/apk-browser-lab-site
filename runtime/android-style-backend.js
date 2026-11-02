@@ -1,6 +1,6 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=ef714893ba48';
-import { APKError } from './apk-runtime.js?v=ef714893ba48';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=ef714893ba48';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=6ef5184e1cfd';
+import { APKError } from './apk-runtime.js?v=6ef5184e1cfd';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=6ef5184e1cfd';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -8,7 +8,7 @@ const empty = value => value == null || value === 0;
 export const STYLE_METHODS = new Set();
 const add = (owner, methods) => methods.forEach(method => STYLE_METHODS.add(`${owner}->${method}`));
 for (const owner of ['Landroid/content/Context;', 'Landroid/content/ContextWrapper;', 'Landroid/view/ContextThemeWrapper;', 'Landroid/app/Activity;', 'Landroid/app/Application;']) add(owner, ['getDrawable(I)Landroid/graphics/drawable/Drawable;', 'getTheme()Landroid/content/res/Resources$Theme;', 'setTheme(I)V', 'obtainStyledAttributes([I)Landroid/content/res/TypedArray;', 'obtainStyledAttributes(I[I)Landroid/content/res/TypedArray;', 'obtainStyledAttributes(Landroid/util/AttributeSet;[I)Landroid/content/res/TypedArray;', 'obtainStyledAttributes(Landroid/util/AttributeSet;[III)Landroid/content/res/TypedArray;']);
-add(RESOURCES, ['getDrawable(I)Landroid/graphics/drawable/Drawable;', 'getDrawable(ILandroid/content/res/Resources$Theme;)Landroid/graphics/drawable/Drawable;', 'getDrawableForDensity(II)Landroid/graphics/drawable/Drawable;', 'getDrawableForDensity(IILandroid/content/res/Resources$Theme;)Landroid/graphics/drawable/Drawable;', 'loadDrawable(Landroid/util/TypedValue;IILandroid/content/res/Resources$Theme;)Landroid/graphics/drawable/Drawable;', 'loadComplexColor(Landroid/util/TypedValue;ILandroid/content/res/Resources$Theme;)Landroid/content/res/ComplexColor;', 'loadColorStateList(Landroid/util/TypedValue;ILandroid/content/res/Resources$Theme;)Landroid/content/res/ColorStateList;', 'getColorStateList(I)Landroid/content/res/ColorStateList;', 'getColorStateList(ILandroid/content/res/Resources$Theme;)Landroid/content/res/ColorStateList;', 'obtainAttributes(Landroid/content/res/Resources;Landroid/content/res/Resources$Theme;Landroid/util/AttributeSet;[I)Landroid/content/res/TypedArray;', 'getValue(ILandroid/util/TypedValue;Z)V', 'getValueForDensity(IILandroid/util/TypedValue;Z)V', 'getAssets()Landroid/content/res/AssetManager;', 'newTheme()Landroid/content/res/Resources$Theme;', 'obtainAttributes(Landroid/util/AttributeSet;[I)Landroid/content/res/TypedArray;']);
+add(RESOURCES, ['obtainTypedArray(I)Landroid/content/res/TypedArray;', 'getDrawable(I)Landroid/graphics/drawable/Drawable;', 'getDrawable(ILandroid/content/res/Resources$Theme;)Landroid/graphics/drawable/Drawable;', 'getDrawableForDensity(II)Landroid/graphics/drawable/Drawable;', 'getDrawableForDensity(IILandroid/content/res/Resources$Theme;)Landroid/graphics/drawable/Drawable;', 'loadDrawable(Landroid/util/TypedValue;IILandroid/content/res/Resources$Theme;)Landroid/graphics/drawable/Drawable;', 'loadComplexColor(Landroid/util/TypedValue;ILandroid/content/res/Resources$Theme;)Landroid/content/res/ComplexColor;', 'loadColorStateList(Landroid/util/TypedValue;ILandroid/content/res/Resources$Theme;)Landroid/content/res/ColorStateList;', 'getColorStateList(I)Landroid/content/res/ColorStateList;', 'getColorStateList(ILandroid/content/res/Resources$Theme;)Landroid/content/res/ColorStateList;', 'obtainAttributes(Landroid/content/res/Resources;Landroid/content/res/Resources$Theme;Landroid/util/AttributeSet;[I)Landroid/content/res/TypedArray;', 'getValue(ILandroid/util/TypedValue;Z)V', 'getValueForDensity(IILandroid/util/TypedValue;Z)V', 'getAssets()Landroid/content/res/AssetManager;', 'newTheme()Landroid/content/res/Resources$Theme;', 'obtainAttributes(Landroid/util/AttributeSet;[I)Landroid/content/res/TypedArray;']);
 add(RESOURCES, ['selectDefaultTheme(II)I','selectSystemTheme(IIIIII)I']);
 add(RESOURCES, ['getAnimation(I)Landroid/content/res/XmlResourceParser;','getAnimatorCache()Landroid/content/res/ConfigurationBoundResourceCache;','getStateListAnimatorCache()Landroid/content/res/ConfigurationBoundResourceCache;','getDrawableInflater()Landroid/graphics/drawable/DrawableInflater;']);
 add(THEME, ['rebase()V','getKey()Landroid/content/res/Resources$ThemeKey;','applyStyle(IZ)V', 'setTo(Landroid/content/res/Resources$Theme;)V', 'getResources()Landroid/content/res/Resources;', 'resolveAttribute(ILandroid/util/TypedValue;Z)Z', 'obtainStyledAttributes([I)Landroid/content/res/TypedArray;', 'obtainStyledAttributes(I[I)Landroid/content/res/TypedArray;', 'obtainStyledAttributes(Landroid/util/AttributeSet;[III)Landroid/content/res/TypedArray;']);
@@ -130,6 +130,23 @@ export class AndroidStyleBackend {
     runtime.record(`RESOURCE styled attributes ${requested.length} (${indices[0]} present; original data)`);
     return array;
   }
+  /** Resources.obtainTypedArray(id) over an <array> / <string-array> / <integer-array> / <array> of @references bag (ResourcesImpl.obtainTypedArray): one 7-int record per item, references resolved. */
+  obtainResourceArray(runtime, id) {
+    if (!runtime.classes.has(TYPED_ARRAY)) fail('Original AOSP TypedArray DEX is required; no JS getter substitute is installed');
+    const bag = this.platform.resources.resolve(id);
+    if (bag.kind !== 'bag') runtime.throwJava('Landroid/content/res/Resources$NotFoundException;', `Array resource ID #0x${(id >>> 0).toString(16)}`);
+    const resources = this.resourceObject(runtime), items = bag.items;
+    const array = runtime.dispatch({ owner: TYPED_ARRAY, name: 'obtain', signature: '(Landroid/content/res/Resources;I)Landroid/content/res/TypedArray;', parameters: [RESOURCES, 'I'], result: TYPED_ARRAY }, [resources, items.length], 'static');
+    const data = runtime.array(this.get(runtime, array, TYPED_ARRAY, 'mData', '[I')).elements, indices = runtime.array(this.get(runtime, array, TYPED_ARRAY, 'mIndices', '[I')).elements;
+    data.fill(0); indices.fill(0);
+    items.forEach((original, index) => {
+      const value = this.resolved(original, new Map(), true), at = index * 7, cookie = value.sourceCookie ?? original.sourceCookie ?? 1;
+      data[at] = value.dataType || 0; data[at + 1] = value.rawData | 0; data[at + 2] = cookie; data[at + 3] = value.resourceId || 0; data[at + 4] = value.changingConfigurations || 0; data[at + 5] = value.density || 0; data[at + 6] = value.sourceResourceId || 0;
+      if (value.dataType === 3) { if (!this.poolStrings.has(cookie)) this.poolStrings.set(cookie, new Map()); this.poolStrings.get(cookie).set(value.rawData, value.value); }
+      if (value.dataType || value.rawData === 1) indices[++indices[0]] = index;
+    });
+    return array;
+  }
   loadColor(runtime, id, theme, suppliedValue = null) {
     const COLOR = 'Landroid/content/res/ColorStateList;';
     if (!runtime.classes.has(COLOR)) fail('Original AOSP ColorStateList DEX is required');
@@ -212,6 +229,7 @@ export class AndroidStyleBackend {
       }
       if (name === 'loadDrawable') return this.loadDrawable(runtime, args[2], args[4], args[3], args[1]);
       if (name === 'getDrawable' || name === 'getDrawableForDensity') return this.loadDrawable(runtime, args[1], name === 'getDrawable' ? args[2] : args[3], name === 'getDrawable' ? 0 : args[2]);
+      if (name === 'obtainTypedArray') return this.obtainResourceArray(runtime, args[1]);
       if (name === 'obtainAttributes' && method.parameters[0] === RESOURCES) return this.obtain(runtime, args[1], args[2], args[3], 0, 0, 0, !empty(args[1]));
       if (name === 'loadComplexColor' || name === 'loadColorStateList' || name === 'getColorStateList') return this.loadColor(runtime, name.startsWith('get') ? args[1] : args[2], name.startsWith('get') ? args[2] : args[3], name.startsWith('get') ? null : args[1]);
       if (name === 'getValue' || name === 'getValueForDensity') { const id = args[1] >>> 0, out = name === 'getValue' ? args[2] : args[3], resolve = !!(name === 'getValue' ? args[3] : args[4]); const table = (id >>> 24) === 1 ? this.platform.resources.frameworkTable || this.platform.resources.table : this.platform.resources.table; const raw = table.selectVariant(id); let value = resolve ? this.platform.resources.resolve(id) : raw; if (!value) fail(`Raw resource unavailable 0x${id.toString(16)}`); while (value.resolved) value = value.resolved; if (value.kind === 'unresolved') fail(value.reason); this.typedValue(runtime, out, { ...value, resourceId: id }); return; }

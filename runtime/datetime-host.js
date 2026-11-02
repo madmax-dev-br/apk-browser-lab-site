@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=ef714893ba48';
-import { gcRoot } from './heap-gc.js?v=ef714893ba48';
-import { createHostRegistry, parseSignature } from './host-contract.js?v=ef714893ba48';
-import { JavaException } from './apk-runtime.js?v=ef714893ba48';
+import { APKError } from './apk-error.js?v=6ef5184e1cfd';
+import { gcRoot } from './heap-gc.js?v=6ef5184e1cfd';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=6ef5184e1cfd';
+import { JavaException } from './apk-runtime.js?v=6ef5184e1cfd';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).
@@ -228,6 +228,10 @@ export function createDateTimeHost(platform) {
   def(SDF, 'setTimeZone', `(${ZONE})V`, (r, _m, [self, z]) => { sdf(r, self).zone = zid(r, z); }); def(SDF, 'getTimeZone', `()${ZONE}`, (r, _m, [self]) => zone(r, sdf(r, self).zone));
   def(SDF, 'setLenient', '(Z)V', (r, _m, [self, v]) => { sdf(r, self).lenient = !!v; }); def(SDF, 'isLenient', '()Z', (r, _m, [self]) => sdf(r, self).lenient ? 1 : 0);
   def(SDF, 'toPattern', `()${STRING}`, (r, _m, [self]) => sdf(r, self).pattern);
+  // SimpleDateFormat.equals / hashCode / clone: same pattern, locale data, zone and leniency (hashCode is the pattern's, as in the original); clone copies the state
+  def(SDF, 'equals', `(${OBJECT})Z`, (r, _m, [self, o]) => { if (self === o) return 1; if (o === null || typeof o !== 'object' || !r.object(o).sdf || r.typeOf(o) !== r.typeOf(self)) return 0; const a = sdf(r, self), b = sdf(r, o); return a.pattern === b.pattern && a.zone === b.zone && a.lenient === b.lenient && a.tag === b.tag ? 1 : 0; });
+  def(SDF, 'hashCode', '()I', (r, _m, [self]) => { let h = 0; for (const ch of sdf(r, self).pattern) h = (Math.imul(31, h) + ch.charCodeAt(0)) | 0; return h; });
+  def(SDF, 'clone', `()${OBJECT}`, (r, _m, [self]) => { const copy = r.allocate(r.typeOf(self)); r.object(copy).sdf = { ...sdf(r, self) }; return copy; });
   const intlName = (tag, id, t, options) => new Intl.DateTimeFormat(tag, { timeZone: id === 'GMT' ? 'UTC' : /^GMT[+-]/.test(id) ? 'UTC' : id, ...options }).format(new Date(t));
   function formatDate(r, f, t) {
     const p = parts(t, f.zone), o = offsetOf(f.zone, t); let out = '';

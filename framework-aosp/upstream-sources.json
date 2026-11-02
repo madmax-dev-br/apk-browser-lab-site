@@ -30145,5 +30145,25 @@
     "sha256": "386bccde0f7f39e957a1d16329486093b98a0fabac484659022f93c1ac77c19c",
     "bytes": 63026,
     "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/text/Annotation.java",
+    "localPath": "framework-aosp/upstream/android/text/Annotation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/Annotation.java?format=TEXT",
+    "sha256": "3dc8bcd47e7321942589b01476d16fae497db51bc87fa0984cd9e07c7ed6df27",
+    "bytes": 1841,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/app/AppComponentFactory.java",
+    "localPath": "framework-aosp/upstream/android/app/AppComponentFactory.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/AppComponentFactory.java?format=TEXT",
+    "sha256": "a8ae267434bd84dad61b1196218c1d01b43835b4030b8d357f68b074cdbcfb13",
+    "bytes": 7026,
+    "license": "Apache-2.0"
   }
 ]

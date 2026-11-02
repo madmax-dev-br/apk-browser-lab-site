@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 7813976,
-  "sha256": "931dfe04f35a7f68f36068814dfd13f01433b9c3d77f38e9830ba767767f1a89",
-  "classCount": 5918,
+  "bytes": 7815996,
+  "sha256": "d61c703660cc8d113bde305b112f3829fdbb59056d9758dc6ba88ce4fe0a619f",
+  "classCount": 5921,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -610,6 +610,7 @@
     "Landroid/animation/ValueAnimator$AnimatorUpdateListener;",
     "Landroid/animation/ValueAnimator$DurationScaleChangeListener;",
     "Landroid/animation/ValueAnimator$RepeatMode;",
+    "Landroid/app/AppComponentFactory;",
     "Landroid/app/ApplicationExitInfo$1;",
     "Landroid/app/ApplicationExitInfo$Reason;",
     "Landroid/app/ApplicationExitInfo$SubReason;",
@@ -1610,6 +1611,8 @@
     "Landroid/system/keystore2/ResponseCode;",
     "Landroid/text/AndroidBidi;",
     "Landroid/text/AndroidCharacter;",
+    "Landroid/text/ParcelableSpan;",
+    "Landroid/text/Annotation;",
     "Landroid/text/AutoGrowArray$ByteArray;",
     "Landroid/text/AutoGrowArray$FloatArray;",
     "Landroid/text/AutoGrowArray$IntArray;",
@@ -1672,7 +1675,6 @@
     "Landroid/text/MeasuredParagraph;",
     "Landroid/text/NoCopySpan;",
     "Landroid/text/NoCopySpan$Concrete;",
-    "Landroid/text/ParcelableSpan;",
     "Landroid/text/PrecomputedText$ParagraphInfo;",
     "Landroid/text/PrecomputedText$Params$Builder;",
     "Landroid/text/PrecomputedText$Params$CheckResultUsableResult;",
@@ -3921,6 +3923,7 @@
     "Ljava/util/PrimitiveIterator$OfInt;",
     "Ljava/lang/CharSequence$1CharIterator;",
     "Ljava/lang/CharSequence$1CodePointIterator;",
+    "Ljava/lang/ClassValue;",
     "Ljava/lang/FindBugsSuppressWarnings;",
     "Ljava/lang/Process;",
     "Ljava/lang/ProcessBuilder$1;",
@@ -36709,6 +36712,26 @@
       "sha256": "386bccde0f7f39e957a1d16329486093b98a0fabac484659022f93c1ac77c19c",
       "bytes": 63026,
       "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/text/Annotation.java",
+      "localPath": "framework-aosp/upstream/android/text/Annotation.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/text/Annotation.java?format=TEXT",
+      "sha256": "3dc8bcd47e7321942589b01476d16fae497db51bc87fa0984cd9e07c7ed6df27",
+      "bytes": 1841,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/app/AppComponentFactory.java",
+      "localPath": "framework-aosp/upstream/android/app/AppComponentFactory.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/AppComponentFactory.java?format=TEXT",
+      "sha256": "a8ae267434bd84dad61b1196218c1d01b43835b4030b8d357f68b074cdbcfb13",
+      "bytes": 7026,
+      "license": "Apache-2.0"
     }
   ],
   "algorithmPatches": [],
@@ -37267,6 +37290,10 @@
       {
         "path": "framework-aosp/lab-java/dev/apkweb/view/WindowInsetsHidden.java",
         "sha256": "675c33f74d567c3e5806db6f492e98329f83be8017baba5ceb588a7a3faade8c"
+      },
+      {
+        "path": "framework-aosp/lab-java/java/lang/ClassValue.java",
+        "sha256": "85f5055b9ab383247e7a71bde75231cfef54516341ab75423e6f5679e302f422"
       },
       {
         "path": "framework-aosp/lab-java/java/time/zone/IcuZoneRulesProvider.java",

@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=ef714893ba48';
+import { createHostRegistry } from './host-contract.js?v=6ef5184e1cfd';
 
 // The system-manager methods an ordinary app calls that the first host passes left out, for a one-user, unmanaged, unlocked phone without fingerprint hardware or thermal HAL
 // (android-13.0.0_r1 UserManager / UserManagerService, KeyguardManager / PhoneWindowManager, PowerManager / ThermalManagerService, FingerprintManager):
@@ -344,5 +344,16 @@ export function createManagersExtrasHost(platform) {
     return `StatusBarNotification(pkg=${s.pkg} user=${text(s.user)} id=${s.id} tag=${s.tag} key=${s.key}: ${text(s.notification)})`;
   });
   def(SBN, 'describeContents', '()I', () => 0);
+
+  // ---- Legacy GpsStatus (GpsStatus.java / LocationManager.getGpsStatus, android-13.0.0_r1). The virtual device has no GNSS hardware, so LocationManager has no GnssStatus: getGpsStatus returns the
+  // given GpsStatus unchanged or a new empty one ("legacy behavior was to always return a GpsStatus instance"), which reports no satellites and no time to first fix.
+  const GPS_STATUS = 'Landroid/location/GpsStatus;', GPS_SATELLITE = 'Landroid/location/GpsSatellite;', LOCATION_MANAGER = 'Landroid/location/LocationManagerImpl;';
+  type(GPS_STATUS, 'Ljava/lang/Object;', [], { allocatable: true }); type(GPS_SATELLITE, 'Ljava/lang/Object;', [], { allocatable: true });
+  for (const [name, value] of Object.entries({ GPS_EVENT_STARTED: 1, GPS_EVENT_STOPPED: 2, GPS_EVENT_FIRST_FIX: 3, GPS_EVENT_SATELLITE_STATUS: 4 })) registry.staticField(GPS_STATUS, name, 'I', () => value);
+  def(LOCATION_MANAGER, 'getGpsStatus', `(${GPS_STATUS})${GPS_STATUS}`, (r, _m, [, status]) => (nullish(status) ? r.allocate(GPS_STATUS) : status));
+  def(GPS_STATUS, 'getTimeToFirstFix', '()I', () => 0); def(GPS_STATUS, 'getMaxSatellites', '()I', () => 0);
+  def(GPS_STATUS, 'getSatellites', '()Ljava/lang/Iterable;', r => r.dispatch({ owner: 'Ljava/util/Collections;', name: 'emptyList', parameters: [], result: 'Ljava/util/List;', signature: '()Ljava/util/List;' }, [], 'static'));
+  // GpsSatellite instances exist only inside a GpsStatus with satellites, and this device reports none; the accessors answer the zero state of an unused record
+  for (const [name, result] of [['getPrn', 'I'], ['getSnr', 'F'], ['getElevation', 'F'], ['getAzimuth', 'F'], ['hasEphemeris', 'Z'], ['hasAlmanac', 'Z'], ['usedInFix', 'Z']]) def(GPS_SATELLITE, name, `()${result}`, () => 0);
   return { ...registry };
 }

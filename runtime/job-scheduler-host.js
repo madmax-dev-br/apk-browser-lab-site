@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=ef714893ba48';
-import { createHostRegistry } from './host-contract.js?v=ef714893ba48';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ef714893ba48';
+import { APKError } from './apk-error.js?v=6ef5184e1cfd';
+import { createHostRegistry } from './host-contract.js?v=6ef5184e1cfd';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=6ef5184e1cfd';
 
 // android.app.job: JobScheduler, JobInfo (+ Builder), JobParameters and the JobService base class, with the scheduling rules of Android 13's JobSchedulerService for the
 // constraints a virtual device can answer. AOSP references: frameworks/base/apex/jobscheduler (JobSchedulerService.validateJob, JobStatus.isReady / wouldBeReadyWithConstraint,

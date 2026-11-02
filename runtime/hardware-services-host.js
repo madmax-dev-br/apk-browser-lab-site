@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=ef714893ba48';
-import { gcRoot } from './heap-gc.js?v=ef714893ba48';
-import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=ef714893ba48';
-import { createHostRegistry } from './host-contract.js?v=ef714893ba48';
-import { GC_ROOTS } from './heap-gc.js?v=ef714893ba48';
+import { APKError } from './apk-error.js?v=6ef5184e1cfd';
+import { gcRoot } from './heap-gc.js?v=6ef5184e1cfd';
+import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=6ef5184e1cfd';
+import { createHostRegistry } from './host-contract.js?v=6ef5184e1cfd';
+import { GC_ROOTS } from './heap-gc.js?v=6ef5184e1cfd';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
 // contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes, and an AlarmManager that
