@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=ab5660c71041';
-import { APKError } from './apk-error.js?v=ab5660c71041';
-import { gcRoot } from './heap-gc.js?v=ab5660c71041';
+import { createHostRegistry } from './host-contract.js?v=2d90c3b6b8c1';
+import { APKError } from './apk-error.js?v=2d90c3b6b8c1';
+import { gcRoot } from './heap-gc.js?v=2d90c3b6b8c1';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -560,7 +560,7 @@ export function createActivityApiHost(platform) {
   defContext('sendStickyOrderedBroadcastAsUser', `(${INTENT}Landroid/os/UserHandle;Landroid/content/BroadcastReceiver;Landroid/os/Handler;I${STRING}${BUNDLE})V`, (r, _m, [self, intent, , receiver, handler, code, data, extras]) => { stick(r, intent); ordered(r, self, intent, receiver, handler, code, data, extras); });
   // Starting / stopping services and activities through the Context.
   defContext('startActivity', `(${INTENT}${BUNDLE})V`, (r, _m, [self, intent]) => call(r, self, CONTEXT, 'startActivity', [INTENT], 'V', [intent]));
-  defContext('startActivities', `([${INTENT})V`, (r, _m, [self, intents]) => { for (const intent of r.array(intents).elements) call(r, self, CONTEXT, 'startActivity', [INTENT], 'V', [intent]); });
+  defContext('startActivities', `([${INTENT})V`, (r, _m, [self, intents]) => { platform.startBatch(() => { for (const intent of r.array(intents).elements) call(r, self, CONTEXT, 'startActivity', [INTENT], 'V', [intent]); }); });
   defContext('startActivities', `([${INTENT}${BUNDLE})V`, (r, _m, [self, intents]) => call(r, self, CONTEXT, 'startActivities', [`[${INTENT}`], 'V', [intents]));
   defContext('bindService', `(${INTENT}ILjava/util/concurrent/Executor;Landroid/content/ServiceConnection;)Z`, (r, _m, [self, intent, flags, , connection]) => call(r, self, CONTEXT, 'bindService', [INTENT, 'Landroid/content/ServiceConnection;', 'I'], 'Z', [intent, connection, flags]));
   defContext('bindIsolatedService', `(${INTENT}I${STRING}Ljava/util/concurrent/Executor;Landroid/content/ServiceConnection;)Z`, (r, _m, [self, intent, flags, , , connection]) => call(r, self, CONTEXT, 'bindService', [INTENT, 'Landroid/content/ServiceConnection;', 'I'], 'Z', [intent, connection, flags]));

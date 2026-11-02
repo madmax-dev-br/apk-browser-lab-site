@@ -82,7 +82,7 @@ export class ActivityStarter {
     }
   }
 
-  start(runtime, intentObject, target, sourceFrame, { resultCaller = null, requestCode = -1, fromActivity = true } = {}) {
+  start(runtime, intentObject, target, sourceFrame, { resultCaller = null, requestCode = -1, fromActivity = true, forward = null } = {}) {
     const p = this.p, intent = intentObject, info = p.activityInfo(target);
     let flags = intent.flags | 0;
     // ActivityStarter.adjustLaunchFlagsToDocumentMode (documents are approximated as NEW_TASK launches, see activityInfoOf).
@@ -100,7 +100,8 @@ export class ActivityStarter {
     let receiver = requestCode >= 0 && resultCaller && source && !source.finishing && !source.finishRequested ? frameOfActivity(resultCaller) : null, code = receiver ? requestCode : -1;
     if ((flags & FLAG.FORWARD_RESULT) !== 0 && source) {
       if (requestCode >= 0) p.throwAndroidRuntime(runtime, 'FORWARD_RESULT_FLAG used while also requesting a result');
-      receiver = frameOfActivity(source.resultReceiver); code = receiver ? source.resultRequestCode : -1; source.resultReceiver = null; source.resultRequestCode = -1;
+      const forwarded = forward ?? { receiver: source.resultReceiver, code: source.resultRequestCode };
+      receiver = frameOfActivity(forwarded.receiver); code = receiver ? forwarded.code : -1; source.resultReceiver = null; source.resultRequestCode = -1;
     }
     const noHistory = (flags & FLAG.NO_HISTORY) !== 0 || info.noHistory;
     const sourceTask = source ? p.taskOf(source) : null;
@@ -168,6 +169,7 @@ export class ActivityStarter {
       const deferred = [];
       for (const frame of plan.finish) {
         if (frame === previous) { frame.finishing = true; deferred.push(frame); continue; }
+        if (frame.lifecycleDepth > 0) { frame.finishRequested = true; continue; }   // one of its callbacks is on the stack: it is torn down when the callback returns
         p.retireFrame(runtime, frame);
       }
       const transition = { kind: 'open', animated: (flags & FLAG.NO_ANIMATION) === 0, from: source?.type ?? null, to: target };
@@ -192,7 +194,7 @@ export class ActivityStarter {
         p.createInstance(runtime, target, delivered, task, { resultReceiver: plan.receiver ? plan.receiver.activity : null, requestCode: plan.code, flags, noHistory: plan.noHistory });
       }
       // The Activity that was on top is no longer visible: onStop (noHistory Activities finish with it); one the launch finishes is torn down now.
-      if (previous && plan.deliver !== previous && !deferred.includes(previous) && p.allFrames().includes(previous)) p.stopFrame(runtime, previous);
+      if (previous && plan.deliver !== previous && !deferred.includes(previous) && p.allFrames().includes(previous) && previous.lifecycleStage !== 4 && p.tasks.at(-1)?.frames.at(-1) !== previous) p.stopFrame(runtime, previous);
       for (const frame of deferred) {
         if (frame.lifecycleDepth > 0) { frame.finishing = false; frame.finishRequested = true; continue; }   // inside its own callback: ActivityThread finishes it when the callback returns
         if (p.allFrames().includes(frame)) p.retireFrame(runtime, frame);

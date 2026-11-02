@@ -1,23 +1,23 @@
-import { VMClock } from './vm-clock.js?v=ab5660c71041';
-import { ExecutionProfile } from './execution-profile.js?v=ab5660c71041';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=ab5660c71041';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=ab5660c71041';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=ab5660c71041';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=ab5660c71041';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=ab5660c71041';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=ab5660c71041';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=ab5660c71041';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=ab5660c71041';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=ab5660c71041';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=ab5660c71041';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=ab5660c71041';
-import { APKError } from './apk-error.js?v=ab5660c71041';
-import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=ab5660c71041';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=ab5660c71041';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=ab5660c71041';
-import { Scheduler, Blocked } from './scheduler.js?v=ab5660c71041';
-import { bootClassLacksMember } from './boot-class-members.js?v=ab5660c71041';
-export { APKError } from './apk-error.js?v=ab5660c71041';
+import { VMClock } from './vm-clock.js?v=2d90c3b6b8c1';
+import { ExecutionProfile } from './execution-profile.js?v=2d90c3b6b8c1';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=2d90c3b6b8c1';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=2d90c3b6b8c1';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=2d90c3b6b8c1';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=2d90c3b6b8c1';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=2d90c3b6b8c1';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=2d90c3b6b8c1';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=2d90c3b6b8c1';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=2d90c3b6b8c1';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=2d90c3b6b8c1';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=2d90c3b6b8c1';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=2d90c3b6b8c1';
+import { APKError } from './apk-error.js?v=2d90c3b6b8c1';
+import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=2d90c3b6b8c1';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=2d90c3b6b8c1';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=2d90c3b6b8c1';
+import { Scheduler, Blocked } from './scheduler.js?v=2d90c3b6b8c1';
+import { bootClassLacksMember } from './boot-class-members.js?v=2d90c3b6b8c1';
+export { APKError } from './apk-error.js?v=2d90c3b6b8c1';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1388,7 +1388,7 @@ export class APKRuntime {
     const create = () => this.dispatch({ owner: type, name: 'onCreate', signature: '(Landroid/os/Bundle;)V', parameters: ['Landroid/os/Bundle;'], result: 'V' }, [launchedActivity, null], 'virtual');
     if (this.platform?.performLifecycle) this.platform.performLifecycle(this, launchedActivity, 'onCreate', [null], create); else create();
     this.platform?.afterActivityCreate?.(this, launchedActivity);
-    if (!this.root && !this.platform?.taskClosed) fail('Activity did not call setContentView');
+    if (!this.root && !this.platform?.taskClosed && !this.platform?.launchPending?.()) fail('Activity did not call setContentView');   // a splash without content that started the next screen is fine
     return this.snapshot();
   }
   click(id) {
@@ -1409,6 +1409,7 @@ export class APKRuntime {
   snapshot() {
     const navigation = this.platform?.navigationState?.(this) ?? {};
     if (this.platform?.taskClosed) return { activityName: null, views: [], texts: [], counters: {}, trace: [...this.trace], clicks: this.clicks, closed: true, canGoBack: false, navigation, ...this.executionSnapshot() };
+    if (!this.root && this.platform?.launchPending?.()) return { activityName: null, views: [], texts: [], counters: {}, trace: [...this.trace], clicks: this.clicks, closed: false, canGoBack: false, navigation, ...this.executionSnapshot() };   // between a content-less caller and the Activity it queued
     if (!this.root) fail('No content view');
     const seen = new Set(), texts = [];
     const build = (value, depth = 0) => {

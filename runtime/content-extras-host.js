@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=ab5660c71041';
+import { createHostRegistry } from './host-contract.js?v=2d90c3b6b8c1';
 
 // Small pure-Java platform classes that are not in the framework DEX. android.content.UriMatcher, a line-for-line port of android-13.0.0_r1 frameworks/base/core/java/android/content/UriMatcher.java (a tree of authority/path tokens with
 // "#" (digits) and "*" (any text) wildcards), and android.webkit.MimeTypeMap (android-13.0.0_r1), which delegates to the original libcore MimeMap that is in the framework DEX.
