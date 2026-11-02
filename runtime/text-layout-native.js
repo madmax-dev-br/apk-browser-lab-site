@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=3007dcaf084a';
-import {getPaintStateByHandle} from './paint-host.js?v=3007dcaf084a';
-import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=3007dcaf084a';
-import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=3007dcaf084a';
+import {APKError} from './apk-error.js?v=75f101f3827d';
+import {getPaintStateByHandle} from './paint-host.js?v=75f101f3827d';
+import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=75f101f3827d';
+import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=75f101f3827d';
 
 const MT='Landroid/graphics/text/MeasuredText;',BUILDER=MT.slice(0,-1)+'$Builder;',LB='Landroid/graphics/text/LineBreaker;';
 const REG='Llibcore/util/NativeAllocationRegistry;';

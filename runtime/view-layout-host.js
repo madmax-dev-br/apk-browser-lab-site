@@ -1,7 +1,7 @@
-import { APKError } from './apk-runtime.js?v=3007dcaf084a';
-import { breakParagraphs } from './text-layout-native.js?v=3007dcaf084a';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=3007dcaf084a';
-import { gcRoot } from './heap-gc.js?v=3007dcaf084a';
+import { APKError } from './apk-runtime.js?v=75f101f3827d';
+import { breakParagraphs } from './text-layout-native.js?v=75f101f3827d';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=75f101f3827d';
+import { gcRoot } from './heap-gc.js?v=75f101f3827d';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -210,7 +210,7 @@ export function createViewLayoutHost(platform) {
       if (name === 'getPaddingStart' || name === 'getPaddingEnd') return view.padding?.[name === 'getPaddingStart' ? view.layoutDirection === 1 ? 'right' : 'left' : view.layoutDirection === 1 ? 'left' : 'right'] || 0;
       if (name === 'addOnLayoutChangeListener') { const list = view.layoutListeners ||= []; if (!list.some(ref => ref.ref === args[1]?.ref)) list.push(args[1]); return; }
       if (name === 'removeOnLayoutChangeListener') { view.layoutListeners = (view.layoutListeners || []).filter(ref => ref.ref !== args[1]?.ref); return; }
-      if (name === 'getBaseline') { if (runtime.isSubtype(view.type, 'Landroid/widget/TextView;')) { if (view.textBaseline == null) fail('Native TextView baseline requires actual font layout'); return view.textBaseline; } return -1; }
+      if (name === 'getBaseline') { if (runtime.isSubtype(view.type, 'Landroid/widget/TextView;')) { return view.textBaseline ?? -1; /* TextView.getBaseline: with no Layout yet (not measured) it is View.getBaseline(), -1; ConstraintLayout/LinearLayout ask before the child's first measure */ } return -1; }
       if (name.startsWith('getMeasured')) { if (name === 'getMeasuredState') return ((view.measuredWidth || 0) & STATE) | (((view.measuredHeight || 0) >> 16) & (STATE >> 16)); const value = name.includes('Width') ? view.measuredWidth || 0 : view.measuredHeight || 0; return name.endsWith('AndState') ? value : value & SIZE; }
       if (['setLeft', 'setTop', 'setRight', 'setBottom'].includes(name)) {   // View.setLeft/..: move one edge of the frame (Compose's ripple host view), invalidate, notify a size change
         const bounds = view.bounds ||= { left: 0, top: 0, right: 0, bottom: 0 }, edge = name.slice(3).toLowerCase(), value = args[1] | 0;

@@ -1,5 +1,5 @@
-import { OS_CONSTANTS as C } from './os-constants-data.js?v=3007dcaf084a';
-import { state, lookup, allocateFd, release, inode } from './libcore-io-native.js?v=3007dcaf084a';
+import { OS_CONSTANTS as C } from './os-constants-data.js?v=75f101f3827d';
+import { state, lookup, allocateFd, release, inode } from './libcore-io-native.js?v=75f101f3827d';
 
 // The libc file functions a lab-built native library calls with plain paths and descriptors (react-native-mmkv's MMKV core: open, read, write, lseek, fstat, stat, access, mkdir, unlink,
 // rename, flock, fcntl, mkstemp, sendfile, close), over the same kernel the Java side uses: the app's VirtualFileSystem and the process descriptor table of src/libcore-io-native.js.
