@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=f9d334aa7591';
-import { gcBlockReason } from './heap-gc.js?v=f9d334aa7591';
+import { APKError } from './apk-error.js?v=9279502e5be3';
+import { gcBlockReason } from './heap-gc.js?v=9279502e5be3';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -135,7 +135,13 @@ export class OperationMonitor {
     const rt = this.rt, op = this.op, phases = rt.gcPhases ?? [];
     const share = op && op.gcMs ? ` (${Math.round(100 * op.gcMs / Math.max(1, op.gcMs + performance.now() - op.start))}% do tempo da operação)` : '';
     const head = `Coleta de lixo: ${op?.gcCount ?? 0} coletas / ${Math.round(op?.gcMs ?? 0)} ms nesta operação${share}; no total ${rt.gcStats?.collections ?? 0} coletas, ${Math.round(rt.gcTotalMs ?? 0)} ms`;
-    return phases.length ? `${head}\n  últimas: ${phases.map(p => `${p.before}→${p.after} vivos [raízes ${p.rootsMs} ms (${p.nodes} nós JS; maior: ${p.worstRoot.key} ${p.worstRoot.ms} ms/${p.worstRoot.nodes}; podados ${p.pruned ?? 0}; por nós: ${(p.topByNodes ?? []).map(r => `${r.key} ${r.nodes}${r.kind ? ' ' + r.kind : ''}${r.size !== undefined ? '[' + r.size + ']' : ''}`).join(', ') || '-'}; por tempo: ${(p.topByMs ?? []).map(r => `${r.key} ${r.ms} ms`).join(', ') || '-'}), marcação ${p.markMs} ms, varredura ${p.sweepMs} ms, recontagem ${p.rebuildMs} ms, ids ${p.idRange} em ${p.blocksInUse} blocos]`).join(' | ')}` : head;
+    const last = phases[0], census = last ? [
+      last.survivorsByCount?.length ? `\n  sobreviventes (por quantidade): ${last.survivorsByCount.slice(0, 12).map(c => `${c.n} ${c.type}`).join(', ')}` : '',
+      last.survivorsByBytes?.length ? `\n  sobreviventes (por bytes estimados): ${last.survivorsByBytes.slice(0, 12).map(c => `${Math.round(c.bytes / 1024)} KiB ${c.type}`).join(', ')}` : '',
+      last.allocated ? `\n  alocados desde a última coleta: ${last.allocated.count}${last.allocated.sites?.length ? ', principais: ' + last.allocated.sites.join(' | ') : ''}` : '',
+      rt.gcRetention?.paths?.length ? `\n  exemplo de retenção (${String(rt.gcRetention.type).replace(/^L|;$/g, '').replaceAll('/', '.')}):${rt.gcRetention.paths.map(path => '\n    ' + path).join('')}` : '',
+    ].join('') : '';
+    return phases.length ? `${head}${census}\n  últimas: ${phases.map(p => `${p.before}→${p.after} vivos [raízes ${p.rootsMs} ms (${p.nodes} nós JS; maior: ${p.worstRoot.key} ${p.worstRoot.ms} ms/${p.worstRoot.nodes}; podados ${p.pruned ?? 0}; por nós: ${(p.topByNodes ?? []).map(r => `${r.key} ${r.nodes}${r.kind ? ' ' + r.kind : ''}${r.size !== undefined ? '[' + r.size + ']' : ''}`).join(', ') || '-'}; por tempo: ${(p.topByMs ?? []).map(r => `${r.key} ${r.ms} ms`).join(', ') || '-'}), marcação ${p.markMs} ms, varredura ${p.sweepMs} ms, recontagem ${p.rebuildMs} ms, ids ${p.idRange} em ${p.blocksInUse} blocos]`).join(' | ')}` : head;
   }
   schedulerLine() {
     const stats = this.rt.scheduler.stats, op = this.op, seconds = op ? Math.max(0.001, (performance.now() - op.start) / 1000) : 0;

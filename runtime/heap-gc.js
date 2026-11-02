@@ -115,15 +115,22 @@ function flatSample(iterable, limit) {
   for (const item of iterable) { if (!flatRecord(item, 0, limit)) return false; if (++seen >= FLAT_SAMPLE) break; }
   return seen > 0;
 }
+const ELEMENT_WIDTH = { Z: 1, B: 1, C: 2, S: 2, I: 4, F: 4, J: 8, D: 8 };
 const refArrayTypes = new Map();
 const refArrayType = type => { let v = refArrayTypes.get(type); if (v === undefined) { v = type.charCodeAt(0) === 91 && (type.charCodeAt(1) === 76 || type.charCodeAt(1) === 91); refArrayTypes.set(type, v); } return v; };
-export function createMarker(runtime) {
+/** The big immutable tables and back-references that are never walked as roots (see SKIP_PROPS). */
+function buildSkip(runtime) {
+  const skip = new WeakSet([runtime.heap, runtime.dex, runtime.classes, runtime.resources, runtime.platform?.resources, runtime.scheduler, ...(runtime.ephemeronMaps ?? [])].filter(Boolean));   // ephemeron maps are not roots
+  for (const name of SKIP_PROPS) { const table = runtime[name]; if (table !== null && typeof table === 'object') skip.add(table); }
+  return skip;
+}
+export function createMarker(runtime, { full = false } = {}) {
   const heap = runtime.heap, weakIds = [], weakTypes = weakTypeCache(runtime), weakMaps = [], traced = new WeakSet();
   /** java.lang.ref.WeakReference and its subclasses (WeakHashMap entries, ThreadLocal map entries ...): the referent does not keep its object alive. SoftReference and PhantomReference stay strong. */
   const isWeak = type => { let weak = weakTypes.get(type); if (weak === undefined) { weak = false; if (type.charCodeAt(0) === 76) try { for (let at = type, depth = 0; at && depth < 64; at = runtime.parent(at), depth++) if (at === 'Ljava/lang/ref/WeakReference;') { weak = true; break; } } catch { weak = false; } /* walks the superclass chain: runtime.isSubtype would memoize every type the collector meets */ weakTypes.set(type, weak); } return weak; };
   const limit = runtime.nextId, worklist = []; let nodes = 0, pruned = 0;
   // Mark bits per 4096-id chunk, allocated only for the chunks that hold records and reused across collections.
-  const markChunks = runtime.gcMarkChunks ??= [];
+  const markChunks = full ? [] : (runtime.gcMarkChunks ??= []);
   for (let ci = 0; ci < markChunks.length; ci++) if (markChunks[ci] !== undefined && heap.chunks[ci] === undefined) markChunks[ci] = undefined;
   for (let ci = 0; ci < heap.chunks.length; ci++) if (heap.chunks[ci] !== undefined) { if (markChunks[ci] === undefined) markChunks[ci] = new Uint8Array(4096); else markChunks[ci].fill(0); }
   const isMarked = id => { const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] === 1; };
@@ -132,11 +139,10 @@ export function createMarker(runtime) {
   const visited = new WeakSet(), stack = [];
   // The big tables are skipped by identity, not only by property name: a back-reference (jni.runtime, platform.runtime) reaches the runtime object from another root and would otherwise walk
   // its resolveCache (millions of entries) and the other skipped tables on every collection.
-  const skip = new WeakSet([heap, runtime.dex, runtime.classes, runtime.resources, runtime.platform?.resources, runtime.scheduler, ...(runtime.ephemeronMaps ?? [])].filter(Boolean));   // ephemeron maps are not roots (see ephemeronMap)
-  for (const name of SKIP_PROPS) { const table = runtime[name]; if (table !== null && typeof table === 'object') skip.add(table); }
+  const skip = buildSkip(runtime);
   // Threads and their frames are roots only through the scheduler's structural enumeration (registers, results, continuations): a back-reference from the runtime or the platform must never lead the
   // generic walk into a frame's program, method record or DEX tables (millions of nodes in a large app).
-  for (const thread of [runtime.thread, ...(runtime.scheduler?.threads ?? [])]) if (thread !== null && typeof thread === 'object') { skip.add(thread); if (Array.isArray(thread.frames)) { skip.add(thread.frames); for (const frame of thread.frames) if (frame !== null && typeof frame === 'object') skip.add(frame); } }
+  if (!full) for (const thread of [runtime.thread, ...(runtime.scheduler?.threads ?? [])]) if (thread !== null && typeof thread === 'object') { skip.add(thread); if (Array.isArray(thread.frames)) { skip.add(thread.frames); for (const frame of thread.frames) if (frame !== null && typeof frame === 'object') skip.add(frame); } }
   const violations = [];
   const markId = (id, strict = false) => {
     if (!(id > 0 && id < limit) || isMarked(id)) return; const record = heap.get(id); if (record === undefined) return;
@@ -151,17 +157,17 @@ export function createMarker(runtime) {
       const value = stack.pop();
       if (value === null || typeof value !== 'object') continue;
       if (typeof value.ref === 'number' && Number.isSafeInteger(value.ref) && Object.keys(value).length === 1) { markId(value.ref, true); continue; }
-      if (visited.has(value) || skip.has(value) || noRefs.has(value)) continue;
-      { const ctor = value.constructor; if (ctor !== Object && ctor !== Array && ctor !== Map && ctor !== undefined && SKIP_CONSTRUCTORS.has(ctor.name)) { skip.add(value); continue; } } visited.add(value); nodes++;
+      if (visited.has(value) || skip.has(value) || (!full && noRefs.has(value))) continue;
+      if (!full) { const ctor = value.constructor; if (ctor !== Object && ctor !== Array && ctor !== Map && ctor !== undefined && SKIP_CONSTRUCTORS.has(ctor.name)) { skip.add(value); continue; } } visited.add(value); nodes++;
       if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer || value instanceof WeakMap || value instanceof WeakSet || value instanceof Promise) continue;
       if (Array.isArray(value)) {
         if (value.length > NUMERIC_ARRAY_LIMIT && typeof value[0] === 'number') continue;   // primitive data (int[] elements, offsets), never a ref list
-        if (value.length > FLAT_CONTAINER_MIN && flatSample(value, limit)) { pruned++; continue; }
+        if (!full && value.length > FLAT_CONTAINER_MIN && flatSample(value, limit)) { pruned++; continue; }
         for (let i = 0; i < value.length; i++) { const item = value[i]; if (item !== null && typeof item === 'object') stack.push(item); }
         continue;
       }
-      if (value instanceof Map && value.size > FLAT_CONTAINER_MIN && flatSample(value.values(), limit) && flatSample(value.keys(), limit)) { pruned++; continue; }
-      if (value instanceof Set && value.size > FLAT_CONTAINER_MIN && flatSample(value.values(), limit)) { pruned++; continue; }
+      if (!full && value instanceof Map && value.size > FLAT_CONTAINER_MIN && flatSample(value.values(), limit) && flatSample(value.keys(), limit)) { pruned++; continue; }
+      if (!full && value instanceof Set && value.size > FLAT_CONTAINER_MIN && flatSample(value.values(), limit)) { pruned++; continue; }
       if (value instanceof Map) { for (const [key, item] of value) { if (key !== null && typeof key === 'object') stack.push(key); if (item !== null && typeof item === 'object') stack.push(item); } continue; }
       if (value instanceof Set) { for (const item of value) if (item !== null && typeof item === 'object') stack.push(item); continue; }
       if (typeof value[GC_ROOTS] === 'function') value[GC_ROOTS](item => { if (item !== null && typeof item === 'object') stack.push(item); });
@@ -271,6 +277,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   }
   const markMs = performance.now() - t0;
   if (violations.length && audit) throw new Error(`GC audit: live structures reference already-collected objects #${[...new Set(violations)].map(id => `${id} ${heap.get(id)?.type}`).join(', #')} (a Java value held outside the collector's roots, e.g. captured by a host closure)`);
+  if (audit && heap.size <= 250000) auditAgainstFullWalk(runtime, { markedHas, extraRoots });
   // Weak references: a referent nothing else keeps alive is cleared (Reference.get() answers null from now on) and its reference is queued on its ReferenceQueue after the collection.
   const cleared = [];
   for (const id of weakIds) {
@@ -278,7 +285,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
     if (referent && typeof referent.ref === 'number' && !markedHas(referent.ref)) { record.fields.set(REFERENT_KEY, null); if (record.fields.get(QUEUE_KEY)) cleared.push({ ref: id }); }
   }
   // Sweep (only the blocks of ids that hold records).
-  const tSweep = performance.now(); let freed = 0;
+  const tSweep = performance.now(); let freed = 0; const freedIds = [], freedTypes = [];
   for (const ci of heap.usedChunks()) {
     const chunk = heap.chunks[ci], base = ci << 12;
     for (let slot = 0; slot < 4096; slot++) {
@@ -286,6 +293,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
       const id = base + slot;
       if (id === 0 || markedHas(id) || record.freed === true) continue;
       if (globalThis.process?.env?.APKWEB_GC_MARK_ONLY === '1') { freed++; continue; }
+      freedIds.push(id); freedTypes.push(record.type);
       if (typeof record.onFree === 'function') { try { record.onFree(); } catch { /* the native resource is already gone */ } }   // NativeAllocationRegistry cleaners: native handles die with the Java object that owned them
       if (audit) { chunk[slot] = tombstone(id, record.type); heap.size--; } else heap.release(id);
       freed++;
@@ -293,16 +301,35 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
     }
   }
   // Budgets count live storage only.
+  const survivors = new Map();
   const tRebuild = performance.now(); let fieldSlots = runtime.staticFields?.size ?? 0, arrayCells = 0, collectionCells = 0;
   for (const ci of heap.usedChunks()) {
     for (const record of heap.chunks[ci]) {
       if (record === undefined || record.freed === true) continue;
       fieldSlots += record.fields?.size ?? 0; if (record.elements) arrayCells += record.elements.length;
+      { const type = record.type; let entry = survivors.get(type); if (entry === undefined) survivors.set(type, entry = { n: 0, bytes: 0 });
+        entry.n++; entry.bytes += 48 + (record.fields?.size ?? 0) * 8 + (record.elements ? record.elements.length * (record.type.length === 2 ? ELEMENT_WIDTH[record.type[1]] ?? 8 : 8) : 0) + (typeof record.value === 'string' ? record.value.length * 2 : 0) + ((record.list?.length ?? 0) + (record.set?.length ?? 0)) * 8 + (record.map?.size ?? 0) * 48; }
       collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
     }
   }
   const phases = { reason, before, after: heap.size, rootsMs: Math.round(rootsMs), schedulerRootsMs: Math.round(tDrain - tRoots), markMs: Math.round(tSweep - tDrain), sweepMs: Math.round(tRebuild - tSweep), rebuildMs: Math.round(performance.now() - tRebuild), nodes: nodes(), marked: count(), worstRoot: { key: worstRoot.key, ms: Math.round(worstRoot.ms), nodes: worstRoot.nodes }, idRange: limit, blocksInUse: heap.usedChunks().length, pruned: pruned(), topByNodes: runtime.gcTopRoots.byNodes, topByMs: runtime.gcTopRoots.byMs, at: Math.round(performance.now()) };
+  const name = type => String(type).replace(/^L|;$/g, '').replaceAll('/', '.');
+  const top = field => [...survivors].sort((a, b) => b[1][field] - a[1][field]).slice(0, 12).map(([type, v]) => ({ type: name(type), n: v.n, bytes: v.bytes }));
+  phases.survivorsByCount = top('n'); phases.survivorsByBytes = top('bytes');
+  { const samples = [...(runtime.allocationSamples ?? [])].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([site]) => site); phases.allocated = { count: Math.max(0, limit - (runtime.gcLastNextId ?? 0)), sites: samples }; }
+  {   // the ids freed by the last collections (sorted, with their class), so that a use of a collected object is diagnosed as such (see APKRuntime.object)
+    const ring = runtime.gcFreedRing ??= [], kinds = [...new Set(freedTypes)], index = new Map(kinds.map((type, i) => [type, i]));
+    const order = Array.from(freedIds.keys()).sort((a, b) => freedIds[a] - freedIds[b]);
+    ring.unshift({ collection: (runtime.gcStats?.collections ?? 0) + 1, ids: Int32Array.from(order, i => freedIds[i]), types: Uint16Array.from(order, i => index.get(freedTypes[i])), kinds }); ring.length = Math.min(ring.length, 3);
+  }
   runtime.gcPhases = [phases, ...(runtime.gcPhases ?? [])].slice(0, 3);
+  if (runtime.headroomBase) { runtime.maxHeapObjects = runtime.headroomBase; runtime.headroomBase = 0; }   // the OOM headroom (APKRuntime.oomHeadroom) lasts until this collection
+  // A collection that frees little of a nearly full heap: the live set is a leak, not garbage. Find out who keeps the most numerous class alive (bounded; at most once per 20 s).
+  if (freed < before * 0.05 && heap.size > runtime.maxHeapObjects * 0.6 && performance.now() - (runtime.gcRetentionAt ?? -1e9) > 20000) {
+    runtime.gcRetentionAt = performance.now();
+    try { runtime.gcRetention = retentionPaths(runtime); } catch (error) { runtime.gcRetention = { type: null, paths: [], error: String(error?.message ?? error) }; }
+    runtime.gcRetentionAt = performance.now();
+  }
   runtime.gcNextAt = Math.min(Math.floor(runtime.maxHeapObjects * 0.85), heap.size + Math.floor(runtime.maxHeapObjects * 0.25));
   // Minimum allocation between two collections: a collection scans the whole live set, so a live set that stays above the threshold (gcNextAt is capped at 85% of the limit) must not be
   // re-scanned at every safepoint. A collection that freed little (< 10% of the heap) quadruples the wait.
@@ -402,4 +429,93 @@ export function heapCensus(runtime, { topClasses = 20, topRoots = 10 } = {}) {
   if (garbageClasses.length) lines.push('Inalcançáveis ainda não coletados:', ...garbageClasses.map(c => `  ${c.count} x ${typeLabel(c.type)}`));
   if (allocationSites.length) lines.push('Métodos que mais alocaram desde a última coleta (amostra):', ...allocationSites.map(s => `  ${s.samples} amostras em ${s.site}`));
   return { live, garbage, estimatedBytes, limit: runtime.maxHeapObjects, topClasses: classes, roots, garbageClasses, allocationSites, gc, trackedContainers: trackedCount, text: lines.join('\n') };
+}
+
+/** Which of the last collections freed object `id`: { collection, type } or null (binary search in the sorted ring). */
+export function freedBy(runtime, id) {
+  for (const entry of runtime.gcFreedRing ?? []) {
+    let low = 0, high = entry.ids.length - 1;
+    while (low <= high) { const mid = (low + high) >> 1, value = entry.ids[mid]; if (value === id) return { collection: entry.collection, type: entry.kinds[entry.types[mid]] }; if (value < id) low = mid + 1; else high = mid - 1; }
+  }
+  return null;
+}
+
+/**
+ * Why is an object alive? A breadth-first walk from the roots (runtime tables, statics, thread frames) over the same edges the collector follows, remembering for each node the node it was
+ * reached from and the field/index name, until `samples` objects of class `type` (default: the most numerous survivor class of the last collection) are found. Bounded in time and nodes:
+ * a diagnostic for the report, run when a collection frees little of a nearly full heap. Returns { type, paths: ['thread worker-2 frame Foo.bar -> field mCallbacks -> ArrayList.list[3] -> Foo', ...] }.
+ */
+export function retentionPaths(runtime, { type = null, samples = 3, budgetMs = 1500, maxNodes = 5_000_000 } = {}) {
+  const heap = runtime.heap, limit = runtime.nextId, started = performance.now(), skip = buildSkip(runtime);
+  const wanted = type ?? (runtime.gcPhases?.[0]?.survivorsByCount?.[0] ? 'L' + runtime.gcPhases[0].survivorsByCount[0].type.replaceAll('.', '/') + ';' : null);
+  if (!wanted) return { type: null, paths: [], visited: 0 };
+  const parent = new Map(), queue = [], found = [], short = t => String(t).replace(/^L|;$/g, '').split('/').pop();
+  const visit = (node, from, label) => { if (parent.has(node)) return; parent.set(node, [from, label]); queue.push(node); };
+  const idNode = id => (id > 0 && id < limit && heap.get(id) !== undefined && heap.get(id).freed !== true) ? id : null;
+  const fieldName = key => { const at = key.indexOf('->'), colon = key.indexOf(':', at); return at >= 0 ? key.slice(at + 2, colon > 0 ? colon : undefined) : key; };
+  const edge = (from, value, label) => {
+    if (value === null || value === undefined) return;
+    if (typeof value === 'object') {
+      if (typeof value.ref === 'number' && Object.keys(value).length === 1) { const id = idNode(value.ref); if (id !== null) visit(id, from, label); return; }
+      if (skip.has(value) || noRefs.has(value) || ArrayBuffer.isView(value) || value instanceof WeakMap || value instanceof WeakSet || value instanceof Promise) return;
+      visit(value, from, label);
+    }
+  };
+  // roots
+  for (const key of Object.keys(runtime)) { if (SKIP_PROPS.has(key)) continue; const item = runtime[key]; if (item !== null && typeof item === 'object' && !skip.has(item)) edge(null, item, `runtime.${key}`); }
+  for (const thread of runtime.scheduler?.threads ?? []) {
+    const label = `thread ${thread.name}`;
+    edge(null, thread.javaObject, `${label} (objeto)`); edge(null, thread.target, `${label} (target)`); edge(null, thread.lastOutcome, `${label} (resultado)`); edge(null, thread.blocked?.roots, `${label} (bloqueada)`);
+    (thread.frames ?? []).forEach((frame, index) => {
+      const m = frame.method, where = `${label} frame ${index} ${m ? short(m.owner) + '.' + m.name : '?'}`;
+      if (frame.cont) { edge(null, frame.cont.args, where + ' (continuação)'); edge(null, frame.cont.roots, where + ' (continuação)'); return; }
+      if (Array.isArray(frame.regs)) frame.regs.forEach((value, r) => edge(null, value, `${where} v${r}`)); edge(null, frame.result, where + ' (resultado)'); edge(null, frame.pendingException, where + ' (exceção)');
+    });
+  }
+  for (const weak of tracked) { const container = weak.deref(); if (container !== undefined) edge(null, container, 'raiz de host'); }
+  let visited = 0;
+  for (let head = 0; head < queue.length && found.length < samples; head++) {
+    if ((++visited & 4095) === 0 && (performance.now() - started > budgetMs || visited > maxNodes)) break;
+    const node = queue[head];
+    if (typeof node === 'number') {
+      const record = heap.get(node);
+      if (record.type === wanted) { found.push(node); if (found.length >= samples) break; }
+      for (const key of Object.keys(record)) {
+        const item = record[key];
+        if (key === 'fields' && item instanceof Map) { for (const [k, v] of item) edge(node, v, fieldName(k)); continue; }
+        if (key === 'elements' && Array.isArray(item) && refArrayType(record.type)) { for (let i = 0; i < item.length; i++) edge(node, item[i], `[${i}]`); continue; }
+        if ((key === 'list' || key === 'set') && Array.isArray(item)) { for (let i = 0; i < item.length; i++) edge(node, item[i], `${key}[${i}]`); continue; }
+        if (key === 'map' && item instanceof Map) { for (const v of item.values()) edge(node, v?.value ?? v, 'map'); for (const v of item.values()) edge(node, v?.key, 'map-key'); continue; }
+        if (item !== null && typeof item === 'object') edge(node, item, key);
+      }
+    } else if (Array.isArray(node)) { if (node.length > NUMERIC_ARRAY_LIMIT && typeof node[0] === 'number') continue; for (let i = 0; i < node.length; i++) edge(node, node[i], `[${i}]`); }
+    else if (node instanceof Map) { if (node.size > FLAT_CONTAINER_MIN && flatSample(node.values(), limit)) continue; for (const [k, v] of node) { edge(node, v, typeof k === 'string' ? `[${k.length > 60 ? k.slice(0, 60) + '…' : k}]` : 'map'); if (k !== null && typeof k === 'object') edge(node, k, 'chave'); } }
+    else if (node instanceof Set) { if (node.size > FLAT_CONTAINER_MIN && flatSample(node.values(), limit)) continue; for (const v of node) edge(node, v, 'set'); }
+    else { if (typeof node[GC_ROOTS] === 'function') node[GC_ROOTS](item => edge(node, item, 'raiz')); for (const key of Object.keys(node)) edge(node, node[key], key); }
+  }
+  const describe = node => {
+    const steps = []; for (let at = node, guard = 0; at !== null && at !== undefined && guard < 200; guard++) { const link = parent.get(at); if (!link) break; const [from, label] = link; steps.push({ label, node: at }); at = from; }
+    steps.reverse();
+    const parts = steps.map(({ label, node: n }) => typeof n === 'number' ? `${label} (${short(heap.get(n).type)})` : label);
+    return parts.length > 14 ? [...parts.slice(0, 5), '…', ...parts.slice(-8)].join(' → ') : parts.join(' → ');
+  };
+  return { type: wanted, paths: found.map(describe), visited, ms: Math.round(performance.now() - started), truncated: found.length < samples };
+}
+
+/**
+ * Audit mode: the collector's root pruning (structural frames, flat-table skipping, class skips) must not change what is alive. A second, fully conservative mark (no pruning of any kind,
+ * every thread and frame walked generically) runs on small heaps and every object it reaches must also be marked by the real collection.
+ */
+function auditAgainstFullWalk(runtime, { markedHas, extraRoots }) {
+  const full = createMarker(runtime, { full: true }), { scan, drain, ephemerons, markId } = full;
+  for (const key of Object.keys(runtime)) { if (SKIP_PROPS.has(key)) continue; const item = runtime[key]; if (item !== null && typeof item === 'object') scan(item); }
+  runtime.scheduler?.enumerateRoots?.(item => scan(item));
+  if (runtime.thread) scan(runtime.thread);
+  for (const id of runtime.hostAllocs ?? []) markId(id);
+  for (const weak of tracked) { const container = weak.deref(); if (container !== undefined) scan(container); }
+  if (extraRoots) { const values = typeof extraRoots === 'function' ? extraRoots() : extraRoots; for (const item of values ?? []) scan(item); }
+  drain(); ephemerons();
+  const missed = [];
+  for (const ci of runtime.heap.usedChunks()) for (let slot = 0; slot < 4096; slot++) { const record = runtime.heap.chunks[ci][slot], id = (ci << 12) + slot; if (record === undefined || id === 0 || record.freed === true) continue; if (full.markedHas(id) && !markedHas(id)) missed.push(`${id} ${record.type}`); }
+  if (missed.length) throw new Error(`GC audit: the pruned root scan lost ${missed.length} object(s) a full conservative walk reaches: #${missed.slice(0, 12).join(', #')}`);
 }

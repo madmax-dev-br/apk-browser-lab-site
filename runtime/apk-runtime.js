@@ -1,26 +1,26 @@
-import { VMClock } from './vm-clock.js?v=f9d334aa7591';
-import { OperationMonitor } from './operation-monitor.js?v=f9d334aa7591';
-import { ExecutionProfile } from './execution-profile.js?v=f9d334aa7591';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=f9d334aa7591';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=f9d334aa7591';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=f9d334aa7591';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=f9d334aa7591';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=f9d334aa7591';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=f9d334aa7591';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=f9d334aa7591';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=f9d334aa7591';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=f9d334aa7591';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=f9d334aa7591';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=f9d334aa7591';
-import { APKError } from './apk-error.js?v=f9d334aa7591';
-import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=f9d334aa7591';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=f9d334aa7591';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=f9d334aa7591';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=f9d334aa7591';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=f9d334aa7591';
-import { Scheduler, Blocked } from './scheduler.js?v=f9d334aa7591';
-import { bootClassLacksMember } from './boot-class-members.js?v=f9d334aa7591';
-export { APKError } from './apk-error.js?v=f9d334aa7591';
+import { VMClock } from './vm-clock.js?v=9279502e5be3';
+import { OperationMonitor } from './operation-monitor.js?v=9279502e5be3';
+import { ExecutionProfile } from './execution-profile.js?v=9279502e5be3';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=9279502e5be3';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=9279502e5be3';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=9279502e5be3';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=9279502e5be3';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=9279502e5be3';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=9279502e5be3';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=9279502e5be3';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=9279502e5be3';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=9279502e5be3';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=9279502e5be3';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=9279502e5be3';
+import { APKError } from './apk-error.js?v=9279502e5be3';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=9279502e5be3';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=9279502e5be3';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=9279502e5be3';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=9279502e5be3';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=9279502e5be3';
+import { Scheduler, Blocked } from './scheduler.js?v=9279502e5be3';
+import { bootClassLacksMember } from './boot-class-members.js?v=9279502e5be3';
+export { APKError } from './apk-error.js?v=9279502e5be3';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1069,7 +1069,11 @@ export class APKRuntime {
   object(value) {
     if (value !== null && typeof value === 'object') { const record = this.heap.get(value.ref); if (record !== undefined) return record; }
     if (isNull(value)) this.throwJava('Ljava/lang/NullPointerException;', 'null object reference');
-    fail('Null or invalid object reference');
+    const id = value !== null && typeof value === 'object' ? value.ref : value;
+    const dead = typeof id === 'number' ? freedBy(this, id) : null, collected = typeof id === 'number' && id > 0 && id < this.nextId;
+    const message = dead ? `Use of a collected object: #${id} of class ${String(dead.type).replace(/^L|;$/g, '').replaceAll('/', '.')} was freed by collection ${dead.collection} (the last collection is ${this.gcStats?.collections ?? 0}): a root the collector did not see`
+      : collected ? `Null or invalid object reference: #${id} was allocated (ids up to ${this.nextId - 1}) but is not on the heap now (freed by an older collection or released)` : `Null or invalid object reference: ${JSON.stringify(value)}`;
+    throw new APKError(message, { kind: 'invalid-object-reference', ref: id, collectedBy: dead?.collection ?? null, type: dead?.type ?? null, jsStack: String(new Error().stack ?? '').split('\n').slice(2, 12).join('\n'), vmContext: this.monitor?.context?.() ?? null });
   }
   /**
    * Class initialization (JLS 12.4.2). The nested form for host callers: it completes the interpreter-frame protocol of initStep() synchronously, waiting (and letting other
@@ -1330,7 +1334,7 @@ export class APKRuntime {
   }
   typeOf(value) { return typeof value === 'string' ? 'Ljava/lang/String;' : this.object(value).type; }
   makeObject(type) {
-    if (this.heap.size >= this.maxHeapObjects) this.outOfMemory(`Object limit (${this.maxHeapObjects}) exceeded`);
+    if (this.heap.size >= this.maxHeapObjects && !this.oomHeadroom()) this.outOfMemory(`Object limit (${this.maxHeapObjects}) exceeded`);
     if (ABSTRACT_GUARD && !this.bytecodeAlloc) this.assertConcreteHostType(type);
     const id = this.nextId++;
     if ((id & 511) === 0) this.sampleAllocation();
@@ -1851,6 +1855,19 @@ export class APKRuntime {
    * heapBudget of executionSnapshot and the Worker's snapshot), so an app that catches Throwable cannot hide it from the page, the harness or the validation flows.
    * The collector (src/heap-gc.js) runs between events; an event that allocates more than the free headroom still fails here.
    */
+  /**
+   * ART lets an allocation that failed once succeed when a collection freed enough, and lets the unwinding handlers allocate. The collector only runs at safepoints, so a full heap whose last
+   * collection did free something is granted 2% of the limit (once per collection, undone by the next collection) and a collection is requested; a heap the last collection could not shrink
+   * throws OutOfMemoryError at once.
+   */
+  oomHeadroom() {
+    if (!this.gcEnabled || this.inOutOfMemory) return false;
+    const collections = this.gcStats?.collections ?? 0, last = this.gcPhases?.[0], base = this.headroomBase || this.maxHeapObjects, extra = Math.floor(base * 0.02);
+    if (this.headroomGrantedAt === collections || (last && last.before - last.after < extra / 2)) return false;
+    this.headroomBase = base; this.headroomGrantedAt = collections; this.maxHeapObjects = base + extra; this.gcPressure = true;
+    this.record(`OOM headroom +${extra} objects until the next collection (${this.heap.size} live of ${base})`);
+    return true;
+  }
   outOfMemory(reason) {
     this.oomCount = (this.oomCount ?? 0) + 1; this.lastOom = { reason, liveObjects: this.heap.size, limit: this.maxHeapObjects, fieldSlots: this.fieldSlots, count: this.oomCount };
     this.record(`OOM java.lang.OutOfMemoryError: ${reason}; ${this.heap.size} live objects`);
@@ -1860,7 +1877,7 @@ export class APKRuntime {
     else this.lastOom.census = this.prevCensus;
     this.prevCensus = this.lastOom.census;
     this.inOutOfMemory = true; this.maxHeapObjects += 64;   // headroom for the throwable itself
-    try { this.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate: ${reason} (${this.heap.size} live objects)`, { kind: 'java-heap-exhausted', limit: this.maxHeapObjects - 64, liveObjects: this.heap.size, heap: this.lastOom.census }); }
+    try { this.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate: ${reason} (${this.heap.size} live objects)${this.gcPhases?.[0] ? `; coleta antes do OOM: ${this.gcPhases[0].before} → ${this.gcPhases[0].after}` : '; nenhuma coleta antes do OOM'}`, { kind: 'java-heap-exhausted', limit: this.maxHeapObjects - 64, liveObjects: this.heap.size, heap: this.lastOom.census }); }
     finally { this.maxHeapObjects -= 64; this.inOutOfMemory = false; }
   }
   throwJava(type, message, details = null) {
