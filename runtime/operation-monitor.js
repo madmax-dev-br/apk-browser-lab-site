@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=fa5329d06a5a';
-import { gcBlockReason } from './heap-gc.js?v=fa5329d06a5a';
+import { APKError } from './apk-error.js?v=8dfe82539cb6';
+import { gcBlockReason } from './heap-gc.js?v=8dfe82539cb6';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -67,7 +67,7 @@ export class OperationMonitor {
     let nextDelay = null, queueDepth = null;
     try { queueDepth = rt.platform?.eventQueue?.length ?? null; nextDelay = rt.platform?.nextEventDelay?.() ?? null; } catch { /* a heartbeat never fails the VM */ }
     return {
-      type: 'heartbeat', reason, operation: op?.name ?? null, wallMs: op ? Math.round(now - op.start) : null, instructions: this.instructions(), events: op?.events ?? 0, thread: thread?.name ?? null,
+      type: 'heartbeat', reason, gc: { count: op?.gcCount ?? 0, ms: Math.round(op?.gcMs ?? 0), total: rt.gcStats?.collections ?? 0 }, operation: op?.name ?? null, wallMs: op ? Math.round(now - op.start) : null, instructions: this.instructions(), events: op?.events ?? 0, thread: thread?.name ?? null,
       stack: profile.currentStack(6), hostCall: rt.hostCall ? short(rt.hostCall) : null, queueDepth, nextDelay, busiest: profile.top(3), heartbeat: ++this.beats,
       vm: { objects: rt.heap?.size ?? null, limit: rt.maxHeapObjects ?? null, collections: rt.gcStats?.collections ?? 0, gcMs: Math.round(rt.gcStats?.totalMs ?? 0), activity: rt.activityType ?? null, gcEnabled: !!rt.gcEnabled, gcBlocked: safe(() => gcBlockReason(rt)), gcSkips: { ...(rt.gcSkips ?? {}) }, nestedRuns: rt.nestedRuns ?? 0, gcFloor: rt.gcSafepointFloor ?? null },   // what the page can still show when the Worker is too busy to answer a request
     };
@@ -114,7 +114,7 @@ export class OperationMonitor {
   /** Where execution stands: which thread runs, the main thread's state, how many runs are nested on the JavaScript stack and whether slices can be preempted right now. */
   executionLine() {
     const rt = this.rt, main = rt.scheduler.main, thread = rt.thread;
-    return `${this.schedulerLine()}\nExecução: thread atual ${thread?.name ?? 'nenhuma'}${thread === main ? ' [main]' : ''}; thread principal ${main ? `${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'espera'})` : ''}` : '?'}; execuções aninhadas na pilha do JavaScript: ${rt.nestedRuns}; profundidade de dispatch: ${rt.depth}; fatia de segundo plano com limite de tempo: ${rt.sliceDeadline !== 0 ? 'sim' : 'não (evento principal ou espera aninhada: não pode ser interrompida)'}${rt.hostCall ? `; chamada do host: ${short(rt.hostCall)}` : ''}`;
+    return `${this.gcLine()}\n${this.schedulerLine()}\nExecução: thread atual ${thread?.name ?? 'nenhuma'}${thread === main ? ' [main]' : ''}; thread principal ${main ? `${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'espera'})` : ''}` : '?'}; execuções aninhadas na pilha do JavaScript: ${rt.nestedRuns}; profundidade de dispatch: ${rt.depth}; fatia de segundo plano com limite de tempo: ${rt.sliceDeadline !== 0 ? 'sim' : 'não (evento principal ou espera aninhada: não pode ser interrompida)'}${rt.hostCall ? `; chamada do host: ${short(rt.hostCall)}` : ''}`;
   }
   wakeRows(op, limit) {
     const CAUSES = ['interrupção', 'sinal', 'tempo esgotado'];
@@ -130,6 +130,13 @@ export class OperationMonitor {
     return rows.sort((a, b) => b.count - a.count).slice(0, limit);
   }
   /** Scheduler cost counters for the reports: rounds (thread picks) and wake-ups, with per-second rates over the operation. */
+  /** GC attribution: collections and time in this operation, the share of the operation's wall time, and the phases of the last collections. */
+  gcLine() {
+    const rt = this.rt, op = this.op, phases = rt.gcPhases ?? [];
+    const share = op && op.gcMs ? ` (${Math.round(100 * op.gcMs / Math.max(1, op.gcMs + performance.now() - op.start))}% do tempo da operação)` : '';
+    const head = `Coleta de lixo: ${op?.gcCount ?? 0} coletas / ${Math.round(op?.gcMs ?? 0)} ms nesta operação${share}; no total ${rt.gcStats?.collections ?? 0} coletas, ${Math.round(rt.gcTotalMs ?? 0)} ms`;
+    return phases.length ? `${head}\n  últimas: ${phases.map(p => `${p.before}→${p.after} vivos [raízes ${p.rootsMs} ms (${p.nodes} nós JS; maior: ${p.worstRoot.key} ${p.worstRoot.ms} ms/${p.worstRoot.nodes}), marcação ${p.markMs} ms, varredura ${p.sweepMs} ms, recontagem ${p.rebuildMs} ms, ids ${p.idRange} em ${p.blocksInUse} blocos]`).join(' | ')}` : head;
+  }
   schedulerLine() {
     const stats = this.rt.scheduler.stats, op = this.op, seconds = op ? Math.max(0.001, (performance.now() - op.start) / 1000) : 0;
     return `Escalonador: ${stats.rounds} rodadas, ${stats.wakeups} despertares${op ? ` (${Math.round(stats.wakeups / seconds)}/s, ${Math.round(stats.rounds / seconds)} rodadas/s nesta operação)` : ''}, ${this.rt.scheduler.threads.length} threads`;

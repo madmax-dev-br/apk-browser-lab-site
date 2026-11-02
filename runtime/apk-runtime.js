@@ -1,24 +1,24 @@
-import { VMClock } from './vm-clock.js?v=fa5329d06a5a';
-import { OperationMonitor } from './operation-monitor.js?v=fa5329d06a5a';
-import { ExecutionProfile } from './execution-profile.js?v=fa5329d06a5a';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=fa5329d06a5a';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=fa5329d06a5a';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=fa5329d06a5a';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=fa5329d06a5a';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=fa5329d06a5a';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=fa5329d06a5a';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=fa5329d06a5a';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=fa5329d06a5a';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=fa5329d06a5a';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=fa5329d06a5a';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=fa5329d06a5a';
-import { APKError } from './apk-error.js?v=fa5329d06a5a';
-import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=fa5329d06a5a';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=fa5329d06a5a';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=fa5329d06a5a';
-import { Scheduler, Blocked } from './scheduler.js?v=fa5329d06a5a';
-import { bootClassLacksMember } from './boot-class-members.js?v=fa5329d06a5a';
-export { APKError } from './apk-error.js?v=fa5329d06a5a';
+import { VMClock } from './vm-clock.js?v=8dfe82539cb6';
+import { OperationMonitor } from './operation-monitor.js?v=8dfe82539cb6';
+import { ExecutionProfile } from './execution-profile.js?v=8dfe82539cb6';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=8dfe82539cb6';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=8dfe82539cb6';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=8dfe82539cb6';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=8dfe82539cb6';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=8dfe82539cb6';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=8dfe82539cb6';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=8dfe82539cb6';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=8dfe82539cb6';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=8dfe82539cb6';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=8dfe82539cb6';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=8dfe82539cb6';
+import { APKError } from './apk-error.js?v=8dfe82539cb6';
+import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=8dfe82539cb6';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=8dfe82539cb6';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=8dfe82539cb6';
+import { Scheduler, Blocked } from './scheduler.js?v=8dfe82539cb6';
+import { bootClassLacksMember } from './boot-class-members.js?v=8dfe82539cb6';
+export { APKError } from './apk-error.js?v=8dfe82539cb6';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -885,11 +885,16 @@ function longArithmetic(op, x, y) {
 }
 
 /** The VM heap: object records by id. Ids are allocated sequentially and objects are never freed (no GC), so an array indexed by id replaces the Map. */
+const HEAP_BLOCK_SHIFT = 10;   // 1024 ids per block
 class Heap {
-  constructor() { this.list = []; this.size = 0; }
+  // `blocks[n]` counts the records in ids [n << 10, (n + 1) << 10): ids are never reused, so after a long run `list` is mostly holes (tens of millions of ids for a few hundred thousand live objects);
+  // the collector walks only the blocks that hold something instead of every id ever allocated.
+  constructor() { this.list = []; this.size = 0; this.blocks = []; }
   get(id) { return this.list[id]; }
   has(id) { return this.list[id] !== undefined; }
-  set(id, record) { if (this.list[id] === undefined) this.size++; this.list[id] = record; return this; }
+  set(id, record) { if (this.list[id] === undefined) { this.size++; this.blocks[id >>> HEAP_BLOCK_SHIFT] = (this.blocks[id >>> HEAP_BLOCK_SHIFT] | 0) + 1; } this.list[id] = record; return this; }
+  /** Removes a record (the collector's sweep): size and the block count follow. */
+  release(id) { this.list[id] = undefined; this.size--; this.blocks[id >>> HEAP_BLOCK_SHIFT]--; }
   *values() { for (const record of this.list) if (record !== undefined) yield record; }
 }
 

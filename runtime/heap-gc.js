@@ -30,7 +30,7 @@ const tracked = new Set();
 export function gcRoot(container) { tracked.add(new WeakRef(container)); return container; }
 
 const ID_KEY = /(^id$|Id$|Ids$|^ids$|^ref$|Ref$|Refs$|^view$|View$|^target$|Target$|^receiver$|Receiver$|^owner$|Owner$|^activity$|Activity$|^object$|Object$|^handle$)/;
-const SKIP_PROPS = new Set(['heap', 'dex', 'classes', 'resolvedClasses', 'resolveCache', 'hostMethodRefs', 'subtypeMemo', 'ancestorSets', 'methodEvidence', 'nativeBindings', 'apkEntries', 'traceRing', 'trace', 'scheduler', 'resources', 'gcStats', 'gcSkips', 'allocationSamples', 'nativeArrays', 'nativeRanges']);   // nativeArrays/nativeRanges pin an array's address only while the array lives (pruned after marking)   // gcStats keeps past nextId values: counters that look like object ids and would pin whatever object had that id
+const SKIP_PROPS = new Set(['heap', 'dex', 'classes', 'resolvedClasses', 'resolveCache', 'hostMethodRefs', 'subtypeMemo', 'ancestorSets', 'methodEvidence', 'nativeBindings', 'apkEntries', 'traceRing', 'trace', 'scheduler', 'resources', 'gcStats', 'gcSkips', 'allocationSamples', 'nativeArrays', 'nativeRanges', 'profile', 'monitor', 'gcPhases', 'hostAllocs']);   // nativeArrays/nativeRanges pin an array's address only while the array lives (pruned after marking)   // gcStats keeps past nextId values: counters that look like object ids and would pin whatever object had that id
 const NUMERIC_ARRAY_LIMIT = 256;
 
 function tombstone(id, type) {
@@ -91,7 +91,7 @@ export function createMarker(runtime) {
   const heap = runtime.heap, weakIds = [], weakTypes = weakTypeCache(runtime), weakMaps = [], traced = new WeakSet();
   /** java.lang.ref.WeakReference and its subclasses (WeakHashMap entries, ThreadLocal map entries ...): the referent does not keep its object alive. SoftReference and PhantomReference stay strong. */
   const isWeak = type => { let weak = weakTypes.get(type); if (weak === undefined) { weak = false; if (type.charCodeAt(0) === 76) try { for (let at = type, depth = 0; at && depth < 64; at = runtime.parent(at), depth++) if (at === 'Ljava/lang/ref/WeakReference;') { weak = true; break; } } catch { weak = false; } /* walks the superclass chain: runtime.isSubtype would memoize every type the collector meets */ weakTypes.set(type, weak); } return weak; };
-  const limit = runtime.nextId, marked = new Uint8Array(limit), worklist = [];
+  const limit = runtime.nextId, marked = new Uint8Array(limit), worklist = []; let nodes = 0;
   const visited = new WeakSet(), stack = [];
   // The big tables are skipped by identity, not only by property name: a back-reference (jni.runtime, platform.runtime) reaches the runtime object from another root and would otherwise walk
   // its resolveCache (millions of entries) and the other skipped tables on every collection.
@@ -111,7 +111,7 @@ export function createMarker(runtime) {
       const value = stack.pop();
       if (value === null || typeof value !== 'object') continue;
       if (typeof value.ref === 'number' && Number.isSafeInteger(value.ref) && Object.keys(value).length === 1) { markId(value.ref, true); continue; }
-      if (visited.has(value) || skip.has(value)) continue; visited.add(value);
+      if (visited.has(value) || skip.has(value)) continue; visited.add(value); nodes++;
       if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer || value instanceof WeakMap || value instanceof WeakSet || value instanceof Promise) continue;
       if (Array.isArray(value)) {
         if (value.length > NUMERIC_ARRAY_LIMIT && typeof value[0] === 'number') continue;   // primitive data (int[] elements, offsets), never a ref list
@@ -157,7 +157,7 @@ export function createMarker(runtime) {
       }
     }
   };
-  return { limit, marked, markId, scan, drain, ephemerons, violations, stack, idLike, weakIds, weakMaps, traced, count: () => count };
+  return { limit, marked, markId, scan, drain, ephemerons, violations, stack, idLike, weakIds, weakMaps, traced, count: () => count, nodes: () => nodes };
 }
 
 /**
@@ -165,21 +165,30 @@ export function createMarker(runtime) {
  * options: { audit, extraRoots: () => iterable of values | values[], reason, requireQuiescence = true }
  */
 export function collectGarbage(runtime, options = {}) {
-  const saved = runtime.hostCall; runtime.hostCall = 'coleta de lixo';   // the page must see "garbage collection" (with progress pulses), never a stale host call, while the VM is busy here
-  try { return collectGarbageNow(runtime, options); } finally { runtime.hostCall = saved ?? null; }
+  const saved = runtime.hostCall, started = performance.now(); runtime.hostCall = 'coleta de lixo';   // the page must see "garbage collection" (with progress pulses), never a stale host call, while the VM is busy here
+  try { return collectGarbageNow(runtime, options); } finally {
+    runtime.hostCall = saved ?? null;
+    const spent = performance.now() - started;
+    if (runtime.gcPhases?.[0] && runtime.gcPhases[0].at >= started - 1) {   // a collection happened: pace the next one and keep its time out of the mutator's watchdogs
+      runtime.gcLastEnd = performance.now(); runtime.gcLastMs = spent; runtime.gcTotalMs = (runtime.gcTotalMs ?? 0) + spent;
+      const op = runtime.monitor?.op; if (op) { op.gcMs = (op.gcMs ?? 0) + spent; op.gcCount = (op.gcCount ?? 0) + 1; op.start += spent; }
+      if (runtime.eventWallStart > 0) runtime.eventWallStart += spent;
+    }
+  }
 }
 function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC_AUDIT === '1', extraRoots = null, reason = 'manual', safepoint = false } = {}) {
   const started = performance.now(), heap = runtime.heap, before = heap.size;
   const blocked = quiescent(runtime, safepoint) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null);
   if (blocked) { const skips = (runtime.gcSkips ??= {}); skips[blocked] = (skips[blocked] ?? 0) + 1; return { collected: false, reason: blocked, before, after: before, freed: 0, ms: 0 }; }
-  const { limit, marked, markId, scan, drain, ephemerons, violations, idLike, weakIds, weakMaps, traced } = createMarker(runtime);
-  const t0 = performance.now();
+  const { limit, marked, markId, scan, drain, ephemerons, violations, idLike, weakIds, weakMaps, traced, nodes, count } = createMarker(runtime);
+  const t0 = performance.now(); let worstRoot = { key: '-', ms: 0, nodes: 0 };
   // Runtime and platform: everything but the heap itself and the large immutable tables.
   for (const key of Object.keys(runtime)) {
     if (SKIP_PROPS.has(key)) continue;
     const item = runtime[key];
-    if (item !== null && typeof item === 'object') scan(item); else if (typeof item === 'number' && idLike(key, item)) markId(item);
+    if (item !== null && typeof item === 'object') { const at = performance.now(), nodes0 = nodes(); scan(item); const ms = performance.now() - at; if (ms > worstRoot.ms) worstRoot = { key, ms, nodes: nodes() - nodes0 }; } else if (typeof item === 'number' && idLike(key, item)) markId(item);
   }
+  const rootsMs = performance.now() - t0, tRoots = performance.now();
   runtime.scheduler?.enumerateRoots?.(item => scan(item));
   // Host code up the JavaScript stack (a native that called back into Java, a class initializer, a nested wait) may hold values no Java frame references: what host code allocated and every result
   // handed back to it since the last fully quiescent collection stay alive. Outside a safepoint nothing is in flight and the set is dropped.
@@ -188,7 +197,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   for (const weak of tracked) { const container = weak.deref(); if (container === undefined) tracked.delete(weak); else scan(container); }
   if (extraRoots) { const values = typeof extraRoots === 'function' ? extraRoots() : extraRoots; for (const item of values ?? []) scan(item); }
   // Heap closure: scan each reachable record's own state.
-  drain(); ephemerons();
+  const tDrain = performance.now(); drain(); ephemerons();
   for (const map of runtime.ephemeronMaps ?? []) for (const key of [...map.keys()]) if (typeof key === 'number' && !marked[key]) map.delete(key);   // the key died: so does the entry
   for (const record of weakMaps) for (const entry of [...record.map.values()]) {   // WeakHashMap entries whose key died are expunged (without a modCount change, as in Java)
     if (traced.has(entry)) continue;
@@ -208,23 +217,32 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
     const record = heap.list[id], referent = record.fields.get(REFERENT_KEY);
     if (referent && typeof referent.ref === 'number' && !marked[referent.ref]) { record.fields.set(REFERENT_KEY, null); if (record.fields.get(QUEUE_KEY)) cleared.push({ ref: id }); }
   }
-  // Sweep.
-  let freed = 0;
-  for (let id = 1; id < limit; id++) {
+  // Sweep (only the blocks of ids that hold records).
+  const tSweep = performance.now(); let freed = 0;
+  for (let block = 0, blocks = heap.blocks.length; block < blocks; block++) {
+  if (!heap.blocks[block]) continue;
+  for (let id = Math.max(1, block << 10), end = Math.min(limit, (block + 1) << 10); id < end; id++) {
     const record = heap.list[id];
     if (record === undefined || marked[id] || record.freed === true) continue;
     if (globalThis.process?.env?.APKWEB_GC_MARK_ONLY === '1') { freed++; continue; }
     if (typeof record.onFree === 'function') { try { record.onFree(); } catch { /* the native resource is already gone */ } }   // NativeAllocationRegistry cleaners: native handles die with the Java object that owns them
-    heap.list[id] = audit ? tombstone(id, record.type) : undefined; heap.size--; freed++;
+    if (audit) { heap.list[id] = tombstone(id, record.type); heap.size--; } else heap.release(id);
+    freed++;
     if (runtime.monitors?.has(id)) runtime.monitors.delete(id);
   }
-  // Budgets count live storage only.
-  let fieldSlots = runtime.staticFields?.size ?? 0, arrayCells = 0, collectionCells = 0;
-  for (let id = 1; id < limit; id++) {
-    const record = heap.list[id]; if (record === undefined || record.freed === true) continue;
-    fieldSlots += record.fields?.size ?? 0; if (record.elements) arrayCells += record.elements.length;
-    collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
   }
+  // Budgets count live storage only.
+  const tRebuild = performance.now(); let fieldSlots = runtime.staticFields?.size ?? 0, arrayCells = 0, collectionCells = 0;
+  for (let block = 0, blocks = heap.blocks.length; block < blocks; block++) {
+    if (!heap.blocks[block]) continue;
+    for (let id = Math.max(1, block << 10), end = Math.min(limit, (block + 1) << 10); id < end; id++) {
+      const record = heap.list[id]; if (record === undefined || record.freed === true) continue;
+      fieldSlots += record.fields?.size ?? 0; if (record.elements) arrayCells += record.elements.length;
+      collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
+    }
+  }
+  const phases = { reason, before, after: heap.size, rootsMs: Math.round(rootsMs), schedulerRootsMs: Math.round(tDrain - tRoots), markMs: Math.round(tSweep - tDrain), sweepMs: Math.round(tRebuild - tSweep), rebuildMs: Math.round(performance.now() - tRebuild), nodes: nodes(), marked: count(), worstRoot: { key: worstRoot.key, ms: Math.round(worstRoot.ms), nodes: worstRoot.nodes }, idRange: limit, blocksInUse: heap.blocks.filter(Boolean).length, at: Math.round(performance.now()) };
+  runtime.gcPhases = [phases, ...(runtime.gcPhases ?? [])].slice(0, 3);
   runtime.gcNextAt = Math.min(Math.floor(runtime.maxHeapObjects * 0.85), heap.size + Math.floor(runtime.maxHeapObjects * 0.25));
   // Minimum allocation between two collections: a collection scans the whole live set, so a live set that stays above the threshold (gcNextAt is capped at 85% of the limit) must not be
   // re-scanned at every safepoint. A collection that freed little (< 10% of the heap) quadruples the wait.
@@ -244,6 +262,8 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
 export const GC_START_FRACTION = 0.25;
 export function collectionDue(runtime, threshold = Math.floor(runtime.maxHeapObjects * GC_START_FRACTION)) {
   const wait = Math.min(runtime.gcMinAlloc ?? 0, Math.max(64, (runtime.maxHeapObjects - runtime.heap.size) >> 1)), allocated = runtime.nextId - (runtime.gcLastNextId ?? 0);   // never wait past half the remaining headroom
+  // Pacing: a collection that took T ms is followed by at least 8 T ms of mutator time (<= ~11% GC overhead), unless the heap is nearly full (above 85% of the limit: collect, the report warns).
+  if (runtime.gcLastEnd && (runtime.gcLastMs ?? 0) >= 20 && runtime.heap.size < runtime.maxHeapObjects * 0.85 && performance.now() - runtime.gcLastEnd < 8 * runtime.gcLastMs) return false;   // collections under 20 ms are cheap enough to run whenever they are due
   if (runtime.gcPressure) return allocated >= Math.min(wait, Math.max(1024, wait >> 2));   // a native resource count asked for it (regex handles are capped at 16384): wait less, but not for every quantum
   return allocated >= wait && runtime.heap.size >= Math.max(threshold, runtime.gcNextAt ?? 0);
 }
