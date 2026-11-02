@@ -1,23 +1,23 @@
-import { VMClock } from './vm-clock.js?v=6ef5184e1cfd';
-import { ExecutionProfile } from './execution-profile.js?v=6ef5184e1cfd';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=6ef5184e1cfd';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=6ef5184e1cfd';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=6ef5184e1cfd';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=6ef5184e1cfd';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=6ef5184e1cfd';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=6ef5184e1cfd';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=6ef5184e1cfd';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=6ef5184e1cfd';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=6ef5184e1cfd';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=6ef5184e1cfd';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=6ef5184e1cfd';
-import { APKError } from './apk-error.js?v=6ef5184e1cfd';
-import { collectGarbage, collectionDue } from './heap-gc.js?v=6ef5184e1cfd';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=6ef5184e1cfd';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=6ef5184e1cfd';
-import { Scheduler, Blocked } from './scheduler.js?v=6ef5184e1cfd';
-import { bootClassLacksMember } from './boot-class-members.js?v=6ef5184e1cfd';
-export { APKError } from './apk-error.js?v=6ef5184e1cfd';
+import { VMClock } from './vm-clock.js?v=85b05e34fc63';
+import { ExecutionProfile } from './execution-profile.js?v=85b05e34fc63';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=85b05e34fc63';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=85b05e34fc63';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=85b05e34fc63';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=85b05e34fc63';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=85b05e34fc63';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=85b05e34fc63';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=85b05e34fc63';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=85b05e34fc63';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=85b05e34fc63';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=85b05e34fc63';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=85b05e34fc63';
+import { APKError } from './apk-error.js?v=85b05e34fc63';
+import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=85b05e34fc63';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=85b05e34fc63';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=85b05e34fc63';
+import { Scheduler, Blocked } from './scheduler.js?v=85b05e34fc63';
+import { bootClassLacksMember } from './boot-class-members.js?v=85b05e34fc63';
+export { APKError } from './apk-error.js?v=85b05e34fc63';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -895,8 +895,8 @@ const LAB_HELPERS = new Map([
 export class APKRuntime {
   constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off' } = {}) {
     if (!Number.isInteger(maxCallDepth) || maxCallDepth < 16 || maxCallDepth > 100000) fail('VM maxCallDepth must be an integer from 16 to 100000');
-    if(!Number.isInteger(maxHeapObjects)||maxHeapObjects<1024||maxHeapObjects>262144)fail('VM maxHeapObjects must be an integer from 1024 to 262144');
-    this.maxHeapObjects=maxHeapObjects; this.gcSafepointFloor=Math.floor(maxHeapObjects*0.5); this.apkEntries=apkEntries; this.apkReader=apkReader;
+    if(!Number.isInteger(maxHeapObjects)||maxHeapObjects<1024||maxHeapObjects>2097152)fail('VM maxHeapObjects must be an integer from 1024 to 2097152');
+    this.maxHeapObjects=maxHeapObjects; { const scale = Math.max(1, maxHeapObjects / 262144); this.maxFieldSlots = Math.round(1000000 * scale); this.maxArrayCells = Math.round(4000000 * scale); this.maxCollectionCells = Math.round(4000000 * scale); } /* storage budgets grow with the object limit */ this.gcSafepointFloor=Math.floor(maxHeapObjects*0.5); this.apkEntries=apkEntries; this.apkReader=apkReader;
     // Opt-in tolerant mode for platform methods the lab does not implement: 'void' skips void ones; 'primitives' also answers
     // boolean/byte/short/char/int/long/float/double methods with 0/false; 'all' also answers object methods with null. Every stubbed call is counted and traced (STUB-VOID / STUB-RETURN), so the run
     // doubles as the to-do list of missing bridges; a run that stubbed anything is never treated as validated. The default stays strict.
@@ -1153,7 +1153,7 @@ export class APKRuntime {
     if(this.isSubtype(object.type,'Ljava/util/AbstractList;'))this.storeField(object.fields,'Ljava/util/AbstractList;->modCount:I',object.modCount);
   }
   storeField(storage, key, value) {
-    if (!storage.has(key) && ++this.fieldSlots > 1000000) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
+    if (!storage.has(key) && ++this.fieldSlots > this.maxFieldSlots) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
     storage.set(key, value);
   }
   resolveField(field) {
@@ -1286,13 +1286,23 @@ export class APKRuntime {
   makeObject(type) {
     if (this.heap.size >= this.maxHeapObjects) this.outOfMemory(`Object limit (${this.maxHeapObjects}) exceeded`);
     const id = this.nextId++;
+    if ((id & 511) === 0) this.sampleAllocation();
     this.heap.set(id, { id, type, fields: new Map(), text: '', orientation: 0, textSize: 20, children: [], listener: null });
     return ref(id);
+  }
+  /** One allocation in 512 records the executing method and its caller (since the last collection): the allocation-site hint of the heap census. */
+  sampleAllocation() {
+    const frames = this.thread?.frames, samples = this.allocationSamples ??= new Map();
+    const name = method => (method ? `${method.owner.replace(/^L|;$/g, '').replaceAll('/', '.')}.${method.name}` : null);
+    const top = frames?.length ? name(frames[frames.length - 1].method) : null, caller = frames?.length > 1 ? name(frames[frames.length - 2].method) : null;
+    const site = top ? (caller ? `${top} <- ${caller}` : top) : 'código do host (sem método Java em execução)';
+    if (samples.size < 2000 || samples.has(site)) samples.set(site, (samples.get(site) ?? 0) + 1);
   }
   newArray(type, length) {
     length = int(length);
     if (length < 0) this.throwJava('Ljava/lang/NegativeArraySizeException;', `negative array length ${length}`);
-    if (!type.startsWith('[') || length > 1000000 || this.arrayCells + length > 4000000) fail('Invalid/excessive array allocation');
+    if (!type.startsWith('[')) fail('Invalid/excessive array allocation');
+    if (length > 1000000 || this.arrayCells + length > this.maxArrayCells) this.outOfMemory(length > 1000000 ? `Array of ${length} elements exceeds the array size limit` : `Array storage limit (${this.maxArrayCells} cells) exceeded`);
     this.arrayCells += length;
     const array = this.makeObject(type); this.object(array).elements = new Array(length).fill(defaultValue(type.slice(1))); return array;
   }
@@ -1718,8 +1728,12 @@ export class APKRuntime {
     this.oomCount = (this.oomCount ?? 0) + 1; this.lastOom = { reason, liveObjects: this.heap.size, limit: this.maxHeapObjects, fieldSlots: this.fieldSlots, count: this.oomCount };
     this.record(`OOM java.lang.OutOfMemoryError: ${reason}; ${this.heap.size} live objects`);
     if (this.inOutOfMemory) fail(reason);
+    // The first few exhaustions get a heap census (src/heap-gc.js heapCensus): what is alive, who keeps it alive, who allocated it. Later ones reuse it (a census is a full mark).
+    if ((this.oomCount ?? 0) <= 3 || !this.lastOom.census) { try { const census = heapCensus(this); this.lastOom.census = { text: census.text, live: census.live, garbage: census.garbage, estimatedBytes: census.estimatedBytes, limit: census.limit }; } catch (error) { this.lastOom.census = { text: `Censo do heap indisponível: ${error.message}` }; } }
+    else this.lastOom.census = this.prevCensus;
+    this.prevCensus = this.lastOom.census;
     this.inOutOfMemory = true; this.maxHeapObjects += 64;   // headroom for the throwable itself
-    try { this.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate: ${reason} (${this.heap.size} live objects)`, { kind: 'java-heap-exhausted', limit: this.maxHeapObjects - 64, liveObjects: this.heap.size }); }
+    try { this.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate: ${reason} (${this.heap.size} live objects)`, { kind: 'java-heap-exhausted', limit: this.maxHeapObjects - 64, liveObjects: this.heap.size, heap: this.lastOom.census }); }
     finally { this.maxHeapObjects -= 64; this.inOutOfMemory = false; }
   }
   throwJava(type, message, details = null) {
@@ -1836,7 +1850,7 @@ export class APKRuntime {
     if (obj.tailSerial === entry.serial) { obj.tailSerial = null; for (const serial of obj.map.keys()) obj.tailSerial = serial; }
   }
   reserveCollection(delta) {
-    if (delta > 0 && this.collectionCells + delta > 4000000) fail('Aggregate Java collection storage limit exceeded');
+    if (delta > 0 && this.collectionCells + delta > this.maxCollectionCells) this.outOfMemory(`Collection storage limit (${this.maxCollectionCells} cells) exceeded`);
     this.collectionCells = Math.max(0, this.collectionCells + delta);
   }
   collectionValues(obj) {
@@ -2172,7 +2186,7 @@ export class APKRuntime {
       if(method.parameters[1]==='[I'&&this.typeOf(args[1])!=='[I')this.throwJava('Ljava/lang/ClassCastException;','Array dimensions require int[]');
       if(!dimensions.length||component.match(/^\[*/)[0].length+dimensions.length>255)this.throwJava('Ljava/lang/IllegalArgumentException;','Array dimensions must total1..255');
       for(const length of dimensions)if(length<0)this.throwJava('Ljava/lang/NegativeArraySizeException;','negative reflected array dimension');
-      let nodes=1,totalArrays=0,totalCells=0;for(const length of dimensions){if(nodes===0)break;totalArrays+=nodes;totalCells+=nodes*length;if(length>1000000||totalCells+this.arrayCells>4000000||totalArrays+this.heap.size>this.maxHeapObjects)fail('Reflected multi-array allocation exceeds VM heap limits');nodes*=length;}
+      let nodes=1,totalArrays=0,totalCells=0;for(const length of dimensions){if(nodes===0)break;totalArrays+=nodes;totalCells+=nodes*length;if(length>1000000||totalCells+this.arrayCells>this.maxArrayCells||totalArrays+this.heap.size>this.maxHeapObjects)fail('Reflected multi-array allocation exceeds VM heap limits');nodes*=length;}
       const allocate=depth=>{const value=this.newArray('['.repeat(dimensions.length-depth)+component,dimensions[depth]);if(depth+1<dimensions.length){const values=this.array(value).elements;for(let i=0;i<values.length;i++)values[i]=allocate(depth+1);}return value;};return allocate(0);
     }
     if(staticCall&&['Ljava/lang/Integer;','Ljava/lang/Long;'].includes(method.owner)&&['toString','toHexString','toOctalString','toBinaryString','toUnsignedString'].includes(name)){

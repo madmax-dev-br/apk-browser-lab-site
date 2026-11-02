@@ -77,3 +77,11 @@
 :root[data-theme=dark] .device-panel summary .quiet-badge{background:#23222c;color:#8f8c9d}
 .tolerant-toggle{display:flex;flex-direction:column;gap:6px;align-items:stretch;font-size:9px;line-height:1.6;color:#8d94a4;margin:0 1px 12px;cursor:pointer}.tolerant-toggle input{accent-color:var(--accent);margin-top:2px}.tolerant-toggle code{font:8px ui-monospace,monospace}
 :root[data-theme=dark] .tolerant-toggle{color:#8f8c9d}
+.memory-meter{display:inline-flex;align-items:center;gap:6px;margin-left:auto;margin-right:12px;font-size:11px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.memory-meter[hidden]{display:none}
+.memory-meter i{display:inline-block;width:44px;height:6px;border-radius:3px;background:var(--line);overflow:hidden;position:relative}
+.memory-meter i::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--fill,0%);background:var(--accent);border-radius:3px}
+.memory-meter[data-level=warn] i::after{background:#d9a21b}
+.memory-meter[data-level=high] i::after{background:#d64545}
+.memory-meter[data-level=high]{color:#d64545}
+@media (max-width:620px){.memory-meter>span{display:none}}

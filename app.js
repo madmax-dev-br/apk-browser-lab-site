@@ -1,8 +1,8 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=6ef5184e1cfd';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=6ef5184e1cfd';
-import { createDeviceView, createViewState } from './device-view.js?v=6ef5184e1cfd';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=6ef5184e1cfd';
-import { formatApiGapReport } from './api-gap-scan.js?v=6ef5184e1cfd';
+import { APKWorkerClient } from './apk-worker-client.js?v=85b05e34fc63';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=85b05e34fc63';
+import { createDeviceView, createViewState } from './device-view.js?v=85b05e34fc63';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=85b05e34fc63';
+import { formatApiGapReport } from './api-gap-scan.js?v=85b05e34fc63';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -268,6 +268,17 @@ async function chooseFile(file) {
   if (!/\.apk$/i.test(file.name)) { switchMode('apk'); showError(new Error('Escolha um arquivo com a extensão .apk.'), 'Formato de arquivo inválido'); return; }
   await importSource({ file, name: file.name });
 }
+// Memory readout in the status bar: live VM objects against the object budget (the OutOfMemoryError threshold), an estimate of what they cost (bytesPerObject, sent by the Worker, is the measured
+// all-in cost used to derive the budget, src/memory-budget.js) and, where the browser exposes it (Chrome), the JS heap of this page; the Worker's own heap is not part of that number.
+const MIB = 1048576, mib = bytes => `${(bytes / MIB).toFixed(bytes < 10 * MIB ? 1 : 0)} MiB`, count = value => value >= 10000 ? `${Math.round(value / 1000)} mil` : String(value);
+function updateMemoryMeter(health) {
+  const meter = $('memory-meter'); if (!meter || !health || !Number.isFinite(health.liveObjects) || !health.limit) return;
+  const ratio = Math.min(1, health.liveObjects / health.limit), page = globalThis.performance?.memory?.usedJSHeapSize, bytesPerObject = health.bytesPerObject || 1600, estimate = health.liveObjects * bytesPerObject;
+  meter.hidden = false; meter.dataset.level = ratio >= 0.9 ? 'high' : ratio >= 0.7 ? 'warn' : 'ok'; meter.style.setProperty('--fill', `${Math.round(ratio * 100)}%`);
+  meter.lastElementChild.textContent = `Memória da VM ${count(health.liveObjects)} / ${count(health.limit)} objetos (${ratio < 0.1 ? (ratio * 100).toFixed(1) : Math.round(ratio * 100)}%) · ≈ ${mib(estimate)}${page ? ` · heap da página ${mib(page)}` : ''}`;
+  meter.title = [`Objetos vivos da VM: ${health.liveObjects} de ${health.limit} (acima disso a VM lança java.lang.OutOfMemoryError).`, `Custo estimado: ${bytesPerObject} bytes por objeto (medido em exemplos reais), ≈ ${mib(estimate)}.`,
+    page ? `Heap JS da página (sem o Web Worker): ${mib(page)}.` : 'Heap JS da página: indisponível neste navegador.', `Coletas de lixo: ${health.collections ?? 0} (${health.freedObjects ?? 0} objetos liberados, ${health.gcMs ?? 0} ms); último evento ${health.lastEventMs ?? 0} ms.`, health.oomCount ? `OutOfMemoryError já lançado ${health.oomCount} vez(es).` : ''].filter(Boolean).join('\n');
+}
 const deviceState = { settings: loadDeviceSettings(), clockTimer: null };
 const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, notifyParent, clickView: id => clickView(id), hooks: {
   navigationChanged(canGoBack) { $('back-button').disabled = state.busy || !canGoBack; $('back-button').hidden = state.mode !== 'apk' || !canGoBack; },
@@ -277,7 +288,7 @@ const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTr
     if (state.mode === 'apk') { setStatus('Aplicativo encerrado · nenhuma Activity ativa'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENCERRADO'; }
   },
   rendered(snapshot, composeReady) {
-    $('empty-preview').hidden = true;
+    $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth);
     if (snapshot.droppedEvent) appendTrace(`Evento descartado: a View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) já não existe na VM.`);
     // The VM raised java.lang.OutOfMemoryError (even if the app caught it): never silent.
     if ((snapshot.vmHealth?.oomCount ?? 0) > (state.oomSeen ?? 0)) { state.oomSeen = snapshot.vmHealth.oomCount; appendTrace(`OutOfMemoryError: ${snapshot.vmHealth.lastOom?.reason} (${snapshot.vmHealth.liveObjects} objetos vivos)`); setStatus(`java.lang.OutOfMemoryError na VM (${snapshot.vmHealth.liveObjects} objetos vivos, limite ${snapshot.vmHealth.limit})`, 'error'); }

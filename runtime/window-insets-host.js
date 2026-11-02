@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=6ef5184e1cfd';
-import { gcRoot } from './heap-gc.js?v=6ef5184e1cfd';
+import { APKError } from './apk-runtime.js?v=85b05e34fc63';
+import { gcRoot, ephemeronMap } from './heap-gc.js?v=85b05e34fc63';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', INSETS = 'Landroid/view/WindowInsets;', RECT = 'Landroid/graphics/Rect;';
 const LISTENER = 'Landroid/view/View$OnApplyWindowInsetsListener;';
@@ -48,7 +48,7 @@ export function createWindowInsetsHost(platform) {
     const source = platform.systemBarsHost?.insetsFor?.(runtime, root), cached = roots.get(root.ref);
     if (cached && (!source || cached.key === source.key)) return cached.insets;
     const built = source?.build?.() ?? fromRect(runtime, newRect(runtime));
-    roots.set(root.ref, { key: source?.key ?? null, insets: built }); return built;
+    ephemeronMap(runtime, roots); roots.set(root.ref, { key: source?.key ?? null, insets: built }); return built;
   };
   const rectangle = (runtime, insets) => call(runtime, insets, INSETS, 'getSystemWindowInsetsAsRect', [], RECT);
   const copyRect = (runtime, target, source) => call(runtime, target, RECT, 'set', [RECT], 'V', [source]);
@@ -57,6 +57,7 @@ export function createWindowInsetsHost(platform) {
     if (!attached(runtime, receiver)) return null;
     const token = call(runtime, receiver, VIEW, 'getWindowToken', [], 'Landroid/os/IBinder;');
     if (!token) fail('Attached View has no virtual window token');
+    ephemeronMap(runtime, windows);   // keyed by the window token: the companions die with their window
     if (!windows.has(token.ref)) {
       const info = runtime.makeObject(ATTACH_INFO), root = runtime.makeObject(ROOT_IMPL), source = initial(runtime, rootOf(runtime, receiver));
       runtime.storeField(runtime.object(root).fields, `${ROOT_IMPL}->mAttachInfo:${ATTACH_INFO}`, info);

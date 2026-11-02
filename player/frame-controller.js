@@ -1,9 +1,9 @@
 // Message-driven controller of one player frame. DOM-free: the VM client, the shared device view and the postMessage sink are injected, so the
 // same code runs in the real frame (frame.js) and in the headless smoke test.
-import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES } from './protocol.js?v=6ef5184e1cfd';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=6ef5184e1cfd';
-import { formatApiGapReport } from '../api-gap-scan.js?v=6ef5184e1cfd';
-import { sanitizeSettings } from '../device-settings.js?v=6ef5184e1cfd';
+import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES } from './protocol.js?v=85b05e34fc63';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=85b05e34fc63';
+import { formatApiGapReport } from '../api-gap-scan.js?v=85b05e34fc63';
+import { sanitizeSettings } from '../device-settings.js?v=85b05e34fc63';
 export function createFrameController({ vm, state, deviceState, post, fetchImpl = globalThis.fetch?.bind(globalThis), hooks = {} }) {
   let view = null, source = null, config = {}, lastActivity = null, destroyed = false, chain = Promise.resolve(), inflight = 0, oomSeen = 0, lastStubs = { void: [], returns: [], classes: [] }, packageName = '', tolerateRunning = 'off'; const dropped = [];
   const send = (type, payload) => post(envelope(type, payload));
@@ -33,8 +33,14 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
       fail(error, title || 'runtime');
     },
     async clickView(id) {
-      if (!state.runtime || state.busy) return;
-      await view.flushPendingInputs(); const token = operations.beginOperation();
+      if (!state.runtime) return;
+      // A tap that arrives while the VM is still handling the previous event is queued (Android delivers it to the main thread when it is free), not dropped: the
+      // wait is bounded so a wedged VM cannot hold the tap forever, and a runtime that went away meanwhile ends it.
+      for (let waited = 0; state.busy && waited < 15000; waited += 10) { await new Promise(resolve => setTimeout(resolve, 10)); if (!state.runtime || destroyed) return; }
+      if (state.busy) return;
+      await view.flushPendingInputs();
+      if (state.busy) { for (let waited = 0; state.busy && waited < 15000; waited += 10) await new Promise(resolve => setTimeout(resolve, 10)); if (state.busy || !state.runtime) return; }   // another tap took the VM while inputs were flushed: queue behind it
+      const token = operations.beginOperation();
       try { const snapshot = await state.runtime.click(id); if (token === state.operation) view.renderSnapshot(snapshot); }
       catch (error) { if (token === state.operation) operations.reportAPKError(error, 'click'); }
       finally { operations.finishOperation(token); }
@@ -44,7 +50,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
       if (snapshot && ('missingVoid' in snapshot || 'missingReturns' in snapshot || 'missingClasses' in snapshot)) lastStubs = stubListsFromSnapshot(snapshot);
       const health = snapshot?.vmHealth;
       if (health && health.oomCount > oomSeen) {   // java.lang.OutOfMemoryError raised by the VM: reported to the embedding page even if the app swallowed it
-        oomSeen = health.oomCount; fail(Object.assign(new Error(`java.lang.OutOfMemoryError: ${health.lastOom?.reason ?? 'heap exhausted'} (${health.liveObjects} live objects, limit ${health.limit})`), { details: { kind: 'java-heap-exhausted', ...health } }), 'runtime');
+        oomSeen = health.oomCount; fail(Object.assign(new Error(`java.lang.OutOfMemoryError: ${health.lastOom?.reason ?? 'heap exhausted'} (${health.liveObjects} live objects, limit ${health.limit})`), { details: { kind: 'java-heap-exhausted', ...health, heap: health.heapCensus } }), 'runtime');
       }
       if (!snapshot?.activityName) return;
       if (snapshot.activityName !== lastActivity) { const first = lastActivity === null; lastActivity = snapshot.activityName; if (!first) send('activity-changed', { activity: snapshot.activityName, canGoBack: !!snapshot.canGoBack }); }

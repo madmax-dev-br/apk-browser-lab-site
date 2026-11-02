@@ -1,6 +1,7 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=6ef5184e1cfd';
-import { APKError } from './apk-runtime.js?v=6ef5184e1cfd';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=6ef5184e1cfd';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=85b05e34fc63';
+import { APKError } from './apk-runtime.js?v=85b05e34fc63';
+import { ephemeronMap } from './heap-gc.js?v=85b05e34fc63';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=85b05e34fc63';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -40,9 +41,9 @@ export class AndroidStyleBackend {
     for(const {id,force} of object.appliedStyles)for(const [attribute,value]of table.resolveBag(id))if(force||!values.has(attribute))values.set(attribute,value);
     object.themeValues=values;runtime.record('RESOURCE Theme.rebase [real applied-style history and compiled resource bags]');
   }
-  createTheme(runtime) { const ref = runtime.makeObject(THEME); runtime.object(ref).themeValues = new Map(); runtime.object(ref).appliedStyles = []; (this.themeRefs ??= new Set()).add(ref); return ref; }
+  createTheme(runtime) { const ref = runtime.makeObject(THEME); runtime.object(ref).themeValues = new Map(); runtime.object(ref).appliedStyles = []; (this.themeRefs ??= ephemeronMap(runtime, new Map())).set(ref.ref, ref); return ref; }   // weakly held: a Theme nothing else references is collected
   /** Resources.updateConfiguration: every live Theme replays its applied styles against the new configuration (identity and key retained). */
-  refreshThemes(runtime) { for (const ref of this.themeRefs ?? []) this.rebaseTheme(runtime, ref); }
+  refreshThemes(runtime) { for (const ref of this.themeRefs?.values() ?? []) this.rebaseTheme(runtime, ref); }
   originalThemeMethod(runtime, context, startType, name, parameters, result, values = []) {
     const signature = `(${parameters.join('')})${result}`, seen = new Set();
     for (let owner = startType; owner; owner = runtime.parent(owner)) {

@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=6ef5184e1cfd';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=6ef5184e1cfd';
+import { APKError } from './apk-runtime.js?v=85b05e34fc63';
+import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=85b05e34fc63';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -55,7 +55,7 @@ export function createViewWindowHost(platform){
   }finally{focusDepth--;}
  };
  const isAttached=(runtime,receiver)=>{const view=runtime.object(receiver);if(view.attached)return true;const frame=frameOf(runtime,receiver);if(!frame?.window||!frame.root)return false;const window=runtime.object(frame.window);return (same(receiver,window.decor)||same(receiver,window.content))&&!!runtime.object(frame.root).attached;};
- const windowToken=(runtime,receiver)=>{if(!isAttached(runtime,receiver))return null;const frame=frameOf(runtime,receiver),key=frame?.activity.ref??rootOf(runtime,receiver).ref;
+ const windowToken=(runtime,receiver)=>{if(!isAttached(runtime,receiver))return null;ephemeronMap(runtime,tokens);const frame=frameOf(runtime,receiver),key=frame?.activity.ref??rootOf(runtime,receiver).ref;
   if(!tokens.has(key)){const value=runtime.makeObject(TOKEN);runtime.object(value).windowOwner=frame?.activity??rootOf(runtime,receiver);tokens.set(key,value);}return tokens.get(key);};
  const mainHandler=runtime=>{if(!handler){handler=runtime.allocate('Landroid/os/Handler;');runtime.dispatch({owner:'Landroid/os/Handler;',name:'<init>',signature:'()V',parameters:[],result:'V'},[handler],'direct');}return handler;};
  const sortQueue=()=>platform.eventQueue.sort((a,b)=>a.front!==b.front?a.front?-1:1:a.front?b.sequence-a.sequence:a.when-b.when||a.sequence-b.sequence);
