@@ -1,4 +1,4 @@
-import { openExchange, serialiseError } from './network-transport.js?v=2a1f5dd8c3fa';
+import { openExchange, serialiseError } from './network-transport.js?v=190c356a68e4';
 
 // The network worker: runs one fetch per exchange for the web device (see network-worker-executor.js for the protocol). Works as a Node worker_thread and as a browser Worker.
 const HEAD_CAPACITY = 64 * 1024;

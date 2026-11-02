@@ -1,8 +1,8 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=2a1f5dd8c3fa';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=2a1f5dd8c3fa';
-import { createDeviceView, createViewState } from './device-view.js?v=2a1f5dd8c3fa';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=2a1f5dd8c3fa';
-import { formatApiGapReport } from './api-gap-scan.js?v=2a1f5dd8c3fa';
+import { APKWorkerClient } from './apk-worker-client.js?v=190c356a68e4';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=190c356a68e4';
+import { createDeviceView, createViewState } from './device-view.js?v=190c356a68e4';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=190c356a68e4';
+import { formatApiGapReport } from './api-gap-scan.js?v=190c356a68e4';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -47,9 +47,23 @@ function updateTrace(snapshot) {
 function resetWebViews() { try { deviceView.resetWebViews?.(); } catch { /* the device view is not created yet: no WebView exists either */ } }
 function hideError() { $('error-panel').hidden = true; }
 /** "Estado da tela" from the live Worker (null when it is gone or has nothing loaded). */
-async function fetchScreenState() { if (!apkVM.worker) return null; try { return await apkVM.screenState(); } catch { return null; } }
+/** The page-side account of a VM that cannot answer: why (no Worker, an operation still running, a failed request), the last signal it sent, its memory at the last snapshot and the tail of the log. */
+function screenStateUnavailable(reason) {
+  const pending = apkVM.pending, lines = ['Estado da tela', `A VM não respondeu ao pedido de estado: ${reason}.`];
+  if (!apkVM.worker) lines.push('Não há Web Worker: nenhum APK foi carregado nesta página, ou o Worker foi encerrado (erro, tempo limite ou "Encerrar"); reabra o APK.');
+  else if (pending) lines.push(`A VM ainda está ocupada com a operação "${pending.type}" há ${Math.round((Date.now() - pending.startedAt) / 1000)} s; um Worker ocupado só responde entre dois eventos. Os dados abaixo são o último sinal que ele enviou.`);
+  if (apkVM.worker) { try { lines.push(apkVM.describeLastSignal(pending?.type ?? 'estado').text); } catch { /* no signal yet */ } }
+  const health = state.lastVmHealth; if (health) lines.push(`Memória no último quadro: ${health.liveObjects} de ${health.limit} objetos vivos (${Math.round(100 * health.liveObjects / health.limit)}%), ${health.collections ?? 0} coletas, último evento ${health.lastEventMs ?? 0} ms${health.oomCount ? `, ${health.oomCount} OutOfMemoryError` : ''}.`);
+  lines.push(`Status da página: ${$('status-text')?.textContent ?? ''}`, `Operação na tela: ${$('operation-panel')?.hidden ? 'nenhuma' : $('operation-message')?.textContent}`);
+  const log = ($('trace-output')?.textContent ?? '').split('\n').filter(Boolean).slice(-25); if (log.length) lines.push('Fim do log de execução:', ...log.map(line => '  ' + line));
+  return { text: lines.join('\n'), blank: false };
+}
+async function fetchScreenState() {
+  if (!apkVM.worker) return screenStateUnavailable('sem Worker');
+  try { return await apkVM.screenState(); } catch (error) { return screenStateUnavailable(error?.message ?? String(error)); }
+}
 document.getElementById('screen-state-copy')?.addEventListener('click', async event => {
-  const button = event.currentTarget, screen = await fetchScreenState(), report = screen?.text ?? 'Estado da tela\nA VM não está disponível (nenhum APK em execução ou o Worker foi encerrado).';
+  const button = event.currentTarget, screen = await fetchScreenState(), report = screen.text;
   try { await navigator.clipboard.writeText(report); button.textContent = screen?.blank ? 'Copiado (tela em branco)' : 'Estado da tela copiado'; }
   catch { $('trace-output').textContent = report; $('trace').open = true; getSelection()?.selectAllChildren($('trace-output')); button.textContent = 'Selecionado: copie com Cmd+C'; }
   setTimeout(() => { button.textContent = 'Copiar estado da tela'; }, 2500);
@@ -297,7 +311,7 @@ const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTr
     if (state.mode === 'apk') { setStatus('Aplicativo encerrado · nenhuma Activity ativa'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENCERRADO'; }
   },
   rendered(snapshot, composeReady) {
-    $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth);
+    $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth); if (snapshot.vmHealth) state.lastVmHealth = snapshot.vmHealth;
     if (snapshot.droppedEvent) appendTrace(`Evento descartado: a View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) já não existe na VM.`);
     // The VM raised java.lang.OutOfMemoryError (even if the app caught it): never silent.
     if ((snapshot.vmHealth?.oomCount ?? 0) > (state.oomSeen ?? 0)) { state.oomSeen = snapshot.vmHealth.oomCount; appendTrace(`OutOfMemoryError: ${snapshot.vmHealth.lastOom?.reason} (${snapshot.vmHealth.liveObjects} objetos vivos)`); setStatus(`java.lang.OutOfMemoryError na VM (${snapshot.vmHealth.liveObjects} objetos vivos, limite ${snapshot.vmHealth.limit})`, 'error'); }

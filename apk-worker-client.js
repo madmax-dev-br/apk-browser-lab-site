@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=2a1f5dd8c3fa';
-import { createRasterReceiver } from './raster-cache.js?v=2a1f5dd8c3fa';
+import { createWebAudioPlayer } from './web-audio-player.js?v=190c356a68e4';
+import { createRasterReceiver } from './raster-cache.js?v=190c356a68e4';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=2a1f5dd8c3fa', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=190c356a68e4', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -58,7 +58,7 @@ export class APKWorkerClient {
     return { heartbeat: beat, silentSeconds: seconds, text };
   }
   request(type, payload = {}, { onProgress, timeoutMs, transfer = [] } = {}) {
-    if (this.pending) return Promise.reject(new Error('Uma operação da VM já está em andamento.'));
+    if (this.pending) return Promise.reject(Object.assign(new Error('Uma operação da VM já está em andamento.'), { kind: 'vm-busy', operation: this.pending.type ?? null }));
     try { this.ensureWorker(); } catch (error) { return Promise.reject(error); }
     return new Promise((resolve, reject) => {
       const requestId = ++this.sequence; this.lastHeartbeat = null;
@@ -66,7 +66,7 @@ export class APKWorkerClient {
         const signal = this.describeLastSignal(type), error = new Error(`A operação ${type} excedeu ${Math.round(timeoutMs / 1000)} s. O Worker foi encerrado; reabra o APK para continuar.${signal ? ' ' + signal.text : ''}`);
         error.name = 'TimeoutError'; if (signal) error.details = { kind: 'vm-timeout', operation: type, heartbeat: signal.heartbeat, silentSeconds: signal.silentSeconds, heartbeatText: signal.text }; this.cancel(error);
       }, timeoutMs);
-      this.pending = { requestId, resolve, reject, timer, onProgress };
+      this.pending = { requestId, resolve, reject, timer, onProgress, type, startedAt: Date.now() };
       try { this.worker.postMessage({ type, requestId, ...payload }, transfer); }
       catch (error) { this.cancel(error); }
     });
