@@ -1,4 +1,4 @@
-import { createHostRegistry, bitsDouble, bitsFloat } from './host-contract.js?v=1d7890576be9';
+import { createHostRegistry, bitsDouble, bitsFloat } from './host-contract.js?v=7995f957f05e';
 
 // java.lang.String.format(...) / java.util.Formatter conversions: %s %S %d %x %X %o %c %b %B %h %n %% %f %e %E %g %G with the flags - # + space 0 , ( and
 // argument indices (%1$s, %<s). Number formatting uses ASCII digits with the locale's decimal/grouping separators from Intl. Date/time (%t) and

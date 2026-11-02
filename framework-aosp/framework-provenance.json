@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 7621072,
-  "sha256": "62d8b68d6d956abc2c87e11c8f81aa3ec2bbe11e79167d1b93431c277a0a8a3e",
-  "classCount": 5736,
+  "bytes": 7633616,
+  "sha256": "d32e3cef2ed5c7344eb530b221bd1297ab5148ed3b4884b753ad26743490f9e9",
+  "classCount": 5741,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -604,6 +604,10 @@
     "Landroid/animation/ValueAnimator$AnimatorUpdateListener;",
     "Landroid/animation/ValueAnimator$DurationScaleChangeListener;",
     "Landroid/animation/ValueAnimator$RepeatMode;",
+    "Landroid/app/ApplicationExitInfo$1;",
+    "Landroid/app/ApplicationExitInfo$Reason;",
+    "Landroid/app/ApplicationExitInfo$SubReason;",
+    "Landroid/app/ApplicationExitInfo;",
     "Landroid/app/Dialog$$ExternalSyntheticLambda0;",
     "Landroid/app/Dialog$$ExternalSyntheticLambda1;",
     "Landroid/app/Dialog$ListenersHandler;",
@@ -1804,6 +1808,7 @@
     "Landroid/util/AtomicFile;",
     "Landroid/util/CloseGuard;",
     "Landroid/util/ContainerHelpers;",
+    "Landroid/util/DebugUtils;",
     "Landroid/util/DisplayMetrics;",
     "Landroid/util/ExceptionUtils;",
     "Ljava/lang/Number;",
@@ -35613,6 +35618,16 @@
       "sha256": "79533579f8f39a13be0e86bbb3e1da63f66e5e3288a9872eefc9ed30eefd125a",
       "bytes": 4096,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/app/ApplicationExitInfo.java",
+      "localPath": "framework-aosp/upstream/android/app/ApplicationExitInfo.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/ApplicationExitInfo.java?format=TEXT",
+      "sha256": "92fa0c1aa0807a165940ba885d0d98dbd50bfb05f21983e72d28e366249ef59f",
+      "bytes": 46250,
+      "license": "Apache-2.0"
     }
   ],
   "algorithmPatches": [],
@@ -35947,6 +35962,10 @@
       {
         "path": "framework-aosp/lab-java/android/sysprop/InputProperties.java",
         "sha256": "6f29fdd1bd662dc1d6c84f4a66cf0e48e7de78df38ed81c06f8a0c525a1fd788"
+      },
+      {
+        "path": "framework-aosp/lab-java/android/util/DebugUtils.java",
+        "sha256": "7ebf3bc77b25003ce21252ee07b8727512ab73bc1fd22567a6945e6b17a3eac7"
       },
       {
         "path": "framework-aosp/lab-java/android/util/Slog.java",
@@ -37998,6 +38017,9 @@
     "android.app.ActivityManager",
     "android.app.ActivityThread",
     "android.app.AppGlobals",
+    "android.app.ApplicationExitInfoProto",
+    "android.app.IAppTraceRetriever",
+    "android.app.IParcelFileDescriptorRetriever",
     "android.app.WindowConfiguration",
     "android.app.compat.CompatChanges",
     "android.compat.annotation.ChangeId",
@@ -38062,6 +38084,7 @@
     "android.text.TextUtils",
     "android.text.method.QwertyKeyListener",
     "android.text.method.WordIterator",
+    "android.util.DebugUtils",
     "android.util.DisplayUtils",
     "android.util.Slog",
     "android.util.TimeUtils",

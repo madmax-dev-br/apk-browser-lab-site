@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=1d7890576be9';
-import { gcRoot } from './heap-gc.js?v=1d7890576be9';
-import { createHostRegistry, parseSignature } from './host-contract.js?v=1d7890576be9';
-import { JavaException } from './apk-runtime.js?v=1d7890576be9';
+import { APKError } from './apk-error.js?v=7995f957f05e';
+import { gcRoot } from './heap-gc.js?v=7995f957f05e';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=7995f957f05e';
+import { JavaException } from './apk-runtime.js?v=7995f957f05e';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).
@@ -50,6 +50,7 @@ export function createDateTimeHost(platform) {
   const validZone = id => { try { new Intl.DateTimeFormat('en-US', { timeZone: id }); return true; } catch { return false; } };
   /** Offset in ms of `id` at instant `t`. Custom ids "GMT+hh:mm" are fixed offsets. */
   function offsetOf(id, t) {
+    const rules = platform.customZones?.get(id); if (rules) return rules.offsetAt(t);   // a java.util.SimpleTimeZone (simple-timezone-host.js)
     const custom = /^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/.exec(id); if (custom) return (custom[1] === '-' ? -1 : 1) * (Number(custom[2]) * 60 + Number(custom[3] ?? 0)) * 60000;
     if (id === 'UTC' || id === 'GMT') return 0;
     const name = dtf(id, { timeZoneName: 'longOffset' }).formatToParts(new Date(t)).find(p => p.type === 'timeZoneName').value, m = /GMT([+-])(\d{2}):(\d{2})/.exec(name);
@@ -115,8 +116,8 @@ export function createDateTimeHost(platform) {
   def(ZONE, 'useDaylightTime', '()Z', (r, _m, [self]) => { const id = zid(r, self), y = new Date().getUTCFullYear(); return offsetOf(id, Date.UTC(y, 0, 1)) !== offsetOf(id, Date.UTC(y, 6, 1)) ? 1 : 0; });
   def(ZONE, 'inDaylightTime', `(${DATE})Z`, (r, _m, [self, d]) => { const id = zid(r, self), t = Number(time(r, d)), y = new Date(t).getUTCFullYear(); return offsetOf(id, t) !== Math.min(offsetOf(id, Date.UTC(y, 0, 1)), offsetOf(id, Date.UTC(y, 6, 1))) ? 1 : 0; });
   // ---- TimeZone: names, offsets, listings (platform tz data through Intl; names are the CLDR/ICU ones Android shows) --------------------------------------------------------------------------------
-  const rawOf = id => { const y = new Date().getUTCFullYear(); return Math.min(offsetOf(id, Date.UTC(y, 0, 1)), offsetOf(id, Date.UTC(y, 6, 1))); };
-  const savingsOf = id => { const y = new Date().getUTCFullYear(), a = offsetOf(id, Date.UTC(y, 0, 1)), b = offsetOf(id, Date.UTC(y, 6, 1)); return Math.abs(a - b); };
+  const rawOf = id => { const rules = platform.customZones?.get(id); if (rules) return rules.rawOffset; const y = new Date().getUTCFullYear(); return Math.min(offsetOf(id, Date.UTC(y, 0, 1)), offsetOf(id, Date.UTC(y, 6, 1))); };
+  const savingsOf = id => { const rules = platform.customZones?.get(id); if (rules) return rules.useDaylight ? rules.dstSavings : 0; const y = new Date().getUTCFullYear(), a = offsetOf(id, Date.UTC(y, 0, 1)), b = offsetOf(id, Date.UTC(y, 6, 1)); return Math.abs(a - b); };
   const zoneDisplay = (id, daylight, long, tag) => {
     const y = new Date().getUTCFullYear(), jan = Date.UTC(y, 0, 1), jul = Date.UTC(y, 6, 1), dstInstant = offsetOf(id, jan) >= offsetOf(id, jul) ? jan : jul, stdInstant = dstInstant === jan ? jul : jan;
     const instant = daylight && savingsOf(id) !== 0 ? dstInstant : stdInstant;   // a zone without daylight time answers its standard name for daylight=true

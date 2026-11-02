@@ -1,23 +1,23 @@
-import { VMClock } from './vm-clock.js?v=1d7890576be9';
-import { ExecutionProfile } from './execution-profile.js?v=1d7890576be9';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=1d7890576be9';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=1d7890576be9';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=1d7890576be9';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=1d7890576be9';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=1d7890576be9';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=1d7890576be9';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=1d7890576be9';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=1d7890576be9';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=1d7890576be9';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=1d7890576be9';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=1d7890576be9';
-import { APKError } from './apk-error.js?v=1d7890576be9';
-import { collectGarbage, collectionDue } from './heap-gc.js?v=1d7890576be9';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=1d7890576be9';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=1d7890576be9';
-import { Scheduler, Blocked } from './scheduler.js?v=1d7890576be9';
-import { bootClassLacksMember } from './boot-class-members.js?v=1d7890576be9';
-export { APKError } from './apk-error.js?v=1d7890576be9';
+import { VMClock } from './vm-clock.js?v=7995f957f05e';
+import { ExecutionProfile } from './execution-profile.js?v=7995f957f05e';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=7995f957f05e';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=7995f957f05e';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=7995f957f05e';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=7995f957f05e';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=7995f957f05e';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=7995f957f05e';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=7995f957f05e';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=7995f957f05e';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=7995f957f05e';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=7995f957f05e';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=7995f957f05e';
+import { APKError } from './apk-error.js?v=7995f957f05e';
+import { collectGarbage, collectionDue } from './heap-gc.js?v=7995f957f05e';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=7995f957f05e';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=7995f957f05e';
+import { Scheduler, Blocked } from './scheduler.js?v=7995f957f05e';
+import { bootClassLacksMember } from './boot-class-members.js?v=7995f957f05e';
+export { APKError } from './apk-error.js?v=7995f957f05e';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -479,7 +479,7 @@ for(const [owner,type]of [['Float','F'],['Double','D']])addBridge('java/lang/'+o
 addBridge('android/os/Trace', ['traceBegin(JLjava/lang/String;)V', 'traceEnd(J)V', 'isTagEnabled(J)Z']);
 addBridge('java/lang/Object',['notify()V','notifyAll()V','wait()V','wait(J)V','wait(JI)V']);
 addBridge('java/lang/Object', ['getClass()Ljava/lang/Class;', 'hashCode()I', 'equals(Ljava/lang/Object;)Z', 'toString()Ljava/lang/String;', 'clone()Ljava/lang/Object;', 'finalize()V']);
-addBridge('java/lang/Class', ['getName()Ljava/lang/String;', 'getSimpleName()Ljava/lang/String;', 'getSuperclass()Ljava/lang/Class;', 'isInterface()Z',
+addBridge('java/lang/Class', ['getPackageName()Ljava/lang/String;', 'isSynthetic()Z', 'isAnnotation()Z', 'getDeclaredClasses()[Ljava/lang/Class;', 'getClasses()[Ljava/lang/Class;', 'getName()Ljava/lang/String;', 'getSimpleName()Ljava/lang/String;', 'getSuperclass()Ljava/lang/Class;', 'isInterface()Z',
   'isArray()Z', 'isPrimitive()Z', 'getComponentType()Ljava/lang/Class;', 'isAssignableFrom(Ljava/lang/Class;)Z', 'isInstance(Ljava/lang/Object;)Z',
   'forName(Ljava/lang/String;)Ljava/lang/Class;', 'forName(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;',
   'desiredAssertionStatus()Z', 'isEnum()Z', 'getEnumConstants()[Ljava/lang/Object;']);
@@ -782,6 +782,27 @@ const signed8 = n => (n << 24) >> 24;
 const WIDE_HIGH = Symbol('wide-high');
 const defaultValue = type => type === 'J' || type === 'D' ? 0n : type.startsWith('L') || type.startsWith('[') ? null : 0;
 const wordCount = parameters => parameters.reduce((n, type) => n + (type === 'J' || type === 'D' ? 2 : 1), 0);
+const LIFECYCLE_CALLBACKS = 'Landroid/app/Application$ActivityLifecycleCallbacks;';
+const noop = () => undefined;
+const PLATFORM_INTERFACE_DEFAULTS = new Map();
+for (const event of ['Created', 'Started', 'Resumed', 'Paused', 'Stopped', 'SaveInstanceState', 'Destroyed'])
+  for (const phase of ['Pre', 'Post']) PLATFORM_INTERFACE_DEFAULTS.set(`${LIFECYCLE_CALLBACKS}->onActivity${phase}${event}(Landroid/app/Activity;${event === 'Created' || event === 'SaveInstanceState' ? 'Landroid/os/Bundle;' : ''})V`, noop);   // API 29
+for (const [owner, signatures] of Object.entries({
+  'Landroid/view/Window$Callback;': ['onProvideKeyboardShortcuts(Ljava/util/List;Landroid/view/Menu;I)V', 'onPointerCaptureChanged(Z)V'],
+  'Landroid/content/ServiceConnection;': ['onBindingDied(Landroid/content/ComponentName;)V', 'onNullBinding(Landroid/content/ComponentName;)V'],
+  'Landroid/location/LocationListener;': ['onProviderEnabled(Ljava/lang/String;)V', 'onProviderDisabled(Ljava/lang/String;)V', 'onStatusChanged(Ljava/lang/String;ILandroid/os/Bundle;)V', 'onFlushComplete(I)V'],
+  'Landroid/location/Geocoder$GeocodeListener;': ['onError(Ljava/lang/String;)V'],
+})) for (const signature of signatures) PLATFORM_INTERFACE_DEFAULTS.set(`${owner}->${signature}`, noop);
+// LocationListener.onLocationChanged(List<Location>) (API 31): the default hands each location to onLocationChanged(Location)
+PLATFORM_INTERFACE_DEFAULTS.set('Landroid/location/LocationListener;->onLocationChanged(Ljava/util/List;)V', (runtime, args) => {
+  const list = args[1]; if (list === null || list === 0) runtime.throwJava('Ljava/lang/NullPointerException;', null);
+  const size = runtime.dispatch({ owner: 'Ljava/util/List;', name: 'size', parameters: [], result: 'I', signature: '()I' }, [list], 'virtual');
+  for (let i = 0; i < size; i++) {
+    const location = runtime.dispatch({ owner: 'Ljava/util/List;', name: 'get', parameters: ['I'], result: 'Ljava/lang/Object;', signature: '(I)Ljava/lang/Object;' }, [list, i], 'virtual');
+    runtime.dispatch({ owner: runtime.typeOf(args[0]), name: 'onLocationChanged', parameters: ['Landroid/location/Location;'], result: 'V', signature: '(Landroid/location/Location;)V' }, [args[0], location], 'virtual');
+  }
+});
+const PLATFORM_DEFAULT_NAMES = new Set([...PLATFORM_INTERFACE_DEFAULTS.keys()].map(key => key.slice(key.indexOf('->') + 2)));
 const EXTERNAL_INTERFACE_NAMES=new Set([...EXTERNAL_INTERFACES.values()].flat());
 // Float/double registers carry IEEE bit patterns; typed-array views reinterpret them (little-endian hosts only, which every browser and Node target is).
 const BITS = new ArrayBuffer(8), F32 = new Float32Array(BITS), I32 = new Int32Array(BITS), F64 = new Float64Array(BITS), B64 = new BigInt64Array(BITS);
@@ -1235,12 +1256,13 @@ export class APKRuntime {
     const count = b.u32(annotations); b.table(count, annotations + 4, 4);
     for (let i = 0; i < count; i++) {
       const cursor = { p: b.u32(annotations + 4 + i * 4) + 1 }, annotationType = cls.dex.types[b.uleb(cursor)];
-      if (!['Ldalvik/annotation/InnerClass;', 'Ldalvik/annotation/EnclosingClass;', 'Ldalvik/annotation/EnclosingMethod;'].includes(annotationType)) continue;
+      if (!['Ldalvik/annotation/InnerClass;', 'Ldalvik/annotation/EnclosingClass;', 'Ldalvik/annotation/EnclosingMethod;', 'Ldalvik/annotation/MemberClasses;'].includes(annotationType)) continue;
       const size = b.uleb(cursor); if (size > 32) fail('Malformed class nesting annotation');
       const attributes = new Map();
       for (let j = 0; j < size; j++) attributes.set(cls.dex.strings[b.uleb(cursor)], cls.dex.encodedValue(cursor));
       if (annotationType.endsWith('/InnerClass;')) { info.inner = true; info.simpleName = attributes.get('name'); info.modifiers = attributes.get('accessFlags'); }
       if (annotationType.endsWith('/EnclosingClass;')) info.declaringClass = attributes.get('value')?.value;
+      if (annotationType.endsWith('/MemberClasses;')) info.members = (attributes.get('value')?.values ?? []).map(entry => entry.value).filter(value => typeof value === 'string');
       if (annotationType.endsWith('/EnclosingMethod;')) { info.enclosingMethod = attributes.get('value')?.value; info.enclosingClass = info.enclosingMethod?.owner; }
     }
     return info;
@@ -1500,6 +1522,7 @@ export class APKRuntime {
       let slot = byMode[mode]; if (slot === undefined) slot = byMode[mode] = new Map();
       let resolution = slot.get(ownerKey);
       if (resolution === undefined) { resolution = this.resolveInvoke(method, args, mode, callerOwner); slot.set(ownerKey, resolution); }
+      if (resolution.kind === 'platform-default') return resolution.run(this, args);
       if (resolution.kind === 'missing-stub') return this.noteMissingStub(resolution.key, resolution.result);
       if (resolution.kind === 'bridge') { this.lastBridge = resolution; this.lastBridgeDepth = this.depth; if (this.profile.active) this.profile.host(resolution.key); this.record(resolution.text ??= `${resolution.skia ? 'SKIA' : 'SHIM'} ${resolution.key}`); this.lastHostCall = resolution.key; return hostReturn(resolution.selected, this.bridge(resolution.selected, args, mode, resolution.key, resolution)); }
       if (resolution.kind === 'default') {
@@ -1570,9 +1593,20 @@ export class APKRuntime {
     // Java 8 default methods: after the class chain, a concrete method inherited from a (super)interface of the receiver's class.
     const defaultMethod = this.findInterfaceDefault(mode === 'virtual' ? this.typeOf(args[0]) : method.owner, method);
     if (defaultMethod?.code) return { kind: 'default', defaultMethod };
+    // Default methods that framework interfaces gained in later API levels: an app compiled against an older SDK implements the interface without them and the platform's default runs.
+    const platformDefault = this.platformInterfaceDefault(mode === 'virtual' ? this.typeOf(args[0]) : method.owner, method);
+    if (platformDefault) return { kind: 'platform-default', run: platformDefault, key: methodKey(method) };
     if (method.name === '<init>') { const widget = this.platform?.unimplementedWidgetMessage?.(method.owner, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' }); }   // never a stubbed constructor: a half-working View
     if (this.toleratesMissing(method)) return { kind: 'missing-stub', key: methodKey(method), result: method.result };
     fail(`Unsupported API/method: ${methodKey(method)}`);
+  }
+  /** The platform's body of an interface default method, for a receiver whose class (or a superinterface) is the framework interface declaring it. */
+  platformInterfaceDefault(type, method) {
+    const key = `${method.name}${method.signature}`;
+    if (!PLATFORM_INTERFACE_DEFAULTS.has(key) && !PLATFORM_DEFAULT_NAMES.has(key)) return null;
+    const owners = new Set(this.ancestorSet(type)); owners.add(method.owner);
+    for (const owner of owners) { const found = PLATFORM_INTERFACE_DEFAULTS.get(`${owner}->${key}`); if (found) return found; }
+    return null;
   }
   toleratesMissing(method) { const mode = this.tolerateMissing; return mode === 'all' || (mode !== 'off' && method.result === 'V') || (mode === 'primitives' && /^[ZBSCIJFD]$/.test(method.result)); }
   /** Tolerant mode: count a stubbed call and answer with the return type's default; the first call per method is traced. */
@@ -2483,6 +2517,13 @@ export class APKRuntime {
       if (['getProperty','setProperty','clearProperty'].includes(name)) {
         if(isNull(args[0]))this.throwJava('Ljava/lang/NullPointerException;','Property key is null');
         if(typeof args[0]!=='string'||!args[0].length)this.throwJava('Ljava/lang/IllegalArgumentException;','Property key is empty/invalid');
+        if(this.systemPropertiesObject){   // System.getProperties() was handed out: that Properties object is the table
+          const via=(method,parameters,result,values)=>this.dispatch({owner:'Ljava/util/Properties;',name:method,parameters,result,signature:`(${parameters.join('')})${result}`},[this.systemPropertiesObject,...values],'virtual');
+          if(name==='getProperty')return args.length>1?via('getProperty',['Ljava/lang/String;','Ljava/lang/String;'],'Ljava/lang/String;',[args[0],args[1]]):via('getProperty',['Ljava/lang/String;'],'Ljava/lang/String;',[args[0]]);
+          if(name==='clearProperty'){const old=via('getProperty',['Ljava/lang/String;'],'Ljava/lang/String;',[args[0]]);via('remove',['Ljava/lang/Object;'],'Ljava/lang/Object;',[args[0]]);return old;}
+          if(isNull(args[1]))this.throwJava('Ljava/lang/NullPointerException;','Property value is null');
+          return via('setProperty',['Ljava/lang/String;','Ljava/lang/String;'],'Ljava/lang/Object;',[args[0],args[1]]);
+        }
         const old=this.javaProperties.has(args[0])?this.javaProperties.get(args[0]):null;
         if(name==='getProperty')return old??args[1]??null;
         if(name==='clearProperty')this.javaProperties.delete(args[0]);else{if(isNull(args[1]))this.throwJava('Ljava/lang/NullPointerException;','Property value is null');if(typeof args[1]!=='string')fail('Expected Java property String');this.javaProperties.set(args[0],args[1]);}return old;
@@ -3360,6 +3401,14 @@ export class APKRuntime {
       }
       if (name === 'getName' || name === 'getSimpleName' || name === 'getCanonicalName') return this.className(type, name === 'getSimpleName' ? 'simple' : name === 'getCanonicalName' ? 'canonical' : 'binary');
       if (name === 'getModifiers') return this.classNesting(type).modifiers ?? this.classes.get(type)?.flags ?? (EXTERNAL_INTERFACE_NAMES.has(type)?0x601:1);
+      if (name === 'getPackageName') { let base = type; while (base.startsWith('[')) base = base.slice(1); if (!base.startsWith('L')) return 'java.lang'; const slash = base.lastIndexOf('/'); return slash < 0 ? '' : base.slice(1, slash).replaceAll('/', '.'); }
+      if (name === 'isSynthetic') return (this.classes.get(type)?.flags ?? 0) & 0x1000 ? 1 : 0;
+      if (name === 'isAnnotation') return (this.classes.get(type)?.flags ?? 0) & 0x2000 ? 1 : 0;
+      if (name === 'getDeclaredClasses' || name === 'getClasses') {   // Class.getDeclaredClasses: the dalvik.annotation.MemberClasses of the class; getClasses: the public member classes of the class and its superclasses
+        const collect = owner => (this.classNesting(owner).members ?? []).filter(member => name === 'getDeclaredClasses' || ((this.classNesting(member).modifiers ?? this.classes.get(member)?.flags ?? 0) & 1));
+        const members = []; for (let current = type, guard = 0; current && guard < 64; current = name === 'getClasses' ? this.parent(current) : null, guard++) members.push(...collect(current));
+        const array = this.newArray('[Ljava/lang/Class;', members.length); this.object(array).elements = members.map(member => this.classObject(member)); return array;
+      }
       if (name === 'getDeclaringClass' || name === 'getEnclosingClass') { const info = this.classNesting(type), enclosing = name === 'getDeclaringClass' ? info.declaringClass : info.enclosingClass ?? info.declaringClass; return enclosing ? this.classObject(enclosing) : null; }
       if (name === 'getProtectionDomain') {
         // ART's Class.getProtectionDomain: every class has the one all-permissions domain without a code source (java.lang.Class.allPermDomain), which is what the provider

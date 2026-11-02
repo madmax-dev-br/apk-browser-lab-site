@@ -1,5 +1,5 @@
-import { floatBits } from './host-contract.js?v=1d7890576be9';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=1d7890576be9';
+import { floatBits } from './host-contract.js?v=7995f957f05e';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=7995f957f05e';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,

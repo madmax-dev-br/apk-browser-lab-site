@@ -29275,5 +29275,15 @@
     "sha256": "79533579f8f39a13be0e86bbb3e1da63f66e5e3288a9872eefc9ed30eefd125a",
     "bytes": 4096,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/app/ApplicationExitInfo.java",
+    "localPath": "framework-aosp/upstream/android/app/ApplicationExitInfo.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/ApplicationExitInfo.java?format=TEXT",
+    "sha256": "92fa0c1aa0807a165940ba885d0d98dbd50bfb05f21983e72d28e366249ef59f",
+    "bytes": 46250,
+    "license": "Apache-2.0"
   }
 ]
