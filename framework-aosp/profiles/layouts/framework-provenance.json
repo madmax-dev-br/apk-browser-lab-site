@@ -1274,7 +1274,7 @@
       "license": "Apache-2.0"
     }
   ],
-  "requiresDefaultFrameworkSha256": "15e99922d102b333d3c453ebf2bccbc9d5e1174ce0b431633fd1ea88948e5e12",
+  "requiresDefaultFrameworkSha256": "931dfe04f35a7f68f36068814dfd13f01433b9c3d77f38e9830ba767767f1a89",
   "sourceTransforms": [
     {
       "path": "com/android/internal/app/AlertController.java",

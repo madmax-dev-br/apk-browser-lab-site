@@ -1,5 +1,5 @@
-import {APKError} from './apk-runtime.js?v=43c1da0663b3';
-import {DIGESTS} from './crypto-host.js?v=43c1da0663b3';
+import {APKError} from './apk-runtime.js?v=ef714893ba48';
+import {DIGESTS} from './crypto-host.js?v=ef714893ba48';
 
 /** Android font fallback (Minikin FontCollection) over the vendored Android 13 fallback chain.
  *
@@ -145,6 +145,8 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
       }
       return true;
     },
+    /** Registers app font bytes with the paragraph font provider under `name` (a content-derived family name), so a text style can list it ahead of Roboto. */
+    registerCustom(name, bytes) { getProvider().registerFont(bytes, name); },
     /** SkParagraph builder over the registered fonts (Roboto + every fallback file loaded so far). */
     makeBuilder(paragraphStyle) { return CK.ParagraphBuilder.MakeFromFontProvider(paragraphStyle, getProvider()); },
     /** Adds `text` to `builder`, one pushed text style per itemized run (`styleProps` is the TextStyle of the paragraph). */

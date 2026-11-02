@@ -1,6 +1,9 @@
 Android framework portions: Apache License 2.0.
 OpenJDK portions from libcore: GPLv2 with Classpath Exception; see NOTICE.
 W3C DOM interfaces (org.w3c.dom): W3C Software Notice and License 2002-12-31; see LICENSE-W3C-SOFTWARE-2002-12-31.txt.
+ICU4J charset converters: ICU license; see LICENSE-ICU.txt. XMLPULL API: public domain; see LICENSE-XMLPULL-PUBLIC-DOMAIN.txt.
+kXML2: MIT; see LICENSE-MIT-KXML2.txt. Bouncy Castle: MIT; see LICENSE-MIT-BOUNCYCASTLE.txt. TagSoup: Apache-2.0; see LICENSE-TAGSOUP-APACHE-2.0.txt.
+Conscrypt: Apache-2.0 (the project's license; the generated sources carry no header).
 
 
                                  Apache License

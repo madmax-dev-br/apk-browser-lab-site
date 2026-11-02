@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=43c1da0663b3';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=43c1da0663b3';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=43c1da0663b3';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=43c1da0663b3';
+import { APKError } from './apk-error.js?v=ef714893ba48';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=ef714893ba48';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=ef714893ba48';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ef714893ba48';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -434,7 +434,7 @@ export function createAppServicesHost(platform) {
   // posted notifications are counted and traced, never shown. areNotificationsEnabled follows Android 13's rule: apps targeting 33+ need
   // POST_NOTIFICATIONS declared (the lab grants declared runtime permissions); older targets are enabled by default.
   const NOTIFICATION_MANAGER = service('notification', 'Landroid/app/NotificationManager;'), CHANNEL = 'Landroid/app/NotificationChannel;';
-  const notificationState = { delegate: null, channels: gcRoot(new Map()), posted: gcRoot(new Map()) };
+  const notificationState = { delegate: null, channels: gcRoot(new Map()), posted: gcRoot(new Map()), records: gcRoot(new Map()) };
   const channelId = (r, channel) => { try { return r.stringCharacters(r.dispatch({ owner: CHANNEL, name: 'getId', parameters: [], result: STRING, signature: `()${STRING}` }, [channel], 'virtual')); } catch { return null; } };
   def(NOTIFICATION_MANAGER, 'setNotificationDelegate', `(${STRING})V`, (r, _m, [, delegate]) => { notificationState.delegate = delegate === null ? null : r.stringCharacters(delegate); });
   def(NOTIFICATION_MANAGER, 'getNotificationDelegate', `()${STRING}`, () => notificationState.delegate);
@@ -489,12 +489,13 @@ export function createAppServicesHost(platform) {
   def(NOTIFICATION_MANAGER, 'getNotificationChannel', `(${STRING})${CHANNEL}`, (r, _m, [, id]) => notificationState.channels.get(text(r, id)) ?? null);
   def(NOTIFICATION_MANAGER, 'getNotificationChannels', '()Ljava/util/List;', r => { const list = newEmptyList(r); for (const channel of notificationState.channels.values()) r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, channel], 'virtual'); return list; });
   def(NOTIFICATION_MANAGER, 'deleteNotificationChannel', `(${STRING})V`, (r, _m, [, id]) => { notificationState.channels.delete(text(r, id)); });
-  const post = (r, key, notification) => { notificationState.posted.set(key, notification); r.record(`NOTIFICATION post ${key}`); };
-  def(NOTIFICATION_MANAGER, 'notify', '(ILandroid/app/Notification;)V', (r, _m, [, id, notification]) => post(r, `:${id}`, notification));
-  def(NOTIFICATION_MANAGER, 'notify', `(${STRING}ILandroid/app/Notification;)V`, (r, _m, [, tag, id, notification]) => post(r, `${tag === null ? '' : r.stringCharacters(tag)}:${id}`, notification));
-  def(NOTIFICATION_MANAGER, 'cancel', '(I)V', (_r, _m, [, id]) => { notificationState.posted.delete(`:${id}`); });
-  def(NOTIFICATION_MANAGER, 'cancel', `(${STRING}I)V`, (r, _m, [, tag, id]) => { notificationState.posted.delete(`${tag === null ? '' : r.stringCharacters(tag)}:${id}`); });
-  def(NOTIFICATION_MANAGER, 'cancelAll', '()V', () => { notificationState.posted.clear(); });
+  const post = (r, key, notification, tag, id) => { notificationState.posted.set(key, notification); notificationState.records.set(key, { tag: tag === null ? null : r.stringCharacters(tag), id, time: BigInt(Math.trunc(platform.clock.wall())) }); r.record(`NOTIFICATION post ${key}`); };
+  platform.notificationRecords = notificationState.records; platform.notificationPosted = notificationState.posted;   // (tag, id, post time) of every notification the app still has posted, in post order (an update keeps its place, as in the service's list): NotificationManager.getActiveNotifications
+  def(NOTIFICATION_MANAGER, 'notify', '(ILandroid/app/Notification;)V', (r, _m, [, id, notification]) => post(r, `:${id}`, notification, null, id));
+  def(NOTIFICATION_MANAGER, 'notify', `(${STRING}ILandroid/app/Notification;)V`, (r, _m, [, tag, id, notification]) => post(r, `${tag === null ? '' : r.stringCharacters(tag)}:${id}`, notification, tag, id));
+  def(NOTIFICATION_MANAGER, 'cancel', '(I)V', (_r, _m, [, id]) => { notificationState.posted.delete(`:${id}`); notificationState.records.delete(`:${id}`); });
+  def(NOTIFICATION_MANAGER, 'cancel', `(${STRING}I)V`, (r, _m, [, tag, id]) => { const key = `${tag === null ? '' : r.stringCharacters(tag)}:${id}`; notificationState.posted.delete(key); notificationState.records.delete(key); });
+  def(NOTIFICATION_MANAGER, 'cancelAll', '()V', () => { notificationState.posted.clear(); notificationState.records.clear(); });
 
   // ShortcutManager (ShortcutManager.java / ShortcutService, API 25+): per-app dynamic shortcut store with the service's limits. The virtual device has
   // no launcher that pins shortcuts, so isRequestPinShortcutSupported/requestPinShortcut answer false; there are no manifest or pinned shortcuts.

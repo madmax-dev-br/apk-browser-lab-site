@@ -1,6 +1,6 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=43c1da0663b3';
-import { APKError } from './apk-error.js?v=43c1da0663b3';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=43c1da0663b3';
+import { bitsFloat, floatBits } from './host-contract.js?v=ef714893ba48';
+import { APKError } from './apk-error.js?v=ef714893ba48';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=ef714893ba48';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB
@@ -32,6 +32,14 @@ export function createPeripheralServicesHost(platform) {
   def(WIFI, 'is5GHzBandSupported', '()Z', () => 0); def(WIFI, 'is6GHzBandSupported', '()Z', () => 0); def(WIFI, 'is24GHzBandSupported', '()Z', () => 1);
   def(WIFI, 'isP2pSupported', '()Z', () => 0); def(WIFI, 'isTdlsSupported', '()Z', () => 0); def(WIFI, 'isPreferredNetworkOffloadSupported', '()Z', () => 0);
   def(WIFI, 'isEnhancedOpenSupported', '()Z', () => 0); def(WIFI, 'isWpa3SaeSupported', '()Z', () => 0); def(WIFI, 'isWifiStandardSupported', '(I)Z', () => 0);
+  // Capability queries that WifiManager.java (android-13) answers from the supported-feature mask: this virtual radio is a 2.4 GHz client without the optional features, so each is false
+  // (isWpa3SaePublicKeySupported is literally false in the framework). is60GHzBandSupported asks the service, which has no 60 GHz radio.
+  for (const name of ['isDeviceToApRttSupported', 'isEnhancedPowerReportingSupported', 'isEasyConnectSupported', 'isEasyConnectEnrolleeResponderModeSupported', 'isEasyConnectDppAkmSupported', 'isWapiSupported', 'isWpa3SuiteBSupported',
+    'isStaApConcurrencySupported', 'isBridgedApConcurrencySupported', 'isStaBridgedApConcurrencySupported', 'isMakeBeforeBreakWifiSwitchingSupported', 'isWpa3SaeH2eSupported', 'isWpa3SaePublicKeySupported', 'isDecoratedIdentitySupported',
+    'isTrustOnFirstUseSupported', 'isPasspointTermsAndConditionsSupported', 'isWifiDisplayR2Supported', 'isStaConcurrencyForLocalOnlyConnectionsSupported', 'isStaConcurrencyForMultiInternetSupported', 'is60GHzBandSupported']) def(WIFI, name, '()Z', () => 0);
+  def(WIFI, 'pingSupplicant', '()Z', () => (connected() ? 1 : 0));   // return isWifiEnabled()
+  def(WIFI, 'getMaxNumberOfNetworkSuggestionsPerApp', '()I', () => 1024);   // isLowRamDevice() is false: NETWORK_SUGGESTIONS_MAX_PER_APP_HIGH_RAM
+  def(WIFI, 'updateNetwork', '(Landroid/net/wifi/WifiConfiguration;)I', () => -1);   // null or negative networkId is -1 in the client; this app has no saved network to update
   def(WIFI, 'getMaxSignalLevel', '()I', () => 4);
   def(WIFI, 'calculateSignalLevel', '(II)I', (r, _m, [rssi, levels]) => { if (levels <= 1) iae(r, 'numLevels ' + levels + ' must be at least 2'); return rssi <= -100 ? 0 : rssi >= -55 ? levels - 1 : Math.trunc((rssi + 100) * (levels - 1) / 45); }, { static: true });
   def(WIFI, 'compareSignalLevel', '(II)I', (r, _m, [a, b]) => a - b, { static: true });

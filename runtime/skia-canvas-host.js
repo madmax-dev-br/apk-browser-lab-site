@@ -1,12 +1,14 @@
-import {APKError} from './apk-runtime.js?v=43c1da0663b3';
-import {getVectorGraphics} from './vector-native.js?v=43c1da0663b3';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=43c1da0663b3';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=43c1da0663b3';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=43c1da0663b3';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=43c1da0663b3';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=43c1da0663b3';
-import {createBitmapHost} from './bitmap-host.js?v=43c1da0663b3';
-import { gcRoot } from './heap-gc.js?v=43c1da0663b3';
+import {APKError} from './apk-runtime.js?v=ef714893ba48';
+import {getVectorGraphics} from './vector-native.js?v=ef714893ba48';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=ef714893ba48';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=ef714893ba48';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=ef714893ba48';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=ef714893ba48';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=ef714893ba48';
+import {createBitmapHost} from './bitmap-host.js?v=ef714893ba48';
+import { gcRoot } from './heap-gc.js?v=ef714893ba48';
+import {sha256Hex} from './sha256-sync.js?v=ef714893ba48';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=ef714893ba48';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -62,9 +64,9 @@ function makeFont(backend,state,text){
  // A simple glyph run is exact for scripts without contextual shaping (Latin, punctuation, symbols) that Roboto covers;
  // complex scripts, combining marks, emoji/joiner sequences, letter/word spacing and code points Roboto lacks are shaped
  // run by run through the Android font fallback chain (SkParagraph/HarfBuzz) instead: makeFont then returns {shaped:true}.
- const shaped=state.letterSpacing||state.wordSpacing||/[\p{Mark}\u200c\u200d\ufe0e\ufe0f\p{Extended_Pictographic}]|[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Gurmukhi}\p{Script=Gujarati}\p{Script=Oriya}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Kannada}\p{Script=Malayalam}\p{Script=Sinhala}\p{Script=Thai}\p{Script=Lao}\p{Script=Tibetan}\p{Script=Myanmar}\p{Script=Khmer}\p{Script=Mongolian}\p{Script=Hangul}]/u.test(text);
+ const shaped=state.letterSpacing||state.wordSpacing||state.fontVariations?.length||/[\p{Mark}\u200c\u200d\ufe0e\ufe0f\p{Extended_Pictographic}]|[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Gurmukhi}\p{Script=Gujarati}\p{Script=Oriya}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Kannada}\p{Script=Malayalam}\p{Script=Sinhala}\p{Script=Thai}\p{Script=Lao}\p{Script=Tibetan}\p{Script=Myanmar}\p{Script=Khmer}\p{Script=Mongolian}\p{Script=Hangul}]/u.test(text);
  if(state.flags&0x800)fail('The CanvasKit font API does not expose force-auto-hinting');
- const font=new CK.Font(state.nativeTypeface??backend.typeface,state.textSize??12);font.setScaleX(state.textScaleX??1);font.setSkewX(state.textSkewX??0);font.setEmbolden(!!(state.flags&0x20));font.setLinearMetrics(!!(state.flags&0x40));font.setSubpixel(!!(state.flags&0x80));font.setEmbeddedBitmaps(!!(state.flags&0x400));
+ const font=new CK.Font(state.nativeTypeface??backend.typeface,state.textSize??12);font.setScaleX(state.textScaleX??1);font.setSkewX((state.textSkewX??0)+(state.fakeItalic?-0.25:0));font.setEmbolden(!!(state.flags&0x20)||!!state.fakeBold);font.setLinearMetrics(!!(state.flags&0x40));font.setSubpixel(!!(state.flags&0x80));font.setEmbeddedBitmaps(!!(state.flags&0x400));
  // Embind's public enum ABI is {value:number};0.42 omits the Alias symbol (SkFont::Edging::kAlias=0).
  font.setEdging(state.flags&1?CK.FontEdging.AntiAlias:(CK.FontEdging.Alias??{value:0}));
  font.setHinting(state.hinting===0?CK.FontHinting.None:CK.FontHinting.Normal);
@@ -76,7 +78,7 @@ const RTL_SCRIPT=/[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=
 const firstStrongRtl=text=>{for(const char of text)if(/\p{L}/u.test(char))return RTL_SCRIPT.test(char);return false;};
 const mergeMetrics=(base,extra)=>{const m={...base};for(const e of extra){m.ascent=Math.min(m.ascent,e.ascent);m.descent=Math.max(m.descent,e.descent);m.leading=Math.max(m.leading??0,e.leading??0);if(m.bounds&&e.bounds){m.bounds=[Math.min(m.bounds[0],e.bounds[0]),Math.min(m.bounds[1],e.bounds[1]),Math.max(m.bounds[2],e.bounds[2]),Math.max(m.bounds[3],e.bounds[3])];}}return m;};
 export function measureSkiaText(backend,text,state={}){const made=makeFont(backend,state,text);
- if(made.shaped){const CK=backend.CanvasKit,face=new CK.Font(state.nativeTypeface??backend.typeface,state.textSize??12);try{face.setScaleX(state.textScaleX??1);face.setSkewX(state.textSkewX??0);face.setEmbolden(!!(state.flags&0x20));face.setLinearMetrics(!!(state.flags&0x40));face.setSubpixel(!!(state.flags&0x80));
+ if(made.shaped){const CK=backend.CanvasKit,face=new CK.Font(state.nativeTypeface??backend.typeface,state.textSize??12);try{face.setScaleX(state.textScaleX??1);face.setSkewX((state.textSkewX??0)+(state.fakeItalic?-0.25:0));face.setEmbolden(!!(state.flags&0x20)||!!state.fakeBold);face.setLinearMetrics(!!(state.flags&0x40));face.setSubpixel(!!(state.flags&0x80));
    const run=measureSkiaShapedText(backend,text,{...state,weight:state.weight??400,italic:!!state.italic});
    return {width:run.width,metrics:mergeMetrics(face.getMetrics(),run.fontMetrics),glyphCount:run.glyphCount,source:'official-Skia-SkParagraph/Roboto+Android-fallback-chain'};}finally{face.delete();}}
  const {font,glyphs}=made;try{return {width:font.getGlyphWidths(glyphs).reduce((a,b)=>a+b,0),metrics:font.getMetrics(),glyphCount:glyphs.length,source:'official-Skia-Font/Roboto/simple-glyph-run'};}finally{font.delete();}}
@@ -265,20 +267,49 @@ export function createSkiaCanvasHost(runtime,backend){
  const TYPEFACE='Landroid/graphics/Typeface;',PAINT='Landroid/graphics/Paint;',typefaces=gcRoot(new Map()),faceCache=gcRoot(new Map());
  add(TYPEFACE,[`create(Ljava/lang/String;I)${TYPEFACE}`,`create(${TYPEFACE}I)${TYPEFACE}`,`create(${TYPEFACE}IZ)${TYPEFACE}`,`defaultFromStyle(I)${TYPEFACE}`,'getStyle()I','getWeight()I','isBold()Z','isItalic()Z']);
  add(PAINT,[`setTypeface(${TYPEFACE})${TYPEFACE}`,`getTypeface()${TYPEFACE}`,'getFillPath(Landroid/graphics/Path;Landroid/graphics/Path;)Z']);
- const makeTypeface=(family='sans-serif',style=0,weight=null,italic=null)=>{
-  const name=family??'sans-serif';if(!['sans-serif','sans','Roboto','sans-serif-medium','arial','helvetica','tahoma','verdana'].includes(name))fail(`Font family ${name} is not installed in the VM`);
-  style&=3;weight??=name==='sans-serif-medium'&&style===0?500:style&1?700:400;italic??=!!(style&2);
-  const key=weight+':'+italic;if(!faceCache.has(key)){const face=backend.selectTypeface(weight,italic),value=runtime.makeObject(TYPEFACE),info={face,family:'Roboto',style:(weight>=700?1:0)|(italic?2:0),weight,italic,reference:value};typefaces.set(value.ref,info);faceCache.set(key,value);}return faceCache.get(key);
+ // System faces: the lab ships Roboto only. fonts.xml maps sans-serif and its aliases (arial, helvetica, tahoma, verdana) to it and defines weight aliases (sans-serif-thin 100 ... sans-serif-black 900). Any other
+ // family name is absent from the system font map, and Typeface.create(String, int) answers the default typeface for it (create((Typeface) null, style)), as Android does: it is not an error.
+ // Families fonts.xml defines that need font files the lab does not ship (serif, monospace, cursive, casual, the condensed and small-caps variants) therefore also answer Roboto.
+ const SYSTEM_BASE=new Map([['sans-serif',400],['sans-serif-thin',100],['sans-serif-light',300],['sans-serif-medium',500],['sans-serif-black',900],['arial',400],['helvetica',400],['tahoma',400],['verdana',400]]);
+ const apiStyle=(weight,italic)=>(weight>=600?1:0)|(italic?2:0);   // Typeface.cpp computeAPIStyle
+ const makeTypeface=(family='sans-serif',style=0,weight=null,italic=null,baseHint=null)=>{
+  const name=typeof family==='string'||family===null||family===undefined?family:runtime.stringCharacters(family);
+  const relative=weight===null,base=baseHint??SYSTEM_BASE.get(name??'sans-serif')??400;
+  if((style&~3)!==0)style=0;weight??=Math.min(1000,base+(style&1?300:0));italic??=!!(style&2);   // Typeface::computeRelativeStyle: bold adds 300 to the base weight
+  const api=relative?style:apiStyle(weight,italic),key=weight+':'+italic+':'+base+':'+api;
+  if(!faceCache.has(key)){const face=backend.selectTypeface(weight,italic),value=runtime.makeObject(TYPEFACE),info={face,family:'Roboto',style:api,weight,baseWeight:base,italic,reference:value};typefaces.set(value.ref,info);faceCache.set(key,value);}return faceCache.get(key);
  };
- const customFaces=[];
- /** A Typeface over font bytes supplied by the app (Typeface.Builder / Font): null when FreeType cannot read them. */
- const customTypeface=({bytes,weight,italic})=>{
-  if(customFaces.length>=256)fail('Custom Typeface limit (256) exceeded');
-  const face=CK.Typeface.MakeFreeTypeFaceFromData(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));if(!face)return null;
-  customFaces.push(face);const value=runtime.makeObject(TYPEFACE);
-  typefaces.set(value.ref,{face,family:'custom',style:(weight>=600?1:0)|(italic?2:0),weight,italic,reference:value,custom:true});return value;
+ // App fonts: one registered face per distinct font file (content hash + collection index), shared by every Typeface built from it, and registered once with the paragraph font provider under a content-derived family
+ // name so SkParagraph can shape and fall back through [app family..., Roboto].
+ const fontFiles=new Map(),registeredNames=backend.customFontNames??=new Set();let customCount=0,specSeq=0;
+ /** A face from font bytes (ttc selects a collection member); null when it is not a font FreeType can read. */
+ const registerFontFile=({bytes,ttc=0})=>{
+  const hash=sha256Hex(bytes)+':'+ttc,known=fontFiles.get(hash);if(known)return known;
+  if(fontFiles.size>=256)fail('Custom font limit (256) exceeded');
+  const data=sfntMember(bytes,ttc);if(!data||!sfntStyle(data,0))return null;
+  const ck=CK.Typeface.MakeFreeTypeFaceFromData(data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength));if(!ck)return null;
+  const name='apk-font-'+hash.slice(0,32).replace(':','-');if(!registeredNames.has(name)){if(registeredNames.size>=1024)fail('Registered custom font limit (1024) exceeded');backend.fallback.registerCustom(name,data);registeredNames.add(name);}
+  const entry={ck,name,axes:sfntAxes(data,0),size:data.length};fontFiles.set(hash,entry);return entry;
  };
+ // Minikin FontFamily::getClosestMatch (score = weight grades apart + 2 for a slant mismatch) and computeFakery (fake bold when the wanted weight is >= 600 and 200+ above the font's; fake italic for an italic request on an upright font)
+ const closest=(fonts,weight,italic)=>{let best=null,score=Infinity;for(const f of fonts){const s=Math.abs(Math.trunc(weight/100)-Math.trunc(f.weight/100))+(italic===f.italic?0:2);if(s<score){best=f;score=s;}}return best;};
+ const bindCustom=info=>{
+  const chain=info.spec.families.map(fonts=>closest(fonts,info.weight,info.italic)),primary=chain[0];
+  info.selected=primary;info.face=primary.file.ck;info.families=chain.map(font=>font.file.name);
+  info.fontVariations=primary.axes?.length?primary.axes.map(axis=>({axis:axis.tag,value:axis.value})):undefined;
+  info.fakeBold=info.weight>=600&&info.weight-primary.weight>=200;info.fakeItalic=info.italic&&!primary.italic;
+ };
+ const makeCustom=(spec,weight,italic,baseWeight,style)=>{
+  const key=weight+':'+italic+':'+baseWeight+':'+style;if(spec.cache.has(key))return spec.cache.get(key);
+  if(customCount>=4096)fail('Custom Typeface limit (4096) exceeded');
+  const value=runtime.makeObject(TYPEFACE),info={custom:true,spec,family:'custom',weight,italic,baseWeight,style,reference:value};bindCustom(info);
+  typefaces.set(value.ref,info);spec.cache.set(key,value);customCount++;return value;
+ };
+ /** Typeface.CustomFallbackBuilder / Typeface.Builder result: `families` is the chain [[{file,weight,italic,axes}]...] (file from registerFontFile); the style picks the font of each family at use. */
+ const customTypeface=({families,weight,italic,baseWeight,style})=>makeCustom({id:specSeq++,families,cache:new Map()},weight,italic,baseWeight??weight,style??apiStyle(weight,italic));
  const resolveTypeface=reference=>{if(reference===null||reference===undefined||reference===0)reference=makeTypeface();const info=typefaces.get(reference.ref);if(!info)fail('Typeface has no installed native Skia font state');return info;};
+ /** What the text paths need of a Typeface: the Skia face, the paragraph family chain, variation coordinates and the synthetic styles Android applies. */
+ const faceState=info=>({nativeTypeface:info.face,weight:info.weight,italic:info.italic,...(info.families?{families:info.families}:{}),...(info.fontVariations?{fontVariations:info.fontVariations}:{}),...(info.fakeBold?{fakeBold:true}:{}),...(info.fakeItalic?{fakeItalic:true}:{})});
  add(PATH,['<init>()V',`<init>(${PATH})V`,'reset()V','rewind()V','moveTo(FF)V','rMoveTo(FF)V','lineTo(FF)V','rLineTo(FF)V','quadTo(FFFF)V','rQuadTo(FFFF)V','cubicTo(FFFFFF)V','rCubicTo(FFFFFF)V','close()V','isEmpty()Z','approximate(F)[F',`set(${PATH})V`,`addPath(${PATH})V`,'setFillType(Landroid/graphics/Path$FillType;)V','getFillType()Landroid/graphics/Path$FillType;']);
  add(PATH,['addRoundRect(FFFFFFLandroid/graphics/Path$Direction;)V']);
  const PICTURE='Landroid/graphics/Picture;';
@@ -320,25 +351,42 @@ export function createSkiaCanvasHost(runtime,backend){
   bitmaps,
   supports:key=>keys.has(key)||matrixHost.supports(key)||bitmaps.supports(key),canAllocate:type=>type===PATH||type===PICTURE||type===PATH_MEASURE||!!matrixHost.parent(type),parent:type=>matrixHost.parent(type)??bitmaps.parent(type)??(type===OP?'Ljava/lang/Enum;':type===CANVAS?'Landroid/graphics/BaseCanvas;':type==='Landroid/graphics/BaseCanvas;'?'Ljava/lang/Object;':type===PATH||type===TYPEFACE||type===PATH_MEASURE||type===PICTURE?'Ljava/lang/Object;':null),
   interfaces:type=>matrixHost.interfaces?.(type)??[],
-  resolveTypeface,customTypeface,
+  resolveTypeface,customTypeface,registerFontFile,faceState,
+  /** Typeface.createFromTypefaceWithVariation: the same family chain with the supported axes (those the font file declares in fvar) set on every font; null when no axis is supported. */
+  variationTypeface(reference,axes){
+   const info=resolveTypeface(reference);if(!info.custom)return null;
+   const supported=axes.filter(a=>info.spec.families.some(fonts=>fonts.some(f=>f.file.axes.some(x=>x.tag===a.tag))));if(!supported.length)return null;
+   const apply=font=>font.file.axes.length?{...font,axes:[...(font.axes??[]).filter(x=>!supported.some(a=>a.tag===x.tag)),...supported.filter(a=>font.file.axes.some(x=>x.tag===a.tag)).map(a=>({tag:a.tag,value:a.value}))]}:font;
+   return makeCustom({id:specSeq++,families:info.spec.families.map(fonts=>fonts.map(apply)),cache:new Map()},info.weight,info.italic,info.baseWeight,info.style);
+  },
   parsePath(handle,text){const ref=pathHandles.get(handle);if(!ref)fail('Invalid or released VM SkPath token');const state=path(ref),shape=CK.Path.MakeFromSVGString(text);if(!shape)runtime.throwJava('Ljava/lang/IllegalArgumentException;','Invalid SVG pathData');try{const count=shape.countPoints(),old=state.builder.countPoints();if(count>100000||pathCells-old+count>1000000)fail('Parsed SkPath exceeds bounded geometry storage');const replacement=new CK.PathBuilder(shape);state.builder.delete();state.builder=replacement;pathCells=pathCells-old+count;}finally{shape.delete();}},
   /** The commands and fill type of the Path object `ref` (what JNI code sees through Path.mNativePath: src/skia-path-layout.js). */
   pathSnapshot(ref){return snapshot(ref);},
   pathByHandle(handle){const ref=pathHandles.get(handle);if(!ref)fail('Invalid or released VM SkPath token');return snapshot(ref);},
   recordNative(handle,command){const graphics=getVectorGraphics(runtime),state=graphics.get(handle,'canvas');let rasterBytes=command.raster?.dataURL?.length??0;for(const value of graphics.handles.values())if(value.kind==='canvas')for(const draw of value.draws){rasterBytes+=draw.raster?.dataURL?.length??0;if(rasterBytes>32*1024*1024)fail('Recorded Canvas rasters exceed32MiB');}getVectorGraphics(runtime).reserveDrawStorage((command.commands?.length??0)*4+(command.text?.length??0));if(state.draws.length>=1024)fail('Skia command limit exceeded');state.draws.push({kind:'skia',...command,matrix:state.matrix.slice(),clips:(state.clips??[]).slice()});},
-  textBounds(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaTextBounds(backend,text,{...state,weight:face.weight,italic:face.italic});},
-  measureRun(text,options={},state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaRun(backend,text,{...state,...options,weight:face.weight,italic:face.italic});},
+  textBounds(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaTextBounds(backend,text,{...state,...faceState(face)});},
+  measureRun(text,options={},state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaRun(backend,text,{...state,...options,...faceState(face)});},
   /** Paint.hasGlyph: the paint's typeface (else Roboto of its weight/style) has a glyph for every character, the Android fallback chain included. */
   hasGlyph(text,state={}){if(!text.length)return false;const face=resolveTypeface(state.typefaceRef),CK=backend.CanvasKit,font=new CK.Font(face.face??backend.typeface,12);
    try{const ids=font.getGlyphIDs(text);if(ids.length&&ids.every(id=>id!==0))return true;}finally{font.delete();}
    return !!backend.fallback?.covers(text,{weight:face.weight,italic:face.italic});},
-  measureText(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaText(backend,text,{...state,nativeTypeface:face.face,weight:face.weight,italic:face.italic});},
-  readStatic(vm,field){const bitmapStatic=bitmaps.readStatic(field);if(bitmapStatic)return bitmapStatic;if(field.owner===OP&&OPS.includes(field.name))return{handled:true,value:bitmaps.enumValue(OP,OPS,field.name)};if(field.owner===TYPEFACE&&['DEFAULT','DEFAULT_BOLD','SANS_SERIF'].includes(field.name))return{handled:true,value:makeTypeface('sans-serif',field.name==='DEFAULT_BOLD'?1:0)};return null;},
-  dispose(){runtime.rasterCache?.clear();runtime.rasterCacheBytes=0;for(const f of customFaces.splice(0))f.delete();for(const m of measures.values())releaseMeasure(m);measures.clear();for(const p of paths.values())p.builder.delete();paths.clear();pathHandles.clear();},
+  measureText(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaText(backend,text,{...state,...faceState(face)});},
+  readStatic(vm,field){const bitmapStatic=bitmaps.readStatic(field);if(bitmapStatic)return bitmapStatic;if(field.owner===OP&&OPS.includes(field.name))return{handled:true,value:bitmaps.enumValue(OP,OPS,field.name)};if(field.owner===TYPEFACE&&['DEFAULT','DEFAULT_BOLD','SANS_SERIF','SERIF','MONOSPACE'].includes(field.name))return{handled:true,value:makeTypeface(field.name==='SERIF'?'serif':field.name==='MONOSPACE'?'monospace':'sans-serif',field.name==='DEFAULT_BOLD'?1:0)};return null;},
+  dispose(){runtime.rasterCache?.clear();runtime.rasterCacheBytes=0;for(const f of fontFiles.values())f.ck.delete();fontFiles.clear();for(const m of measures.values())releaseMeasure(m);measures.clear();for(const p of paths.values())p.builder.delete();paths.clear();pathHandles.clear();},
   invoke(vm,method,args){if(bitmaps.supports(method.owner+'->'+method.name+method.signature))return bitmaps.invoke(vm,method,args);if(matrixHost.supports(method.owner+'->'+method.name+method.signature))return matrixHost.invoke(vm,method,args);const name=method.name,receiver=args[0];
    if(method.owner===CANVAS&&name==='setCompatibilityVersion'){vm.canvasCompatibilityVersion=args[0]|0;vm.record(`CANVAS compatibility target=${vm.canvasCompatibilityVersion} [actual process graphics policy]`);return;}
    if(method.owner===TYPEFACE){
-    if(name==='create'){if(method.parameters[0]==='Ljava/lang/String;')return makeTypeface(args[0],args[1]);const source=resolveTypeface(args[0]);if(method.parameters.length===3){if(args[1]<0||args[1]>1000)vm.throwJava('Ljava/lang/IllegalArgumentException;','Typeface weight must be0..1000');return makeTypeface(source.family,0,args[1],!!args[2]);}return (args[1]&3)===source.style?source.reference:makeTypeface(source.family,args[1]);}
+    if(name==='create'){
+     if(method.parameters[0]==='Ljava/lang/String;')return makeTypeface(args[0],args[1]);   // an unknown family name answers the default typeface (no exception)
+     const source=resolveTypeface(args[0]);
+     if(method.parameters.length===3){   // create(Typeface, weight, italic): an absolute style over the same family chain
+      if(args[1]<0||args[1]>1000)vm.throwJava('Ljava/lang/IllegalArgumentException;','Typeface weight must be0..1000');
+      return source.custom?makeCustom(source.spec,args[1],!!args[2],source.baseWeight,apiStyle(args[1],!!args[2])):makeTypeface(source.family,0,args[1],!!args[2],source.baseWeight);
+     }
+     let style=args[1];if((style&~3)!==0)style=0;
+     if(style===source.style)return source.reference;
+     return source.custom?makeCustom(source.spec,Math.min(1000,source.baseWeight+(style&1?300:0)),!!(style&2),source.baseWeight,style):makeTypeface(source.family,style,null,null,source.baseWeight);
+    }
     if(name==='defaultFromStyle')return makeTypeface('sans-serif',args[0]);
     const info=resolveTypeface(receiver);return name==='getStyle'?info.style:name==='getWeight'?info.weight:name==='isBold'?(info.style&1?1:0):info.italic?1:0;
    }
@@ -550,7 +598,7 @@ export function createSkiaCanvasHost(runtime,backend){
     const byPair=method.parameters[1]==='F',outer=byPair?shape(args[1],args[2],args[3]):shape(args[1],args[2]),inner=byPair?shape(args[4],args[5],args[6]):shape(args[3],args[4]);
     finite(outer);finite(inner);record(receiver,{op:'doubleRoundRect',outer,inner,pair:byPair,paint});return;
    }
-   const paintFace=resolveTypeface(getPaintState(vm,args.at(-1)).typefaceRef),paint={...getSolidPaint(vm,args.at(-1)),nativeTypeface:paintFace.face,weight:paintFace.weight,italic:paintFace.italic};
+   const paintFace=resolveTypeface(getPaintState(vm,args.at(-1)).typefaceRef),paint={...getSolidPaint(vm,args.at(-1)),...faceState(paintFace)};
    if(name==='drawPath'){record(receiver,{op:'path',...snapshot(args[1]),paint});return;}
    if(name==='drawArc'){const rect=method.parameters[0]==='Landroid/graphics/RectF;'?rectF(args[1]):finite(values.slice(0,4)),angles=method.parameters[0]==='Landroid/graphics/RectF;'?[number(args[2]),number(args[3])]:values.slice(4,6),useCenter=!!args[method.parameters[0]==='Landroid/graphics/RectF;'?4:7];record(receiver,{op:'arc',args:finite([...rect,...angles]),useCenter,paint});return;}
    if(method.parameters[0]==='Landroid/graphics/RectF;'){
@@ -563,7 +611,7 @@ export function createSkiaCanvasHost(runtime,backend){
     if(cs<0||start<cs||end<start||ce<end||ce>length)vm.throwJava('Ljava/lang/IndexOutOfBoundsException;','Text run range');if(ce-cs>65536)fail('Text shaping context exceeds65536UTF16units');
     if(!array&&typeof value!=='string'&&vm.isSubtype(vm.typeOf(value),'Landroid/text/GraphicsOperations;'))return vm.dispatch({owner:'Landroid/text/GraphicsOperations;',name:'drawTextRun',parameters:[CANVAS.replace('Canvas;','BaseCanvas;'),'I','I','I','I','F','F','Z','Landroid/graphics/Paint;'],result:'V',signature:'(Landroid/graphics/BaseCanvas;IIIIFFZLandroid/graphics/Paint;)V'},[value,receiver,start,end,cs,ce,args[6],args[7],args[8],args[9]],'virtual');
     let text;if(typeof value==='string')text=value.slice(cs,ce);else if(vm.typeOf(value)==='Ljava/lang/String;')text=vm.stringCharacters(value).slice(cs,ce);else{const chars=array?vm.array(value).elements.slice(cs,ce):(()=>{const ref=vm.newArray('[C',ce-cs);vm.dispatch({owner:'Landroid/text/TextUtils;',name:'getChars',parameters:['Ljava/lang/CharSequence;','I','I','[C','I'],result:'V',signature:'(Ljava/lang/CharSequence;II[CI)V'},[value,cs,ce,ref,0],'static');return vm.array(ref).elements;})();text='';for(let i=0;i<chars.length;i+=16384)text+=String.fromCharCode(...chars.slice(i,i+16384));}
-    const face=resolveTypeface(paint.typefaceRef);record(receiver,{op:'paragraphRun',text,runStart:start-cs,runEnd:end-cs,args:finite([number(args[6]),number(args[7])]),isRtl:!!args[8],paint:{...paint,weight:face.weight,italic:face.italic}});return;
+    const face=resolveTypeface(paint.typefaceRef);record(receiver,{op:'paragraphRun',text,runStart:start-cs,runEnd:end-cs,args:finite([number(args[6]),number(args[7])]),isRtl:!!args[8],paint:{...paint,...faceState(face)}});return;
    }
    if(name==='drawText'&&method.parameters[0]==='[C'){   // drawText(char[] text, int index, int count, float x, float y, Paint)
     if(args[1]==null||args[1]===0)vm.throwJava('Ljava/lang/NullPointerException;',null);const chars=vm.array(args[1]).elements,index=args[2],count=args[3];

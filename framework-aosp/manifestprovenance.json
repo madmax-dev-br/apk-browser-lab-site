@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 7803360,
-  "sha256": "15e99922d102b333d3c453ebf2bccbc9d5e1174ce0b431633fd1ea88948e5e12",
-  "classCount": 5913,
+  "bytes": 7813976,
+  "sha256": "931dfe04f35a7f68f36068814dfd13f01433b9c3d77f38e9830ba767767f1a89",
+  "classCount": 5918,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -5080,6 +5080,11 @@
     "Ljava/util/concurrent/locks/ReentrantReadWriteLock$Sync$ThreadLocalHoldCounter;",
     "Ljava/util/concurrent/locks/ReentrantReadWriteLock$WriteLock;",
     "Ljava/util/concurrent/locks/ReentrantReadWriteLock;",
+    "Ljava/util/concurrent/locks/StampedLock$ReadLockView;",
+    "Ljava/util/concurrent/locks/StampedLock$ReadWriteLockView;",
+    "Ljava/util/concurrent/locks/StampedLock$WNode;",
+    "Ljava/util/concurrent/locks/StampedLock$WriteLockView;",
+    "Ljava/util/concurrent/locks/StampedLock;",
     "Ljava/util/function/BiConsumer$$ExternalSyntheticLambda0;",
     "Ljava/util/function/BiFunction$$ExternalSyntheticLambda0;",
     "Ljava/util/function/BiPredicate;",
@@ -9293,7 +9298,7 @@
       "bytes": 1480,
       "tag": "android-13.0.0_r1",
       "localPath": "framework-aosp/upstream/com/android/icu/charset/CharsetICU.java",
-      "license": "ICU",
+      "license": "ICU (IBM copyright header; SPDX ICU)",
       "compilerStage": "javac-release8"
     },
     {
@@ -9304,7 +9309,7 @@
       "bytes": 4366,
       "tag": "android-13.0.0_r1",
       "localPath": "framework-aosp/upstream/com/android/icu/charset/NativeConverter.java",
-      "license": "ICU",
+      "license": "ICU (IBM copyright header; SPDX ICU)",
       "compilerStage": "javac-release8"
     },
     {
@@ -12683,7 +12688,7 @@
       "url": "https://android.googlesource.com/platform/external/icu/+/android-13.0.0_r1/android_icu4j/libcore_bridge/src/java/com/android/icu/charset/CharsetDecoderICU.java?format=TEXT",
       "sha256": "36965469f05571a7faafe42dfba8a2233e1ce38a5be0f16c909564e8a7d1f0de",
       "bytes": 7949,
-      "license": "Apache-2.0"
+      "license": "ICU (IBM copyright header; SPDX ICU)"
     },
     {
       "project": "platform/external/icu",
@@ -12693,7 +12698,7 @@
       "url": "https://android.googlesource.com/platform/external/icu/+/android-13.0.0_r1/android_icu4j/libcore_bridge/src/java/com/android/icu/charset/CharsetEncoderICU.java?format=TEXT",
       "sha256": "d0313046b7b96bd0e3e784f8e3e6818c4d17794786a91594a51806d1ed0a4bb3",
       "bytes": 10139,
-      "license": "Apache-2.0"
+      "license": "ICU (IBM copyright header; SPDX ICU)"
     },
     {
       "project": "platform/libcore",
@@ -23973,7 +23978,7 @@
       "url": "https://android.googlesource.com/platform/external/conscrypt/+/android-13.0.0_r1/repackaged/common/src/main/java/com/android/org/conscrypt/OpenSSLX25519Key.java?format=TEXT",
       "sha256": "2ad7c9e8597b5108ac24237836ebe5e2f71eee50b56819db83fc6c24e1293976",
       "bytes": 239,
-      "license": "Apache-2.0"
+      "license": "Apache-2.0 (Conscrypt project license; the file has no header)"
     },
     {
       "project": "platform/external/conscrypt",
@@ -23983,7 +23988,7 @@
       "url": "https://android.googlesource.com/platform/external/conscrypt/+/android-13.0.0_r1/repackaged/common/src/main/java/com/android/org/conscrypt/OpenSSLX25519PrivateKey.java?format=TEXT",
       "sha256": "770f9031e6b80bfb12b1b4e95a0d35c7395fca7e8c01b9f865a2ae76d632bbb2",
       "bytes": 3355,
-      "license": "Apache-2.0"
+      "license": "Apache-2.0 (Conscrypt project license; the file has no header)"
     },
     {
       "project": "platform/external/conscrypt",
@@ -23993,7 +23998,7 @@
       "url": "https://android.googlesource.com/platform/external/conscrypt/+/android-13.0.0_r1/repackaged/common/src/main/java/com/android/org/conscrypt/OpenSSLX25519PublicKey.java?format=TEXT",
       "sha256": "b49d2794f7a5bc2e0f2b8486021179bfbdc716d619c51b2e8e6cba770e74a7e4",
       "bytes": 3238,
-      "license": "Apache-2.0"
+      "license": "Apache-2.0 (Conscrypt project license; the file has no header)"
     },
     {
       "project": "platform/external/conscrypt",
@@ -24083,7 +24088,7 @@
       "url": "https://android.googlesource.com/platform/external/conscrypt/+/android-13.0.0_r1/repackaged/common/src/main/java/com/android/org/conscrypt/OpenSSLXECParameterSpec.java?format=TEXT",
       "sha256": "89618f460f4a78eb89b71137ccf5d16792c1ced1dfbc987556fe0b573f440e75",
       "bytes": 527,
-      "license": "Apache-2.0"
+      "license": "Apache-2.0 (Conscrypt project license; the file has no header)"
     },
     {
       "project": "platform/external/conscrypt",
@@ -27343,7 +27348,7 @@
       "url": "https://android.googlesource.com/platform/external/bouncycastle/+/android-13.0.0_r1/repackaged/bcprov/src/main/java/com/android/org/bouncycastle/crypto/digests/AndroidDigestFactory.java?format=TEXT",
       "sha256": "ce923c4db37e32f4bd5e5f281c70378016ee2b07bbd88220c22c80df6034afa1",
       "bytes": 3069,
-      "license": "MIT (Bouncy Castle License)"
+      "license": "Apache-2.0"
     },
     {
       "project": "platform/external/bouncycastle",
@@ -27353,7 +27358,7 @@
       "url": "https://android.googlesource.com/platform/external/bouncycastle/+/android-13.0.0_r1/repackaged/bcprov/src/main/java/com/android/org/bouncycastle/crypto/digests/AndroidDigestFactoryBouncyCastle.java?format=TEXT",
       "sha256": "e0eb61f7dbaf42d1b39dac4a338a5bb3afcfc84ee565a08ff59cdc2543f0319a",
       "bytes": 1355,
-      "license": "MIT (Bouncy Castle License)"
+      "license": "Apache-2.0"
     },
     {
       "project": "platform/external/bouncycastle",
@@ -27363,7 +27368,7 @@
       "url": "https://android.googlesource.com/platform/external/bouncycastle/+/android-13.0.0_r1/repackaged/bcprov/src/main/java/com/android/org/bouncycastle/crypto/digests/AndroidDigestFactoryInterface.java?format=TEXT",
       "sha256": "aa196ac140aeeb2f9779ab601d2cbd0903bcad4e8d0b0218db51072f5b32dd57",
       "bytes": 991,
-      "license": "MIT (Bouncy Castle License)"
+      "license": "Apache-2.0"
     },
     {
       "project": "platform/external/bouncycastle",
@@ -27373,7 +27378,7 @@
       "url": "https://android.googlesource.com/platform/external/bouncycastle/+/android-13.0.0_r1/repackaged/bcprov/src/main/java/com/android/org/bouncycastle/crypto/digests/AndroidDigestFactoryOpenSSL.java?format=TEXT",
       "sha256": "7786892ea7e0ed3a09cff9db43f7309a80e05f75c09b23314f36dcc006b70486",
       "bytes": 1398,
-      "license": "MIT (Bouncy Castle License)"
+      "license": "Apache-2.0"
     },
     {
       "project": "platform/external/bouncycastle",
@@ -27443,7 +27448,7 @@
       "url": "https://android.googlesource.com/platform/external/bouncycastle/+/android-13.0.0_r1/repackaged/bcprov/src/main/java/com/android/org/bouncycastle/crypto/digests/OpenSSLDigest.java?format=TEXT",
       "sha256": "a714f5f8ae070f276dfa356c896039d10fb31b908ca6271341170fe8b2bf843b",
       "bytes": 3414,
-      "license": "MIT (Bouncy Castle License)"
+      "license": "Apache-2.0"
     },
     {
       "project": "platform/external/bouncycastle",
@@ -30803,7 +30808,7 @@
       "url": "https://android.googlesource.com/platform/external/bouncycastle/+/android-13.0.0_r1/repackaged/bcprov/src/main/java/com/android/org/bouncycastle/jce/provider/CertBlocklist.java?format=TEXT",
       "sha256": "0cb92eea30825b32d02bf66dffcbdc31ff1551297b13293ed57c736288ec64b6",
       "bytes": 9839,
-      "license": "MIT (Bouncy Castle License)"
+      "license": "Apache-2.0"
     },
     {
       "project": "platform/external/bouncycastle",
@@ -34713,7 +34718,7 @@
       "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/xml/src/main/java/org/xmlpull/v1/XmlPullParser.java?format=TEXT",
       "sha256": "0bbd5d1afba717ca2aecb0a755ac88654edc2e7b8ee2afe1614955d86d537dad",
       "bytes": 45457,
-      "license": "Apache-2.0"
+      "license": "Public Domain (XMLPULL API)"
     },
     {
       "project": "platform/libcore",
@@ -34723,7 +34728,7 @@
       "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/xml/src/main/java/org/xmlpull/v1/XmlSerializer.java?format=TEXT",
       "sha256": "8264a479c66efc52a5acdab9c294850a3b0e986bb2263d3e3b18e48a4eb8fc5a",
       "bytes": 14799,
-      "license": "Apache-2.0"
+      "license": "Public Domain (XMLPULL API)"
     },
     {
       "project": "platform/libcore",
@@ -34733,7 +34738,7 @@
       "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/xml/src/main/java/org/xmlpull/v1/XmlPullParserFactory.java?format=TEXT",
       "sha256": "a5749154add84344cacfc64900816938d5ee1752fc6c5982f68fd3cb88316254",
       "bytes": 8616,
-      "license": "Apache-2.0"
+      "license": "Public Domain (XMLPULL API)"
     },
     {
       "project": "platform/libcore",
@@ -34743,7 +34748,7 @@
       "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/xml/src/main/java/org/xmlpull/v1/XmlPullParserException.java?format=TEXT",
       "sha256": "a275c02f1aa601dab909b37d9e17eb9413f284d3a9736294b18e6cb1c0966a24",
       "bytes": 2268,
-      "license": "Apache-2.0"
+      "license": "Public Domain (XMLPULL API)"
     },
     {
       "project": "platform/libcore",
@@ -34753,7 +34758,7 @@
       "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/xml/src/main/java/com/android/org/kxml2/io/KXmlParser.java?format=TEXT",
       "sha256": "d91fa063856bed37dcfe2a088ee26f7ac7d52374952865fbd259f3cb49f0e2b5",
       "bytes": 73033,
-      "license": "Apache-2.0"
+      "license": "MIT"
     },
     {
       "project": "platform/libcore",
@@ -34763,7 +34768,7 @@
       "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/xml/src/main/java/com/android/org/kxml2/io/KXmlSerializer.java?format=TEXT",
       "sha256": "982e2ac2351404bdd6069bb009c5a37c23c16fef489cb2a02b3a35e9dc02ae58",
       "bytes": 19104,
-      "license": "Apache-2.0"
+      "license": "MIT"
     },
     {
       "project": "platform/frameworks/base",
@@ -36694,6 +36699,16 @@
       "sha256": "a75f7543c89f83318d00824544b5fd7f5f3e86d69f99e6963af8a32b9ce52160",
       "bytes": 5801,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/concurrent/locks/StampedLock.java",
+      "localPath": "framework-aosp/upstream/java/util/concurrent/locks/StampedLock.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/locks/StampedLock.java?format=TEXT",
+      "sha256": "386bccde0f7f39e957a1d16329486093b98a0fabac484659022f93c1ac77c19c",
+      "bytes": 63026,
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0"
     }
   ],
   "algorithmPatches": [],
@@ -37016,6 +37031,12 @@
         "kind": "varhandle-to-field-updaters",
         "inputSha256": "5ad7826735a170b1bf07faffb210ab0064474d160f4c8b83d53e6b449444a7be",
         "outputSha256": "5ad7826735a170b1bf07faffb210ab0064474d160f4c8b83d53e6b449444a7be"
+      },
+      {
+        "path": "java/util/concurrent/locks/StampedLock.java",
+        "kind": "varhandle-to-field-updaters",
+        "inputSha256": "386bccde0f7f39e957a1d16329486093b98a0fabac484659022f93c1ac77c19c",
+        "outputSha256": "c6214c5f2df22b96db434abac4097c5761556771c239917ebcd6d962210b641c"
       }
     ],
     "labAuthored": [
@@ -37197,7 +37218,7 @@
       },
       {
         "path": "framework-aosp/lab-java/dev/apkweb/util/Fences.java",
-        "sha256": "dac45aa1e875938bdc7ba8c4a81691beeb031518feec7004aedeaed870e4de95"
+        "sha256": "69605ae7e201e2060c0eb01b447cc2eb51363239291a830da223cbfee6fc5e1f"
       },
       {
         "path": "framework-aosp/lab-java/dev/apkweb/util/IntegerOps.java",

@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=43c1da0663b3';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=43c1da0663b3';
+import { APKError } from './apk-error.js?v=ef714893ba48';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=ef714893ba48';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -234,10 +234,14 @@ export function createPaintHost() {
         const value = nullish(args[1]) ? null : runtime.stringCharacters(args[1]); paint.fontFeatureSettings = value === '' ? null : value; return;
       }
       if (name === 'getFontVariationSettings') return paint.fontVariationSettings;
-      if (name === 'setFontVariationSettings') {   // Paint.setFontVariationSettings: false (and no change) when the typeface has none of the requested axes -- the lab's static Roboto and fallback fonts have no variation axes
+      if (name === 'setFontVariationSettings') {   // Paint.setFontVariationSettings: the axes the typeface's fonts declare are applied through Typeface.createFromTypefaceWithVariation; false (and no change) when it supports none
         const value = nullish(args[1]) ? '' : runtime.stringCharacters(args[1]);
+        if (value === (paint.fontVariationSettings ?? '')) return 1;
         if (value === '') { paint.fontVariationSettings = null; return 1; }
-        return 0;
+        let axes; try { axes = runtime.platform.typefaceBuilder.parseVariationSettings(runtime, value); } catch (error) { if (error?.name === 'JavaException' && runtime.isSubtype(runtime.typeOf(error.value), 'Ljava/lang/IllegalArgumentException;')) return 0; throw error; }
+        const face = axes ? runtime.skiaHost.variationTypeface(paint.typefaceRef ?? null, axes) : null;
+        if (!face) return 0;
+        paint.fontVariationSettings = value; paint.typefaceRef = face; return 1;
       }
       if (name === 'isElegantTextHeight') return paint.elegantTextHeight ? 1 : 0;
       if (name === 'setElegantTextHeight') { paint.elegantTextHeight = !!args[1]; return; }

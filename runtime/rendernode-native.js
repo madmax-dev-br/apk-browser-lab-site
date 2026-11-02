@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=43c1da0663b3';
-import {getVectorGraphics} from './vector-native.js?v=43c1da0663b3';
-import {getSolidPaintByHandle} from './paint-host.js?v=43c1da0663b3';
-import {createMatrixNativeBindings} from './matrix-native.js?v=43c1da0663b3';
+import {APKError} from './apk-error.js?v=ef714893ba48';
+import {getVectorGraphics} from './vector-native.js?v=ef714893ba48';
+import {getSolidPaintByHandle} from './paint-host.js?v=ef714893ba48';
+import {createMatrixNativeBindings} from './matrix-native.js?v=ef714893ba48';
 
 const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;',RECORD='Landroid/view/RecordingCanvas;';
 const NODE33='Landroid/graphics/RenderNode;',RC33='Landroid/graphics/RecordingCanvas;',BRC='Landroid/graphics/BaseRecordingCanvas;';
@@ -132,7 +132,7 @@ export function createRenderNodeNativeBindings(){const map=new Map();
   const array=value?.ref&&r.object(value).type==='[C',source=array?null:typeof value==='string'?value:r.javaString(value);let content;
   if(array){const elements=r.array(value).elements;if(contextStart<0||start<contextStart||end<start||contextEnd<end||contextEnd>elements.length)r.throwJava('Ljava/lang/IndexOutOfBoundsException;','Recorded text range');content='';for(let i=contextStart;i<contextEnd;i+=16384)content+=String.fromCharCode(...elements.slice(i,Math.min(contextEnd,i+16384)));}
   else{if(contextStart<0||start<contextStart||end<start||contextEnd<end||contextEnd>source.length)r.throwJava('Ljava/lang/IndexOutOfBoundsException;','Recorded text range');content=source.slice(contextStart,contextEnd);}
-  const state={...getSolidPaintByHandle(r,paint)},face=r.skiaHost.resolveTypeface(state.typefaceRef);Object.assign(state,{weight:face.weight,italic:face.italic});
+  const state={...getSolidPaintByHandle(r,paint)},face=r.skiaHost.resolveTypeface(state.typefaceRef);Object.assign(state,r.skiaHost.faceState(face));
   r.skiaHost.recordNative(h,{op:'paragraphRun',text:content,runStart:start-contextStart,runEnd:end-contextStart,args:finite([x,y]),isRtl:!!rtl,paint:state});
  };
  rec('nDrawText',['J','Ljava/lang/String;','I','I','F','F','I','J'],(r,[h,t,start,end,x,y,bidi,p])=>{if(bidi!==0&&bidi!==1&&bidi!==2)fail('RecordingCanvas text bidi flag not implemented');text(r,h,t,start,end,start,end,x,y,bidi===1,p);});

@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=43c1da0663b3';
+import { createHostRegistry } from './host-contract.js?v=ef714893ba48';
 
 // The system-manager methods an ordinary app calls that the first host passes left out, for a one-user, unmanaged, unlocked phone without fingerprint hardware or thermal HAL
 // (android-13.0.0_r1 UserManager / UserManagerService, KeyguardManager / PhoneWindowManager, PowerManager / ThermalManagerService, FingerprintManager):
@@ -249,5 +249,100 @@ export function createManagersExtrasHost(platform) {
   def(NOTIFICATIONS, 'getAutomaticZenRules', '()Ljava/util/Map;', policyDenied); def(NOTIFICATIONS, 'getAutomaticZenRule', `(${STRING})${RULE}`, policyDenied);
   def(NOTIFICATIONS, 'addAutomaticZenRule', `(${RULE})${STRING}`, policyDenied); def(NOTIFICATIONS, 'updateAutomaticZenRule', `(${STRING}${RULE})Z`, policyDenied);
   def(NOTIFICATIONS, 'removeAutomaticZenRule', `(${STRING})Z`, policyDenied); def(NOTIFICATIONS, 'setAutomaticZenRuleState', `(${STRING}${CONDITION})V`, policyDenied);
+
+  // ---- NotificationManager.Policy (NotificationManager.java android-13.0.0_r1) and the queries that need no policy access. The default policy is the one ZenModeConfig derives from the
+  // platform's default_zen_mode_config.xml: alarms, media, calls and messages from starred contacts, repeat callers and important conversations allowed; visual effects 157 suppressed.
+  type(POLICY, 'Ljava/lang/Object;', ['Landroid/os/Parcelable;'], { allocatable: true });
+  const PC = { REMINDERS: 1, EVENTS: 2, MESSAGES: 4, CALLS: 8, REPEAT_CALLERS: 16, ALARMS: 32, MEDIA: 64, SYSTEM: 128, CONVERSATIONS: 256 };
+  for (const [name, value] of Object.entries(PC)) registry.staticField(POLICY, `PRIORITY_CATEGORY_${name}`, 'I', () => value);
+  for (const [name, value] of Object.entries({ PRIORITY_SENDERS_ANY: 0, PRIORITY_SENDERS_CONTACTS: 1, PRIORITY_SENDERS_STARRED: 2, CONVERSATION_SENDERS_ANYONE: 1, CONVERSATION_SENDERS_IMPORTANT: 2, CONVERSATION_SENDERS_NONE: 3, CONVERSATION_SENDERS_UNSET: -1,
+    SUPPRESSED_EFFECTS_UNSET: -1, SUPPRESSED_EFFECT_SCREEN_OFF: 1, SUPPRESSED_EFFECT_SCREEN_ON: 2, SUPPRESSED_EFFECT_FULL_SCREEN_INTENT: 4, SUPPRESSED_EFFECT_LIGHTS: 8, SUPPRESSED_EFFECT_PEEK: 16, SUPPRESSED_EFFECT_STATUS_BAR: 32,
+    SUPPRESSED_EFFECT_BADGE: 64, SUPPRESSED_EFFECT_AMBIENT: 128, SUPPRESSED_EFFECT_NOTIFICATION_LIST: 256, STATE_CHANNELS_BYPASSING_DND: 1, STATE_UNSET: -1 })) registry.staticField(POLICY, name, 'I', () => value);
+  const ALL_CATEGORIES = [PC.ALARMS, PC.MEDIA, PC.SYSTEM, PC.REMINDERS, PC.EVENTS, PC.MESSAGES, PC.CALLS, PC.REPEAT_CALLERS, PC.CONVERSATIONS], ALL_EFFECTS = [1, 2, 4, 8, 16, 32, 64, 128, 256];
+  registry.staticField(POLICY, 'ALL_PRIORITY_CATEGORIES', '[I', r => { const a = r.newArray('[I', ALL_CATEGORIES.length); r.array(a).elements = [...ALL_CATEGORIES]; return a; });
+  const policy = (r, ref) => r.object(ref).policy ?? r.throwJava('Ljava/lang/IllegalStateException;', 'Policy used before construction');
+  const FIELDS = [['priorityCategories', 'categories'], ['priorityCallSenders', 'callSenders'], ['priorityMessageSenders', 'messageSenders'], ['priorityConversationSenders', 'conversation'], ['suppressedVisualEffects', 'effects'], ['state', 'state']];
+  for (const [field] of FIELDS) registry.instanceField(POLICY, field, 'I', { reflect: true });
+  const init = (r, self, categories, callSenders, messageSenders, effects, state, conversation) => {
+    const p = { categories, callSenders, messageSenders, effects, state, conversation }; r.object(self).policy = p;
+    for (const [field, key] of FIELDS) r.storeField(r.object(self).fields, `${POLICY}->${field}:I`, p[key]);
+  };
+  const makePolicy = (r, ...values) => { const p = r.allocate(POLICY); init(r, p, ...values); return p; };
+  def(POLICY, '<init>', '(III)V', (r, _m, [self, c, calls, messages]) => init(r, self, c, calls, messages, -1, -1, -1));
+  def(POLICY, '<init>', '(IIII)V', (r, _m, [self, c, calls, messages, effects]) => init(r, self, c, calls, messages, effects, -1, -1));
+  def(POLICY, '<init>', '(IIIII)V', (r, _m, [self, c, calls, messages, effects, conversation]) => init(r, self, c, calls, messages, effects, -1, conversation));
+  def(POLICY, '<init>', '(IIIIII)V', (r, _m, [self, c, calls, messages, effects, state, conversation]) => init(r, self, c, calls, messages, effects, state, conversation));
+  const categoryName = c => ({ 1: 'PRIORITY_CATEGORY_REMINDERS', 2: 'PRIORITY_CATEGORY_EVENTS', 4: 'PRIORITY_CATEGORY_MESSAGES', 8: 'PRIORITY_CATEGORY_CALLS', 16: 'PRIORITY_CATEGORY_REPEAT_CALLERS', 32: 'PRIORITY_CATEGORY_ALARMS', 64: 'PRIORITY_CATEGORY_MEDIA', 128: 'PRIORITY_CATEGORY_SYSTEM', 256: 'PRIORITY_CATEGORY_CONVERSATIONS' })[c] ?? `PRIORITY_CATEGORY_UNKNOWN_${c}`;
+  const effectName = e => ({ 4: 'SUPPRESSED_EFFECT_FULL_SCREEN_INTENT', 8: 'SUPPRESSED_EFFECT_LIGHTS', 16: 'SUPPRESSED_EFFECT_PEEK', 32: 'SUPPRESSED_EFFECT_STATUS_BAR', 64: 'SUPPRESSED_EFFECT_BADGE', 128: 'SUPPRESSED_EFFECT_AMBIENT', 256: 'SUPPRESSED_EFFECT_NOTIFICATION_LIST', 1: 'SUPPRESSED_EFFECT_SCREEN_OFF', 2: 'SUPPRESSED_EFFECT_SCREEN_ON', [-1]: 'SUPPRESSED_EFFECTS_UNSET' })[e] ?? `UNKNOWN_${e}`;
+  const listBits = (value, all, name, unknown) => { if (value <= 0 && unknown === 'UNKNOWN_') return ''; if (value === 0) return ''; const out = []; for (const bit of all) { if (value & bit) out.push(name(bit)); value &= ~bit; } if (value !== 0) out.push(`${unknown}${value}`); return out.join(','); };
+  const categoriesToString = c => listBits(c, ALL_CATEGORIES, categoryName, 'PRIORITY_CATEGORY_UNKNOWN_');
+  const effectsToString = e => (e <= 0 ? '' : listBits(e, ALL_EFFECTS, effectName, 'UNKNOWN_'));
+  const sendersToString = s => ({ 0: 'PRIORITY_SENDERS_ANY', 1: 'PRIORITY_SENDERS_CONTACTS', 2: 'PRIORITY_SENDERS_STARRED' })[s] ?? `PRIORITY_SENDERS_UNKNOWN_${s}`;
+  const conversationToString = s => ({ 1: 'anyone', 2: 'important', 3: 'none', [-1]: 'unset' })[s] ?? `invalidConversationType{${s}}`;
+  def(POLICY, 'priorityCategoriesToString', '(I)Ljava/lang/String;', (r, _m, [c]) => categoriesToString(c), { static: true });
+  def(POLICY, 'suppressedEffectsToString', '(I)Ljava/lang/String;', (r, _m, [e]) => effectsToString(e), { static: true });
+  def(POLICY, 'prioritySendersToString', '(I)Ljava/lang/String;', (r, _m, [s]) => sendersToString(s), { static: true });
+  def(POLICY, 'conversationSendersToString', '(I)Ljava/lang/String;', (r, _m, [s]) => conversationToString(s), { static: true });
+  def(POLICY, 'getAllSuppressedVisualEffects', '()I', () => 511, { static: true });
+  def(POLICY, 'areAllVisualEffectsSuppressed', '(I)Z', (r, _m, [e]) => (ALL_EFFECTS.every(bit => e & bit) ? 1 : 0), { static: true });
+  def(POLICY, 'describeContents', '()I', () => 0);
+  def(POLICY, 'toString', '()Ljava/lang/String;', (r, _m, [self]) => { const p = policy(r, self); return `NotificationManager.Policy[priorityCategories=${categoriesToString(p.categories)},priorityCallSenders=${sendersToString(p.callSenders)},priorityMessageSenders=${sendersToString(p.messageSenders)},priorityConvSenders=${conversationToString(p.conversation)},suppressedVisualEffects=${effectsToString(p.effects)},areChannelsBypassingDnd=${p.state === -1 ? 'unset' : (p.state & 1) !== 0 ? 'true' : 'false'}]`; });
+  const effectsEqual = (a, b) => {
+    if (a === b) return true;
+    const expand = e => { if (e & 2) e |= 16; if (e & 1) e |= 4 | 8 | 128; return e; };
+    if ((a & 2) !== (b & 2)) { const cur = (a & 2) !== 0 ? b : a; if ((cur & 16) === 0) return false; }
+    if ((a & 1) !== (b & 1)) { const cur = (a & 1) !== 0 ? b : a; if ((cur & 4) === 0 || (cur & 8) === 0 || (cur & 128) === 0) return false; }
+    void expand;
+    return (a & ~3) === (b & ~3);
+  };
+  def(POLICY, 'equals', '(Ljava/lang/Object;)Z', (r, _m, [self, other]) => {
+    if (other === self) return 1; if (other === null || other === 0 || !r.object(other).policy) return 0;
+    const a = policy(r, self), b = policy(r, other);
+    return a.categories === b.categories && a.callSenders === b.callSenders && a.messageSenders === b.messageSenders && effectsEqual(a.effects, b.effects) && a.state === b.state && a.conversation === b.conversation ? 1 : 0;
+  });
+  def(POLICY, 'hashCode', '()I', (r, _m, [self]) => { const p = policy(r, self); let h = 1; for (const v of [p.categories, p.callSenders, p.messageSenders, p.effects, p.state, p.conversation]) h = (Math.imul(31, h) + v) | 0; return h; });
+  const CATEGORY_TESTS = { allowAlarms: PC.ALARMS, allowMedia: PC.MEDIA, allowSystem: PC.SYSTEM, allowRepeatCallers: PC.REPEAT_CALLERS, allowCalls: PC.CALLS, allowConversations: PC.CONVERSATIONS, allowMessages: PC.MESSAGES, allowEvents: PC.EVENTS, allowReminders: PC.REMINDERS };
+  for (const [name, bit] of Object.entries(CATEGORY_TESTS)) def(POLICY, name, '()Z', (r, _m, [self]) => ((policy(r, self).categories & bit) !== 0 ? 1 : 0));
+  def(POLICY, 'allowCallsFrom', '()I', (r, _m, [self]) => policy(r, self).callSenders); def(POLICY, 'allowMessagesFrom', '()I', (r, _m, [self]) => policy(r, self).messageSenders); def(POLICY, 'allowConversationsFrom', '()I', (r, _m, [self]) => policy(r, self).conversation);
+  for (const [name, bit] of Object.entries({ showFullScreenIntents: 4, showLights: 8, showPeeking: 16, showStatusBarIcons: 32, showAmbient: 128, showBadges: 64, showInNotificationList: 256 })) def(POLICY, name, '()Z', (r, _m, [self]) => ((policy(r, self).effects & bit) === 0 ? 1 : 0));
+  const defaultPolicy = r => makePolicy(r, PC.CONVERSATIONS | PC.CALLS | PC.MESSAGES | PC.REPEAT_CALLERS | PC.ALARMS | PC.MEDIA, 2, 2, 157, 0, 2);
+  def(NOTIFICATIONS, 'getNotificationPolicy', `()${POLICY}`, r => defaultPolicy(r)); def(NOTIFICATIONS, 'getConsolidatedNotificationPolicy', `()${POLICY}`, r => defaultPolicy(r));
+  // bubbles and pause state: the default preference is BUBBLE_PREFERENCE_NONE with the feature on; the status-bar icon query is for notification listeners only
+  def(NOTIFICATIONS, 'areBubblesAllowed', '()Z', () => 0); def(NOTIFICATIONS, 'areBubblesEnabled', '()Z', () => 1); def(NOTIFICATIONS, 'getBubblePreference', '()I', () => 0);
+  def(NOTIFICATIONS, 'areNotificationsPaused', '()Z', () => 0);
+  def(NOTIFICATIONS, 'shouldHideSilentStatusBarIcons', '()Z', r => denied(r, 'Only available for notification listeners'));
+
+  // ---- StatusBarNotification (android-13.0.0_r1) for NotificationManager.getActiveNotifications(): the notifications this app posted and has not cancelled, in post order (the service
+  // returns only the caller's own). The user is the owner (0); the process id is the virtual process.
+  const SBN = 'Landroid/service/notification/StatusBarNotification;', NOTIFICATION = 'Landroid/app/Notification;';
+  type(SBN, 'Ljava/lang/Object;', ['Landroid/os/Parcelable;'], { allocatable: true });
+  const sbn = (r, ref) => r.object(ref).sbn ?? r.throwJava('Ljava/lang/IllegalStateException;', 'StatusBarNotification used before construction');
+  const userHandle0 = r => r.dispatch({ owner: 'Landroid/os/UserHandle;', name: 'of', parameters: ['I'], result: 'Landroid/os/UserHandle;', signature: '(I)Landroid/os/UserHandle;' }, [0], 'static');
+  const notificationString = (r, ref, name, result = STRING) => call(r, ref, NOTIFICATION, name, [], result);
+  const makeSbn = (r, record, notification) => {
+    const o = r.allocate(SBN), pkg = platform.packageName, tag = record.tag, user = userHandle0(r);
+    const key = `0|${pkg}|${record.id}|${tag}|${uid()}`;
+    const group = notificationString(r, notification, 'getGroup'), sortKey = notificationString(r, notification, 'getSortKey');
+    const groupKey = group === null && sortKey === null ? key : `0|${pkg}|${group === null ? `c:${r.stringCharacters(notificationString(r, notification, 'getChannelId'))}` : `g:${r.stringCharacters(group)}`}`;
+    r.object(o).sbn = { pkg, id: record.id, tag, uid: uid(), notification, user, time: record.time, key, groupKey, appGroup: group !== null || sortKey !== null };
+    return o;
+  };
+  def(NOTIFICATIONS, 'getActiveNotifications', `()[${SBN}`, r => {
+    const list = [...(platform.notificationRecords ?? new Map()).entries()].map(([key, record]) => makeSbn(r, record, platform.notificationPosted.get(key)));
+    const array = r.newArray(`[${SBN}`, list.length); r.array(array).elements = list; return array;
+  });
+  def(SBN, 'getPackageName', `()${STRING}`, (r, _m, [self]) => sbn(r, self).pkg); def(SBN, 'getOpPkg', `()${STRING}`, (r, _m, [self]) => sbn(r, self).pkg);
+  def(SBN, 'getId', '()I', (r, _m, [self]) => sbn(r, self).id); def(SBN, 'getTag', `()${STRING}`, (r, _m, [self]) => sbn(r, self).tag); def(SBN, 'getUid', '()I', (r, _m, [self]) => sbn(r, self).uid);
+  def(SBN, 'getNotification', `()${NOTIFICATION}`, (r, _m, [self]) => sbn(r, self).notification); def(SBN, 'getUser', '()Landroid/os/UserHandle;', (r, _m, [self]) => sbn(r, self).user);
+  def(SBN, 'getUserId', '()I', () => 0); def(SBN, 'getPostTime', '()J', (r, _m, [self]) => sbn(r, self).time);
+  def(SBN, 'getKey', `()${STRING}`, (r, _m, [self]) => sbn(r, self).key); def(SBN, 'getGroupKey', `()${STRING}`, (r, _m, [self]) => sbn(r, self).groupKey);
+  def(SBN, 'isGroup', '()Z', (r, _m, [self]) => (sbn(r, self).appGroup ? 1 : 0)); def(SBN, 'isAppGroup', '()Z', (r, _m, [self]) => (sbn(r, self).appGroup ? 1 : 0));
+  const flags = (r, self) => r.object(sbn(r, self).notification).fields.get(`${NOTIFICATION}->flags:I`) ?? 0;
+  def(SBN, 'isOngoing', '()Z', (r, _m, [self]) => ((flags(r, self) & 2) !== 0 ? 1 : 0)); def(SBN, 'isClearable', '()Z', (r, _m, [self]) => ((flags(r, self) & (2 | 32)) === 0 ? 1 : 0));
+  def(SBN, 'toString', `()${STRING}`, (r, _m, [self]) => {
+    const s = sbn(r, self), text = ref => r.stringCharacters(call(r, ref, 'Ljava/lang/Object;', 'toString', [], STRING));
+    return `StatusBarNotification(pkg=${s.pkg} user=${text(s.user)} id=${s.id} tag=${s.tag} key=${s.key}: ${text(s.notification)})`;
+  });
+  def(SBN, 'describeContents', '()I', () => 0);
   return { ...registry };
 }

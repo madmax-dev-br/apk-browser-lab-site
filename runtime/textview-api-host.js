@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=43c1da0663b3';
-import { gcRoot } from './heap-gc.js?v=43c1da0663b3';
-import { APKError } from './apk-error.js?v=43c1da0663b3';
+import { createHostRegistry } from './host-contract.js?v=ef714893ba48';
+import { gcRoot } from './heap-gc.js?v=ef714893ba48';
+import { APKError } from './apk-error.js?v=ef714893ba48';
 
 // Public android.widget.TextView API (API 33) beyond what the platform's native text model carries, with the semantics of android-13.0.0_r1 TextView.java.
 // The lab renders TextView / Button / EditText text through its native SkParagraph path (view-layout-host measure, compose-canvas-host draw), which honours the text, size, colour, typeface,
@@ -570,13 +570,15 @@ export function createTextViewApiHost(platform) {
       if (has(TA.textColorHighlight)) call(r, self, TEXT, 'setHighlightColor', ['I'], 'V', [call(r, a, TYPED_ARRAY, 'getColor', ['I', 'I'], 'I', [TA.textColorHighlight, 0])]);
       if (has(TA.textSize)) { const px = call(r, a, TYPED_ARRAY, 'getDimensionPixelSize', ['I', 'I'], 'I', [TA.textSize, -1]); if (px !== -1) call(r, self, TEXT, 'setTextSize', ['I', 'F'], 'V', [0, f2i(px)]); }
       const style = has(TA.textStyle) ? call(r, a, TYPED_ARRAY, 'getInt', ['I', 'I'], 'I', [TA.textStyle, 0]) : 0, index = has(TA.typeface) ? call(r, a, TYPED_ARRAY, 'getInt', ['I', 'I'], 'I', [TA.typeface, -1]) : -1;
-      const family = has(TA.fontFamily) ? call(r, a, TYPED_ARRAY, 'getString', ['I'], STRING, [TA.fontFamily]) : null;
-      if (!nullish(family) || index !== -1 || style !== 0) {
-        let face = null; const TF = 'Landroid/graphics/Typeface;';
-        if (!nullish(family)) face = callStatic(r, TF, 'create', [STRING, 'I'], TF, [family, style]);
-        else if (index !== -1) face = staticField(r, TF, index === 2 ? 'SERIF' : index === 3 ? 'MONOSPACE' : 'SANS_SERIF');
-        call(r, self, TEXT, 'setTypeface', [TF, 'I'], 'V', [face, style]);
+      // TextView.readTextAppearance: a font resource (TypedArray.getFont) wins; any other fontFamily value is a family name (getString); textFontWeight picks Typeface.create(tf, weight, italic)
+      const weight = has(TA.textFontWeight) ? call(r, a, TYPED_ARRAY, 'getInt', ['I', 'I'], 'I', [TA.textFontWeight, -1]) : -1;
+      let typeface = null, family = null;
+      if (has(TA.fontFamily)) {
+        try { typeface = call(r, a, TYPED_ARRAY, 'getFont', ['I'], 'Landroid/graphics/Typeface;', [TA.fontFamily]); }
+        catch (error) { if (!(error?.name === 'JavaException' && r.isSubtype(r.typeOf(error.value), 'Landroid/content/res/Resources$NotFoundException;') || error?.name === 'JavaException' && r.isSubtype(r.typeOf(error.value), 'Ljava/lang/UnsupportedOperationException;'))) throw error; }
+        if (nullish(typeface)) { typeface = null; family = call(r, a, TYPED_ARRAY, 'getString', ['I'], STRING, [TA.fontFamily]); if (nullish(family)) family = null; }
       }
+      if (typeface !== null || family !== null || index !== -1 || style !== 0 || weight >= 0) platform.typefaceBuilder.applyTextViewFont(r, self, { typeface, familyName: family === null ? null : r.stringCharacters(family), typefaceIndex: index, style, weight });
       if (has(TA.shadowColor)) {
         const color = call(r, a, TYPED_ARRAY, 'getInt', ['I', 'I'], 'I', [TA.shadowColor, 0]);
         if (color !== 0) call(r, self, TEXT, 'setShadowLayer', ['F', 'F', 'F', 'I'], 'V', [call(r, a, TYPED_ARRAY, 'getFloat', ['I', 'F'], 'F', [TA.shadowRadius, 0]), call(r, a, TYPED_ARRAY, 'getFloat', ['I', 'F'], 'F', [TA.shadowDx, 0]), call(r, a, TYPED_ARRAY, 'getFloat', ['I', 'F'], 'F', [TA.shadowDy, 0]), color]);

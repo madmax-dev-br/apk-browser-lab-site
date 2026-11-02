@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=43c1da0663b3';
-import {getPaintStateByHandle} from './paint-host.js?v=43c1da0663b3';
-import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=43c1da0663b3';
-import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=43c1da0663b3';
+import {APKError} from './apk-error.js?v=ef714893ba48';
+import {getPaintStateByHandle} from './paint-host.js?v=ef714893ba48';
+import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=ef714893ba48';
+import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=ef714893ba48';
 
 const MT='Landroid/graphics/text/MeasuredText;',BUILDER=MT.slice(0,-1)+'$Builder;',LB='Landroid/graphics/text/LineBreaker;';
 const REG='Llibcore/util/NativeAllocationRegistry;';
@@ -30,18 +30,18 @@ function paintSnapshot(r,handle){
  const p={...getPaintStateByHandle(r,handle)},face=r.skiaHost.resolveTypeface(p.typefaceRef);
  if(![p.textSize,p.textScaleX,p.textSkewX,p.letterSpacing,p.wordSpacing].every(Number.isFinite)||p.textSize<0||p.textSize>512||p.textScaleX!==1||p.textSkewX!==0)fail('Paragraph font state requires finite size0..512, scaleX1 and skewX0');
  if(p.flags&0x20||p.flags&0x800||p.hyphenEdit)fail('Paragraph synthetic bold, forced auto-hinting and hyphen edits require a separate backend');
- backend(r).selectTypeface(face.weight,face.italic);return{...p,weight:face.weight,italic:face.italic};
+ backend(r).selectTypeface(face.weight,face.italic);return{...p,...r.skiaHost.faceState(face)};
 }
 function nativeParagraph(r,m,width){
  const b=backend(r),c=b.CanvasKit,first=m.runs[0]?.paint??{hinting:1};
  // Minikin itemization: runs Roboto covers keep the original single-family path; the others are split per fallback font (HarfBuzz shapes each run).
  const itemized=m.runs.map(run=>b.fallback?.itemize(m.text.slice(run.start,run.end),{weight:run.paint.weight,italic:run.paint.italic})??null),anyFallback=itemized.some(Boolean);m.fallbackUsed=anyFallback;
- const style=new c.ParagraphStyle({textDirection:c.TextDirection.LTR,textAlign:c.TextAlign.Left,textStyle:{},disableHinting:first.hinting===0}),builder=anyFallback?b.fallback.makeBuilder(style):c.ParagraphBuilder.Make(style,b.fontManager);
+ const style=new c.ParagraphStyle({textDirection:c.TextDirection.LTR,textAlign:c.TextAlign.Left,textStyle:{},disableHinting:first.hinting===0}),builder=anyFallback||m.runs.some(run=>run.paint.families)?b.fallback.makeBuilder(style):c.ParagraphBuilder.Make(style,b.fontManager);
  let paragraph;
  try{
   for(const [index,run] of m.runs.entries()){
    const p=run.paint;if(p.hinting!==first.hinting)fail('Mixed font hinting inside a paragraph is unavailable');
-   const textStyle={fontFamilies:['Roboto'],fontSize:p.textSize,locale:p.textLocaleTag??'en-US',letterSpacing:p.letterSpacing*p.textSize,wordSpacing:p.wordSpacing,
+   const textStyle={fontFamilies:p.families?.length?[...p.families,'Roboto']:['Roboto'],...(p.fontVariations?.length?{fontVariations:p.fontVariations}:{}),fontSize:p.textSize,locale:p.textLocaleTag??'en-US',letterSpacing:p.letterSpacing*p.textSize,wordSpacing:p.wordSpacing,
     fontStyle:{weight:{value:p.weight},width:c.FontWidth.Normal,slant:p.italic?c.FontSlant.Italic:c.FontSlant.Upright},
     fontFeatures:[{name:'kern',value:p.flags&0x100?1:0}]};
    if(itemized[index])b.fallback.addRuns(builder,m.text.slice(run.start,run.end),textStyle,itemized[index]);

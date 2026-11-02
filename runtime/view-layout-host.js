@@ -1,7 +1,7 @@
-import { APKError } from './apk-runtime.js?v=43c1da0663b3';
-import { breakParagraphs } from './text-layout-native.js?v=43c1da0663b3';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=43c1da0663b3';
-import { gcRoot } from './heap-gc.js?v=43c1da0663b3';
+import { APKError } from './apk-runtime.js?v=ef714893ba48';
+import { breakParagraphs } from './text-layout-native.js?v=ef714893ba48';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=ef714893ba48';
+import { gcRoot } from './heap-gc.js?v=ef714893ba48';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -120,12 +120,14 @@ export function createViewLayoutHost(platform) {
     view.textRaster = null; view.textParagraph = null;
     let paragraph = null;
     view.textBreakText = null;
-    if (mode && width > available && !view.singleLine && !view.horizontallyScrolling || view.maxLines != null && lines.length > view.maxLines) {
-      const desiredWidth = width, paragraphWidth = mode === 0x40000000 || mode && desiredWidth > available ? available : desiredWidth, contentWidth = paragraphWidth - (padding.left || 0) - (padding.right || 0);
+    // An app font is drawn by Skia in every case: the DOM preview only has Roboto, so the text is laid out as a paragraph and its raster replaces the DOM glyphs (the way multi-line text already is).
+    const appFont = !!info.custom && !view.singleLine && !where && lines.length <= 64 && !view.horizontallyScrolling;
+    if (mode && width > available && !view.singleLine && !view.horizontallyScrolling || view.maxLines != null && lines.length > view.maxLines || appFont) {
+      const desiredWidth = width, paragraphWidth = mode === 0x40000000 || mode && desiredWidth > available ? available : desiredWidth, contentWidth = paragraphWidth - (padding.left || 0) - (padding.right || 0) + (appFont && width <= available ? 1 : 0);   // 1px of slack: the shaper's unhinted advances must not wrap a line the hinted run measure just fit
       // Layout.BREAK_STRATEGY_HIGH_QUALITY / BALANCED: Minikin's optimal breaker decides the lines, SkParagraph then lays out one hard line per entry
       const strategy = platform.textViewApi.breakStrategy(runtime, receiver), brokenText = strategy > 0 && !text.includes('\t') ? breakParagraphs(runtime, text, { textSize: font.textSize, weight: info.weight, italic: info.italic, locale: 'en-US' }, contentWidth, strategy, platform.textViewApi.hyphenationFrequency(runtime, receiver)).join('\n') : null;
       if (brokenText !== null) view.textBreakText = brokenText;
-      paragraph = measureSkiaParagraph(runtime.skia, brokenText ?? text, { width: contentWidth, textSize: font.textSize, weight: info.weight, italic: info.italic, direction: view.layoutDirection || 0, maxLines: view.maxLines ?? null, ellipsis: where === 'END' && view.maxLines != null ? '\u2026' : null, color: view.textColor == null ? 0xff757575 : typeof view.textColor === 'string' ? parseInt(view.textColor.replace('#', ''), 16) : view.textColor, raster: true });
+      paragraph = measureSkiaParagraph(runtime.skia, brokenText ?? text, { width: contentWidth, textSize: font.textSize, weight: info.weight, italic: info.italic, families: info.families ?? null, fontVariations: info.fontVariations ?? null, direction: view.layoutDirection || 0, maxLines: view.maxLines ?? null, ellipsis: where === 'END' && view.maxLines != null ? '\u2026' : null, color: view.textColor == null ? 0xff757575 : typeof view.textColor === 'string' ? parseInt(view.textColor.replace('#', ''), 16) : view.textColor, raster: true });
       width = paragraphWidth;
       height = Math.ceil(paragraph.height) + (padding.top || 0) + (padding.bottom || 0);
       view.textRaster = paragraph.raster;
