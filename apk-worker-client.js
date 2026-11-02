@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=190c356a68e4';
-import { createRasterReceiver } from './raster-cache.js?v=190c356a68e4';
+import { createWebAudioPlayer } from './web-audio-player.js?v=6a6418abc03c';
+import { createRasterReceiver } from './raster-cache.js?v=6a6418abc03c';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=190c356a68e4', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=6a6418abc03c', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -61,7 +61,7 @@ export class APKWorkerClient {
     if (this.pending) return Promise.reject(Object.assign(new Error('Uma operação da VM já está em andamento.'), { kind: 'vm-busy', operation: this.pending.type ?? null }));
     try { this.ensureWorker(); } catch (error) { return Promise.reject(error); }
     return new Promise((resolve, reject) => {
-      const requestId = ++this.sequence; this.lastHeartbeat = null;
+      const requestId = ++this.sequence; if (type !== 'screen-state') this.lastHeartbeat = null;   // a state request must not forget the signals of the work the VM is busy with
       const timer = setTimeout(() => {
         const signal = this.describeLastSignal(type), error = new Error(`A operação ${type} excedeu ${Math.round(timeoutMs / 1000)} s. O Worker foi encerrado; reabra o APK para continuar.${signal ? ' ' + signal.text : ''}`);
         error.name = 'TimeoutError'; if (signal) error.details = { kind: 'vm-timeout', operation: type, heartbeat: signal.heartbeat, silentSeconds: signal.silentSeconds, heartbeatText: signal.text }; this.cancel(error);
