@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=fd8143b587e9';
-import { NativeLibraryProvider, BASE_SONAME } from './jni-host.js?v=fd8143b587e9';
+import { APKError } from './apk-error.js?v=434c66f9a58e';
+import { NativeLibraryProvider, BASE_SONAME } from './jni-host.js?v=434c66f9a58e';
 
 // SQLCipher for Android: System.loadLibrary("sqlcipher").
 //

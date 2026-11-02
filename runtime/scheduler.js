@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=fd8143b587e9';
+import { APKError } from './apk-error.js?v=434c66f9a58e';
 
 // Green-thread scheduler for the VM.
 //
@@ -68,9 +68,10 @@ export class Scheduler {
     for (const thread of this.threads) {
       if (thread.state !== 'blocked') continue;
       const blocked = thread.blocked;
-      if (thread.interrupted && blocked.interruptible) { thread.timedOut = false; thread.state = 'runnable'; continue; }
-      if (blocked.ready()) { thread.timedOut = false; thread.state = 'runnable'; }
-      else if (blocked.deadline <= now) { thread.timedOut = true; thread.state = 'runnable'; }
+      const monitor = this.rt.monitor;
+      if (thread.interrupted && blocked.interruptible) { thread.timedOut = false; thread.state = 'runnable'; monitor?.noteWake(thread, blocked, 'interrupt'); continue; }
+      if (blocked.ready()) { thread.timedOut = false; thread.state = 'runnable'; monitor?.noteWake(thread, blocked, 'signal'); }
+      else if (blocked.deadline <= now) { thread.timedOut = true; thread.state = 'runnable'; monitor?.noteWake(thread, blocked, 'timeout'); }
       else if (blocked.deadline < earliest) earliest = blocked.deadline;
     }
     return earliest;

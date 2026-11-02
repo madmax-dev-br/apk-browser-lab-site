@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=fd8143b587e9';
+import { createHostRegistry } from './host-contract.js?v=434c66f9a58e';
 
 // android.util.StatsLog (packages/modules/StatsD framework/java/android/util/StatsLog.java, android-13.0.0_r1) over an in-memory sink. The device writes events to the statsd socket from
 // libstats_jni; the browser VM has no statsd, so every accepted event is kept in platform.statsEvents ({ atomId, bytes }) and nothing is sent anywhere. StatsEvent itself is the original

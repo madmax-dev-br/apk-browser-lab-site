@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=fd8143b587e9';
-import { gcBlockReason } from './heap-gc.js?v=fd8143b587e9';
+import { APKError } from './apk-error.js?v=434c66f9a58e';
+import { gcBlockReason } from './heap-gc.js?v=434c66f9a58e';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -19,11 +19,11 @@ export class OperationMonitor {
   configure({ sink = null, budgetMs = 0, intervalMs = 250 } = {}) { this.sink = sink; this.budgetMs = budgetMs; this.intervalMs = intervalMs; this.active = sink !== null || budgetMs > 0; return this; }
   begin(name) {
     const now = performance.now();
-    this.op = { name, start: now, events: 0, pump: new Map(), slices: new Map(), expired: false, startInstructions: this.instructions() };
+    this.op = { name, start: now, events: 0, pump: new Map(), slices: new Map(), wakes: new Map(), expired: false, startInstructions: this.instructions() };
     this.lastBeat = now; this.rt.hostCall = null;
     if (this.sink) this.beat(now, 'begin');
   }
-  end() { this.op = null; this.rt.hostCall = null; }
+  end() { this.lastWakes = this.op?.wakes ?? this.lastWakes; this.op = null; this.rt.hostCall = null; }
   instructions() { const by = this.rt.executionByOrigin; return (by?.apk?.instructions ?? 0) + (by?.framework?.instructions ?? 0); }
 
   /** Cheap check at the scheduler tick, thread switches, idle rounds and event dispatch: heartbeat when due, operation budget. */
@@ -32,7 +32,12 @@ export class OperationMonitor {
     const now = performance.now();
     if (this.sink !== null && now - this.lastBeat >= this.intervalMs) this.beat(now, 'tick');
     const op = this.op;
-    if (op !== null && this.budgetMs > 0 && !op.expired && now - op.start > this.budgetMs) this.expire(now);
+    if (op !== null && this.budgetMs > 0 && !op.expired && now - op.start > this.budgetMs) {
+      // Only main-thread work fails the operation. A background thread that overruns is preempted (its slice ends at the next quantum and it keeps running in later rounds), never the reason the app dies.
+      const rt = this.rt;
+      if (rt.thread !== null && rt.thread !== rt.scheduler.main && rt.sliceDeadline !== 0) { rt.sliceDeadline = 1; op.backgroundOverruns = (op.backgroundOverruns ?? 0) + 1; return; }
+      this.expire(now);
+    }
   }
   /** A host call is starting: remember it (the page sees it in the next heartbeat) and, for the calls known to run long, post a heartbeat right away so a hang inside names its culprit. */
   hostEnter(key, holder) {
@@ -85,6 +90,12 @@ export class OperationMonitor {
     if (entry === undefined) { if (op.pump.size >= 256) return; op.pump.set(key, entry = { count: 0, first: event.when ?? 0, last: event.when ?? 0 }); }
     entry.count++; entry.last = event.when ?? entry.last;
   }
+  /** A blocked thread became runnable again (signal/unpark/notify, timeout or interrupt): counted per thread, wait primitive and cause, so a spin made of instant wake-ups is visible. */
+  noteWake(thread, blocked, cause) {
+    const op = this.op; if (op === null) return;
+    const key = `${thread.name} · ${blocked.reason ?? 'espera'} · ${cause}`;
+    op.wakes.set(key, (op.wakes.get(key) ?? 0) + 1);
+  }
   /** Threads that are about to get a slice of the processor. */
   sliceRan() {
     const op = this.op; if (op === null) return;
@@ -92,13 +103,15 @@ export class OperationMonitor {
   }
   pumpReport(limit = 8) {
     const op = this.op; if (op === null) return { text: '', recurring: [], threads: [] };
+    const wakes = [...op.wakes].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => ({ key, count }));
     const recurring = [...op.pump].sort((a, b) => b[1].count - a[1].count).slice(0, limit).map(([key, e]) => ({ target: key, count: e.count, periodMs: e.count > 1 ? Math.round((e.last - e.first) / (e.count - 1)) : null }));
     const threads = [...op.slices].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name, count]) => ({ name, slices: count }));
     const lines = [`O que a VM continuou agendando nesta operação (${op.events} eventos):`,
       ...recurring.map(row => `  ${row.count}×${row.periodMs === null ? '' : ` a cada ~${row.periodMs} ms (tempo virtual)`}  ${row.target}`),
       ...(recurring.length ? [] : ['  (nenhum evento da fila)']),
+      'Despertares de threads (thread · primitiva · causa):', ...[...op.wakes].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => `  ${count}× ${key}`), ...(op.wakes.size ? [] : ['  (nenhum)']),
       'Threads que receberam tempo de processador:', ...threads.map(row => `  ${row.slices}× ${row.name}`), ...(threads.length ? [] : ['  (nenhuma)'])];
-    return { text: lines.join('\n'), recurring, threads, events: op.events };
+    return { text: lines.join('\n'), recurring, threads, wakes, events: op.events };
   }
   expire(now) {
     const op = this.op; op.expired = true;
