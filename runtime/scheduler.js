@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=8dfe82539cb6';
+import { APKError } from './apk-error.js?v=8961994ab6b4';
 
 // Green-thread scheduler for the VM.
 //
@@ -147,7 +147,7 @@ export class Scheduler {
   enumerateRoots(visit) {
     const each = values => { for (const value of values) if (value !== undefined && value !== null && typeof value === 'object') visit(value); };
     for (const thread of this.threads) {
-      each([thread.javaObject, thread.target, thread.handler, thread.uncaught, thread.contextLoader, thread.blocker, thread.looper]);
+      each([thread.javaObject, thread.target, thread.handler, thread.uncaught, thread.contextLoader, thread.blocker, thread.looper, thread.guardPolicy]);
       if (thread.blocked) each(thread.blocked.roots ?? []);
       for (const frame of thread.frames) {
         if (frame.cont) { each(frame.cont.args ?? []); each(frame.cont.roots ?? []); continue; }

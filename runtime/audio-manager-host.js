@@ -1,5 +1,5 @@
-import { mixerOf } from './audio-native.js?v=8dfe82539cb6';
-import { APKError } from './apk-error.js?v=8dfe82539cb6';
+import { mixerOf } from './audio-native.js?v=8961994ab6b4';
+import { APKError } from './apk-error.js?v=8961994ab6b4';
 
 // android.media.AudioManager on the virtual device (android-13.0.0_r1 AudioService / MediaFocusControl contracts), installed on the host type `AudioManagerImpl`:
 //   * stream volumes with Android's default maxima and indexes, adjust*() with mute/unmute/toggle, and the ringer mode with the Do Not Disturb rule: toggling silent mode changes the
@@ -207,7 +207,7 @@ export function installAudioManager({ platform, def, service, call, holds, empty
  */
 export function installRingtoneManager({ platform, def, type, holds }) {
   const RM = 'Landroid/media/RingtoneManager;', URI = 'Landroid/net/Uri;', CONTEXT = 'Landroid/content/Context;';
-  type(RM, 'Ljava/lang/Object;', [], { allocatable: false });
+  
   const DEFAULTS = [[1, 'content://settings/system/ringtone'], [2, 'content://settings/system/notification_sound'], [4, 'content://settings/system/alarm_alert']];
   const parse = (r, text) => r.dispatch({ owner: URI, name: 'parse', parameters: ['Ljava/lang/String;'], result: URI, signature: `(Ljava/lang/String;)${URI}` }, [text], 'static');
   const uriText = (r, uri) => r.stringCharacters(r.dispatch({ owner: URI, name: 'toString', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [uri], 'virtual'));
@@ -225,6 +225,62 @@ export function installRingtoneManager({ platform, def, type, holds }) {
     if (uri === null || uri === 0) chosen.delete(kind); else chosen.set(kind, uri);
   }, { static: true });
   def(RM, 'getValidRingtoneUri', `(${CONTEXT})${URI}`, () => null, { static: true });   // no sounds installed
-  def(RM, 'getRingtone', `(${CONTEXT}${URI})Landroid/media/Ringtone;`, () => { throw new APKError('RingtoneManager.getRingtone needs the media stack, which the virtual device does not have', { kind: 'ringtone-unsupported' }); }, { static: true });
+
+  // ---- Ringtone: the device has no sound to play, so a Ringtone is a valid object that never plays (play() is the silent no-op of a Ringtone with neither local nor remote playback)
+  const RT = 'Landroid/media/Ringtone;', ATTRS = 'Landroid/media/AudioAttributes;', MATRIX = 'Landroid/database/MatrixCursor;', CURSOR = 'Landroid/database/Cursor;', ACTIVITY = 'Landroid/app/Activity;';
+  type(RT, OBJECT, [], { allocatable: true }); type(RM, OBJECT, [], { allocatable: true });
+  const streamForType = kind => (kind & 4) ? 4 : (kind & 2) ? 5 : 2;
+  const state = (r, self) => r.object(self).ringtone ??= { uri: null, volume: 1, looping: false, attributes: null, stream: 2, haptic: false };
+  const uriSegment = (r, uri) => nullish(uri) ? null : (() => { const v = r.dispatch({ owner: URI, name: 'getLastPathSegment', parameters: [], result: STRING, signature: `()${STRING}` }, [uri], 'virtual'); return nullish(v) ? null : r.stringCharacters(v); })();
+  const nullish = v => v === null || v === undefined || v === 0;
+  const makeRingtone = (r, uri, stream) => { const o = r.allocate(RT); const st = state(r, o); st.uri = nullish(uri) ? null : uri; st.stream = stream; return o; };
+  def(RT, 'getUri', `()${URI}`, (r, _m, [self]) => state(r, self).uri);
+  def(RT, 'isPlaying', '()Z', () => 0);
+  def(RT, 'play', '()V', () => {});
+  def(RT, 'stop', '()V', () => {});
+  def(RT, 'setVolume', '(F)V', (r, _m, [self, volume]) => { state(r, self).volume = volume < 0 ? 0 : volume > 1 ? 1 : volume; });
+  def(RT, 'getVolume', '()F', (r, _m, [self]) => state(r, self).volume);
+  def(RT, 'setLooping', '(Z)V', (r, _m, [self, looping]) => { state(r, self).looping = looping ? 1 : 0; });
+  def(RT, 'isLooping', '()Z', (r, _m, [self]) => state(r, self).looping ? 1 : 0);
+  def(RT, 'setHapticGeneratorEnabled', '(Z)V', (r, _m, [self, on]) => { state(r, self).haptic = on ? 1 : 0; });
+  def(RT, 'isHapticGeneratorEnabled', '()Z', (r, _m, [self]) => state(r, self).haptic ? 1 : 0);
+  def(RT, 'setAudioAttributes', `(${ATTRS})V`, (r, _m, [self, attributes]) => {
+    if (nullish(attributes)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Invalid null AudioAttributes for Ringtone');
+    const st = state(r, self); st.attributes = attributes;
+    st.stream = r.dispatch({ owner: ATTRS, name: 'getVolumeControlStream', parameters: [], result: 'I', signature: '()I' }, [attributes], 'virtual');
+  });
+  def(RT, 'getAudioAttributes', `()${ATTRS}`, (r, _m, [self]) => {
+    const st = state(r, self); if (st.attributes) return st.attributes;
+    const builder = r.allocate('Landroid/media/AudioAttributes$Builder;'); r.dispatch({ owner: 'Landroid/media/AudioAttributes$Builder;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [builder], 'direct');
+    for (const [name, value] of [['setUsage', 6], ['setContentType', 4]]) r.dispatch({ owner: 'Landroid/media/AudioAttributes$Builder;', name, parameters: ['I'], result: 'Landroid/media/AudioAttributes$Builder;', signature: '(I)Landroid/media/AudioAttributes$Builder;' }, [builder, value], 'virtual');
+    return st.attributes = r.dispatch({ owner: 'Landroid/media/AudioAttributes$Builder;', name: 'build', parameters: [], result: ATTRS, signature: `()${ATTRS}` }, [builder], 'virtual');
+  });
+  def(RT, 'setStreamType', '(I)V', (r, _m, [self, stream]) => { const st = state(r, self); st.stream = stream; st.attributes = null; });
+  def(RT, 'getStreamType', '()I', (r, _m, [self]) => state(r, self).stream);
+  def(RT, 'getTitle', `(${CONTEXT})${STRING}`, (r, _m, [self]) => r.javaString(uriSegment(r, state(r, self).uri) ?? 'Unknown ringtone'));
+  def(RT, 'getTitle', `(${CONTEXT}${URI}ZZ)${STRING}`, (r, _m, [, uri]) => r.javaString(uriSegment(r, uri) ?? 'Unknown ringtone'), { static: true });
+  def(RM, 'getRingtone', `(${CONTEXT}${URI})${RT}`, (r, _m, [, uri]) => makeRingtone(r, uri, 2), { static: true });
+  def(RM, 'getRingtone', `(${CONTEXT}${URI}I)${RT}`, (r, _m, [, uri, stream]) => makeRingtone(r, uri, stream), { static: true });
+  def(RM, 'hasHapticChannels', `(${URI})Z`, () => 0, { static: true });
+  def(RM, 'hasHapticChannels', '(I)Z', () => 0, { static: true });
+
+  // ---- RingtoneManager instances: a cursor over the sounds the device has, which is none
+  const manager = (r, self) => r.object(self).ringtones ??= { type: 1, cursor: null, stopPrevious: true, previous: null };
+  def(RM, '<init>', `(${CONTEXT})V`, (r, _m, [self, context]) => { if (nullish(context)) r.throwJava('Ljava/lang/NullPointerException;', null); manager(r, self); });
+  def(RM, '<init>', `(${ACTIVITY})V`, (r, _m, [self, context]) => { if (nullish(context)) r.throwJava('Ljava/lang/NullPointerException;', null); manager(r, self); });
+  def(RM, 'setType', '(I)V', (r, _m, [self, kind]) => { const m = manager(r, self); if (m.cursor) r.throwJava('Ljava/lang/IllegalStateException;', 'Setting filter columns should be done before querying for the cursor'); m.type = kind; });
+  def(RM, 'getCursor', `()${CURSOR}`, (r, _m, [self]) => {
+    const m = manager(r, self); if (m.cursor) return m.cursor;
+    const columns = r.newArray('[Ljava/lang/String;', 4); r.array(columns).elements = ['_id', 'title', '"content://media/external/audio/media"', 'title_key'].map(c => r.javaString(c));
+    const cursor = r.allocate(MATRIX); r.dispatch({ owner: MATRIX, name: '<init>', parameters: ['[Ljava/lang/String;'], result: 'V', signature: '([Ljava/lang/String;)V' }, [cursor, columns], 'direct');
+    return m.cursor = cursor;
+  });
+  def(RM, 'getRingtonePosition', `(${URI})I`, () => -1);
+  def(RM, 'getRingtoneUri', '(I)Landroid/net/Uri;', () => null);
+  def(RM, 'getRingtone', `(I)${RT}`, (r, _m, [self]) => { const m = manager(r, self); if (m.stopPrevious && m.previous) { /* a previous Ringtone never plays */ } return m.previous = makeRingtone(r, null, streamForType(m.type)); });
+  def(RM, 'setStopPreviousRingtone', '(Z)V', (r, _m, [self, stop]) => { manager(r, self).stopPrevious = stop ? 1 : 0; });
+  def(RM, 'getStopPreviousRingtone', '()Z', (r, _m, [self]) => manager(r, self).stopPrevious ? 1 : 0);
+  def(RM, 'stopPreviousRingtone', '()V', (r, _m, [self]) => { manager(r, self).previous = null; });
+  def(RM, 'setIncludeDrm', '(Z)V', () => {}); def(RM, 'getIncludeDrm', '()Z', () => 0);
   return { roots(visit) { for (const uri of chosen.values()) visit(uri); } };
 }

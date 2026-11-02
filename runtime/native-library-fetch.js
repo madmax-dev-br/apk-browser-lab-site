@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=8dfe82539cb6';
-import { buildElfDescriptor } from './native-descriptor.js?v=8dfe82539cb6';
-import { sha256Hex } from './sha256-sync.js?v=8dfe82539cb6';
-import { withVariants } from './native-provider-variants.js?v=8dfe82539cb6';
+import { APKError } from './apk-error.js?v=8961994ab6b4';
+import { buildElfDescriptor } from './native-descriptor.js?v=8961994ab6b4';
+import { sha256Hex } from './sha256-sync.js?v=8961994ab6b4';
+import { withVariants } from './native-provider-variants.js?v=8961994ab6b4';
 
 // Browser-side provider of the lab's wasm32 native libraries (vendor/native-libs/wasm32, published next to the page by scripts/build-web.mjs).
 //
@@ -44,11 +44,15 @@ export class LazyNativeLibraryProvider {
       if (actual !== lib.sha256) throw new APKError(`Native library ${lib.soname} does not match its pinned SHA-256 (expected ${lib.sha256}, got ${actual})`, { kind: 'native-library-hash-mismatch' });
       bytes = fetched; module = new WebAssembly.Module(fetched); provider.fetched.push(lib.soname);
     };
-    return {
+    const entry = {
       soname: lib.soname, abi: this.abi, sha256: lib.sha256, needed: lib.needed, provenance: lib, apkSha256: lib.apkSha256 ?? null, requires: lib.requires ?? null,
       descriptor: buildElfDescriptor({ soname: lib.soname, needed: lib.needed, wasmSha256: lib.sha256 }),
-      get bytes() { load(); return bytes; }, get module() { load(); return module; },
     };
+    // Non-enumerable: the lazy fetch must only happen when a library is linked, never because something walked the entry's properties (the garbage collector's root scan did: it fetched,
+    // hashed and compiled every wasm module on the first collection, ~0.5 s in the browser Worker and the memory of all of them).
+    Object.defineProperty(entry, 'bytes', { get() { load(); return bytes; }, enumerable: false });
+    Object.defineProperty(entry, 'module', { get() { load(); return module; }, enumerable: false });
+    return entry;
   }
   has(soname) { return this.modules.has(soname); }
   get(soname) { return this.modules.get(soname) ?? null; }

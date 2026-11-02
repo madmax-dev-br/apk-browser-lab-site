@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=8dfe82539cb6';
-import { NativeLibraryProvider, BASE_SONAME } from './jni-host.js?v=8dfe82539cb6';
-import { buildElfDescriptor } from './native-descriptor.js?v=8dfe82539cb6';
-import { sha256Hex } from './sha256-sync.js?v=8dfe82539cb6';
-import { xhrFetchSync } from './native-library-fetch.js?v=8dfe82539cb6';
+import { APKError } from './apk-error.js?v=8961994ab6b4';
+import { NativeLibraryProvider, BASE_SONAME } from './jni-host.js?v=8961994ab6b4';
+import { buildElfDescriptor } from './native-descriptor.js?v=8961994ab6b4';
+import { sha256Hex } from './sha256-sync.js?v=8961994ab6b4';
+import { xhrFetchSync } from './native-library-fetch.js?v=8961994ab6b4';
 
 // The native half of Android's public-key / TLS stack: System.loadLibrary("javacrypto") from the original Conscrypt classes in the framework DEX
 // (com.android.org.conscrypt.NativeCryptoJni) is served by the lab's wasm32 modules libjavacrypto.so, libssl.so and libcrypto.so, built from AOSP's own
@@ -47,12 +47,14 @@ export class JavacryptoProvider {
       if (actual !== lib.sha256) throw new APKError(`Native library ${lib.soname} does not match its pinned SHA-256 (expected ${lib.sha256}, got ${actual})`, { kind: 'native-library-hash-mismatch' });
       bytes = fetched; module = new WebAssembly.Module(fetched); self.fetched.push(lib.soname);
     };
-    return {
+    const entry = {
       soname: lib.soname, abi: 'wasm32', sha256: lib.sha256, needed: lib.needed, provenance: lib, apkSha256: null, requires: null, platform: true,   // system libraries: not mounted in the app's lib directory
       hostImports: lib.soname === 'libcrypto.so' ? javacryptoHostImports : null,
       descriptor: buildElfDescriptor({ soname: lib.soname, needed: lib.needed, wasmSha256: lib.sha256 }),
-      get bytes() { load(); return bytes; }, get module() { load(); return module; },
     };
+    Object.defineProperty(entry, 'bytes', { get() { load(); return bytes; }, enumerable: false });   // lazy fetch: never triggered by walking the entry (see native-library-fetch.js)
+    Object.defineProperty(entry, 'module', { get() { load(); return module; }, enumerable: false });
+    return entry;
   }
   /** A NativeLibraryProvider holding `base`'s modules plus the javacrypto trio (and libc++_shared.so / liblog.so unless `base` already has them). */
   compose(base = null) {

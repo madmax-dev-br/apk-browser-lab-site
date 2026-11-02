@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=8dfe82539cb6';
-import { createRasterReceiver } from './raster-cache.js?v=8dfe82539cb6';
+import { createWebAudioPlayer } from './web-audio-player.js?v=8961994ab6b4';
+import { createRasterReceiver } from './raster-cache.js?v=8961994ab6b4';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=8dfe82539cb6', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=8961994ab6b4', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -19,6 +19,9 @@ export class APKWorkerClient {
       // Every snapshot, delivered or not, passes the raster cache in order so Worker and page LRUs stay identical.
       if (data?.snapshot) { try { this.rasters.resolve(data.snapshot); } catch (error) { this.cancel(error); return; } }
       if (data?.type === 'heartbeat') { this.lastHeartbeat = { ...data, receivedAt: Date.now() }; this.onHeartbeat?.(data); this.rearm?.(); return; }   // a Worker that keeps heartbeating is alive: the request timeout measures silence   // posted by the VM from inside its loops: the last one explains a timeout
+      if (data?.type === 'screen-snapshot') { this.lastScreenSnapshot = { text: data.text, receivedAt: Date.now() }; return; }
+      const side = this.sideRequests?.get(data?.requestId);
+      if (side && (data.type === 'result' || data.type === 'error')) { clearTimeout(side.timer); this.sideRequests.delete(data.requestId); side.resolve(data.type === 'result' ? data.screenState : this.cachedScreenState()); return; }
       if (data?.type === 'app-data') { this.appData = data.status; this.onAppData?.(data.status); return; }
       if (data?.type === 'webview') { this.onWebView?.(data); return; }   // a WebView command for the page's iframes (src/webview-frame.js)
       if (data?.type === 'api-gaps') { this.apiGaps = data.report ?? null; this.onApiGaps?.(this.apiGaps); return; }   // static estimate, posted once after a launch; never part of a request
@@ -90,7 +93,21 @@ export class APKWorkerClient {
   webViewEvent(event) { try { this.worker?.postMessage({ ...event, requestId: ++this.sequence }); } catch { /* worker already gone */ } }
   flushAppData() { try { this.worker?.postMessage({ type: 'app-data-flush', requestId: ++this.sequence }); } catch { /* worker already gone */ } }
   /** "Estado da tela": the VM's picture of the screen (activity stack, view tree, Compose, frames, queue, threads, memory, swallowed exceptions) as { text, blank, reasons }. */
-  async screenState() { return (await this.request('screen-state', {}, { timeoutMs: 10000 })).screenState; }
+  /** The last screen-state text captured during an operation, marked as such: the Worker cannot answer while it executes VM code. */
+  cachedScreenState() {
+    const last = this.lastScreenSnapshot; if (!last) return null;
+    return { text: `${last.text}\n(captura feita há ${Math.round((Date.now() - last.receivedAt) / 100) / 10} s durante uma operação da VM: o Worker não responde enquanto executa código da VM; a semântica do Compose não está incluída)`, blank: false, reasons: [], stale: true };
+  }
+  /** Side channel: independent of the one-operation-at-a-time request slot, so it works while a click or launch is running (and then answers from the last snapshot). */
+  screenState() {
+    if (!this.worker) return Promise.resolve(this.cachedScreenState());
+    return new Promise(resolve => {
+      const requestId = ++this.sequence, sides = this.sideRequests ??= new Map();
+      const timer = setTimeout(() => { sides.delete(requestId); resolve(this.cachedScreenState()); }, this.pending ? 1500 : 10000);
+      sides.set(requestId, { resolve, timer });
+      try { this.worker.postMessage({ type: 'screen-state', requestId }); } catch { clearTimeout(timer); sides.delete(requestId); resolve(this.cachedScreenState()); }
+    });
+  }
   async launch(activity, { onProgress } = {}) {
     return (await this.request('launch', { activity }, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot;
   }
@@ -117,6 +134,8 @@ export class APKWorkerClient {
   cancel(error) {
     if (this.worker) this.worker.terminate();
     this.worker = null;
+    for (const side of this.sideRequests?.values() ?? []) { clearTimeout(side.timer); side.resolve(this.cachedScreenState()); }
+    this.sideRequests?.clear();
     if (this.pending) {
       clearTimeout(this.pending.timer);
       const reject = this.pending.reject; this.pending = null;

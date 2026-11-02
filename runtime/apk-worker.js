@@ -1,38 +1,38 @@
-import { buildScreenState } from './screen-state.js?v=8dfe82539cb6';
-import { createMessageSink } from './audio-native.js?v=8dfe82539cb6';
-import { loadAPK } from './apk-loader.js?v=8dfe82539cb6';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=8dfe82539cb6';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=8dfe82539cb6';
-import { createWebViewBackend } from './webview-backend.js?v=8dfe82539cb6';
-import { FrameworkProvider } from './framework-provider.js?v=8dfe82539cb6';
-import { createRasterSender } from './raster-cache.js?v=8dfe82539cb6';
-import { isFreedId } from './heap-gc.js?v=8dfe82539cb6';
-import { dispatchPointer } from './pointer-input-host.js?v=8dfe82539cb6';
-import { resolveDevice } from './device-profile.js?v=8dfe82539cb6';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=8dfe82539cb6';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=8dfe82539cb6';
-import { SkiaProvider } from './skia-provider.js?v=8dfe82539cb6';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=8dfe82539cb6';
-import { disposeTextLayout } from './text-layout-native.js?v=8dfe82539cb6';
-import { IcuBreakProvider } from './icu-break-provider.js?v=8dfe82539cb6';
-import { SqliteProvider } from './sqlite-native.js?v=8dfe82539cb6';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=8dfe82539cb6';
-import { TzdataProvider } from './java-time-native.js?v=8dfe82539cb6';
-import { ZlibProvider } from './zip-native.js?v=8dfe82539cb6';
-import { IcuConverterProvider } from './icu-converter-native.js?v=8dfe82539cb6';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=8dfe82539cb6';
-import { JavacryptoProvider } from './javacrypto-native.js?v=8dfe82539cb6';
-import { disposeColorFilters } from './color-filter-native.js?v=8dfe82539cb6';
-import { disposeRegex } from './regex-native.js?v=8dfe82539cb6';
-import { disposeRenderNodes } from './rendernode-native.js?v=8dfe82539cb6';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=8dfe82539cb6';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=8dfe82539cb6';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=8dfe82539cb6';
+import { buildScreenState } from './screen-state.js?v=8961994ab6b4';
+import { createMessageSink } from './audio-native.js?v=8961994ab6b4';
+import { loadAPK } from './apk-loader.js?v=8961994ab6b4';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=8961994ab6b4';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=8961994ab6b4';
+import { createWebViewBackend } from './webview-backend.js?v=8961994ab6b4';
+import { FrameworkProvider } from './framework-provider.js?v=8961994ab6b4';
+import { createRasterSender } from './raster-cache.js?v=8961994ab6b4';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=8961994ab6b4';
+import { dispatchPointer } from './pointer-input-host.js?v=8961994ab6b4';
+import { resolveDevice } from './device-profile.js?v=8961994ab6b4';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=8961994ab6b4';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=8961994ab6b4';
+import { SkiaProvider } from './skia-provider.js?v=8961994ab6b4';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=8961994ab6b4';
+import { disposeTextLayout } from './text-layout-native.js?v=8961994ab6b4';
+import { IcuBreakProvider } from './icu-break-provider.js?v=8961994ab6b4';
+import { SqliteProvider } from './sqlite-native.js?v=8961994ab6b4';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=8961994ab6b4';
+import { TzdataProvider } from './java-time-native.js?v=8961994ab6b4';
+import { ZlibProvider } from './zip-native.js?v=8961994ab6b4';
+import { IcuConverterProvider } from './icu-converter-native.js?v=8961994ab6b4';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=8961994ab6b4';
+import { JavacryptoProvider } from './javacrypto-native.js?v=8961994ab6b4';
+import { disposeColorFilters } from './color-filter-native.js?v=8961994ab6b4';
+import { disposeRegex } from './regex-native.js?v=8961994ab6b4';
+import { disposeRenderNodes } from './rendernode-native.js?v=8961994ab6b4';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=8961994ab6b4';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=8961994ab6b4';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=8961994ab6b4';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=8dfe82539cb6';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=8dfe82539cb6';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=8dfe82539cb6';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '8dfe82539cb6';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=8961994ab6b4';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=8961994ab6b4';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=8961994ab6b4';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '8961994ab6b4';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -114,14 +114,65 @@ function startApiGapScan() {
     } catch { /* an estimate: nothing to report */ }
   }, 0);
 }
+// A Worker running VM code cannot answer a "screen-state" request until the operation ends. While an operation runs, a heartbeat at most every 4 s also carries a text snapshot of the screen
+// state (no Java code is run for it: no Compose semantics), which the page keeps so that "Copiar estado da tela" still has something when the VM is stuck.
+let lastScreenSnapshotAt = 0;
+function snapshotScreenDuringOperation(message) {
+  if (message?.type !== 'heartbeat' || !runtime) return;
+  const now = performance.now(); if (now - lastScreenSnapshotAt < 4000) return; lastScreenSnapshotAt = now;
+  try { self.postMessage({ type: 'screen-snapshot', text: buildScreenState(runtime, { semantics: null, heartbeat: null }).text, at: Date.now() }); } catch { /* best effort */ }
+}
 self.onmessage = async ({ data }) => {
   if (!data || !Number.isSafeInteger(data.requestId)) return;
   const { requestId, type } = data;
   const send = (message) => self.postMessage({ requestId, ...message });
   if (type === 'webview-event') { try { runtime?.platform?.webViewBackend?.handleEvent(runtime, data); } finally { scheduleEvents(); } return; }   // an iframe finished or failed: only queues VM tasks
   if (type === 'app-data-flush') { runtime?.fileMappings?.flushAll(); appData?.syncPoint('page-hide'); return; }   // shared native file mappings reach their files before the data is stored   // the page is being hidden/closed: store now, even while the VM is busy (no reply)
-  if (type === 'screen-state') {   // read-only picture of the screen for "Copiar estado da tela"; answered even while the VM is between operations
-    try { send({ type: 'result', screenState: runtime ? buildScreenState(runtime, { semantics: composeSemantics?.snapshot?.() ?? null, heartbeat: runtime.monitor.snapshot(performance.now(), 'screen-state') }) : { text: 'Estado da tela\nNenhum APK carregado.', blank: false, reasons: [] } }); } catch (error) { send({ type: 'error', error: errorData(error) }); }
+  if (type === 'screen-state') {   // read-only picture of the screen for "Copiar estado da tela"; answered even while the VM is between operations, always with whatever could be read
+    try {
+      if (!runtime) { send({ type: 'result', screenState: { text: 'Estado da tela\nNenhum APK carregado.', blank: false, reasons: [] } }); return; }
+      const notes = [];
+      const semantics = runtime.runDiagnostic(() => composeSemantics?.snapshot?.() ?? null, null, error => notes.push(`semântica do Compose indisponível: ${String(error?.message ?? error).slice(0, 200)}`));
+      const state = runtime.runDiagnostic(() => buildScreenState(runtime, { semantics, heartbeat: runtime.monitor.snapshot(performance.now(), 'screen-state') }), null, error => notes.push(`parte do estado indisponível: ${String(error?.message ?? error).slice(0, 200)}`));
+      const result = state ?? { text: 'Estado da tela\nNão foi possível montar o estado da tela.', blank: false, reasons: [] };
+      if (notes.length) result.text += '\nAvisos do relatório: ' + notes.join('; ');
+      send({ type: 'result', screenState: result });
+    } catch (error) { send({ type: 'result', screenState: { text: `Estado da tela\nNão foi possível montar o estado da tela: ${String(error?.message ?? error).slice(0, 300)}`, blank: false, reasons: [] } }); }
+    return;
+  }
+  if (type === 'debug-static') {   // measurement aid (scripts/validation/bench-worker.mjs): runs one static method of the loaded APK and reports wall time, instructions and the host's clock cost
+    if (!runtime) { send({ type: 'error', error: { name: 'ProtocolError', message: 'Nenhum APK carregado.' } }); return; }
+    try {
+      const { owner, name, argument } = data, signature = '(Ljava/lang/String;)Ljava/lang/String;', counted = () => runtime.executionByOrigin.apk.instructions + runtime.executionByOrigin.framework.instructions;
+      const before = counted(), start = performance.now();
+      const value = runtime.dispatch({ owner, name, parameters: ['Ljava/lang/String;'], result: 'Ljava/lang/String;', signature }, runtime.argumentWords(['Ljava/lang/String;'], [runtime.javaString(argument)]), 'static');
+      send({ type: 'result', ms: performance.now() - start, instructions: counted() - before, value: runtime.stringCharacters(value) });
+    } catch (error) { send({ type: 'error', error: errorData(error) }); }
+    return;
+  }
+  if (type === 'debug-gc') {   // measurement aid (scripts/validation/bench-gc.mjs): keeps `live` small objects of mixed shapes reachable, then collects and reports the phase timings
+    if (!runtime) { send({ type: 'error', error: { name: 'ProtocolError', message: 'Nenhum APK carregado.' } }); return; }
+    try {
+      const { live = 100000, garbage = 100000 } = data, holder = runtime.makeObject('Ljava/util/ArrayList;'), list = runtime.object(holder); list.list = [];
+      for (let i = 0; i < live; i++) { const k = i % 4; list.list.push(k === 0 ? runtime.makeObject('Ljava/lang/StringBuilder;') : k === 1 ? runtime.newArray('[B', 24) : k === 2 ? runtime.javaString('value-' + i) : runtime.makeObject('Ljava/util/ArrayList;')); }
+      for (let i = 0; i < garbage; i++) runtime.makeObject('Ljava/lang/StringBuilder;');
+      (runtime.debugKeep ??= []).push(holder);
+      let rootProbe = null;
+      if (data.probeRoots) {   // cold timing of every property read and key listing while walking the platform root once: finds a lazily computed accessor
+        const seen = new WeakSet(), slow = [], walk = (value, path, depth) => {
+          if (value === null || typeof value !== 'object' || seen.has(value) || depth > 12) return; seen.add(value);
+          if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer || value instanceof WeakMap || value instanceof WeakSet || value instanceof Promise) return;
+          if (value instanceof Map || value instanceof Set) { for (const item of value) { if (value instanceof Map) { walk(item[0], path + '<k>', depth + 1); walk(item[1], path + '<v>', depth + 1); } else walk(item, path + '<e>', depth + 1); } return; }
+          const t0 = performance.now(); const keys = Object.keys(value); const dKeys = performance.now() - t0;
+          if (dKeys > 5) slow.push({ path, op: 'keys', ms: Math.round(dKeys), count: keys.length, kind: value?.constructor?.name });
+          if (Array.isArray(value)) { for (let i = 0; i < Math.min(value.length, 2000); i++) walk(value[i], path + '[]', depth + 1); return; }
+          for (const key of keys) { const t1 = performance.now(); const item = value[key]; const d = performance.now() - t1; if (d > 5) slow.push({ path: path + '.' + key, op: 'get', ms: Math.round(d), kind: item?.constructor?.name }); walk(item, path + '.' + key, depth + 1); }
+        };
+        walk(runtime.platform, 'platform', 0); rootProbe = slow.slice(0, 12);
+      }
+      const before = performance.now(); collectGarbage(runtime, { reason: 'debug-gc' }); const ms = performance.now() - before;
+      send({ type: 'result', ms, phases: runtime.gcPhases?.[0] ?? null, heapSize: runtime.heap.size, rootProbe });
+    } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
   }
   if (busy) { send({ type: 'error', error: { name: 'ProtocolError', message: 'A VM já está processando outra operação.' } }); return; }
@@ -148,7 +199,7 @@ self.onmessage = async ({ data }) => {
       const javacryptoProvider = NATIVE_LIBS_URL ? (sharedJavacryptoProvider ??= await JavacryptoProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
       const result = await loadAPK(data.buffer, { maxEventWallMs: EVENT_WALL_LIMIT_MS, maxHeapObjects: heapLimitFor(data), nativeLibraryProvider, javacryptoProvider, device: resolveDevice(data.device || {}), tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
       runtime = result.runtime; archive = result.archive; inventory = result.inventory;
-      runtime.monitor.configure({ sink: message => self.postMessage({ ...message, requestId: activeRequestId }), budgetMs: OPERATION_WALL_LIMIT_MS });   // heartbeats to the page + the operation wall budget
+      runtime.monitor.configure({ sink: message => { self.postMessage({ ...message, requestId: activeRequestId }); snapshotScreenDuringOperation(message); }, budgetMs: OPERATION_WALL_LIMIT_MS });   // heartbeats to the page + the operation wall budget
       runtime.platform.audioSink = createMessageSink((message, transfer) => self.postMessage(message, transfer));   // android.media.AudioTrack PCM goes to the page's Web Audio output
       // WebView content lives in iframes of the page: without a page that wants them (the embedded player's default) the WebView has no backend and fails explicitly
       if (data.webview !== false) runtime.platform.webViewBackend = createWebViewBackend({ platform: runtime.platform, post: message => self.postMessage(message), labOrigin: self.location?.origin ?? '' }); inspectNativeLibraries = result.inspectNativeLibraries;

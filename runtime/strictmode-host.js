@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=8dfe82539cb6';
-import { collectGarbage } from './heap-gc.js?v=8dfe82539cb6';
+import { createHostRegistry } from './host-contract.js?v=8961994ab6b4';
+import { collectGarbage } from './heap-gc.js?v=8961994ab6b4';
 
 // The platform side of android.os.StrictMode. StrictMode itself, its ThreadPolicy/VmPolicy builders, the android.os.strictmode violation classes, dalvik.system.CloseGuard and
 // dalvik.system.BlockGuard are the pinned originals (android-13.0.0_r1) in framework.dex; policies live in ThreadLocals and BlockGuard exactly as on a device. What the original
@@ -40,7 +40,7 @@ export function createStrictModeHost(platform) {
   // VMDebug.countInstancesOfClass(Class, boolean): live instances after a collection (ART counts reachable objects), the class itself or, when assignable, its subclasses too.
   const count = (r, klass, assignable) => {
     const wanted = r.object(klass).classType; let n = 0;
-    for (let id = 1; id < r.nextId; id++) { const record = r.heap.list[id]; if (!record || record.freed || record.elements) continue; if (record.type === wanted || (assignable && r.isSubtype(record.type, wanted))) n++; }
+    for (let id = 1; id < r.nextId; id++) { const record = r.heap.get(id); if (!record || record.freed || record.elements) continue; if (record.type === wanted || (assignable && r.isSubtype(record.type, wanted))) n++; }
     return n;
   };
   const prepare = r => { collectGarbage(r, { reason: 'VMDebug.countInstancesOfClass' }); };

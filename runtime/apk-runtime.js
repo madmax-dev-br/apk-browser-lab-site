@@ -1,24 +1,25 @@
-import { VMClock } from './vm-clock.js?v=8dfe82539cb6';
-import { OperationMonitor } from './operation-monitor.js?v=8dfe82539cb6';
-import { ExecutionProfile } from './execution-profile.js?v=8dfe82539cb6';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=8dfe82539cb6';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=8dfe82539cb6';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=8dfe82539cb6';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=8dfe82539cb6';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=8dfe82539cb6';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=8dfe82539cb6';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=8dfe82539cb6';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=8dfe82539cb6';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=8dfe82539cb6';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=8dfe82539cb6';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=8dfe82539cb6';
-import { APKError } from './apk-error.js?v=8dfe82539cb6';
-import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=8dfe82539cb6';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=8dfe82539cb6';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=8dfe82539cb6';
-import { Scheduler, Blocked } from './scheduler.js?v=8dfe82539cb6';
-import { bootClassLacksMember } from './boot-class-members.js?v=8dfe82539cb6';
-export { APKError } from './apk-error.js?v=8dfe82539cb6';
+import { VMClock } from './vm-clock.js?v=8961994ab6b4';
+import { OperationMonitor } from './operation-monitor.js?v=8961994ab6b4';
+import { ExecutionProfile } from './execution-profile.js?v=8961994ab6b4';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=8961994ab6b4';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=8961994ab6b4';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=8961994ab6b4';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=8961994ab6b4';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=8961994ab6b4';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=8961994ab6b4';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=8961994ab6b4';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=8961994ab6b4';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=8961994ab6b4';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=8961994ab6b4';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=8961994ab6b4';
+import { APKError } from './apk-error.js?v=8961994ab6b4';
+import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=8961994ab6b4';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=8961994ab6b4';
+import { FAST_PATHS } from './io-fast-paths.js?v=8961994ab6b4';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=8961994ab6b4';
+import { Scheduler, Blocked } from './scheduler.js?v=8961994ab6b4';
+import { bootClassLacksMember } from './boot-class-members.js?v=8961994ab6b4';
+export { APKError } from './apk-error.js?v=8961994ab6b4';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -885,17 +886,30 @@ function longArithmetic(op, x, y) {
 }
 
 /** The VM heap: object records by id. Ids are allocated sequentially and objects are never freed (no GC), so an array indexed by id replaces the Map. */
-const HEAP_BLOCK_SHIFT = 10;   // 1024 ids per block
+const HEAP_CHUNK_SHIFT = 12, HEAP_CHUNK_MASK = 4095;   // 4096 ids per chunk
+/**
+ * The object table. Ids are never reused (a stale id resolves to "dead", never to another object), so a flat array indexed by id would keep a slot for every object ever allocated -- tens of
+ * millions of mostly empty slots after a long run. Records live in 4096-slot chunks that are allocated on demand and dropped when their last record is released: memory and the collector's
+ * walk follow the live objects (and the chunks they are spread over), not the number of ids ever handed out.
+ */
 class Heap {
-  // `blocks[n]` counts the records in ids [n << 10, (n + 1) << 10): ids are never reused, so after a long run `list` is mostly holes (tens of millions of ids for a few hundred thousand live objects);
-  // the collector walks only the blocks that hold something instead of every id ever allocated.
-  constructor() { this.list = []; this.size = 0; this.blocks = []; }
-  get(id) { return this.list[id]; }
-  has(id) { return this.list[id] !== undefined; }
-  set(id, record) { if (this.list[id] === undefined) { this.size++; this.blocks[id >>> HEAP_BLOCK_SHIFT] = (this.blocks[id >>> HEAP_BLOCK_SHIFT] | 0) + 1; } this.list[id] = record; return this; }
-  /** Removes a record (the collector's sweep): size and the block count follow. */
-  release(id) { this.list[id] = undefined; this.size--; this.blocks[id >>> HEAP_BLOCK_SHIFT]--; }
-  *values() { for (const record of this.list) if (record !== undefined) yield record; }
+  constructor() { this.chunks = []; this.chunkLive = []; this.size = 0; }
+  get(id) { const chunk = this.chunks[id >>> HEAP_CHUNK_SHIFT]; return chunk === undefined ? undefined : chunk[id & HEAP_CHUNK_MASK]; }
+  has(id) { return this.get(id) !== undefined; }
+  set(id, record) {
+    const ci = id >>> HEAP_CHUNK_SHIFT; let chunk = this.chunks[ci];
+    if (chunk === undefined) { chunk = this.chunks[ci] = new Array(HEAP_CHUNK_MASK + 1).fill(undefined); this.chunkLive[ci] = 0; }
+    if (chunk[id & HEAP_CHUNK_MASK] === undefined) { this.size++; this.chunkLive[ci]++; }
+    chunk[id & HEAP_CHUNK_MASK] = record; return this;
+  }
+  /** Removes a record (the collector's sweep): size follows, and an emptied chunk is dropped. */
+  release(id) {
+    const ci = id >>> HEAP_CHUNK_SHIFT, chunk = this.chunks[ci]; chunk[id & HEAP_CHUNK_MASK] = undefined; this.size--;
+    if (--this.chunkLive[ci] === 0) this.chunks[ci] = undefined;
+  }
+  /** Chunk indexes that hold at least one record. */
+  usedChunks() { const out = []; for (let ci = 0; ci < this.chunks.length; ci++) if (this.chunks[ci] !== undefined) out.push(ci); return out; }
+  *values() { for (const chunk of this.chunks) if (chunk !== undefined) for (const record of chunk) if (record !== undefined) yield record; }
 }
 
 /** Returned by a chunk of APKRuntime.bridge() when none of its branches applies to the call. */
@@ -1052,7 +1066,7 @@ export class APKRuntime {
     return args;
   }
   object(value) {
-    if (value !== null && typeof value === 'object') { const record = this.heap.list[value.ref]; if (record !== undefined) return record; }
+    if (value !== null && typeof value === 'object') { const record = this.heap.get(value.ref); if (record !== undefined) return record; }
     if (isNull(value)) this.throwJava('Ljava/lang/NullPointerException;', 'null object reference');
     fail('Null or invalid object reference');
   }
@@ -1529,6 +1543,18 @@ export class APKRuntime {
   /** Heap-pressure collection at a thread-switch safepoint of a scheduling run (no host native is in flight there; see heap-gc.js). A no-op unless collection is enabled and the heap passed half its limit. */
   /** Called every scheduling quantum by the interpreter: records the peak budget use of one thread and enforces the wall-clock limit of an event. */
   /** Throws the instruction-budget / wall-clock failure with the execution profile of the event (src/execution-profile.js): the message names the busiest methods, `details.profile.text` is the full section of the diagnostic report. */
+  /**
+   * Runs read-only diagnostic code (the screen-state report asks Java for Compose semantics) with a fresh budget: the operation that is being diagnosed has usually just exhausted its own,
+   * and the report must still be built. The instruction counters and the event wall clock are saved and restored, no app thread is scheduled, and any error returns `fallback` (with the
+   * message in `onError`) instead of propagating, so a report always carries what could be read.
+   */
+  runDiagnostic(fn, fallback = null, onError = null) {
+    const scheduler = this.scheduler, saved = { steps: this.steps, wall: this.maxEventWallMs, eventWallStart: this.eventWallStart, total: scheduler?.eventTotal, last: scheduler?.lastSteps };
+    this.steps = 0; this.maxEventWallMs = 0; if (scheduler) { scheduler.eventTotal = 0; scheduler.lastSteps = 0; }
+    try { return fn(); } catch (error) { onError?.(error); return fallback; } finally {
+      this.steps = saved.steps; this.maxEventWallMs = saved.wall; this.eventWallStart = saved.eventWallStart; if (scheduler) { scheduler.eventTotal = saved.total; scheduler.lastSteps = saved.last; }
+    }
+  }
   budgetExceeded(message, details = {}) {
     const profile = this.profile.report(), summary = this.profile.summary();
     throw new APKError(message + summary, { kind: 'instruction-budget', ...details, profile });
@@ -1663,6 +1689,7 @@ export class APKRuntime {
       const selected = { ...method, owner }, key = methodKey(selected);
       // Packaged Kotlin/Java library bytecode always takes precedence over a bridge fallback -- except a method of an interface reached through a host-typed receiver (a host
       // iterator whose runtime type is the java.util.Iterator interface itself, a class chain never contains interfaces otherwise): the host serves that call.
+      if (definition && FAST_PATHS.has(key) && this.dex.bootDexes?.has(definition.method.dex)) return { kind: 'platform-default', run: FAST_PATHS.get(key), key };
       if (definition && !(cls.flags & 0x200 && (SHIMS.has(key) || this.platform?.supports?.(key)))) return { kind: 'definition', definition };
       if (SHIMS.has(key) || this.skiaHost?.supports?.(key) || this.platform?.supports?.(key)) {
         // A loaded Java class is authoritative about its declared methods.
@@ -2124,7 +2151,7 @@ export class APKRuntime {
     // Object.<init>() on a live object does nothing: no registry, Skia or platform bridge claims it and the generic tail only validates the receiver.
     if (knownKey === OBJECT_INIT_KEY && words.length === 1 && this.fastCallPaths !== false) {
       const receiver = words[0];
-      if (receiver !== null && typeof receiver === 'object' && this.heap.list[receiver.ref] !== undefined && (this.objectInitIsPlain ??= !(this.skiaHost?.supports?.(OBJECT_INIT_KEY) || this.platform?.supports?.(OBJECT_INIT_KEY) || ICU_BREAK_KEYS.has(OBJECT_INIT_KEY)))) return undefined;
+      if (receiver !== null && typeof receiver === 'object' && this.heap.get(receiver.ref) !== undefined && (this.objectInitIsPlain ??= !(this.skiaHost?.supports?.(OBJECT_INIT_KEY) || this.platform?.supports?.(OBJECT_INIT_KEY) || ICU_BREAK_KEYS.has(OBJECT_INIT_KEY)))) return undefined;
     }
     const staticCall = mode === 'static', args = this.hostArguments(method, words, mode);
     const key = knownKey ?? methodKey(method), name = method.name;

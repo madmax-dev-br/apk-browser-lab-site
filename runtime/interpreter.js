@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=8dfe82539cb6';
-import { Blocked, QUANTUM } from './scheduler.js?v=8dfe82539cb6';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=8dfe82539cb6';
+import { APKError } from './apk-error.js?v=8961994ab6b4';
+import { Blocked, QUANTUM } from './scheduler.js?v=8961994ab6b4';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=8961994ab6b4';
 
 // Frame-based DEX interpreter.
 //
@@ -123,7 +123,7 @@ function jitSupport(rt) {
     return frame;
   };
   return support = { QUANTUM, WIDE_HIGH, makeInvokeSite, helpers: {
-    prepareCall, receiverType: (rt, receiver) => receiver !== null && typeof receiver === 'object' ? (rt.heap.list[receiver.ref]?.type ?? rt.typeOf(receiver)) : rt.typeOf(receiver),
+    prepareCall, receiverType: (rt, receiver) => receiver !== null && typeof receiver === 'object' ? (rt.heap.get(receiver.ref)?.type ?? rt.typeOf(receiver)) : rt.typeOf(receiver),
     arith: arithmetic, long: (op, x, y) => longArithmetic(op, x, y), num: (kind, op, x, y) => numericBinary(kind === 'float' ? 2 : 3, op, x, y), cmp, same: equal,
     floatBits, floatNumber, doubleBits, doubleNumber, javaInt, javaLong,
     fuse(max, rt) { rt.budgetExceeded(`Instruction budget (${max}/event) exceeded`); },
@@ -304,7 +304,7 @@ function runLoop(rt, owner, base) {
   const sched = rt.scheduler;
   let thread = owner, frames = null, f = null, regs = null, prog = null, u = null, dex = null, stats = null, pc = 0, start = 0, returnValue, returning = false;
   let need = owner === null, quantum = QUANTUM, ran = false, input = null;
-  const max = rt.maxInstructionsPerEvent, heapList = rt.heap.list, fastCalls = rt.fastCallPaths !== false; let probe = rt.instructionProbe;
+  const max = rt.maxInstructionsPerEvent, heapChunks = rt.heap.chunks, heapList = { get: id => { const chunk = heapChunks[id >>> 12]; return chunk === undefined ? undefined : chunk[id & 4095]; } }, fastCalls = rt.fastCallPaths !== false; let probe = rt.instructionProbe;
   if (owner !== null) { frames = owner.frames; f = frames[frames.length - 1]; if (f === undefined) fail(`The run owner thread ${owner.name} (${owner.state}) has no frames to run`); regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc; start = pc; }
   for (;;) {
     probe = rt.instructionProbe;
@@ -426,14 +426,14 @@ function runLoop(rt, owner, base) {
             break;
           }
           case 0x44: case 0x45: case 0x46: case 0x47: case 0x48: case 0x49: case 0x4a: {
-            const packed = u[pc + 1], index = regs[packed >> 8], arrayRef = regs[packed & 255]; let array; if (arrayRef !== null && typeof arrayRef === 'object') array = heapList[arrayRef.ref];
+            const packed = u[pc + 1], index = regs[packed >> 8], arrayRef = regs[packed & 255]; let array; if (arrayRef !== null && typeof arrayRef === 'object') array = heapList.get(arrayRef.ref);
             if (array === undefined || array.elements === undefined || !(index >= 0 && index < array.elements.length)) array = rt.array(arrayRef, index);
             const variant = op - 0x44, e = array.elements[index];
             if (variant === 1) { regs[a] = e; regs[a + 1] = WIDE_HIGH; } else regs[a] = variant === 3 ? e & 1 : variant === 4 ? (e << 24) >> 24 : variant === 5 ? e & 65535 : variant === 6 ? (e << 16) >> 16 : e;
             pc += 2; break;
           }
           case 0x4b: case 0x4c: case 0x4d: case 0x4e: case 0x4f: case 0x50: case 0x51: {
-            const packed = u[pc + 1], index = regs[packed >> 8], arrayRef = regs[packed & 255]; let array; if (arrayRef !== null && typeof arrayRef === 'object') array = heapList[arrayRef.ref];
+            const packed = u[pc + 1], index = regs[packed >> 8], arrayRef = regs[packed & 255]; let array; if (arrayRef !== null && typeof arrayRef === 'object') array = heapList.get(arrayRef.ref);
             if (array === undefined || array.elements === undefined || !(index >= 0 && index < array.elements.length)) array = rt.array(arrayRef, index);
             const variant = op - 0x4b, v = regs[a];
             const value = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
@@ -442,7 +442,7 @@ function runLoop(rt, owner, base) {
             pc += 2; break;
           }
           case 0x52: case 0x53: case 0x54: case 0x55: case 0x56: case 0x57: case 0x58: {
-            const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList[objectRef.ref]; if (obj === undefined) obj = rt.object(objectRef);
+            const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.object(objectRef);
             let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = prog.refs[pc] = fieldSiteFor(rt, dex.fields[u[pc + 1]], obj.type);
             let v = obj.fields.get(site.key); if (v === undefined) v = site.def;
             const variant = op - 0x52;
@@ -451,7 +451,7 @@ function runLoop(rt, owner, base) {
             pc += 2; break;
           }
           case 0x59: case 0x5a: case 0x5b: case 0x5c: case 0x5d: case 0x5e: case 0x5f: {
-            const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList[objectRef.ref]; if (obj === undefined) obj = rt.object(objectRef);
+            const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.object(objectRef);
             let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = prog.refs[pc] = fieldSiteFor(rt, dex.fields[u[pc + 1]], obj.type);
             const variant = op - 0x59, v = regs[lo], value = variant <= 2 ? v : variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : (v << 16) >> 16;
             const fields = obj.fields; if (fields.has(site.key)) fields.set(site.key, value); else rt.storeField(fields, site.key, value);
@@ -484,7 +484,7 @@ function runLoop(rt, owner, base) {
               let hit = true;
               if (site.virtual) {
                 const receiver = regs[site.first >= 0 ? site.first : u[pc + 2] & 15];
-                const receiverType = receiver !== null && typeof receiver === 'object' ? (rt.heap.list[receiver.ref]?.type ?? rt.typeOf(receiver)) : rt.typeOf(receiver);
+                const receiverType = receiver !== null && typeof receiver === 'object' ? (rt.heap.get(receiver.ref)?.type ?? rt.typeOf(receiver)) : rt.typeOf(receiver);
                 if (receiverType !== site.type) {
                   // Polymorphic inline cache: the other receiver classes this site has resolved to a DEX body (the first one stays in site.callee, which compiled code reads).
                   hit = false; const poly = site.poly;
@@ -511,7 +511,7 @@ function runLoop(rt, owner, base) {
                 const getter = calleeProg.getter;
                 if (getter !== null && fastCalls && quantum > 1 && rt.steps + 2 <= max && !probe) {
                   // Frameless trivial getter: the two instructions the callee would run (iget, return) are executed here, with their effects on the instruction budget and counters.
-                  const receiver = regs[site.first >= 0 ? site.first : u[pc + 2] & 15]; let target; if (receiver !== null && typeof receiver === 'object') target = heapList[receiver.ref];
+                  const receiver = regs[site.first >= 0 ? site.first : u[pc + 2] & 15]; let target; if (receiver !== null && typeof receiver === 'object') target = heapList.get(receiver.ref);
                   if (target !== undefined) {
                     const fieldSite = calleeProg.refs[0];
                     if (fieldSite !== undefined && fieldSite.type === target.type) {
@@ -535,7 +535,7 @@ function runLoop(rt, owner, base) {
             // Calls that resolve to a SHIM/platform bridge are cached too: the resolution is reused for the same call site (and receiver class) without re-walking dispatch().
             let outcome;
             const bridge = site.bridge;
-            if (bridge !== null && site.bridgeEpoch === rt.resolveEpoch && (!site.virtual || (typeof args[0] !== 'string' && args[0] !== null && args[0] !== 0 && rt.typeOf(args[0]) === site.bridgeType && rt.heap.list[args[0].ref].annotationValues === undefined))) {
+            if (bridge !== null && site.bridgeEpoch === rt.resolveEpoch && (!site.virtual || (typeof args[0] !== 'string' && args[0] !== null && args[0] !== 0 && rt.typeOf(args[0]) === site.bridgeType && rt.heap.get(args[0].ref).annotationValues === undefined))) {
               rt.callStats.bridged++; if (rt.profile.active) rt.profile.host(bridge.key); rt.monitor.hostEnter(bridge.key, bridge); rt.record(bridge.text);
               outcome = rt.bridge(bridge.selected, args, site.mode, bridge.key, bridge); rt.hostCall = null;
             } else {

@@ -54,7 +54,7 @@ export function pinAll(runtime) {
 }
 
 /** True when `id` once named a heap object that has since been collected (a stale id from the page, a pending event...). */
-export function isFreedId(runtime, id) { return Number.isSafeInteger(id) && id > 0 && id < runtime.nextId && runtime.heap.list[id] === undefined; }
+export function isFreedId(runtime, id) { return Number.isSafeInteger(id) && id > 0 && id < runtime.nextId && runtime.heap.get(id) === undefined; }
 
 function quiescent(runtime, safepoint = false) {
   // A safepoint (the interpreter's run loop at a quantum boundary or a thread switch) is collectable even inside nested runs, host waits and class initializers: every Java frame is a root, and what
@@ -91,7 +91,14 @@ export function createMarker(runtime) {
   const heap = runtime.heap, weakIds = [], weakTypes = weakTypeCache(runtime), weakMaps = [], traced = new WeakSet();
   /** java.lang.ref.WeakReference and its subclasses (WeakHashMap entries, ThreadLocal map entries ...): the referent does not keep its object alive. SoftReference and PhantomReference stay strong. */
   const isWeak = type => { let weak = weakTypes.get(type); if (weak === undefined) { weak = false; if (type.charCodeAt(0) === 76) try { for (let at = type, depth = 0; at && depth < 64; at = runtime.parent(at), depth++) if (at === 'Ljava/lang/ref/WeakReference;') { weak = true; break; } } catch { weak = false; } /* walks the superclass chain: runtime.isSubtype would memoize every type the collector meets */ weakTypes.set(type, weak); } return weak; };
-  const limit = runtime.nextId, marked = new Uint8Array(limit), worklist = []; let nodes = 0;
+  const limit = runtime.nextId, worklist = []; let nodes = 0;
+  // Mark bits per 4096-id chunk, allocated only for the chunks that hold records and reused across collections.
+  const markChunks = runtime.gcMarkChunks ??= [];
+  for (let ci = 0; ci < markChunks.length; ci++) if (markChunks[ci] !== undefined && heap.chunks[ci] === undefined) markChunks[ci] = undefined;
+  for (let ci = 0; ci < heap.chunks.length; ci++) if (heap.chunks[ci] !== undefined) { if (markChunks[ci] === undefined) markChunks[ci] = new Uint8Array(4096); else markChunks[ci].fill(0); }
+  const isMarked = id => { const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] === 1; };
+  const setMarked = id => { markChunks[id >>> 12][id & 4095] = 1; };
+  const marked = { has: isMarked };
   const visited = new WeakSet(), stack = [];
   // The big tables are skipped by identity, not only by property name: a back-reference (jni.runtime, platform.runtime) reaches the runtime object from another root and would otherwise walk
   // its resolveCache (millions of entries) and the other skipped tables on every collection.
@@ -99,9 +106,9 @@ export function createMarker(runtime) {
   for (const name of SKIP_PROPS) { const table = runtime[name]; if (table !== null && typeof table === 'object') skip.add(table); }
   const violations = [];
   const markId = (id, strict = false) => {
-    if (!(id > 0 && id < limit) || marked[id]) return; const record = heap.list[id]; if (record === undefined) return;
+    if (!(id > 0 && id < limit) || isMarked(id)) return; const record = heap.get(id); if (record === undefined) return;
     if (record.freed === true) { if (strict && violations.length < 20) violations.push(id); return; }   // a real {ref} to an object collected earlier: a root the collector did not see
-    marked[id] = 1; worklist.push(id); count++;
+    setMarked(id); worklist.push(id); count++;
   };
   const idLike = (key, value) => typeof value === 'number' && Number.isSafeInteger(value) && value > 0 && value < limit && ID_KEY.test(key);
   /** Iterative scan of plain JavaScript data; pointers are `{ ref }` objects and id-named integers. */
@@ -133,7 +140,7 @@ export function createMarker(runtime) {
   const drain = (cap = Infinity) => {
   while (worklist.length && count < cap) {
     if (++sincePulse >= 2048) { sincePulse = 0; runtime.monitor?.pulse(`coleta de lixo (marcando ${count} objetos)`); }
-    const record = heap.list[worklist.pop()], weak = isWeak(record.type);
+    const record = heap.get(worklist.pop()), weak = isWeak(record.type);
     if (weak) weakIds.push(record.id);
     for (const key of Object.keys(record)) {
       const item = record[key];
@@ -150,14 +157,14 @@ export function createMarker(runtime) {
   const ephemerons = () => {
     for (let progress = true; progress;) {
       progress = false;
-      for (const map of runtime.ephemeronMaps ?? []) for (const [key, value] of map) { if (typeof key === 'number' && marked[key] && value !== null && typeof value === 'object') { const before = count; scan(value); drain(); if (count !== before) progress = true; } }
+      for (const map of runtime.ephemeronMaps ?? []) for (const [key, value] of map) { if (typeof key === 'number' && isMarked(key) && value !== null && typeof value === 'object') { const before = count; scan(value); drain(); if (count !== before) progress = true; } }
       for (const record of weakMaps) for (const entry of record.map.values()) {
         if (traced.has(entry)) continue; const key = entry.key;
-        if (!(key && typeof key.ref === 'number') || marked[key.ref]) { traced.add(entry); const before = count; scan(entry.key); scan(entry.value); drain(); if (count !== before) progress = true; }
+        if (!(key && typeof key.ref === 'number') || isMarked(key.ref)) { traced.add(entry); const before = count; scan(entry.key); scan(entry.value); drain(); if (count !== before) progress = true; }
       }
     }
   };
-  return { limit, marked, markId, scan, drain, ephemerons, violations, stack, idLike, weakIds, weakMaps, traced, count: () => count, nodes: () => nodes };
+  return { limit, marked, markedHas: isMarked, markId, scan, drain, ephemerons, violations, stack, idLike, weakIds, weakMaps, traced, count: () => count, nodes: () => nodes };
 }
 
 /**
@@ -180,7 +187,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   const started = performance.now(), heap = runtime.heap, before = heap.size;
   const blocked = quiescent(runtime, safepoint) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null);
   if (blocked) { const skips = (runtime.gcSkips ??= {}); skips[blocked] = (skips[blocked] ?? 0) + 1; return { collected: false, reason: blocked, before, after: before, freed: 0, ms: 0 }; }
-  const { limit, marked, markId, scan, drain, ephemerons, violations, idLike, weakIds, weakMaps, traced, nodes, count } = createMarker(runtime);
+  const { limit, markedHas, markId, scan, drain, ephemerons, violations, idLike, weakIds, weakMaps, traced, nodes, count } = createMarker(runtime);
   const t0 = performance.now(); let worstRoot = { key: '-', ms: 0, nodes: 0 };
   // Runtime and platform: everything but the heap itself and the large immutable tables.
   for (const key of Object.keys(runtime)) {
@@ -198,7 +205,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   if (extraRoots) { const values = typeof extraRoots === 'function' ? extraRoots() : extraRoots; for (const item of values ?? []) scan(item); }
   // Heap closure: scan each reachable record's own state.
   const tDrain = performance.now(); drain(); ephemerons();
-  for (const map of runtime.ephemeronMaps ?? []) for (const key of [...map.keys()]) if (typeof key === 'number' && !marked[key]) map.delete(key);   // the key died: so does the entry
+  for (const map of runtime.ephemeronMaps ?? []) for (const key of [...map.keys()]) if (typeof key === 'number' && !markedHas(key)) map.delete(key);   // the key died: so does the entry
   for (const record of weakMaps) for (const entry of [...record.map.values()]) {   // WeakHashMap entries whose key died are expunged (without a modCount change, as in Java)
     if (traced.has(entry)) continue;
     if (!record.map.delete(entry.serial)) continue; runtime.reserveCollection(-1);
@@ -206,42 +213,42 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
     if (record.tailSerial === entry.serial) { record.tailSerial = null; for (const serial of record.map.keys()) record.tailSerial = serial; }
   }
   if (runtime.nativeArrays?.size) {   // an array's native address is valid only while the array is alive
-    for (const [handle, value] of [...runtime.nativeArrays]) if (value && !marked[value.ref]) runtime.nativeArrays.delete(handle);
-    runtime.nativeRanges = runtime.nativeRanges.filter(range => range.value && marked[range.value.ref]);
+    for (const [handle, value] of [...runtime.nativeArrays]) if (value && !markedHas(value.ref)) runtime.nativeArrays.delete(handle);
+    runtime.nativeRanges = runtime.nativeRanges.filter(range => range.value && markedHas(range.value.ref));
   }
   const markMs = performance.now() - t0;
-  if (violations.length && audit) throw new Error(`GC audit: live structures reference already-collected objects #${[...new Set(violations)].map(id => `${id} ${heap.list[id]?.type}`).join(', #')} (a Java value held outside the collector's roots, e.g. captured by a host closure)`);
+  if (violations.length && audit) throw new Error(`GC audit: live structures reference already-collected objects #${[...new Set(violations)].map(id => `${id} ${heap.get(id)?.type}`).join(', #')} (a Java value held outside the collector's roots, e.g. captured by a host closure)`);
   // Weak references: a referent nothing else keeps alive is cleared (Reference.get() answers null from now on) and its reference is queued on its ReferenceQueue after the collection.
   const cleared = [];
   for (const id of weakIds) {
-    const record = heap.list[id], referent = record.fields.get(REFERENT_KEY);
-    if (referent && typeof referent.ref === 'number' && !marked[referent.ref]) { record.fields.set(REFERENT_KEY, null); if (record.fields.get(QUEUE_KEY)) cleared.push({ ref: id }); }
+    const record = heap.get(id), referent = record.fields.get(REFERENT_KEY);
+    if (referent && typeof referent.ref === 'number' && !markedHas(referent.ref)) { record.fields.set(REFERENT_KEY, null); if (record.fields.get(QUEUE_KEY)) cleared.push({ ref: id }); }
   }
   // Sweep (only the blocks of ids that hold records).
   const tSweep = performance.now(); let freed = 0;
-  for (let block = 0, blocks = heap.blocks.length; block < blocks; block++) {
-  if (!heap.blocks[block]) continue;
-  for (let id = Math.max(1, block << 10), end = Math.min(limit, (block + 1) << 10); id < end; id++) {
-    const record = heap.list[id];
-    if (record === undefined || marked[id] || record.freed === true) continue;
-    if (globalThis.process?.env?.APKWEB_GC_MARK_ONLY === '1') { freed++; continue; }
-    if (typeof record.onFree === 'function') { try { record.onFree(); } catch { /* the native resource is already gone */ } }   // NativeAllocationRegistry cleaners: native handles die with the Java object that owns them
-    if (audit) { heap.list[id] = tombstone(id, record.type); heap.size--; } else heap.release(id);
-    freed++;
-    if (runtime.monitors?.has(id)) runtime.monitors.delete(id);
-  }
+  for (const ci of heap.usedChunks()) {
+    const chunk = heap.chunks[ci], base = ci << 12;
+    for (let slot = 0; slot < 4096; slot++) {
+      const record = chunk[slot]; if (record === undefined) continue;
+      const id = base + slot;
+      if (id === 0 || markedHas(id) || record.freed === true) continue;
+      if (globalThis.process?.env?.APKWEB_GC_MARK_ONLY === '1') { freed++; continue; }
+      if (typeof record.onFree === 'function') { try { record.onFree(); } catch { /* the native resource is already gone */ } }   // NativeAllocationRegistry cleaners: native handles die with the Java object that owned them
+      if (audit) { chunk[slot] = tombstone(id, record.type); heap.size--; } else heap.release(id);
+      freed++;
+      if (runtime.monitors?.has(id)) runtime.monitors.delete(id);
+    }
   }
   // Budgets count live storage only.
   const tRebuild = performance.now(); let fieldSlots = runtime.staticFields?.size ?? 0, arrayCells = 0, collectionCells = 0;
-  for (let block = 0, blocks = heap.blocks.length; block < blocks; block++) {
-    if (!heap.blocks[block]) continue;
-    for (let id = Math.max(1, block << 10), end = Math.min(limit, (block + 1) << 10); id < end; id++) {
-      const record = heap.list[id]; if (record === undefined || record.freed === true) continue;
+  for (const ci of heap.usedChunks()) {
+    for (const record of heap.chunks[ci]) {
+      if (record === undefined || record.freed === true) continue;
       fieldSlots += record.fields?.size ?? 0; if (record.elements) arrayCells += record.elements.length;
       collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
     }
   }
-  const phases = { reason, before, after: heap.size, rootsMs: Math.round(rootsMs), schedulerRootsMs: Math.round(tDrain - tRoots), markMs: Math.round(tSweep - tDrain), sweepMs: Math.round(tRebuild - tSweep), rebuildMs: Math.round(performance.now() - tRebuild), nodes: nodes(), marked: count(), worstRoot: { key: worstRoot.key, ms: Math.round(worstRoot.ms), nodes: worstRoot.nodes }, idRange: limit, blocksInUse: heap.blocks.filter(Boolean).length, at: Math.round(performance.now()) };
+  const phases = { reason, before, after: heap.size, rootsMs: Math.round(rootsMs), schedulerRootsMs: Math.round(tDrain - tRoots), markMs: Math.round(tSweep - tDrain), sweepMs: Math.round(tRebuild - tSweep), rebuildMs: Math.round(performance.now() - tRebuild), nodes: nodes(), marked: count(), worstRoot: { key: worstRoot.key, ms: Math.round(worstRoot.ms), nodes: worstRoot.nodes }, idRange: limit, blocksInUse: heap.usedChunks().length, at: Math.round(performance.now()) };
   runtime.gcPhases = [phases, ...(runtime.gcPhases ?? [])].slice(0, 3);
   runtime.gcNextAt = Math.min(Math.floor(runtime.maxHeapObjects * 0.85), heap.size + Math.floor(runtime.maxHeapObjects * 0.25));
   // Minimum allocation between two collections: a collection scans the whole live set, so a live set that stays above the threshold (gcNextAt is capped at 85% of the limit) must not be
@@ -299,7 +306,7 @@ const familyOf = key => { const text = String(key), owner = text.slice(1, text.i
  * collection. Nothing is freed. Returns { live, garbage, estimatedBytes, topClasses, roots, garbageClasses, allocationSites, gc, text }; `text` is the section of the diagnostic report.
  */
 export function heapCensus(runtime, { topClasses = 20, topRoots = 10 } = {}) {
-  const heap = runtime.heap, marker = createMarker(runtime), { marked, scan, drain, markId, idLike } = marker, groups = [], REACH_CAP = 25000;
+  const heap = runtime.heap, marker = createMarker(runtime), { markedHas, scan, drain, markId, idLike } = marker, groups = [], REACH_CAP = 25000;
   // Root groups: thread stacks, static fields by class family, the runtime's own tables, every host of the platform, registered host containers.
   const defs = [], scheduler = runtime.scheduler;
   if (scheduler?.threads) scheduler.threads.forEach((thread, index) => defs.push({ name: `pilha da thread ${index}${thread.name ? ` (${thread.name})` : ''}`, visit: sc => { const view = Object.create(scheduler); view.threads = [thread]; scheduler.enumerateRoots.call(view, item => sc(item)); } }));
@@ -324,9 +331,9 @@ export function heapCensus(runtime, { topClasses = 20, topRoots = 10 } = {}) {
   for (const def of [...defs].sort((x, y) => x.reach - y.reach)) { const before = marker.count(); def.visit(scan); drain(); const gained = marker.count() - before; if (gained > 0) groups.push({ name: def.name, objects: gained, reachAlone: def.reach >= REACH_CAP ? `${REACH_CAP}+` : def.reach }); }
   drain(); marker.ephemerons();
   const counts = new Map(), garbageCounts = new Map(); let live = 0, garbage = 0, estimatedBytes = 0;
-  for (let id = 1; id < marker.limit; id++) {
-    const record = heap.list[id]; if (record === undefined || record.freed === true) continue;
-    if (marked[id]) { live++; const entry = counts.get(record.type) ?? counts.set(record.type, { count: 0, bytes: 0 }).get(record.type), bytes = estimateRecordBytes(record); entry.count++; entry.bytes += bytes; estimatedBytes += bytes; }
+  for (const ci of heap.usedChunks()) for (let slot = 0; slot < 4096; slot++) {
+    const record = heap.chunks[ci][slot]; const id = (ci << 12) + slot; if (record === undefined || id === 0 || record.freed === true) continue;
+    if (markedHas(id)) { live++; const entry = counts.get(record.type) ?? counts.set(record.type, { count: 0, bytes: 0 }).get(record.type), bytes = estimateRecordBytes(record); entry.count++; entry.bytes += bytes; estimatedBytes += bytes; }
     else { garbage++; garbageCounts.set(record.type, (garbageCounts.get(record.type) ?? 0) + 1); }
   }
   const classes = [...counts].map(([type, { count, bytes }]) => ({ type, count, bytes })).sort((a, b) => b.count - a.count).slice(0, topClasses);
