@@ -1,7 +1,7 @@
-import { APKError } from './apk-runtime.js?v=f6262415a5da';
-import { breakParagraphs } from './text-layout-native.js?v=f6262415a5da';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=f6262415a5da';
-import { gcRoot } from './heap-gc.js?v=f6262415a5da';
+import { APKError } from './apk-runtime.js?v=c5d78c3c57c5';
+import { breakParagraphs } from './text-layout-native.js?v=c5d78c3c57c5';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=c5d78c3c57c5';
+import { gcRoot } from './heap-gc.js?v=c5d78c3c57c5';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -161,6 +161,8 @@ export function createViewLayoutHost(platform) {
     rootReady(runtime, root) { if (!root) return; let type = runtime.object(root).type, source = runtime.dex.classes.has(type); const seen = new Set(); while (type && !seen.has(type)) { seen.add(type); if (runtime.classes.get(type)?.methods.has('onMeasure(II)V')) { source = true; break; } type = runtime.parent(type); } if (source || runtime.skia) request(runtime, root); },
     afterAttach(runtime, receiver, attached) { if(!attached&&pendingRoots.has(receiver.ref)){pendingRoots.delete(receiver.ref);pending=pendingRoots.size>0;} if (attached && pending) { const root=rootFor(runtime,receiver); if(root&&pendingRoots.has(root.ref))schedule(runtime,root); } },
     state: () => ({ pending, queued }),
+    /** Which roots still wait for a measure/layout pass, whether the pass is queued as a task (the performTraversals of this VM) and whether the root is attached to a window. */
+    detail: runtime => ({ pending, queued, roots: [...pendingRoots.values()].map(root => ({ ref: root.ref, type: runtime.object(root).type, attached: !!runtime.object(root).attached, queued: queuedRoots.has(root.ref) })) }),
     relayoutRoot(runtime, root) { request(runtime, root); },
     invoke(runtime, method, args) {
       const name = method.name;

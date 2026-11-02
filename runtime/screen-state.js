@@ -106,8 +106,25 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
     out.push(`  em ${Math.round((event.when ?? now) - now)} ms: ${what}`);
   }
   if (queue.length > 12) out.push(`  … +${queue.length - 12}`);
-  out.push('Threads:');
-  for (const thread of runtime.scheduler.threads) out.push(`  ${thread.name}: ${thread.state}${thread.blocked ? ` (esperando: ${thread.blocked.reason ?? '?'})` : ''}${thread === runtime.scheduler.main ? ' [main]' : ''}`);
+  // ---- why layout is pending
+  const layout = platform.viewLayoutHost?.detail?.(runtime), scheduler = runtime.scheduler, mainThread = scheduler.main;
+  if (layout) {
+    out.push(`Layout: ${layout.pending ? 'PENDENTE' : 'sem passada pendente'}; tarefa de medição/layout na fila: ${layout.queued ? 'sim' : 'não'}`);
+    for (const root of layout.roots) out.push(`  raiz ${dotted(root.type)}: ${root.attached ? 'anexada' : 'NÃO anexada à janela (a passada só é agendada depois de anexar)'}, tarefa ${root.queued ? 'na fila' : 'não agendada'}`);
+    if (layout.pending && layout.roots.some(root => root.attached)) {
+      const head = queue[0], running = runtime.thread?.frames?.length > 0;
+      const mainState = mainThread ? `${mainThread.state}${mainThread.blocked ? ` (${mainThread.blocked.reason ?? 'espera'})` : ''}` : 'sem thread principal';
+      out.push(`  por que não rodou: ${running ? 'uma thread está executando código Java agora (evento em andamento; a passada só roda entre eventos)' : mainThread?.state === 'blocked' ? `a thread principal está bloqueada: ${mainState}` : head && (head.when ?? now) > now ? `o próximo evento só vence em ${Math.round(head.when - now)} ms virtuais` : 'a fila tem eventos antes da passada de layout'}; thread principal: ${mainState}`);
+    }
+  }
+  const shortKey = key => String(key ?? '?').replace(/^L/, '').replace(/;->/, '.');
+  out.push('Threads (nome, estado, espera, 6 quadros mais internos):');
+  for (const thread of [...(mainThread ? [mainThread] : []), ...scheduler.threads.filter(candidate => candidate !== mainThread)]) {
+    const frames = (thread.frames ?? []).slice(-6).reverse().map(frame => frame.method ? shortKey(frame.method.key) : frame.cont ? '(chamada do host)' : '?');
+    let target = ''; try { if (thread.blocked) target = `esperando: ${thread.blocked.reason ?? '?'}${thread.blocker ? ' em ' + dotted(runtime.typeOf(thread.blocker)) : ''}`; } catch { target = `esperando: ${thread.blocked?.reason ?? '?'}`; }
+    out.push(`  ${thread.name}${thread === mainThread ? ' [main]' : ''}: ${thread.state}${thread.nestedDepth ? `, dentro de chamada nativa aninhada (${thread.nestedDepth})` : ''}${target ? ', ' + target : ''}${runtime.initDepth && thread.state === 'blocked' && /class init/i.test(String(thread.blocked?.reason)) ? ' [inicialização de classe]' : ''}`);
+    for (const frame of frames) out.push(`      ${frame}`);
+  }
   if (heartbeat) out.push(`Último sinal da VM: ${heartbeat.operation ?? 'ocioso'}, ${heartbeat.thread ?? 'sem thread'}, chamada do host: ${heartbeat.hostCall ?? 'nenhuma'}, eventos: ${heartbeat.events}, instruções: ${heartbeat.instructions}`);
   // ---- memory
   const live = runtime.heap.size, mib = Math.round(live * BYTES_PER_OBJECT / MiB);

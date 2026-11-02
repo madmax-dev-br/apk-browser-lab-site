@@ -1,24 +1,24 @@
-import { VMClock } from './vm-clock.js?v=f6262415a5da';
-import { OperationMonitor } from './operation-monitor.js?v=f6262415a5da';
-import { ExecutionProfile } from './execution-profile.js?v=f6262415a5da';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=f6262415a5da';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=f6262415a5da';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=f6262415a5da';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=f6262415a5da';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=f6262415a5da';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=f6262415a5da';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=f6262415a5da';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=f6262415a5da';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=f6262415a5da';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=f6262415a5da';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=f6262415a5da';
-import { APKError } from './apk-error.js?v=f6262415a5da';
-import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=f6262415a5da';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=f6262415a5da';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=f6262415a5da';
-import { Scheduler, Blocked } from './scheduler.js?v=f6262415a5da';
-import { bootClassLacksMember } from './boot-class-members.js?v=f6262415a5da';
-export { APKError } from './apk-error.js?v=f6262415a5da';
+import { VMClock } from './vm-clock.js?v=c5d78c3c57c5';
+import { OperationMonitor } from './operation-monitor.js?v=c5d78c3c57c5';
+import { ExecutionProfile } from './execution-profile.js?v=c5d78c3c57c5';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=c5d78c3c57c5';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=c5d78c3c57c5';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=c5d78c3c57c5';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=c5d78c3c57c5';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=c5d78c3c57c5';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=c5d78c3c57c5';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=c5d78c3c57c5';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=c5d78c3c57c5';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=c5d78c3c57c5';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=c5d78c3c57c5';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=c5d78c3c57c5';
+import { APKError } from './apk-error.js?v=c5d78c3c57c5';
+import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=c5d78c3c57c5';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=c5d78c3c57c5';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=c5d78c3c57c5';
+import { Scheduler, Blocked } from './scheduler.js?v=c5d78c3c57c5';
+import { bootClassLacksMember } from './boot-class-members.js?v=c5d78c3c57c5';
+export { APKError } from './apk-error.js?v=c5d78c3c57c5';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -587,6 +587,7 @@ for (const [name, type] of [['AtomicReference', 'Ljava/lang/Object;'], ['AtomicI
     `getAndSet(${type})${type}`, `compareAndSet(${type}${type})Z`, `weakCompareAndSet(${type}${type})Z`]);
   if (type === 'I' || type === 'J') addBridge(owner, [`getAndIncrement()${type}`, `incrementAndGet()${type}`, `getAndDecrement()${type}`, `decrementAndGet()${type}`, `getAndAdd(${type})${type}`, `addAndGet(${type})${type}`, 'intValue()I', 'longValue()J']);
 }
+const ABSTRACT_GUARD = globalThis.process?.env?.APKWEB_GUARD_ABSTRACT === '1', ABSTRACT_HOST_TYPES = new Set(['Ljava/util/AbstractMap;', 'Ljava/util/AbstractList;', 'Ljava/util/AbstractCollection;', 'Ljava/util/AbstractSet;']);
 const MAP_TYPES = ['HashMap', 'WeakHashMap', 'LinkedHashMap', 'concurrent/ConcurrentHashMap'];
 EXTERNAL_PARENTS.set('Ljava/util/concurrent/atomic/AtomicReferenceArray;', 'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set('Ljava/util/concurrent/atomic/AtomicReferenceArray;', ['Ljava/io/Serializable;']);
@@ -603,6 +604,26 @@ for (const name of [...MAP_TYPES, ...LIST_TYPES]) {
     'remove(I)Ljava/lang/Object;', 'remove(Ljava/lang/Object;)Z', 'contains(Ljava/lang/Object;)Z', 'indexOf(Ljava/lang/Object;)I', 'iterator()Ljava/util/Iterator;', 'toArray()[Ljava/lang/Object;']);
 }
 for (const name of MAP_TYPES) addBridge(`java/util/${name}`, ['<init>(IF)V', '<init>(Ljava/util/Map;)V']);
+// Map views (keySet/values/entrySet of the bridged maps) are objects of concrete classes that mirror libcore's (HashMap$KeySet, ...), never of the abstract interface types: a receiver whose runtime
+// type is java.util.Set has no code for most of the interface, so every call on it failed. Each view class is an AbstractSet/AbstractCollection with the full Collection API bridged.
+const MAP_VIEW_NAMES = { HashMap: ['HashMap$HostKeySet', 'HashMap$HostValues', 'HashMap$HostEntrySet'], LinkedHashMap: ['LinkedHashMap$HostKeySet', 'LinkedHashMap$HostValues', 'LinkedHashMap$HostEntrySet'],
+  WeakHashMap: ['WeakHashMap$HostKeySet', 'WeakHashMap$HostValues', 'WeakHashMap$HostEntrySet'], 'concurrent/ConcurrentHashMap': [null, 'ConcurrentHashMap$HostValuesView', 'ConcurrentHashMap$HostEntrySetView'] };   // names that do not collide with the libcore originals in framework.dex (HashMap$KeySet ...), which expect an original HashMap
+const MAP_VIEW_OWNERS = new Set();
+const VIEW_METHODS = ['size()I', 'isEmpty()Z', 'contains(Ljava/lang/Object;)Z', 'iterator()Ljava/util/Iterator;', 'toArray()[Ljava/lang/Object;', 'toArray([Ljava/lang/Object;)[Ljava/lang/Object;', 'add(Ljava/lang/Object;)Z',
+  'remove(Ljava/lang/Object;)Z', 'containsAll(Ljava/util/Collection;)Z', 'addAll(Ljava/util/Collection;)Z', 'removeAll(Ljava/util/Collection;)Z', 'retainAll(Ljava/util/Collection;)Z', 'clear()V', 'equals(Ljava/lang/Object;)Z', 'hashCode()I', 'toString()Ljava/lang/String;'];
+for (const [family, names] of Object.entries(MAP_VIEW_NAMES)) names.forEach((name, kind) => {
+  if (!name) return;
+  const owner = `java/util/${name.includes('ConcurrentHashMap') ? 'concurrent/' : ''}${name}`, type = `L${owner};`;
+  MAP_VIEW_OWNERS.add(type);
+  EXTERNAL_PARENTS.set(type, kind === 1 ? 'Ljava/util/AbstractCollection;' : 'Ljava/util/AbstractSet;');
+  EXTERNAL_INTERFACES.set(type, kind === 1 ? ['Ljava/util/Collection;', 'Ljava/lang/Iterable;'] : ['Ljava/util/Set;', 'Ljava/util/Collection;', 'Ljava/lang/Iterable;']);
+  addBridge(owner, VIEW_METHODS);
+});
+const viewTypeOf = (mapType, kind) => {   // kind: 0 keys, 1 values, 2 entries
+  const family = mapType === 'Ljava/util/LinkedHashMap;' ? 'LinkedHashMap' : mapType === 'Ljava/util/WeakHashMap;' ? 'WeakHashMap' : mapType === 'Ljava/util/concurrent/ConcurrentHashMap;' ? 'concurrent/ConcurrentHashMap' : 'HashMap';
+  const name = MAP_VIEW_NAMES[family][kind] ?? 'java/util/concurrent/ConcurrentHashMap$KeySetView';
+  return name.startsWith('java/') ? `L${name};` : `Ljava/util/${family.includes('concurrent') ? 'concurrent/' : ''}${name};`;
+};
 addBridge('java/util/LinkedHashMap', ['<init>(IFZ)V']);
 addBridge('java/util/LinkedHashMap', ['eldest()Ljava/util/Map$Entry;']);
 EXTERNAL_INTERFACES.set('Ljava/util/concurrent/ConcurrentHashMap;', ['Ljava/util/concurrent/ConcurrentMap;', 'Ljava/util/Map;', 'Ljava/io/Serializable;']);
@@ -635,6 +656,9 @@ for(const owner of ['java/util/Collection','java/util/Set','java/util/AbstractCo
 addBridge('java/util/Collection',['contains(Ljava/lang/Object;)Z','remove(Ljava/lang/Object;)Z']);
 addBridge('java/util/Set',['remove(Ljava/lang/Object;)Z','clear()V']);
 addBridge('java/util/Iterator', ['hasNext()Z', 'next()Ljava/lang/Object;', 'remove()V']);
+const HOST_ITERATOR = 'Ljava/util/HostIterator;';   // the concrete class of every iterator the host creates over its collections and map views (never the Iterator interface itself)
+EXTERNAL_PARENTS.set(HOST_ITERATOR, 'Ljava/lang/Object;'); EXTERNAL_INTERFACES.set(HOST_ITERATOR, ['Ljava/util/Iterator;']);
+addBridge('java/util/HostIterator', ['hasNext()Z', 'next()Ljava/lang/Object;', 'remove()V']);
 const HOST_MAP_ENTRY='Lapkweb/bridge/MapEntry;';
 EXTERNAL_PARENTS.set(HOST_MAP_ENTRY,'Ljava/lang/Object;');EXTERNAL_INTERFACES.set(HOST_MAP_ENTRY,['Ljava/util/Map$Entry;']);
 for(const owner of ['java/util/Map$Entry',HOST_MAP_ENTRY.slice(1,-1)])addBridge(owner,['getKey()Ljava/lang/Object;','getValue()Ljava/lang/Object;','setValue(Ljava/lang/Object;)Ljava/lang/Object;','equals(Ljava/lang/Object;)Z','hashCode()I','toString()Ljava/lang/String;']);
@@ -1286,11 +1310,20 @@ export class APKRuntime {
   typeOf(value) { return typeof value === 'string' ? 'Ljava/lang/String;' : this.object(value).type; }
   makeObject(type) {
     if (this.heap.size >= this.maxHeapObjects) this.outOfMemory(`Object limit (${this.maxHeapObjects}) exceeded`);
+    if (ABSTRACT_GUARD && !this.bytecodeAlloc) this.assertConcreteHostType(type);
     const id = this.nextId++;
     if ((id & 511) === 0) this.sampleAllocation();
     this.heap.set(id, { id, type, fields: new Map(), text: '', orientation: 0, textSize: 20, children: [], listener: null });
     if (!this.bytecodeAlloc) this.hostAllocs.add(id);   // allocated by host code (a native, the platform): its JavaScript locals may hold it where no Java frame does -- see hostAllocs in heap-gc.js
     return ref(id);
+  }
+  /** Test guard (APKWEB_GUARD_ABSTRACT=1): host code must never create an object whose runtime type is an interface or an abstract class -- such an object has no code for most of its API and every call on it fails
+   *  as "abstract/missing-code". Every view, iterator or wrapper the host makes gets a concrete class. */
+  assertConcreteHostType(type) {
+    if (typeof type !== 'string' || type[0] !== 'L') return;
+    const flags = this.classes.get(type)?.flags ?? 0;
+    if (flags & 0x2000) return;   // an annotation instance is a proxy of the annotation interface
+    if ((flags & (0x200 | 0x400)) || EXTERNAL_INTERFACE_NAMES.has(type) || ABSTRACT_HOST_TYPES.has(type)) fail(`Host code allocated an object of the interface/abstract type ${type}`);
   }
   /** One allocation in 512 records the executing method and its caller (since the last collection): the allocation-site hint of the heap census. */
   sampleAllocation() {
@@ -2272,6 +2305,44 @@ export class APKRuntime {
     }
     return BRIDGE_NEXT;
   }
+  /** keySet()/values()/entrySet() of the bridged maps (libcore HashMap$KeySet ...): the Collection operations beyond iteration, over the backing map. Removal writes through; add is unsupported. */
+  mapViewOperation(obj, method, args, name) {
+    const source = this.object(obj.mapSource), O = 'Ljava/lang/Object;';
+    const values = () => this.collectionValues(obj), elementsOf = collection => { if (isNull(collection)) this.throwJava('Ljava/lang/NullPointerException;', null); return this.collectionValues(this.object(collection)).slice(); };
+    const has = item => {
+      if (obj.viewKind === 'keys') { if (source.concurrentMap && isNull(item)) this.throwJava('Ljava/lang/NullPointerException;', null); return !!this.mapEntry(source, item).entry; }
+      return values().some(value => this.javaEquals(item, value));
+    };
+    const removeOne = item => this.dispatch({ owner: obj.type, name: 'remove', parameters: [O], result: 'Z', signature: '(Ljava/lang/Object;)Z' }, [ref(obj.id), item], 'virtual');
+    switch (name) {
+      case 'contains': return has(args[1]) ? 1 : 0;
+      case 'containsAll': return elementsOf(args[1]).every(has) ? 1 : 0;
+      case 'removeAll': { if (source.readOnly) this.throwJava('Ljava/lang/UnsupportedOperationException;', null); let changed = false; for (const item of elementsOf(args[1])) while (removeOne(item)) changed = true; return changed ? 1 : 0; }
+      case 'retainAll': {
+        if (source.readOnly) this.throwJava('Ljava/lang/UnsupportedOperationException;', null);
+        const keep = elementsOf(args[1]); let changed = false;
+        for (const item of values().slice()) if (!keep.some(other => this.javaEquals(item, other))) { removeOne(item); changed = true; }
+        return changed ? 1 : 0;
+      }
+      case 'toArray': {
+        const items = values().slice();
+        if (!method.parameters.length) { const array = this.newArray('[Ljava/lang/Object;', items.length); this.object(array).elements = items; return array; }
+        if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', null);
+        const target = this.array(args[1]);
+        if (target.elements.length >= items.length) { items.forEach((item, index) => { target.elements[index] = item; }); if (target.elements.length > items.length) target.elements[items.length] = null; return args[1]; }
+        const array = this.newArray(this.typeOf(args[1]), items.length); this.object(array).elements = items; return array;
+      }
+      case 'hashCode': return values().reduce((sum, item) => (sum + (isNull(item) ? 0 : this.javaHash(item))) | 0, 0);
+      case 'toString': return `[${values().map(item => equal(item, ref(obj.id)) ? '(this Collection)' : this.javaString(item)).join(', ')}]`;
+      case 'equals': {
+        if (equal(args[0], args[1])) return 1;
+        if (obj.viewKind === 'values' || isNull(args[1]) || typeof args[1] === 'string' || !this.isSubtype(this.typeOf(args[1]), 'Ljava/util/Set;')) return 0;
+        const other = elementsOf(args[1]);
+        return other.length === source.map.size && other.every(has) ? 1 : 0;
+      }
+    }
+    return BRIDGE_NEXT;
+  }
   /** ConcurrentHashMap.KeySetView (libcore ConcurrentHashMap.java): every operation goes through the backing map, so null keys throw as the map does. */
   concurrentKeySet(method, args, staticCall, name) {
     const MAP = 'Ljava/util/concurrent/ConcurrentHashMap;', O = 'Ljava/lang/Object;', Z = 'Z';
@@ -2314,7 +2385,7 @@ export class APKRuntime {
         for (const item of keys()) if (!keep.some(other => this.javaEquals(item, other))) changed = removeKey(item) || changed;
         return changed ? 1 : 0;
       }
-      case 'iterator': { const keySet = this.makeObject('Ljava/util/Set;'), state = this.object(keySet); state.mapSource = map; state.viewKind = 'keys'; return call(keySet, 'Ljava/util/Set;', 'iterator', '()Ljava/util/Iterator;', [], 'Ljava/util/Iterator;'); }
+      case 'iterator': { const keySet = this.makeObject(viewTypeOf('Ljava/util/HashMap;', 0)), state = this.object(keySet); state.mapSource = map; state.viewKind = 'keys'; return call(keySet, viewTypeOf('Ljava/util/HashMap;', 0), 'iterator', '()Ljava/util/Iterator;', [], 'Ljava/util/Iterator;'); }
       case 'toArray': {
         const items = keys();
         if (!method.parameters.length) { const array = this.newArray('[Ljava/lang/Object;', items.length); this.object(array).elements = items; return array; }
@@ -3048,7 +3119,7 @@ export class APKRuntime {
       return undefined;
     }
     if (method.owner === 'Ljava/util/AbstractList;' && name === 'iterator') {
-      const value = this.makeObject('Ljava/util/Iterator;'), iterator = this.object(value);
+      const value = this.makeObject(HOST_ITERATOR), iterator = this.object(value);
       iterator.virtualList = args[0]; iterator.index = 0; iterator.last = -1; iterator.expectedListMod = obj.fields.get('Ljava/util/AbstractList;->modCount:I') ?? 0; return value;
     }
     if (method.owner === 'Ljava/util/AbstractCollection;' && name === 'isEmpty') {
@@ -3183,7 +3254,7 @@ export class APKRuntime {
       if (name === 'size') return obj.set.length;
       if (name === 'isEmpty') return obj.set.length ? 0 : 1;
       if (name === 'iterator') {
-        const value = this.makeObject('Ljava/util/Iterator;'), iterator = this.object(value);
+        const value = this.makeObject(HOST_ITERATOR), iterator = this.object(value);
         iterator.source = args[0]; iterator.expectedModCount = obj.modCount;
         iterator.snapshotIterator = method.owner.includes('CopyOnWrite'); iterator.index = 0; iterator.last = -1; iterator.values = obj.set.slice(); return value;
       }
@@ -3246,7 +3317,7 @@ export class APKRuntime {
         return undefined;
       }
       if (['entrySet', 'keySet', 'values'].includes(name)) {
-        const value = this.makeObject(name === 'values' ? 'Ljava/util/Collection;' : 'Ljava/util/Set;');
+        const value = this.makeObject(viewTypeOf(obj.type, name === 'keySet' ? 0 : name === 'values' ? 1 : 2));
         const view = this.object(value); view.mapSource = args[0]; view.viewKind = name === 'keySet' ? 'keys' : name === 'values' ? 'values' : 'entries'; return value;
       }
       if (name === 'clear') { if (obj.readOnly) fail('Read-only Map'); this.reserveCollection(-obj.map.size); obj.map.clear(); obj.mapBuckets?.clear(); this.bumpModCount(obj); return undefined; }
@@ -3280,7 +3351,7 @@ export class APKRuntime {
   }
   bridgeC2(method, args, staticCall, key, name) {
     const obj = this.object(args[0]);
-    if (method.owner === 'Ljava/util/Iterator;') {
+    if (method.owner === 'Ljava/util/Iterator;' || method.owner === HOST_ITERATOR) {
       if (obj.virtualList) {
         const list = this.object(obj.virtualList);
         if (name !== 'hasNext' && (list.fields.get('Ljava/util/AbstractList;->modCount:I') ?? 0) !== obj.expectedListMod) this.throwJava('Ljava/util/ConcurrentModificationException;', 'Java list changed during iteration');
@@ -3325,7 +3396,7 @@ export class APKRuntime {
       if (name === 'getValue') return obj.entry.value;
       const previous = obj.entry.value; obj.entry.value = args[1]; return previous;
     }
-    if (['Ljava/util/ArrayList;', 'Ljava/util/Vector;', 'Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/Collection;', 'Ljava/util/Set;', 'Ljava/util/Arrays$ArrayList;'].includes(method.owner)) {
+    if (['Ljava/util/ArrayList;', 'Ljava/util/Vector;', 'Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/Collection;', 'Ljava/util/Set;', 'Ljava/util/Arrays$ArrayList;'].includes(method.owner) || MAP_VIEW_OWNERS.has(method.owner)) {
       if (name === '<init>') {
         if (method.parameters[0] === '[Ljava/lang/Object;') { if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', null); obj.list = this.array(args[1]).elements.slice(); }   // CopyOnWriteArrayList(E[])
         else obj.list = method.parameters[0] === 'Ljava/util/Collection;' ? this.collectionValues(this.object(args[1])).slice() : [];
@@ -3333,11 +3404,12 @@ export class APKRuntime {
         this.reserveCollection(obj.list.length); obj.modCount = 0; return undefined;
       }
       if ((name === 'size' || name === 'isEmpty') && obj.mapSource) { const count = this.object(obj.mapSource).map.size; return name === 'size' ? count : count ? 0 : 1; }
+      if (obj.mapSource) { const served = this.mapViewOperation(obj, method, args, name); if (served !== BRIDGE_NEXT) return served; }
       const values = this.collectionValues(obj);
       if (name === 'size') return values.length;
       if (name === 'isEmpty') return values.length ? 0 : 1;
       if (name === 'iterator') {
-        const value = this.makeObject('Ljava/util/Iterator;'), iterator = this.object(value);
+        const value = this.makeObject(HOST_ITERATOR), iterator = this.object(value);
         iterator.source = obj.mapSource ?? args[0]; iterator.expectedModCount = this.object(iterator.source).modCount ?? 0;
         iterator.snapshotIterator = method.owner.includes('CopyOnWrite');
         iterator.liveList = !obj.mapSource && !iterator.snapshotIterator;

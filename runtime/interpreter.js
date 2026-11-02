@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=f6262415a5da';
-import { Blocked, QUANTUM } from './scheduler.js?v=f6262415a5da';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=f6262415a5da';
+import { APKError } from './apk-error.js?v=c5d78c3c57c5';
+import { Blocked, QUANTUM } from './scheduler.js?v=c5d78c3c57c5';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=c5d78c3c57c5';
 
 // Frame-based DEX interpreter.
 //
@@ -628,6 +628,7 @@ function runLoop(rt, owner, base) {
         } else {
           // A register-type error names the failing opcode and the last host bridge the VM called, which is usually where the bad value came from.
           const where = innermost && /^Expected (int|long|wide|object|reference)/.test(current.message ?? '') ? ` [opcode 0x${(u[start] & 0xff).toString(16).padStart(2, '0')}${rt.lastHostCall ? `; last host call ${rt.lastHostCall}` : ''}]` : '';
+          if (globalThis.process?.env?.APKWEB_DEBUG_HOST_ERRORS && innermost) console.error(current.stack);
           current = new APKError(`${f.method.key} [${prog.filename}] at PC 0x${start.toString(16).padStart(4, '0')}: ${current.message ?? current}${where}`, current.details);
         }
         innermost = false;
