@@ -1,8 +1,9 @@
-import { APKError } from './apk-error.js?v=643e640e353f';
-import { createHostRegistry } from './host-contract.js?v=643e640e353f';
-import { Blocked, VMThread } from './scheduler.js?v=643e640e353f';
-import { Invoke } from './interpreter.js?v=643e640e353f';
-import { GC_ROOTS } from './heap-gc.js?v=643e640e353f';
+import { APKError } from './apk-error.js?v=cee526e0bf77';
+import { queueObject } from './hidden-members.js?v=cee526e0bf77';
+import { createHostRegistry } from './host-contract.js?v=cee526e0bf77';
+import { Blocked, VMThread } from './scheduler.js?v=cee526e0bf77';
+import { Invoke } from './interpreter.js?v=cee526e0bf77';
+import { GC_ROOTS } from './heap-gc.js?v=cee526e0bf77';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -699,6 +700,6 @@ export function createConcurrencyHost(platform) {
   }, { static: true });
   def(LOOPER, 'quit', '()V', (r, _m, [self]) => { const state = r.object(self); if (state === r.object(r.mainLooper ?? self) && !state.looperQueue) r.throwJava('Ljava/lang/IllegalStateException;', 'Main thread not allowed to quit.'); state.quitting = true; state.safeQuit = false; for (const event of state.looperQueue) { const message = r.object(event.message); message.inUse = false; message.recycled = true; } state.looperQueue.length = 0; platform.onExternalActivity?.(); });
   def(LOOPER, 'quitSafely', '()V', (r, _m, [self]) => { const state = r.object(self); if (!state.looperQueue) r.throwJava('Ljava/lang/IllegalStateException;', 'Main thread not allowed to quit.'); state.quitting = true; state.safeQuit = true; platform.onExternalActivity?.(); });
-  def(LOOPER, 'getQueue', '()Landroid/os/MessageQueue;', () => { throw new APKError('Looper.getQueue(): MessageQueue is not modelled (use Handler.hasMessages / removeCallbacks)', { kind: 'messagequeue-unsupported' }); });
+  def(LOOPER, 'getQueue', '()Landroid/os/MessageQueue;', (r, _m, [self]) => queueObject(r, self));   // an object that exposes MessageQueue.mMessages to reflection; its methods are not modelled
   return { ...registry, interfaces: registry.interfacesOf, helpUntil, currentThread, mainThread, [GC_ROOTS](visit) { for (const hook of shutdownHooks.values()) visit(hook); } };
 }

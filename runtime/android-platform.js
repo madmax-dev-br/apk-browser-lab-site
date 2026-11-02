@@ -1,120 +1,120 @@
-import { Invoke } from './interpreter.js?v=643e640e353f';
-import { createComposeCanvasHost } from './compose-canvas-host.js?v=643e640e353f';
-import { createViewTransformHost } from './view-transform-host.js?v=643e640e353f';
-import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=643e640e353f';
-import { createViewOutlineHost } from './view-outline-host.js?v=643e640e353f';
-import { createShaderHost } from './shader-host.js?v=643e640e353f';
-import { createSystemBarsHost } from './system-bars-host.js?v=643e640e353f';
-import { createDeviceStateHost } from './device-state-host.js?v=643e640e353f';
-import { createJobSchedulerHost } from './job-scheduler-host.js?v=643e640e353f';
-import { createPendingIntentHost } from './pending-intent-host.js?v=643e640e353f';
-import { ActivityStarter, activityInfoOf, FLAG as LAUNCH_FLAG } from './activity-starter.js?v=643e640e353f';
-import { createBinderHost } from './binder-host.js?v=643e640e353f';
-import { createInputManagerHost } from './input-native.js?v=643e640e353f';
-import { createBackDispatcherHost } from './back-dispatcher-host.js?v=643e640e353f';
-import { createRenderThreadAnimators } from './rt-animators.js?v=643e640e353f';
-import { renderNodeByHandle } from './rendernode-native.js?v=643e640e353f';
-import { resolveDevice } from './device-profile.js?v=643e640e353f';
-import { configurationFor } from './device-configuration.js?v=643e640e353f';
-import { createViewCoordinateHost } from './view-coordinate-host.js?v=643e640e353f';
-import { createEditableTextHost } from './editable-text-host.js?v=643e640e353f';
-import { createComponentCallbacksHost } from './component-callbacks-host.js?v=643e640e353f';
-import { createViewStateHost } from './view-state-host.js?v=643e640e353f';
-import { createLocaleServiceHost } from './locale-service-host.js?v=643e640e353f';
-import { APKError } from './apk-runtime.js?v=643e640e353f';
-import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=643e640e353f';
-import { createViewTreeHost } from './view-tree-host.js?v=643e640e353f';
-import { createDialogWindowHost } from './dialog-window-host.js?v=643e640e353f';
-import { createStrictModeHost } from './strictmode-host.js?v=643e640e353f';
-import { createProgressBarApiHost } from './progress-bar-api-host.js?v=643e640e353f';
-import { createViewGroupApiHost } from './viewgroup-api-host.js?v=643e640e353f';
-import { createViewInternalsHost } from './view-internals-host.js?v=643e640e353f';
-import { createViewWindowHost } from './view-window-host.js?v=643e640e353f';
-import { createVectorCanvasHost } from './vector-native.js?v=643e640e353f';
-import { createPaintHost } from './paint-host.js?v=643e640e353f';
-import { createContentResolverHost } from './content-resolver-host.js?v=643e640e353f';
-import { createDrawableViewHost } from './drawable-view-host.js?v=643e640e353f';
-import { createDeviceServicesHost } from './device-services-host.js?v=643e640e353f';
-import { createSystemServicesHost } from './system-services-host.js?v=643e640e353f';
-import { createJavaIoHost } from './java-io-host.js?v=643e640e353f';
-import { createClassLoaderHost } from './class-loader-host.js?v=643e640e353f';
-import { createAppServicesHost } from './app-services-host.js?v=643e640e353f';
-import { createConcurrencyHost } from './concurrency-host.js?v=643e640e353f';
-import { createDateTimeHost } from './datetime-host.js?v=643e640e353f';
+import { Invoke } from './interpreter.js?v=cee526e0bf77';
+import { createComposeCanvasHost } from './compose-canvas-host.js?v=cee526e0bf77';
+import { createViewTransformHost } from './view-transform-host.js?v=cee526e0bf77';
+import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=cee526e0bf77';
+import { createViewOutlineHost } from './view-outline-host.js?v=cee526e0bf77';
+import { createShaderHost } from './shader-host.js?v=cee526e0bf77';
+import { createSystemBarsHost } from './system-bars-host.js?v=cee526e0bf77';
+import { createDeviceStateHost } from './device-state-host.js?v=cee526e0bf77';
+import { createJobSchedulerHost } from './job-scheduler-host.js?v=cee526e0bf77';
+import { createPendingIntentHost } from './pending-intent-host.js?v=cee526e0bf77';
+import { ActivityStarter, activityInfoOf, FLAG as LAUNCH_FLAG } from './activity-starter.js?v=cee526e0bf77';
+import { createBinderHost } from './binder-host.js?v=cee526e0bf77';
+import { createInputManagerHost } from './input-native.js?v=cee526e0bf77';
+import { createBackDispatcherHost } from './back-dispatcher-host.js?v=cee526e0bf77';
+import { createRenderThreadAnimators } from './rt-animators.js?v=cee526e0bf77';
+import { renderNodeByHandle } from './rendernode-native.js?v=cee526e0bf77';
+import { resolveDevice } from './device-profile.js?v=cee526e0bf77';
+import { configurationFor } from './device-configuration.js?v=cee526e0bf77';
+import { createViewCoordinateHost } from './view-coordinate-host.js?v=cee526e0bf77';
+import { createEditableTextHost } from './editable-text-host.js?v=cee526e0bf77';
+import { createComponentCallbacksHost } from './component-callbacks-host.js?v=cee526e0bf77';
+import { createViewStateHost } from './view-state-host.js?v=cee526e0bf77';
+import { createLocaleServiceHost } from './locale-service-host.js?v=cee526e0bf77';
+import { APKError } from './apk-runtime.js?v=cee526e0bf77';
+import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=cee526e0bf77';
+import { createViewTreeHost } from './view-tree-host.js?v=cee526e0bf77';
+import { createDialogWindowHost } from './dialog-window-host.js?v=cee526e0bf77';
+import { createStrictModeHost } from './strictmode-host.js?v=cee526e0bf77';
+import { createProgressBarApiHost } from './progress-bar-api-host.js?v=cee526e0bf77';
+import { createViewGroupApiHost } from './viewgroup-api-host.js?v=cee526e0bf77';
+import { createViewInternalsHost } from './view-internals-host.js?v=cee526e0bf77';
+import { createViewWindowHost } from './view-window-host.js?v=cee526e0bf77';
+import { createVectorCanvasHost } from './vector-native.js?v=cee526e0bf77';
+import { createPaintHost } from './paint-host.js?v=cee526e0bf77';
+import { createContentResolverHost } from './content-resolver-host.js?v=cee526e0bf77';
+import { createDrawableViewHost } from './drawable-view-host.js?v=cee526e0bf77';
+import { createDeviceServicesHost } from './device-services-host.js?v=cee526e0bf77';
+import { createSystemServicesHost } from './system-services-host.js?v=cee526e0bf77';
+import { createJavaIoHost } from './java-io-host.js?v=cee526e0bf77';
+import { createClassLoaderHost } from './class-loader-host.js?v=cee526e0bf77';
+import { createAppServicesHost } from './app-services-host.js?v=cee526e0bf77';
+import { createConcurrencyHost } from './concurrency-host.js?v=cee526e0bf77';
+import { createDateTimeHost } from './datetime-host.js?v=cee526e0bf77';
 const LOCALE_CONSTANTS = { US: 'en-US', UK: 'en-GB', ENGLISH: 'en', ROOT: 'und', CANADA: 'en-CA', CANADA_FRENCH: 'fr-CA', FRANCE: 'fr-FR', FRENCH: 'fr', GERMAN: 'de', GERMANY: 'de-DE', ITALIAN: 'it', ITALY: 'it-IT', JAPAN: 'ja-JP', JAPANESE: 'ja', KOREA: 'ko-KR', KOREAN: 'ko', CHINA: 'zh-CN', CHINESE: 'zh', PRC: 'zh-CN', SIMPLIFIED_CHINESE: 'zh-CN', TAIWAN: 'zh-TW', TRADITIONAL_CHINESE: 'zh-TW' };
-import { createNumberFormatHost } from './number-format-host.js?v=643e640e353f';
-import { createCookieHost } from './cookie-host.js?v=643e640e353f';
-import { createViewApiHost } from './view-api-host.js?v=643e640e353f';
-import { createTextViewApiHost } from './textview-api-host.js?v=643e640e353f';
-import { createIntentApiHost } from './intent-api-host.js?v=643e640e353f';
-import { createImageDecoderHost } from './image-decoder-host.js?v=643e640e353f';
-import { createPlatformDataClassesHost } from './platform-data-classes-host.js?v=643e640e353f';
-import { createToastHost } from './toast-host.js?v=643e640e353f';
-import { createIcuTextHost } from './icu-text-host.js?v=643e640e353f';
-import { createMiscPlatformHost } from './misc-platform-host.js?v=643e640e353f';
-import { createRemoteViewsHost } from './remote-views-host.js?v=643e640e353f';
-import { createPackageManagerApiHost } from './package-manager-api-host.js?v=643e640e353f';
-import { createContentResolverApiHost } from './content-resolver-api-host.js?v=643e640e353f';
-import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=643e640e353f';
-import { createImageViewApiHost } from './image-view-api-host.js?v=643e640e353f';
-import { createUriApiHost } from './uri-api-host.js?v=643e640e353f';
-import { createFormatterHost } from './formatter-host.js?v=643e640e353f';
-import { createJcaHost } from './jca-host.js?v=643e640e353f';
-import { createIcuBidiHost } from './icu-bidi-host.js?v=643e640e353f';
-import { createSecurityHost } from './security-host.js?v=643e640e353f';
-import { createReflectionHost } from './reflection-host.js?v=643e640e353f';
-import { createSerializationHost } from './serialization-host.js?v=643e640e353f';
-import { createBitmapCodecHost } from './bitmap-codec-host.js?v=643e640e353f';
-import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=643e640e353f';
-import { createImageViewHost } from './image-view-host.js?v=643e640e353f';
-import { createWebViewHost } from './webview-host.js?v=643e640e353f';
-import { createContentExtrasHost } from './content-extras-host.js?v=643e640e353f';
-import { createPreferenceManagerHost } from './preference-manager-host.js?v=643e640e353f';
-import { createProcessHost } from './process-host.js?v=643e640e353f';
-import { createStatsHost } from './stats-host.js?v=643e640e353f';
-import { createTelephonyHost } from './telephony-host.js?v=643e640e353f';
-import { createSurfaceTextureHost } from './surface-texture-host.js?v=643e640e353f';
-import { createBuildHost } from './build-host.js?v=643e640e353f';
-import { createSensorHost } from './sensor-host.js?v=643e640e353f';
-import { createGeocoderHost } from './geocoder-host.js?v=643e640e353f';
-import { createCoreLangHost } from './core-lang-host.js?v=643e640e353f';
-import { createResourcesExtrasHost } from './resources-extras-host.js?v=643e640e353f';
-import { createSimpleTimeZoneHost } from './simple-timezone-host.js?v=643e640e353f';
-import { createActivityManagerExtrasHost } from './activity-manager-extras-host.js?v=643e640e353f';
-import { createManagersExtrasHost } from './managers-extras-host.js?v=643e640e353f';
-import { createStrictMathHost } from './strict-math-host.js?v=643e640e353f';
-import { createLocaleExtrasHost } from './locale-extras-host.js?v=643e640e353f';
-import { createUnicodeHost } from './unicode-host.js?v=643e640e353f';
-import { createMessageFormatHost } from './message-format-host.js?v=643e640e353f';
-import { createSettingsHost } from './settings-host.js?v=643e640e353f';
-import { createHardwareServicesHost } from './hardware-services-host.js?v=643e640e353f';
-import { createPeripheralServicesHost } from './peripheral-services-host.js?v=643e640e353f';
-import { createStorageServicesHost } from './storage-services-host.js?v=643e640e353f';
-import { createSystemManagersHost } from './system-managers-host.js?v=643e640e353f';
-import { DEVICE_FEATURES } from './service-kit.js?v=643e640e353f';
-import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=643e640e353f';
-import { createViewTouchHost } from './view-touch-host.js?v=643e640e353f';
-import { createMagnifierHost } from './magnifier-host.js?v=643e640e353f';
-import { createDisplayHost } from './display-host.js?v=643e640e353f';
-import { createNotificationHost } from './notification-host.js?v=643e640e353f';
-import { createDatabaseSupportHost } from './database-support-host.js?v=643e640e353f';
-import { VMClock } from './vm-clock.js?v=643e640e353f';
-import { createWindowInsetsHost } from './window-insets-host.js?v=643e640e353f';
-import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=643e640e353f';
-import { createViewLayoutHost } from './view-layout-host.js?v=643e640e353f';
-import { createInputMethodServiceHost } from './input-method-service-host.js?v=643e640e353f';
-import { createAutofillServiceHost } from './autofill-service-host.js?v=643e640e353f';
-import { createClipboardServiceHost } from './clipboard-service-host.js?v=643e640e353f';
-import { createViewInputHost } from './view-input-host.js?v=643e640e353f';
-import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=643e640e353f';
-import { maybeCollect, ephemeronMap } from './heap-gc.js?v=643e640e353f';
+import { createNumberFormatHost } from './number-format-host.js?v=cee526e0bf77';
+import { createCookieHost } from './cookie-host.js?v=cee526e0bf77';
+import { createViewApiHost } from './view-api-host.js?v=cee526e0bf77';
+import { createTextViewApiHost } from './textview-api-host.js?v=cee526e0bf77';
+import { createIntentApiHost } from './intent-api-host.js?v=cee526e0bf77';
+import { createImageDecoderHost } from './image-decoder-host.js?v=cee526e0bf77';
+import { createPlatformDataClassesHost } from './platform-data-classes-host.js?v=cee526e0bf77';
+import { createToastHost } from './toast-host.js?v=cee526e0bf77';
+import { createIcuTextHost } from './icu-text-host.js?v=cee526e0bf77';
+import { createMiscPlatformHost } from './misc-platform-host.js?v=cee526e0bf77';
+import { createRemoteViewsHost } from './remote-views-host.js?v=cee526e0bf77';
+import { createPackageManagerApiHost } from './package-manager-api-host.js?v=cee526e0bf77';
+import { createContentResolverApiHost } from './content-resolver-api-host.js?v=cee526e0bf77';
+import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=cee526e0bf77';
+import { createImageViewApiHost } from './image-view-api-host.js?v=cee526e0bf77';
+import { createUriApiHost } from './uri-api-host.js?v=cee526e0bf77';
+import { createFormatterHost } from './formatter-host.js?v=cee526e0bf77';
+import { createJcaHost } from './jca-host.js?v=cee526e0bf77';
+import { createIcuBidiHost } from './icu-bidi-host.js?v=cee526e0bf77';
+import { createSecurityHost } from './security-host.js?v=cee526e0bf77';
+import { createReflectionHost } from './reflection-host.js?v=cee526e0bf77';
+import { createSerializationHost } from './serialization-host.js?v=cee526e0bf77';
+import { createBitmapCodecHost } from './bitmap-codec-host.js?v=cee526e0bf77';
+import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=cee526e0bf77';
+import { createImageViewHost } from './image-view-host.js?v=cee526e0bf77';
+import { createWebViewHost } from './webview-host.js?v=cee526e0bf77';
+import { createContentExtrasHost } from './content-extras-host.js?v=cee526e0bf77';
+import { createPreferenceManagerHost } from './preference-manager-host.js?v=cee526e0bf77';
+import { createProcessHost } from './process-host.js?v=cee526e0bf77';
+import { createStatsHost } from './stats-host.js?v=cee526e0bf77';
+import { createTelephonyHost } from './telephony-host.js?v=cee526e0bf77';
+import { createSurfaceTextureHost } from './surface-texture-host.js?v=cee526e0bf77';
+import { createBuildHost } from './build-host.js?v=cee526e0bf77';
+import { createSensorHost } from './sensor-host.js?v=cee526e0bf77';
+import { createGeocoderHost } from './geocoder-host.js?v=cee526e0bf77';
+import { createCoreLangHost } from './core-lang-host.js?v=cee526e0bf77';
+import { createResourcesExtrasHost } from './resources-extras-host.js?v=cee526e0bf77';
+import { createSimpleTimeZoneHost } from './simple-timezone-host.js?v=cee526e0bf77';
+import { createActivityManagerExtrasHost } from './activity-manager-extras-host.js?v=cee526e0bf77';
+import { createManagersExtrasHost } from './managers-extras-host.js?v=cee526e0bf77';
+import { createStrictMathHost } from './strict-math-host.js?v=cee526e0bf77';
+import { createLocaleExtrasHost } from './locale-extras-host.js?v=cee526e0bf77';
+import { createUnicodeHost } from './unicode-host.js?v=cee526e0bf77';
+import { createMessageFormatHost } from './message-format-host.js?v=cee526e0bf77';
+import { createSettingsHost } from './settings-host.js?v=cee526e0bf77';
+import { createHardwareServicesHost } from './hardware-services-host.js?v=cee526e0bf77';
+import { createPeripheralServicesHost } from './peripheral-services-host.js?v=cee526e0bf77';
+import { createStorageServicesHost } from './storage-services-host.js?v=cee526e0bf77';
+import { createSystemManagersHost } from './system-managers-host.js?v=cee526e0bf77';
+import { DEVICE_FEATURES } from './service-kit.js?v=cee526e0bf77';
+import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=cee526e0bf77';
+import { createViewTouchHost } from './view-touch-host.js?v=cee526e0bf77';
+import { createMagnifierHost } from './magnifier-host.js?v=cee526e0bf77';
+import { createDisplayHost } from './display-host.js?v=cee526e0bf77';
+import { createNotificationHost } from './notification-host.js?v=cee526e0bf77';
+import { createDatabaseSupportHost } from './database-support-host.js?v=cee526e0bf77';
+import { VMClock } from './vm-clock.js?v=cee526e0bf77';
+import { createWindowInsetsHost } from './window-insets-host.js?v=cee526e0bf77';
+import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=cee526e0bf77';
+import { createViewLayoutHost } from './view-layout-host.js?v=cee526e0bf77';
+import { createInputMethodServiceHost } from './input-method-service-host.js?v=cee526e0bf77';
+import { createAutofillServiceHost } from './autofill-service-host.js?v=cee526e0bf77';
+import { createClipboardServiceHost } from './clipboard-service-host.js?v=cee526e0bf77';
+import { createViewInputHost } from './view-input-host.js?v=cee526e0bf77';
+import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=cee526e0bf77';
+import { maybeCollect, ephemeronMap } from './heap-gc.js?v=cee526e0bf77';
 
 const ACTIVITY = 'Landroid/app/Activity;', INTENT = 'Landroid/content/Intent;', BUNDLE = 'Landroid/os/Bundle;';
 const APPLICATION = 'Landroid/app/Application;', APP_CONTEXT = 'Landroid/app/ContextImpl;';
 const CONTEXTS = [ACTIVITY, APPLICATION, APP_CONTEXT, 'Landroid/content/Context;', 'Landroid/content/ContextWrapper;', 'Landroid/view/ContextThemeWrapper;'];
 const KEYS = new Set();
 const UI_FIRST_BEHIND_MS = 2000, DRAIN_HOST_BUDGET_MS = 30;
-const FRAGMENT = 'Landroid/app/Fragment;', FRAGMENT_MANAGER = 'Landroid/app/FragmentManager;', TRANSACTION = 'Landroid/app/FragmentTransaction;';
+const FRAGMENT_CALLBACKS = 'Landroid/app/FragmentManager$FragmentLifecycleCallbacks;', FRAGMENT = 'Landroid/app/Fragment;', FRAGMENT_MANAGER = 'Landroid/app/FragmentManager;', TRANSACTION = 'Landroid/app/FragmentTransaction;';
 const LOCALE = 'Ljava/util/Locale;', LOCALES = 'Landroid/os/LocaleList;';
 const PACKAGE_MANAGER = 'Landroid/content/pm/PackageManager;', APPLICATION_INFO = 'Landroid/content/pm/ApplicationInfo;', ACTIVITY_INFO = 'Landroid/content/pm/ActivityInfo;', COMPONENT = 'Landroid/content/ComponentName;';
 const CONFIGURATION = 'Landroid/content/res/Configuration;', METRICS = 'Landroid/util/DisplayMetrics;';
@@ -132,7 +132,7 @@ add(ACTIVITY, ['onConfigurationChanged(Landroid/content/res/Configuration;)V']);
 add(ACTIVITY, ['getWindowManager()Landroid/view/WindowManager;', 'getOnBackInvokedDispatcher()Landroid/window/OnBackInvokedDispatcher;', 'registerActivityLifecycleCallbacks(Landroid/app/Application$ActivityLifecycleCallbacks;)V', 'unregisterActivityLifecycleCallbacks(Landroid/app/Application$ActivityLifecycleCallbacks;)V']);
 add(ACTIVITY, ['setResult(I)V', 'setResult(ILandroid/content/Intent;)V', 'startActivityForResult(Landroid/content/Intent;I)V', 'startActivityForResult(Landroid/content/Intent;ILandroid/os/Bundle;)V', 'onActivityResult(IILandroid/content/Intent;)V', 'onCreateView(Ljava/lang/String;Landroid/content/Context;Landroid/util/AttributeSet;)Landroid/view/View;', 'onCreateView(Landroid/view/View;Ljava/lang/String;Landroid/content/Context;Landroid/util/AttributeSet;)Landroid/view/View;', 'getTitle()Ljava/lang/CharSequence;', 'setTitle(Ljava/lang/CharSequence;)V', 'setTitle(I)V', 'getWindow()Landroid/view/Window;', 'getFragmentManager()Landroid/app/FragmentManager;', 'getLastNonConfigurationInstance()Ljava/lang/Object;', 'onRetainNonConfigurationInstance()Ljava/lang/Object;', 'isChangingConfigurations()Z', 'isDestroyed()Z', 'recreate()V', 'onPostResume()V', 'onRestart()V', 'onStart()V', 'onResume()V', 'onPause()V', 'onStop()V', 'onDestroy()V', 'onSaveInstanceState(Landroid/os/Bundle;)V', 'onRestoreInstanceState(Landroid/os/Bundle;)V', 'onPostCreate(Landroid/os/Bundle;)V']);
 add(FRAGMENT, ['<init>()V', 'getActivity()Landroid/app/Activity;', 'getContext()Landroid/content/Context;', 'getFragmentManager()Landroid/app/FragmentManager;', 'setArguments(Landroid/os/Bundle;)V', 'getArguments()Landroid/os/Bundle;', 'setRetainInstance(Z)V', 'getRetainInstance()Z', 'isAdded()Z', 'getView()Landroid/view/View;', 'onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;', 'onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V', 'onDestroyView()V', 'onAttach(Landroid/content/Context;)V', 'onAttach(Landroid/app/Activity;)V', 'onCreate(Landroid/os/Bundle;)V', 'onActivityCreated(Landroid/os/Bundle;)V', 'onStart()V', 'onResume()V', 'onPause()V', 'onStop()V', 'onDestroy()V', 'onDetach()V']);
-add(FRAGMENT_MANAGER, ['findFragmentByTag(Ljava/lang/String;)Landroid/app/Fragment;', 'beginTransaction()Landroid/app/FragmentTransaction;', 'executePendingTransactions()Z', 'isDestroyed()Z']);
+add(FRAGMENT_MANAGER, ['findFragmentByTag(Ljava/lang/String;)Landroid/app/Fragment;', 'beginTransaction()Landroid/app/FragmentTransaction;', 'executePendingTransactions()Z', 'isDestroyed()Z', 'registerFragmentLifecycleCallbacks(Landroid/app/FragmentManager$FragmentLifecycleCallbacks;Z)V', 'unregisterFragmentLifecycleCallbacks(Landroid/app/FragmentManager$FragmentLifecycleCallbacks;)V', 'findFragmentById(I)Landroid/app/Fragment;', 'getFragments()Ljava/util/List;', 'getBackStackEntryCount()I']);
 add(TRANSACTION, ['add(ILandroid/app/Fragment;Ljava/lang/String;)Landroid/app/FragmentTransaction;', 'add(Landroid/app/Fragment;Ljava/lang/String;)Landroid/app/FragmentTransaction;', 'remove(Landroid/app/Fragment;)Landroid/app/FragmentTransaction;', 'commit()I', 'commitAllowingStateLoss()I', 'commitNow()V', 'commitNowAllowingStateLoss()V']);
 add(APPLICATION, ['<init>()V', 'onCreate()V', 'registerActivityLifecycleCallbacks(Landroid/app/Application$ActivityLifecycleCallbacks;)V', 'unregisterActivityLifecycleCallbacks(Landroid/app/Application$ActivityLifecycleCallbacks;)V']);
 add('Landroid/content/ContextWrapper;', ['<init>(Landroid/content/Context;)V', 'attachBaseContext(Landroid/content/Context;)V', 'getBaseContext()Landroid/content/Context;']);
@@ -1542,21 +1542,33 @@ export class AndroidPlatform {
     return frame.fragmentManager;
   }
   fragmentCall(runtime, fragment, name, parameters = [], args = []) { return this.lifecycleCall(runtime, fragment, name, parameters, args); }
+  /** FragmentManager.FragmentLifecycleCallbacks (registerFragmentLifecycleCallbacks): called around each lifecycle step of a fragment of the manager, in FragmentManager.dispatchOnFragment* order. */
+  notifyFragment(runtime, value, event, extraTypes = [], extra = []) {
+    const manager = runtime.object(value).manager; if (nullish(manager)) return;
+    const callbacks = runtime.object(manager).callbacks; if (!callbacks?.length) return;
+    for (const entry of [...callbacks]) {
+      const parameters = [FRAGMENT_MANAGER, FRAGMENT, ...extraTypes];
+      runtime.dispatch({ owner: FRAGMENT_CALLBACKS, name: event, signature: `(${parameters.join('')})V`, parameters, result: 'V' }, [entry.callbacks, manager, value, ...extra], 'virtual');
+    }
+  }
   moveFragment(runtime, value, target) {
     const fragment = runtime.object(value); let state = fragment.fragmentStage || 0;
     while (state < target) {
       const next = state + 1;
-      if (next === 1) { this.fragmentCall(runtime, value, 'onAttach', ['Landroid/content/Context;'], [fragment.host]); if (!fragment.skipCreateOnce) this.fragmentCall(runtime, value, 'onCreate', [BUNDLE], [null]); fragment.skipCreateOnce = false; }
-      if (next === 2) { const frame = this.frame(runtime, fragment.host); const container = fragment.containerId ? this.find(runtime, frame.root, fragment.containerId) : null; fragment.root = runtime.dispatch({ owner: runtime.object(value).type, name: 'onCreateView', signature: '(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;', parameters: [INFLATER, 'Landroid/view/ViewGroup;', BUNDLE], result: 'Landroid/view/View;' }, [value, this.inflater(runtime, fragment.host), container, frame.savedState || null], 'virtual'); if (!nullish(fragment.root)) { if (container) runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'addView', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [container, fragment.root], 'virtual'); this.fragmentCall(runtime, value, 'onViewCreated', ['Landroid/view/View;', BUNDLE], [fragment.root, frame.savedState || null]); } this.fragmentCall(runtime, value, 'onActivityCreated', [BUNDLE], [frame.savedState || null]); }
-      if (next === 3) this.fragmentCall(runtime, value, 'onStart');
-      if (next === 4) this.fragmentCall(runtime, value, 'onResume');
+      if (next === 1) {
+        this.notifyFragment(runtime, value, 'onFragmentPreAttached', ['Landroid/content/Context;'], [fragment.host]); this.fragmentCall(runtime, value, 'onAttach', ['Landroid/content/Context;'], [fragment.host]); this.notifyFragment(runtime, value, 'onFragmentAttached', ['Landroid/content/Context;'], [fragment.host]);
+        if (!fragment.skipCreateOnce) { this.notifyFragment(runtime, value, 'onFragmentPreCreated', [BUNDLE], [null]); this.fragmentCall(runtime, value, 'onCreate', [BUNDLE], [null]); this.notifyFragment(runtime, value, 'onFragmentCreated', [BUNDLE], [null]); } fragment.skipCreateOnce = false;
+      }
+      if (next === 2) { const frame = this.frame(runtime, fragment.host); const container = fragment.containerId ? this.find(runtime, frame.root, fragment.containerId) : null; fragment.root = runtime.dispatch({ owner: runtime.object(value).type, name: 'onCreateView', signature: '(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;', parameters: [INFLATER, 'Landroid/view/ViewGroup;', BUNDLE], result: 'Landroid/view/View;' }, [value, this.inflater(runtime, fragment.host), container, frame.savedState || null], 'virtual'); if (!nullish(fragment.root)) { if (container) runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'addView', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [container, fragment.root], 'virtual'); this.fragmentCall(runtime, value, 'onViewCreated', ['Landroid/view/View;', BUNDLE], [fragment.root, frame.savedState || null]); this.notifyFragment(runtime, value, 'onFragmentViewCreated', ['Landroid/view/View;', BUNDLE], [fragment.root, frame.savedState || null]); } this.fragmentCall(runtime, value, 'onActivityCreated', [BUNDLE], [frame.savedState || null]); this.notifyFragment(runtime, value, 'onFragmentActivityCreated', [BUNDLE], [frame.savedState || null]); }
+      if (next === 3) { this.fragmentCall(runtime, value, 'onStart'); this.notifyFragment(runtime, value, 'onFragmentStarted'); }
+      if (next === 4) { this.fragmentCall(runtime, value, 'onResume'); this.notifyFragment(runtime, value, 'onFragmentResumed'); }
       state = fragment.fragmentStage = next;
     }
     while (state > target) {
-      if (state === 4) this.fragmentCall(runtime, value, 'onPause');
-      if (state === 3) this.fragmentCall(runtime, value, 'onStop');
-      if (state === 2 && fragment.root) { this.fragmentCall(runtime, value, 'onDestroyView'); const parent = runtime.object(fragment.root).parent; if (parent) runtime.object(parent).children = runtime.object(parent).children.filter(ref => !sameRef(ref, fragment.root)); fragment.root = null; }
-      if (state === 1) { if (!fragment.retaining) this.fragmentCall(runtime, value, 'onDestroy'); this.fragmentCall(runtime, value, 'onDetach'); }
+      if (state === 4) { this.fragmentCall(runtime, value, 'onPause'); this.notifyFragment(runtime, value, 'onFragmentPaused'); }
+      if (state === 3) { this.fragmentCall(runtime, value, 'onStop'); this.notifyFragment(runtime, value, 'onFragmentStopped'); }
+      if (state === 2 && fragment.root) { this.fragmentCall(runtime, value, 'onDestroyView'); this.notifyFragment(runtime, value, 'onFragmentViewDestroyed'); const parent = runtime.object(fragment.root).parent; if (parent) runtime.object(parent).children = runtime.object(parent).children.filter(ref => !sameRef(ref, fragment.root)); fragment.root = null; }
+      if (state === 1) { if (!fragment.retaining) { this.fragmentCall(runtime, value, 'onDestroy'); this.notifyFragment(runtime, value, 'onFragmentDestroyed'); } this.fragmentCall(runtime, value, 'onDetach'); this.notifyFragment(runtime, value, 'onFragmentDetached'); }
       state = fragment.fragmentStage = state - 1;
     }
   }
@@ -1589,6 +1601,11 @@ export class AndroidPlatform {
       if (name === 'beginTransaction') { const transaction = runtime.makeObject(TRANSACTION); Object.assign(runtime.object(transaction), { manager: value, operations: [], committed: false }); return transaction; }
       if (name === 'executePendingTransactions') return this.executeTransactions(runtime, value);
       if (name === 'isDestroyed') return object.destroyed ? 1 : 0;
+      if (name === 'registerFragmentLifecycleCallbacks') { if (nullish(args[1])) error('FragmentLifecycleCallbacks must not be null'); (object.callbacks ??= []).push({ callbacks: args[1], recursive: !!args[2] }); return; }
+      if (name === 'unregisterFragmentLifecycleCallbacks') { object.callbacks = (object.callbacks ?? []).filter(entry => !sameRef(entry.callbacks, args[1])); return; }
+      if (name === 'findFragmentById') return [...object.fragments].reverse().find(ref => runtime.object(ref).containerId === args[1]) ?? null;
+      if (name === 'getFragments') { const list = runtime.allocate('Ljava/util/ArrayList;'); runtime.dispatch({ owner: 'Ljava/util/ArrayList;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [list], 'direct'); for (const ref of object.fragments) runtime.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: ['Ljava/lang/Object;'], result: 'Z', signature: '(Ljava/lang/Object;)Z' }, [list, ref], 'virtual'); return list; }
+      if (name === 'getBackStackEntryCount') return 0;
     }
     if (owner === TRANSACTION) {
       if (object.committed) error('FragmentTransaction is already committed');

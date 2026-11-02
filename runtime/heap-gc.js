@@ -87,11 +87,37 @@ export function ephemeronMap(runtime, map) { (runtime.ephemeronMaps ??= new Set(
 const REFERENT_KEY = 'Ljava/lang/ref/Reference;->referent:Ljava/lang/Object;', QUEUE_KEY = 'Ljava/lang/ref/Reference;->queue:Ljava/lang/ref/ReferenceQueue;';
 const weakTypeCaches = new WeakMap();   // per runtime: type -> is a WeakReference subclass (class hierarchies do not change after load)
 const weakTypeCache = runtime => weakTypeCaches.get(runtime) ?? weakTypeCaches.set(runtime, new Map()).get(runtime);
+/**
+ * Big host tables of pure data (resource entries, string tables, per-class indexes) are most of the JS nodes of a large app and hold no Java reference. A container of more than
+ * FLAT_CONTAINER_MIN entries is skipped when a sample of its leading entries is all primitives or "flat records": plain objects whose every property is a non-null string, number,
+ * boolean or bigint and none of whose names look like an id (a property that is a string today does not become a reference tomorrow). A container that holds references, nulls or
+ * nested objects in its sample is walked in full. `markNoJavaRefs(object)` declares an object (and everything under it) reference-free explicitly.
+ */
+const FLAT_CONTAINER_MIN = 2048, FLAT_SAMPLE = 48;
+const noRefs = new WeakSet();
+export function markNoJavaRefs(object) { if (object !== null && typeof object === 'object') noRefs.add(object); return object; }
+function flatRecord(value, depth, limit) {
+  if (value === null) return false;
+  const kind = typeof value;
+  if (kind === 'string' || kind === 'number' || kind === 'boolean' || kind === 'bigint') return true;
+  if (kind !== 'object' || depth > 3 || value instanceof Map || value instanceof Set) return false;
+  if (ArrayBuffer.isView(value)) return true;   // typed arrays hold numbers only
+  if (Array.isArray(value)) { if (value.length === 0) return false; const n = Math.min(value.length, 8); for (let i = 0; i < n; i++) if (!flatRecord(value[i], depth + 1, limit)) return false; return true; }
+  if (typeof value.ref === 'number' || value[GC_ROOTS] !== undefined) return false;
+  let keys = 0;
+  for (const key in value) { keys++; const item = value[key], t = typeof item; if (t === 'number') { if (item > 0 && item < limit && ID_KEY.test(key)) return false; } else if (t === 'object') { if (!flatRecord(item, depth + 1, limit)) return false; } else if (!(t === 'string' || t === 'boolean' || t === 'bigint')) return false; }
+  return keys > 0;   // an empty object may be filled with references later
+}
+function flatSample(iterable, limit) {
+  let seen = 0;
+  for (const item of iterable) { if (!flatRecord(item, 0, limit)) return false; if (++seen >= FLAT_SAMPLE) break; }
+  return seen > 0;
+}
 export function createMarker(runtime) {
   const heap = runtime.heap, weakIds = [], weakTypes = weakTypeCache(runtime), weakMaps = [], traced = new WeakSet();
   /** java.lang.ref.WeakReference and its subclasses (WeakHashMap entries, ThreadLocal map entries ...): the referent does not keep its object alive. SoftReference and PhantomReference stay strong. */
   const isWeak = type => { let weak = weakTypes.get(type); if (weak === undefined) { weak = false; if (type.charCodeAt(0) === 76) try { for (let at = type, depth = 0; at && depth < 64; at = runtime.parent(at), depth++) if (at === 'Ljava/lang/ref/WeakReference;') { weak = true; break; } } catch { weak = false; } /* walks the superclass chain: runtime.isSubtype would memoize every type the collector meets */ weakTypes.set(type, weak); } return weak; };
-  const limit = runtime.nextId, worklist = []; let nodes = 0;
+  const limit = runtime.nextId, worklist = []; let nodes = 0, pruned = 0;
   // Mark bits per 4096-id chunk, allocated only for the chunks that hold records and reused across collections.
   const markChunks = runtime.gcMarkChunks ??= [];
   for (let ci = 0; ci < markChunks.length; ci++) if (markChunks[ci] !== undefined && heap.chunks[ci] === undefined) markChunks[ci] = undefined;
@@ -118,13 +144,16 @@ export function createMarker(runtime) {
       const value = stack.pop();
       if (value === null || typeof value !== 'object') continue;
       if (typeof value.ref === 'number' && Number.isSafeInteger(value.ref) && Object.keys(value).length === 1) { markId(value.ref, true); continue; }
-      if (visited.has(value) || skip.has(value)) continue; visited.add(value); nodes++;
+      if (visited.has(value) || skip.has(value) || noRefs.has(value)) continue; visited.add(value); nodes++;
       if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer || value instanceof WeakMap || value instanceof WeakSet || value instanceof Promise) continue;
       if (Array.isArray(value)) {
         if (value.length > NUMERIC_ARRAY_LIMIT && typeof value[0] === 'number') continue;   // primitive data (int[] elements, offsets), never a ref list
+        if (value.length > FLAT_CONTAINER_MIN && flatSample(value, limit)) { pruned++; continue; }
         for (let i = 0; i < value.length; i++) { const item = value[i]; if (item !== null && typeof item === 'object') stack.push(item); }
         continue;
       }
+      if (value instanceof Map && value.size > FLAT_CONTAINER_MIN && flatSample(value.values(), limit) && flatSample(value.keys(), limit)) { pruned++; continue; }
+      if (value instanceof Set && value.size > FLAT_CONTAINER_MIN && flatSample(value.values(), limit)) { pruned++; continue; }
       if (value instanceof Map) { for (const [key, item] of value) { if (key !== null && typeof key === 'object') stack.push(key); if (item !== null && typeof item === 'object') stack.push(item); } continue; }
       if (value instanceof Set) { for (const item of value) if (item !== null && typeof item === 'object') stack.push(item); continue; }
       if (typeof value[GC_ROOTS] === 'function') value[GC_ROOTS](item => { if (item !== null && typeof item === 'object') stack.push(item); });
@@ -164,7 +193,7 @@ export function createMarker(runtime) {
       }
     }
   };
-  return { limit, marked, markedHas: isMarked, markId, scan, drain, ephemerons, violations, stack, idLike, weakIds, weakMaps, traced, count: () => count, nodes: () => nodes };
+  return { limit, marked, markedHas: isMarked, markId, scan, drain, ephemerons, violations, stack, idLike, weakIds, weakMaps, traced, count: () => count, nodes: () => nodes, pruned: () => pruned, visited };
 }
 
 /**
@@ -187,14 +216,29 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   const started = performance.now(), heap = runtime.heap, before = heap.size;
   const blocked = quiescent(runtime, safepoint) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null);
   if (blocked) { const skips = (runtime.gcSkips ??= {}); skips[blocked] = (skips[blocked] ?? 0) + 1; return { collected: false, reason: blocked, before, after: before, freed: 0, ms: 0 }; }
-  const { limit, markedHas, markId, scan, drain, ephemerons, violations, idLike, weakIds, weakMaps, traced, nodes, count } = createMarker(runtime);
+  const { limit, markedHas, markId, scan, drain, ephemerons, violations, idLike, weakIds, weakMaps, traced, nodes, count, pruned, visited } = createMarker(runtime);
   const t0 = performance.now(); let worstRoot = { key: '-', ms: 0, nodes: 0 };
-  // Runtime and platform: everything but the heap itself and the large immutable tables.
+  // Runtime and platform: everything but the heap itself and the large immutable tables. Each root is timed and counted on its own; a root that turned out heavy (>50k JS nodes) is split into
+  // its properties on the following collections (iterative deepening), so the report names the structure by path (platform.x.y).
+  const heavy = runtime.gcHeavyPaths ??= new Set(), rows = [], plain = value => value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Map) && !(value instanceof Set) && !ArrayBuffer.isView(value);
+  const scanRoot = (value, path, depth) => {
+    if (heavy.has(path) && depth < 5 && plain(value) && typeof value[GC_ROOTS] !== 'function') {
+      visited.add(value);   // so that a back-reference to this object from one of its parts does not attribute the whole object to that part
+      for (const key of Object.keys(value)) { const item = value[key]; if (item !== null && typeof item === 'object') scanRoot(item, `${path}.${key}`, depth + 1); else if (typeof item === 'number' && idLike(key, item)) markId(item); }
+      return;
+    }
+    const at = performance.now(), nodes0 = nodes(); scan(value); const ms = performance.now() - at, n = nodes() - nodes0;
+    if (n > 50000) heavy.add(path);
+    if (ms > 1 || n > 1000) rows.push({ key: path, ms, nodes: n, kind: value?.constructor?.name ?? '?', size: value instanceof Map || value instanceof Set ? value.size : Array.isArray(value) ? value.length : undefined });
+  };
   for (const key of Object.keys(runtime)) {
     if (SKIP_PROPS.has(key)) continue;
     const item = runtime[key];
-    if (item !== null && typeof item === 'object') { const at = performance.now(), nodes0 = nodes(); scan(item); const ms = performance.now() - at; if (ms > worstRoot.ms) worstRoot = { key, ms, nodes: nodes() - nodes0 }; } else if (typeof item === 'number' && idLike(key, item)) markId(item);
+    if (item !== null && typeof item === 'object') scanRoot(item, key, 0); else if (typeof item === 'number' && idLike(key, item)) markId(item);
   }
+  for (const row of rows) if (row.ms > worstRoot.ms) worstRoot = row;
+  const topBy = field => [...rows].sort((a, b) => b[field] - a[field]).slice(0, 5).map(row => ({ key: row.key, ms: Math.round(row.ms), nodes: row.nodes, kind: row.kind, size: row.size }));
+  runtime.gcTopRoots = { byNodes: topBy('nodes'), byMs: topBy('ms') };
   const rootsMs = performance.now() - t0, tRoots = performance.now();
   runtime.scheduler?.enumerateRoots?.(item => scan(item));
   // Host code up the JavaScript stack (a native that called back into Java, a class initializer, a nested wait) may hold values no Java frame references: what host code allocated and every result
@@ -248,7 +292,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
       collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
     }
   }
-  const phases = { reason, before, after: heap.size, rootsMs: Math.round(rootsMs), schedulerRootsMs: Math.round(tDrain - tRoots), markMs: Math.round(tSweep - tDrain), sweepMs: Math.round(tRebuild - tSweep), rebuildMs: Math.round(performance.now() - tRebuild), nodes: nodes(), marked: count(), worstRoot: { key: worstRoot.key, ms: Math.round(worstRoot.ms), nodes: worstRoot.nodes }, idRange: limit, blocksInUse: heap.usedChunks().length, at: Math.round(performance.now()) };
+  const phases = { reason, before, after: heap.size, rootsMs: Math.round(rootsMs), schedulerRootsMs: Math.round(tDrain - tRoots), markMs: Math.round(tSweep - tDrain), sweepMs: Math.round(tRebuild - tSweep), rebuildMs: Math.round(performance.now() - tRebuild), nodes: nodes(), marked: count(), worstRoot: { key: worstRoot.key, ms: Math.round(worstRoot.ms), nodes: worstRoot.nodes }, idRange: limit, blocksInUse: heap.usedChunks().length, pruned: pruned(), topByNodes: runtime.gcTopRoots.byNodes, topByMs: runtime.gcTopRoots.byMs, at: Math.round(performance.now()) };
   runtime.gcPhases = [phases, ...(runtime.gcPhases ?? [])].slice(0, 3);
   runtime.gcNextAt = Math.min(Math.floor(runtime.maxHeapObjects * 0.85), heap.size + Math.floor(runtime.maxHeapObjects * 0.25));
   // Minimum allocation between two collections: a collection scans the whole live set, so a live set that stays above the threshold (gcNextAt is capped at 85% of the limit) must not be

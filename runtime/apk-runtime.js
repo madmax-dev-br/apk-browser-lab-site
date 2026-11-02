@@ -1,25 +1,26 @@
-import { VMClock } from './vm-clock.js?v=643e640e353f';
-import { OperationMonitor } from './operation-monitor.js?v=643e640e353f';
-import { ExecutionProfile } from './execution-profile.js?v=643e640e353f';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=643e640e353f';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=643e640e353f';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=643e640e353f';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=643e640e353f';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=643e640e353f';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=643e640e353f';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=643e640e353f';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=643e640e353f';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=643e640e353f';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=643e640e353f';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=643e640e353f';
-import { APKError } from './apk-error.js?v=643e640e353f';
-import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=643e640e353f';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=643e640e353f';
-import { FAST_PATHS } from './io-fast-paths.js?v=643e640e353f';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=643e640e353f';
-import { Scheduler, Blocked } from './scheduler.js?v=643e640e353f';
-import { bootClassLacksMember } from './boot-class-members.js?v=643e640e353f';
-export { APKError } from './apk-error.js?v=643e640e353f';
+import { VMClock } from './vm-clock.js?v=cee526e0bf77';
+import { OperationMonitor } from './operation-monitor.js?v=cee526e0bf77';
+import { ExecutionProfile } from './execution-profile.js?v=cee526e0bf77';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=cee526e0bf77';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=cee526e0bf77';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=cee526e0bf77';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=cee526e0bf77';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=cee526e0bf77';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=cee526e0bf77';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=cee526e0bf77';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=cee526e0bf77';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=cee526e0bf77';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=cee526e0bf77';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=cee526e0bf77';
+import { APKError } from './apk-error.js?v=cee526e0bf77';
+import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=cee526e0bf77';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=cee526e0bf77';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=cee526e0bf77';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=cee526e0bf77';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=cee526e0bf77';
+import { Scheduler, Blocked } from './scheduler.js?v=cee526e0bf77';
+import { bootClassLacksMember } from './boot-class-members.js?v=cee526e0bf77';
+export { APKError } from './apk-error.js?v=cee526e0bf77';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1270,6 +1271,7 @@ export class APKRuntime {
     }
     const constant = constantField(field.owner, field.name);
     if (constant && constant.type === field.type) return constant.value;   // SDK compile-time constant read through reflection
+    { const hidden = hiddenStatic(this, field); if (hidden.handled) return hidden.value; }   // tabled member of a host-modelled class (src/hidden-members.js)
     fail(`Unsupported external static field: ${field.key}`);
   }
   writeStatic(reference, value) {
@@ -1643,6 +1645,7 @@ export class APKRuntime {
         return this.execute(defaultMethod.method, defaultMethod.code, args);
       }
       const definition = resolution.definition;
+      if (resolution.fast !== undefined) { const fast = resolution.fast(this, args); if (fast !== FALLTHROUGH) return fast; }   // host fast path of a framework method (src/io-fast-paths.js); FALLTHROUGH runs the DEX body
       if (!!(definition.flags & 8) !== (mode === 'static')) fail(`Invalid static/instance invoke: ${definition.method.key}`);
       if (mode === 'static') this.initialize(definition.method.owner);
       if (definition.flags & 0x100) {
@@ -1689,7 +1692,7 @@ export class APKRuntime {
       const selected = { ...method, owner }, key = methodKey(selected);
       // Packaged Kotlin/Java library bytecode always takes precedence over a bridge fallback -- except a method of an interface reached through a host-typed receiver (a host
       // iterator whose runtime type is the java.util.Iterator interface itself, a class chain never contains interfaces otherwise): the host serves that call.
-      if (definition && FAST_PATHS.has(key) && this.dex.bootDexes?.has(definition.method.dex)) return { kind: 'platform-default', run: FAST_PATHS.get(key), key };
+      if (definition && FAST_PATHS.has(key) && this.dex.bootDexes?.has(definition.method.dex)) return { kind: 'definition', definition, fast: FAST_PATHS.get(key) };
       if (definition && !(cls.flags & 0x200 && (SHIMS.has(key) || this.platform?.supports?.(key)))) return { kind: 'definition', definition };
       if (SHIMS.has(key) || this.skiaHost?.supports?.(key) || this.platform?.supports?.(key)) {
         // A loaded Java class is authoritative about its declared methods.
@@ -2045,6 +2048,7 @@ export class APKRuntime {
         }
         const external=this.platform?.reflectionDefinition?.(owner,kind,name,parameters,publicOnly);
         if(external){const member=kind==='field'?external.field:external.method;if(!member||member.owner!==owner||member.name!==name||(publicOnly&&!(external.flags&1)))fail('Invalid host reflection metadata');return external;}
+        { const hidden = hiddenReflection(owner, kind, name, parameters, publicOnly); if (hidden) return hidden; }   // members of host-modelled classes: src/hidden-members.js
         if(kind==='constructor'&&name==='<init>'&&this.isSubtype(owner,'Landroid/view/View;')&&parameters[0]==='Landroid/content/Context;'){
           const signature=`(${parameters.join('')})V`;
           if(this.platform?.supports?.(`${owner}-><init>${signature}`))return {method:{owner,name,parameters,result:'V',signature,key:`${owner}->${name}${signature}`},flags:1};
@@ -2076,6 +2080,7 @@ export class APKRuntime {
           if (other && (!publicOnly || (other.flags & 1))) return { field: { owner, name, type: other.type, key: `${owner}->${name}:${other.type}` }, flags: other.flags };
           if (owner === type && knownClass(owner)) continue;
         }
+        if (owner === type && isTabled(owner)) continue;   // the member tables are complete: it does not exist on Android 13 (NoSuchFieldException / NoSuchMethodException below)
         if (owner === type && !bootClassLacksMember(owner, kind, name)) fail(`External reflection metadata is not implemented: ${owner}->${name}${parameters ? '(' + parameters.join('') + ')' : ''} (${kind})`);
         continue;
       }
@@ -3147,7 +3152,8 @@ export class APKRuntime {
         if (!staticField && !this.isSubtype(target.type, owner)) this.throwJava('Ljava/lang/IllegalArgumentException;', 'Reflection field receiver mismatch');
         this.reflectionAccess(member, obj.accessible, args[1]);
         if (name.startsWith('get')) {
-          const value = staticField ? this.readStatic(field) : target.fields.has(field.key) ? target.fields.get(field.key) : defaultValue(field.type);
+          const accessor = staticField ? null : HIDDEN_ACCESSORS.get(field.key);
+          const value = staticField ? this.readStatic(field) : accessor ? accessor.get(this, args[1]) : target.fields.has(field.key) ? target.fields.get(field.key) : defaultValue(field.type);
           if (name === 'get') return this.boxPrimitive(field.type, value);
           return this.unboxReflection(this.boxPrimitive(field.type, value), method.result);
         }
@@ -3155,7 +3161,8 @@ export class APKRuntime {
           if (member.flags & 0x10 && (staticField || !obj.accessible)) this.throwJava('Ljava/lang/IllegalAccessException;', `Final field ${field.key}`);
           const sourceType = method.parameters[1], boxed = name === 'set' ? args[2] : this.boxPrimitive(sourceType, args[2]);
           const value = this.unboxReflection(boxed, field.type);
-          if (staticField) this.writeStatic(field, value); else this.storeField(target.fields, field.key, value);
+          const accessor = staticField ? null : HIDDEN_ACCESSORS.get(field.key);
+          if (staticField) this.writeStatic(field, value); else if (accessor?.set) accessor.set(this, args[1], value); else if (accessor) this.throwJava('Ljava/lang/IllegalAccessException;', `Field ${field.key} is read-only in the lab`); else this.storeField(target.fields, field.key, value);
           return undefined;
         }
       }
@@ -3541,14 +3548,16 @@ export class APKRuntime {
           // Platform classes without DEX bodies: the members are the registered bridge signatures (static-ness unknown, see bridgeReflection).
           const kind = name.includes('Constructors') ? 'constructor' : name.includes('Fields') ? 'field' : 'method';
           if (kind === 'field') {   // SDK classes without a body: their compile-time constants
-            const rows = constantFields(type) ?? [], result = this.newArray('[Ljava/lang/reflect/Field;', rows.length);
-            this.object(result).elements = rows.map(c => this.reflectionObject('field', { field: { owner: type, name: c.name, type: c.type, key: `${type}->${c.name}:${c.type}` }, flags: c.flags })); return result;
+            const rows = constantFields(type) ?? [], tabled = hiddenFields(type), names = new Set(tabled.map(item => item.field.name));
+            const members = [...tabled, ...rows.filter(c => !names.has(c.name)).map(c => ({ field: { owner: type, name: c.name, type: c.type, key: `${type}->${c.name}:${c.type}` }, flags: c.flags }))], result = this.newArray('[Ljava/lang/reflect/Field;', members.length);
+            this.object(result).elements = members.map(member => this.reflectionObject('field', member)); return result;
           }
           this.bridgeReflection(type, '<init>', []); // builds BRIDGE_INDEX
           const members = [...BRIDGE_INDEX.entries()].filter(([key]) => key.startsWith(type + '\0')).flatMap(([key, list]) => list.map(entry => ({ name: key.slice(type.length + 1), entry })))
             .filter(item => (kind === 'constructor') === (item.name === '<init>')).map(item => this.bridgeReflection(type, item.name, parseParameters(item.entry.params)));
-          const result = this.newArray(`[Ljava/lang/reflect/${kind === 'constructor' ? 'Constructor' : 'Method'};`, members.length);
-          this.object(result).elements = members.map(member => this.reflectionObject(kind, member)); return result;
+          const tabled = hiddenMethods(type, kind === 'constructor').filter(item => name !== 'getConstructors' || (item.flags & 1)), seen = new Set(tabled.map(item => item.method.key)), merged = [...tabled, ...members.filter(item => item && !seen.has(item.method?.key))];
+          const result = this.newArray(`[Ljava/lang/reflect/${kind === 'constructor' ? 'Constructor' : 'Method'};`, merged.length);
+          this.object(result).elements = merged.map(member => this.reflectionObject(kind, member)); return result;
         }
         const kind = name.includes('Constructors') ? 'constructor' : name.includes('Fields') ? 'field' : 'method';
         const members = kind === 'field' ? [...cls.fields, ...cls.staticFields].map(item => ({ field: cls.dex.fields[item.index], flags: item.flags }))

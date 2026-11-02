@@ -1,4 +1,4 @@
-import { currentThread } from './interpreter.js?v=643e640e353f';
+import { currentThread } from './interpreter.js?v=cee526e0bf77';
 
 /**
  * Host fast paths for three small framework methods that sit on every file read and write (FileInputStream/FileOutputStream/RandomAccessFile -> IoBridge -> BlockGuardOs): a tiny libcore
@@ -8,10 +8,18 @@ import { currentThread } from './interpreter.js?v=643e640e353f';
  *   IoTracker.trackIo(int)           the same counters, and the same onUnbufferedIO() call on the policy after more than 10 small operations.
  * They apply only to the framework's own classes (the resolver checks the origin) and are looked up once per call site by the resolution cache.
  */
+export const FALLTHROUGH = Symbol('run the DEX body');
 const TRACKER = 'Llibcore/io/IoTracker;';
 const field = name => `${TRACKER}->${name}`;
 
 export const FAST_PATHS = new Map([
+  // InetAddressUtils.parseNumericAddressNoThrow(String): the AOSP body asks getaddrinfo(AI_NUMERICHOST) and swallows the GaiException a hostname raises; apps call it for every host name they see, and
+  // each call built, threw and caught an exception. A string that cannot be a numeric address (characters outside hex digits, ':', '.', 'x', '%') is answered null directly; the rest runs the DEX body.
+  ['Llibcore/net/InetAddressUtils;->parseNumericAddressNoThrow(Ljava/lang/String;)Ljava/net/InetAddress;', (rt, [text]) => {
+    if (text === null || text === undefined || text === 0) return FALLTHROUGH;
+    const value = typeof text === 'string' ? text : rt.stringCharacters(text);
+    return /^[0-9a-fA-F:.xX%]+$/.test(value) ? FALLTHROUGH : null;
+  }],
   ['Lcom/android/internal/util/ArrayUtils;->throwsIfOutOfBounds(III)V', (rt, [length, offset, count]) => {
     if (length < 0) rt.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `Negative length: ${length}`);
     if ((offset | count) < 0 || offset > length - count) rt.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `length=${length}; regionStart=${offset}; regionLength=${count}`);

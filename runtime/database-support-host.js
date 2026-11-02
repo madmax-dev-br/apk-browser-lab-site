@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=643e640e353f';
-import { fieldOffset } from './unsafe-native.js?v=643e640e353f';
+import { createHostRegistry } from './host-contract.js?v=cee526e0bf77';
+import { fieldOffset } from './unsafe-native.js?v=cee526e0bf77';
 
 // Platform contract for the hidden/internal framework APIs that android.database and android.database.sqlite (Android 13 sources, compiled into the
 // framework DEX) call: dalvik.system.CloseGuard, dalvik.system.BlockGuard, android.os.FileUtils.setPermissions, android.os.StrictMode SQLite leak
@@ -69,6 +69,12 @@ export function createDatabaseSupportHost(platform) {
   const THREAD = 'Landroid/app/ActivityThread;', APPLICATION = 'Landroid/app/Application;';
   type(THREAD, OBJECT, [], { allocatable: true });
   def(THREAD, 'currentActivityThread', `()${THREAD}`, r => r.activityThread ??= r.allocate(THREAD), { static: true });
+  // ActivityThread.H (the main Handler, ActivityThread.mH) and the MessageQueue object of a Looper: host types whose state lives in src/hidden-members.js
+  type('Landroid/app/ActivityThread$H;', 'Landroid/os/Handler;', [], { allocatable: true }); type('Landroid/os/MessageQueue;', OBJECT, [], { allocatable: true });
+  // FragmentManager.FragmentLifecycleCallbacks (deprecated android.app family): an abstract-in-spirit base class whose callbacks are empty; the platform calls them around fragment lifecycle steps.
+  const CALLBACKS = 'Landroid/app/FragmentManager$FragmentLifecycleCallbacks;', FM = 'Landroid/app/FragmentManager;', FR = 'Landroid/app/Fragment;', CTX = 'Landroid/content/Context;', BUNDLE = 'Landroid/os/Bundle;', VIEW = 'Landroid/view/View;';
+  type(CALLBACKS, OBJECT, [], { allocatable: true }); def(CALLBACKS, '<init>', '()V', () => {});
+  for (const [name, extra] of [['onFragmentPreAttached', [CTX]], ['onFragmentAttached', [CTX]], ['onFragmentPreCreated', [BUNDLE]], ['onFragmentCreated', [BUNDLE]], ['onFragmentActivityCreated', [BUNDLE]], ['onFragmentViewCreated', [VIEW, BUNDLE]], ['onFragmentStarted', []], ['onFragmentResumed', []], ['onFragmentPaused', []], ['onFragmentStopped', []], ['onFragmentSaveInstanceState', [BUNDLE]], ['onFragmentViewDestroyed', []], ['onFragmentDestroyed', []], ['onFragmentDetached', []]]) def(CALLBACKS, name, `(${FM}${FR}${extra.join('')})V`, () => {});
   def(THREAD, 'getApplication', `()${APPLICATION}`, () => platform.applicationAttached ? platform.application : null);
 
   return registry;
