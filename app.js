@@ -1,8 +1,8 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=1955bfec5107';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=1955bfec5107';
-import { createDeviceView, createViewState } from './device-view.js?v=1955bfec5107';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=1955bfec5107';
-import { formatApiGapReport } from './api-gap-scan.js?v=1955bfec5107';
+import { APKWorkerClient } from './apk-worker-client.js?v=1d7890576be9';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=1d7890576be9';
+import { createDeviceView, createViewState } from './device-view.js?v=1d7890576be9';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=1d7890576be9';
+import { formatApiGapReport } from './api-gap-scan.js?v=1d7890576be9';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -186,7 +186,7 @@ function showInventory(inventory) {
   if (inventory.framework?.enabled) details.append(listSection('FRAMEWORK AOSP · CÓDIGO DEX SEPARADO', [`${inventory.framework.classes} classes · ${inventory.framework.bytes} bytes`, `Origem: ${inventory.framework.source} · ${inventory.framework.policy}`, `SHA-256: ${inventory.framework.sha256 || 'indisponível'}`]));
   if (inventory.framework?.profiles?.length) details.append(listSection('PERFIS ORIGINAIS CARREGADOS', inventory.framework.profiles.map(profile => `${profile.profile || profile.name || 'AOSP'} · ${profile.classes ?? profile.classCount ?? '—'} classes · ${profile.reason || 'seleção explícita'} · SHA-256 ${profile.sha256 || 'indisponível'}`)));
   if (inventory.frameworkResources?.enabled) details.append(listSection('DADOS DE RECURSOS FRAMEWORK', [`${inventory.frameworkResources.selectedUniqueResourceIds} IDs originais · perfil parcial sem qualificadores`, inventory.frameworkResources.source || '', `Integridade: ${inventory.frameworkResources.integrity}`]));
-  if (inventory.resourceSummary) details.append(listSection('RECURSOS ANDROID', [`${inventory.resourceSummary.entries} recursos · ${inventory.resourceSummary.parsedLayouts}/${inventory.resourceSummary.layoutFiles} layouts XML preparados`, ...(inventory.resourceSummary.errors || [])]));
+  if (inventory.resourceSummary) details.append(listSection('RECURSOS ANDROID', [`${inventory.resourceSummary.entries} recursos · ${inventory.resourceSummary.parsedLayouts}/${inventory.resourceSummary.layoutFiles} layouts XML preparados${inventory.resourceSummary.xml?.deferred || inventory.resourceSummary.deferredLayouts ? ` · ${(inventory.resourceSummary.xml?.deferred || 0)} XML sob demanda` : ''}`, ...(inventory.resourceSummary.errors || [])]));
   configureNativeInspection(inventory);
   if (inventory.unsupportedFeatures?.length) details.append(listSection('LIMITAÇÕES ENCONTRADAS', inventory.unsupportedFeatures));
   if (inventory.warnings?.length) details.append(listSection('OBSERVAÇÕES', inventory.warnings));

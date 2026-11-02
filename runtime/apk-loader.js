@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=1955bfec5107';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=1955bfec5107';
-import { inspectELF } from './native-inspector.js?v=1955bfec5107';
-import { inflateRaw } from './inflate.js?v=1955bfec5107';
-import { resolveDevice } from './device-profile.js?v=1955bfec5107';
-import { resourceProfileFor } from './device-configuration.js?v=1955bfec5107';
-import { JniBridge } from './jni-host.js?v=1955bfec5107';
-import { providerForApk } from './native-provider-variants.js?v=1955bfec5107';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=1955bfec5107';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=1955bfec5107';
-import { AndroidResources } from './android-resources.js?v=1955bfec5107';
-import { AndroidPlatform } from './android-platform.js?v=1955bfec5107';
-import { FrameworkProvider } from './framework-provider.js?v=1955bfec5107';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=1d7890576be9';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=1d7890576be9';
+import { inspectELF } from './native-inspector.js?v=1d7890576be9';
+import { inflateRaw } from './inflate.js?v=1d7890576be9';
+import { resolveDevice } from './device-profile.js?v=1d7890576be9';
+import { resourceProfileFor } from './device-configuration.js?v=1d7890576be9';
+import { JniBridge } from './jni-host.js?v=1d7890576be9';
+import { providerForApk } from './native-provider-variants.js?v=1d7890576be9';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=1d7890576be9';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=1d7890576be9';
+import { AndroidResources } from './android-resources.js?v=1d7890576be9';
+import { AndroidPlatform } from './android-platform.js?v=1d7890576be9';
+import { FrameworkProvider } from './framework-provider.js?v=1d7890576be9';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -261,12 +261,12 @@ export function parseManifest(data) {
     launcherActivity: launchers.length === 1 ? launchers[0].name : null };
 }
 
-async function prepareResources(archive, names, options, report, yieldControl, warnings) {
+export async function prepareResources(archive, names, options, report, yieldControl, warnings) {
   const frameworkTable = options.frameworkResources ?? null;
   let layoutFiles = names.filter(name => /^res\/layout(?:-[^/]+)?\/[^/]+\.xml$/.test(name)).sort();
   const arsc = archive.entries.get('resources.arsc');
   const summary = { present: !!arsc, tableBytes: arsc?.size ?? 0, tableParsed: false, entries: 0,
-    layoutFiles: layoutFiles.length, parsedLayouts: 0, skippedLayouts: layoutFiles.length,
+    layoutFiles: layoutFiles.length, parsedLayouts: 0, deferredLayouts: 0, skippedLayouts: layoutFiles.length,
     parsedLayoutBytes: 0, inspectionComplete: false, errors: [], omittedErrors: 0 };
   if (options.resources === false || (!arsc && !frameworkTable)) {
     if (options.resources === false && arsc) summary.errors.push('Resource parsing disabled by caller.');
@@ -296,15 +296,17 @@ async function prepareResources(archive, names, options, report, yieldControl, w
   } catch (error) { note(`resources.arsc: ${error.message}`); }
   await report('resources', 1, layoutFiles.length + 1, 'resources.arsc', 'Android resource table inspected');
   await yieldControl();
+  // Eager preparation is a startup-cost budget, not a semantic limit: files beyond it are parsed on first use (resolveXML), as Android parses on demand.
+  const MAX_XML_BYTES = 1024 * 1024, EAGER_LAYOUTS = 1024, EAGER_XML = 4096, EAGER_BYTES = 16 * 1024 * 1024, LAZY_BYTES = 64 * 1024 * 1024;
+  const deferred = new Set(), layoutSet = new Set(layoutFiles), lazy = { bytes: 0 };
   for (let i = 0; i < layoutFiles.length; i++) {
     const path = layoutFiles[i], size = archive.entries.get(path).size;
     let reason = null;
-    if (i >= 1024) reason = 'layout count exceeds 1024-file limit';
-    else if (size > 1024 * 1024) reason = 'layout exceeds 1 MiB limit';
-    else if (summary.parsedLayoutBytes + size > 16 * 1024 * 1024) reason = 'layout bytes exceed combined 16 MiB limit';
-    if (!reason) {
+    if (size > MAX_XML_BYTES) reason = 'layout exceeds 1 MiB limit';
+    else if (i >= EAGER_LAYOUTS || summary.parsedLayoutBytes + size > EAGER_BYTES) deferred.add(path);
+    else {
       summary.parsedLayoutBytes += size;
-      try { layouts.set(path, table.parseLayout(await archive.extract(path, 1024 * 1024))); }
+      try { layouts.set(path, table.parseLayout(await archive.extract(path, MAX_XML_BYTES))); }
       catch (error) { reason = error.message; }
     }
     if (reason) { layoutErrors.set(path, reason); note(`${path}: ${reason}`); }
@@ -313,7 +315,7 @@ async function prepareResources(archive, names, options, report, yieldControl, w
       await yieldControl();
     }
   }
-  summary.parsedLayouts = layouts.size; summary.skippedLayouts = layoutFiles.length - layouts.size;
+  summary.parsedLayouts = layouts.size; summary.deferredLayouts = deferred.size; summary.skippedLayouts = layoutFiles.length - layouts.size - deferred.size;
   const xmlTrees = new Map(layouts), xmlErrors = new Map(layoutErrors), candidates = new Set(layoutFiles);
   const xmlTypes = new Set(['navigation', 'drawable', 'color', 'animator', 'anim', 'interpolator', 'xml', 'menu', 'transition', 'font', 'mipmap']);
   const alwaysXML = new Set(['navigation', 'color', 'animator', 'anim', 'interpolator', 'xml', 'menu', 'transition']);
@@ -322,21 +324,34 @@ async function prepareResources(archive, names, options, report, yieldControl, w
       (entry.value.endsWith('.xml') || alwaysXML.has(entry.resourceType)) && archive.entries.has(entry.value)) candidates.add(entry.value);
   }
   const xmlFiles = [...candidates].sort();
-  summary.xml = { files: xmlFiles.length, parsed: xmlTrees.size, skipped: 0, bytes: summary.parsedLayoutBytes };
+  summary.xml = { files: xmlFiles.length, parsed: xmlTrees.size, deferred: 0, skipped: 0, bytes: summary.parsedLayoutBytes };
   for (let i = 0; i < xmlFiles.length; i++) {
-    const path = xmlFiles[i]; if (xmlTrees.has(path) || xmlErrors.has(path)) continue;
+    const path = xmlFiles[i]; if (xmlTrees.has(path) || xmlErrors.has(path) || deferred.has(path)) continue;
     const size = archive.entries.get(path).size;
-    let reason = i >= 4096 ? 'XML count exceeds 4096-file limit' : size > 1024 * 1024 ? 'XML exceeds 1 MiB limit' : summary.xml.bytes + size > 16 * 1024 * 1024 ? 'XML bytes exceed combined 16 MiB limit' : null;
-    if (!reason) {
+    let reason = size > MAX_XML_BYTES ? 'XML exceeds 1 MiB limit' : null;
+    if (!reason && (xmlTrees.size >= EAGER_XML || summary.xml.bytes + size > EAGER_BYTES)) deferred.add(path);
+    else if (!reason) {
       summary.xml.bytes += size;
-      try { xmlTrees.set(path, table.parseLayout(await archive.extract(path, 1024 * 1024))); }
+      try { xmlTrees.set(path, table.parseLayout(await archive.extract(path, MAX_XML_BYTES))); }
       catch (error) { reason = error.message; }
     }
     if (reason) { xmlErrors.set(path, reason); note(`${path}: ${reason}`); }
     if (i % 16 === 15) { await report('resources-xml', i + 1, xmlFiles.length, path, `Prepared ${xmlTrees.size} compiled XML resources`); await yieldControl(); }
   }
-  summary.xml.parsed = xmlTrees.size; summary.xml.skipped = xmlFiles.length - xmlTrees.size;
-  summary.inspectionComplete = summary.tableParsed && !summary.skippedLayouts && !summary.errors.length;
+  // parsed/deferred/skipped describe the state at load: deferred files are not failures, they are parsed on first use and are not claimed as parsed.
+  summary.xml.parsed = xmlTrees.size; summary.xml.deferred = deferred.size; summary.xml.skipped = xmlFiles.length - xmlTrees.size - deferred.size;
+  summary.inspectionComplete = summary.tableParsed && !summary.skippedLayouts && !summary.xml.deferred && !summary.errors.length;
+  const parseDeferred = path => {
+    deferred.delete(path);
+    const size = archive.entries.get(path).size; let reason = null;
+    if (lazy.bytes + size > LAZY_BYTES) reason = 'lazily parsed XML bytes exceed the 64 MiB budget';
+    else {
+      lazy.bytes += size;
+      try { const tree = table.parseLayout(archive.extractSync(path, MAX_XML_BYTES)); xmlTrees.set(path, tree); if (layoutSet.has(path)) layouts.set(path, tree); return; }
+      catch (error) { reason = error.message; }
+    }
+    xmlErrors.set(path, reason); if (layoutSet.has(path)) layoutErrors.set(path, reason);
+  };
   if (summary.errors.length) warnings.push(`Resource inspection: ${summary.errors.slice(0, 4).join('; ')}${summary.errors.length > 4 || summary.omittedErrors ? '; additional details in resourceSummary.errors' : ''}`);
   const resolveXML = (id, layoutOnly = false) => {
     const resource = table.resolve(id); let leaf = resource;
@@ -349,6 +364,7 @@ async function prepareResources(archive, names, options, report, yieldControl, w
       throw new APKError(`Framework XML ${path} is not prepared in the framework resource dataset`, { kind: 'framework-xml-unavailable', resourceId: Number(id) >>> 0, path });
     }
     const trees = layoutOnly ? layouts : xmlTrees, errors = layoutOnly ? layoutErrors : xmlErrors;
+    if (deferred.has(path) && (!layoutOnly || layoutSet.has(path))) parseDeferred(path);
     if (!trees.has(path)) throw new APKError(`${layoutOnly ? 'Layout' : 'XML'} ${path} is not prepared: ${errors.get(path) ?? 'not found in APK compiled XML resources'}`, { kind: 'resource-unsupported', resourceId: Number(id) >>> 0, path });
     const tree = trees.get(path); nameFrameworkAttributes(tree, id => frameworkTable?.entries?.get(id >>> 0)?.[0]?.name ?? null);
     return tree;
