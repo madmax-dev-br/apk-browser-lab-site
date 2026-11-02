@@ -1,5 +1,5 @@
-import {APKError} from './apk-error.js?v=9279502e5be3';
-import {getVectorGraphics} from './vector-native.js?v=9279502e5be3';
+import {APKError} from './apk-error.js?v=18ee3639c104';
+import {getVectorGraphics} from './vector-native.js?v=18ee3639c104';
 const AVD='Landroid/graphics/drawable/AnimatedVectorDrawable;';
 /** Original AVD constructs an RT set before choosing its CPU fallback. The set
  * has real, bounded VM allocation/refcount ownership, but no RT executor. None

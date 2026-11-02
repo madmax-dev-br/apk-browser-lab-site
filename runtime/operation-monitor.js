@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=9279502e5be3';
-import { gcBlockReason } from './heap-gc.js?v=9279502e5be3';
+import { APKError } from './apk-error.js?v=18ee3639c104';
+import { gcBlockReason } from './heap-gc.js?v=18ee3639c104';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -147,7 +147,7 @@ export class OperationMonitor {
     const stats = this.rt.scheduler.stats, op = this.op, seconds = op ? Math.max(0.001, (performance.now() - op.start) / 1000) : 0;
     return `Escalonador: ${stats.rounds} rodadas, ${stats.wakeups} despertares${op ? ` (${Math.round(stats.wakeups / seconds)}/s, ${Math.round(stats.rounds / seconds)} rodadas/s nesta operação)` : ''}, ${this.rt.scheduler.threads.length} threads`;
   }
-  pumpReport(limit = 8) {
+  pumpReport(limit = 5) {
     const op = this.op; if (op === null) return { text: '', recurring: [], threads: [] };
     const wakes = this.wakeRows(op, limit);
     const recurring = [...op.pump].sort((a, b) => b[1].count - a[1].count).slice(0, limit).map(([key, e]) => ({ target: key, count: e.count, periodMs: e.count > 1 ? Math.round((e.last - e.first) / (e.count - 1)) : null }));

@@ -1,38 +1,39 @@
-import { buildScreenState } from './screen-state.js?v=9279502e5be3';
-import { createMessageSink } from './audio-native.js?v=9279502e5be3';
-import { loadAPK } from './apk-loader.js?v=9279502e5be3';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=9279502e5be3';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=9279502e5be3';
-import { createWebViewBackend } from './webview-backend.js?v=9279502e5be3';
-import { FrameworkProvider } from './framework-provider.js?v=9279502e5be3';
-import { createRasterSender } from './raster-cache.js?v=9279502e5be3';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=9279502e5be3';
-import { dispatchPointer } from './pointer-input-host.js?v=9279502e5be3';
-import { resolveDevice } from './device-profile.js?v=9279502e5be3';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=9279502e5be3';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=9279502e5be3';
-import { SkiaProvider } from './skia-provider.js?v=9279502e5be3';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=9279502e5be3';
-import { disposeTextLayout } from './text-layout-native.js?v=9279502e5be3';
-import { IcuBreakProvider } from './icu-break-provider.js?v=9279502e5be3';
-import { SqliteProvider } from './sqlite-native.js?v=9279502e5be3';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=9279502e5be3';
-import { TzdataProvider } from './java-time-native.js?v=9279502e5be3';
-import { ZlibProvider } from './zip-native.js?v=9279502e5be3';
-import { IcuConverterProvider } from './icu-converter-native.js?v=9279502e5be3';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=9279502e5be3';
-import { JavacryptoProvider } from './javacrypto-native.js?v=9279502e5be3';
-import { disposeColorFilters } from './color-filter-native.js?v=9279502e5be3';
-import { disposeRegex } from './regex-native.js?v=9279502e5be3';
-import { disposeRenderNodes } from './rendernode-native.js?v=9279502e5be3';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=9279502e5be3';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=9279502e5be3';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=9279502e5be3';
+import { buildScreenState } from './screen-state.js?v=18ee3639c104';
+import { reportSummary } from './report-summary.js?v=18ee3639c104';
+import { createMessageSink } from './audio-native.js?v=18ee3639c104';
+import { loadAPK } from './apk-loader.js?v=18ee3639c104';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=18ee3639c104';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=18ee3639c104';
+import { createWebViewBackend } from './webview-backend.js?v=18ee3639c104';
+import { FrameworkProvider } from './framework-provider.js?v=18ee3639c104';
+import { createRasterSender } from './raster-cache.js?v=18ee3639c104';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=18ee3639c104';
+import { dispatchPointer } from './pointer-input-host.js?v=18ee3639c104';
+import { resolveDevice } from './device-profile.js?v=18ee3639c104';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=18ee3639c104';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=18ee3639c104';
+import { SkiaProvider } from './skia-provider.js?v=18ee3639c104';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=18ee3639c104';
+import { disposeTextLayout } from './text-layout-native.js?v=18ee3639c104';
+import { IcuBreakProvider } from './icu-break-provider.js?v=18ee3639c104';
+import { SqliteProvider } from './sqlite-native.js?v=18ee3639c104';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=18ee3639c104';
+import { TzdataProvider } from './java-time-native.js?v=18ee3639c104';
+import { ZlibProvider } from './zip-native.js?v=18ee3639c104';
+import { IcuConverterProvider } from './icu-converter-native.js?v=18ee3639c104';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=18ee3639c104';
+import { JavacryptoProvider } from './javacrypto-native.js?v=18ee3639c104';
+import { disposeColorFilters } from './color-filter-native.js?v=18ee3639c104';
+import { disposeRegex } from './regex-native.js?v=18ee3639c104';
+import { disposeRenderNodes } from './rendernode-native.js?v=18ee3639c104';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=18ee3639c104';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=18ee3639c104';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=18ee3639c104';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=9279502e5be3';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=9279502e5be3';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=9279502e5be3';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '9279502e5be3';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=18ee3639c104';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=18ee3639c104';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=18ee3639c104';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '18ee3639c104';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -46,7 +47,7 @@ let inventory = null, archive = null;
 let activeRequestId = null;
 let busy = false;
 let eventTimer = null, lastEventMs = 0;
-function errorData(error) { const uncaught = (() => { try { return runtime?.uncaughtText?.() || null; } catch { return null; } })(); const internal = !error.details && /^(TypeError|RangeError|ReferenceError|SyntaxError|EvalError)$/.test(error.name ?? ''); return { uncaught, name: error.name || 'Error', message: error.message || String(error), stack: error.stack, details: internal ? { kind: 'internal-js-error', jsStack: String(error.stack ?? '').split('\n').slice(0, 13).join('\n'), vmContext: runtime?.monitor?.context?.() ?? null } : error.details, navigation: runtime?.platform?.navigationState?.(runtime), trace: Array.isArray(runtime?.trace) ? runtime.trace.slice(-512) : [], stubs: runtime ? [...[...(runtime.missingLibraries ?? [])].map(([key, count]) => [`lib${key}.so`, count]), ...(runtime.missingClasses ?? []), ...(runtime.missingReturns ?? []), ...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`) : [], stubLists: runtime ? { void: [...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`), returns: [...(runtime.missingReturns ?? [])].map(([key, count]) => `${key} x${count}`), classes: [...(runtime.missingClasses ?? [])].map(([key, count]) => `${key} x${count}`) } : null }; }
+function errorData(error) { const summary = (() => { try { return runtime ? reportSummary(runtime).join('\n') : null; } catch { return null; } })(); const uncaught = (() => { try { return runtime?.uncaughtText?.() || null; } catch { return null; } })(); const internal = !error.details && /^(TypeError|RangeError|ReferenceError|SyntaxError|EvalError)$/.test(error.name ?? ''); return { summary, uncaught, name: error.name || 'Error', message: error.message || String(error), stack: error.stack, details: internal ? { kind: 'internal-js-error', jsStack: String(error.stack ?? '').split('\n').slice(0, 13).join('\n'), vmContext: runtime?.monitor?.context?.() ?? null } : error.details, navigation: runtime?.platform?.navigationState?.(runtime), trace: Array.isArray(runtime?.trace) ? runtime.trace.slice(-512) : [], stubs: runtime ? [...[...(runtime.missingLibraries ?? [])].map(([key, count]) => [`lib${key}.so`, count]), ...(runtime.missingClasses ?? []), ...(runtime.missingReturns ?? []), ...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`) : [], stubLists: runtime ? { void: [...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`), returns: [...(runtime.missingReturns ?? [])].map(([key, count]) => `${key} x${count}`), classes: [...(runtime.missingClasses ?? [])].map(([key, count]) => `${key} x${count}`) } : null }; }
 const rasterSender = createRasterSender();
 function currentSnapshot() {
   appData?.touch();
@@ -178,7 +179,7 @@ self.onmessage = async ({ data }) => {
         walk(runtime.platform, 'platform', 0); rootProbe = slow.slice(0, 12);
       }
       const before = performance.now(); collectGarbage(runtime, { reason: 'debug-gc' }); const ms = performance.now() - before;
-      send({ type: 'result', ms, phases: runtime.gcPhases?.[0] ?? null, heapSize: runtime.heap.size, rootProbe });
+      send({ type: 'result', ms, phases: runtime.gcPhases?.[0] ?? null, heapSize: runtime.heap.size, rootProbe, memory: self.performance?.memory ? { used: self.performance.memory.usedJSHeapSize, total: self.performance.memory.totalJSHeapSize, limit: self.performance.memory.jsHeapSizeLimit } : null, maxHeapObjects: runtime.maxHeapObjects });
     } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
   }

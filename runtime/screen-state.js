@@ -1,5 +1,6 @@
 // "Estado da tela": a plain-text picture of what the VM shows and why it may be blank, for "Copiar diagnóstico" and for a button that works without any error. Read-only on the VM.
 // Pure data: no app or library names are written here; class names come from the running app and only reach the user's clipboard.
+import { reportSummary, collapseThreads } from './report-summary.js?v=18ee3639c104';
 const MiB = 1024 * 1024, BYTES_PER_OBJECT = 1600;
 const STAGES = { 0: 'destruída', 1: 'criada', 2: 'parada', 3: 'iniciada/pausada', 4: 'retomada (em primeiro plano)' };
 const dotted = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');
@@ -49,6 +50,7 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
   const tasks = platform.tasks ?? [], frames = platform.allFrames?.() ?? [];
   const top = frames.length ? frames[frames.length - 1] : null;
   out.push('Estado da tela');
+  out.push(...reportSummary(runtime, { heartbeat }));
   // ---- activity stack
   out.push('Pilha de Activities (tarefa: Activity, estágio):');
   for (const task of tasks) for (const frame of task.frames) out.push(`  tarefa ${task.id}: ${dotted(frame.type)}, ${STAGES[frame.lifecycleStage] ?? frame.lifecycleStage}${frame.finished ? ', finalizada' : ''}${frame === top ? '  ← topo' : ''}`);
@@ -118,12 +120,14 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
     }
   }
   const shortKey = key => String(key ?? '?').replace(/^L/, '').replace(/;->/, '.');
-  const wakeOp = runtime.monitor.op ?? (runtime.monitor.lastWakes ? { wakes: runtime.monitor.lastWakes } : null); if (wakeOp?.wakes?.size) out.push('Despertares de threads nesta operação (thread · primitiva · causa): ' + runtime.monitor.wakeRows(wakeOp, 6).map(row => `${row.count}× ${row.key}`).join('; '));
+  const wakeOp = runtime.monitor.op ?? (runtime.monitor.lastWakes ? { wakes: runtime.monitor.lastWakes } : null); if (wakeOp?.wakes?.size) out.push('Despertares de threads nesta operação (thread · primitiva · causa): ' + runtime.monitor.wakeRows(wakeOp, 5).map(row => `${row.count}× ${row.key}`).join('; '));
   out.push(runtime.monitor.executionLine());
   const anonymous = [...(platform.anonymousTaskSites ?? [])].sort((a, b) => b[1] - a[1]).slice(0, 6);
   out.push(`Tarefas do host sem lista de raízes (enfileiradas com raízes conservadoras), por origem: ${anonymous.length ? anonymous.map(([site, count]) => `${count}× ${site}`).join('; ') : 'nenhuma'}`);
   out.push('Threads (nome, estado, espera, 6 quadros mais internos):');
-  for (const thread of [...(mainThread ? [mainThread] : []), ...scheduler.threads.filter(candidate => candidate !== mainThread)]) {
+  const collapsed = collapseThreads(runtime, scheduler.threads, mainThread);
+  for (const group of collapsed.groups) out.push(`  ${group} (espera ociosa de pool; omitidas)`);
+  for (const thread of [...(mainThread ? [mainThread] : []), ...collapsed.shown.filter(candidate => candidate !== mainThread)]) {
     const frames = (thread.frames ?? []).slice(-6).reverse().map(frame => frame.method ? shortKey(frame.method.key) : frame.cont ? '(chamada do host)' : '?');
     let target = ''; try { if (thread.blocked) target = `esperando: ${thread.blocked.reason ?? '?'}${thread.blocker ? ' em ' + dotted(runtime.typeOf(thread.blocker)) : ''}`; } catch { target = `esperando: ${thread.blocked?.reason ?? '?'}`; }
     out.push(`  ${thread.name}${thread === mainThread ? ' [main]' : ''}: ${thread.state}${thread.nestedDepth ? `, dentro de chamada nativa aninhada (${thread.nestedDepth})` : ''}${target ? ', ' + target : ''}${runtime.initDepth && thread.state === 'blocked' && /class init/i.test(String(thread.blocked?.reason)) ? ' [inicialização de classe]' : ''}`);

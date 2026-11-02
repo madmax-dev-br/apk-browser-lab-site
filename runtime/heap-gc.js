@@ -133,8 +133,9 @@ export function createMarker(runtime, { full = false } = {}) {
   const markChunks = full ? [] : (runtime.gcMarkChunks ??= []);
   for (let ci = 0; ci < markChunks.length; ci++) if (markChunks[ci] !== undefined && heap.chunks[ci] === undefined) markChunks[ci] = undefined;
   for (let ci = 0; ci < heap.chunks.length; ci++) if (heap.chunks[ci] !== undefined) { if (markChunks[ci] === undefined) markChunks[ci] = new Uint8Array(4096); else markChunks[ci].fill(0); }
-  const isMarked = id => { const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] === 1; };
-  const setMarked = id => { markChunks[id >>> 12][id & 4095] = 1; };
+  const isMarked = id => { const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] !== 0; };
+  let category = 4; const setCategory = value => { category = value; };
+  const setMarked = id => { markChunks[id >>> 12][id & 4095] = category; };
   const marked = { has: isMarked };
   const visited = new WeakSet(), stack = [];
   // The big tables are skipped by identity, not only by property name: a back-reference (jni.runtime, platform.runtime) reaches the runtime object from another root and would otherwise walk
@@ -207,7 +208,7 @@ export function createMarker(runtime, { full = false } = {}) {
       }
     }
   };
-  return { limit, marked, markedHas: isMarked, markId, scan, drain, ephemerons, violations, stack, idLike, weakIds, weakMaps, traced, count: () => count, nodes: () => nodes, pruned: () => pruned, visited };
+  return { limit, marked, markedHas: isMarked, setCategory, markId, scan, drain, ephemerons, violations, stack, idLike, weakIds, weakMaps, traced, count: () => count, nodes: () => nodes, pruned: () => pruned, visited };
 }
 
 /**
@@ -230,7 +231,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   const started = performance.now(), heap = runtime.heap, before = heap.size;
   const blocked = quiescent(runtime, safepoint) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null);
   if (blocked) { const skips = (runtime.gcSkips ??= {}); skips[blocked] = (skips[blocked] ?? 0) + 1; return { collected: false, reason: blocked, before, after: before, freed: 0, ms: 0 }; }
-  const { limit, markedHas, markId, scan, drain, ephemerons, violations, idLike, weakIds, weakMaps, traced, nodes, count, pruned, visited } = createMarker(runtime);
+  const { limit, markedHas, setCategory, markId, scan, drain, ephemerons, violations, idLike, weakIds, weakMaps, traced, nodes, count, pruned, visited } = createMarker(runtime);
   const t0 = performance.now(); let worstRoot = { key: '-', ms: 0, nodes: 0 };
   // Runtime and platform: everything but the heap itself and the large immutable tables. Each root is timed and counted on its own; a root that turned out heavy (>50k JS nodes) is split into
   // its properties on the following collections (iterative deepening), so the report names the structure by path (platform.x.y).
@@ -245,23 +246,34 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
     if (n > 50000) heavy.add(path);
     if (ms > 1 || n > 1000) rows.push({ key: path, ms, nodes: n, kind: value?.constructor?.name ?? '?', size: value instanceof Map || value instanceof Set ? value.size : Array.isArray(value) ? value.length : undefined });
   };
-  for (const key of Object.keys(runtime)) {
-    if (SKIP_PROPS.has(key)) continue;
-    const item = runtime[key];
-    if (item !== null && typeof item === 'object') scanRoot(item, key, 0); else if (typeof item === 'number' && idLike(key, item)) markId(item);
+  // Owner categories: roots are scanned and closed in a fixed order and every object keeps the category of the first group that reaches it (a dominator-lite attribution: where is the mass).
+  const categories = new Map(); let counted = 0;
+  const closeCategory = (id, name) => { drain(); const now = count(); if (now > counted) { const entry = categories.get(id) ?? categories.set(id, { id, name, n: 0 }).get(id); entry.n += now - counted; counted = now; } };
+  setCategory(1); if (runtime.staticFields && typeof runtime.staticFields === 'object') scanRoot(runtime.staticFields, 'staticFields', 0); closeCategory(1, 'campos estáticos das classes');
+  { const threads = runtime.scheduler?.threads ?? [];
+    threads.forEach((thread, index) => { const id = 10 + Math.min(index, 200); setCategory(id); const view = Object.create(runtime.scheduler); view.threads = [thread]; runtime.scheduler.enumerateRoots.call(view, item => scan(item)); closeCategory(id, `thread ${thread.name ?? index}`); });
+    for (const extra of [runtime.thread]) if (extra && Array.isArray(extra.frames) && runtime.scheduler && !threads.includes(extra)) { setCategory(5); const view = Object.create(runtime.scheduler); view.threads = [extra]; runtime.scheduler.enumerateRoots.call(view, item => scan(item)); closeCategory(5, 'thread em execução aninhada'); }
   }
-  for (const row of rows) if (row.ms > worstRoot.ms) worstRoot = row;
-  const topBy = field => [...rows].sort((a, b) => b[field] - a[field]).slice(0, 5).map(row => ({ key: row.key, ms: Math.round(row.ms), nodes: row.nodes, kind: row.kind, size: row.size }));
-  runtime.gcTopRoots = { byNodes: topBy('nodes'), byMs: topBy('ms') };
-  const rootsMs = performance.now() - t0, tRoots = performance.now();
-  runtime.scheduler?.enumerateRoots?.(item => scan(item));
-  for (const extra of [runtime.thread]) if (extra && Array.isArray(extra.frames) && runtime.scheduler && !runtime.scheduler.threads.includes(extra)) { const view = Object.create(runtime.scheduler); view.threads = [extra]; runtime.scheduler.enumerateRoots.call(view, item => scan(item)); }   // a thread record outside the scheduler's list (nested runs)
+  setCategory(2); for (const queue of [runtime.platform?.eventQueue]) if (queue) scan(queue); closeCategory(2, 'filas de Handler / eventos do host');
   // Host code up the JavaScript stack (a native that called back into Java, a class initializer, a nested wait) may hold values no Java frame references: what host code allocated and every result
   // handed back to it since the last fully quiescent collection stay alive. Outside a safepoint nothing is in flight and the set is dropped.
+  setCategory(3);
   const stackQuiet = runtime.depth === 0 && runtime.nestedRuns <= 1 && !runtime.initDepth && !runtime.scheduler?.waitingNested?.size && !runtime.scheduler?.threads.some(thread => thread.nestedDepth > 0 || thread.nestedBlock);
   if (!safepoint || stackQuiet) runtime.hostAllocs.length = 0; else for (const id of runtime.hostAllocs) markId(id);
   for (const weak of tracked) { const container = weak.deref(); if (container === undefined) tracked.delete(weak); else scan(container); }
   if (extraRoots) { const values = typeof extraRoots === 'function' ? extraRoots() : extraRoots; for (const item of values ?? []) scan(item); }
+  closeCategory(3, 'raízes do host (alocações do host, contêineres, tarefas)');
+  setCategory(4);
+  for (const key of Object.keys(runtime)) {
+    if (SKIP_PROPS.has(key) || key === 'staticFields') continue;
+    const item = runtime[key];
+    if (item !== null && typeof item === 'object') scanRoot(item, key, 0); else if (typeof item === 'number' && idLike(key, item)) markId(item);
+  }
+  closeCategory(4, 'tabelas da plataforma e do runtime');
+  for (const row of rows) if (row.ms > worstRoot.ms) worstRoot = row;
+  const topBy = field => [...rows].sort((a, b) => b[field] - a[field]).slice(0, 5).map(row => ({ key: row.key, ms: Math.round(row.ms), nodes: row.nodes, kind: row.kind, size: row.size }));
+  runtime.gcTopRoots = { byNodes: topBy('nodes'), byMs: topBy('ms') };
+  const rootsMs = performance.now() - t0, tRoots = performance.now();
   // Heap closure: scan each reachable record's own state.
   const tDrain = performance.now(); drain(); ephemerons();
   for (const map of runtime.ephemeronMaps ?? []) for (const key of [...map.keys()]) if (typeof key === 'number' && !markedHas(key)) map.delete(key);   // the key died: so does the entry
@@ -301,14 +313,15 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
     }
   }
   // Budgets count live storage only.
-  const survivors = new Map();
+  const survivors = new Map(), markBytes = runtime.gcMarkChunks;
   const tRebuild = performance.now(); let fieldSlots = runtime.staticFields?.size ?? 0, arrayCells = 0, collectionCells = 0;
   for (const ci of heap.usedChunks()) {
-    for (const record of heap.chunks[ci]) {
-      if (record === undefined || record.freed === true) continue;
+    const records = heap.chunks[ci];
+    for (let slot = 0; slot < 4096; slot++) {
+      const record = records[slot]; if (record === undefined || record.freed === true) continue;
       fieldSlots += record.fields?.size ?? 0; if (record.elements) arrayCells += record.elements.length;
-      { const type = record.type; let entry = survivors.get(type); if (entry === undefined) survivors.set(type, entry = { n: 0, bytes: 0 });
-        entry.n++; entry.bytes += 48 + (record.fields?.size ?? 0) * 8 + (record.elements ? record.elements.length * (record.type.length === 2 ? ELEMENT_WIDTH[record.type[1]] ?? 8 : 8) : 0) + (typeof record.value === 'string' ? record.value.length * 2 : 0) + ((record.list?.length ?? 0) + (record.set?.length ?? 0)) * 8 + (record.map?.size ?? 0) * 48; }
+      { const type = record.type; let entry = survivors.get(type); if (entry === undefined) { const own = runtime.classes.get(type); survivors.set(type, entry = { n: 0, bytes: 0, cats: new Uint32Array(256), dex: own ? (runtime.dex.bootDexes?.has(own.dex) ? 'framework' : (own.dex?.filename ?? 'app')) : 'host' }); }
+        entry.cats[markBytes[ci][slot]]++; entry.n++; entry.bytes += 48 + (record.fields?.size ?? 0) * 8 + (record.elements ? record.elements.length * (record.type.length === 2 ? ELEMENT_WIDTH[record.type[1]] ?? 8 : 8) : 0) + (typeof record.value === 'string' ? record.value.length * 2 : 0) + ((record.list?.length ?? 0) + (record.set?.length ?? 0)) * 8 + (record.map?.size ?? 0) * 48; }
       collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
     }
   }
@@ -316,6 +329,11 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   const name = type => String(type).replace(/^L|;$/g, '').replaceAll('/', '.');
   const top = field => [...survivors].sort((a, b) => b[1][field] - a[1][field]).slice(0, 12).map(([type, v]) => ({ type: name(type), n: v.n, bytes: v.bytes }));
   phases.survivorsByCount = top('n'); phases.survivorsByBytes = top('bytes');
+  { const list = [...categories.values()].sort((a, b) => b.n - a.n), biggest = list[0];
+    const topClassIn = id => { let best = null; for (const [type, v] of survivors) if (!best || v.cats[id] > best.n) best = { type: name(type), n: v.cats[id] }; return best; };
+    phases.categories = list.slice(0, 8).map(c => ({ name: c.name, n: c.n, ...(c === biggest ? { topClass: topClassIn(c.id) } : {}) }));
+    const byDex = new Map(); for (const v of survivors.values()) byDex.set(v.dex, (byDex.get(v.dex) ?? 0) + v.n);
+    phases.byDex = [...byDex].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([dex, n]) => ({ dex, n })); }
   { const samples = [...(runtime.allocationSamples ?? [])].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([site]) => site); phases.allocated = { count: Math.max(0, limit - (runtime.gcLastNextId ?? 0)), sites: samples }; }
   {   // the ids freed by the last collections (sorted, with their class), so that a use of a collected object is diagnosed as such (see APKRuntime.object)
     const ring = runtime.gcFreedRing ??= [], kinds = [...new Set(freedTypes)], index = new Map(kinds.map((type, i) => [type, i]));
