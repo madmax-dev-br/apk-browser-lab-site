@@ -85,3 +85,5 @@
 .memory-meter[data-level=high] i::after{background:#d64545}
 .memory-meter[data-level=high]{color:#d64545}
 @media (max-width:620px){.memory-meter>span{display:none}}
+.crash-notice{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 16px;background:#3a2a12;color:#ffe2a8;border-bottom:1px solid #6b4a14;font-size:13px}
+.crash-notice button{background:transparent;border:1px solid currentColor;color:inherit;border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}

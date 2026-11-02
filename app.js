@@ -1,8 +1,8 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=8961994ab6b4';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=8961994ab6b4';
-import { createDeviceView, createViewState } from './device-view.js?v=8961994ab6b4';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=8961994ab6b4';
-import { formatApiGapReport } from './api-gap-scan.js?v=8961994ab6b4';
+import { APKWorkerClient } from './apk-worker-client.js?v=643e640e353f';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=643e640e353f';
+import { createDeviceView, createViewState } from './device-view.js?v=643e640e353f';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=643e640e353f';
+import { formatApiGapReport } from './api-gap-scan.js?v=643e640e353f';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -159,6 +159,40 @@ $('clear-app-data')?.addEventListener('click', async () => {
 // Page hidden or closing: ask the Worker to store the app data right away (best effort; the write is already a transaction by the time the page goes).
 document.addEventListener?.('visibilitychange', () => { if (document.visibilityState === 'hidden') apkVM.flushAppData(); });
 globalThis.addEventListener?.('pagehide', () => apkVM.flushAppData());
+// Crash recorder: while an APK runs, the page keeps the latest state in localStorage every few seconds and marks the run as ended when the page goes away normally (pagehide). If the browser
+// kills the tab (out of memory) none of that runs, so the next load finds a run that never ended and offers the last recorded state, which is all that survives such a crash.
+const LAST_RUN_KEY = 'apkweb.lastRun';
+const lastRunStore = { read() { try { return JSON.parse(globalThis.localStorage?.getItem(LAST_RUN_KEY) ?? 'null'); } catch { return null; } }, write(value) { try { globalThis.localStorage?.setItem(LAST_RUN_KEY, JSON.stringify(value)); } catch { /* storage full or blocked: the recorder is best effort */ } }, clear() { try { globalThis.localStorage?.removeItem(LAST_RUN_KEY); } catch { /* best effort */ } } };
+let recorderSawWorker = false;   // only a page that ran a VM may close a record: a fresh page must leave a crashed run's record for showPreviousCrash
+function recordLastRun() {
+  if (!apkVM.worker) { if (recorderSawWorker) { recorderSawWorker = false; markLastRunEnded(); } return; }
+  recorderSawWorker = true;   // the VM ended in a way the page knows about (Encerrar, an error, a timeout): not a crash
+  const health = state.lastVmHealth, beat = apkVM.lastHeartbeat, text = apkVM.lastScreenSnapshot?.text ?? null, heap = globalThis.performance?.memory;
+  lastRunStore.write({ v: 1, ended: false, at: Date.now(), startedAt: state.runStartedAt ?? Date.now(), page: location.href.split('#')[0], package: state.inventory?.packageName ?? null, mode: state.mode,
+    pageHeapMiB: heap ? Math.round(heap.usedJSHeapSize / 1048576) : null, pageHeapLimitMiB: heap ? Math.round(heap.jsHeapSizeLimit / 1048576) : null, deviceMemoryGiB: globalThis.navigator?.deviceMemory ?? null,
+    vm: health ? { objects: health.liveObjects, limit: health.limit, collections: health.collections, gcMs: health.gcMs, lastEventMs: health.lastEventMs, oom: health.oomCount } : null,
+    beat: beat ? { operation: beat.operation, thread: beat.thread, stack: (beat.stack ?? []).slice(0, 6), hostCall: beat.hostCall, events: beat.events, instructions: beat.instructions, queueDepth: beat.queueDepth, vm: beat.vm ?? null, ageMs: Date.now() - (apkVM.lastHeartbeat?.receivedAt ?? Date.now()) } : null,
+    status: $('status-text')?.textContent ?? '', screen: text ? text.slice(0, 24000) : null });
+}
+function markLastRunEnded() { const last = lastRunStore.read(); if (last && last.ended === false) lastRunStore.write({ ...last, ended: true, endedAt: Date.now() }); }
+setInterval(recordLastRun, 3000);
+globalThis.addEventListener?.('pagehide', () => { if (recorderSawWorker) markLastRunEnded(); });
+function showPreviousCrash() {
+  const last = lastRunStore.read(); if (!last || last.ended !== false || Date.now() - last.at > 24 * 3600 * 1000) return;
+  const seconds = Math.round((last.at - last.startedAt) / 1000), lines = ['Última execução interrompida sem aviso', `Pacote: ${last.package ?? '?'} · modo ${last.mode ?? '?'} · rodou cerca de ${seconds} s antes do último registro (${new Date(last.at).toLocaleString()}).`,
+    last.pageHeapMiB != null ? `Heap JS da página no último registro: ${last.pageHeapMiB} MiB de ${last.pageHeapLimitMiB} MiB (só o Chrome informa; o Worker da VM não entra nessa conta).` : 'Heap JS da página: indisponível neste navegador.',
+    last.deviceMemoryGiB != null ? `Memória do dispositivo informada pelo navegador: ${last.deviceMemoryGiB} GiB.` : '',
+    last.vm ? `VM: ${last.vm.objects} de ${last.vm.limit} objetos vivos, ${last.vm.collections} coletas (${last.vm.gcMs} ms), último evento ${last.vm.lastEventMs} ms${last.vm.oom ? `, ${last.vm.oom} OutOfMemoryError` : ''}.` : '',
+    last.beat ? `Último sinal da VM (há ${Math.round(last.beat.ageMs / 1000)} s do registro): ${last.beat.operation ?? 'sem operação'}, thread ${last.beat.thread ?? '?'}, ${last.beat.stack.join(' < ') || 'sem pilha'}, chamada do host: ${last.beat.hostCall ?? 'nenhuma'}, ${last.beat.events} eventos, ${last.beat.instructions} instruções, fila ${last.beat.queueDepth}.` : '',
+    `Status da página: ${last.status}`, 'Possíveis causas: o navegador encerrou a aba por falta de memória (o mais comum), a aba foi recarregada à força ou o computador dormiu. Nada disso gera erro dentro da página.', last.screen ? `\n${last.screen}` : ''].filter(Boolean);
+  const banner = document.createElement('div'); banner.className = 'crash-notice'; banner.setAttribute('role', 'alert');
+  const text = document.createElement('span'); text.textContent = 'A última execução parou sem aviso (provável falta de memória do navegador).';
+  const copy = document.createElement('button'); copy.type = 'button'; copy.textContent = 'Copiar o último estado';
+  copy.addEventListener('click', async () => { try { await navigator.clipboard.writeText(lines.join('\n')); copy.textContent = 'Copiado'; } catch { $('trace-output').textContent = lines.join('\n'); $('trace').open = true; copy.textContent = 'Veja o log de execução'; } });
+  const close = document.createElement('button'); close.type = 'button'; close.textContent = 'Dispensar'; close.addEventListener('click', () => { lastRunStore.clear(); banner.remove(); });
+  banner.append(text, copy, close); document.body.prepend(banner);
+}
+showPreviousCrash();
 function formatSize(size) {
   return size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` : `${(size / (1024 * 1024)).toFixed(2)} MB`;
 }
@@ -374,7 +408,7 @@ async function runAPKOnce() {
   }
   switchMode('apk'); hideError(); state.lastAPKError = null; state.launchAttempted = true;
   const token = beginOperation('Tentando iniciar a Activity…');
-  try { const snapshot = await state.runtime.launch(activity, { onProgress: onWorkerProgress }); if (token === state.operation) renderSnapshot(snapshot); }
+  state.runStartedAt = Date.now(); try { const snapshot = await state.runtime.launch(activity, { onProgress: onWorkerProgress }); if (token === state.operation) renderSnapshot(snapshot); }
   catch (error) { if (token === state.operation) reportAPKError(error); }
   finally { finishOperation(token); }
 }
