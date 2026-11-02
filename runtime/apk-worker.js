@@ -1,37 +1,37 @@
-import { createMessageSink } from './audio-native.js?v=3e66c3e6cd8f';
-import { loadAPK } from './apk-loader.js?v=3e66c3e6cd8f';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=3e66c3e6cd8f';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=3e66c3e6cd8f';
-import { createWebViewBackend } from './webview-backend.js?v=3e66c3e6cd8f';
-import { FrameworkProvider } from './framework-provider.js?v=3e66c3e6cd8f';
-import { createRasterSender } from './raster-cache.js?v=3e66c3e6cd8f';
-import { isFreedId } from './heap-gc.js?v=3e66c3e6cd8f';
-import { dispatchPointer } from './pointer-input-host.js?v=3e66c3e6cd8f';
-import { resolveDevice } from './device-profile.js?v=3e66c3e6cd8f';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=3e66c3e6cd8f';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=3e66c3e6cd8f';
-import { SkiaProvider } from './skia-provider.js?v=3e66c3e6cd8f';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=3e66c3e6cd8f';
-import { disposeTextLayout } from './text-layout-native.js?v=3e66c3e6cd8f';
-import { IcuBreakProvider } from './icu-break-provider.js?v=3e66c3e6cd8f';
-import { SqliteProvider } from './sqlite-native.js?v=3e66c3e6cd8f';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=3e66c3e6cd8f';
-import { TzdataProvider } from './java-time-native.js?v=3e66c3e6cd8f';
-import { ZlibProvider } from './zip-native.js?v=3e66c3e6cd8f';
-import { IcuConverterProvider } from './icu-converter-native.js?v=3e66c3e6cd8f';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=3e66c3e6cd8f';
-import { JavacryptoProvider } from './javacrypto-native.js?v=3e66c3e6cd8f';
-import { disposeColorFilters } from './color-filter-native.js?v=3e66c3e6cd8f';
-import { disposeRegex } from './regex-native.js?v=3e66c3e6cd8f';
-import { disposeRenderNodes } from './rendernode-native.js?v=3e66c3e6cd8f';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=3e66c3e6cd8f';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=3e66c3e6cd8f';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=3e66c3e6cd8f';
+import { createMessageSink } from './audio-native.js?v=7dfccde7cc14';
+import { loadAPK } from './apk-loader.js?v=7dfccde7cc14';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=7dfccde7cc14';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=7dfccde7cc14';
+import { createWebViewBackend } from './webview-backend.js?v=7dfccde7cc14';
+import { FrameworkProvider } from './framework-provider.js?v=7dfccde7cc14';
+import { createRasterSender } from './raster-cache.js?v=7dfccde7cc14';
+import { isFreedId } from './heap-gc.js?v=7dfccde7cc14';
+import { dispatchPointer } from './pointer-input-host.js?v=7dfccde7cc14';
+import { resolveDevice } from './device-profile.js?v=7dfccde7cc14';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=7dfccde7cc14';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=7dfccde7cc14';
+import { SkiaProvider } from './skia-provider.js?v=7dfccde7cc14';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=7dfccde7cc14';
+import { disposeTextLayout } from './text-layout-native.js?v=7dfccde7cc14';
+import { IcuBreakProvider } from './icu-break-provider.js?v=7dfccde7cc14';
+import { SqliteProvider } from './sqlite-native.js?v=7dfccde7cc14';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=7dfccde7cc14';
+import { TzdataProvider } from './java-time-native.js?v=7dfccde7cc14';
+import { ZlibProvider } from './zip-native.js?v=7dfccde7cc14';
+import { IcuConverterProvider } from './icu-converter-native.js?v=7dfccde7cc14';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=7dfccde7cc14';
+import { JavacryptoProvider } from './javacrypto-native.js?v=7dfccde7cc14';
+import { disposeColorFilters } from './color-filter-native.js?v=7dfccde7cc14';
+import { disposeRegex } from './regex-native.js?v=7dfccde7cc14';
+import { disposeRenderNodes } from './rendernode-native.js?v=7dfccde7cc14';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=7dfccde7cc14';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=7dfccde7cc14';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=7dfccde7cc14';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=3e66c3e6cd8f';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=3e66c3e6cd8f';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=3e66c3e6cd8f';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '3e66c3e6cd8f';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=7dfccde7cc14';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=7dfccde7cc14';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=7dfccde7cc14';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '7dfccde7cc14';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -60,7 +60,8 @@ function currentSnapshot() {
 }
 // Host-time limit of one VM event in the Worker. The instruction fuse (100M per thread: a React Native startup needs ~3.4M-85M in one dispatch, see the comment at
 // APKRuntime.maxInstructionsPerEvent) bounds work, this bounds time: a hot loop that is cheap per instruction can never freeze the page for more than this.
-const EVENT_WALL_LIMIT_MS = 30000;
+// The Worker reports a runaway event itself (with the execution profile) before the page gives up on it: the page-side timeout is the backstop for a Worker that cannot answer (a long native call).
+const EVENT_WALL_LIMIT_MS = 25000;
 function drainReadyEvents() {
   let processed = 0, result;
   for (let round = 0; round < 32; round++) {
