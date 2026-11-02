@@ -1,6 +1,6 @@
 // android.os.MemoryFile's two private natives (android-13.0.0_r1 android_os_MemoryFile.cpp). The ashmem region is the lab's SharedMemory byte array, so no page is ever purged: native_pin answers
 // "not purged" (false); native_get_size needs the region's file descriptor, which the lab's SharedMemory never hands out, so it fails explicitly.
-import { APKError } from './apk-error.js?v=e9ecadb60317';
+import { APKError } from './apk-error.js?v=2a1f5dd8c3fa';
 
 const MEMORY_FILE = 'Landroid/os/MemoryFile;';
 

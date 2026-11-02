@@ -1,37 +1,38 @@
-import { createMessageSink } from './audio-native.js?v=e9ecadb60317';
-import { loadAPK } from './apk-loader.js?v=e9ecadb60317';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=e9ecadb60317';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=e9ecadb60317';
-import { createWebViewBackend } from './webview-backend.js?v=e9ecadb60317';
-import { FrameworkProvider } from './framework-provider.js?v=e9ecadb60317';
-import { createRasterSender } from './raster-cache.js?v=e9ecadb60317';
-import { isFreedId } from './heap-gc.js?v=e9ecadb60317';
-import { dispatchPointer } from './pointer-input-host.js?v=e9ecadb60317';
-import { resolveDevice } from './device-profile.js?v=e9ecadb60317';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=e9ecadb60317';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=e9ecadb60317';
-import { SkiaProvider } from './skia-provider.js?v=e9ecadb60317';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=e9ecadb60317';
-import { disposeTextLayout } from './text-layout-native.js?v=e9ecadb60317';
-import { IcuBreakProvider } from './icu-break-provider.js?v=e9ecadb60317';
-import { SqliteProvider } from './sqlite-native.js?v=e9ecadb60317';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=e9ecadb60317';
-import { TzdataProvider } from './java-time-native.js?v=e9ecadb60317';
-import { ZlibProvider } from './zip-native.js?v=e9ecadb60317';
-import { IcuConverterProvider } from './icu-converter-native.js?v=e9ecadb60317';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=e9ecadb60317';
-import { JavacryptoProvider } from './javacrypto-native.js?v=e9ecadb60317';
-import { disposeColorFilters } from './color-filter-native.js?v=e9ecadb60317';
-import { disposeRegex } from './regex-native.js?v=e9ecadb60317';
-import { disposeRenderNodes } from './rendernode-native.js?v=e9ecadb60317';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=e9ecadb60317';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=e9ecadb60317';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=e9ecadb60317';
+import { buildScreenState } from './screen-state.js?v=2a1f5dd8c3fa';
+import { createMessageSink } from './audio-native.js?v=2a1f5dd8c3fa';
+import { loadAPK } from './apk-loader.js?v=2a1f5dd8c3fa';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=2a1f5dd8c3fa';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=2a1f5dd8c3fa';
+import { createWebViewBackend } from './webview-backend.js?v=2a1f5dd8c3fa';
+import { FrameworkProvider } from './framework-provider.js?v=2a1f5dd8c3fa';
+import { createRasterSender } from './raster-cache.js?v=2a1f5dd8c3fa';
+import { isFreedId } from './heap-gc.js?v=2a1f5dd8c3fa';
+import { dispatchPointer } from './pointer-input-host.js?v=2a1f5dd8c3fa';
+import { resolveDevice } from './device-profile.js?v=2a1f5dd8c3fa';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=2a1f5dd8c3fa';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=2a1f5dd8c3fa';
+import { SkiaProvider } from './skia-provider.js?v=2a1f5dd8c3fa';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=2a1f5dd8c3fa';
+import { disposeTextLayout } from './text-layout-native.js?v=2a1f5dd8c3fa';
+import { IcuBreakProvider } from './icu-break-provider.js?v=2a1f5dd8c3fa';
+import { SqliteProvider } from './sqlite-native.js?v=2a1f5dd8c3fa';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=2a1f5dd8c3fa';
+import { TzdataProvider } from './java-time-native.js?v=2a1f5dd8c3fa';
+import { ZlibProvider } from './zip-native.js?v=2a1f5dd8c3fa';
+import { IcuConverterProvider } from './icu-converter-native.js?v=2a1f5dd8c3fa';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=2a1f5dd8c3fa';
+import { JavacryptoProvider } from './javacrypto-native.js?v=2a1f5dd8c3fa';
+import { disposeColorFilters } from './color-filter-native.js?v=2a1f5dd8c3fa';
+import { disposeRegex } from './regex-native.js?v=2a1f5dd8c3fa';
+import { disposeRenderNodes } from './rendernode-native.js?v=2a1f5dd8c3fa';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=2a1f5dd8c3fa';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=2a1f5dd8c3fa';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=2a1f5dd8c3fa';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=e9ecadb60317';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=e9ecadb60317';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=e9ecadb60317';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'e9ecadb60317';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=2a1f5dd8c3fa';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=2a1f5dd8c3fa';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=2a1f5dd8c3fa';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '2a1f5dd8c3fa';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -118,6 +119,10 @@ self.onmessage = async ({ data }) => {
   const send = (message) => self.postMessage({ requestId, ...message });
   if (type === 'webview-event') { try { runtime?.platform?.webViewBackend?.handleEvent(runtime, data); } finally { scheduleEvents(); } return; }   // an iframe finished or failed: only queues VM tasks
   if (type === 'app-data-flush') { runtime?.fileMappings?.flushAll(); appData?.syncPoint('page-hide'); return; }   // shared native file mappings reach their files before the data is stored   // the page is being hidden/closed: store now, even while the VM is busy (no reply)
+  if (type === 'screen-state') {   // read-only picture of the screen for "Copiar estado da tela"; answered even while the VM is between operations
+    try { send({ type: 'result', screenState: runtime ? buildScreenState(runtime, { semantics: composeSemantics?.snapshot?.() ?? null, heartbeat: runtime.monitor.snapshot(performance.now(), 'screen-state') }) : { text: 'Estado da tela\nNenhum APK carregado.', blank: false, reasons: [] } }); } catch (error) { send({ type: 'error', error: errorData(error) }); }
+    return;
+  }
   if (busy) { send({ type: 'error', error: { name: 'ProtocolError', message: 'A VM já está processando outra operação.' } }); return; }
   busy = true; activeRequestId = requestId; let succeeded = false; clearTimeout(eventTimer);
   try {

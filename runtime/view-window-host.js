@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=e9ecadb60317';
-import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=e9ecadb60317';
+import { APKError } from './apk-runtime.js?v=2a1f5dd8c3fa';
+import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=2a1f5dd8c3fa';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -21,7 +21,7 @@ const error=message=>{throw new APKError(message,{kind:'window-frame-unsupported
 export function createViewWindowHost(platform){
  // Choreographer.sFrameDelay is a legacy animation setting, not the VSYNC interval.
  let legacyFrameDelay=10n;
- const frameInterval=1000/60, pendingViews=gcRoot(new Map()), pendingFrames=gcRoot([]), tokens=gcRoot(new Map());let display=null,choreographer=null,handler=null,frameTime=null,lastFrameMs=0,currentPhase=-1,pendingViewCount=0;
+ const frameInterval=1000/60, pendingViews=gcRoot(new Map()), pendingFrames=gcRoot([]), tokens=gcRoot(new Map());let framesRun=0,callbacksRun=0,display=null,choreographer=null,handler=null,frameTime=null,lastFrameMs=0,currentPhase=-1,pendingViewCount=0;
  const focusedWindows=gcRoot(new Map()),focusQueryStack=new Set();let focusDepth=0,inTouchMode=true,focusQueryNodes=0; /* config_defaultInTouchMode is true on a touchscreen device: a window starts in touch mode and leaves it on a key press */
  const rootOf=(runtime,receiver)=>{let current=receiver;const seen=new Set();while(runtime.object(current).parent){if(seen.has(current.ref)||seen.size>=4096)error('Cyclic/excessive View window hierarchy');seen.add(current.ref);current=runtime.object(current).parent;}return current;};
  const frameOf=(runtime,receiver)=>{const root=rootOf(runtime,receiver);const context=runtime.object(receiver).context;return platform.allFrames().find(frame=>same(frame.root,root)||frame.window&&same(runtime.object(frame.window).decor,root)||same(frame.activity,context))||null;};
@@ -72,11 +72,11 @@ export function createViewWindowHost(platform){
   // One queue task per frame lets callbacks posted while dispatching wait until a later frame.
   if(platform.eventQueue.some(event=>event.windowFrameTime===when))return;
   schedule(runtime,when,()=>{
-   const vsync=Math.max(when,Math.floor(platform.clock.now()/frameInterval)*frameInterval);/* Choreographer skips frames it was too late for: the frame time is the latest vsync not after now */lastFrameMs=vsync;platform.lastFrameMs=vsync;frameTime=BigInt(Math.round(vsync*1000000));runtime.record(`FRAME ${frameTime} [explicit60HzwebVMclock]`);
+   const vsync=Math.max(when,Math.floor(platform.clock.now()/frameInterval)*frameInterval);/* Choreographer skips frames it was too late for: the frame time is the latest vsync not after now */lastFrameMs=vsync;platform.lastFrameMs=vsync;frameTime=BigInt(Math.round(vsync*1000000));runtime.record(`FRAME ${frameTime} [explicit60HzwebVMclock]`);framesRun++;
    let animationClockLocked=false;
    const animationClock=(name,parameters,values)=>runtime.dispatch({owner:'Landroid/view/animation/AnimationUtils;',name,parameters,result:'V',signature:`(${parameters.join('')})V`},runtime.argumentWords(parameters,values),'static');
    try{if(runtime.dex.bootClasses?.has('Landroid/view/animation/AnimationUtils;')){animationClock('lockAnimationClock',['J'],[frameTime/1000000n]);animationClockLocked=true;}for(currentPhase=0;currentPhase<=4;currentPhase++){const due=pendingFrames.filter(x=>x.when<=when&&x.phase===currentPhase);for(const item of due)pendingFrames.splice(pendingFrames.indexOf(item),1);
-    for(const item of due){runtime.record(`FRAME callback phase=${currentPhase}`);if(item.js)item.js(runtime,vsync);else if(item.runnable)run(runtime,item.callback);else runtime.dispatch({owner:CALLBACK,name:'doFrame',signature:'(J)V',parameters:['J'],result:'V'},runtime.argumentWords(['J'],[frameTime],{receiver:item.callback}),'virtual');}
+    for(const item of due){callbacksRun++;runtime.record(`FRAME callback phase=${currentPhase}`);if(item.js)item.js(runtime,vsync);else if(item.runnable)run(runtime,item.callback);else runtime.dispatch({owner:CALLBACK,name:'doFrame',signature:'(J)V',parameters:['J'],result:'V'},runtime.argumentWords(['J'],[frameTime],{receiver:item.callback}),'virtual');}
    }}finally{try{if(animationClockLocked)animationClock('unlockAnimationClock',[],[]);}finally{frameTime=null;currentPhase=-1;}}
   },{windowFrameTime:when,roots:[]});
  };
@@ -92,7 +92,7 @@ export function createViewWindowHost(platform){
  };
  /** A JS callback run in the next frame's traversal phase (RenderThread animators): `fn(runtime, frameTimeMs)`. */
  const planJsFrame=(runtime,fn,phase=3)=>{ if(pendingFrames.length>=1024)error('Frame callback limit exceeded'); const when=Math.ceil((Math.max(platform.clock.now(),lastFrameMs)+0.000001)/frameInterval)*frameInterval; pendingFrames.push({js:fn,callback:null,token:null,runnable:false,phase,when}); ensureFrameEvent(runtime,when); };
- return { planJsFrame, [GC_ROOTS](visit) { visit(display); visit(choreographer); visit(handler); },
+ return { planJsFrame, frameState: () => ({ framesRun, callbacksRun, pendingFrames: pendingFrames.length, nextFrameAt: pendingFrames.reduce((min, x) => Math.min(min, x.when), Infinity), lastFrameMs, detachedCallbacks: pendingViewCount }), [GC_ROOTS](visit) { visit(display); visit(choreographer); visit(handler); },
   supports:key=>keys.has(key),
   interfaces:type=>type===TOKEN?['Landroid/os/IBinder;']:[],
   parent:type=>type===TOKEN||type===DISPLAY?'Ljava/lang/Object;':null,

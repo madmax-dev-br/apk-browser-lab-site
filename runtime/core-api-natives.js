@@ -1,6 +1,6 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=e9ecadb60317';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e9ecadb60317';
-import { icuCharMirror, icuEastAsianWidth } from './unicode-character-data.js?v=e9ecadb60317';
+import { bitsFloat, floatBits } from './host-contract.js?v=2a1f5dd8c3fa';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=2a1f5dd8c3fa';
+import { icuCharMirror, icuEastAsianWidth } from './unicode-character-data.js?v=2a1f5dd8c3fa';
 
 // Native methods of original-source framework classes whose JNI halves are plain computation:
 //   android.text.AndroidCharacter   frameworks/base/core/jni/android_text_AndroidCharacter.cpp (android-13.0.0_r1), ICU data from the Android 13 ICU (Unicode 14)

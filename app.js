@@ -1,8 +1,8 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=e9ecadb60317';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=e9ecadb60317';
-import { createDeviceView, createViewState } from './device-view.js?v=e9ecadb60317';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=e9ecadb60317';
-import { formatApiGapReport } from './api-gap-scan.js?v=e9ecadb60317';
+import { APKWorkerClient } from './apk-worker-client.js?v=2a1f5dd8c3fa';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=2a1f5dd8c3fa';
+import { createDeviceView, createViewState } from './device-view.js?v=2a1f5dd8c3fa';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=2a1f5dd8c3fa';
+import { formatApiGapReport } from './api-gap-scan.js?v=2a1f5dd8c3fa';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -46,8 +46,17 @@ function updateTrace(snapshot) {
 }
 function resetWebViews() { try { deviceView.resetWebViews?.(); } catch { /* the device view is not created yet: no WebView exists either */ } }
 function hideError() { $('error-panel').hidden = true; }
+/** "Estado da tela" from the live Worker (null when it is gone or has nothing loaded). */
+async function fetchScreenState() { if (!apkVM.worker) return null; try { return await apkVM.screenState(); } catch { return null; } }
+document.getElementById('screen-state-copy')?.addEventListener('click', async event => {
+  const button = event.currentTarget, screen = await fetchScreenState(), report = screen?.text ?? 'Estado da tela\nA VM não está disponível (nenhum APK em execução ou o Worker foi encerrado).';
+  try { await navigator.clipboard.writeText(report); button.textContent = screen?.blank ? 'Copiado (tela em branco)' : 'Estado da tela copiado'; }
+  catch { $('trace-output').textContent = report; $('trace').open = true; getSelection()?.selectAllChildren($('trace-output')); button.textContent = 'Selecionado: copie com Cmd+C'; }
+  setTimeout(() => { button.textContent = 'Copiar estado da tela'; }, 2500);
+});
 document.getElementById('error-copy')?.addEventListener('click', async event => {
-  const button = event.currentTarget, report = (state.errorReport ?? $('error-message').textContent) + (state.apiGaps ? '\n\n' + formatApiGapReport(state.apiGaps) : '');   // the static API estimate may arrive after the error was shown
+  const screen = await fetchScreenState();
+  const button = event.currentTarget, report = (state.errorReport ?? $('error-message').textContent) + (screen ? '\n\n' + screen.text : '') + (state.apiGaps ? '\n\n' + formatApiGapReport(state.apiGaps) : '');   // the static API estimate may arrive after the error was shown
   try { await navigator.clipboard.writeText(report); button.textContent = 'Diagnóstico copiado'; }
   catch { $('error-detail').textContent = report; $('error-detail').hidden = false; $('error-diagnostics').hidden = false; $('error-diagnostics').open = true; getSelection()?.selectAllChildren($('error-detail')); button.textContent = 'Selecionado: copie com Cmd+C'; }
   setTimeout(() => { button.textContent = 'Copiar diagnóstico'; }, 2500);

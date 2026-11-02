@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=e9ecadb60317';
-import { Blocked, QUANTUM } from './scheduler.js?v=e9ecadb60317';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=e9ecadb60317';
+import { APKError } from './apk-error.js?v=2a1f5dd8c3fa';
+import { Blocked, QUANTUM } from './scheduler.js?v=2a1f5dd8c3fa';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=2a1f5dd8c3fa';
 
 // Frame-based DEX interpreter.
 //
@@ -623,7 +623,7 @@ function runLoop(rt, owner, base) {
         }
         if (current instanceof JavaException) {
           const target = catchTarget(rt, f, start, current.value);
-          if (target !== null) { f.pendingException = current.value; pc = target; rt.record(`CATCH ${rt.typeOf(current.value)} in ${f.method.key}`); regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; break; }
+          if (target !== null) { f.pendingException = current.value; pc = target; rt.record(`CATCH ${rt.typeOf(current.value)} in ${f.method.key}`); rt.noteCaught(current.value, f.method.key); regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; break; }
           current.message = `${f.method.key} [${prog.filename}] at PC 0x${start.toString(16).padStart(4, '0')}: ${current.message}`;
         } else {
           // A register-type error names the failing opcode and the last host bridge the VM called, which is usually where the bad value came from.

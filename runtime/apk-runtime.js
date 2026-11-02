@@ -1,24 +1,24 @@
-import { VMClock } from './vm-clock.js?v=e9ecadb60317';
-import { OperationMonitor } from './operation-monitor.js?v=e9ecadb60317';
-import { ExecutionProfile } from './execution-profile.js?v=e9ecadb60317';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=e9ecadb60317';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=e9ecadb60317';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=e9ecadb60317';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=e9ecadb60317';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e9ecadb60317';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=e9ecadb60317';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=e9ecadb60317';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=e9ecadb60317';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=e9ecadb60317';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=e9ecadb60317';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=e9ecadb60317';
-import { APKError } from './apk-error.js?v=e9ecadb60317';
-import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=e9ecadb60317';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=e9ecadb60317';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=e9ecadb60317';
-import { Scheduler, Blocked } from './scheduler.js?v=e9ecadb60317';
-import { bootClassLacksMember } from './boot-class-members.js?v=e9ecadb60317';
-export { APKError } from './apk-error.js?v=e9ecadb60317';
+import { VMClock } from './vm-clock.js?v=2a1f5dd8c3fa';
+import { OperationMonitor } from './operation-monitor.js?v=2a1f5dd8c3fa';
+import { ExecutionProfile } from './execution-profile.js?v=2a1f5dd8c3fa';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=2a1f5dd8c3fa';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=2a1f5dd8c3fa';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=2a1f5dd8c3fa';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=2a1f5dd8c3fa';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=2a1f5dd8c3fa';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=2a1f5dd8c3fa';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=2a1f5dd8c3fa';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=2a1f5dd8c3fa';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=2a1f5dd8c3fa';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=2a1f5dd8c3fa';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=2a1f5dd8c3fa';
+import { APKError } from './apk-error.js?v=2a1f5dd8c3fa';
+import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=2a1f5dd8c3fa';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=2a1f5dd8c3fa';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=2a1f5dd8c3fa';
+import { Scheduler, Blocked } from './scheduler.js?v=2a1f5dd8c3fa';
+import { bootClassLacksMember } from './boot-class-members.js?v=2a1f5dd8c3fa';
+export { APKError } from './apk-error.js?v=2a1f5dd8c3fa';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1479,6 +1479,18 @@ export class APKRuntime {
   budgetExceeded(message, details = {}) {
     const profile = this.profile.report(), summary = this.profile.summary();
     throw new APKError(message + summary, { kind: 'instruction-budget', ...details, profile });
+  }
+  /** An exception reached a catch block of app/framework code: counted by class and message (the first distinct ones are kept) for "Estado da tela", since libraries often swallow them. */
+  noteCaught(value, where) {
+    const caught = this.caughtExceptions ??= { total: 0, distinct: new Map() }; caught.total++;
+    let type = '?', message = '';
+    try {
+      type = String(this.typeOf(value)).replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.'); const object = this.object(value);
+      let text = object.message; if (text === undefined || text === null) for (const [key, field] of object.fields ?? []) if (key.endsWith('->detailMessage:Ljava/lang/String;')) { text = field; break; }
+      message = typeof text === 'string' ? text.slice(0, 160) : '';
+    } catch { /* the exception object is not inspectable */ }
+    const key = type + '|' + message, entry = caught.distinct.get(key);
+    if (entry) entry.count++; else if (caught.distinct.size < 200) caught.distinct.set(key, { type, message, count: 1, where: String(where).replace(/^L/, '').replace(/;->/, '.') });
   }
   budgetTick() {
     if (this.steps > this.peakThreadSteps) this.peakThreadSteps = this.steps;

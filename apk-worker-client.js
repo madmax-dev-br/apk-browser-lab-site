@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=e9ecadb60317';
-import { createRasterReceiver } from './raster-cache.js?v=e9ecadb60317';
+import { createWebAudioPlayer } from './web-audio-player.js?v=2a1f5dd8c3fa';
+import { createRasterReceiver } from './raster-cache.js?v=2a1f5dd8c3fa';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=e9ecadb60317', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=2a1f5dd8c3fa', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -83,6 +83,8 @@ export class APKWorkerClient {
   /** An event from a WebView iframe (loaded, failed) for the Worker's backend; fire and forget. */
   webViewEvent(event) { try { this.worker?.postMessage({ ...event, requestId: ++this.sequence }); } catch { /* worker already gone */ } }
   flushAppData() { try { this.worker?.postMessage({ type: 'app-data-flush', requestId: ++this.sequence }); } catch { /* worker already gone */ } }
+  /** "Estado da tela": the VM's picture of the screen (activity stack, view tree, Compose, frames, queue, threads, memory, swallowed exceptions) as { text, blank, reasons }. */
+  async screenState() { return (await this.request('screen-state', {}, { timeoutMs: 10000 })).screenState; }
   async launch(activity, { onProgress } = {}) {
     return (await this.request('launch', { activity }, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot;
   }
