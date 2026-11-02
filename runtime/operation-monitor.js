@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=d39d0632fd73';
-import { gcBlockReason } from './heap-gc.js?v=d39d0632fd73';
+import { APKError } from './apk-error.js?v=6f26bf29757e';
+import { gcBlockReason } from './heap-gc.js?v=6f26bf29757e';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -95,17 +95,16 @@ export class OperationMonitor {
     entry.count++; entry.last = event.when ?? entry.last;
   }
   /** A blocked thread became runnable again (signal/unpark/notify, timeout or interrupt): counted per thread, wait primitive and cause, so a spin made of instant wake-ups is visible. */
-  noteWake(thread, blocked, cause) {
+  noteWake(thread, blocked, cause) {   // cause: 0 interrupt, 1 signal, 2 timeout -- counters only: no strings or stacks on the scheduler's hot path
     const op = this.op; if (op === null) return;
-    const key = `${thread.name} · ${blocked.reason ?? 'espera'} · ${cause}`;
-    op.wakes.set(key, (op.wakes.get(key) ?? 0) + 1);
+    let row = op.wakes.get(thread); if (row === undefined) op.wakes.set(thread, row = { reason: blocked.reason, counts: [0, 0, 0] });
+    row.reason = blocked.reason; row.counts[cause]++;
   }
   /** An unpark: who woke whom, from which Java frame -- a storm (unparks of a thread that parks again at once) shows up as one very large row. */
-  noteUnpark(targetState, unparker) {
+  noteUnpark(targetState, unparker) {   // counters keyed by objects; the names and the top frame are rendered only when a report is built
     const op = this.op; if (op === null) return;
-    const frames = unparker?.frames, top = frames?.length ? short(frames.at(-1).method?.key) : 'código do host';
-    const key = `${unparker?.name ?? 'host'} (${top}) acordou ${targetState.name ?? targetState.threadName ?? 'uma thread'}`;
-    (op.unparks ??= new Map()).set(key, (op.unparks.get(key) ?? 0) + 1);
+    const byTarget = (op.unparks ??= new Map()).get(unparker ?? 'host') ?? op.unparks.set(unparker ?? 'host', new Map()).get(unparker ?? 'host');
+    byTarget.set(targetState, (byTarget.get(targetState) ?? 0) + 1);
   }
   /** Threads that are about to get a slice of the processor. */
   sliceRan() {
@@ -115,19 +114,37 @@ export class OperationMonitor {
   /** Where execution stands: which thread runs, the main thread's state, how many runs are nested on the JavaScript stack and whether slices can be preempted right now. */
   executionLine() {
     const rt = this.rt, main = rt.scheduler.main, thread = rt.thread;
-    return `Execução: thread atual ${thread?.name ?? 'nenhuma'}${thread === main ? ' [main]' : ''}; thread principal ${main ? `${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'espera'})` : ''}` : '?'}; execuções aninhadas na pilha do JavaScript: ${rt.nestedRuns}; profundidade de dispatch: ${rt.depth}; fatia de segundo plano com limite de tempo: ${rt.sliceDeadline !== 0 ? 'sim' : 'não (evento principal ou espera aninhada: não pode ser interrompida)'}${rt.hostCall ? `; chamada do host: ${short(rt.hostCall)}` : ''}`;
+    return `${this.schedulerLine()}\nExecução: thread atual ${thread?.name ?? 'nenhuma'}${thread === main ? ' [main]' : ''}; thread principal ${main ? `${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'espera'})` : ''}` : '?'}; execuções aninhadas na pilha do JavaScript: ${rt.nestedRuns}; profundidade de dispatch: ${rt.depth}; fatia de segundo plano com limite de tempo: ${rt.sliceDeadline !== 0 ? 'sim' : 'não (evento principal ou espera aninhada: não pode ser interrompida)'}${rt.hostCall ? `; chamada do host: ${short(rt.hostCall)}` : ''}`;
+  }
+  wakeRows(op, limit) {
+    const CAUSES = ['interrupção', 'sinal', 'tempo esgotado'];
+    return [...op.wakes].map(([thread, row]) => ({ thread, total: row.counts[0] + row.counts[1] + row.counts[2], row })).sort((a, b) => b.total - a.total).slice(0, limit)
+      .map(({ thread, total, row }) => ({ count: total, key: `${thread.name} · ${row.reason ?? 'espera'} · ${row.counts.map((n, i) => n ? `${n} ${CAUSES[i]}` : '').filter(Boolean).join(', ')}` }));
+  }
+  unparkRows(op, limit) {
+    const rows = [];
+    for (const [unparker, targets] of op.unparks) {
+      const frames = unparker?.frames, top = frames?.length ? short(frames.at(-1).method?.key) : 'código do host';
+      for (const [target, count] of targets) rows.push({ count, key: `${unparker?.name ?? 'host'} (${top}) acordou ${target.name ?? target.threadName ?? 'uma thread'}` });
+    }
+    return rows.sort((a, b) => b.count - a.count).slice(0, limit);
+  }
+  /** Scheduler cost counters for the reports: rounds (thread picks) and wake-ups, with per-second rates over the operation. */
+  schedulerLine() {
+    const stats = this.rt.scheduler.stats, op = this.op, seconds = op ? Math.max(0.001, (performance.now() - op.start) / 1000) : 0;
+    return `Escalonador: ${stats.rounds} rodadas, ${stats.wakeups} despertares${op ? ` (${Math.round(stats.wakeups / seconds)}/s, ${Math.round(stats.rounds / seconds)} rodadas/s nesta operação)` : ''}, ${this.rt.scheduler.threads.length} threads`;
   }
   pumpReport(limit = 8) {
     const op = this.op; if (op === null) return { text: '', recurring: [], threads: [] };
-    const wakes = [...op.wakes].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => ({ key, count }));
+    const wakes = this.wakeRows(op, limit);
     const recurring = [...op.pump].sort((a, b) => b[1].count - a[1].count).slice(0, limit).map(([key, e]) => ({ target: key, count: e.count, periodMs: e.count > 1 ? Math.round((e.last - e.first) / (e.count - 1)) : null }));
     const threads = [...op.slices].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name, count]) => ({ name, slices: count }));
     const lines = [this.executionLine(), `O que a VM continuou agendando nesta operação (${op.events} eventos):`,
       ...(op.overrun ? [`Aviso: o tempo da operação passou do orçamento enquanto ${op.overrun.mainWaiting ? 'a thread principal esperava outras threads' : 'uma thread em segundo plano'} executava (${op.overrun.thread ?? 'sem thread'}, aos ${op.overrun.atMs} ms)${op.backgroundOverruns ? `; ${op.backgroundOverruns} fatias foram interrompidas` : ''}`] : []),
       ...recurring.map(row => `  ${row.count}×${row.periodMs === null ? '' : ` a cada ~${row.periodMs} ms (tempo virtual)`}  ${row.target}`),
       ...(recurring.length ? [] : ['  (nenhum evento da fila)']),
-      'Despertares de threads (thread · primitiva · causa):', ...[...op.wakes].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => `  ${count}× ${key}`), ...(op.wakes.size ? [] : ['  (nenhum)']),
-      ...(op.unparks?.size ? ['Quem acordou quem (LockSupport.unpark):', ...[...op.unparks].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => `  ${count}× ${key}`)] : []),
+      'Despertares de threads (thread · primitiva · causa):', ...this.wakeRows(op, limit).map(row => `  ${row.count}× ${row.key}`), ...(op.wakes.size ? [] : ['  (nenhum)']),
+      ...(op.unparks?.size ? ['Quem acordou quem (LockSupport.unpark):', ...this.unparkRows(op, limit).map(row => `  ${row.count}× ${row.key}`)] : []),
       'Threads que receberam tempo de processador:', ...threads.map(row => `  ${row.slices}× ${row.name}`), ...(threads.length ? [] : ['  (nenhuma)'])];
     return { text: lines.join('\n'), recurring, threads, wakes, events: op.events };
   }

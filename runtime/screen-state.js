@@ -118,7 +118,7 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
     }
   }
   const shortKey = key => String(key ?? '?').replace(/^L/, '').replace(/;->/, '.');
-  const wakeStats = runtime.monitor.op?.wakes ?? runtime.monitor.lastWakes; if (wakeStats?.size) out.push('Despertares de threads nesta operação (thread · primitiva · causa): ' + [...wakeStats].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([key, count]) => `${count}× ${key}`).join('; '));
+  const wakeOp = runtime.monitor.op ?? (runtime.monitor.lastWakes ? { wakes: runtime.monitor.lastWakes } : null); if (wakeOp?.wakes?.size) out.push('Despertares de threads nesta operação (thread · primitiva · causa): ' + runtime.monitor.wakeRows(wakeOp, 6).map(row => `${row.count}× ${row.key}`).join('; '));
   out.push(runtime.monitor.executionLine());
   const anonymous = [...(platform.anonymousTaskSites ?? [])].sort((a, b) => b[1] - a[1]).slice(0, 6);
   out.push(`Tarefas do host sem lista de raízes (enfileiradas com raízes conservadoras), por origem: ${anonymous.length ? anonymous.map(([site, count]) => `${count}× ${site}`).join('; ') : 'nenhuma'}`);

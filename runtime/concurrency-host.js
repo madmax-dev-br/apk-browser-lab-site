@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=d39d0632fd73';
-import { createHostRegistry } from './host-contract.js?v=d39d0632fd73';
-import { Blocked, VMThread } from './scheduler.js?v=d39d0632fd73';
-import { Invoke } from './interpreter.js?v=d39d0632fd73';
-import { GC_ROOTS } from './heap-gc.js?v=d39d0632fd73';
+import { APKError } from './apk-error.js?v=6f26bf29757e';
+import { createHostRegistry } from './host-contract.js?v=6f26bf29757e';
+import { Blocked, VMThread } from './scheduler.js?v=6f26bf29757e';
+import { Invoke } from './interpreter.js?v=6f26bf29757e';
+import { GC_ROOTS } from './heap-gc.js?v=6f26bf29757e';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -192,6 +192,7 @@ export function createConcurrencyHost(platform) {
   const LOCK_SUPPORT = 'Ljava/util/concurrent/locks/LockSupport;';
   // park returns a Blocked: the thread leaves the processor until unpark(), an interrupt or the deadline (the permit is consumed on return, like LockSupport.park).
   const parkUntil = (r, ms) => {
+    if (ms < (r.stormMitigation ? 5 : 1)) ms = r.stormMitigation ? 5 : 1;   // a park shorter than a millisecond of virtual time would wake every thread of a pool in lockstep, once per host microsecond
     const st = state(r, currentThread(r));     if (st.permit || st.interrupted) { st.permit = false; return undefined; }
     return block(r, { reason: 'LockSupport.park', ready: () => st.permit, timeoutMs: ms, finish: () => { st.permit = false; } });
   };

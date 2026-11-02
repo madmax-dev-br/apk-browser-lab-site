@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=d39d0632fd73';
+import { APKError } from './apk-error.js?v=6f26bf29757e';
 
 // Green-thread scheduler for the VM.
 //
@@ -29,7 +29,7 @@ export const QUANTUM = 20000;   // instructions a thread runs before another run
 
 const QUIET_IDLE_LIMIT = 50000;   // consecutive clock skips with no host event in between
 export class Scheduler {
-  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0 }; this.quietIdles = 0; this.eventTotal = 0; this.lastSteps = 0; }
+  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0 }; this.otherTick = 0; this.otherCached = false; this.quietIdles = 0; this.eventTotal = 0; this.lastSteps = 0; }
   get clock() { return this.rt.platform.clock; }
 
   /** The thread that runs host events (Looper/main). */
@@ -48,6 +48,7 @@ export class Scheduler {
     const steps = rt.steps; if (steps > (rt.peakThreadSteps ?? 0)) rt.peakThreadSteps = steps;
     this.eventTotal += steps >= this.lastSteps ? steps - this.lastSteps : steps;
     if (previous) previous.budget = previous.state === 'runnable' ? steps : 0;
+    this.stats.rounds++;
     if (this.eventTotal > (rt.peakEventTotal ?? 0)) rt.peakEventTotal = this.eventTotal;
     if (this.eventTotal > rt.maxEventInstructions) rt.budgetExceeded(`Instruction budget (${rt.maxEventInstructions} across all threads of one event) exceeded; threads: ${this.describe()}`, { kind: 'event-instruction-budget' });
     rt.steps = this.lastSteps = next.budget ?? 0;
@@ -68,10 +69,10 @@ export class Scheduler {
     for (const thread of this.threads) {
       if (thread.state !== 'blocked') continue;
       const blocked = thread.blocked;
-      const monitor = this.rt.monitor;
-      if (thread.interrupted && blocked.interruptible) { thread.timedOut = false; thread.state = 'runnable'; monitor?.noteWake(thread, blocked, 'interrupt'); continue; }
-      if (blocked.ready()) { thread.timedOut = false; thread.state = 'runnable'; monitor?.noteWake(thread, blocked, 'signal'); }
-      else if (blocked.deadline <= now) { thread.timedOut = true; thread.state = 'runnable'; monitor?.noteWake(thread, blocked, 'timeout'); }
+      const monitor = this.rt.monitor, stats = this.stats;
+      if (thread.interrupted && blocked.interruptible) { thread.timedOut = false; thread.state = 'runnable'; stats.wakeups++; monitor?.noteWake(thread, blocked, 0); continue; }
+      if (blocked.ready()) { thread.timedOut = false; thread.state = 'runnable'; stats.wakeups++; monitor?.noteWake(thread, blocked, 1); }
+      else if (blocked.deadline <= now) { thread.timedOut = true; thread.state = 'runnable'; stats.wakeups++; monitor?.noteWake(thread, blocked, 2); }
       else if (blocked.deadline < earliest) earliest = blocked.deadline;
     }
     return earliest;
@@ -105,9 +106,11 @@ export class Scheduler {
   hasOtherRunnable(current, owner) {
     // The main thread runs host events (UI, Looper callbacks) that assume they are not interleaved with other Java threads mid-event: it yields only by blocking or finishing.
     if (current === this.main) return false;
+    // With dozens of threads this check, made at every scheduling quantum, was O(threads); the answer is refreshed every 4th call (preemption granularity stays far below a millisecond).
+    if ((++this.otherTick & 3) !== 0 && !this.otherCached) return false;
     this.wake();                                   // timers and conditions that came due while `current` ran
-    for (const thread of this.threads) if (thread !== current && thread.state === 'runnable' && (thread === owner || thread.nestedDepth === 0)) return true;
-    return false;
+    for (const thread of this.threads) if (thread !== current && thread.state === 'runnable' && (thread === owner || thread.nestedDepth === 0)) return (this.otherCached = true);
+    return (this.otherCached = false);
   }
 
   /** What to do when nothing is runnable: run due platform events, skip the clock to the earliest deadline, or report the deadlock. `owner` is the blocked loop owner. */
