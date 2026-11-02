@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=2d90c3b6b8c1';
-import { createHostRegistry } from './host-contract.js?v=2d90c3b6b8c1';
-import { Blocked, VMThread } from './scheduler.js?v=2d90c3b6b8c1';
-import { Invoke } from './interpreter.js?v=2d90c3b6b8c1';
-import { GC_ROOTS } from './heap-gc.js?v=2d90c3b6b8c1';
+import { APKError } from './apk-error.js?v=3e66c3e6cd8f';
+import { createHostRegistry } from './host-contract.js?v=3e66c3e6cd8f';
+import { Blocked, VMThread } from './scheduler.js?v=3e66c3e6cd8f';
+import { Invoke } from './interpreter.js?v=3e66c3e6cd8f';
+import { GC_ROOTS } from './heap-gc.js?v=3e66c3e6cd8f';
 
 // Cooperative threads for the single-threaded VM.
 //

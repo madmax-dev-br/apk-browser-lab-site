@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=2d90c3b6b8c1';
-import { APKError } from './apk-error.js?v=2d90c3b6b8c1';
+import { createHostRegistry } from './host-contract.js?v=3e66c3e6cd8f';
+import { APKError } from './apk-error.js?v=3e66c3e6cd8f';
 
 // android.content.pm.PackageManager public API (API 33) that the package model of app-services-host does not answer yet, ported from android-13.0.0_r1 PackageManager.java /
 // ApplicationPackageManager.java for a device with this app and the system packages of that model. Flag-holder overloads (ComponentInfoFlags / PackageInfoFlags / ResolveInfoFlags) forward to the
@@ -157,8 +157,24 @@ export function createPackageManagerApiHost(platform) {
   def(PM, 'getPackageGids', `(${STRING}I)[I`, (r, _m, [, name]) => { const n = known(r, name), gids = n === own() && platform.holdsPermission(r, 'android.permission.INTERNET') ? [3003] : [], array = r.newArray('[I', gids.length); r.array(array).elements = gids; return array; });   // AID_INET
   def(PM, 'getPackageArchiveInfo', `(${STRING}I)${PACKAGE_INFO}`, (r, _m, [self, path, flags]) => { if (nullish(path)) npe(r); return text(r, path) === `${platform.javaIo.fs().codePath}/base.apk` ? call(r, self, PM, 'getPackageInfo', [STRING, 'I'], PACKAGE_INFO, [own(), flags]) : null; });   // the app's own APK; an unreadable or foreign file gives null as a failed parse does
   def(PM, 'getPackageArchiveInfo', `(${STRING}${PACKAGE_FLAGS})${PACKAGE_INFO}`, (r, _m, [self, path, holder]) => call(r, self, PM, 'getPackageArchiveInfo', [STRING, 'I'], PACKAGE_INFO, [path, Number(BigInt.asIntN(32, call(r, holder, PACKAGE_FLAGS, 'getValue', [], 'J')))]));
-  def(PM, 'getPackageInstaller', '()Landroid/content/pm/PackageInstaller;', () => unsupported('PackageManager.getPackageInstaller: PackageInstaller is not part of the lab framework; apps cannot install packages on the virtual device', 'package-installer-unsupported'));
-  def(PM, 'getInstallSourceInfo', `(${STRING})Landroid/content/pm/InstallSourceInfo;`, (r, _m, [, name]) => { known(r, name); return unsupported('PackageManager.getInstallSourceInfo: InstallSourceInfo is not part of the lab framework (getInstallerPackageName reports null)', 'install-source-unsupported'); });
+  // PackageManager.getPackageInstaller(): the process's PackageInstaller for this user. The device has no sessions (nothing is being installed or staged), so every listing is empty and a session id
+  // is unknown: getSessionInfo answers null and openSession/abandonSession refuse with the framework's SecurityException for a session the caller does not own. Creating, committing or uninstalling
+  // needs PackageInstaller.SessionParams/SessionInfo-backed sessions and the installer service, which the lab does not carry.
+  const INSTALLER = 'Landroid/content/pm/PackageInstaller;', SESSION_CALLBACK = 'Landroid/content/pm/PackageInstaller$SessionCallback;';
+  type(INSTALLER, OBJECT, [], { allocatable: true });
+  def(PM, 'getPackageInstaller', `()${INSTALLER}`, r => { platform.packageInstaller ??= r.allocate(INSTALLER); return platform.packageInstaller; });
+  for (const name of ['getAllSessions', 'getMySessions', 'getStagedSessions']) def(INSTALLER, name, `()${LIST}`, r => emptyList(r));
+  def(INSTALLER, 'getSessionInfo', '(I)Landroid/content/pm/PackageInstaller$SessionInfo;', () => null);
+  def(INSTALLER, 'getActiveStagedSession', '()Landroid/content/pm/PackageInstaller$SessionInfo;', () => null);
+  def(INSTALLER, 'getActiveStagedSessions', `()${LIST}`, r => emptyList(r));
+  def(INSTALLER, 'registerSessionCallback', `(${SESSION_CALLBACK})V`, (r, _m, [, callback]) => { if (nullish(callback)) npe(r); });
+  def(INSTALLER, 'registerSessionCallback', `(${SESSION_CALLBACK}Landroid/os/Handler;)V`, (r, _m, [, callback]) => { if (nullish(callback)) npe(r); });
+  def(INSTALLER, 'unregisterSessionCallback', `(${SESSION_CALLBACK})V`, (r, _m, [, callback]) => { if (nullish(callback)) npe(r); });
+  def(INSTALLER, 'abandonSession', '(I)V', (r, _m, [, id]) => r.throwJava(SECURITY, `Caller has no access to session ${id}`));
+  def(INSTALLER, 'openSession', '(I)Landroid/content/pm/PackageInstaller$Session;', (r, _m, [, id]) => r.throwJava(SECURITY, `Caller has no access to session ${id}`));
+  // PackageManager.getInstallSourceInfo(String): InstallSourceInfo is the original class. The loaded APK was side-loaded into the lab, so no installer, initiating or originating package exists
+  // (and with no initiating package there is no initiating signing info); an unknown package is a NameNotFoundException, exactly as ApplicationPackageManager turns the service's null.
+  def(PM, 'getInstallSourceInfo', `(${STRING})Landroid/content/pm/InstallSourceInfo;`, (r, _m, [, name]) => { known(r, name); return construct(r, 'Landroid/content/pm/InstallSourceInfo;', [STRING, 'Landroid/content/pm/SigningInfo;', STRING, STRING], [null, null, null, null]); });
   def(PM, 'requestChecksums', `(${STRING}ZILjava/util/List;Landroid/content/pm/PackageManager$OnChecksumsReadyListener;)V`, () => unsupported('PackageManager.requestChecksums: APK checksums are not computed by the lab', 'checksums-unsupported'));
   def(PM, 'getChangedPackages', '(I)Landroid/content/pm/ChangedPackages;', () => null);
   def(PM, 'getInstalledModules', `(I)${LIST}`, r => emptyList(r)); def(PM, 'getModuleInfo', `(${STRING}I)Landroid/content/pm/ModuleInfo;`, (r, _m, [, name]) => notFound(r, text(r, name)));

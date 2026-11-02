@@ -1,6 +1,6 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=2d90c3b6b8c1';
-import { APKError } from './apk-error.js?v=2d90c3b6b8c1';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=2d90c3b6b8c1';
+import { bitsFloat, floatBits } from './host-contract.js?v=3e66c3e6cd8f';
+import { APKError } from './apk-error.js?v=3e66c3e6cd8f';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=3e66c3e6cd8f';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB
@@ -110,13 +110,22 @@ export function createPeripheralServicesHost(platform) {
   def(WIFI, 'createMulticastLock', `(${STRING})${MULTICAST_LOCK}`, (r, _m, [, tag]) => newLock(r, MULTICAST_LOCK, 'MulticastLock', tag));
 
   // ---- BluetoothManager / NfcManager: the services exist, the adapters do not (SystemServer starts Bluetooth/NFC only with the feature)
-  const BLUETOOTH = service('bluetooth', 'Landroid/bluetooth/BluetoothManager;'), NFC = service('nfc', 'Landroid/nfc/NfcManager;');
+  const BLUETOOTH = service('bluetooth', 'Landroid/bluetooth/BluetoothManager;');
+  // NfcManager is the original framework class: its constructor asks NfcAdapter.getNfcAdapter, which on a device without FEATURE_NFC logs "this device does not have NFC support" and throws
+  // UnsupportedOperationException, so getDefaultAdapter() is null (NfcAdapter.getDefaultAdapter(Context) answers null earlier still: there is no "nfc" service). No adapter object ever exists.
+  kit.classService('nfc', 'Landroid/nfc/NfcManager;', r => construct(r, 'Landroid/nfc/NfcManager;', ['Landroid/content/Context;'], [platform.application]));
+  // The hidden process accessors the NFC originals read: ServiceManager.getService (no binder services in the process) and the IPackageManager feature query.
+  def('Landroid/os/ServiceManager;', 'getService', '(Ljava/lang/String;)Landroid/os/IBinder;', () => null, { static: true });
+  const IPM = 'Landroid/content/pm/IPackageManager;', PM_BINDER = 'Ldev/apkweb/pm/PackageManagerBinder;';
+  type(PM_BINDER, OBJECT, [IPM], { allocatable: true });
+  def('Landroid/app/ActivityThread;', 'getPackageManager', `()${IPM}`, r => { platform.packageManagerBinder ??= r.allocate(PM_BINDER); return platform.packageManagerBinder; }, { static: true });
+  for (const owner of [IPM, PM_BINDER]) def(owner, 'hasSystemFeature', `(${STRING}I)Z`, (r, _m, [, name]) => { if (nullish(name)) npe(r); return hasFeature(text(r, name)) ? 1 : 0; });
+  for (const name of ['isResumed', 'registerOnActivityPausedListener', 'unregisterOnActivityPausedListener']) def('Ldev/apkweb/os/NfcHost;', name, name === 'isResumed' ? '(Landroid/app/Activity;)Z' : '(Landroid/app/Activity;Landroid/app/OnActivityPausedListener;)V', () => { throw new APKError(`NfcAdapter foreground dispatch (${name}) needs an NFC adapter, which this virtual device does not have`, { kind: 'nfc-unavailable' }); }, { static: true });
   def(BLUETOOTH, 'getAdapter', '()Landroid/bluetooth/BluetoothAdapter;', () => null);
   const gattProfile = (r, profile) => { if (profile !== 7 && profile !== 8) iae(r, `Profile not supported: ${profile}`); };   // BluetoothProfile.GATT / GATT_SERVER
   def(BLUETOOTH, 'getConnectedDevices', `(I)${LIST}`, (r, _m, [, profile]) => { gattProfile(r, profile); return emptyList(r); });
   def(BLUETOOTH, 'getDevicesMatchingConnectionStates', `(I[I)${LIST}`, (r, _m, [, profile]) => { gattProfile(r, profile); return emptyList(r); });
   def(BLUETOOTH, 'getConnectionState', '(Landroid/bluetooth/BluetoothDevice;I)I', (r, _m, [, , profile]) => { gattProfile(r, profile); return 0; });
-  def(NFC, 'getDefaultAdapter', '()Landroid/nfc/NfcAdapter;', () => (hasFeature('android.hardware.nfc') ? npe(null) : null));
 
   // ---- CameraManager: no cameras
   const CAMERA = service('camera', 'Landroid/hardware/camera2/CameraManager;');

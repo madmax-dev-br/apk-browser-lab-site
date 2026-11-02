@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=2d90c3b6b8c1';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=2d90c3b6b8c1';
+import { createHostRegistry } from './host-contract.js?v=3e66c3e6cd8f';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=3e66c3e6cd8f';
 
 // Shared plumbing of the system-service hosts (hardware-services-host.js, device-services-host.js, system-managers-host.js): a host contract registry plus the Context service
 // table -- each service has a Context.*_SERVICE name and a manager class; the manager object is a host object created once per runtime. Behaviour follows what an API 33 phone
@@ -15,14 +15,16 @@ export function createServiceKit(platform) {
   const def = (owner, name, signature, fn, options) => rawDef(options?.static ? (classOf.get(owner) ?? owner) : owner, name, signature, fn, options);
   const staticField = (owner, name, kind, compute) => rawStaticField(classOf.get(owner) ?? owner, name, kind, compute);
   registry.def = def; registry.staticField = staticField;
-  const services = new Map(), byClass = new Map(), objects = new WeakMap(), roots = [];
+  const factories = new Map(), services = new Map(), byClass = new Map(), objects = new WeakMap(), roots = [];
   const service = (name, classType, hostType = classType.replace(/;$/, '') + 'Impl;') => {
     services.set(name, hostType); classOf.set(hostType, classType); byClass.set(classType, name); type(classType, OBJECT, [], { allocatable: false }); type(hostType, classType, [], { allocatable: true }); return hostType;
   };
+  /** A service whose manager is an original framework class (in framework.dex) built by `factory(r)` on first use, instead of a host object. */
+  const classService = (name, classType, factory) => { services.set(name, classType); byClass.set(classType, name); factories.set(name, factory); };
   const getService = (r, name) => {
     const hostType = services.get(name); if (!hostType) return null;
     const cache = objects.get(r) ?? objects.set(r, gcRoot(new Map())).get(r);
-    if (!cache.has(name)) cache.set(name, r.allocate(hostType));
+    if (!cache.has(name)) cache.set(name, factories.has(name) ? factories.get(name)(r) : r.allocate(hostType));
     return cache.get(name);
   };
   const call = (r, receiver, owner, name, parameters, result, args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, r.argumentWords(parameters, args, { receiver }), 'virtual');
@@ -49,5 +51,5 @@ export function createServiceKit(platform) {
   /** The host object that finishes the registry: the platform's contract-host surface plus service lookup. */
   const finish = (extra = {}) => ({ ...registry, getService, serviceNameForClass: classType => byClass.get(classType) ?? null, serviceNames: () => [...services.keys()], [GC_ROOTS](visit) { for (const root of roots) root(visit); }, ...extra });
   const root = fn => roots.push(fn);
-  return { registry, def, type, service, getService, call, callStatic, text, uid, holds, enforce, hasFeature, construct, emptyList, listOf, stringArray, intArray, array, device, npe, iae, ise, nullish, finish, root, services, byClass };
+  return { registry, def, type, service, classService, getService, call, callStatic, text, uid, holds, enforce, hasFeature, construct, emptyList, listOf, stringArray, intArray, array, device, npe, iae, ise, nullish, finish, root, services, byClass };
 }

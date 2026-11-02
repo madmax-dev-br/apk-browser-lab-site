@@ -30445,5 +30445,255 @@
     "sha256": "98613fb2bf3be1b2ce0d3d8a9314d13768bbf513aa0ed6f84cbf1ba218a1df8f",
     "bytes": 129074,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/NdefMessage.java",
+    "localPath": "framework-aosp/upstream/android/nfc/NdefMessage.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/NdefMessage.java?format=TEXT",
+    "sha256": "51c27643a468992bd56bd9c407134339987af562cb4f3c9983e6e222001fc930",
+    "bytes": 9880,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/NdefRecord.java",
+    "localPath": "framework-aosp/upstream/android/nfc/NdefRecord.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/NdefRecord.java?format=TEXT",
+    "sha256": "e97ccf7f5ed7e2eb17cec625de13766f0e948e80bb98d53435ce523601a69751",
+    "bytes": 43268,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/FormatException.java",
+    "localPath": "framework-aosp/upstream/android/nfc/FormatException.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/FormatException.java?format=TEXT",
+    "sha256": "a53a110de073269d35ada87ed7df3ca61137086dd994ccc5b1f6a6c486f59cd5",
+    "bytes": 916,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/TagLostException.java",
+    "localPath": "framework-aosp/upstream/android/nfc/TagLostException.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/TagLostException.java?format=TEXT",
+    "sha256": "c5079b0ea149e413e53d1c3f2382e31974f34ce7b421d26668dbd9f2c2824027",
+    "bytes": 858,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/ErrorCodes.java",
+    "localPath": "framework-aosp/upstream/android/nfc/ErrorCodes.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/ErrorCodes.java?format=TEXT",
+    "sha256": "26930c46e90fbae2b0014679055cdd606460c9444471b10eec9b80bf53a8ccf3",
+    "bytes": 3839,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/TransceiveResult.java",
+    "localPath": "framework-aosp/upstream/android/nfc/TransceiveResult.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/TransceiveResult.java?format=TEXT",
+    "sha256": "ac418f07ecfade9ee2dc0af338d47cb6b9cf717bfd58f9b3db0ad5de26592b0f",
+    "bytes": 2862,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/TechListParcel.java",
+    "localPath": "framework-aosp/upstream/android/nfc/TechListParcel.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/TechListParcel.java?format=TEXT",
+    "sha256": "6a4eb9a161321b4282077cab000ee216aac8d823d52f79d66dce23d2990a3c71",
+    "bytes": 1936,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/Tag.java",
+    "localPath": "framework-aosp/upstream/android/nfc/Tag.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/Tag.java?format=TEXT",
+    "sha256": "a609b52a96bfafb949ed3502ee75be09159449a8341873a2ccb86fad8d9441d2",
+    "bytes": 19799,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/NfcAdapter.java",
+    "localPath": "framework-aosp/upstream/android/nfc/NfcAdapter.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/NfcAdapter.java?format=TEXT",
+    "sha256": "a2c766524fea34ff1625105869d17235abd18c627f3acda5a4194a65e70ede64",
+    "bytes": 96979,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/NfcManager.java",
+    "localPath": "framework-aosp/upstream/android/nfc/NfcManager.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/NfcManager.java?format=TEXT",
+    "sha256": "7aa262d6dc36176eb3695e857fa3f6b9ad2467a611734fe7d7b32bca44354333",
+    "bytes": 2437,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/NfcEvent.java",
+    "localPath": "framework-aosp/upstream/android/nfc/NfcEvent.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/NfcEvent.java?format=TEXT",
+    "sha256": "ba0fee49a4d095ce06f4c1e7f3f3d3d583251c7c9fa79ccb0586f548260f6ae0",
+    "bytes": 1896,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/BeamShareData.java",
+    "localPath": "framework-aosp/upstream/android/nfc/BeamShareData.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/BeamShareData.java?format=TEXT",
+    "sha256": "71e6b3e093f56ca794a045c107afa58cdd19e0b8dec347125cf985a265a9903d",
+    "bytes": 2179,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/tech/BasicTagTechnology.java",
+    "localPath": "framework-aosp/upstream/android/nfc/tech/BasicTagTechnology.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/tech/BasicTagTechnology.java?format=TEXT",
+    "sha256": "5594698c5faa8f11e2140d3701a81e67f0a47cad5cf50e1042a1568c4d907193",
+    "bytes": 5223,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/tech/IsoDep.java",
+    "localPath": "framework-aosp/upstream/android/nfc/tech/IsoDep.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/tech/IsoDep.java?format=TEXT",
+    "sha256": "981d4e0533b9914131cfb2f92940f66e3a5f9ac558fbcbfccb7d45f6f15b1453",
+    "bytes": 7913,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/tech/MifareClassic.java",
+    "localPath": "framework-aosp/upstream/android/nfc/tech/MifareClassic.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/tech/MifareClassic.java?format=TEXT",
+    "sha256": "d117668907d6e2602dc0f9a3891c439e3e6c29ea099cf01fdcceb9b5d9bb8695",
+    "bytes": 24276,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/tech/MifareUltralight.java",
+    "localPath": "framework-aosp/upstream/android/nfc/tech/MifareUltralight.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/tech/MifareUltralight.java?format=TEXT",
+    "sha256": "1d906a629b2f2398209937e8d5a98b9e31e50c311485cfcfdae8dfb615c19eca",
+    "bytes": 10937,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/tech/Ndef.java",
+    "localPath": "framework-aosp/upstream/android/nfc/tech/Ndef.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/tech/Ndef.java?format=TEXT",
+    "sha256": "f04e3f2683a981b8168e3435e2dc801117b61173a573932a619ccb657ff1e725",
+    "bytes": 14991,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/tech/NdefFormatable.java",
+    "localPath": "framework-aosp/upstream/android/nfc/tech/NdefFormatable.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/tech/NdefFormatable.java?format=TEXT",
+    "sha256": "ac11b7a46e7eb16ff60031374a643e0a30289299fd58423431255cde11772c2b",
+    "bytes": 6986,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/tech/NfcA.java",
+    "localPath": "framework-aosp/upstream/android/nfc/tech/NfcA.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/tech/NfcA.java?format=TEXT",
+    "sha256": "7a81a125e3c54e844a72368d2eef9c5b3d239e1834553bde6e9bfc7c914d91b6",
+    "bytes": 5792,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/tech/NfcB.java",
+    "localPath": "framework-aosp/upstream/android/nfc/tech/NfcB.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/tech/NfcB.java?format=TEXT",
+    "sha256": "7d3036046e2f65af740d34342d4b232c7c049025baa70444960b92ff6cb03765",
+    "bytes": 4403,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/tech/NfcBarcode.java",
+    "localPath": "framework-aosp/upstream/android/nfc/tech/NfcBarcode.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/tech/NfcBarcode.java?format=TEXT",
+    "sha256": "f671905f94a1dce163e697bd659839a8331c000fcdefe8a387566558ded86a2b",
+    "bytes": 4604,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/tech/NfcF.java",
+    "localPath": "framework-aosp/upstream/android/nfc/tech/NfcF.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/tech/NfcF.java?format=TEXT",
+    "sha256": "70e23e9b7fe65553f4fbebbb5b1bf8efc139bafbd371a8ae7c6e9f64a523fbe9",
+    "bytes": 5966,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/tech/NfcV.java",
+    "localPath": "framework-aosp/upstream/android/nfc/tech/NfcV.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/tech/NfcV.java?format=TEXT",
+    "sha256": "44cd78bf4f62c85bfa07773ddee8aecdfa43392b183085b85bbd2044c0560c75",
+    "bytes": 4194,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/nfc/tech/TagTechnology.java",
+    "localPath": "framework-aosp/upstream/android/nfc/tech/TagTechnology.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/nfc/tech/TagTechnology.java?format=TEXT",
+    "sha256": "eb635ffa8da6fa22bc422087cb4a60b9d3989939e5ad4be7117d15ddcf24f697",
+    "bytes": 8743,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/content/pm/InstallSourceInfo.java",
+    "localPath": "framework-aosp/upstream/android/content/pm/InstallSourceInfo.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/pm/InstallSourceInfo.java?format=TEXT",
+    "sha256": "3362a66e2b3cbff4202bbc6eeb945d8b6552d9da9f8d9a07ad6c689f5024d8b6",
+    "bytes": 6209,
+    "license": "Apache-2.0"
   }
 ]
