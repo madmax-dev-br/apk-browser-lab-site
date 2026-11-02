@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=434c66f9a58e';
-import { createHostRegistry } from './host-contract.js?v=434c66f9a58e';
-import { Blocked, VMThread } from './scheduler.js?v=434c66f9a58e';
-import { Invoke } from './interpreter.js?v=434c66f9a58e';
-import { GC_ROOTS } from './heap-gc.js?v=434c66f9a58e';
+import { APKError } from './apk-error.js?v=d39d0632fd73';
+import { createHostRegistry } from './host-contract.js?v=d39d0632fd73';
+import { Blocked, VMThread } from './scheduler.js?v=d39d0632fd73';
+import { Invoke } from './interpreter.js?v=d39d0632fd73';
+import { GC_ROOTS } from './heap-gc.js?v=d39d0632fd73';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -201,7 +201,7 @@ export function createConcurrencyHost(platform) {
   def(LOCK_SUPPORT, 'parkNanos', `(${OBJECT}J)V`, (r, _m, [, n]) => n > 0n ? parkUntil(r, Number(n) / 1e6) : undefined, { static: true });
   def(LOCK_SUPPORT, 'parkUntil', '(J)V', (r, _m, [t]) => parkUntil(r, Math.max(0, Number(t) - platform.clock.wall())), { static: true });
   def(LOCK_SUPPORT, 'parkUntil', `(${OBJECT}J)V`, (r, _m, [, t]) => parkUntil(r, Math.max(0, Number(t) - platform.clock.wall())), { static: true });
-  def(LOCK_SUPPORT, 'unpark', `(${THREAD})V`, (r, _m, [thread]) => { if (thread !== null) state(r, thread).permit = true; }, { static: true });
+  def(LOCK_SUPPORT, 'unpark', `(${THREAD})V`, (r, _m, [thread]) => { if (thread !== null) { const st = state(r, thread); st.permit = true; r.monitor.noteUnpark(st, r.thread); } }, { static: true });
 
   // Thread.getContextClassLoader/setContextClassLoader: a thread starts with its creator's context loader, which for the VM's first thread is the system (app) class loader.
   const CLASS_LOADER = 'Ljava/lang/ClassLoader;';

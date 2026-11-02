@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=434c66f9a58e';
-import { createRasterReceiver } from './raster-cache.js?v=434c66f9a58e';
+import { createWebAudioPlayer } from './web-audio-player.js?v=d39d0632fd73';
+import { createRasterReceiver } from './raster-cache.js?v=d39d0632fd73';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=434c66f9a58e', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=d39d0632fd73', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -18,7 +18,7 @@ export class APKWorkerClient {
       if (worker !== this.worker) return;
       // Every snapshot, delivered or not, passes the raster cache in order so Worker and page LRUs stay identical.
       if (data?.snapshot) { try { this.rasters.resolve(data.snapshot); } catch (error) { this.cancel(error); return; } }
-      if (data?.type === 'heartbeat') { this.lastHeartbeat = { ...data, receivedAt: Date.now() }; this.onHeartbeat?.(data); return; }   // posted by the VM from inside its loops: the last one explains a timeout
+      if (data?.type === 'heartbeat') { this.lastHeartbeat = { ...data, receivedAt: Date.now() }; this.onHeartbeat?.(data); this.rearm?.(); return; }   // a Worker that keeps heartbeating is alive: the request timeout measures silence   // posted by the VM from inside its loops: the last one explains a timeout
       if (data?.type === 'app-data') { this.appData = data.status; this.onAppData?.(data.status); return; }
       if (data?.type === 'webview') { this.onWebView?.(data); return; }   // a WebView command for the page's iframes (src/webview-frame.js)
       if (data?.type === 'api-gaps') { this.apiGaps = data.report ?? null; this.onApiGaps?.(this.apiGaps); return; }   // static estimate, posted once after a launch; never part of a request
@@ -67,6 +67,12 @@ export class APKWorkerClient {
         error.name = 'TimeoutError'; if (signal) error.details = { kind: 'vm-timeout', operation: type, heartbeat: signal.heartbeat, silentSeconds: signal.silentSeconds, heartbeatText: signal.text }; this.cancel(error);
       }, timeoutMs);
       this.pending = { requestId, resolve, reject, timer, onProgress, type, startedAt: Date.now() };
+      const fire = () => {
+        const signal = this.describeLastSignal(type), error = new Error(`A operação ${type} excedeu ${Math.round(timeoutMs / 1000)} s. O Worker foi encerrado; reabra o APK para continuar.${signal ? ' ' + signal.text : ''}`);
+        error.name = 'TimeoutError'; if (signal) error.details = { kind: 'vm-timeout', operation: type, heartbeat: signal.heartbeat, silentSeconds: signal.silentSeconds, heartbeatText: signal.text }; this.cancel(error);
+      };
+      // Silence, not total time: every heartbeat of this operation re-arms the timer (up to 5x the timeout in all); without heartbeats the original timeout stands.
+      this.rearm = () => { const pending = this.pending; if (!pending || pending.requestId !== requestId || Date.now() - pending.startedAt > timeoutMs * 5) return; clearTimeout(pending.timer); pending.timer = setTimeout(fire, timeoutMs); };
       try { this.worker.postMessage({ type, requestId, ...payload }, transfer); }
       catch (error) { this.cancel(error); }
     });

@@ -11,6 +11,13 @@
 // the interpreter. Operand checks the interpreter performs on every access (register initialised, int/wide type) are not repeated here: they guard against a malformed DEX or an
 // interpreter bug, not against Java semantics, and the verifier-clean code of an APK cannot trigger them.
 
+const STRING_INTRINSICS = {
+  'Ljava/lang/String;->length()I': `n++; f.result = a0.length; pc = ${'${PC_NEXT}'}; continue;`,
+  'Ljava/lang/String;->isEmpty()Z': `n++; f.result = a0.length === 0 ? 1 : 0; pc = ${'${PC_NEXT}'}; continue;`,
+  'Ljava/lang/String;->charAt(I)C': `const i = a1 | 0; if (i >= 0 && i < a0.length) { n++; f.result = a0.charCodeAt(i); pc = ${'${PC_NEXT}'}; continue; }`,
+  'Ljava/lang/String;->equals(Ljava/lang/Object;)Z': `n++; f.result = a0 === a1 ? 1 : 0; pc = ${'${PC_NEXT}'}; continue;`,
+  'Ljava/lang/String;->startsWith(Ljava/lang/String;)Z': `if (typeof a1 === 'string') { n++; f.result = a0.startsWith(a1) ? 1 : 0; pc = ${'${PC_NEXT}'}; continue; }`,
+};
 export const EXIT = 1, YIELD = 2, CALL = 3, RET = 4;
 export const MAX_COMPILED_UNITS = 6000;
 
@@ -107,6 +114,10 @@ export function compileMethod(rt, method, code, prog, tries, support) {
       let site;
       try { site = prog.refs[pc] ??= support.makeInvokeSite(dex, u, pc, op, a, hi); } catch (error) { if (typeof process !== 'undefined' && process.env?.APKWEB_DEBUG_JIT) console.error(`JIT: ${method.key} stays interpreted: invoke site at pc ${pc} failed: ${error.message}`); return null; }
       const k = site.argc, registers = site.first >= 0 ? Array.from({ length: k }, (_, j) => site.first + j) : [u[pc + 2] & 15, (u[pc + 2] >> 4) & 15, (u[pc + 2] >> 8) & 15, (u[pc + 2] >> 12) & 15, lo].slice(0, k);
+      // Pure String intrinsics, inline: a hot loop over charAt/length must not leave the compiled function (one exit through the interpreter and the bridge per call costs ~250 ns). Anything unusual (a
+      // non-String receiver, an index out of range) falls through to the generic call below, which raises the real exception.
+      const target = site.target, intrinsic = target ? STRING_INTRINSICS[`${target.owner}->${target.name}${target.signature}`] : undefined;
+      if (intrinsic) emit(`{ const a0 = r[${registers[0]}]${registers.length > 1 ? `, a1 = r[${registers[1]}]` : ''}; if (typeof a0 === 'string') { ${intrinsic.replaceAll('${PC_NEXT}', String(pc + 3))} } }`);
       const index = sites.length; sites.push(site);
       const hit = site.virtual ? `H.receiverType(rt, a0) === s.type` : 'true';
       emit(`{ const s = Z[${index}]; if (s.callee !== null) { ${registers.map((x, j) => `const a${j} = r[${x}];`).join(' ')} if (${hit}) {

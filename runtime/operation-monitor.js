@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=434c66f9a58e';
-import { gcBlockReason } from './heap-gc.js?v=434c66f9a58e';
+import { APKError } from './apk-error.js?v=d39d0632fd73';
+import { gcBlockReason } from './heap-gc.js?v=d39d0632fd73';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -13,7 +13,7 @@ const typeName = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '')
 
 export class OperationMonitor {
   constructor(runtime) {
-    this.rt = runtime; this.sink = null; this.intervalMs = 250; this.budgetMs = 0; this.op = null; this.lastBeat = 0; this.beats = 0; this.active = false;
+    this.rt = runtime; this.backgroundBudgetMs = 120000; this.sink = null; this.intervalMs = 250; this.budgetMs = 0; this.op = null; this.lastBeat = 0; this.beats = 0; this.active = false;
   }
   /** sink(message) posts a heartbeat; budgetMs = wall budget per operation (0 = none); intervalMs = heartbeat period. */
   configure({ sink = null, budgetMs = 0, intervalMs = 250 } = {}) { this.sink = sink; this.budgetMs = budgetMs; this.intervalMs = intervalMs; this.active = sink !== null || budgetMs > 0; return this; }
@@ -34,8 +34,12 @@ export class OperationMonitor {
     const op = this.op;
     if (op !== null && this.budgetMs > 0 && !op.expired && now - op.start > this.budgetMs) {
       // Only main-thread work fails the operation. A background thread that overruns is preempted (its slice ends at the next quantum and it keeps running in later rounds), never the reason the app dies.
-      const rt = this.rt;
-      if (rt.thread !== null && rt.thread !== rt.scheduler.main && rt.sliceDeadline !== 0) { rt.sliceDeadline = 1; op.backgroundOverruns = (op.backgroundOverruns ?? 0) + 1; return; }
+      const rt = this.rt, main = rt.scheduler.main, background = rt.thread !== null && rt.thread !== main, mainWaiting = main?.state === 'blocked';
+      if (background || mainWaiting) {   // the main thread is waiting for (or the budget ran out inside) other threads' work: it is not what overran
+        op.overrun ??= { thread: rt.thread?.name ?? null, atMs: Math.round(now - op.start), mainWaiting };
+        if (background && rt.sliceDeadline !== 0) { rt.sliceDeadline = 1; op.backgroundOverruns = (op.backgroundOverruns ?? 0) + 1; return; }
+        if (now - op.start <= this.backgroundBudgetMs) return;   // a nested wait cannot be unwound; the heartbeat keeps the page informed, the extended budget bounds it
+      }
       this.expire(now);
     }
   }
@@ -96,20 +100,34 @@ export class OperationMonitor {
     const key = `${thread.name} · ${blocked.reason ?? 'espera'} · ${cause}`;
     op.wakes.set(key, (op.wakes.get(key) ?? 0) + 1);
   }
+  /** An unpark: who woke whom, from which Java frame -- a storm (unparks of a thread that parks again at once) shows up as one very large row. */
+  noteUnpark(targetState, unparker) {
+    const op = this.op; if (op === null) return;
+    const frames = unparker?.frames, top = frames?.length ? short(frames.at(-1).method?.key) : 'código do host';
+    const key = `${unparker?.name ?? 'host'} (${top}) acordou ${targetState.name ?? targetState.threadName ?? 'uma thread'}`;
+    (op.unparks ??= new Map()).set(key, (op.unparks.get(key) ?? 0) + 1);
+  }
   /** Threads that are about to get a slice of the processor. */
   sliceRan() {
     const op = this.op; if (op === null) return;
     for (const thread of this.rt.scheduler.threads) if (thread.state === 'runnable' && thread.nestedDepth === 0) op.slices.set(thread.name, (op.slices.get(thread.name) ?? 0) + 1);
+  }
+  /** Where execution stands: which thread runs, the main thread's state, how many runs are nested on the JavaScript stack and whether slices can be preempted right now. */
+  executionLine() {
+    const rt = this.rt, main = rt.scheduler.main, thread = rt.thread;
+    return `Execução: thread atual ${thread?.name ?? 'nenhuma'}${thread === main ? ' [main]' : ''}; thread principal ${main ? `${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'espera'})` : ''}` : '?'}; execuções aninhadas na pilha do JavaScript: ${rt.nestedRuns}; profundidade de dispatch: ${rt.depth}; fatia de segundo plano com limite de tempo: ${rt.sliceDeadline !== 0 ? 'sim' : 'não (evento principal ou espera aninhada: não pode ser interrompida)'}${rt.hostCall ? `; chamada do host: ${short(rt.hostCall)}` : ''}`;
   }
   pumpReport(limit = 8) {
     const op = this.op; if (op === null) return { text: '', recurring: [], threads: [] };
     const wakes = [...op.wakes].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => ({ key, count }));
     const recurring = [...op.pump].sort((a, b) => b[1].count - a[1].count).slice(0, limit).map(([key, e]) => ({ target: key, count: e.count, periodMs: e.count > 1 ? Math.round((e.last - e.first) / (e.count - 1)) : null }));
     const threads = [...op.slices].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name, count]) => ({ name, slices: count }));
-    const lines = [`O que a VM continuou agendando nesta operação (${op.events} eventos):`,
+    const lines = [this.executionLine(), `O que a VM continuou agendando nesta operação (${op.events} eventos):`,
+      ...(op.overrun ? [`Aviso: o tempo da operação passou do orçamento enquanto ${op.overrun.mainWaiting ? 'a thread principal esperava outras threads' : 'uma thread em segundo plano'} executava (${op.overrun.thread ?? 'sem thread'}, aos ${op.overrun.atMs} ms)${op.backgroundOverruns ? `; ${op.backgroundOverruns} fatias foram interrompidas` : ''}`] : []),
       ...recurring.map(row => `  ${row.count}×${row.periodMs === null ? '' : ` a cada ~${row.periodMs} ms (tempo virtual)`}  ${row.target}`),
       ...(recurring.length ? [] : ['  (nenhum evento da fila)']),
       'Despertares de threads (thread · primitiva · causa):', ...[...op.wakes].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => `  ${count}× ${key}`), ...(op.wakes.size ? [] : ['  (nenhum)']),
+      ...(op.unparks?.size ? ['Quem acordou quem (LockSupport.unpark):', ...[...op.unparks].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => `  ${count}× ${key}`)] : []),
       'Threads que receberam tempo de processador:', ...threads.map(row => `  ${row.slices}× ${row.name}`), ...(threads.length ? [] : ['  (nenhuma)'])];
     return { text: lines.join('\n'), recurring, threads, wakes, events: op.events };
   }
