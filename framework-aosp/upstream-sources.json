@@ -29085,5 +29085,195 @@
     "sha256": "b406f8c68cd39194e1bcee8bde175e153ebdbdbbb418a68a1a6a4401863d96d7",
     "bytes": 19579,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/net/DatagramSocket.java",
+    "localPath": "framework-aosp/upstream/java/net/DatagramSocket.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/net/DatagramSocket.java?format=TEXT",
+    "sha256": "00a8c6489b51c476c3cf886c13588756691102fbd80ed3d559c193308ea583fa",
+    "bytes": 57000,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/net/DatagramSocketImpl.java",
+    "localPath": "framework-aosp/upstream/java/net/DatagramSocketImpl.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/net/DatagramSocketImpl.java?format=TEXT",
+    "sha256": "76b167793406c652135a3be8da8e1a5d1561a5c15ee8f2b43013500b0c3a4f08",
+    "bytes": 14856,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/net/DatagramSocketImplFactory.java",
+    "localPath": "framework-aosp/upstream/java/net/DatagramSocketImplFactory.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/net/DatagramSocketImplFactory.java?format=TEXT",
+    "sha256": "9654cf6347108618a1e105bcda8f583ab9dbb67238e6ed1fb9c06ad5e1be9fb4",
+    "bytes": 1776,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/net/DefaultDatagramSocketImplFactory.java",
+    "localPath": "framework-aosp/upstream/java/net/DefaultDatagramSocketImplFactory.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/net/DefaultDatagramSocketImplFactory.java?format=TEXT",
+    "sha256": "e6f13c8d0b0ec0dba96226a79d236e82de46d8ad8c6e97ebe0e758f55b8e149c",
+    "bytes": 2904,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/net/AbstractPlainDatagramSocketImpl.java",
+    "localPath": "framework-aosp/upstream/java/net/AbstractPlainDatagramSocketImpl.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/net/AbstractPlainDatagramSocketImpl.java?format=TEXT",
+    "sha256": "a490e1bf0f40335daf6534cd95db68d985c3c76bfb408d1a17ab849513e6a9cf",
+    "bytes": 14816,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/net/PlainDatagramSocketImpl.java",
+    "localPath": "framework-aosp/upstream/java/net/PlainDatagramSocketImpl.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/net/PlainDatagramSocketImpl.java?format=TEXT",
+    "sha256": "ff5d385f1b7d4a3be80f0607a06c472b60e3987ba3836a5624d3b767e6b87c24",
+    "bytes": 8764,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/net/MulticastSocket.java",
+    "localPath": "framework-aosp/upstream/java/net/MulticastSocket.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/net/MulticastSocket.java?format=TEXT",
+    "sha256": "050b46463b743e814584570639795fe126d6ca3921936d3a3d60f2d9744a2b6d",
+    "bytes": 28225,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/hardware/Sensor.java",
+    "localPath": "framework-aosp/upstream/android/hardware/Sensor.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/hardware/Sensor.java?format=TEXT",
+    "sha256": "cab6f9a86f8daaac108403503a9c8bcd612313a7702bb9abb4ca543dd2f835b2",
+    "bytes": 54588,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/WindowMetrics.java",
+    "localPath": "framework-aosp/upstream/android/view/WindowMetrics.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/WindowMetrics.java?format=TEXT",
+    "sha256": "5acb46cffb27066f6fef24cbd5c4be389c4be44d81dd36651c23542620249deb",
+    "bytes": 3025,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/Process.java",
+    "localPath": "framework-aosp/upstream/java/lang/Process.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/Process.java?format=TEXT",
+    "sha256": "0ac2c349a28c2a911fa3992ab2868873be7d69fa820bff8c48d7a055d35642ce",
+    "bytes": 11123,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/ProcessBuilder.java",
+    "localPath": "framework-aosp/upstream/java/lang/ProcessBuilder.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/ProcessBuilder.java?format=TEXT",
+    "sha256": "51a14ddcb6e410c6f1da13638ee4f9f3b7adefda88cb3e01fd3d784257734160",
+    "bytes": 41022,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/ProcessEnvironment.java",
+    "localPath": "framework-aosp/upstream/java/lang/ProcessEnvironment.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/ProcessEnvironment.java?format=TEXT",
+    "sha256": "4faadaef1c87b926766cc228d4ebab25b466da0363a7de726981d0ed166ad069",
+    "bytes": 17766,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/ProcessImpl.java",
+    "localPath": "framework-aosp/upstream/java/lang/ProcessImpl.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/ProcessImpl.java?format=TEXT",
+    "sha256": "aa9d3ac80ec287c73da36645c8c3c3e820e1e4be5929fa6f8cd4c4cb5456913b",
+    "bytes": 5925,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/UNIXProcess.java",
+    "localPath": "framework-aosp/upstream/java/lang/UNIXProcess.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/UNIXProcess.java?format=TEXT",
+    "sha256": "16d0a310d2c53caa3f3a716d6ed18a579d350e6c92e85f11e26dd1ac1cb9983b",
+    "bytes": 12049,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/webkit/URLUtil.java",
+    "localPath": "framework-aosp/upstream/android/webkit/URLUtil.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/webkit/URLUtil.java?format=TEXT",
+    "sha256": "8fb3fc5f40892b8e80939ebc016159a017baf161005c1b69eb3b7ce4a5f32409",
+    "bytes": 14317,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/net/WebAddress.java",
+    "localPath": "framework-aosp/upstream/android/net/WebAddress.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/net/WebAddress.java?format=TEXT",
+    "sha256": "35a866d4233d51efb870bb25be4899e9acc542efa1e2d71b7cad598fd2d09410",
+    "bytes": 6159,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/packages/modules/Connectivity",
+    "tag": "android-13.0.0_r1",
+    "path": "framework/src/android/net/ParseException.java",
+    "localPath": "framework-aosp/upstream/android/net/ParseException.java",
+    "url": "https://android.googlesource.com/platform/packages/modules/Connectivity/+/android-13.0.0_r1/framework/src/android/net/ParseException.java?format=TEXT",
+    "sha256": "685e7ed6a53c541532e7e3a8928a3da99a195e283ff94345b10a047c27493fbd",
+    "bytes": 1120,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/webkit/WebMessage.java",
+    "localPath": "framework-aosp/upstream/android/webkit/WebMessage.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/webkit/WebMessage.java?format=TEXT",
+    "sha256": "cb9f9c2563fbe43f488e959a02cf226c0145d9a9918963d7470218d518be7aee",
+    "bytes": 1715,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/webkit/WebMessagePort.java",
+    "localPath": "framework-aosp/upstream/android/webkit/WebMessagePort.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/webkit/WebMessagePort.java?format=TEXT",
+    "sha256": "79533579f8f39a13be0e86bbb3e1da63f66e5e3288a9872eefc9ed30eefd125a",
+    "bytes": 4096,
+    "license": "Apache-2.0"
   }
 ]

@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=51ff96812b1a';
-import { APKError } from './apk-error.js?v=51ff96812b1a';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=51ff96812b1a';
+import { gcRoot } from './heap-gc.js?v=1955bfec5107';
+import { APKError } from './apk-error.js?v=1955bfec5107';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=1955bfec5107';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -373,30 +373,30 @@ export function createSystemServicesHost(platform) {
   const used = runtime => BigInt(runtime.heap.size * 16 + runtime.fieldSlots * 8 + runtime.arrayCells * 8 + runtime.collectionCells * 16);
   def(RUNTIME, 'maxMemory', '()J', () => MAX_MEMORY); def(RUNTIME, 'totalMemory', '()J', () => TOTAL_MEMORY);
   def(RUNTIME, 'freeMemory', '()J', (runtime) => { const free = TOTAL_MEMORY - used(runtime); return free > 0n ? free : 0n; });
-  // Runtime.exec: the device image the VM models has no executables the app can run (no su, no which, no shell binaries in the virtual filesystem), so starting any program fails the
-  // way ProcessBuilder.start does on a device when the file is missing: IOException "Cannot run program \"<name>\": error=2, No such file or directory". Root-detection libraries
-  // (RootBeer and friends) rely on exactly this answer from an unrooted phone.
-  const PROCESS_BUILDER_START = (runtime, command) => runtime.throwJava('Ljava/io/IOException;', `Cannot run program "${command}": error=2, No such file or directory`);
-  const execArray = (runtime, commands) => {
-    if (commands === null || commands === 0) runtime.throwJava('Ljava/lang/NullPointerException;', 'cmdarray == null');
-    const elements = runtime.array(commands).elements;
-    if (elements.length === 0) runtime.throwJava('Ljava/lang/IndexOutOfBoundsException;', 'length=0; index=0');
-    for (const element of elements) if (element === null || element === 0) runtime.throwJava('Ljava/lang/NullPointerException;', null);
-    return runtime.stringCharacters(elements[0]);
+  // Runtime.exec (libcore Runtime.java): tokenize a command line with StringTokenizer's default delimiters, then `new ProcessBuilder(cmdarray).environment(envp).directory(dir).start()`. The
+  // original ProcessBuilder / UNIXProcess run; the fork itself (src/process-native.js) finds no executable in the virtual file system, so a program that is not there fails with the genuine
+  // IOException "Cannot run program \"x\": error=2, No such file or directory" (RootBeer-style probes rely on exactly that), and nothing is faked.
+  const JAVA_PROCESS = 'Ljava/lang/Process;', FILE_T = 'Ljava/io/File;', PB = 'Ljava/lang/ProcessBuilder;', STRINGS = `[${STRING_T}`;
+  const startProcess = (runtime, cmdarray, envp, dir) => {
+    const call = (receiver, name, parameters, result, values) => runtime.dispatch({ owner: PB, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...values], 'virtual');
+    const builder = runtime.allocate(PB);
+    runtime.dispatch({ owner: PB, name: '<init>', parameters: [STRINGS], result: 'V', signature: `(${STRINGS})V` }, [builder, cmdarray], 'direct');
+    call(builder, 'environment', [STRINGS], PB, [envp ?? null]); call(builder, 'directory', [FILE_T], PB, [dir ?? null]);
+    return call(builder, 'start', [], JAVA_PROCESS, []);
   };
-  const execLine = (runtime, line) => {
+  const tokenize = (runtime, line) => {
     if (line === null || line === 0) runtime.throwJava('Ljava/lang/NullPointerException;', 'command == null');
-    const text = runtime.stringCharacters(line).trim();
-    if (text === '') runtime.throwJava('Ljava/lang/IllegalArgumentException;', 'Empty command');
-    return text.split(/[ \t\n\r\f]+/)[0];   // StringTokenizer on whitespace: the first token is the program
+    const text = runtime.stringCharacters(line);
+    if (text.length === 0) runtime.throwJava('Ljava/lang/IllegalArgumentException;', 'Empty command');
+    const parts = text.split(/[ \t\n\r\f]+/).filter(Boolean), array = runtime.newArray(STRINGS, parts.length);
+    runtime.array(array).elements = parts; return array;
   };
-  const JAVA_PROCESS = 'Ljava/lang/Process;', FILE_T = 'Ljava/io/File;';
-  def(RUNTIME, 'exec', `(${STRING_T})${JAVA_PROCESS}`, (runtime, _m, [, line]) => PROCESS_BUILDER_START(runtime, execLine(runtime, line)));
-  def(RUNTIME, 'exec', `(${STRING_T}[${STRING_T})${JAVA_PROCESS}`, (runtime, _m, [, line]) => PROCESS_BUILDER_START(runtime, execLine(runtime, line)));
-  def(RUNTIME, 'exec', `(${STRING_T}[${STRING_T}${FILE_T})${JAVA_PROCESS}`, (runtime, _m, [, line]) => PROCESS_BUILDER_START(runtime, execLine(runtime, line)));
-  def(RUNTIME, 'exec', `([${STRING_T})${JAVA_PROCESS}`, (runtime, _m, [, commands]) => PROCESS_BUILDER_START(runtime, execArray(runtime, commands)));
-  def(RUNTIME, 'exec', `([${STRING_T}[${STRING_T})${JAVA_PROCESS}`, (runtime, _m, [, commands]) => PROCESS_BUILDER_START(runtime, execArray(runtime, commands)));
-  def(RUNTIME, 'exec', `([${STRING_T}[${STRING_T}${FILE_T})${JAVA_PROCESS}`, (runtime, _m, [, commands]) => PROCESS_BUILDER_START(runtime, execArray(runtime, commands)));
+  def(RUNTIME, 'exec', `(${STRING_T})${JAVA_PROCESS}`, (runtime, _m, [, line]) => startProcess(runtime, tokenize(runtime, line), null, null));
+  def(RUNTIME, 'exec', `(${STRING_T}${STRINGS})${JAVA_PROCESS}`, (runtime, _m, [, line, envp]) => startProcess(runtime, tokenize(runtime, line), envp, null));
+  def(RUNTIME, 'exec', `(${STRING_T}${STRINGS}${FILE_T})${JAVA_PROCESS}`, (runtime, _m, [, line, envp, dir]) => startProcess(runtime, tokenize(runtime, line), envp, dir));
+  def(RUNTIME, 'exec', `(${STRINGS})${JAVA_PROCESS}`, (runtime, _m, [, commands]) => startProcess(runtime, commands, null, null));
+  def(RUNTIME, 'exec', `(${STRINGS}${STRINGS})${JAVA_PROCESS}`, (runtime, _m, [, commands, envp]) => startProcess(runtime, commands, envp, null));
+  def(RUNTIME, 'exec', `(${STRINGS}${STRINGS}${FILE_T})${JAVA_PROCESS}`, (runtime, _m, [, commands, envp, dir]) => startProcess(runtime, commands, envp, dir));
   def(RUNTIME, 'gc', '()V', (runtime) => { runtime.record('RUNTIME gc requested; the VM has no garbage collector (Runtime.gc is a hint)'); });
 
   // ---- Runtime.nativeLoad: the primitive under System.load and SoLoader's SoFileLoader (libcore Runtime.java; returns null on success, else the dlopen error text)

@@ -1,9 +1,10 @@
-import { APKError } from './apk-error.js?v=51ff96812b1a';
-import { throwNew } from './java-throw.js?v=51ff96812b1a';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=51ff96812b1a';
-import { networkOf, isIpLiteral } from './network-native.js?v=51ff96812b1a';
-import { Blocked } from './scheduler.js?v=51ff96812b1a';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=51ff96812b1a';
+import { APKError } from './apk-error.js?v=1955bfec5107';
+import { throwNew } from './java-throw.js?v=1955bfec5107';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=1955bfec5107';
+import { networkOf, isIpLiteral } from './network-native.js?v=1955bfec5107';
+import { Blocked } from './scheduler.js?v=1955bfec5107';
+import { installUdp } from './udp-native.js?v=1955bfec5107';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=1955bfec5107';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -226,16 +227,10 @@ export function createLibcoreIoNativeBindings() {
     }
   });
   L('shutdown(Ljava/io/FileDescriptor;I)V', (runtime, [, fdRef]) => { const entry = entryOf(runtime, 'shutdown', fdRef); if (entry.desc.kind !== 'socket') err(runtime, 'shutdown', 'ENOTSOCK'); if (!entry.desc.connected) err(runtime, 'shutdown', 'ENOTCONN'); });
-  L('getsockoptInt(Ljava/io/FileDescriptor;II)I', (runtime, [, fdRef, level, option]) => {
-    const desc = entryOf(runtime, 'getsockopt', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'getsockopt', 'ENOTSOCK');
-    if (level === C.SOL_SOCKET) { if (option === C.SO_TYPE) return desc.type; if (option === C.SO_RCVBUF || option === C.SO_SNDBUF) return 212992; }
-    return 0;                                                   // SO_ERROR and the boolean options: no pending error, nothing enabled
-  });
-  L(`getsockname(Ljava/io/FileDescriptor;)${SOCKADDR}`, (runtime, [, fdRef]) => {   // a socket that never bound or connected is on the wildcard address, port 0
+  const udp = installUdp({ L, C, err, entryOf, state, construct, byteArray: (runtime, bytes) => byteArray(runtime, bytes), interfaces: runtime => interfaces(runtime), INET, SOCKADDR });
+  L(`getsockname(Ljava/io/FileDescriptor;)${SOCKADDR}`, (runtime, [, fdRef]) => {   // bound sockets answer their address and port; one that never bound or connected is on the wildcard address, port 0
     const desc = entryOf(runtime, 'getsockname', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'getsockname', 'ENOTSOCK');
-    const bytes = runtime.newArray('[B', desc.domain === C.AF_INET6 ? 16 : 4); runtime.object(bytes).elements.fill(0);
-    const address = runtime.dispatch({ owner: INET, name: 'getByAddress', parameters: ['[B'], result: INET, signature: `([B)${INET}` }, [bytes], 'static');
-    return construct(runtime, 'Ljava/net/InetSocketAddress;', [INET, 'I'], [address, 0]);
+    return udp.boundAddress(runtime, desc);
   });
   // ---- network interfaces (libcore_io_Linux.cpp getifaddrs / if_nametoindex / ioctlFlags / ioctlMTU, under java.net.NetworkInterface). The virtual device has the loopback
   // interface and one Wi-Fi interface, wlan0, which is up with the 10.0.2.15/24 address WifiManager and ConnectivityManager report while connectivity is online and
@@ -277,20 +272,21 @@ export function createLibcoreIoNativeBindings() {
     const left = groups.slice(0, bestStart).map(g => g.toString(16)).join(':'), right = groups.slice(bestStart + bestLength).map(g => g.toString(16)).join(':');
     return `${left}::${right}`;
   });
-  const connectSocket = (runtime, fdRef, host, port) => {
+  const connectSocket = (runtime, fdRef, host, port, address = null) => {
     const entry = entryOf(runtime, 'connect', fdRef); if (entry.desc.kind !== 'socket') err(runtime, 'connect', 'ENOTSOCK');
+    if (udp.isDatagram(entry.desc)) return udp.connectDatagram(runtime, fdRef, udp.bytesOf(runtime, address), port);
+    host ??= hostOf(runtime, address);
     const net = networkOf(runtime); net.noteHost(host);
     if (!net.online || !net.allowed(host, port)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; err(runtime, 'connect', 'ENETUNREACH'); }
     throw new APKError(`Raw TCP connect to ${host}:${port} is not available in the browser; only HTTP(S) through java.net.HttpURLConnection reaches the network (src/network-native.js)`, { kind: 'raw-socket-unsupported' });
   };
   const hostOf = (runtime, address) => runtime.stringCharacters(runtime.dispatch({ owner: INET, name: 'getHostAddress', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [address], 'virtual'));
-  L(`connect(Ljava/io/FileDescriptor;${INET}I)V`, (runtime, [, fdRef, address, port]) => connectSocket(runtime, fdRef, hostOf(runtime, address), port));
+  L(`connect(Ljava/io/FileDescriptor;${INET}I)V`, (runtime, [, fdRef, address, port]) => connectSocket(runtime, fdRef, null, port, address));
   L(`connect(Ljava/io/FileDescriptor;${SOCKADDR})V`, (runtime, [, fdRef, socketAddress]) => {
     const address = runtime.dispatch({ owner: 'Ljava/net/InetSocketAddress;', name: 'getAddress', parameters: [], result: INET, signature: `()${INET}` }, [socketAddress], 'virtual');
     const port = runtime.dispatch({ owner: 'Ljava/net/InetSocketAddress;', name: 'getPort', parameters: [], result: 'I', signature: '()I' }, [socketAddress], 'virtual');
-    connectSocket(runtime, fdRef, hostOf(runtime, address), port);
+    connectSocket(runtime, fdRef, null, port, address);
   });
-  for (const name of ['setsockoptInt', 'setsockoptByte']) L(`${name}(Ljava/io/FileDescriptor;III)V`, (runtime, [, fdRef]) => { entryOf(runtime, 'setsockopt', fdRef); });   // options of a socket that never connects have no effect to model
   L('close(Ljava/io/FileDescriptor;)V', (runtime, [, fdRef]) => {
     const number = fdNumber(runtime, fdRef); if (!state(runtime).table.has(number)) err(runtime, 'close', 'EBADF');
     release(runtime, number); setFdNumber(runtime, fdRef, -1);                    // libcore_io_Linux.cpp marks the Java descriptor invalid after closing it

@@ -1,29 +1,30 @@
-import { APKError, DexFile } from './apk-runtime.js?v=51ff96812b1a';
-import { createVectorNativeBindings } from './vector-native.js?v=51ff96812b1a';
-import { createMatrixNativeBindings } from './matrix-native.js?v=51ff96812b1a';
-import { createCharsetNativeBindings } from './charset-native.js?v=51ff96812b1a';
-import { createSqliteNativeBindings } from './sqlite-native.js?v=51ff96812b1a';
-import { createJavaTimeNativeBindings } from './java-time-native.js?v=51ff96812b1a';
-import { createMathNativeBindings } from './math-native.js?v=51ff96812b1a';
-import { createUnsafeNativeBindings } from './unsafe-native.js?v=51ff96812b1a';
-import { createZipNativeBindings } from './zip-native.js?v=51ff96812b1a';
-import { createLibcoreIoNativeBindings } from './libcore-io-native.js?v=51ff96812b1a';
-import { createNetworkNativeBindings } from './network-native.js?v=51ff96812b1a';
-import { createParcelNativeBindings } from './parcel-native.js?v=51ff96812b1a';
-import { createInputNativeBindings } from './input-native.js?v=51ff96812b1a';
-import { createViewHiddenNativeBindings } from './view-hidden-native.js?v=51ff96812b1a';
-import { createAudioNativeBindings } from './audio-native.js?v=51ff96812b1a';
-import { createFileObserverNativeBindings } from './file-observer-native.js?v=51ff96812b1a';
-import { createRegionNativeBindings } from './region-native.js?v=51ff96812b1a';
-import { createRenderThreadAnimators } from './rt-animators.js?v=51ff96812b1a';
-import { createIcuConverterNativeBindings } from './icu-converter-native.js?v=51ff96812b1a';
-import { createCoreApiNativeBindings } from './core-api-natives.js?v=51ff96812b1a';
-import { createTextLayoutNativeBindings } from './text-layout-native.js?v=51ff96812b1a';
-import { createColorFilterNativeBindings } from './color-filter-native.js?v=51ff96812b1a';
-import { createRenderNodeNativeBindings } from './rendernode-native.js?v=51ff96812b1a';
-import { createAnimatedVectorNativeBindings } from './animated-vector-native.js?v=51ff96812b1a';
-import { createRegexNativeBindings } from './regex-native.js?v=51ff96812b1a';
-import { createMemoryFileNativeBindings } from './memory-file-native.js?v=51ff96812b1a';
+import { APKError, DexFile } from './apk-runtime.js?v=1955bfec5107';
+import { createVectorNativeBindings } from './vector-native.js?v=1955bfec5107';
+import { createMatrixNativeBindings } from './matrix-native.js?v=1955bfec5107';
+import { createCharsetNativeBindings } from './charset-native.js?v=1955bfec5107';
+import { createSqliteNativeBindings } from './sqlite-native.js?v=1955bfec5107';
+import { createJavaTimeNativeBindings } from './java-time-native.js?v=1955bfec5107';
+import { createMathNativeBindings } from './math-native.js?v=1955bfec5107';
+import { createUnsafeNativeBindings } from './unsafe-native.js?v=1955bfec5107';
+import { createZipNativeBindings } from './zip-native.js?v=1955bfec5107';
+import { createLibcoreIoNativeBindings } from './libcore-io-native.js?v=1955bfec5107';
+import { createNetworkNativeBindings } from './network-native.js?v=1955bfec5107';
+import { createParcelNativeBindings } from './parcel-native.js?v=1955bfec5107';
+import { createInputNativeBindings } from './input-native.js?v=1955bfec5107';
+import { createViewHiddenNativeBindings } from './view-hidden-native.js?v=1955bfec5107';
+import { createAudioNativeBindings } from './audio-native.js?v=1955bfec5107';
+import { createFileObserverNativeBindings } from './file-observer-native.js?v=1955bfec5107';
+import { createRegionNativeBindings } from './region-native.js?v=1955bfec5107';
+import { createRenderThreadAnimators } from './rt-animators.js?v=1955bfec5107';
+import { createIcuConverterNativeBindings } from './icu-converter-native.js?v=1955bfec5107';
+import { createCoreApiNativeBindings } from './core-api-natives.js?v=1955bfec5107';
+import { createProcessNativeBindings } from './process-native.js?v=1955bfec5107';
+import { createTextLayoutNativeBindings } from './text-layout-native.js?v=1955bfec5107';
+import { createColorFilterNativeBindings } from './color-filter-native.js?v=1955bfec5107';
+import { createRenderNodeNativeBindings } from './rendernode-native.js?v=1955bfec5107';
+import { createAnimatedVectorNativeBindings } from './animated-vector-native.js?v=1955bfec5107';
+import { createRegexNativeBindings } from './regex-native.js?v=1955bfec5107';
+import { createMemoryFileNativeBindings } from './memory-file-native.js?v=1955bfec5107';
 
 const MAX_FRAMEWORK_BYTES = 64 * 1024 * 1024;
 const NATIVE_GET_INT = 'Landroid/os/SystemProperties;->native_get_int(Ljava/lang/String;I)I';
@@ -95,7 +96,7 @@ export function createFrameworkNativeBindings({ properties = {}, onBoundary = nu
     runtime.record('TRACE enabled tags=0 [web-device profiling disabled]'); return 0n;
   });
   for (const [key] of createRenderThreadAnimators(null).bindings) bindings.set(key, (runtime, args) => runtime.platform.rtAnimators.table.get(key)(runtime, args));   // RenderNodeAnimator / native interpolators: the engine is per platform
-  for (const [key, binding] of [...createVectorNativeBindings(), ...createMatrixNativeBindings(), ...createCharsetNativeBindings(), ...createTextLayoutNativeBindings(), ...createColorFilterNativeBindings(), ...createRenderNodeNativeBindings(), ...createRegexNativeBindings(), ...createNetworkNativeBindings(), ...createParcelNativeBindings(), ...createInputNativeBindings(), ...createViewHiddenNativeBindings(), ...createAudioNativeBindings(), ...createFileObserverNativeBindings(), ...createRegionNativeBindings(), ...createAnimatedVectorNativeBindings(), ...createSqliteNativeBindings(), ...createJavaTimeNativeBindings(), ...createMathNativeBindings(), ...createUnsafeNativeBindings(), ...createZipNativeBindings(), ...createMemoryFileNativeBindings(), ...createLibcoreIoNativeBindings(), ...createIcuConverterNativeBindings(), ...createCoreApiNativeBindings()]) bindings.set(key, binding);
+  for (const [key, binding] of [...createVectorNativeBindings(), ...createMatrixNativeBindings(), ...createCharsetNativeBindings(), ...createTextLayoutNativeBindings(), ...createColorFilterNativeBindings(), ...createRenderNodeNativeBindings(), ...createRegexNativeBindings(), ...createNetworkNativeBindings(), ...createParcelNativeBindings(), ...createInputNativeBindings(), ...createViewHiddenNativeBindings(), ...createAudioNativeBindings(), ...createFileObserverNativeBindings(), ...createRegionNativeBindings(), ...createAnimatedVectorNativeBindings(), ...createSqliteNativeBindings(), ...createJavaTimeNativeBindings(), ...createMathNativeBindings(), ...createUnsafeNativeBindings(), ...createZipNativeBindings(), ...createMemoryFileNativeBindings(), ...createLibcoreIoNativeBindings(), ...createIcuConverterNativeBindings(), ...createCoreApiNativeBindings(), ...createProcessNativeBindings()]) bindings.set(key, binding);
   return bindings;
 }
 

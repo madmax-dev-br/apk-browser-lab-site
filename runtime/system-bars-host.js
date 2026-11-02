@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=51ff96812b1a';
-import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=51ff96812b1a';
+import { APKError } from './apk-error.js?v=1955bfec5107';
+import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=1955bfec5107';
 // SystemUI of the virtual device: status bar, navigation bar (gesture handle or 3 buttons) and the window policy PhoneWindow/DecorView apply to the app:
 // edge-to-edge (targetSdk >= 35 unless windowOptOutEdgeToEdgeEnforcement, Window.setDecorFitsSystemWindows(false), SYSTEM_UI_FLAG_LAYOUT_*),
 // bar colors/appearance (theme + Window setters + WindowInsetsController + SYSTEM_UI_FLAG_LIGHT_*), hiding (FLAG_FULLSCREEN, SYSTEM_UI_FLAG_FULLSCREEN/HIDE_NAVIGATION,
@@ -106,6 +106,14 @@ export function createSystemBarsHost(platform) {
       const frame = this.frameForRoot(r, root); if (!frame) return null; const value = compute(r, frame);
       const effective = value.edgeToEdge ? value : { ...value, insets: { left: 0, top: 0, right: 0, bottom: 0 } };
       return { key: key(effective), build: () => buildInsets(r, effective) };
+    },
+    /** WindowMetrics for the Activity window (WindowManager.getCurrentWindowMetrics / getMaximumWindowMetrics): the whole display as bounds, and the system bars as real, unconsumed insets whatever the window's own edge-to-edge policy. */
+    windowMetrics(r, frame = activeFrame(r)) {
+      const device = platform.device, RECT = 'Landroid/graphics/Rect;', METRICS = 'Landroid/view/WindowMetrics;';
+      const bounds = r.allocate(RECT); call(r, bounds, RECT, '<init>', ['I', 'I', 'I', 'I'], 'V', [0, 0, device.widthDp, device.heightDp], 'direct');   // 160 dpi: dp == px
+      const insets = (frame && (frame.root || frame.window) ? buildInsets(r, compute(r, frame)) : null) ?? r.readStatic({ owner: INSETS, name: 'CONSUMED', type: INSETS });
+      const metrics = r.allocate(METRICS); call(r, metrics, METRICS, '<init>', [RECT, INSETS], 'V', [bounds, insets], 'direct');
+      return metrics;
     },
     contentFrame(r, root) { const frame = this.frameForRoot(r, root); return frame ? compute(r, frame).contentFrame : null; },
     notifyChanged(r) { for (const frame of platform.frames) changed(r, frame); },
