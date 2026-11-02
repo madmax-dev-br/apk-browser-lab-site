@@ -1,8 +1,8 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=172f078155c4';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=172f078155c4';
-import { createDeviceView, createViewState } from './device-view.js?v=172f078155c4';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=172f078155c4';
-import { formatApiGapReport } from './api-gap-scan.js?v=172f078155c4';
+import { APKWorkerClient } from './apk-worker-client.js?v=f9d334aa7591';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=f9d334aa7591';
+import { createDeviceView, createViewState } from './device-view.js?v=f9d334aa7591';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=f9d334aa7591';
+import { formatApiGapReport } from './api-gap-scan.js?v=f9d334aa7591';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -175,7 +175,7 @@ function recordLastRun() {
     status: $('status-text')?.textContent ?? '', screen: text ? text.slice(0, 24000) : null });
 }
 function markLastRunEnded() { const last = lastRunStore.read(); if (last && last.ended === false) lastRunStore.write({ ...last, ended: true, endedAt: Date.now() }); }
-setInterval(recordLastRun, 3000);
+{ const recorder = setInterval(recordLastRun, 3000); recorder?.unref?.(); }   // unref: a page has no use for it, and a test that loads this file must still be able to exit
 globalThis.addEventListener?.('pagehide', () => { if (recorderSawWorker) markLastRunEnded(); });
 function showPreviousCrash() {
   const last = lastRunStore.read(); if (!last || last.ended !== false || Date.now() - last.at > 24 * 3600 * 1000) return;
