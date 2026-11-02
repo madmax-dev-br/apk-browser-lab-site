@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=7dfccde7cc14';
+import { APKError } from './apk-error.js?v=e9ecadb60317';
 
 // Green-thread scheduler for the VM.
 //
@@ -112,6 +112,7 @@ export class Scheduler {
   /** What to do when nothing is runnable: run due platform events, skip the clock to the earliest deadline, or report the deadlock. `owner` is the blocked loop owner. */
   idle(earliest, why) {
     const platform = this.rt.platform;
+    if (this.rt.monitor?.active) this.rt.monitor.tick();   // a nested wait that keeps skipping the virtual clock and running events still ends with the operation budget
     // Readiness can change asynchronously now (a network worker thread writes shared memory while this run loop is deciding): look once more before concluding that nothing can run.
     this.wake(); if (this.threads.some(thread => thread.state === 'runnable' && (thread.nestedDepth === 0 || this.waitingNested.has(thread)))) return;
     const processed = platform.drainEvents?.(this.rt)?.processed ?? 0;

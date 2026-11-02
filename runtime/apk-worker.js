@@ -1,37 +1,37 @@
-import { createMessageSink } from './audio-native.js?v=7dfccde7cc14';
-import { loadAPK } from './apk-loader.js?v=7dfccde7cc14';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=7dfccde7cc14';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=7dfccde7cc14';
-import { createWebViewBackend } from './webview-backend.js?v=7dfccde7cc14';
-import { FrameworkProvider } from './framework-provider.js?v=7dfccde7cc14';
-import { createRasterSender } from './raster-cache.js?v=7dfccde7cc14';
-import { isFreedId } from './heap-gc.js?v=7dfccde7cc14';
-import { dispatchPointer } from './pointer-input-host.js?v=7dfccde7cc14';
-import { resolveDevice } from './device-profile.js?v=7dfccde7cc14';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=7dfccde7cc14';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=7dfccde7cc14';
-import { SkiaProvider } from './skia-provider.js?v=7dfccde7cc14';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=7dfccde7cc14';
-import { disposeTextLayout } from './text-layout-native.js?v=7dfccde7cc14';
-import { IcuBreakProvider } from './icu-break-provider.js?v=7dfccde7cc14';
-import { SqliteProvider } from './sqlite-native.js?v=7dfccde7cc14';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=7dfccde7cc14';
-import { TzdataProvider } from './java-time-native.js?v=7dfccde7cc14';
-import { ZlibProvider } from './zip-native.js?v=7dfccde7cc14';
-import { IcuConverterProvider } from './icu-converter-native.js?v=7dfccde7cc14';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=7dfccde7cc14';
-import { JavacryptoProvider } from './javacrypto-native.js?v=7dfccde7cc14';
-import { disposeColorFilters } from './color-filter-native.js?v=7dfccde7cc14';
-import { disposeRegex } from './regex-native.js?v=7dfccde7cc14';
-import { disposeRenderNodes } from './rendernode-native.js?v=7dfccde7cc14';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=7dfccde7cc14';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=7dfccde7cc14';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=7dfccde7cc14';
+import { createMessageSink } from './audio-native.js?v=e9ecadb60317';
+import { loadAPK } from './apk-loader.js?v=e9ecadb60317';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=e9ecadb60317';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=e9ecadb60317';
+import { createWebViewBackend } from './webview-backend.js?v=e9ecadb60317';
+import { FrameworkProvider } from './framework-provider.js?v=e9ecadb60317';
+import { createRasterSender } from './raster-cache.js?v=e9ecadb60317';
+import { isFreedId } from './heap-gc.js?v=e9ecadb60317';
+import { dispatchPointer } from './pointer-input-host.js?v=e9ecadb60317';
+import { resolveDevice } from './device-profile.js?v=e9ecadb60317';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=e9ecadb60317';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=e9ecadb60317';
+import { SkiaProvider } from './skia-provider.js?v=e9ecadb60317';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=e9ecadb60317';
+import { disposeTextLayout } from './text-layout-native.js?v=e9ecadb60317';
+import { IcuBreakProvider } from './icu-break-provider.js?v=e9ecadb60317';
+import { SqliteProvider } from './sqlite-native.js?v=e9ecadb60317';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=e9ecadb60317';
+import { TzdataProvider } from './java-time-native.js?v=e9ecadb60317';
+import { ZlibProvider } from './zip-native.js?v=e9ecadb60317';
+import { IcuConverterProvider } from './icu-converter-native.js?v=e9ecadb60317';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=e9ecadb60317';
+import { JavacryptoProvider } from './javacrypto-native.js?v=e9ecadb60317';
+import { disposeColorFilters } from './color-filter-native.js?v=e9ecadb60317';
+import { disposeRegex } from './regex-native.js?v=e9ecadb60317';
+import { disposeRenderNodes } from './rendernode-native.js?v=e9ecadb60317';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=e9ecadb60317';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=e9ecadb60317';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=e9ecadb60317';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=7dfccde7cc14';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=7dfccde7cc14';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=7dfccde7cc14';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '7dfccde7cc14';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=e9ecadb60317';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=e9ecadb60317';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=e9ecadb60317';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'e9ecadb60317';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -62,13 +62,26 @@ function currentSnapshot() {
 // APKRuntime.maxInstructionsPerEvent) bounds work, this bounds time: a hot loop that is cheap per instruction can never freeze the page for more than this.
 // The Worker reports a runaway event itself (with the execution profile) before the page gives up on it: the page-side timeout is the backstop for a Worker that cannot answer (a long native call).
 const EVENT_WALL_LIMIT_MS = 25000;
-function drainReadyEvents() {
-  let processed = 0, result;
+// Host time of one whole operation (launch, click, back, ...): the per-event limit restarts with every short event, so a pump that keeps scheduling work (a self-rescheduling Handler loop, a polling
+// thread, a Timer) is only ended by this budget, with the profile and the list of what kept being scheduled. It must stay below the page's request timeout.
+const OPERATION_WALL_LIMIT_MS = 20000;
+// After the first frame of an operation is committed the Worker settles at most this long on work that is due right now; whatever is still scheduled (animations, polling, timers) continues as
+// ordinary events in later pumps (scheduleEvents), exactly as on a device, where nothing ever "waits for idle".
+const SETTLE_WINDOW_MS = 1500;
+function drainReadyEvents(maxMs = SETTLE_WINDOW_MS) {
+  let processed = 0, result; const started = performance.now();
   for (let round = 0; round < 32; round++) {
     result = runtime.platform.drainEvents(runtime); processed += result.processed;
     if (!result.processed || result.nextDelay !== 0) break;
+    if (performance.now() - started > maxMs) break;   // the rest is left queued for the next pump
   }
   return {...result, processed};
+}
+/** Runs `body` as a named operation of the VM monitor (heartbeats, operation wall budget, pump accounting). */
+function monitored(name, body) {
+  const monitor = runtime?.monitor; if (!monitor) return body();
+  monitor.begin(name);
+  try { return body(); } finally { monitor.end(); }
 }
 function scheduleEvents() {
   clearTimeout(eventTimer); eventTimer = null;
@@ -80,7 +93,7 @@ function scheduleEvents() {
     busy = true; let succeeded = false;
     self.postMessage({ type: 'runtime-busy' });   // the page must not treat the screen as settled while a scheduled VM event is being processed
     try {
-      const started = performance.now(), drained = drainReadyEvents(); lastEventMs = Math.round(performance.now() - started);
+      const started = performance.now(), drained = monitored('evento agendado', () => drainReadyEvents()); lastEventMs = Math.round(performance.now() - started);
       if (drained.processed) self.postMessage({ type: 'runtime-event', snapshot: currentSnapshot() }); else self.postMessage({ type: 'runtime-idle' });
       succeeded = true;
     } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); }
@@ -129,6 +142,7 @@ self.onmessage = async ({ data }) => {
       const javacryptoProvider = NATIVE_LIBS_URL ? (sharedJavacryptoProvider ??= await JavacryptoProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
       const result = await loadAPK(data.buffer, { maxEventWallMs: EVENT_WALL_LIMIT_MS, maxHeapObjects: heapLimitFor(data), nativeLibraryProvider, javacryptoProvider, device: resolveDevice(data.device || {}), tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
       runtime = result.runtime; archive = result.archive; inventory = result.inventory;
+      runtime.monitor.configure({ sink: message => self.postMessage({ ...message, requestId: activeRequestId }), budgetMs: OPERATION_WALL_LIMIT_MS });   // heartbeats to the page + the operation wall budget
       runtime.platform.audioSink = createMessageSink((message, transfer) => self.postMessage(message, transfer));   // android.media.AudioTrack PCM goes to the page's Web Audio output
       // WebView content lives in iframes of the page: without a page that wants them (the embedded player's default) the WebView has no backend and fails explicitly
       if (data.webview !== false) runtime.platform.webViewBackend = createWebViewBackend({ platform: runtime.platform, post: message => self.postMessage(message), labOrigin: self.location?.origin ?? '' }); inspectNativeLibraries = result.inspectNativeLibraries;
@@ -149,7 +163,7 @@ self.onmessage = async ({ data }) => {
     } else if (type === 'device') {
       // Virtual-device settings changed while an APK runs: Configuration/resources/lifecycle exactly like ActivityThread.handleConfigurationChanged.
       if (!runtime) { send({ type: 'result', outcome: { changed: 0, applied: false } }); }
-      else { runtime.steps = 0; const outcome = runtime.platform.deviceState.apply(runtime, resolveDevice(data.device || {})); drainReadyEvents(); send({ type: 'result', outcome, snapshot: currentSnapshot() }); }
+      else { runtime.steps = 0; const outcome = monitored('device', () => { const applied = runtime.platform.deviceState.apply(runtime, resolveDevice(data.device || {})); drainReadyEvents(); return applied; }); send({ type: 'result', outcome, snapshot: currentSnapshot() }); }
     } else if (type === 'inspect-native') {
       if (!runtime || typeof inspectNativeLibraries !== 'function') throw new Error('Reabra o APK para disponibilizar a inspeção ELF.');
       const libraries = await inspectNativeLibraries(data.paths, data.limits);
@@ -157,6 +171,7 @@ self.onmessage = async ({ data }) => {
     } else if (type === 'launch' || type === 'click' || type === 'back' || type === 'input' || type === 'check' || type === 'focus' || type === 'press' || type === 'scroll' || type === 'compose-action' || type === 'pointer' || type === 'scrollby') {
       if (!runtime) throw new Error('Reabra um APK antes de executar a VM.');
       send({ type: 'progress', progress: { phase: type, completed: 0, total: 1 } });
+      runtime.monitor.begin(type);
       runtime.steps = 0; let droppedComposeAction = null, droppedEvent = null;
       // An id the page took from an older snapshot can name a View that has since been collected (it was removed from the hierarchy): Android would not deliver the event either.
       const staleId = ['click', 'input', 'check', 'focus', 'press', 'scroll', 'scrollby'].includes(type) ? data.id : type === 'compose-action' || type === 'pointer' ? data.ownerViewId : null;
@@ -204,5 +219,5 @@ self.onmessage = async ({ data }) => {
     succeeded = true;
   } catch (error) {
     send({ type: 'error', error: errorData(error) });
-  } finally { busy = false; if (succeeded) scheduleEvents(); if (type === 'launch') startApiGapScan(); }
+  } finally { runtime?.monitor?.end(); busy = false; if (succeeded) scheduleEvents(); if (type === 'launch') startApiGapScan(); }
 };

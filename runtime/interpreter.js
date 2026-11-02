@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=7dfccde7cc14';
-import { Blocked, QUANTUM } from './scheduler.js?v=7dfccde7cc14';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=7dfccde7cc14';
+import { APKError } from './apk-error.js?v=e9ecadb60317';
+import { Blocked, QUANTUM } from './scheduler.js?v=e9ecadb60317';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=e9ecadb60317';
 
 // Frame-based DEX interpreter.
 //
@@ -536,8 +536,8 @@ function runLoop(rt, owner, base) {
             let outcome;
             const bridge = site.bridge;
             if (bridge !== null && site.bridgeEpoch === rt.resolveEpoch && (!site.virtual || (typeof args[0] !== 'string' && args[0] !== null && args[0] !== 0 && rt.typeOf(args[0]) === site.bridgeType && rt.heap.list[args[0].ref].annotationValues === undefined))) {
-              rt.callStats.bridged++; if (rt.profile.active) rt.profile.host(bridge.key); rt.record(bridge.text);
-              outcome = rt.bridge(bridge.selected, args, site.mode, bridge.key, bridge);
+              rt.callStats.bridged++; if (rt.profile.active) rt.profile.host(bridge.key); rt.monitor.hostEnter(bridge.key, bridge); rt.record(bridge.text);
+              outcome = rt.bridge(bridge.selected, args, site.mode, bridge.key, bridge); rt.hostCall = null;
             } else {
               rt.callStats.dispatched++; rt.lastBridge = null; const depthBefore = rt.depth;
               outcome = rt.dispatch(site.target, args, site.mode, f.method.owner, true);

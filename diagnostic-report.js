@@ -19,6 +19,7 @@ export function buildDiagnosticReport({ error, product = 'APK Browser Lab', pack
   const text = [
     `${product}${build ? ' ' + build : ''} · ${packageName} · modo tolerante: ${tolerateMissing}`,
     `Erro: ${cause}`,
+    error?.details?.heartbeatText ? error.details.heartbeatText : '',
     error?.details?.heap?.text ? error.details.heap.text : '',
     frames.length ? `Pilha (mais interna por último):\n${frames.slice(-12).join('\n')}` : '',
     error?.details?.profile?.text ? error.details.profile.text : '',

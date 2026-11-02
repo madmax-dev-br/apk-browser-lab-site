@@ -1,23 +1,24 @@
-import { VMClock } from './vm-clock.js?v=7dfccde7cc14';
-import { ExecutionProfile } from './execution-profile.js?v=7dfccde7cc14';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=7dfccde7cc14';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=7dfccde7cc14';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=7dfccde7cc14';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=7dfccde7cc14';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=7dfccde7cc14';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=7dfccde7cc14';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=7dfccde7cc14';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=7dfccde7cc14';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=7dfccde7cc14';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=7dfccde7cc14';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=7dfccde7cc14';
-import { APKError } from './apk-error.js?v=7dfccde7cc14';
-import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=7dfccde7cc14';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=7dfccde7cc14';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=7dfccde7cc14';
-import { Scheduler, Blocked } from './scheduler.js?v=7dfccde7cc14';
-import { bootClassLacksMember } from './boot-class-members.js?v=7dfccde7cc14';
-export { APKError } from './apk-error.js?v=7dfccde7cc14';
+import { VMClock } from './vm-clock.js?v=e9ecadb60317';
+import { OperationMonitor } from './operation-monitor.js?v=e9ecadb60317';
+import { ExecutionProfile } from './execution-profile.js?v=e9ecadb60317';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=e9ecadb60317';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=e9ecadb60317';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=e9ecadb60317';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=e9ecadb60317';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e9ecadb60317';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=e9ecadb60317';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=e9ecadb60317';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=e9ecadb60317';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=e9ecadb60317';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=e9ecadb60317';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=e9ecadb60317';
+import { APKError } from './apk-error.js?v=e9ecadb60317';
+import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=e9ecadb60317';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=e9ecadb60317';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=e9ecadb60317';
+import { Scheduler, Blocked } from './scheduler.js?v=e9ecadb60317';
+import { bootClassLacksMember } from './boot-class-members.js?v=e9ecadb60317';
+export { APKError } from './apk-error.js?v=e9ecadb60317';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -910,7 +911,7 @@ export class APKRuntime {
     // stopped that legitimate work. A spinning thread still hits the fuse (tests/instruction-budget.test.mjs sets its own small fuse); `maxEventWallMs` bounds host time too.
     this.maxInstructionsPerEvent = maxInstructionsPerEvent; this.maxEventInstructions = maxInstructionsPerEvent * 8;
     // Wall-clock watchdog (host time of one event); 0 = off (tests and probes are deterministic), the Worker turns it on. Checked at every scheduling quantum, so it also trips for code that never switches threads.
-    this.profile = new ExecutionProfile(this); this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
+    this.profile = new ExecutionProfile(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
     this.dex = dex;
     this.classes = dex.resolvedClasses ?? dex.classes;
     this.launcherActivity = launcherActivity;
@@ -1481,6 +1482,7 @@ export class APKRuntime {
   }
   budgetTick() {
     if (this.steps > this.peakThreadSteps) this.peakThreadSteps = this.steps;
+    if (this.monitor.active) this.monitor.tick();
     this.profile.tick();
     if (this.maxEventWallMs > 0 && this.eventWallStart > 0) {
       const elapsed = performance.now() - this.eventWallStart;
@@ -1535,7 +1537,7 @@ export class APKRuntime {
       if (resolution === undefined) { resolution = this.resolveInvoke(method, args, mode, callerOwner); slot.set(ownerKey, resolution); }
       if (resolution.kind === 'platform-default') return resolution.run(this, args);
       if (resolution.kind === 'missing-stub') return this.noteMissingStub(resolution.key, resolution.result);
-      if (resolution.kind === 'bridge') { this.lastBridge = resolution; this.lastBridgeDepth = this.depth; if (this.profile.active) this.profile.host(resolution.key); this.record(resolution.text ??= `${resolution.skia ? 'SKIA' : 'SHIM'} ${resolution.key}`); this.lastHostCall = resolution.key; return hostReturn(resolution.selected, this.bridge(resolution.selected, args, mode, resolution.key, resolution)); }
+      if (resolution.kind === 'bridge') { this.lastBridge = resolution; this.lastBridgeDepth = this.depth; if (this.profile.active) this.profile.host(resolution.key); this.monitor.hostEnter(resolution.key, resolution); this.record(resolution.text ??= `${resolution.skia ? 'SKIA' : 'SHIM'} ${resolution.key}`); this.lastHostCall = resolution.key; return hostReturn(resolution.selected, this.bridge(resolution.selected, args, mode, resolution.key, resolution)); }
       if (resolution.kind === 'default') {
         const defaultMethod = resolution.defaultMethod;
         this.recordMethod(defaultMethod.method);
@@ -1557,8 +1559,8 @@ export class APKRuntime {
           this.nativeRequired(definition.method.key);
         }
         this.executionByOrigin.host.calls++;
-        this.record(`HOST ${definition.method.key} [AOSP:${definition.method.dex.filename}]`); this.lastHostCall = definition.method.key;
-        const result = binding(this, this.hostArguments(definition.method, args, mode), definition.method);
+        this.record(`HOST ${definition.method.key} [AOSP:${definition.method.dex.filename}]`); this.lastHostCall = definition.method.key; this.monitor.hostEnter(definition.method.key, definition.method);
+        const result = binding(this, this.hostArguments(definition.method, args, mode), definition.method); this.hostCall = null;
         if (result && typeof result.then === 'function') fail(`Framework native binding must be synchronous: ${definition.method.key}`);
         return hostReturn(definition.method, result);
       }

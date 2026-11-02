@@ -25,6 +25,8 @@ export class ExecutionProfile {
   }
   /** A call that reached a host bridge (SHIM/platform) while the profile is active. */
   host(key) { this.hostCalls.set(key, (this.hostCalls.get(key) ?? 0) + 1); }
+  /** The `limit` methods with the most own-instruction samples so far (empty until the profile started), as `name share`. */
+  top(limit = 3) { return this.active && this.samples ? [...this.self].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => `${short(key)} ${pct(count, this.samples)}`) : []; }
   /** The innermost frames of the running thread, innermost first. */
   currentStack(limit = 12) {
     const frames = this.rt.thread?.frames ?? [], out = [];

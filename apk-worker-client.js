@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=7dfccde7cc14';
-import { createRasterReceiver } from './raster-cache.js?v=7dfccde7cc14';
+import { createWebAudioPlayer } from './web-audio-player.js?v=e9ecadb60317';
+import { createRasterReceiver } from './raster-cache.js?v=e9ecadb60317';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=7dfccde7cc14', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=e9ecadb60317', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -18,6 +18,7 @@ export class APKWorkerClient {
       if (worker !== this.worker) return;
       // Every snapshot, delivered or not, passes the raster cache in order so Worker and page LRUs stay identical.
       if (data?.snapshot) { try { this.rasters.resolve(data.snapshot); } catch (error) { this.cancel(error); return; } }
+      if (data?.type === 'heartbeat') { this.lastHeartbeat = { ...data, receivedAt: Date.now() }; this.onHeartbeat?.(data); return; }   // posted by the VM from inside its loops: the last one explains a timeout
       if (data?.type === 'app-data') { this.appData = data.status; this.onAppData?.(data.status); return; }
       if (data?.type === 'webview') { this.onWebView?.(data); return; }   // a WebView command for the page's iframes (src/webview-frame.js)
       if (data?.type === 'api-gaps') { this.apiGaps = data.report ?? null; this.onApiGaps?.(this.apiGaps); return; }   // static estimate, posted once after a launch; never part of a request
@@ -44,14 +45,26 @@ export class APKWorkerClient {
     };
     worker.onmessageerror = () => { if (worker === this.worker) this.cancel(new Error('Não foi possível receber os dados da VM. Reabra o APK.')); };
   }
+  /** "Último sinal da VM ...": what the last heartbeat said, and whether the VM went silent after it (a long synchronous host call or a loop that never reaches a tick). */
+  describeLastSignal(type) {
+    const beat = this.lastHeartbeat;
+    if (!beat) return { heartbeat: null, silentSeconds: null, text: `Nenhum sinal da VM foi recebido durante a operação ${type}; o Worker não chegou a executar código da VM.` };
+    const silent = Math.max(0, (Date.now() - beat.receivedAt) / 1000), seconds = Math.round(silent * 10) / 10;
+    let text = `Último sinal da VM há ${seconds} s: ${beat.operation ?? type}, ${beat.thread ?? 'sem thread'}, ${(beat.stack ?? []).join(' < ') || 'sem pilha'}, chamada do host: ${beat.hostCall ?? 'nenhuma'}, eventos nesta operação: ${beat.events ?? 0}, instruções: ${beat.instructions ?? 0}`;
+    if (beat.busiest?.length) text += `, mais ocupados: ${beat.busiest.join(', ')}`;
+    if (beat.queueDepth !== null && beat.queueDepth !== undefined) text += `, fila: ${beat.queueDepth}${beat.nextDelay === null || beat.nextDelay === undefined ? '' : ` (próximo em ${Math.round(beat.nextDelay)} ms)`}`;
+    text += '.';
+    if (silent > 2) text += ` A VM não respondeu desde esse sinal${beat.hostCall ? ` (última chamada do host em andamento: ${beat.hostCall})` : ''}.`;
+    return { heartbeat: beat, silentSeconds: seconds, text };
+  }
   request(type, payload = {}, { onProgress, timeoutMs, transfer = [] } = {}) {
     if (this.pending) return Promise.reject(new Error('Uma operação da VM já está em andamento.'));
     try { this.ensureWorker(); } catch (error) { return Promise.reject(error); }
     return new Promise((resolve, reject) => {
-      const requestId = ++this.sequence;
+      const requestId = ++this.sequence; this.lastHeartbeat = null;
       const timer = setTimeout(() => {
-        const error = new Error(`A operação ${type} excedeu ${Math.round(timeoutMs / 1000)} s. O Worker foi encerrado; reabra o APK para continuar.`);
-        error.name = 'TimeoutError'; this.cancel(error);
+        const signal = this.describeLastSignal(type), error = new Error(`A operação ${type} excedeu ${Math.round(timeoutMs / 1000)} s. O Worker foi encerrado; reabra o APK para continuar.${signal ? ' ' + signal.text : ''}`);
+        error.name = 'TimeoutError'; if (signal) error.details = { kind: 'vm-timeout', operation: type, heartbeat: signal.heartbeat, silentSeconds: signal.silentSeconds, heartbeatText: signal.text }; this.cancel(error);
       }, timeoutMs);
       this.pending = { requestId, resolve, reject, timer, onProgress };
       try { this.worker.postMessage({ type, requestId, ...payload }, transfer); }
