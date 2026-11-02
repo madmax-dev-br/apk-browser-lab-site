@@ -1,23 +1,23 @@
-import { VMClock } from './vm-clock.js?v=039e497067f0';
-import { ExecutionProfile } from './execution-profile.js?v=039e497067f0';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=039e497067f0';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=039e497067f0';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=039e497067f0';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=039e497067f0';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=039e497067f0';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=039e497067f0';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=039e497067f0';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=039e497067f0';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=039e497067f0';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=039e497067f0';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=039e497067f0';
-import { APKError } from './apk-error.js?v=039e497067f0';
-import { collectGarbage, collectionDue } from './heap-gc.js?v=039e497067f0';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=039e497067f0';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=039e497067f0';
-import { Scheduler, Blocked } from './scheduler.js?v=039e497067f0';
-import { bootClassLacksMember } from './boot-class-members.js?v=039e497067f0';
-export { APKError } from './apk-error.js?v=039e497067f0';
+import { VMClock } from './vm-clock.js?v=93b5ba602b8e';
+import { ExecutionProfile } from './execution-profile.js?v=93b5ba602b8e';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=93b5ba602b8e';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=93b5ba602b8e';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=93b5ba602b8e';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=93b5ba602b8e';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=93b5ba602b8e';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=93b5ba602b8e';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=93b5ba602b8e';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=93b5ba602b8e';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=93b5ba602b8e';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=93b5ba602b8e';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=93b5ba602b8e';
+import { APKError } from './apk-error.js?v=93b5ba602b8e';
+import { collectGarbage, collectionDue } from './heap-gc.js?v=93b5ba602b8e';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=93b5ba602b8e';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=93b5ba602b8e';
+import { Scheduler, Blocked } from './scheduler.js?v=93b5ba602b8e';
+import { bootClassLacksMember } from './boot-class-members.js?v=93b5ba602b8e';
+export { APKError } from './apk-error.js?v=93b5ba602b8e';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -2924,7 +2924,13 @@ export class APKRuntime {
       if (name === 'getClass') return this.classObject(this.typeOf(args[0]));
       if (name === 'equals') return equal(args[0], args[1]) ? 1 : 0;
       if (name === 'hashCode') return typeof args[0] === 'string' ? stringHash(args[0]) : this.object(args[0]).id;
-      if (name === 'toString') return this.javaString(args[0]);
+      if (name === 'toString') {
+        // Object.toString for an instance of a class loaded from DEX: getClass().getName() + "@" + Integer.toHexString(hashCode()). It must not go back through virtual toString: a class's own
+        // toString reaches this method through invoke-super (super.toString()) and would call itself forever.
+        const type = typeof args[0] === 'string' ? null : this.typeOf(args[0]);
+        if (type && !type.startsWith('[') && this.classes.has(type)) { const hash = this.dispatch({ owner: 'Ljava/lang/Object;', name: 'hashCode', parameters: [], result: 'I', signature: '()I' }, [args[0]], 'virtual'); return this.className(type, 'binary') + '@' + (hash >>> 0).toString(16); }
+        return this.javaString(args[0]);
+      }
       if (name === 'finalize') return undefined;   // Object.finalize() does nothing; the VM never runs finalizers on its own (the collector reclaims objects without them)
       if (name === 'clone') {
         const original = this.object(args[0]);

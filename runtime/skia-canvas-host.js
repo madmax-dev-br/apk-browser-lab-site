@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=039e497067f0';
-import {getVectorGraphics} from './vector-native.js?v=039e497067f0';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=039e497067f0';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=039e497067f0';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=039e497067f0';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=039e497067f0';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=039e497067f0';
-import {createBitmapHost} from './bitmap-host.js?v=039e497067f0';
-import { gcRoot } from './heap-gc.js?v=039e497067f0';
+import {APKError} from './apk-runtime.js?v=93b5ba602b8e';
+import {getVectorGraphics} from './vector-native.js?v=93b5ba602b8e';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=93b5ba602b8e';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=93b5ba602b8e';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=93b5ba602b8e';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=93b5ba602b8e';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=93b5ba602b8e';
+import {createBitmapHost} from './bitmap-host.js?v=93b5ba602b8e';
+import { gcRoot } from './heap-gc.js?v=93b5ba602b8e';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -85,11 +85,22 @@ function applyClips(CK,canvas,clips){for(const clip of clips??[]){let path,build
  if(clip.fillType!==undefined)path.setFillType({value:clip.fillType});
  const transformed=new CK.PathBuilder(path);transformed.transform(matrix(clip.matrix));const shape=transformed.snapshot();canvas.clipPath(shape,clip.difference?CK.ClipOp.Difference:CK.ClipOp.Intersect,!!clip.antiAlias);shape.delete();transformed.delete();path.delete();
 }}
+// VectorDrawable trim paths (VectorDrawable.cpp FullPath::getUpdatedPath / VFullPath.applyTrim): the first contour of the path, from (trimPathStart + trimPathOffset) to (trimPathEnd + trimPathOffset)
+// as fractions of its length modulo 1, wrapping through the contour end when start > end, taken with SkPathMeasure::getSegment (CanvasKit ContourMeasure).
+function trimVectorPath(CK,path,props){
+ const start=(props.trimPathStart+props.trimPathOffset)%1,end=(props.trimPathEnd+props.trimPathOffset)%1,iter=new CK.ContourMeasureIter(path,false,1),contour=iter.next();
+ try{
+  const builder=new CK.PathBuilder();
+  if(contour){const length=contour.length(),add=(from,to)=>{const segment=contour.getSegment(from,to,true);if(segment){builder.addPath(segment);segment.delete();}};
+   if(start>end){add(start*length,length);add(0,end*length);}else add(start*length,end*length);}
+  const trimmed=builder.snapshot();builder.delete();return trimmed;
+ }finally{contour?.delete();iter.delete();path.delete();}
+}
 function sourceVector(CK,canvas,graphics,handle,colorFilter=null){const tree=typeof handle==='object'?handle:graphics.get(handle,'tree'),seen=new Set(),get=pointer=>typeof pointer==='object'?pointer:graphics.get(pointer);
  const walk=(pointer,depth=0)=>{if(depth>128||seen.has(pointer))fail('Cyclic/excessive Skia vector tree');seen.add(pointer);const node=get(pointer);
   if(node.kind==='group'){const p=node.props;canvas.save();canvas.translate(p.translateX+p.pivotX,p.translateY+p.pivotY);canvas.rotate(p.rotation,0,0);canvas.scale(p.scaleX,p.scaleY);canvas.translate(-p.pivotX,-p.pivotY);
    for(const child of node.children){if(get(child).kind==='clip'){const path=CK.Path.MakeFromSVGString(get(child).path);if(!path)fail('Skia rejected a vector clip path');canvas.clipPath(path,CK.ClipOp.Intersect,tree.antiAlias);path.delete();}else walk(child,depth+1);}canvas.restore();
-  }else if(node.kind==='full'){const p=node.props;if(p.trimPathStart!==0||p.trimPathEnd!==1||p.trimPathOffset!==0)fail('Android vector trim semantics are not connected to the Skia backend yet');const path=CK.Path.MakeFromSVGString(node.path);if(!path)fail('Skia rejected vector pathData');path.setFillType(p.fillType?CK.FillType.EvenOdd:CK.FillType.Winding);
+  }else if(node.kind==='full'){const p=node.props;let path=CK.Path.MakeFromSVGString(node.path);if(!path)fail('Skia rejected vector pathData');if(p.trimPathStart!==0||p.trimPathEnd!==1)path=trimVectorPath(CK,path,p);path.setFillType(p.fillType?CK.FillType.EvenOdd:CK.FillType.Winding);
    for(const [stroke,color,alpha]of [[false,p.fillColor,p.fillAlpha],[true,p.strokeColor,p.strokeAlpha]]){if(!(color>>>24)||stroke&&p.strokeWidth<=0)continue;const paint=new CK.Paint();paint.setAntiAlias(tree.antiAlias);paint.setColor(argb(CK,color,alpha));paint.setStyle(stroke?CK.PaintStyle.Stroke:CK.PaintStyle.Fill);if(stroke){paint.setStrokeWidth(p.strokeWidth);paint.setStrokeMiter(p.strokeMiterLimit);paint.setStrokeCap([CK.StrokeCap.Butt,CK.StrokeCap.Round,CK.StrokeCap.Square][p.strokeLineCap]);paint.setStrokeJoin([CK.StrokeJoin.Miter,CK.StrokeJoin.Round,CK.StrokeJoin.Bevel][p.strokeLineJoin]);}canvas.drawPath(path,paint);paint.delete();}path.delete();
   }else fail('Unsupported Skia vector node '+node.kind);seen.delete(pointer);
  };const alpha=new CK.Paint();alpha.setAlphaf(tree.alpha);if(colorFilter){const filter=makeSkiaColorFilter(CK,colorFilter);alpha.setColorFilter(filter);filter?.delete();}canvas.saveLayer(alpha);walk(tree.root);canvas.restore();alpha.delete();

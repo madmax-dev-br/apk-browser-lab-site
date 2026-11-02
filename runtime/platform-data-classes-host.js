@@ -1,12 +1,12 @@
-import { createHostRegistry } from './host-contract.js?v=039e497067f0';
-import { APKError } from './apk-error.js?v=039e497067f0';
+import { createHostRegistry } from './host-contract.js?v=93b5ba602b8e';
+import { APKError } from './apk-error.js?v=93b5ba602b8e';
 
-// Data classes of the platform API that apps build and hand back to the framework: android.app.RemoteInput (+Builder), Notification.BubbleMetadata (+Builder), android.location.Address and
-// android.app.ActivityOptions. Validation follows android-13.0.0_r1 (RemoteInput.Builder / BubbleMetadata.Builder / ActivityOptions); the values are held as the app set them. RemoteInput results travel in
+// Data classes of the platform API that apps build and hand back to the framework: android.app.RemoteInput (+Builder), android.location.Address and
+// android.app.ActivityOptions. Validation follows android-13.0.0_r1 (RemoteInput.Builder / ActivityOptions); the values are held as the app set them. RemoteInput results travel in
 // the Intent extra "android.remoteinput.resultsData" like the framework's, so getResultsFromIntent / addResultsToIntent round-trip. ActivityOptions.toBundle carries the android:activity.* keys the
 // framework would read; the virtual device does not animate or place activities from them (single task, no window animations), which the options object says.
 const STRING = 'Ljava/lang/String;', CHARS = 'Ljava/lang/CharSequence;', OBJECT = 'Ljava/lang/Object;', BUNDLE = 'Landroid/os/Bundle;', INTENT = 'Landroid/content/Intent;', PENDING = 'Landroid/app/PendingIntent;', ICON = 'Landroid/graphics/drawable/Icon;';
-const RI = 'Landroid/app/RemoteInput;', RIB = 'Landroid/app/RemoteInput$Builder;', BM = 'Landroid/app/Notification$BubbleMetadata;', BMB = 'Landroid/app/Notification$BubbleMetadata$Builder;', ADDRESS = 'Landroid/location/Address;', AO = 'Landroid/app/ActivityOptions;';
+const RI = 'Landroid/app/RemoteInput;', RIB = 'Landroid/app/RemoteInput$Builder;', ADDRESS = 'Landroid/location/Address;', AO = 'Landroid/app/ActivityOptions;';
 const nullish = v => v === null || v === undefined || v === 0;
 const RESULTS_KEY = 'android.remoteinput.resultsData', RESULTS_SOURCE_KEY = 'android.remoteinput.resultsSource';
 
@@ -20,7 +20,7 @@ export function createPlatformDataClassesHost(platform) {
   const text = (r, v) => nullish(v) ? null : typeof v === 'string' ? v : r.stringCharacters(v);
   const unsupported = (message, kind) => { throw new APKError(message, { kind }); };
   const bundle = r => construct(r, BUNDLE, [], []);
-  for (const t of [RI, RIB, BM, BMB, ADDRESS, AO]) type(t, OBJECT, t === RI || t === BM || t === ADDRESS ? ['Landroid/os/Parcelable;'] : [], { allocatable: t === RIB || t === BMB || t === ADDRESS });
+  for (const t of [RI, RIB, ADDRESS, AO]) type(t, OBJECT, t === RI || t === ADDRESS ? ['Landroid/os/Parcelable;'] : [], { allocatable: t === RIB || t === ADDRESS });
 
   // ---- RemoteInput -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   const ri = (r, self) => r.object(self).input;
@@ -58,27 +58,6 @@ export function createPlatformDataClassesHost(platform) {
   def(RI, 'addDataResultToIntent', `(${RI}${INTENT}Ljava/util/Map;)V`, () => unsupported('RemoteInput.addDataResultToIntent: data (URI) results are not modelled', 'remote-input-data-unsupported'), { static: true });
   def(RI, 'getDataResultsFromIntent', `(${INTENT}${STRING})Ljava/util/Map;`, () => null, { static: true });
 
-  // ---- Notification.BubbleMetadata -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  const bb = (r, self) => r.object(self).bubble;
-  def(BMB, '<init>', '()V', (r, _m, [self]) => { r.object(self).bubble = { intent: null, icon: null, shortcutId: null, height: 0, heightRes: 0, autoExpand: false, suppressNotification: false, suppressable: false, deleteIntent: null }; });
-  def(BMB, '<init>', `(${STRING})V`, (r, _m, [self, shortcutId]) => { if (nullish(shortcutId)) npe(r, 'Bubble requires a non-null shortcut id'); r.object(self).bubble = { intent: null, icon: null, shortcutId: text(r, shortcutId), height: 0, heightRes: 0, autoExpand: false, suppressNotification: false, suppressable: false, deleteIntent: null }; });
-  def(BMB, '<init>', `(${PENDING}${ICON})V`, (r, _m, [self, intent, icon]) => { if (nullish(intent)) npe(r, 'Bubble requires non-null pending intent'); if (nullish(icon)) npe(r, 'Bubbles require non-null icon'); r.object(self).bubble = { intent, icon, shortcutId: null, height: 0, heightRes: 0, autoExpand: false, suppressNotification: false, suppressable: false, deleteIntent: null }; });
-  def(BMB, 'setIntent', `(${PENDING})${BMB}`, (r, _m, [self, intent]) => { if (nullish(intent)) npe(r, 'Bubble requires non-null pending intent'); const b = bb(r, self); if (b.shortcutId !== null) ise(r, 'Created bubble with shortcut, can\'t set intent using setIntent'); b.intent = intent; return self; });
-  def(BMB, 'setIcon', `(${ICON})${BMB}`, (r, _m, [self, icon]) => { if (nullish(icon)) npe(r, 'Bubbles require non-null icon'); const b = bb(r, self); if (b.shortcutId !== null) ise(r, 'Created bubble with shortcut, can\'t set icon using setIcon'); b.icon = icon; return self; });
-  def(BMB, 'setDesiredHeight', `(I)${BMB}`, (r, _m, [self, height]) => { const b = bb(r, self); b.height = Math.max(height, 0); b.heightRes = 0; return self; });
-  def(BMB, 'setDesiredHeightResId', `(I)${BMB}`, (r, _m, [self, res]) => { const b = bb(r, self); b.heightRes = res; b.height = 0; return self; });
-  def(BMB, 'setAutoExpandBubble', `(Z)${BMB}`, (r, _m, [self, v]) => { bb(r, self).autoExpand = !!v; return self; });
-  def(BMB, 'setSuppressNotification', `(Z)${BMB}`, (r, _m, [self, v]) => { bb(r, self).suppressNotification = !!v; return self; });
-  def(BMB, 'setSuppressableBubble', `(Z)${BMB}`, (r, _m, [self, v]) => { bb(r, self).suppressable = !!v; return self; });
-  def(BMB, 'setDeleteIntent', `(${PENDING})${BMB}`, (r, _m, [self, intent]) => { bb(r, self).deleteIntent = nullish(intent) ? null : intent; return self; });
-  def(BMB, 'build', `()${BM}`, (r, _m, [self]) => {
-    const b = bb(r, self); if (b.shortcutId === null && nullish(b.intent)) ise(r, 'Must supply pending intent or shortcut to bubble'); if (b.shortcutId === null && nullish(b.icon)) ise(r, 'Must supply an icon or shortcut for the bubble');
-    const o = r.makeObject(BM); r.object(o).bubble = { ...b }; return o;
-  });
-  for (const [name, key, kind] of [['getIntent', 'intent', 'ref'], ['getIcon', 'icon', 'ref'], ['getShortcutId', 'shortcutId', 'ref'], ['getDeleteIntent', 'deleteIntent', 'ref'], ['getDesiredHeight', 'height', 'I'], ['getDesiredHeightResId', 'heightRes', 'I'], ['getAutoExpandBubble', 'autoExpand', 'Z'], ['isNotificationSuppressed', 'suppressNotification', 'Z'], ['isBubbleSuppressable', 'suppressable', 'Z']]) {
-    def(BM, name, `()${kind === 'ref' ? (key === 'intent' || key === 'deleteIntent' ? PENDING : key === 'icon' ? ICON : STRING) : kind}`, (r, _m, [self]) => kind === 'Z' ? (bb(r, self)[key] ? 1 : 0) : bb(r, self)[key] ?? (kind === 'I' ? 0 : null));
-  }
-  def(BM, 'isBubbleSuppressed', '()Z', () => 0); def(BM, 'describeContents', '()I', () => 0);
 
   // ---- android.location.Address ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   const ad = (r, self) => r.object(self).address ??= { locale: null, lines: new Map(), lat: null, lon: null, extras: null, props: {} };

@@ -1,6 +1,6 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=039e497067f0';
-import { APKError } from './apk-runtime.js?v=039e497067f0';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=039e497067f0';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=93b5ba602b8e';
+import { APKError } from './apk-runtime.js?v=93b5ba602b8e';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=93b5ba602b8e';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -167,6 +167,13 @@ export class AndroidStyleBackend {
     let value = suppliedValue ? { dataType: this.get(runtime, suppliedValue, VALUE, 'type', 'I'), rawData: this.get(runtime, suppliedValue, VALUE, 'data', 'I') } : this.platform.resources.resolve(id >>> 0); while (value.resolved) value = value.resolved;
     if (value.kind === 'unresolved') fail(value.reason, { resourceId: id });
     let type, parameters = [], values = [], tree;
+    if (!(value.dataType >= 28 && value.dataType <= 31) && (this.platform.resources.table.selectVariant(id >>> 0)?.resourceType ?? value.resourceType) === 'color') {
+      // ResourcesImpl.loadDrawableForCookie: an XML file of a color/ resource loads as a ColorStateListDrawable around the ColorStateList parsed from it (not through DrawableInflater).
+      const csl = this.loadColor(runtime, id >>> 0, theme || null), type = 'Landroid/graphics/drawable/ColorStateListDrawable;';
+      if (!runtime.classes.has(type)) fail('Original AOSP ColorStateListDrawable DEX is unavailable', { resourceId: id });
+      const drawable = runtime.allocate(type); runtime.dispatch({ owner: type, name: '<init>', signature: '(Landroid/content/res/ColorStateList;)V', parameters: ['Landroid/content/res/ColorStateList;'], result: 'V' }, [drawable, csl], 'direct');
+      runtime.record(`RESOURCE drawable ${id >>> 0} ${type} [color state list file, original ColorStateListDrawable]`); return drawable;
+    }
     if (!(value.dataType >= 28 && value.dataType <= 31) && runtime.classes.has('Landroid/graphics/drawable/DrawableInflater;')) {
       tree=this.platform.resources.getXml(id);
       const parser=this.platform.xmlHost.create(runtime,tree,id);this.platform.xmlHost.advance(runtime.object(parser));

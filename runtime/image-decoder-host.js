@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=039e497067f0';
-import { APKError } from './apk-error.js?v=039e497067f0';
+import { createHostRegistry } from './host-contract.js?v=93b5ba602b8e';
+import { APKError } from './apk-error.js?v=93b5ba602b8e';
 
 // android.graphics.ImageDecoder (API 28+, android-13.0.0_r1 ImageDecoder.java) over the lab's bitmap codec: a Source is the encoded bytes (byte[], ByteBuffer, File, raw resource, asset, content Uri,
 // Callable<AssetFileDescriptor> is not modelled); decodeBitmap / decodeDrawable decode with BitmapFactory, call the OnHeaderDecodedListener with the decoder and the ImageInfo (size, mime type,
@@ -41,6 +41,9 @@ export function createImageDecoderHost(platform) {
   def(ID, 'createSource', `(Ljava/nio/ByteBuffer;)${SOURCE}`, (r, _m, [buffer]) => { if (nullish(buffer)) npe(r, 'buffer is null'); return source(r, () => { const dup = call(r, buffer, 'Ljava/nio/ByteBuffer;', 'duplicate', [], 'Ljava/nio/ByteBuffer;'), n = call(r, dup, 'Ljava/nio/Buffer;', 'remaining', [], 'I'), a = r.newArray('[B', n); call(r, dup, 'Ljava/nio/ByteBuffer;', 'get', ['[B'], 'Ljava/nio/ByteBuffer;', [a]); return Uint8Array.from(r.array(a).elements, v => v & 255); }, 'ByteBufferSource'); }, { static: true });
   def(ID, 'createSource', `(Ljava/io/File;)${SOURCE}`, (r, _m, [file]) => { if (nullish(file)) npe(r, 'file is null'); return source(r, () => readAll(r, construct(r, 'Ljava/io/FileInputStream;', ['Ljava/io/File;'], [file])), 'FileSource'); }, { static: true });
   def(ID, 'createSource', `(${RESOURCES}I)${SOURCE}`, (r, _m, [res, id]) => { if (nullish(res)) npe(r, 'res is null'); return source(r, () => readAll(r, call(r, res, RESOURCES, 'openRawResource', ['I'], INPUT, [id])), 'ResourceSource'); }, { static: true });
+  // createSource(Resources, InputStream[, int density]): the stream's bytes with the density they are authored at (Bitmap.DENSITY_NONE when absent); decoding tags the bitmap with it.
+  def(ID, 'createSource', `(${RESOURCES}${INPUT})${SOURCE}`, (r, _m, [res, stream]) => { if (nullish(res) || nullish(stream)) npe(r, 'res or is is null'); const o = source(r, () => readAll(r, stream), 'InputStream'); r.object(o).source.density = null; return o; });
+  def(ID, 'createSource', `(${RESOURCES}${INPUT}I)${SOURCE}`, (r, _m, [res, stream, density]) => { if (nullish(res) || nullish(stream)) npe(r, 'res or is is null'); const o = source(r, () => readAll(r, stream), 'InputStream'); r.object(o).source.density = density; return o; });
   def(ID, 'createSource', `(Landroid/content/res/AssetManager;${STRING})${SOURCE}`, (r, _m, [assets, name]) => { if (nullish(assets) || nullish(name)) npe(r); return source(r, () => readAll(r, call(r, assets, 'Landroid/content/res/AssetManager;', 'open', [STRING], INPUT, [name])), 'AssetSource'); }, { static: true });
   def(ID, 'createSource', `(Landroid/content/ContentResolver;Landroid/net/Uri;)${SOURCE}`, (r, _m, [resolver, uri]) => { if (nullish(resolver) || nullish(uri)) npe(r); return source(r, () => readAll(r, call(r, resolver, 'Landroid/content/ContentResolver;', 'openInputStream', ['Landroid/net/Uri;'], INPUT, [uri])), 'ContentResolverSource'); }, { static: true });
   def(ID, 'createSource', `(Ljava/util/concurrent/Callable;)${SOURCE}`, () => unsupported('ImageDecoder.createSource(Callable<AssetFileDescriptor>): not modelled; use a File, byte[], ByteBuffer, resource, asset or content Uri source', 'image-source-unsupported'), { static: true });
@@ -69,6 +72,12 @@ export function createImageDecoderHost(platform) {
     if (tw !== width || th !== height) out = callStatic(r, BITMAP, 'createScaledBitmap', [BITMAP, 'I', 'I', 'Z'], BITMAP, [out, tw, th, 1]);
     if (s.crop) { const [l, t, rr, b] = s.crop; out = callStatic(r, BITMAP, 'createBitmap', [BITMAP, 'I', 'I', 'I', 'I'], BITMAP, [out, l, t, rr - l, b - t]); }
     if (s.mutable && !call(r, out, BITMAP, 'isMutable', [], 'Z')) out = call(r, out, BITMAP, 'copy', ['Landroid/graphics/Bitmap$Config;', 'Z'], BITMAP, [call(r, out, BITMAP, 'getConfig', [], 'Landroid/graphics/Bitmap$Config;'), 1]);
+    const density = r.object(src).source.density;
+    if (density !== undefined && density !== null) {   // ImageDecoder.computeDensity: the bitmap carries the source density; a source at another density than the display is resized to the display density
+      const display = 160;   // the lab's display density (DisplayMetrics.densityDpi of the 160 dpi device profile)
+      if (density !== 0 && density !== display && !s.target) { const w = Math.max(1, Math.round(width * display / density)), h = Math.max(1, Math.round(height * display / density)); out = callStatic(r, BITMAP, 'createScaledBitmap', [BITMAP, 'I', 'I', 'Z'], BITMAP, [out, w, h, 1]); call(r, out, BITMAP, 'setDensity', ['I'], 'V', [display]); }
+      else call(r, out, BITMAP, 'setDensity', ['I'], 'V', [density]);
+    }
     s.closed = true;
     return asDrawable ? construct(r, 'Landroid/graphics/drawable/BitmapDrawable;', [RESOURCES, BITMAP], [call(r, platform.application, 'Landroid/content/Context;', 'getResources', [], RESOURCES), out]) : out;
   };

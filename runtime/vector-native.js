@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=039e497067f0';
-import { getSolidPaint } from './paint-host.js?v=039e497067f0';
-import { getMatrixValues } from './matrix-native.js?v=039e497067f0';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=039e497067f0';
+import { APKError } from './apk-error.js?v=93b5ba602b8e';
+import { getSolidPaint } from './paint-host.js?v=93b5ba602b8e';
+import { getMatrixValues } from './matrix-native.js?v=93b5ba602b8e';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=93b5ba602b8e';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -55,7 +55,8 @@ export class VectorGraphics {
     }else body+=render(child,depth+1);}
     body+='</g>'.repeat(clips);result=`<g transform="translate(${p.translateX+p.pivotX} ${p.translateY+p.pivotY}) rotate(${p.rotation}) scale(${p.scaleX} ${p.scaleY}) translate(${-p.pivotX} ${-p.pivotY})">${body}</g>`;
    }else if(node.kind==='full'){
-    const p=node.props;if(p.trimPathStart!==0||p.trimPathEnd!==1||p.trimPathOffset!==0)problem('Vector trimPath requires a measured-path backend');
+    const p=node.props;if((p.trimPathStart!==0||p.trimPathEnd!==1)&&!this.runtime.skia?.rasterizeCanvas)problem('Vector trimPath requires a measured-path backend (the Skia raster backend); the SVG fallback cannot trim');   // with Skia the recorded vector state is rasterized by sourceVector, which trims the path (SkPathMeasure)
+    
     if(![0,1].includes(p.fillType))problem('Unsupported vector fill rule');
     const fill=color(p.fillColor,p.fillAlpha),stroke=color(p.strokeColor,p.strokeAlpha);pathCount++;
     result=`<path d="${xml(node.path||'')}" fill="${fill.color}" fill-opacity="${fill.alpha}" fill-rule="${p.fillType?'evenodd':'nonzero'}" stroke="${stroke.color}" stroke-opacity="${stroke.alpha}" stroke-width="${p.strokeWidth}" stroke-linecap="${['butt','round','square'][p.strokeLineCap]||problem('Invalid stroke cap')}" stroke-linejoin="${['miter','round','bevel'][p.strokeLineJoin]||problem('Invalid stroke join')}" stroke-miterlimit="${p.strokeMiterLimit}"/>`;

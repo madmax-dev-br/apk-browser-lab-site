@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=039e497067f0';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=039e497067f0';
-import { inspectELF } from './native-inspector.js?v=039e497067f0';
-import { inflateRaw } from './inflate.js?v=039e497067f0';
-import { resolveDevice } from './device-profile.js?v=039e497067f0';
-import { resourceProfileFor } from './device-configuration.js?v=039e497067f0';
-import { JniBridge } from './jni-host.js?v=039e497067f0';
-import { providerForApk } from './native-provider-variants.js?v=039e497067f0';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=039e497067f0';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=039e497067f0';
-import { AndroidResources } from './android-resources.js?v=039e497067f0';
-import { AndroidPlatform } from './android-platform.js?v=039e497067f0';
-import { FrameworkProvider } from './framework-provider.js?v=039e497067f0';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=93b5ba602b8e';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=93b5ba602b8e';
+import { inspectELF } from './native-inspector.js?v=93b5ba602b8e';
+import { inflateRaw } from './inflate.js?v=93b5ba602b8e';
+import { resolveDevice } from './device-profile.js?v=93b5ba602b8e';
+import { resourceProfileFor } from './device-configuration.js?v=93b5ba602b8e';
+import { JniBridge } from './jni-host.js?v=93b5ba602b8e';
+import { providerForApk } from './native-provider-variants.js?v=93b5ba602b8e';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=93b5ba602b8e';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=93b5ba602b8e';
+import { AndroidResources } from './android-resources.js?v=93b5ba602b8e';
+import { AndroidPlatform } from './android-platform.js?v=93b5ba602b8e';
+import { FrameworkProvider } from './framework-provider.js?v=93b5ba602b8e';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -89,7 +89,10 @@ export class APKArchive {
     return { entry: e, compressed: b.slice(start, e.compressed) };
   }
   /** Synchronous variant for the run-time VM (Class.getResource, AssetManager.open): same bounds and CRC checks as extract(). */
-  extractSync(name, limit) {
+  /** Bounded read for load-time inspection (profile selection): the same checks as extractSync, not counted as resource preparation. */
+  inspectSync(name, limit) { return this.readEntrySync(name, limit); }
+  extractSync(name, limit) { return this.readEntrySync(name, limit); }
+  readEntrySync(name, limit) {
     const e = this.entries.get(name);
     if (!e) fail(`APK is missing ${name}`);
     if (!Number.isSafeInteger(limit) || limit < 0) fail('APK extraction requires a nonnegative byte limit');
@@ -509,10 +512,20 @@ export async function loadAPK(arrayBuffer, options = {}) {
     while(type){if(type==='Landroidx/appcompat/app/AppCompatActivity;')return true;if(seen.has(type)||seen.size>=128)fail('Invalid/excessive Activity superclass chain');seen.add(type);type=apkClasses.get(type)?.superclass;}return false;
   });
   const usesWindowSurfaces=files.some(file=>file.dex.types.some(type=>['Landroid/app/Dialog;','Landroid/view/WindowManager;'].includes(type)));
+  // Gravity-dependent drawables (LayerDrawable, InsetDrawable, ScaleDrawable, ClipDrawable, RippleDrawable) need the original View/Gravity layer of the layouts profile: load it when the code names
+  // those classes or a drawable/mipmap XML of the APK uses one of their tags (the tag is a whole string of the compiled XML string pool, UTF-8 or UTF-16).
+  const gravityDrawableTypes=new Set(['LayerDrawable','InsetDrawable','ScaleDrawable','ClipDrawable','RippleDrawable','TransitionDrawable'].map(name=>`Landroid/graphics/drawable/${name};`));
+  const gravityTags=['layer-list','inset','scale','clip','ripple','transition'];
+  const poolString=(text,utf16)=>{const bytes=[];if(utf16){bytes.push(text.length,0);for(const c of text)bytes.push(c.charCodeAt(0),0);bytes.push(0,0);}else{bytes.push(text.length,text.length);for(const c of text)bytes.push(c.charCodeAt(0));bytes.push(0);}return bytes;};
+  const tagPatterns=gravityTags.flatMap(tag=>[poolString(tag,false),poolString(tag,true)]);
+  const containsPattern=(data,pattern)=>{outer:for(let at=data.indexOf(pattern[0]);at>=0&&at<=data.length-pattern.length;at=data.indexOf(pattern[0],at+1)){for(let i=1;i<pattern.length;i++)if(data[at+i]!==pattern[i])continue outer;return true;}return false;};
+  const usesGravityDrawables=files.some(file=>file.dex.types.some(type=>gravityDrawableTypes.has(type)))||[...archive.entries.keys()].filter(name=>/^res\/(?:drawable|mipmap)[^/]*\/[^/]+\.xml$/.test(name)).slice(0,512).some(name=>{
+    if(archive.entries.get(name).size>65536)return false;let data;try{data=archive.inspectSync(name,65536);}catch{return false;}return tagPatterns.some(pattern=>containsPattern(data,pattern));
+  });
   const usesConfiguration=files.some(file=>file.dex.types.includes('Landroid/content/res/Configuration;'));
   const baseFrameworkFiles = framework ? [...framework.files] : []; let verifiedBaseFrameworkHash = null;
   const profiles=[
-    {name:'layouts',explicit:options.enableLayoutProfile,automatic:appCompatActivity||usesWindowSurfaces,reason:appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':'APK-references-Dialog-or-WindowManager'},
+    {name:'layouts',explicit:options.enableLayoutProfile,automatic:appCompatActivity||usesWindowSurfaces||usesGravityDrawables,reason:appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':usesWindowSurfaces?'APK-references-Dialog-or-WindowManager':'APK-uses-Gravity-dependent-drawables'},
     {name:'configuration',explicit:options.enableConfigurationProfile,automatic:usesConfiguration,reason:'APK-references-android.content.res.Configuration'},
   ];
   for(const selection of profiles){

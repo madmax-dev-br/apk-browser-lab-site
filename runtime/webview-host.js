@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=039e497067f0';
-import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=039e497067f0';
-import { isInterfaceName } from './webview-bridge.js?v=039e497067f0';
-import { APKError } from './apk-error.js?v=039e497067f0';
+import { gcRoot } from './heap-gc.js?v=93b5ba602b8e';
+import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=93b5ba602b8e';
+import { isInterfaceName } from './webview-bridge.js?v=93b5ba602b8e';
+import { APKError } from './apk-error.js?v=93b5ba602b8e';
 
 // android.webkit.WebView and its public companions for the browser VM (design: docs/APK-REAL-TASKS.md, task 33).
 //
@@ -60,6 +60,38 @@ export function createWebViewHost(platform) {
   // ---- main-Looper tasks: callbacks reach the app on the UI thread, after the call that caused them returns (as Android posts them) --------------------------------------
   /** Runs `task` on the VM's main thread after the current call returns (the platform event queue); `roots` keep the Java objects it uses alive until then. */
   const postMain = (r, task, roots = []) => platform.queueTask(task, 0, roots.filter(ref => !isNull(ref)));
+
+  // ---- GeolocationPermissions / WebViewDatabase: the WebView profile's stored decisions, kept for the VM's lifetime (the data directory is the VM file system, no disk) ---------------
+  // Origins are normalised to scheme://host[:port] like the Chromium profile does; a string that is no origin is ignored by allow/clear and reads as "not allowed". Results reach the
+  // callbacks on the main Looper after the call returns.
+  const GEO = 'Landroid/webkit/GeolocationPermissions;', WV_DATABASE = 'Landroid/webkit/WebViewDatabase;', SET_T = 'Ljava/util/Set;';
+  type(GEO, OBJECT, [], { allocatable: true }); type(WV_DATABASE, OBJECT, [], { allocatable: true });
+  const geo = gcRoot({ instance: null, database: null }), profile = platform.webProfile ??= { origins: new Map(), httpAuth: new Map() };
+  const originOf = (r, value) => { if (isNull(value)) return null; try { const url = new URL(r.stringCharacters(value)); return url.origin === 'null' ? null : url.origin; } catch { return null; } };
+  def(GEO, 'getInstance', `()${GEO}`, r => geo.instance ??= r.allocate(GEO), { static: true });
+  def(GEO, 'allow', `(${STRING})V`, (r, _m, [, origin]) => { const key = originOf(r, origin); if (key) profile.origins.set(key, true); });
+  def(GEO, 'clear', `(${STRING})V`, (r, _m, [, origin]) => { const key = originOf(r, origin); if (key) profile.origins.delete(key); });
+  def(GEO, 'clearAll', '()V', () => { profile.origins.clear(); });
+  def(GEO, 'getAllowed', `(${STRING}${CALLBACK})V`, (r, _m, [, origin, callback]) => {
+    if (isNull(callback)) r.throwJava('Ljava/lang/NullPointerException;', 'Callback is null');
+    const allowed = profile.origins.get(originOf(r, origin)) === true;
+    postMain(r, () => call(r, callback, CALLBACK, 'onReceiveValue', [OBJECT], 'V', [staticCall(r, 'Ljava/lang/Boolean;', 'valueOf', ['Z'], 'Ljava/lang/Boolean;', [allowed ? 1 : 0])]), [callback]);
+  });
+  def(GEO, 'getOrigins', `(${CALLBACK})V`, (r, _m, [, callback]) => {
+    if (isNull(callback)) r.throwJava('Ljava/lang/NullPointerException;', 'Callback is null');
+    const origins = [...profile.origins.keys()];
+    postMain(r, () => { const set = r.allocate('Ljava/util/HashSet;'); call(r, set, 'Ljava/util/HashSet;', '<init>', [], 'V', []); for (const o of origins) call(r, set, SET_T, 'add', [OBJECT], 'Z', [o]); call(r, callback, CALLBACK, 'onReceiveValue', [OBJECT], 'V', [set]); }, [callback]);
+  });
+  const authKey = (r, host, realm) => `${r.stringCharacters(host)}\u0000${r.stringCharacters(realm)}`;
+  def(WEBVIEW, 'setHttpAuthUsernamePassword', `(${STRING}${STRING}${STRING}${STRING})V`, (r, _m, [, host, realm, user, pass]) => { if (isNull(host) || isNull(realm)) return; profile.httpAuth.set(authKey(r, host, realm), [r.stringCharacters(user), r.stringCharacters(pass)]); });
+  def(WEBVIEW, 'getHttpAuthUsernamePassword', `(${STRING}${STRING})[${STRING}`, (r, _m, [, host, realm]) => {
+    const pair = isNull(host) || isNull(realm) ? undefined : profile.httpAuth.get(authKey(r, host, realm)); if (!pair) return null;
+    const a = r.newArray(`[${STRING}`, 2); r.array(a).elements = [...pair]; return a;
+  });
+  def(WV_DATABASE, 'getInstance', `(${CONTEXT})${WV_DATABASE}`, (r, _m, [context]) => { if (isNull(context)) r.throwJava('Ljava/lang/NullPointerException;', null); return geo.database ??= r.allocate(WV_DATABASE); }, { static: true });
+  def(WV_DATABASE, 'hasUsernamePassword', '()Z', () => 0); def(WV_DATABASE, 'clearUsernamePassword', '()V', () => undefined);   // saved form passwords were removed from WebView in API 26 (always empty)
+  def(WV_DATABASE, 'hasHttpAuthUsernamePassword', '()Z', () => (profile.httpAuth.size > 0 ? 1 : 0)); def(WV_DATABASE, 'clearHttpAuthUsernamePassword', '()V', () => { profile.httpAuth.clear(); });
+  def(WV_DATABASE, 'hasFormData', '()Z', () => 0); def(WV_DATABASE, 'clearFormData', '()V', () => undefined);   // autofill form data is not stored by the WebView profile of this device
 
   // ---- per-WebView state ---------------------------------------------------------------------------------------------------------------------------------------------
   const newState = () => ({ settings: null, client: null, chrome: null, url: null, originalUrl: null, title: null, progress: 0, loading: false, history: [], index: -1, interfaces: new Map(), loadId: 0, destroyed: false, paused: false, id: null });

@@ -1,0 +1,125 @@
+import { createHostRegistry } from './host-contract.js?v=93b5ba602b8e';
+import { ISO_COUNTRIES, ISO_LANGUAGES } from './iso-codes-data.js?v=93b5ba602b8e';
+
+// java.util.Locale beyond the first host pass (libcore Locale.java, android-13.0.0_r1): the ISO code tables, 3-letter codes, extensions (BCP 47 -u- / -x- and any singleton),
+// stripExtensions, setDefault, and Locale.Builder with IllformedLocaleException. Locale objects are the platform's (one per canonical language tag, platform.locale).
+const LOCALE = 'Ljava/util/Locale;', BUILDER = 'Ljava/util/Locale$Builder;', ILLFORMED = 'Ljava/util/IllformedLocaleException;', CATEGORY = 'Ljava/util/Locale$Category;', STRING = 'Ljava/lang/String;', SET = 'Ljava/util/Set;';
+const LANGUAGE = /^[a-zA-Z]{2,8}$/, SCRIPT = /^[a-zA-Z]{4}$/, REGION = /^(?:[a-zA-Z]{2}|\d{3})$/, VARIANT = /^(?:[a-zA-Z0-9]{5,8}|\d[a-zA-Z0-9]{3})$/, KEY = /^[a-zA-Z0-9]{2}$/, TYPE = /^[a-zA-Z0-9]{3,8}$/, ATTRIBUTE = /^[a-zA-Z0-9]{3,8}$/;
+
+export function createLocaleExtrasHost(platform) {
+  const registry = createHostRegistry(), { def, type } = registry;
+  const nullish = value => value === null || value === undefined || value === 0;
+  const call = (r, receiver, owner, name, parameters = [], result = 'V', values = [], mode = 'virtual') => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, mode === 'static' ? values : [receiver, ...values], mode);
+  const create = (r, owner) => { const ref = r.allocate(owner); call(r, ref, owner, '<init>', [], 'V', [], 'direct'); return ref; };
+  const tagOf = (r, locale) => r.object(locale).localeData?.tag ?? 'und';
+  const stringSet = (r, values) => { const set = create(r, 'Ljava/util/LinkedHashSet;'); for (const value of values) call(r, set, SET, 'add', ['Ljava/lang/Object;'], 'Z', [value]); return call(r, null, 'Ljava/util/Collections;', 'unmodifiableSet', [SET], SET, [set], 'static'); };
+
+  // ---- extensions of a language tag: [{ key: 'u', subtags: ['nu', 'latn'] }, { key: 'x', ... }]
+  const parseExtensions = tag => {
+    const parts = tag.split('-'), found = []; let current = null;
+    for (const part of parts) {
+      if (part.length === 1) { current = { key: part.toLowerCase(), subtags: [] }; found.push(current); if (current.key === 'x') { found[found.length - 1].subtags = parts.slice(parts.indexOf(part) + 1); break; } }
+      else if (current) current.subtags.push(part);
+    }
+    return found;
+  };
+  const withoutExtensions = tag => { const parts = tag.split('-'), at = parts.findIndex(part => part.length === 1); return (at < 0 ? parts : parts.slice(0, at)).join('-'); };
+  const validKey = (r, key) => { if (!/^[a-zA-Z0-9]$/.test(String.fromCharCode(key))) r.throwJava('Ljava/lang/IllegalArgumentException;', `Ill-formed extension key: ${String.fromCharCode(key)}`); };
+  const unicode = tag => parseExtensions(tag).find(extension => extension.key === 'u') ?? null;
+  const keywords = extension => {   // attributes (3-8 alnum before the first key) and key -> type
+    const attributes = [], map = new Map(); let key = null;
+    for (const subtag of extension?.subtags ?? []) {
+      if (KEY.test(subtag) && !/^\d/.test(subtag) || (KEY.test(subtag) && key === null && attributes.length >= 0 && subtag.length === 2)) { key = subtag.toLowerCase(); if (!map.has(key)) map.set(key, []); }
+      else if (key === null) attributes.push(subtag.toLowerCase()); else map.get(key).push(subtag.toLowerCase());
+    }
+    return { attributes, map };
+  };
+
+  def(LOCALE, 'getExtension', '(C)Ljava/lang/String;', (r, _m, [self, key]) => {
+    validKey(r, key); const found = parseExtensions(tagOf(r, self)).find(extension => extension.key === String.fromCharCode(key).toLowerCase());
+    return found && found.subtags.length ? found.subtags.join('-') : null;
+  });
+  def(LOCALE, 'getExtensionKeys', `()${SET}`, (r, _m, [self]) => {
+    const set = create(r, 'Ljava/util/TreeSet;');
+    for (const extension of parseExtensions(tagOf(r, self))) call(r, set, SET, 'add', ['Ljava/lang/Object;'], 'Z', [call(r, null, 'Ljava/lang/Character;', 'valueOf', ['C'], 'Ljava/lang/Character;', [extension.key.charCodeAt(0)], 'static')]);
+    return call(r, null, 'Ljava/util/Collections;', 'unmodifiableSet', [SET], SET, [set], 'static');
+  });
+  def(LOCALE, 'getUnicodeLocaleKeys', `()${SET}`, (r, _m, [self]) => stringSet(r, [...keywords(unicode(tagOf(r, self))).map.keys()].sort()));
+  def(LOCALE, 'getUnicodeLocaleAttributes', `()${SET}`, (r, _m, [self]) => stringSet(r, keywords(unicode(tagOf(r, self))).attributes));
+  def(LOCALE, 'getUnicodeLocaleType', `(${STRING})${STRING}`, (r, _m, [self, key]) => {
+    if (nullish(key)) r.throwJava('Ljava/lang/NullPointerException;', null);
+    const name = r.stringCharacters(key); if (!KEY.test(name)) r.throwJava('Ljava/lang/IllegalArgumentException;', `Ill-formed Unicode locale key: ${name}`);
+    const type = keywords(unicode(tagOf(r, self))).map.get(name.toLowerCase()); return type ? type.join('-') : null;
+  });
+  def(LOCALE, 'stripExtensions', `()${LOCALE}`, (r, _m, [self]) => { const tag = tagOf(r, self); return parseExtensions(tag).length ? platform.locale(r, withoutExtensions(tag)) : self; });
+
+  // ---- ISO tables
+  const stringArray = (r, values) => { const array = r.newArray(`[${STRING}`, values.length); r.array(array).elements = values; return array; };
+  def(LOCALE, 'getISOCountries', `()[${STRING}`, r => stringArray(r, Object.keys(ISO_COUNTRIES)), { static: true });
+  def(LOCALE, 'getISOLanguages', `()[${STRING}`, r => stringArray(r, Object.keys(ISO_LANGUAGES)), { static: true });
+  const missing = (r, what, value) => r.throwJava('Ljava/util/MissingResourceException;', `Couldn't find 3-letter ${what} code for ${value}`);
+  def(LOCALE, 'getISO3Country', `()${STRING}`, (r, _m, [self]) => { const country = r.object(self).localeData?.country ?? ''; if (country === '') return ''; const three = ISO_COUNTRIES[country.toUpperCase()]; if (!three) missing(r, 'country', country); return three; });
+  def(LOCALE, 'getISO3Language', `()${STRING}`, (r, _m, [self]) => { const language = r.object(self).localeData?.language ?? ''; if (language === '') return ''; const three = ISO_LANGUAGES[language.toLowerCase()]; if (three === undefined || three === '') { if (language.length === 3) return language; missing(r, 'language', language); } return three; });
+
+  // ---- default locale
+  type(CATEGORY, 'Ljava/lang/Enum;');
+  def(LOCALE, 'setDefault', `(${LOCALE})V`, (r, _m, [locale]) => { if (nullish(locale)) r.throwJava('Ljava/lang/NullPointerException;', 'Can\'t set default locale to NULL'); platform.defaultLocaleOverride = { tag: tagOf(r, locale), device: platform.device.locale }; }, { static: true });
+  def(LOCALE, 'setDefault', `(${CATEGORY}${LOCALE})V`, (r, _m, [category, locale]) => {
+    if (nullish(category)) r.throwJava('Ljava/lang/NullPointerException;', 'Category cannot be NULL'); if (nullish(locale)) r.throwJava('Ljava/lang/NullPointerException;', 'Can\'t set default locale to NULL');
+    platform.defaultLocaleOverride = { tag: tagOf(r, locale), device: platform.device.locale };   // the VM has one default per process: both categories follow it
+  }, { static: true });
+
+  // ---- Locale.Builder
+  type(BUILDER, 'Ljava/lang/Object;', [], { allocatable: true }); type(ILLFORMED, 'Ljava/lang/RuntimeException;', [], { allocatable: true });
+  def(ILLFORMED, '<init>', '()V', (r, _m, [self]) => { r.object(self).errorIndex = -1; });
+  def(ILLFORMED, '<init>', `(${STRING})V`, (r, _m, [self, message]) => { r.object(self).message = message; r.object(self).errorIndex = -1; });
+  def(ILLFORMED, '<init>', `(${STRING}I)V`, (r, _m, [self, message, index]) => { r.object(self).message = (message === null ? 'null' : r.stringCharacters(message)) + (index < 0 ? '' : ` [at index ${index}]`); r.object(self).errorIndex = index; });
+  def(ILLFORMED, 'getErrorIndex', '()I', (r, _m, [self]) => r.object(self).errorIndex);
+  const state = (r, self) => (r.object(self).builder ??= { language: '', script: '', region: '', variant: '', extensions: new Map(), keywords: new Map(), attributes: new Set() });
+  const illformed = (r, message, index) => { const e = r.allocate(ILLFORMED); call(r, e, ILLFORMED, '<init>', [STRING, 'I'], 'V', [message, index], 'direct'); r.throwJavaReference(e, message); };
+  const text = (r, value) => (nullish(value) ? '' : r.stringCharacters(value));
+  def(BUILDER, '<init>', '()V', (r, _m, [self]) => { state(r, self); });
+  def(BUILDER, 'setLanguage', `(${STRING})${BUILDER}`, (r, _m, [self, language]) => { const v = text(r, language); if (v !== '' && !LANGUAGE.test(v)) illformed(r, `Ill-formed language: ${v}`, 0); state(r, self).language = v.toLowerCase(); return self; });
+  def(BUILDER, 'setScript', `(${STRING})${BUILDER}`, (r, _m, [self, script]) => { const v = text(r, script); if (v !== '' && !SCRIPT.test(v)) illformed(r, `Ill-formed script: ${v}`, 0); state(r, self).script = v === '' ? '' : v[0].toUpperCase() + v.slice(1).toLowerCase(); return self; });
+  def(BUILDER, 'setRegion', `(${STRING})${BUILDER}`, (r, _m, [self, region]) => { const v = text(r, region); if (v !== '' && !REGION.test(v)) illformed(r, `Ill-formed region: ${v}`, 0); state(r, self).region = v.toUpperCase(); return self; });
+  def(BUILDER, 'setVariant', `(${STRING})${BUILDER}`, (r, _m, [self, variant]) => {
+    const v = text(r, variant).replaceAll('_', '-'); const bad = v === '' ? -1 : v.split('-').findIndex(part => !VARIANT.test(part));
+    if (bad >= 0) illformed(r, `Ill-formed variant: ${v}`, v.split('-').slice(0, bad).join('-').length + (bad ? 1 : 0)); state(r, self).variant = v; return self;
+  });
+  def(BUILDER, 'setLanguageTag', `(${STRING})${BUILDER}`, (r, _m, [self, tag]) => {
+    const b = state(r, self); if (nullish(tag)) { Object.assign(b, { language: '', script: '', region: '', variant: '' }); b.extensions.clear(); b.keywords.clear(); b.attributes.clear(); return self; }
+    const value = r.stringCharacters(tag); let info; try { info = new Intl.Locale(value); } catch { illformed(r, `Ill-formed language tag: ${value}`, 0); }
+    Object.assign(b, { language: info.language === 'und' ? '' : info.language, script: info.script ?? '', region: info.region ?? '', variant: (info.variants ?? []).join('-') });
+    b.extensions.clear(); b.keywords.clear(); b.attributes.clear();
+    for (const extension of parseExtensions(info.toString())) { if (extension.key === 'u') { const k = keywords(extension); k.attributes.forEach(a => b.attributes.add(a)); for (const [key, parts] of k.map) b.keywords.set(key, parts.join('-')); } else b.extensions.set(extension.key, extension.subtags.join('-')); }
+    return self;
+  });
+  def(BUILDER, 'setLocale', `(${LOCALE})${BUILDER}`, (r, _m, [self, locale]) => {
+    const b = state(r, self), data = nullish(locale) ? null : r.object(locale).localeData;
+    if (!data) { Object.assign(b, { language: '', script: '', region: '', variant: '' }); b.extensions.clear(); b.keywords.clear(); b.attributes.clear(); return self; }
+    return call(r, self, BUILDER, 'setLanguageTag', [STRING], BUILDER, [data.tag]);
+  });
+  def(BUILDER, 'setUnicodeLocaleKeyword', `(${STRING}${STRING})${BUILDER}`, (r, _m, [self, key, value]) => {
+    if (nullish(key)) r.throwJava('Ljava/lang/NullPointerException;', null); const k = r.stringCharacters(key); if (!KEY.test(k)) illformed(r, `Ill-formed Unicode locale keyword key: ${k}`, 0);
+    if (nullish(value)) state(r, self).keywords.delete(k.toLowerCase()); else { const v = r.stringCharacters(value).replaceAll('_', '-'); if (v.split('-').some(part => !TYPE.test(part))) illformed(r, `Ill-formed Unicode locale keyword type: ${v}`, 0); state(r, self).keywords.set(k.toLowerCase(), v.toLowerCase()); }
+    return self;
+  });
+  def(BUILDER, 'addUnicodeLocaleAttribute', `(${STRING})${BUILDER}`, (r, _m, [self, attribute]) => { if (nullish(attribute)) r.throwJava('Ljava/lang/NullPointerException;', null); const a = r.stringCharacters(attribute); if (!ATTRIBUTE.test(a)) illformed(r, `Ill-formed Unicode locale attribute: ${a}`, 0); state(r, self).attributes.add(a.toLowerCase()); return self; });
+  def(BUILDER, 'removeUnicodeLocaleAttribute', `(${STRING})${BUILDER}`, (r, _m, [self, attribute]) => { if (nullish(attribute)) r.throwJava('Ljava/lang/NullPointerException;', null); state(r, self).attributes.delete(r.stringCharacters(attribute).toLowerCase()); return self; });
+  def(BUILDER, 'setExtension', `(C${STRING})${BUILDER}`, (r, _m, [self, key, value]) => {
+    const k = String.fromCharCode(key).toLowerCase(); if (!/^[a-wyz0-9]$|^x$/.test(k)) illformed(r, `Ill-formed extension key: ${k}`, 0);
+    if (k === 'u') { const b = state(r, self); b.keywords.clear(); b.attributes.clear(); if (!nullish(value)) { const parsed = keywords({ subtags: r.stringCharacters(value).split(/[-_]/) }); parsed.attributes.forEach(a => b.attributes.add(a)); for (const [name, parts] of parsed.map) b.keywords.set(name, parts.join('-')); } return self; }
+    if (nullish(value) || r.stringCharacters(value) === '') state(r, self).extensions.delete(k); else state(r, self).extensions.set(k, r.stringCharacters(value).replaceAll('_', '-').toLowerCase());
+    return self;
+  });
+  def(BUILDER, 'clearExtensions', `()${BUILDER}`, (r, _m, [self]) => { const b = state(r, self); b.extensions.clear(); b.keywords.clear(); b.attributes.clear(); return self; });
+  def(BUILDER, 'clear', `()${BUILDER}`, (r, _m, [self]) => { r.object(self).builder = null; state(r, self); return self; });
+  def(BUILDER, 'build', `()${LOCALE}`, (r, _m, [self]) => {
+    const b = state(r, self), parts = [b.language || 'und', b.script, b.region, ...(b.variant ? b.variant.split('-') : [])].filter(Boolean);
+    const u = [...[...b.attributes].sort(), ...[...b.keywords].sort(([a], [c]) => (a < c ? -1 : 1)).flatMap(([k, v]) => [k, v])];
+    const tail = [...[...b.extensions].filter(([k]) => k !== 'x').sort(([a], [c]) => (a < c ? -1 : 1)), ...(u.length ? [['u', u.join('-')]] : [])].sort(([a], [c]) => (a < c ? -1 : 1)).flatMap(([k, v]) => [k, v]);
+    if (b.extensions.has('x')) tail.push('x', b.extensions.get('x'));
+    return platform.locale(r, [...parts, ...tail].join('-'));
+  });
+  return { ...registry };
+}

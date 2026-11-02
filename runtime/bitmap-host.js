@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=039e497067f0';
-import {getVectorGraphics} from './vector-native.js?v=039e497067f0';
-import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=039e497067f0';
-import { gcRoot } from './heap-gc.js?v=039e497067f0';
+import {APKError} from './apk-error.js?v=93b5ba602b8e';
+import {getVectorGraphics} from './vector-native.js?v=93b5ba602b8e';
+import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=93b5ba602b8e';
+import { gcRoot } from './heap-gc.js?v=93b5ba602b8e';
 const BITMAP='Landroid/graphics/Bitmap;',CONFIG='Landroid/graphics/Bitmap$Config;',SPACE='Landroid/graphics/ColorSpace;',NAMED='Landroid/graphics/ColorSpace$Named;',CANVAS='Landroid/graphics/Canvas;';
 // android.graphics.Bitmap.Config / ColorSpace.Named declaration order (API 28 + API 34 HLG/PQ appended).
 const CONFIGS=['ALPHA_8','RGB_565','ARGB_4444','ARGB_8888','RGBA_F16','HARDWARE'];
@@ -13,7 +13,7 @@ const keys=new Set();const add=(owner,list)=>list.forEach(s=>keys.add(owner+'->'
 add(BITMAP,['getNativeInstance()J',`createBitmap(II${CONFIG})${BITMAP}`,`createBitmap(II${CONFIG}Z)${BITMAP}`,`createBitmap(II${CONFIG}Z${SPACE})${BITMAP}`,`createBitmap(${DM}II${CONFIG})${BITMAP}`,`createBitmap(${DM}II${CONFIG}Z)${BITMAP}`,`createBitmap(${DM}II${CONFIG}Z${SPACE})${BITMAP}`,'getWidth()I','getHeight()I',`getConfig()${CONFIG}`,'hasAlpha()Z','setHasAlpha(Z)V',`getColorSpace()${SPACE}`,'isRecycled()Z','recycle()V','prepareToDraw()V','hasMipMap()Z','setHasMipMap(Z)V','isMutable()Z','isPremultiplied()Z','getDensity()I','getByteCount()I','getAllocationByteCount()I','getRowBytes()I','setDensity(I)V','eraseColor(I)V']);
 add(CONFIG,[`values()[${CONFIG}`]);add(NAMED,[`values()[${NAMED}`]);
 add(SPACE,[`get(${NAMED})${SPACE}`,'getId()I','getName()Ljava/lang/String;','isSrgb()Z','isWideGamut()Z','getComponentCount()I']);
-add(CANVAS,['getWidth()I','getHeight()I',`throwIfCannotDraw(${BITMAP})V`,`<init>(${BITMAP})V`,`drawBitmap(${BITMAP}FFLandroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Rect;Landroid/graphics/Rect;Landroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Rect;Landroid/graphics/RectF;Landroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Matrix;Landroid/graphics/Paint;)V`]);
+add(CANVAS,['getWidth()I','getHeight()I',`throwIfCannotDraw(${BITMAP})V`,`<init>(${BITMAP})V`,`setBitmap(${BITMAP})V`,`drawBitmap(${BITMAP}FFLandroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Rect;Landroid/graphics/Rect;Landroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Rect;Landroid/graphics/RectF;Landroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Matrix;Landroid/graphics/Paint;)V`]);
 /** Software Bitmap over the verified Skia canvas model: a Bitmap owns a recorded Canvas command list that Canvas(Bitmap) appends to;
  * its pixels are produced by the real Skia rasterizer when the bitmap is drawn (snapshot semantics at the draw call). */
 export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
@@ -87,6 +87,12 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
    if(owner===CANVAS){
     if(name==='getWidth'||name==='getHeight'){const bitmap=vm.object(args[0]).canvasBitmap;const o=vm.object(args[0]);return bitmap?state(bitmap)[name==='getWidth'?'width':'height']:(name==='getWidth'?o.canvasWidth:o.canvasHeight)??0;}   // Canvas.nGetWidth: the bitmap's size, 0 without one
     if(name==='throwIfCannotDraw'){if(state(args[1]).recycled)vm.throwJava('Ljava/lang/RuntimeException;','Canvas: trying to use a recycled bitmap');return;}
+    if(name==='setBitmap'){   // Canvas.setBitmap: later draws go to the bitmap (null detaches the canvas: draws land on a scratch device); the bitmap's recorded command list is shared with every Canvas bound to it
+     const object=vm.object(args[0]);let handle;
+     if(args[1]===null||args[1]===0){handle=getVectorGraphics(vm).createCanvas();object.canvasBitmap=null;}
+     else{const b=live(args[1]);if(b.mutable===false)vm.throwJava('Ljava/lang/IllegalStateException;','Immutable bitmap');handle=b.handle;object.canvasBitmap=args[1];}
+     object.nativeCanvasHandle=handle;vm.storeField(object.fields,`${CANVAS}->mNativeCanvasWrapper:J`,handle);return;
+    }
     if(name==='<init>'){
      const b=live(args[1]);if(b.mutable===false)vm.throwJava('Ljava/lang/IllegalStateException;','Immutable bitmap passed to Canvas constructor');
      const object=vm.object(args[0]);object.nativeCanvasHandle=b.handle;object.canvasBitmap=args[1];

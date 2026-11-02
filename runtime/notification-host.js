@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=039e497067f0';
-import { createHostRegistry } from './host-contract.js?v=039e497067f0';
+import { APKError } from './apk-error.js?v=93b5ba602b8e';
+import { createHostRegistry } from './host-contract.js?v=93b5ba602b8e';
 
 // android.app.Notification, Notification.Builder / Action / BigTextStyle / BigPictureStyle / InboxStyle, NotificationChannel and android.graphics.drawable.Icon (android-13.0.0_r1).
 // None of these is in the framework DEX. The Builder is a recorder, exactly as in Notification.java: every setter stores a value and build() writes the public fields of
 // Notification (icon, when, flags, contentIntent, priority...) and the standard `extras` Bundle (EXTRA_TITLE, EXTRA_TEXT, ...), which apps and NotificationCompat read back. Rendering is not
-// modelled (the virtual device has no status bar; NotificationManager only records posts). Remote views, MessagingStyle, MediaStyle and bubbles fail explicitly.
+// modelled (the virtual device has no status bar; NotificationManager only records posts). Remote views and MediaStyle fail explicitly; bubble metadata is recorded, not shown.
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', CHARS = 'Ljava/lang/CharSequence;', CONTEXT = 'Landroid/content/Context;', PENDING = 'Landroid/app/PendingIntent;', BUNDLE = 'Landroid/os/Bundle;', BITMAP = 'Landroid/graphics/Bitmap;', URI = 'Landroid/net/Uri;';
 const NOTIFICATION = 'Landroid/app/Notification;', BUILDER = 'Landroid/app/Notification$Builder;', ACTION = 'Landroid/app/Notification$Action;', ACTION_BUILDER = 'Landroid/app/Notification$Action$Builder;', STYLE = 'Landroid/app/Notification$Style;';
 const BIG_TEXT = 'Landroid/app/Notification$BigTextStyle;', BIG_PICTURE = 'Landroid/app/Notification$BigPictureStyle;', INBOX = 'Landroid/app/Notification$InboxStyle;', CHANNEL = 'Landroid/app/NotificationChannel;', ICON = 'Landroid/graphics/drawable/Icon;';
@@ -245,6 +245,60 @@ export function createNotificationHost(platform) {
   def(BIG_PICTURE, 'bigPicture', `(${BITMAP})${BIG_PICTURE}`, (r, _m, [self, bitmap]) => { style(r, self).picture = bitmap; return self; });
   def(BIG_PICTURE, 'bigLargeIcon', `(${BITMAP})${BIG_PICTURE}`, (r, _m, [self, bitmap]) => { style(r, self).bigLargeIcon = bitmap; return self; });
 
+  // ---- Notification.BubbleMetadata and its Builder (Notification.java, android-13.0.0_r1): same argument checks, messages and flag bits. The bubble is not shown (the virtual device has no
+  // system UI); the metadata is recorded on the Notification and read back through getBubbleMetadata(). Parcel serialisation of the contained PendingIntent / Icon is not modelled.
+  const BUBBLE = 'Landroid/app/Notification$BubbleMetadata;', BUBBLE_BUILDER = 'Landroid/app/Notification$BubbleMetadata$Builder;';
+  type(BUBBLE, OBJECT, [], { allocatable: true }); type(BUBBLE_BUILDER, OBJECT, [], { allocatable: true }); registry.interfaces.set(BUBBLE, ['Landroid/os/Parcelable;']);
+  const FLAG = { AUTO_EXPAND_BUBBLE: 1, SUPPRESS_NOTIFICATION: 2, SUPPRESSABLE_BUBBLE: 4, SUPPRESS_BUBBLE: 8 };
+  for (const [name, value] of Object.entries(FLAG)) registry.staticField(BUBBLE, 'FLAG_' + name, 'I', () => value);
+  const bubble = (r, ref) => r.object(ref).bubble ?? r.throwJava('Ljava/lang/IllegalStateException;', 'Notification.BubbleMetadata used before construction');
+  const bb = (r, ref) => r.object(ref).bubbleBuilder ??= { intent: null, icon: null, height: 0, heightRes: 0, flags: 0, deleteIntent: null, shortcutId: null };
+  const NPE = 'Ljava/lang/NullPointerException;', IAE = 'Ljava/lang/IllegalArgumentException;', ISE = 'Ljava/lang/IllegalStateException;', URI_TYPES = [4, 5];
+  const warnIcon = (r, icon) => { if (!URI_TYPES.includes(call(r, icon, ICON, 'getType', [], 'I'))) r.dispatch({ owner: 'Landroid/util/Log;', name: 'w', parameters: [STRING, STRING], result: 'I', signature: '(Ljava/lang/String;Ljava/lang/String;)I' }, ['Notification', 'Bubbles work best with icons of TYPE_URI or TYPE_URI_ADAPTIVE_BITMAP. In the future, using an icon of this type will be required.'], 'static'); };
+  const isEmpty = (r, v) => v === null || v === 0 || r.stringCharacters(v) === '';
+  def(BUBBLE_BUILDER, '<init>', '()V', (r, _m, [self]) => { bb(r, self); });
+  def(BUBBLE_BUILDER, '<init>', `(${STRING})V`, (r, _m, [self, id]) => { if (isEmpty(r, id)) r.throwJava(NPE, 'Bubble requires a non-null shortcut id'); bb(r, self).shortcutId = id; });
+  def(BUBBLE_BUILDER, '<init>', `(${PENDING}${ICON})V`, (r, _m, [self, intent, icon]) => {
+    if (intent === null) r.throwJava(NPE, 'Bubble requires non-null pending intent'); if (icon === null) r.throwJava(NPE, 'Bubbles require non-null icon');
+    warnIcon(r, icon); Object.assign(bb(r, self), { intent, icon });
+  });
+  def(BUBBLE_BUILDER, 'createShortcutBubble', `(${STRING})${BUBBLE_BUILDER}`, (r, _m, [self, id]) => { const b = bb(r, self); if (!isEmpty(r, id)) { b.intent = null; b.icon = null; } b.shortcutId = id; return self; });
+  def(BUBBLE_BUILDER, 'createIntentBubble', `(${PENDING}${ICON})${BUBBLE_BUILDER}`, (r, _m, [self, intent, icon]) => {
+    if (intent === null) r.throwJava(IAE, 'Bubble requires non-null pending intent'); if (icon === null) r.throwJava(IAE, 'Bubbles require non-null icon');
+    warnIcon(r, icon); Object.assign(bb(r, self), { shortcutId: null, intent, icon }); return self;
+  });
+  def(BUBBLE_BUILDER, 'setIntent', `(${PENDING})${BUBBLE_BUILDER}`, (r, _m, [self, intent]) => {
+    const b = bb(r, self); if (b.shortcutId !== null) r.throwJava(ISE, 'Created as a shortcut bubble, cannot set a PendingIntent. Consider using BubbleMetadata.Builder(PendingIntent,Icon) instead.');
+    if (intent === null) r.throwJava(NPE, 'Bubble requires non-null pending intent'); b.intent = intent; return self;
+  });
+  def(BUBBLE_BUILDER, 'setIcon', `(${ICON})${BUBBLE_BUILDER}`, (r, _m, [self, icon]) => {
+    const b = bb(r, self); if (b.shortcutId !== null) r.throwJava(ISE, 'Created as a shortcut bubble, cannot set an Icon. Consider using BubbleMetadata.Builder(PendingIntent,Icon) instead.');
+    if (icon === null) r.throwJava(NPE, 'Bubbles require non-null icon'); warnIcon(r, icon); b.icon = icon; return self;
+  });
+  def(BUBBLE_BUILDER, 'setDesiredHeight', `(I)${BUBBLE_BUILDER}`, (r, _m, [self, height]) => { const b = bb(r, self); b.height = Math.max(height, 0); b.heightRes = 0; return self; });
+  def(BUBBLE_BUILDER, 'setDesiredHeightResId', `(I)${BUBBLE_BUILDER}`, (r, _m, [self, id]) => { const b = bb(r, self); b.heightRes = id; b.height = 0; return self; });
+  const flag = (name, bit) => def(BUBBLE_BUILDER, name, `(Z)${BUBBLE_BUILDER}`, (r, _m, [self, on]) => { const b = bb(r, self); b.flags = on ? b.flags | bit : b.flags & ~bit; return self; });
+  flag('setAutoExpandBubble', FLAG.AUTO_EXPAND_BUBBLE); flag('setSuppressNotification', FLAG.SUPPRESS_NOTIFICATION); flag('setSuppressableBubble', FLAG.SUPPRESSABLE_BUBBLE);
+  def(BUBBLE_BUILDER, 'setFlag', `(IZ)${BUBBLE_BUILDER}`, (r, _m, [self, mask, on]) => { const b = bb(r, self); b.flags = on ? b.flags | mask : b.flags & ~mask; return self; });
+  def(BUBBLE_BUILDER, 'setDeleteIntent', `(${PENDING})${BUBBLE_BUILDER}`, (r, _m, [self, intent]) => { bb(r, self).deleteIntent = intent; return self; });
+  def(BUBBLE_BUILDER, 'build', `()${BUBBLE}`, (r, _m, [self]) => {
+    const b = bb(r, self);
+    if (b.shortcutId === null && b.intent === null) r.throwJava(NPE, 'Must supply pending intent or shortcut to bubble');
+    if (b.shortcutId === null && b.icon === null) r.throwJava(NPE, 'Must supply an icon or shortcut for the bubble');
+    const data = r.allocate(BUBBLE); r.object(data).bubble = { ...b }; return data;
+  });
+  const bubbleGetter = (name, result, read) => def(BUBBLE, name, `()${result}`, (r, _m, [self]) => read(bubble(r, self)));
+  for (const name of ['getIntent', 'getBubbleIntent']) bubbleGetter(name, PENDING, b => b.intent);
+  bubbleGetter('getDeleteIntent', PENDING, b => b.deleteIntent); for (const name of ['getIcon', 'getBubbleIcon']) bubbleGetter(name, ICON, b => b.icon);
+  bubbleGetter('getShortcutId', STRING, b => b.shortcutId); bubbleGetter('getDesiredHeight', 'I', b => b.height); bubbleGetter('getDesiredHeightResId', 'I', b => b.heightRes); bubbleGetter('getFlags', 'I', b => b.flags);
+  for (const [name, bit] of [['getAutoExpandBubble', 1], ['isNotificationSuppressed', 2], ['isBubbleSuppressable', 4], ['isBubbleSuppressed', 8]]) bubbleGetter(name, 'Z', b => (b.flags & bit) !== 0 ? 1 : 0);
+  def(BUBBLE, 'setSuppressNotification', '(Z)V', (r, _m, [self, on]) => { const b = bubble(r, self); b.flags = on ? b.flags | 2 : b.flags & ~2; });
+  def(BUBBLE, 'setSuppressBubble', '(Z)V', (r, _m, [self, on]) => { const b = bubble(r, self); b.flags = on ? b.flags | 8 : b.flags & ~8; });
+  def(BUBBLE, 'setFlags', '(I)V', (r, _m, [self, flags]) => { bubble(r, self).flags = flags; });
+  def(BUBBLE, 'describeContents', '()I', () => 0);
+  def(NOTIFICATION, 'getBubbleMetadata', `()${BUBBLE}`, (r, _m, [self]) => meta(r, self).bubbleMetadata ?? null);
+  def(NOTIFICATION, 'getLocusId', '()Landroid/content/LocusId;', (r, _m, [self]) => meta(r, self).locusId ?? null);
+
   // ---- Notification.Builder -----------------------------------------------------------------------------------------------------------------------------
   const builder = (r, ref) => r.object(ref).builder ?? r.throwJava('Ljava/lang/IllegalStateException;', 'Notification.Builder used before construction');
   const fresh = () => ({ when: null, showWhen: null, icon: 0, smallIcon: null, title: null, text: null, subText: null, info: null, number: 0, progress: null, contentIntent: null, deleteIntent: null, fullScreen: null, fullScreenHighPriority: false, ticker: null, largeIcon: null,
@@ -267,7 +321,7 @@ export function createNotificationHost(platform) {
   setter('setGroup', STRING, (b, [v]) => { b.group = v; }); setter('setGroupSummary', 'Z', (b, [v]) => { b.groupSummary = !!v; }); setter('setGroupAlertBehavior', 'I', (b, [v]) => { b.groupAlert = v; }); setter('setBadgeIconType', 'I', (b, [v]) => { b.badge = v; });
   setter('setChannelId', STRING, (b, [v]) => { b.channelId = v; }); setter('setTimeoutAfter', 'J', (b, [v]) => { b.timeoutAfter = BigInt(v); }); setter('setShortcutId', STRING, (b, [v]) => { b.shortcutId = v; });
   setter('setRemoteInputHistory', '[' + CHARS, (b, [v]) => { b.remoteInputHistory = v; }); setter('setSettingsText', CHARS, (b, [v]) => { b.settingsText = v; });
-  setter('setLocusId', 'Landroid/content/LocusId;', (b, [v]) => { b.locusId = v; }); setter('setBubbleMetadata', 'Landroid/app/Notification$BubbleMetadata;', (b, [v]) => { if (v !== null) throw new APKError('Notification.Builder.setBubbleMetadata: bubbles are not implemented', { kind: 'unsupported-notification' }); });
+  setter('setLocusId', 'Landroid/content/LocusId;', (b, [v]) => { b.locusId = v; }); setter('setBubbleMetadata', 'Landroid/app/Notification$BubbleMetadata;', (b, [v]) => { b.bubbleMetadata = v; });
   setter('setStyle', STYLE, (b, [v], r) => { b.style = v; if (v !== null) style(r, v).builder = true; });
   setter('addPerson', PERSON, (b, [v]) => { if (v !== null) b.people.push(v); }); setter('addPerson', STRING, (b, [v], r) => { b.people.push(newPerson(r, { name: null, icon: null, uri: v, key: null, bot: false, important: false })); }); setter('setAllowSystemGeneratedContextualActions', 'Z', () => {}); setter('setForegroundServiceBehavior', 'I', (b, [v]) => { b.foregroundBehavior = v; });
   setter('addExtras', BUNDLE, (b, [v], r) => { if (v !== null) { b.extras ??= platform.bundle(r); call(r, b.extras, BUNDLE, 'putAll', [BUNDLE], 'V', [v]); } }); setter('setExtras', BUNDLE, (b, [v]) => { b.extras = v; });
@@ -326,7 +380,7 @@ export function createNotificationHost(platform) {
       ['tickerText', CHARS, b.ticker], ['largeIcon', BITMAP, b.largeIcon], ['sound', URI, b.sound], ['audioStreamType', 'I', b.audioStreamType], ['vibrate', '[J', b.vibrate], ['ledARGB', 'I', lights?.argb ?? 0], ['ledOnMS', 'I', lights?.on ?? 0], ['ledOffMS', 'I', lights?.off ?? 0],
       ['defaults', 'I', defaults], ['flags', 'I', flags | (defaults & 4 ? 1 : 0)], ['priority', 'I', b.priority], ['category', STRING, b.category], ['color', 'I', b.color], ['visibility', 'I', b.visibility], ['publicVersion', NOTIFICATION, b.publicVersion], ['extras', BUNDLE, extras]]) put(r, n, name, t, value);
     if (b.actions.length) { const actions = r.newArray(`[${ACTION}`, b.actions.length); r.array(actions).elements = [...b.actions]; put(r, n, 'actions', `[${ACTION}`, actions); }
-    Object.assign(meta(r, n), { channelId: b.channelId, group: b.group, sortKey: b.sortKey, timeoutAfter: b.timeoutAfter, smallIcon: b.smallIcon, largeIcon: b.largeIconObject ?? null, groupAlert: b.groupAlert, badgeIcon: b.badge, shortcutId: b.shortcutId, settingsText: b.settingsText ?? null });
+    Object.assign(meta(r, n), { channelId: b.channelId, group: b.group, sortKey: b.sortKey, timeoutAfter: b.timeoutAfter, smallIcon: b.smallIcon, largeIcon: b.largeIconObject ?? null, groupAlert: b.groupAlert, badgeIcon: b.badge, shortcutId: b.shortcutId, settingsText: b.settingsText ?? null, bubbleMetadata: b.bubbleMetadata ?? null, locusId: b.locusId ?? null });
     return n;
   }
   return { ...registry, interfaces: registry.interfacesOf };

@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=039e497067f0';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=039e497067f0';
-import { installNetworkCallbacks } from './network-callbacks.js?v=039e497067f0';
-import { createHostRegistry } from './host-contract.js?v=039e497067f0';
-import { resolveDevice } from './device-profile.js?v=039e497067f0';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=039e497067f0';
-import { gcRoot } from './heap-gc.js?v=039e497067f0';
+import { APKError } from './apk-error.js?v=93b5ba602b8e';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=93b5ba602b8e';
+import { installNetworkCallbacks } from './network-callbacks.js?v=93b5ba602b8e';
+import { createHostRegistry } from './host-contract.js?v=93b5ba602b8e';
+import { resolveDevice } from './device-profile.js?v=93b5ba602b8e';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=93b5ba602b8e';
+import { gcRoot } from './heap-gc.js?v=93b5ba602b8e';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -67,7 +67,25 @@ export function createDeviceStateHost(platform) {
   // ConnectivityManager: one active network (Wi-Fi unmetered, mobile metered) or none.
   const activeNetwork = r => { const state = platform.device.connectivity; if (state === 'offline') return null; const cache = platform.networks ??= new Map(); if (!cache.has(state)) { const network = r.makeObject(NETWORK); r.object(network).netId = state === 'online' ? 100 : 101; r.object(network).transport = state === 'online' ? 1 : 0; cache.set(state, network); } return cache.get(state); };
   const capabilitiesFor = (r, network) => { const caps = r.makeObject(CAPABILITIES); r.object(caps).transport = r.object(network).transport; r.object(caps).metered = r.object(network).transport === 0; return caps; };
-  def(NETWORK, 'toString', `()${STRING}`, (r, _m, [self]) => String(r.object(self).netId)); def(NETWORK, 'getNetworkHandle', '()J', (r, _m, [self]) => BigInt(r.object(self).netId));
+  // Network handles (android.net.Network): (netId << 32) | HANDLE_MAGIC, 0 for NETID_UNSET
+  const HANDLE_MAGIC = 0xcafed00dn;
+  def(NETWORK, 'toString', `()${STRING}`, (r, _m, [self]) => String(r.object(self).netId)); def(NETWORK, 'getNetworkHandle', '()J', (r, _m, [self]) => { const id = r.object(self).netId; return id === 0 ? 0n : (BigInt(id) << 32n) | HANDLE_MAGIC; });
+  def(NETWORK, 'equals', '(Ljava/lang/Object;)Z', (r, _m, [self, other]) => other !== null && other !== 0 && r.object(other).netId !== undefined && r.object(other).netId === r.object(self).netId ? 1 : 0);
+  def(NETWORK, 'hashCode', '()I', (r, _m, [self]) => Math.imul(r.object(self).netId, 11));
+  def(NETWORK, 'fromNetworkHandle', `(J)${NETWORK}`, (r, _m, [handle]) => {
+    if (handle === 0n) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Network.fromNetworkHandle refusing to instantiate NETID_UNSET Network.');
+    if ((handle & 0xffffffffn) !== HANDLE_MAGIC || handle < 0n) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Value passed to fromNetworkHandle() is not a network handle.');
+    const id = Number(handle >> 32n), known = [...(platform.networks?.values() ?? [])].find(n => r.object(n).netId === id);
+    if (known) return known; const network = r.makeObject(NETWORK); r.object(network).netId = id; r.object(network).transport = 1; return network;
+  }, { static: true });
+  // Name lookups and connections go through the process's resolver and URL stack with this network's id (the VM has one routed network)
+  def(NETWORK, 'getByName', `(${STRING})Ljava/net/InetAddress;`, (r, _m, [self, host]) => call(r, null, 'Ljava/net/InetAddress;', 'getByNameOnNet', [STRING, 'I'], 'Ljava/net/InetAddress;', [host, r.object(self).netId], 'static'));
+  def(NETWORK, 'getAllByName', `(${STRING})[Ljava/net/InetAddress;`, (r, _m, [self, host]) => call(r, null, 'Ljava/net/InetAddress;', 'getAllByNameOnNet', [STRING, 'I'], '[Ljava/net/InetAddress;', [host, r.object(self).netId], 'static'));
+  def(NETWORK, 'getSocketFactory', '()Ljavax/net/SocketFactory;', r => call(r, null, 'Ljavax/net/SocketFactory;', 'getDefault', [], 'Ljavax/net/SocketFactory;', [], 'static'));
+  def(NETWORK, 'openConnection', '(Ljava/net/URL;)Ljava/net/URLConnection;', (r, _m, [, url]) => { if (url === null || url === 0) r.throwJava('Ljava/lang/NullPointerException;', null); return call(r, url, 'Ljava/net/URL;', 'openConnection', [], 'Ljava/net/URLConnection;'); });
+  def(NETWORK, 'openConnection', '(Ljava/net/URL;Ljava/net/Proxy;)Ljava/net/URLConnection;', (r, _m, [, url, proxy]) => { if (proxy === null || proxy === 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'proxy is null'); return call(r, url, 'Ljava/net/URL;', 'openConnection', ['Ljava/net/Proxy;'], 'Ljava/net/URLConnection;', [proxy]); });
+  def(NETWORK, 'bindSocket', '(Ljava/net/Socket;)V', (r, _m, [, socket]) => { call(r, socket, 'Ljava/net/Socket;', 'getReuseAddress', [], 'Z'); });   // libcore first queries the socket (SocketException when closed), then binds its descriptor to the network
+  def(NETWORK, 'bindSocket', '(Ljava/net/DatagramSocket;)V', (r, _m, [, socket]) => { call(r, socket, 'Ljava/net/DatagramSocket;', 'getReuseAddress', [], 'Z'); });
   def(CAPABILITIES, 'hasTransport', '(I)Z', (r, _m, [self, t]) => r.object(self).transport === t ? 1 : 0);
   def(CAPABILITIES, 'hasCapability', '(I)Z', (r, _m, [self, c]) => { const o = r.object(self); if (c === 11) return o.metered ? 0 : 1; if ([12, 13, 14, 15, 16, 18, 19, 20, 21].includes(c)) return 1; return 0; });
   def(CAPABILITIES, 'getLinkDownstreamBandwidthKbps', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? 100000 : 20000); def(CAPABILITIES, 'getLinkUpstreamBandwidthKbps', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? 50000 : 5000);

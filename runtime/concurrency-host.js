@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=039e497067f0';
-import { createHostRegistry } from './host-contract.js?v=039e497067f0';
-import { Blocked, VMThread } from './scheduler.js?v=039e497067f0';
-import { Invoke } from './interpreter.js?v=039e497067f0';
-import { GC_ROOTS } from './heap-gc.js?v=039e497067f0';
+import { APKError } from './apk-error.js?v=93b5ba602b8e';
+import { createHostRegistry } from './host-contract.js?v=93b5ba602b8e';
+import { Blocked, VMThread } from './scheduler.js?v=93b5ba602b8e';
+import { Invoke } from './interpreter.js?v=93b5ba602b8e';
+import { GC_ROOTS } from './heap-gc.js?v=93b5ba602b8e';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -629,6 +629,8 @@ export function createConcurrencyHost(platform) {
   const FORK_JOIN = 'Ljava/util/concurrent/ForkJoinPool;', MANAGED_BLOCKER = 'Ljava/util/concurrent/ForkJoinPool$ManagedBlocker;';
   type(FORK_JOIN, OBJECT, [], { allocatable: false }); type(MANAGED_BLOCKER, OBJECT); registry.interfaces.set(MANAGED_BLOCKER, []);
   const blockerCall = (name, blocker, then) => new Invoke({ owner: MANAGED_BLOCKER, name, parameters: [], result: 'Z', signature: '()Z' }, [blocker], 'virtual', then);
+  def(FORK_JOIN, 'commonPool', `()${FORK_JOIN}`, r => (r.commonPoolStandIn ??= r.makeObject(FORK_JOIN)), { static: true });   // only ever compared with an executor (CompletableFuture.screenExecutor): there is no pool behind it
+  def(FORK_JOIN, 'getCommonPoolParallelism', '()I', () => 1, { static: true });   // no work-stealing pool: CompletableFuture's default executor is its thread-per-task fallback
   def(FORK_JOIN, 'managedBlock', `(${MANAGED_BLOCKER})V`, (r, _m, [blocker]) => {
     if (blocker === null || blocker === 0 || blocker === undefined) throwNew(r, 'Ljava/lang/NullPointerException;');
     const loop = () => blockerCall('isReleasable', blocker, releasable => releasable ? undefined : blockerCall('block', blocker, done => done ? undefined : loop()));
