@@ -1,8 +1,8 @@
-import { createHostRegistry } from './host-contract.js?v=93b5ba602b8e';
-import { ISO_COUNTRIES, ISO_LANGUAGES } from './iso-codes-data.js?v=93b5ba602b8e';
+import { createHostRegistry } from './host-contract.js?v=43c1da0663b3';
+import { ISO_COUNTRIES, ISO_LANGUAGES } from './iso-codes-data.js?v=43c1da0663b3';
 
 // java.util.Locale beyond the first host pass (libcore Locale.java, android-13.0.0_r1): the ISO code tables, 3-letter codes, extensions (BCP 47 -u- / -x- and any singleton),
-// stripExtensions, setDefault, and Locale.Builder with IllformedLocaleException. Locale objects are the platform's (one per canonical language tag, platform.locale).
+// stripExtensions, setDefault, and Locale.Builder with IllformedLocaleException; plus Calendar week dates and Calendar.Builder. Locale objects are the platform's (one per canonical language tag, platform.locale).
 const LOCALE = 'Ljava/util/Locale;', BUILDER = 'Ljava/util/Locale$Builder;', ILLFORMED = 'Ljava/util/IllformedLocaleException;', CATEGORY = 'Ljava/util/Locale$Category;', STRING = 'Ljava/lang/String;', SET = 'Ljava/util/Set;';
 const LANGUAGE = /^[a-zA-Z]{2,8}$/, SCRIPT = /^[a-zA-Z]{4}$/, REGION = /^(?:[a-zA-Z]{2}|\d{3})$/, VARIANT = /^(?:[a-zA-Z0-9]{5,8}|\d[a-zA-Z0-9]{3})$/, KEY = /^[a-zA-Z0-9]{2}$/, TYPE = /^[a-zA-Z0-9]{3,8}$/, ATTRIBUTE = /^[a-zA-Z0-9]{3,8}$/;
 
@@ -120,6 +120,90 @@ export function createLocaleExtrasHost(platform) {
     const tail = [...[...b.extensions].filter(([k]) => k !== 'x').sort(([a], [c]) => (a < c ? -1 : 1)), ...(u.length ? [['u', u.join('-')]] : [])].sort(([a], [c]) => (a < c ? -1 : 1)).flatMap(([k, v]) => [k, v]);
     if (b.extensions.has('x')) tail.push('x', b.extensions.get('x'));
     return platform.locale(r, [...parts, ...tail].join('-'));
+  });
+
+  // ---- Calendar week dates and Calendar.Builder (Calendar.java android-13.0.0_r1). Week-date arithmetic is the Gregorian one (week 1 is the first week with at least
+  // getMinimalDaysInFirstWeek() days in the year, weeks start on getFirstDayOfWeek()); dates before the Julian cutover are treated as proleptic Gregorian.
+  const CALENDAR = 'Ljava/util/Calendar;', CAL_BUILDER = 'Ljava/util/Calendar$Builder;', TZ = 'Ljava/util/TimeZone;', DATE = 'Ljava/util/Date;', SET_I = 'Ljava/util/Set;';
+  type(CAL_BUILDER, 'Ljava/lang/Object;', [], { allocatable: true });
+  const FIELD_COUNT = 17, WEEK_YEAR = 17, YEAR = 1, MONTH = 2, WEEK_OF_YEAR = 3, DAY_OF_MONTH = 5, DAY_OF_WEEK = 7;
+  const fromDayNumber = days => { const d = new Date(days * 86400000); return [d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()]; };
+  const utcDayNumber = (year, month, day) => { const d = new Date(0); d.setUTCFullYear(year, month, day); d.setUTCHours(0, 0, 0, 0); return Math.floor(d.getTime() / 86400000); };
+  const week1Start = (year, first, minimal) => {
+    const jan1 = utcDayNumber(year, 0, 1), dow1 = new Date(jan1 * 86400000).getUTCDay() + 1, lead = (dow1 - first + 7) % 7;
+    return jan1 - lead + (7 - lead < minimal ? 7 : 0);
+  };
+  const calField = (r, cal, field) => call(r, cal, CALENDAR, 'get', ['I'], 'I', [field]);
+  const weekRules = (r, cal) => [call(r, cal, CALENDAR, 'getFirstDayOfWeek', [], 'I'), call(r, cal, CALENDAR, 'getMinimalDaysInFirstWeek', [], 'I')];
+  const applyWeekDate = (r, cal, weekYear, weekOfYear, dayOfWeek) => {
+    const [first, minimal] = weekRules(r, cal);
+    const target = week1Start(weekYear, first, minimal) + (weekOfYear - 1) * 7 + ((dayOfWeek - first + 7) % 7);
+    const [y, m, d] = fromDayNumber(target);
+    call(r, cal, CALENDAR, 'set', ['I', 'I', 'I'], 'V', [y, m, d]);
+  };
+  def(CALENDAR, 'isWeekDateSupported', '()Z', () => 1);
+  def(CALENDAR, 'setWeekDate', '(III)V', (r, _m, [self, weekYear, weekOfYear, dayOfWeek]) => applyWeekDate(r, self, weekYear, weekOfYear, dayOfWeek));
+  def(CALENDAR, 'getWeekYear', '()I', (r, _m, [self]) => {
+    const year = calField(r, self, YEAR), week = calField(r, self, WEEK_OF_YEAR), month = calField(r, self, MONTH);
+    return month === 0 && week >= 52 ? year - 1 : month === 11 && week === 1 ? year + 1 : year;
+  });
+  def(CALENDAR, 'getWeeksInWeekYear', '()I', (r, _m, [self]) => {
+    const weekYear = call(r, self, CALENDAR, 'getWeekYear', [], 'I'), [first, minimal] = weekRules(r, self);
+    return (week1Start(weekYear + 1, first, minimal) - week1Start(weekYear, first, minimal)) / 7;
+  });
+  def(CALENDAR, 'getAvailableCalendarTypes', `()${SET_I}`, r => {
+    const set = r.allocate('Ljava/util/HashSet;'); r.dispatch({ owner: 'Ljava/util/HashSet;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [set], 'direct');
+    call(r, set, SET_I, 'add', ['Ljava/lang/Object;'], 'Z', ['gregory']);
+    return r.dispatch({ owner: 'Ljava/util/Collections;', name: 'unmodifiableSet', parameters: [SET_I], result: SET_I, signature: `(${SET_I})${SET_I}` }, [set], 'static');
+  }, { static: true });
+
+  const builder = (r, self) => (r.object(self).calendarBuilder ??= { instant: null, set: false, stamps: new Map(), nextStamp: 1, type: null, zone: null, lenient: true, locale: null, week: null });
+  const ise = (r, message) => r.throwJava('Ljava/lang/IllegalStateException;', message), iae = (r, message) => r.throwJava('Ljava/lang/IllegalArgumentException;', message);
+  const stamp = (b, field, value) => { b.stamps.delete(field); b.stamps.set(field, value); };   // the latest set of a field wins; fields apply in the order they were last set
+  const callWide = (r, receiver, owner, name, parameters, result, values) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, r.argumentWords(parameters, values, { receiver }), 'virtual');
+  def(CAL_BUILDER, '<init>', '()V', (r, _m, [self]) => { builder(r, self); });
+  def(CAL_BUILDER, 'setInstant', `(J)${CAL_BUILDER}`, (r, _m, [self, instant]) => { const b = builder(r, self); if (b.set) ise(r, null); b.instant = instant; return self; });
+  def(CAL_BUILDER, 'setInstant', `(${DATE})${CAL_BUILDER}`, (r, _m, [self, date]) => { if (nullish(date)) r.throwJava('Ljava/lang/NullPointerException;', null); return callWide(r, self, CAL_BUILDER, 'setInstant', ['J'], CAL_BUILDER, [call(r, date, DATE, 'getTime', [], 'J')]); });
+  const setField = (r, b, field, value) => { if (field < 0 || field >= FIELD_COUNT) iae(r, 'field is invalid'); if (b.instant !== null) ise(r, 'instant has been set'); b.set = true; stamp(b, field, value); };
+  def(CAL_BUILDER, 'set', `(II)${CAL_BUILDER}`, (r, _m, [self, field, value]) => { setField(r, builder(r, self), field, value); return self; });
+  def(CAL_BUILDER, 'setFields', `([I)${CAL_BUILDER}`, (r, _m, [self, pairs]) => {
+    const values = r.array(pairs).elements, b = builder(r, self); if (values.length % 2 !== 0) iae(r, null); if (b.instant !== null) ise(r, 'instant has been set');
+    for (let i = 0; i < values.length; i += 2) setField(r, b, values[i], values[i + 1]);
+    return self;
+  });
+  def(CAL_BUILDER, 'setDate', `(III)${CAL_BUILDER}`, (r, _m, [self, y, m, d]) => { const b = builder(r, self); if (b.instant !== null) ise(r, 'instant has been set'); setField(r, b, YEAR, y); setField(r, b, MONTH, m); setField(r, b, DAY_OF_MONTH, d); return self; });
+  const timeOfDay = (r, self, h, mi, s, ms) => { const b = builder(r, self); if (b.instant !== null) ise(r, 'instant has been set'); for (const [f, v] of [[11, h], [12, mi], [13, s], [14, ms]]) setField(r, b, f, v); return self; };
+  def(CAL_BUILDER, 'setTimeOfDay', `(III)${CAL_BUILDER}`, (r, _m, [self, h, mi, s]) => timeOfDay(r, self, h, mi, s, 0));
+  def(CAL_BUILDER, 'setTimeOfDay', `(IIII)${CAL_BUILDER}`, (r, _m, [self, h, mi, s, ms]) => timeOfDay(r, self, h, mi, s, ms));
+  def(CAL_BUILDER, 'setWeekDate', `(III)${CAL_BUILDER}`, (r, _m, [self, weekYear, weekOfYear, dayOfWeek]) => { const b = builder(r, self); b.set = true; stamp(b, WEEK_YEAR, weekYear); stamp(b, WEEK_OF_YEAR, weekOfYear); stamp(b, DAY_OF_WEEK, dayOfWeek); return self; });
+  def(CAL_BUILDER, 'setTimeZone', `(${TZ})${CAL_BUILDER}`, (r, _m, [self, zone]) => { if (nullish(zone)) r.throwJava('Ljava/lang/NullPointerException;', null); builder(r, self).zone = zone; return self; });
+  def(CAL_BUILDER, 'setLenient', `(Z)${CAL_BUILDER}`, (r, _m, [self, lenient]) => { builder(r, self).lenient = !!lenient; return self; });
+  def(CAL_BUILDER, 'setLocale', `(${LOCALE})${CAL_BUILDER}`, (r, _m, [self, locale]) => { if (nullish(locale)) r.throwJava('Ljava/lang/NullPointerException;', null); builder(r, self).locale = locale; return self; });
+  def(CAL_BUILDER, 'setCalendarType', `(${STRING})${CAL_BUILDER}`, (r, _m, [self, type]) => {
+    if (nullish(type)) r.throwJava('Ljava/lang/NullPointerException;', null);
+    let name = r.stringCharacters(type); if (name === 'gregorian') name = 'gregory';
+    if (name !== 'gregory' && name !== 'iso8601') iae(r, `unknown calendar type: ${name}`);
+    const b = builder(r, self); if (b.type === null) b.type = name; else if (b.type !== name) ise(r, 'calendar type override');
+    return self;
+  });
+  def(CAL_BUILDER, 'setWeekDefinition', `(II)${CAL_BUILDER}`, (r, _m, [self, first, minimal]) => { if (first < 1 || first > 7 || minimal < 1 || minimal > 7) iae(r, null); builder(r, self).week = [first, minimal]; return self; });
+  def(CAL_BUILDER, 'build', `()${CALENDAR}`, (r, _m, [self]) => {
+    const b = builder(r, self);
+    const locale = b.locale ?? r.dispatch({ owner: LOCALE, name: 'getDefault', parameters: [], result: LOCALE, signature: `()${LOCALE}` }, [], 'static');
+    const zone = b.zone ?? r.dispatch({ owner: TZ, name: 'getDefault', parameters: [], result: TZ, signature: `()${TZ}` }, [], 'static');
+    const type = b.type ?? 'gregory';
+    const cal = r.dispatch({ owner: CALENDAR, name: 'getInstance', parameters: [TZ, LOCALE], result: CALENDAR, signature: `(${TZ}${LOCALE})${CALENDAR}` }, [zone, locale], 'static');
+    call(r, cal, CALENDAR, 'clear', [], 'V'); call(r, cal, CALENDAR, 'setLenient', ['Z'], 'V', [b.lenient ? 1 : 0]);
+    const week = type === 'iso8601' ? [2, 4] : b.week;
+    if (week) { call(r, cal, CALENDAR, 'setFirstDayOfWeek', ['I'], 'V', [week[0]]); call(r, cal, CALENDAR, 'setMinimalDaysInFirstWeek', ['I'], 'V', [week[1]]); }
+    if (b.instant !== null) { callWide(r, cal, CALENDAR, 'setTimeInMillis', ['J'], 'V', [b.instant]); call(r, cal, CALENDAR, 'getTimeInMillis', [], 'J'); return cal; }
+    if (b.set) {
+      const weekDate = b.stamps.has(WEEK_YEAR) && [...b.stamps.keys()].indexOf(WEEK_YEAR) > [...b.stamps.keys()].indexOf(YEAR);
+      for (const [field, value] of b.stamps) if (field < FIELD_COUNT && !(weekDate && (field === WEEK_OF_YEAR || field === DAY_OF_WEEK))) call(r, cal, CALENDAR, 'set', ['I', 'I'], 'V', [field, value]);
+      if (weekDate) applyWeekDate(r, cal, b.stamps.get(WEEK_YEAR), b.stamps.get(WEEK_OF_YEAR) ?? 1, b.stamps.get(DAY_OF_WEEK) ?? call(r, cal, CALENDAR, 'getFirstDayOfWeek', [], 'I'));
+      call(r, cal, CALENDAR, 'getTimeInMillis', [], 'J');   // Calendar.complete(): resolve the fields (an IllegalArgumentException for an invalid date when not lenient)
+    }
+    return cal;
   });
   return { ...registry };
 }

@@ -1,5 +1,6 @@
 Android framework portions: Apache License 2.0.
 OpenJDK portions from libcore: GPLv2 with Classpath Exception; see NOTICE.
+W3C DOM interfaces (org.w3c.dom): W3C Software Notice and License 2002-12-31; see LICENSE-W3C-SOFTWARE-2002-12-31.txt.
 
 
                                  Apache License

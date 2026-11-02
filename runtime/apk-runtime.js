@@ -1,23 +1,23 @@
-import { VMClock } from './vm-clock.js?v=93b5ba602b8e';
-import { ExecutionProfile } from './execution-profile.js?v=93b5ba602b8e';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=93b5ba602b8e';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=93b5ba602b8e';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=93b5ba602b8e';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=93b5ba602b8e';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=93b5ba602b8e';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=93b5ba602b8e';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=93b5ba602b8e';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=93b5ba602b8e';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=93b5ba602b8e';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=93b5ba602b8e';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=93b5ba602b8e';
-import { APKError } from './apk-error.js?v=93b5ba602b8e';
-import { collectGarbage, collectionDue } from './heap-gc.js?v=93b5ba602b8e';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=93b5ba602b8e';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=93b5ba602b8e';
-import { Scheduler, Blocked } from './scheduler.js?v=93b5ba602b8e';
-import { bootClassLacksMember } from './boot-class-members.js?v=93b5ba602b8e';
-export { APKError } from './apk-error.js?v=93b5ba602b8e';
+import { VMClock } from './vm-clock.js?v=43c1da0663b3';
+import { ExecutionProfile } from './execution-profile.js?v=43c1da0663b3';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=43c1da0663b3';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=43c1da0663b3';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=43c1da0663b3';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=43c1da0663b3';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=43c1da0663b3';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=43c1da0663b3';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=43c1da0663b3';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=43c1da0663b3';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=43c1da0663b3';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=43c1da0663b3';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=43c1da0663b3';
+import { APKError } from './apk-error.js?v=43c1da0663b3';
+import { collectGarbage, collectionDue } from './heap-gc.js?v=43c1da0663b3';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=43c1da0663b3';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=43c1da0663b3';
+import { Scheduler, Blocked } from './scheduler.js?v=43c1da0663b3';
+import { bootClassLacksMember } from './boot-class-members.js?v=43c1da0663b3';
+export { APKError } from './apk-error.js?v=43c1da0663b3';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -269,7 +269,7 @@ export class DexProgram {
       if (bootBytes > 128 * 1024 * 1024) fail('Framework DEX layer exceeds 128 MiB');
       this.bootFiles.push({ filename, dex }); this.bootDexes.add(dex);
       for (const [name, cls] of dex.classes) {
-        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore)\/|com\/(?:android\/(?:internal|icu|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/collect|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
+        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/w3c\/dom\/|org\/apache\/harmony\/xml\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore)\/|com\/(?:android\/(?:internal|icu|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/collect|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
         if (this.bootClasses.has(name)) fail(`Duplicate framework class: ${name}`);
         this.bootClasses.set(name, cls);
       }

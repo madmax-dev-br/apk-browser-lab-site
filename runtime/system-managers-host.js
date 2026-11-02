@@ -1,5 +1,5 @@
-import { floatBits } from './host-contract.js?v=93b5ba602b8e';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=93b5ba602b8e';
+import { floatBits } from './host-contract.js?v=43c1da0663b3';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=43c1da0663b3';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,
@@ -176,6 +176,16 @@ export function createSystemManagersHost(platform) {
   def(DPM, 'lockNow', '()V', r => denied(r, 'No active admin owned by uid ' + uid()));
   def(DPM, 'wipeData', '(I)V', r => denied(r, 'No active admin owned by uid ' + uid()));
   def(DPM, 'resetPassword', `(${STRING}I)Z`, r => denied(r, 'Admin cannot call resetPassword'));
+  // Queries whose answer for an app that is no admin follows DevicePolicyManager.java / DevicePolicyManagerService.java (android-13.0.0_r1): no device owner, no profile owner, no system update policy.
+  def(DPM, 'getAutoTimeRequired', '()Z', () => 0); def(DPM, 'isLogoutEnabled', '()Z', () => 0); def(DPM, 'isAffiliatedUser', '()Z', () => 0);
+  def(DPM, 'getDeviceOwnerLockScreenInfo', `()Ljava/lang/CharSequence;`, () => null); def(DPM, 'getSystemUpdatePolicy', '()Landroid/app/admin/SystemUpdatePolicy;', () => null);
+  def(DPM, 'getMinimumRequiredWifiSecurityLevel', '()I', () => 0);   // WIFI_SECURITY_OPEN: no admin sets a floor
+  def(DPM, 'isUsbDataSignalingEnabled', '()Z', () => 1);
+  def(DPM, 'getWifiSsidPolicy', '()Landroid/net/wifi/WifiSsidPolicy;', r => denied(r, 'SSID policy can only be retrieved by a device owner or a profile owner on an organization-owned device or an app with the QUERY_ADMIN_POLICY permission.'));
+  def(DPM, 'getCurrentFailedPasswordAttempts', '()I', r => { if (!platform.holdsPermission?.(r, 'android.permission.ACCESS_KEYGUARD_SECURE_STORAGE')) denied(r, `No active admin owned by uid ${uid()} for policy #1`); return 0; });
+  const hasFeature = (r, feature) => call(r, call(r, platform.application, 'Landroid/content/Context;', 'getPackageManager', [], 'Landroid/content/pm/PackageManager;'), 'Landroid/content/pm/PackageManager;', 'hasSystemFeature', [STRING], 'Z', [feature]);
+  def(DPM, 'isDeviceIdAttestationSupported', '()Z', r => hasFeature(r, 'android.software.device_id_attestation'));
+  def(DPM, 'isUniqueDeviceAttestationSupported', '()Z', r => hasFeature(r, 'android.hardware.device_unique_attestation'));
   def(DPM, 'getParentProfileInstance', `(${COMPONENT})Landroid/app/admin/DevicePolicyManager;`, (r, _m, [, admin]) => { if (nullish(admin)) npe(r); notAdmin(r, admin); });
 
   // ---- SubscriptionManager / CarrierConfigManager: no telephony feature and no SIM, so there are no subscriptions and the carrier configuration is the default one

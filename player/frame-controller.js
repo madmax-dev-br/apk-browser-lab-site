@@ -1,9 +1,9 @@
 // Message-driven controller of one player frame. DOM-free: the VM client, the shared device view and the postMessage sink are injected, so the
 // same code runs in the real frame (frame.js) and in the headless smoke test.
-import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES } from './protocol.js?v=93b5ba602b8e';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=93b5ba602b8e';
-import { formatApiGapReport } from '../api-gap-scan.js?v=93b5ba602b8e';
-import { sanitizeSettings } from '../device-settings.js?v=93b5ba602b8e';
+import { configToSettings, parseConfig, settingsToConfig, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES } from './protocol.js?v=43c1da0663b3';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=43c1da0663b3';
+import { formatApiGapReport } from '../api-gap-scan.js?v=43c1da0663b3';
+import { sanitizeSettings } from '../device-settings.js?v=43c1da0663b3';
 export function createFrameController({ vm, state, deviceState, post, fetchImpl = globalThis.fetch?.bind(globalThis), hooks = {} }) {
   let view = null, source = null, config = {}, lastActivity = null, destroyed = false, chain = Promise.resolve(), inflight = 0, oomSeen = 0, lastStubs = { void: [], returns: [], classes: [] }, packageName = '', tolerateRunning = 'off'; const dropped = [];
   const send = (type, payload) => post(envelope(type, payload));

@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=93b5ba602b8e';
-import { APKError } from './apk-error.js?v=93b5ba602b8e';
-import { Invoke } from './interpreter.js?v=93b5ba602b8e';
-import { createHostRegistry } from './host-contract.js?v=93b5ba602b8e';
+import { gcRoot } from './heap-gc.js?v=43c1da0663b3';
+import { APKError } from './apk-error.js?v=43c1da0663b3';
+import { Invoke } from './interpreter.js?v=43c1da0663b3';
+import { createHostRegistry } from './host-contract.js?v=43c1da0663b3';
 
 // Generic-type reflection and java.lang.reflect.Proxy for the libraries that wire themselves up with reflection at launch (Retrofit, Gson, Moshi, Koin, Dagger,
 // Room, WorkManager). Contracts: java.lang.Class / java.lang.reflect.{Method,Constructor,Field,Proxy,Type,ParameterizedType,TypeVariable,WildcardType,GenericArrayType}

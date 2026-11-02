@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=93b5ba602b8e';
+import { createHostRegistry } from './host-contract.js?v=43c1da0663b3';
 
 // The system-manager methods an ordinary app calls that the first host passes left out, for a one-user, unmanaged, unlocked phone without fingerprint hardware or thermal HAL
 // (android-13.0.0_r1 UserManager / UserManagerService, KeyguardManager / PhoneWindowManager, PowerManager / ThermalManagerService, FingerprintManager):
@@ -159,5 +159,95 @@ export function createManagersExtrasHost(platform) {
     authenticate(r, self, crypto, cancel, executor, authCallback);
   });
   void LIST_T;
+
+  // ---- AccountManager future-based methods (AccountManager.java android-13.0.0_r1): the client-side argument checks, then the request goes to AccountManagerService. This device has no
+  // account authenticator, so a request that needs one fails the way the service reports it: the future ends with AuthenticatorException("bind failure") (ERROR_CODE_REMOTE_EXCEPTION),
+  // after the call returned. The callback runs on the Handler (the main Looper when null); getResult() on the main Looper before that is the framework's IllegalStateException for
+  // targetSdk >= 8. removeAccount needs the caller to be the authenticator (SecurityException); an empty feature list needs no authenticator and yields an empty array.
+  const ACCOUNTS = 'Landroid/accounts/AccountManagerImpl;', ACCOUNT = 'Landroid/accounts/Account;', FUTURE = 'Lapkweb/bridge/AccountFuture;', FUTURE_I = 'Landroid/accounts/AccountManagerFuture;';
+  const ACCOUNT_CB = 'Landroid/accounts/AccountManagerCallback;', UNITS = 'Ljava/util/concurrent/TimeUnit;';
+  type(FUTURE, 'Ljava/lang/Object;', [FUTURE_I], { allocatable: true });
+  const isMainThread = r => !r.thread || r.thread === r.scheduler.mainThread();
+  const finish = (r, future) => {
+    const state = r.object(future);
+    if (state.done) return;
+    state.done = true;
+    if (nullish(state.callback)) return;
+    const run = () => call(r, state.callback, ACCOUNT_CB, 'run', [FUTURE_I], 'V', [future]);
+    if (nullish(state.handler)) platform.queueTask(run, 0, [future, state.callback]);
+    else { const runnable = r.allocate(DELIVERY); r.object(runnable).task = run; call(r, state.handler, 'Landroid/os/Handler;', 'post', [RUNNABLE], 'Z', [runnable]); }
+  };
+  const newFuture = (r, callback, handler, outcome) => {
+    const future = r.allocate(FUTURE); Object.assign(r.object(future), { done: false, cancelled: false, callback, handler, outcome });
+    platform.queueTask(() => finish(r, future), 0, [future, callback, handler].filter(ref => !nullish(ref)));
+    return future;
+  };
+  const bindFailure = { error: 'bind failure' };
+  const result = (r, future) => {
+    const state = r.object(future);
+    if (state.cancelled) r.throwJava('Landroid/accounts/OperationCanceledException;', null);
+    if (!state.done) {
+      if (isMainThread(r) && (platform.targetSdk ?? 34) >= 8) r.throwJava('Ljava/lang/IllegalStateException;', 'calling this from your main thread can lead to deadlock');
+      finish(r, future);   // another thread waits for the (immediate) answer of the service
+    }
+    if (state.outcome.error !== undefined) r.throwJava('Landroid/accounts/AuthenticatorException;', state.outcome.error);
+    return state.outcome.value;
+  };
+  def(FUTURE, 'getResult', '()Ljava/lang/Object;', (r, _m, [self]) => result(r, self));
+  def(FUTURE, 'getResult', `(J${UNITS})Ljava/lang/Object;`, (r, _m, [self]) => result(r, self));
+  def(FUTURE, 'isDone', '()Z', (r, _m, [self]) => (r.object(self).done ? 1 : 0)); def(FUTURE, 'isCancelled', '()Z', (r, _m, [self]) => (r.object(self).cancelled ? 1 : 0));
+  def(FUTURE, 'cancel', '(Z)Z', (r, _m, [self]) => { const state = r.object(self); if (state.done) return 0; state.cancelled = true; finish(r, self); return 1; });
+  // [name, parameters, null checks [parameter index, message]..., outcome]; the future's parameters are the last callback and handler
+  const CB_H = `${ACCOUNT_CB}${HANDLER}`, S = STRING, B = BUNDLE, SA = `[${STRING}`, boolArray = 'Z';
+  const request = [
+    ['addAccount', `${S}${S}${SA}${B}${ACTIVITY}${CB_H}`, [[0, 'accountType is null']]],
+    ['getAuthToken', `${ACCOUNT}${S}${B}${ACTIVITY}${CB_H}`, [[0, 'account is null'], [1, 'authTokenType is null']]],
+    ['getAuthToken', `${ACCOUNT}${S}${B}Z${CB_H}`, [[0, 'account is null'], [1, 'authTokenType is null']]],
+    ['getAuthToken', `${ACCOUNT}${S}Z${CB_H}`, [[0, 'account is null'], [1, 'authTokenType is null']]],
+    ['getAuthTokenByFeatures', `${S}${S}${SA}${ACTIVITY}${B}${B}${CB_H}`, [[0, 'account type is null'], [1, 'authTokenType is null']]],
+    ['confirmCredentials', `${ACCOUNT}${B}${ACTIVITY}${CB_H}`, [[0, 'account is null']]],
+    ['updateCredentials', `${ACCOUNT}${S}${B}${ACTIVITY}${CB_H}`, [[0, 'account is null']]],
+    ['editProperties', `${S}${ACTIVITY}${CB_H}`, [[0, 'accountType is null']]],
+    ['hasFeatures', `${ACCOUNT}${SA}${CB_H}`, [[0, 'account is null'], [1, 'features is null']]],
+    ['getAuthTokenLabel', `${S}${S}${CB_H}`, [[0, 'accountType is null'], [1, 'authTokenType is null']]],
+    ['isCredentialsUpdateSuggested', `${ACCOUNT}${S}${CB_H}`, [[0, 'account is null']]],
+  ];
+  const resultFor = { addAccount: B, getAuthToken: B, getAuthTokenByFeatures: B, confirmCredentials: B, updateCredentials: B, editProperties: B, hasFeatures: 'Ljava/lang/Boolean;', getAuthTokenLabel: STRING, isCredentialsUpdateSuggested: 'Ljava/lang/Boolean;' };
+  void resultFor;
+  for (const [name, parameters, checks] of request) {
+    const shape = parameters.match(/\[?L[^;]+;|[ZIJ]/g);
+    def(ACCOUNTS, name, `(${parameters})${FUTURE_I}`, (r, _m, [, ...args]) => {
+      for (const [index, message] of checks) if (nullish(args[index])) iae(r, message);
+      if (name === 'isCredentialsUpdateSuggested' && r.stringCharacters(args[1]) === '') iae(r, 'status token is empty');
+      return newFuture(r, args[shape.length - 2], args[shape.length - 1], bindFailure);
+    });
+  }
+  const accountTypeOf = (r, account) => r.stringCharacters(r.object(account).fields.get(`${ACCOUNT}->type:${STRING}`));
+  def(ACCOUNTS, 'removeAccount', `(${ACCOUNT}${CB_H})${FUTURE_I}`, (r, _m, [, account, callback, handler]) => {
+    if (nullish(account)) iae(r, 'account is null');
+    denied(r, `uid ${uid()} cannot remove accounts of type: ${accountTypeOf(r, account)}`);
+    return newFuture(r, callback, handler, bindFailure);
+  });
+  def(ACCOUNTS, 'removeAccount', `(${ACCOUNT}${ACTIVITY}${CB_H})${FUTURE_I}`, (r, _m, [, account, , callback, handler]) => {
+    if (nullish(account)) iae(r, 'account is null');
+    denied(r, `uid ${uid()} cannot remove accounts of type: ${accountTypeOf(r, account)}`);
+    return newFuture(r, callback, handler, bindFailure);
+  });
+  def(ACCOUNTS, 'getAccountsByTypeAndFeatures', `(${S}${SA}${CB_H})${FUTURE_I}`, (r, _m, [, type, features, callback, handler]) => {
+    if (nullish(type)) iae(r, 'type is null');
+    const none = nullish(features) || r.array(features).elements.length === 0;
+    return newFuture(r, callback, handler, none ? { value: (() => { const a = r.newArray(`[${ACCOUNT}`, 0); return a; })() } : bindFailure);
+  });
+
+  // ---- NotificationManager policy surface (NotificationManagerService android-13.0.0_r1): an app has no notification-policy access (Do Not Disturb access is a user grant), so the zen-rule
+  // and policy mutators fail with the service's SecurityException; the interruption filter is "all" (zen mode off).
+  const NOTIFICATIONS = 'Landroid/app/NotificationManagerImpl;', RULE = 'Landroid/app/AutomaticZenRule;', POLICY = 'Landroid/app/NotificationManager$Policy;', CONDITION = 'Landroid/service/notification/Condition;';
+  const policyDenied = r => denied(r, 'Notification policy access denied');
+  def(NOTIFICATIONS, 'getCurrentInterruptionFilter', '()I', () => 1); def(NOTIFICATIONS, 'isNotificationPolicyAccessGranted', '()Z', () => 0);
+  def(NOTIFICATIONS, 'isNotificationListenerAccessGranted', '(Landroid/content/ComponentName;)Z', () => 0);
+  def(NOTIFICATIONS, 'setInterruptionFilter', '(I)V', policyDenied); def(NOTIFICATIONS, 'setNotificationPolicy', `(${POLICY})V`, policyDenied);
+  def(NOTIFICATIONS, 'getAutomaticZenRules', '()Ljava/util/Map;', policyDenied); def(NOTIFICATIONS, 'getAutomaticZenRule', `(${STRING})${RULE}`, policyDenied);
+  def(NOTIFICATIONS, 'addAutomaticZenRule', `(${RULE})${STRING}`, policyDenied); def(NOTIFICATIONS, 'updateAutomaticZenRule', `(${STRING}${RULE})Z`, policyDenied);
+  def(NOTIFICATIONS, 'removeAutomaticZenRule', `(${STRING})Z`, policyDenied); def(NOTIFICATIONS, 'setAutomaticZenRuleState', `(${STRING}${CONDITION})V`, policyDenied);
   return { ...registry };
 }

@@ -1,4 +1,4 @@
-import { createHostRegistry, bitsDouble, bitsFloat } from './host-contract.js?v=93b5ba602b8e';
+import { createHostRegistry, bitsDouble, bitsFloat } from './host-contract.js?v=43c1da0663b3';
 
 // java.lang.String.format(...) / java.util.Formatter conversions: %s %S %d %x %X %o %c %b %B %h %n %% %f %e %E %g %G with the flags - # + space 0 , ( and
 // argument indices (%1$s, %<s). Number formatting uses ASCII digits with the locale's decimal/grouping separators from Intl. Date/time (%t) and
@@ -111,5 +111,30 @@ export function createFormatterHost(platform) {
   const args = (r, array) => array === null ? [null] : r.array(array).elements; // format(fmt, (Object[]) null) formats one null argument, as Java does
   def('Ljava/lang/String;', 'format', `(${STRING}${OBJECTS})${STRING}`, (r, _m, [f, a]) => { if (f === null) r.throwJava('Ljava/lang/NullPointerException;', null); return format(r, r.stringCharacters(f), args(r, a), 'en-US'); }, { static: true });
   def('Ljava/lang/String;', 'format', `(${LOCALE}${STRING}${OBJECTS})${STRING}`, (r, _m, [l, f, a]) => { if (f === null) r.throwJava('Ljava/lang/NullPointerException;', null); return format(r, r.stringCharacters(f), args(r, a), localeTag(r, l)); }, { static: true });
+  // ---- java.util.Formatter over the same conversion engine: output goes to an Appendable (a StringBuilder by default), the locale defaults to Locale.getDefault(), close() closes a Closeable
+  // destination, and every method after close() fails with FormatterClosedException.
+  const FORMATTER = 'Ljava/util/Formatter;', APPENDABLE = 'Ljava/lang/Appendable;', CHARS = 'Ljava/lang/CharSequence;';
+  type(FORMATTER, 'Ljava/lang/Object;', ['Ljava/io/Closeable;', 'Ljava/io/Flushable;'], { allocatable: true }); type('Ljava/util/FormatterClosedException;', 'Ljava/lang/IllegalStateException;');
+  const virtual = (r, receiver, owner, name, parameters, result, values = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...values], 'virtual');
+  const defaultOut = r => { const sb = r.allocate('Ljava/lang/StringBuilder;'); r.dispatch({ owner: 'Ljava/lang/StringBuilder;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [sb], 'direct'); return sb; };
+  const defaultLocale = r => r.dispatch({ owner: LOCALE, name: 'getDefault', parameters: [], result: LOCALE, signature: `()${LOCALE}` }, [], 'static');
+  const open = (r, self) => { const f = r.object(self).formatter; if (!f) r.throwJava('Ljava/lang/IllegalStateException;', 'Formatter used before construction'); if (f.closed) r.throwJava('Ljava/util/FormatterClosedException;', null); return f; };
+  const setup = (r, self, out, locale) => { r.object(self).formatter = { out: out === null || out === 0 ? defaultOut(r) : out, locale: locale === null || locale === 0 ? defaultLocale(r) : locale, closed: false }; };
+  def(FORMATTER, '<init>', '()V', (r, _m, [self]) => setup(r, self, null, null));
+  def(FORMATTER, '<init>', `(${APPENDABLE})V`, (r, _m, [self, out]) => setup(r, self, out, null));
+  def(FORMATTER, '<init>', `(${LOCALE})V`, (r, _m, [self, locale]) => setup(r, self, null, locale));
+  def(FORMATTER, '<init>', `(${APPENDABLE}${LOCALE})V`, (r, _m, [self, out, locale]) => setup(r, self, out, locale));
+  const emit = (r, self, locale, f, a) => {
+    const state = open(r, self); if (f === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    virtual(r, state.out, APPENDABLE, 'append', [CHARS], APPENDABLE, [format(r, r.stringCharacters(f), args(r, a), localeTag(r, locale ?? state.locale))]);
+    return self;
+  };
+  def(FORMATTER, 'format', `(${STRING}${OBJECTS})${FORMATTER}`, (r, _m, [self, f, a]) => emit(r, self, null, f, a));
+  def(FORMATTER, 'format', `(${LOCALE}${STRING}${OBJECTS})${FORMATTER}`, (r, _m, [self, l, f, a]) => emit(r, self, l, f, a));
+  def(FORMATTER, 'out', `()${APPENDABLE}`, (r, _m, [self]) => open(r, self).out); def(FORMATTER, 'locale', `()${LOCALE}`, (r, _m, [self]) => open(r, self).locale);
+  def(FORMATTER, 'toString', `()${STRING}`, (r, _m, [self]) => r.stringCharacters(virtual(r, open(r, self).out, 'Ljava/lang/Object;', 'toString', [], STRING)));
+  def(FORMATTER, 'flush', '()V', (r, _m, [self]) => { const out = open(r, self).out; if (r.isSubtype(r.typeOf(out), 'Ljava/io/Flushable;')) virtual(r, out, 'Ljava/io/Flushable;', 'flush', [], 'V'); });
+  def(FORMATTER, 'close', '()V', (r, _m, [self]) => { const state = r.object(self).formatter; if (!state || state.closed) return; state.closed = true; if (r.isSubtype(r.typeOf(state.out), 'Ljava/io/Closeable;')) virtual(r, state.out, 'Ljava/io/Closeable;', 'close', [], 'V'); });
+  def(FORMATTER, 'ioException', '()Ljava/io/IOException;', () => null);
   return { ...registry, interfaces: registry.interfacesOf, format };
 }

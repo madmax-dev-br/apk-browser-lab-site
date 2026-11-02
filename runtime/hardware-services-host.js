@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=93b5ba602b8e';
-import { gcRoot } from './heap-gc.js?v=93b5ba602b8e';
-import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=93b5ba602b8e';
-import { createHostRegistry } from './host-contract.js?v=93b5ba602b8e';
-import { GC_ROOTS } from './heap-gc.js?v=93b5ba602b8e';
+import { APKError } from './apk-error.js?v=43c1da0663b3';
+import { gcRoot } from './heap-gc.js?v=43c1da0663b3';
+import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=43c1da0663b3';
+import { createHostRegistry } from './host-contract.js?v=43c1da0663b3';
+import { GC_ROOTS } from './heap-gc.js?v=43c1da0663b3';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
 // contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes, and an AlarmManager that
@@ -181,6 +181,11 @@ export function createHardwareServicesHost(platform) {
   const BIOMETRIC = service('biometric', 'Landroid/hardware/biometrics/BiometricManager;');
   def(BIOMETRIC, 'canAuthenticate', '()I', () => 12);   // BIOMETRIC_ERROR_NO_HARDWARE
   def(BIOMETRIC, 'canAuthenticate', '(I)I', (r, _m, [, authenticators]) => (authenticators & 0x8000) ? 11 : 12);   // DEVICE_CREDENTIAL alone: no credential is set up (BIOMETRIC_ERROR_NONE_ENROLLED)
+  // BiometricManager.getStrings: with no sensor and no credential the service has no modality to describe, so every label is null (BiometricService returns null for TYPE_NONE)
+  const BIOMETRIC_STRINGS = 'Landroid/hardware/biometrics/BiometricManager$Strings;';
+  type(BIOMETRIC_STRINGS, 'Ljava/lang/Object;', [], { allocatable: true });
+  def(BIOMETRIC, 'getStrings', `(I)${BIOMETRIC_STRINGS}`, (r, _m, [, authenticators]) => { const strings = r.allocate(BIOMETRIC_STRINGS); r.object(strings).authenticators = authenticators; return strings; });
+  for (const name of ['getButtonLabel', 'getPromptMessage', 'getSettingName']) def(BIOMETRIC_STRINGS, name, '()Ljava/lang/CharSequence;', () => null);
   const FINGERPRINT = service('fingerprint', 'Landroid/hardware/fingerprint/FingerprintManager;');
   def(FINGERPRINT, 'isHardwareDetected', '()Z', () => 0); def(FINGERPRINT, 'hasEnrolledFingerprints', '()Z', () => 0);
 
