@@ -1,9 +1,10 @@
-import { APKError } from './apk-error.js?v=c86d39fb1524';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=c86d39fb1524';
-import { createHostRegistry } from './host-contract.js?v=c86d39fb1524';
-import { resolveDevice } from './device-profile.js?v=c86d39fb1524';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=c86d39fb1524';
-import { gcRoot } from './heap-gc.js?v=c86d39fb1524';
+import { APKError } from './apk-error.js?v=51ff96812b1a';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=51ff96812b1a';
+import { installNetworkCallbacks } from './network-callbacks.js?v=51ff96812b1a';
+import { createHostRegistry } from './host-contract.js?v=51ff96812b1a';
+import { resolveDevice } from './device-profile.js?v=51ff96812b1a';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=51ff96812b1a';
+import { gcRoot } from './heap-gc.js?v=51ff96812b1a';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -83,15 +84,7 @@ export function createDeviceStateHost(platform) {
   def(CONNECTIVITY, 'getNetworkCapabilities', `(${NETWORK})${CAPABILITIES}`, (r, _m, [, network]) => network ? capabilitiesFor(r, network) : null);
   def(CONNECTIVITY, 'isActiveNetworkMetered', '()Z', r => { const n = activeNetwork(r); return n && r.object(n).transport === 0 ? 1 : 0; });
   def(CONNECTIVITY, 'getAllNetworks', `()[${NETWORK}`, r => { const n = activeNetwork(r), array = r.newArray(`[${NETWORK}`, n ? 1 : 0); if (n) r.array(array).elements = [n]; return array; });
-  def(REQUEST_BUILDER, '<init>', '()V', () => {}); def(REQUEST_BUILDER, 'addCapability', `(I)${REQUEST_BUILDER}`, (r, _m, [self]) => self); def(REQUEST_BUILDER, 'addTransportType', `(I)${REQUEST_BUILDER}`, (r, _m, [self]) => self);
-  def(REQUEST_BUILDER, 'removeCapability', `(I)${REQUEST_BUILDER}`, (r, _m, [self]) => self); def(REQUEST_BUILDER, 'build', `()${REQUEST}`, r => r.makeObject(REQUEST));
-  def(CALLBACK, '<init>', '()V', () => {}); for (const name of ['onUnavailable', 'onBlockedStatusChanged']) def(CALLBACK, name, '()V', () => {});
-  def(CALLBACK, 'onAvailable', `(${NETWORK})V`, () => {}); def(CALLBACK, 'onLost', `(${NETWORK})V`, () => {}); def(CALLBACK, 'onCapabilitiesChanged', `(${NETWORK}${CAPABILITIES})V`, () => {}); def(CALLBACK, 'onLosing', `(${NETWORK}I)V`, () => {});
-  const registerCallback = (r, _m, args) => { const callback = args.at(-1) && r.isSubtype(r.object(args.at(-1)).type, CALLBACK) ? args.at(-1) : args[2]; if (!callback) r.throwJava('Ljava/lang/IllegalArgumentException;', 'null NetworkCallback'); callbacks.push({ callback, network: null });
-    const network = activeNetwork(r); if (network) platform.queueTask(() => { const entry = callbacks.find(value => value.callback.ref === callback.ref); if (!entry) return; entry.network = network; call(r, callback, CALLBACK, 'onAvailable', [NETWORK], 'V', [network]); call(r, callback, CALLBACK, 'onCapabilitiesChanged', [NETWORK, CAPABILITIES], 'V', [network, capabilitiesFor(r, network)]); }, 0, [callback, network]); };
-  def(CONNECTIVITY, 'registerDefaultNetworkCallback', `(${CALLBACK})V`, registerCallback); def(CONNECTIVITY, 'registerDefaultNetworkCallback', `(${CALLBACK}${HANDLER})V`, registerCallback);
-  def(CONNECTIVITY, 'registerNetworkCallback', `(${REQUEST}${CALLBACK})V`, registerCallback); def(CONNECTIVITY, 'registerNetworkCallback', `(${REQUEST}${CALLBACK}${HANDLER})V`, registerCallback);
-  def(CONNECTIVITY, 'unregisterNetworkCallback', `(${CALLBACK})V`, (r, _m, [, callback]) => { const at = callbacks.findIndex(entry => entry.callback.ref === callback?.ref); if (at < 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'NetworkCallback was not registered'); callbacks.splice(at, 1); });
+  const networkCallbacks = installNetworkCallbacks({ platform, registry, activeNetwork, capabilitiesFor, call: (...args) => call(...args), entries: callbacks, names: { CONNECTIVITY, NETWORK, CAPABILITIES, CALLBACK, REQUEST, REQUEST_BUILDER } });
   // android.net.TrafficStats: per-thread tags are kept (apps set them around network calls); the kernel byte counters and socket tagging (xt_qtaguid/eBPF) do not exist in the
   // browser, so counters report UNSUPPORTED (-1) exactly like a device whose kernel lacks them, and tagging a socket has nothing to account.
   const TRAFFIC = 'Landroid/net/TrafficStats;', SOCKET = 'Ljava/net/Socket;', FDESC = 'Ljava/io/FileDescriptor;', DATAGRAM = 'Ljava/net/DatagramSocket;';
@@ -144,11 +137,7 @@ export function createDeviceStateHost(platform) {
       r.network?.connectivityChanged();
       const network = activeNetwork(r);
       deliver(r, 'android.net.conn.CONNECTIVITY_CHANGE', () => ({ networkType: ['I', network ? (r.object(network).transport === 1 ? 1 : 0) : -1], noConnectivity: ['Z', network ? 0 : 1], isFailover: ['Z', 0], inetCondition: ['I', network ? 100 : 0] }));
-      for (const entry of [...callbacks]) platform.queueTask(() => {
-        if (!callbacks.includes(entry)) return;
-        if (entry.network && entry.network.ref !== network?.ref) { call(r, entry.callback, CALLBACK, 'onLost', [NETWORK], 'V', [entry.network]); entry.network = null; }
-        if (network && !entry.network) { entry.network = network; call(r, entry.callback, CALLBACK, 'onAvailable', [NETWORK], 'V', [network]); call(r, entry.callback, CALLBACK, 'onCapabilitiesChanged', [NETWORK, CAPABILITIES], 'V', [network, capabilitiesFor(r, network)]); }
-      }, 0, [entry.callback, entry.network, network]);
+      networkCallbacks.connectivityChanged(r);
     }
   };
   const call = (r, receiver, owner, name, parameters = [], result = 'V', values = [], mode = 'virtual') => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, mode === 'static' ? values : [receiver, ...values], mode);

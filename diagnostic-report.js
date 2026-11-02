@@ -13,11 +13,15 @@ export function buildDiagnosticReport({ error, product = 'APK Browser Lab', pack
   const raw = error?.message || String(error), cause = causeOf(raw);
   const frames = [...raw.matchAll(/(L[^\s:]+?;->[^\s]+?) \[([^\]]+)\] at PC (0x[\da-f]+)/gi)].map(([, frame, dex, pc]) => `  ${frame} [${dex}] @${pc}`);
   const trace = error?.trace ?? [], list = stubs ?? stubsOf(error);
+  const libStubs = list.filter(line => /^STUB-LIB /.test(line)).length;
+  const consequence = libStubs && !/UnsatisfiedLink|native|JNI|\.so\b/i.test(cause)
+    ? `Atenção: o modo tolerante substituiu ${libStubs} biblioteca${libStubs > 1 ? 's' : ''} nativa${libStubs > 1 ? 's' : ''} (STUB-LIB) e este erro não menciona nativos: a falha pode ser consequência das bibliotecas substituídas listadas abaixo (os resultados delas são vazios).` : '';
   const text = [
     `${product}${build ? ' ' + build : ''} · ${packageName} · modo tolerante: ${tolerateMissing}`,
     `Erro: ${cause}`,
     frames.length ? `Pilha (mais interna por último):\n${frames.slice(-12).join('\n')}` : '',
     error?.details?.profile?.text ? error.details.profile.text : '',
+    consequence,
     list.length ? `APIs com stub (${list.length}):\n${list.slice(0, 60).join('\n')}` : '',
     trace.length ? `Últimas linhas do log:\n${trace.filter(line => !/^STUB-/.test(line)).slice(-15).join('\n')}` : '',
     apiGaps || '',

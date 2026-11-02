@@ -10,7 +10,8 @@
 // The report holds ONLY framework/JDK names and counts (and the native library file names the user asked for): app class names, method names and strings never
 // enter it, so it can be pasted into a chat. DOM-free and process-free: it runs in the Worker and in Node.
 
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=c86d39fb1524';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=51ff96812b1a';
+import { describeNativeLibrary } from './native-library-hints.js?v=51ff96812b1a';
 
 const FRAMEWORK = /^L(android|java|javax|dalvik|libcore|sun|org\/(json|xml|w3c))\//;
 const SDK_INT_FIELD = 'Landroid/os/Build$VERSION;->SDK_INT:I';
@@ -170,11 +171,12 @@ function parameters(signature) {
   return out.join(', ');
 }
 
+const DESCRIBE_LIMIT = 40;
 /** Lab status of each native library in the APK's lib/ directories: available, version-gated, protected (not a plain ELF: packed or encrypted) or missing. */
 async function nativeTable(runtime, archive, nativeLibraries) {
   const abis = nativeLibraries ?? {}, bySoname = new Map();
   for (const [abi, info] of Object.entries(abis)) for (const name of info.libraries ?? info) { if (!bySoname.has(name)) bySoname.set(name, []); bySoname.get(name).push(abi); }
-  const out = [];
+  const out = []; let described = 0;
   for (const [soname, where] of [...bySoname].sort((a, b) => a[0].localeCompare(b[0]))) {
     let status = runtime.jni?.libraryStatus?.(soname) ?? { status: 'missing' };
     if (status.status === 'missing' && PROTECTED_NATIVE_LIBRARY.test(soname.replace(/^lib/, '').replace(/\.so$/, ''))) status = { status: 'protected' };   // the rule tolerant mode uses (protected-native.js)
@@ -182,7 +184,17 @@ async function nativeTable(runtime, archive, nativeLibraries) {
       const abi = where.includes('arm64-v8a') ? 'arm64-v8a' : where[0], path = `lib/${abi}/${soname}`;
       try { if (archive.entries.has(path) && isPacked(await archive.extractPrefix(path, 4096))) status = { status: 'protected' }; } catch { /* unreadable: stays missing */ }
     }
-    out.push({ name: soname, abis: where.sort(), status: status.status, needs: status.needs ?? null });
+    const entry = { name: soname, abis: where.sort(), status: status.status, needs: status.needs ?? null };
+    // what a library the lab does not build IS, from its own bytes (static; the first ABI present, arm64-v8a preferred); bounded in count and size
+    if (archive && status.status !== 'available' && described < DESCRIBE_LIMIT) {
+      const abi = entry.abis.includes('arm64-v8a') ? 'arm64-v8a' : entry.abis.find(a => archive.entries.has(`lib/${a}/${soname}`));
+      if (abi) {
+        described++;
+        try { entry.elf = describeNativeLibrary(await archive.extract(`lib/${abi}/${soname}`, 32 * 1024 * 1024)); entry.elf.abi = abi; }
+        catch (error) { entry.elf = { error: String(error.message ?? error).slice(0, 80), abi }; }
+      }
+    }
+    out.push(entry);
   }
   return out;
 }
@@ -192,6 +204,21 @@ function isPacked(bytes) {
   const counts = new Uint32Array(256); for (const b of bytes) counts[b]++;
   let entropy = 0; for (const c of counts) if (c) { const p = c / bytes.length; entropy -= p * Math.log2(p); }
   return entropy > 7.5;
+}
+
+const NATIVE_LINE_MAX = 420;
+const sizeText = n => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MiB` : `${Math.max(1, Math.round(n / 1024))} KiB`;
+const HINT_KIND = { provides: 'parece', uses: 'usa', banner: 'texto indica' };
+/** One compact description of a library's ELF (see describeNativeLibrary). */
+function describeElf(e) {
+  if (e.error) return `${e.size !== undefined ? sizeText(e.size) + ', ' : ''}ELF ilegível (${e.error})`;
+  const parts = [`${sizeText(e.size)} ${e.architecture} ${e.bits}-bit`];
+  if (e.noSymbols) parts.push('sem tabela de símbolos dinâmicos');
+  else parts.push(`${e.exportCount} exportados${e.exportSample.length ? ': ' + e.exportSample.join(', ') + (e.exportCount > e.exportSample.length ? ', ...' : '') : ''}`, `${e.importCount} importados`);
+  parts.push(`JNI_OnLoad ${e.jniOnLoad ? 'sim' : 'não'}`, `RegisterNatives ${e.registerNatives ? 'sim' : 'não'}`);
+  if (e.neededCount) parts.push(`precisa de ${e.needed.join(' ')}${e.neededCount > e.needed.length ? ` +${e.neededCount - e.needed.length}` : ''}`);
+  if (e.hints?.length) parts.push(e.hints.map(h => `${HINT_KIND[h.kind]} ${h.label}`).join(' / '));
+  return parts.join('; ');
 }
 
 const MARK = { direct: 'incond.', sdk: 'SDK_INT', unknown: '?' };
@@ -216,8 +243,14 @@ export function formatApiGapReport(report, { topClasses = 20, topMethods = 3, to
   const libs = [...(report.native ?? [])].sort((x, y) => (rank[x.status] ?? 4) - (rank[y.status] ?? 4) || x.name.localeCompare(y.name));
   if (libs.length) {
     lines.push('Bibliotecas nativas do APK (estado no laboratório):');
-    for (const lib of libs.slice(0, topNative)) lines.push(`- ${lib.name} [${lib.abis.join(',')}]: ${STATUS[lib.status] ?? lib.status}${lib.needs ? ` (precisa de ${lib.needs})` : ''}`);
+    for (const lib of libs.slice(0, topNative)) {
+      const line = `- ${lib.name} [${lib.abis.join(',')}]: ${STATUS[lib.status] ?? lib.status}${lib.needs ? ` (precisa de ${lib.needs})` : ''}${lib.elf ? ' | ' + describeElf(lib.elf) : ''}`;
+      lines.push(line.length > NATIVE_LINE_MAX ? line.slice(0, NATIVE_LINE_MAX - 3) + '...' : line);
+    }
     if (libs.length > topNative) lines.push(`... +${libs.length - topNative} bibliotecas`);
+    if (libs.some(l => l.elf)) lines.push('Descrição estática lida do próprio ELF (ABI preferida arm64-v8a); nada foi executado. RegisterNatives só é detectável como texto na imagem.');
+    const stubbed = libs.filter(l => l.status === 'missing').length;
+    if (stubbed) lines.push(`Se o modo tolerante substituiu ${stubbed} biblioteca${stubbed > 1 ? 's' : ''} nativa${stubbed > 1 ? 's' : ''} ausente${stubbed > 1 ? 's' : ''} (STUB-LIB) e a execução falhar depois com um erro sem relação com nativos, a falha pode ser consequência das bibliotecas substituídas listadas acima (os resultados delas são vazios).`);
   }
   return lines.join('\n');
 }

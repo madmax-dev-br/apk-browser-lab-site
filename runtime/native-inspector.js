@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=c86d39fb1524';
+import { APKError } from './apk-error.js?v=51ff96812b1a';
 
 const fail = message => { throw new APKError(`ELF inspection: ${message}`); };
 const ARCHITECTURES = new Map([[3, 'x86'], [8, 'mips'], [40, 'arm'], [62, 'x86_64'], [183, 'aarch64'], [243, 'riscv']]);
@@ -36,10 +36,12 @@ export function inspectELF(input, options = {}) {
   const result = { format: 'ELF', bits, endianness: little ? 'little' : 'big', machine,
     architecture: ARCHITECTURES.get(machine) ?? `machine-${machine}`, type,
     needed: [], soname: null, jniExports: [], jniOnLoad: false, dynamicSymbolsScanned: 0,
+    exportCount: 0, exportNames: [], importCount: 0, importNames: [],   // defined / undefined dynamic function symbols (names capped by maxNames)
     symbolInspectionComplete: false, executed: false, warnings };
   const maxHeaders = bounded(options.maxHeaders, 1024, 4096);
   const maxSections = bounded(options.maxSections, 4096, 8192);
   const maxSymbols = bounded(options.maxSymbols, 100000, 250000);
+  const maxNames = bounded(options.maxNames, 0, 20000);   // 0: only counts, no name lists
   const maxJNIExports = bounded(options.maxJNIExports, 1024, 4096);
   const maxStringBytes = bounded(options.maxStringBytes, 8 * 1024 * 1024, 16 * 1024 * 1024);
   const loads = [];
@@ -151,9 +153,16 @@ export function inspectELF(input, options = {}) {
       result.dynamicSymbolsScanned++;
       const p = table.offset + i * table.width, name = u32(p), info = bytes[p + (bits === 64 ? 4 : 12)];
       const defined = u16(p + (bits === 64 ? 6 : 14)) !== 0;
+      if (!defined && name && name < table.strings.size && [1, 2].includes(info >> 4) && [0, 2].includes(info & 15)) {
+        result.importCount++;
+        if (result.importNames.length < maxNames) result.importNames.push(text(table.strings.offset + name, table.strings.size - name));
+        continue;
+      }
       if (!defined || ![1, 2].includes(info >> 4) || ![0, 2].includes(info & 15) || !name) continue;
       if (name >= table.strings.size) fail('invalid symbol name offset');
       const value = text(table.strings.offset + name, table.strings.size - name);
+      result.exportCount++;
+      if (result.exportNames.length < maxNames) result.exportNames.push(value);
       if (value === 'JNI_OnLoad') result.jniOnLoad = true;
       if (value.startsWith('Java_') || value === 'JNI_OnLoad' || value === 'JNI_OnUnload') {
         exportedBytes += value.length;
