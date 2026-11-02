@@ -1,5 +1,5 @@
-import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=6a6418abc03c';
-import { APKError } from './apk-error.js?v=6a6418abc03c';
+import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=8ab89c3fe95a';
+import { APKError } from './apk-error.js?v=8ab89c3fe95a';
 
 // java.net.IDN and the javax.net.ssl surface (TrustManagerFactory, KeyManagerFactory, SSLContext) for libraries that probe the platform at launch (OkHttp's Platform.get(),
 // host name normalisation). java.security.Security / Provider / KeyStore and the providers (Conscrypt, the Android Keystore) are the original libcore and Conscrypt

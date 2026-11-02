@@ -1,4 +1,5 @@
-import { APKError } from './apk-error.js?v=6a6418abc03c';
+import { APKError } from './apk-error.js?v=8ab89c3fe95a';
+import { gcBlockReason } from './heap-gc.js?v=8ab89c3fe95a';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -6,6 +7,7 @@ import { APKError } from './apk-error.js?v=6a6418abc03c';
 //  - an operation wall budget (host time of the whole operation, not of one event): a pump that keeps scheduling short events (a self-rescheduling Handler loop, a polling thread, a Timer) restarts
 //    the per-event watchdog every time, so only this budget ends it, with the execution profile and the list of what kept being scheduled.
 const SLOW_HOST = /Inflater|Deflater|java\/util\/zip|ZipFile|ZipEntry|DexFile|DexClassLoader|PathClassLoader|ClassLoader;->(?:loadClass|defineClass|findClass)|regex\/|Pattern;|Matcher;|\/icu\/|Icu|Collator|BreakIterator|Normalizer|Skia|Paragraph|Bitmap|ImageDecoder|sqlite|SQLite|Cipher|MessageDigest|Mac;|Signature;|KeyStore|Crypto|conscrypt|Thread;->sleep|LockSupport|MappedByteBuffer|FileChannel|Linux;|Hermes|NativeLibrary|System;->load|Runtime;->load|AssetManager|XmlBlock|ApkAssets|Resources;->(?:getValue|obtain)|Typeface|FontFamily|Gzip|Zlib|ObjectInputStream|MessageFormat|NumberFormat|DateFormat|URLConnection|HttpURLConnection/;
+const safe = fn => { try { return fn(); } catch { return null; } };   // a heartbeat never fails the VM
 const short = key => String(key ?? '?').replace(/^L/, '').replace(/;->/, '.');
 const typeName = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');
 
@@ -47,7 +49,7 @@ export class OperationMonitor {
     return {
       type: 'heartbeat', reason, operation: op?.name ?? null, wallMs: op ? Math.round(now - op.start) : null, instructions: this.instructions(), events: op?.events ?? 0, thread: thread?.name ?? null,
       stack: profile.currentStack(6), hostCall: rt.hostCall ? short(rt.hostCall) : null, queueDepth, nextDelay, busiest: profile.top(3), heartbeat: ++this.beats,
-      vm: { objects: rt.heap?.size ?? null, limit: rt.maxHeapObjects ?? null, collections: rt.gcStats?.collections ?? 0, gcMs: Math.round(rt.gcStats?.totalMs ?? 0), activity: rt.activityType ?? null },   // what the page can still show when the Worker is too busy to answer a request
+      vm: { objects: rt.heap?.size ?? null, limit: rt.maxHeapObjects ?? null, collections: rt.gcStats?.collections ?? 0, gcMs: Math.round(rt.gcStats?.totalMs ?? 0), activity: rt.activityType ?? null, gcEnabled: !!rt.gcEnabled, gcBlocked: safe(() => gcBlockReason(rt)), gcSkips: { ...(rt.gcSkips ?? {}) }, nestedRuns: rt.nestedRuns ?? 0, gcFloor: rt.gcSafepointFloor ?? null },   // what the page can still show when the Worker is too busy to answer a request
     };
   }
   beat(now, reason) {

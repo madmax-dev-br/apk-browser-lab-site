@@ -66,6 +66,9 @@ function quiescent(runtime, safepoint = false) {
   return null;
 }
 
+/** Why a safepoint collection could not run right now (null = it could): the same checks collectGarbage makes, for diagnostics (heartbeats). */
+export function gcBlockReason(runtime) { return quiescent(runtime, true) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null); }
+
 function unannotatedTask(runtime) {
   const queue = runtime.platform?.eventQueue; if (!Array.isArray(queue)) return false;
   return queue.some(event => event.platformTask && !('roots' in event));
