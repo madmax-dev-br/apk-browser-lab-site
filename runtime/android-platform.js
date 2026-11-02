@@ -1,106 +1,107 @@
-import { Invoke } from './interpreter.js?v=7995f957f05e';
-import { createComposeCanvasHost } from './compose-canvas-host.js?v=7995f957f05e';
-import { createViewTransformHost } from './view-transform-host.js?v=7995f957f05e';
-import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=7995f957f05e';
-import { createViewOutlineHost } from './view-outline-host.js?v=7995f957f05e';
-import { createShaderHost } from './shader-host.js?v=7995f957f05e';
-import { createSystemBarsHost } from './system-bars-host.js?v=7995f957f05e';
-import { createDeviceStateHost } from './device-state-host.js?v=7995f957f05e';
-import { createJobSchedulerHost } from './job-scheduler-host.js?v=7995f957f05e';
-import { createPendingIntentHost } from './pending-intent-host.js?v=7995f957f05e';
-import { createBinderHost } from './binder-host.js?v=7995f957f05e';
-import { createInputManagerHost } from './input-native.js?v=7995f957f05e';
-import { createBackDispatcherHost } from './back-dispatcher-host.js?v=7995f957f05e';
-import { createRenderThreadAnimators } from './rt-animators.js?v=7995f957f05e';
-import { renderNodeByHandle } from './rendernode-native.js?v=7995f957f05e';
-import { resolveDevice } from './device-profile.js?v=7995f957f05e';
-import { configurationFor } from './device-configuration.js?v=7995f957f05e';
-import { createViewCoordinateHost } from './view-coordinate-host.js?v=7995f957f05e';
-import { createEditableTextHost } from './editable-text-host.js?v=7995f957f05e';
-import { createComponentCallbacksHost } from './component-callbacks-host.js?v=7995f957f05e';
-import { createViewStateHost } from './view-state-host.js?v=7995f957f05e';
-import { createLocaleServiceHost } from './locale-service-host.js?v=7995f957f05e';
-import { APKError } from './apk-runtime.js?v=7995f957f05e';
-import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=7995f957f05e';
-import { createViewTreeHost } from './view-tree-host.js?v=7995f957f05e';
-import { createDialogWindowHost } from './dialog-window-host.js?v=7995f957f05e';
-import { createProgressBarApiHost } from './progress-bar-api-host.js?v=7995f957f05e';
-import { createViewGroupApiHost } from './viewgroup-api-host.js?v=7995f957f05e';
-import { createViewInternalsHost } from './view-internals-host.js?v=7995f957f05e';
-import { createViewWindowHost } from './view-window-host.js?v=7995f957f05e';
-import { createVectorCanvasHost } from './vector-native.js?v=7995f957f05e';
-import { createPaintHost } from './paint-host.js?v=7995f957f05e';
-import { createContentResolverHost } from './content-resolver-host.js?v=7995f957f05e';
-import { createDrawableViewHost } from './drawable-view-host.js?v=7995f957f05e';
-import { createDeviceServicesHost } from './device-services-host.js?v=7995f957f05e';
-import { createSystemServicesHost } from './system-services-host.js?v=7995f957f05e';
-import { createJavaIoHost } from './java-io-host.js?v=7995f957f05e';
-import { createClassLoaderHost } from './class-loader-host.js?v=7995f957f05e';
-import { createAppServicesHost } from './app-services-host.js?v=7995f957f05e';
-import { createConcurrencyHost } from './concurrency-host.js?v=7995f957f05e';
-import { createDateTimeHost } from './datetime-host.js?v=7995f957f05e';
+import { Invoke } from './interpreter.js?v=039e497067f0';
+import { createComposeCanvasHost } from './compose-canvas-host.js?v=039e497067f0';
+import { createViewTransformHost } from './view-transform-host.js?v=039e497067f0';
+import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=039e497067f0';
+import { createViewOutlineHost } from './view-outline-host.js?v=039e497067f0';
+import { createShaderHost } from './shader-host.js?v=039e497067f0';
+import { createSystemBarsHost } from './system-bars-host.js?v=039e497067f0';
+import { createDeviceStateHost } from './device-state-host.js?v=039e497067f0';
+import { createJobSchedulerHost } from './job-scheduler-host.js?v=039e497067f0';
+import { createPendingIntentHost } from './pending-intent-host.js?v=039e497067f0';
+import { ActivityStarter, activityInfoOf, FLAG as LAUNCH_FLAG } from './activity-starter.js?v=039e497067f0';
+import { createBinderHost } from './binder-host.js?v=039e497067f0';
+import { createInputManagerHost } from './input-native.js?v=039e497067f0';
+import { createBackDispatcherHost } from './back-dispatcher-host.js?v=039e497067f0';
+import { createRenderThreadAnimators } from './rt-animators.js?v=039e497067f0';
+import { renderNodeByHandle } from './rendernode-native.js?v=039e497067f0';
+import { resolveDevice } from './device-profile.js?v=039e497067f0';
+import { configurationFor } from './device-configuration.js?v=039e497067f0';
+import { createViewCoordinateHost } from './view-coordinate-host.js?v=039e497067f0';
+import { createEditableTextHost } from './editable-text-host.js?v=039e497067f0';
+import { createComponentCallbacksHost } from './component-callbacks-host.js?v=039e497067f0';
+import { createViewStateHost } from './view-state-host.js?v=039e497067f0';
+import { createLocaleServiceHost } from './locale-service-host.js?v=039e497067f0';
+import { APKError } from './apk-runtime.js?v=039e497067f0';
+import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=039e497067f0';
+import { createViewTreeHost } from './view-tree-host.js?v=039e497067f0';
+import { createDialogWindowHost } from './dialog-window-host.js?v=039e497067f0';
+import { createProgressBarApiHost } from './progress-bar-api-host.js?v=039e497067f0';
+import { createViewGroupApiHost } from './viewgroup-api-host.js?v=039e497067f0';
+import { createViewInternalsHost } from './view-internals-host.js?v=039e497067f0';
+import { createViewWindowHost } from './view-window-host.js?v=039e497067f0';
+import { createVectorCanvasHost } from './vector-native.js?v=039e497067f0';
+import { createPaintHost } from './paint-host.js?v=039e497067f0';
+import { createContentResolverHost } from './content-resolver-host.js?v=039e497067f0';
+import { createDrawableViewHost } from './drawable-view-host.js?v=039e497067f0';
+import { createDeviceServicesHost } from './device-services-host.js?v=039e497067f0';
+import { createSystemServicesHost } from './system-services-host.js?v=039e497067f0';
+import { createJavaIoHost } from './java-io-host.js?v=039e497067f0';
+import { createClassLoaderHost } from './class-loader-host.js?v=039e497067f0';
+import { createAppServicesHost } from './app-services-host.js?v=039e497067f0';
+import { createConcurrencyHost } from './concurrency-host.js?v=039e497067f0';
+import { createDateTimeHost } from './datetime-host.js?v=039e497067f0';
 const LOCALE_CONSTANTS = { US: 'en-US', UK: 'en-GB', ENGLISH: 'en', ROOT: 'und', CANADA: 'en-CA', CANADA_FRENCH: 'fr-CA', FRANCE: 'fr-FR', FRENCH: 'fr', GERMAN: 'de', GERMANY: 'de-DE', ITALIAN: 'it', ITALY: 'it-IT', JAPAN: 'ja-JP', JAPANESE: 'ja', KOREA: 'ko-KR', KOREAN: 'ko', CHINA: 'zh-CN', CHINESE: 'zh', PRC: 'zh-CN', SIMPLIFIED_CHINESE: 'zh-CN', TAIWAN: 'zh-TW', TRADITIONAL_CHINESE: 'zh-TW' };
-import { createNumberFormatHost } from './number-format-host.js?v=7995f957f05e';
-import { createCookieHost } from './cookie-host.js?v=7995f957f05e';
-import { createViewApiHost } from './view-api-host.js?v=7995f957f05e';
-import { createTextViewApiHost } from './textview-api-host.js?v=7995f957f05e';
-import { createIntentApiHost } from './intent-api-host.js?v=7995f957f05e';
-import { createImageDecoderHost } from './image-decoder-host.js?v=7995f957f05e';
-import { createPlatformDataClassesHost } from './platform-data-classes-host.js?v=7995f957f05e';
-import { createToastHost } from './toast-host.js?v=7995f957f05e';
-import { createIcuTextHost } from './icu-text-host.js?v=7995f957f05e';
-import { createMiscPlatformHost } from './misc-platform-host.js?v=7995f957f05e';
-import { createRemoteViewsHost } from './remote-views-host.js?v=7995f957f05e';
-import { createPackageManagerApiHost } from './package-manager-api-host.js?v=7995f957f05e';
-import { createContentResolverApiHost } from './content-resolver-api-host.js?v=7995f957f05e';
-import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=7995f957f05e';
-import { createImageViewApiHost } from './image-view-api-host.js?v=7995f957f05e';
-import { createUriApiHost } from './uri-api-host.js?v=7995f957f05e';
-import { createFormatterHost } from './formatter-host.js?v=7995f957f05e';
-import { createJcaHost } from './jca-host.js?v=7995f957f05e';
-import { createIcuBidiHost } from './icu-bidi-host.js?v=7995f957f05e';
-import { createSecurityHost } from './security-host.js?v=7995f957f05e';
-import { createReflectionHost } from './reflection-host.js?v=7995f957f05e';
-import { createSerializationHost } from './serialization-host.js?v=7995f957f05e';
-import { createBitmapCodecHost } from './bitmap-codec-host.js?v=7995f957f05e';
-import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=7995f957f05e';
-import { createImageViewHost } from './image-view-host.js?v=7995f957f05e';
-import { createWebViewHost } from './webview-host.js?v=7995f957f05e';
-import { createContentExtrasHost } from './content-extras-host.js?v=7995f957f05e';
-import { createPreferenceManagerHost } from './preference-manager-host.js?v=7995f957f05e';
-import { createProcessHost } from './process-host.js?v=7995f957f05e';
-import { createStatsHost } from './stats-host.js?v=7995f957f05e';
-import { createTelephonyHost } from './telephony-host.js?v=7995f957f05e';
-import { createSurfaceTextureHost } from './surface-texture-host.js?v=7995f957f05e';
-import { createBuildHost } from './build-host.js?v=7995f957f05e';
-import { createSensorHost } from './sensor-host.js?v=7995f957f05e';
-import { createGeocoderHost } from './geocoder-host.js?v=7995f957f05e';
-import { createCoreLangHost } from './core-lang-host.js?v=7995f957f05e';
-import { createResourcesExtrasHost } from './resources-extras-host.js?v=7995f957f05e';
-import { createSimpleTimeZoneHost } from './simple-timezone-host.js?v=7995f957f05e';
-import { createActivityManagerExtrasHost } from './activity-manager-extras-host.js?v=7995f957f05e';
-import { createSettingsHost } from './settings-host.js?v=7995f957f05e';
-import { createHardwareServicesHost } from './hardware-services-host.js?v=7995f957f05e';
-import { createPeripheralServicesHost } from './peripheral-services-host.js?v=7995f957f05e';
-import { createStorageServicesHost } from './storage-services-host.js?v=7995f957f05e';
-import { createSystemManagersHost } from './system-managers-host.js?v=7995f957f05e';
-import { DEVICE_FEATURES } from './service-kit.js?v=7995f957f05e';
-import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=7995f957f05e';
-import { createViewTouchHost } from './view-touch-host.js?v=7995f957f05e';
-import { createMagnifierHost } from './magnifier-host.js?v=7995f957f05e';
-import { createDisplayHost } from './display-host.js?v=7995f957f05e';
-import { createNotificationHost } from './notification-host.js?v=7995f957f05e';
-import { createDatabaseSupportHost } from './database-support-host.js?v=7995f957f05e';
-import { VMClock } from './vm-clock.js?v=7995f957f05e';
-import { createWindowInsetsHost } from './window-insets-host.js?v=7995f957f05e';
-import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=7995f957f05e';
-import { createViewLayoutHost } from './view-layout-host.js?v=7995f957f05e';
-import { createInputMethodServiceHost } from './input-method-service-host.js?v=7995f957f05e';
-import { createAutofillServiceHost } from './autofill-service-host.js?v=7995f957f05e';
-import { createClipboardServiceHost } from './clipboard-service-host.js?v=7995f957f05e';
-import { createViewInputHost } from './view-input-host.js?v=7995f957f05e';
-import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=7995f957f05e';
-import { maybeCollect } from './heap-gc.js?v=7995f957f05e';
+import { createNumberFormatHost } from './number-format-host.js?v=039e497067f0';
+import { createCookieHost } from './cookie-host.js?v=039e497067f0';
+import { createViewApiHost } from './view-api-host.js?v=039e497067f0';
+import { createTextViewApiHost } from './textview-api-host.js?v=039e497067f0';
+import { createIntentApiHost } from './intent-api-host.js?v=039e497067f0';
+import { createImageDecoderHost } from './image-decoder-host.js?v=039e497067f0';
+import { createPlatformDataClassesHost } from './platform-data-classes-host.js?v=039e497067f0';
+import { createToastHost } from './toast-host.js?v=039e497067f0';
+import { createIcuTextHost } from './icu-text-host.js?v=039e497067f0';
+import { createMiscPlatformHost } from './misc-platform-host.js?v=039e497067f0';
+import { createRemoteViewsHost } from './remote-views-host.js?v=039e497067f0';
+import { createPackageManagerApiHost } from './package-manager-api-host.js?v=039e497067f0';
+import { createContentResolverApiHost } from './content-resolver-api-host.js?v=039e497067f0';
+import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=039e497067f0';
+import { createImageViewApiHost } from './image-view-api-host.js?v=039e497067f0';
+import { createUriApiHost } from './uri-api-host.js?v=039e497067f0';
+import { createFormatterHost } from './formatter-host.js?v=039e497067f0';
+import { createJcaHost } from './jca-host.js?v=039e497067f0';
+import { createIcuBidiHost } from './icu-bidi-host.js?v=039e497067f0';
+import { createSecurityHost } from './security-host.js?v=039e497067f0';
+import { createReflectionHost } from './reflection-host.js?v=039e497067f0';
+import { createSerializationHost } from './serialization-host.js?v=039e497067f0';
+import { createBitmapCodecHost } from './bitmap-codec-host.js?v=039e497067f0';
+import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=039e497067f0';
+import { createImageViewHost } from './image-view-host.js?v=039e497067f0';
+import { createWebViewHost } from './webview-host.js?v=039e497067f0';
+import { createContentExtrasHost } from './content-extras-host.js?v=039e497067f0';
+import { createPreferenceManagerHost } from './preference-manager-host.js?v=039e497067f0';
+import { createProcessHost } from './process-host.js?v=039e497067f0';
+import { createStatsHost } from './stats-host.js?v=039e497067f0';
+import { createTelephonyHost } from './telephony-host.js?v=039e497067f0';
+import { createSurfaceTextureHost } from './surface-texture-host.js?v=039e497067f0';
+import { createBuildHost } from './build-host.js?v=039e497067f0';
+import { createSensorHost } from './sensor-host.js?v=039e497067f0';
+import { createGeocoderHost } from './geocoder-host.js?v=039e497067f0';
+import { createCoreLangHost } from './core-lang-host.js?v=039e497067f0';
+import { createResourcesExtrasHost } from './resources-extras-host.js?v=039e497067f0';
+import { createSimpleTimeZoneHost } from './simple-timezone-host.js?v=039e497067f0';
+import { createActivityManagerExtrasHost } from './activity-manager-extras-host.js?v=039e497067f0';
+import { createSettingsHost } from './settings-host.js?v=039e497067f0';
+import { createHardwareServicesHost } from './hardware-services-host.js?v=039e497067f0';
+import { createPeripheralServicesHost } from './peripheral-services-host.js?v=039e497067f0';
+import { createStorageServicesHost } from './storage-services-host.js?v=039e497067f0';
+import { createSystemManagersHost } from './system-managers-host.js?v=039e497067f0';
+import { DEVICE_FEATURES } from './service-kit.js?v=039e497067f0';
+import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=039e497067f0';
+import { createViewTouchHost } from './view-touch-host.js?v=039e497067f0';
+import { createMagnifierHost } from './magnifier-host.js?v=039e497067f0';
+import { createDisplayHost } from './display-host.js?v=039e497067f0';
+import { createNotificationHost } from './notification-host.js?v=039e497067f0';
+import { createDatabaseSupportHost } from './database-support-host.js?v=039e497067f0';
+import { VMClock } from './vm-clock.js?v=039e497067f0';
+import { createWindowInsetsHost } from './window-insets-host.js?v=039e497067f0';
+import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=039e497067f0';
+import { createViewLayoutHost } from './view-layout-host.js?v=039e497067f0';
+import { createInputMethodServiceHost } from './input-method-service-host.js?v=039e497067f0';
+import { createAutofillServiceHost } from './autofill-service-host.js?v=039e497067f0';
+import { createClipboardServiceHost } from './clipboard-service-host.js?v=039e497067f0';
+import { createViewInputHost } from './view-input-host.js?v=039e497067f0';
+import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=039e497067f0';
+import { maybeCollect } from './heap-gc.js?v=039e497067f0';
 
 const ACTIVITY = 'Landroid/app/Activity;', INTENT = 'Landroid/content/Intent;', BUNDLE = 'Landroid/os/Bundle;';
 const APPLICATION = 'Landroid/app/Application;', APP_CONTEXT = 'Landroid/app/ContextImpl;';
@@ -233,7 +234,7 @@ function checkString(value, context) { if (typeof value !== 'string') error(`${c
 /** Explicit local Activity/Intent/Bundle and basic XML Views subset. Never bridges AndroidX. */
 const CORE_SERVICE_CLASSES = { 'Landroid/view/LayoutInflater;': 'layout_inflater', 'Landroid/view/WindowManager;': 'window', 'Landroid/view/accessibility/AccessibilityManager;': 'accessibility', 'Landroid/view/autofill/AutofillManager;': 'autofill', 'Landroid/content/ClipboardManager;': 'clipboard', 'Landroid/view/inputmethod/InputMethodManager;': 'input_method', 'Landroid/os/BatteryManager;': 'batterymanager', 'Landroid/net/ConnectivityManager;': 'connectivity', 'Landroid/app/job/JobScheduler;': 'jobscheduler', 'Landroid/telephony/TelephonyManager;': 'phone' };
 export class AndroidPlatform {
-  constructor({ resources = null, applicationName = null, packageName = null, manifest = null, apkBytes = null, device = null } = {}) { this.device = resolveDevice(device || {}); this.userDevice = this.device; this.clock = new VMClock(); this.apkBytes = apkBytes; this.manifest = manifest; this.resources = resources; this.applicationName = applicationName; this.packageName = packageName; this.application = null; this.applicationState = 'new'; this.frames = []; this.taskClosed = false; this.resourceObject = null; this.finishedActivities = new Set(); this.eventQueue = []; this.eventSequence = 0; this.virtualProcess = { source: 'browser-vm', pid: 1, uid: 10000, foreground: true }; this.transactionSequence = 0; this.porterModes = new Map(); this.inflaters = new Map(); this.applicationCallbacks = []; this.styleBackend = new AndroidStyleBackend(this); this.viewTreeHost = createViewTreeHost(this); this.viewWindowHost = createViewWindowHost(this); this.canvasHost = createVectorCanvasHost(); this.paintHost = createPaintHost(); this.contentHost = createContentResolverHost(this); this.drawableViewHost = createDrawableViewHost(this); this.deviceServices = createDeviceServicesHost(this); this.insetsHost = createWindowInsetsHost(this); this.accessibilityService = createAccessibilityServiceHost(this); this.viewLayoutHost = createViewLayoutHost(this); this.autofillService = createAutofillServiceHost(this); this.inputMethodService = createInputMethodServiceHost(this); this.clipboardService = createClipboardServiceHost(this); this.viewInputHost = createViewInputHost(this); this.xmlHost = new AndroidXmlHost(this); this.localeService = createLocaleServiceHost(this); this.viewStateHost = createViewStateHost(); this.componentCallbacksHost = createComponentCallbacksHost(this); this.editableTextHost = createEditableTextHost(this); this.viewCoordinateHost = createViewCoordinateHost(this); this.viewTransformHost = createViewTransformHost(this); this.viewPropertyAnimatorHost = createViewPropertyAnimatorHost(this); this.viewOutlineHost = createViewOutlineHost(this); this.composeCanvasHost = createComposeCanvasHost(this); this.dialogWindowHost = createDialogWindowHost(this); this.systemServices = createSystemServicesHost(this); this.javaIo = createJavaIoHost(this); this.classLoaders = createClassLoaderHost(this); this.appServices = createAppServicesHost(this); this.concurrency = createConcurrencyHost(this); this.dateTime = createDateTimeHost(this); this.numberFormat = createNumberFormatHost(this); this.cookies = createCookieHost(this); this.viewApi = createViewApiHost(this); this.textViewApi = createTextViewApiHost(this); this.intentApi = createIntentApiHost(this); this.activityApi = createActivityApiHost(this); this.contentResolverApi = createContentResolverApiHost(this); this.packageManagerApi = createPackageManagerApiHost(this); this.remoteViews = createRemoteViewsHost(this); this.miscPlatform = createMiscPlatformHost(this); this.icuText = createIcuTextHost(this); this.toasts = createToastHost(this); this.platformData = createPlatformDataClassesHost(this); this.imageDecoder = createImageDecoderHost(this); this.imageViewApi = createImageViewApiHost(this); this.progressBarApi = createProgressBarApiHost(this); this.viewGroupApi = createViewGroupApiHost(this); this.viewInternals = createViewInternalsHost(this); this.uriApi = createUriApiHost(this); this.formatter = createFormatterHost(this); this.security = createSecurityHost(this); this.jca = createJcaHost(this); this.reflection = createReflectionHost(this); this.serialization = createSerializationHost(this); this.bitmapCodec = createBitmapCodecHost(this); this.bitmapDrawable = createBitmapDrawableHost(this); this.imageView = createImageViewHost(this); this.webView = createWebViewHost(this); this.contentExtras = createContentExtrasHost(this); this.preferenceManager = createPreferenceManagerHost(this); this.processHost = createProcessHost(this); this.statsHost = createStatsHost(this); this.telephonyExtras = createTelephonyHost(this); this.surfaceTextureHost = createSurfaceTextureHost(); this.buildHost = createBuildHost(this); this.sensorHost = createSensorHost(); this.geocoderHost = createGeocoderHost(this); this.coreLangHost = createCoreLangHost(this); this.resourcesExtras = createResourcesExtrasHost(this); this.simpleTimeZone = createSimpleTimeZoneHost(this); this.activityManagerExtras = createActivityManagerExtrasHost(this); this.settings = createSettingsHost(this); this.systemFeatures = new Set(DEVICE_FEATURES); this.hardwareServices = createHardwareServicesHost(this); this.peripheralServices = createPeripheralServicesHost(this); this.storageServices = createStorageServicesHost(this); this.systemManagers = createSystemManagersHost(this); this.typefaceBuilder = createTypefaceBuilderHost(this); this.viewTouch = createViewTouchHost(this); this.magnifier = createMagnifierHost(this); this.displayHost = createDisplayHost(this); this.notifications = createNotificationHost(this); this.databaseSupport = createDatabaseSupportHost(this); this.shaderHost = createShaderHost(this); this.systemBarsHost = createSystemBarsHost(this); this.deviceState = createDeviceStateHost(this); this.jobScheduler = createJobSchedulerHost(this); this.pendingIntents = createPendingIntentHost(this); this.binderHost = createBinderHost(this); this.inputManagerHost = createInputManagerHost(this); this.backDispatcher = createBackDispatcherHost(this); this.rtAnimators = createRenderThreadAnimators(this); this.icuBidi = createIcuBidiHost(this); this.contractHosts = [this.systemServices, this.javaIo, this.classLoaders, this.appServices, this.concurrency, this.dateTime, this.numberFormat, this.cookies, this.viewApi, this.textViewApi, this.intentApi, this.activityApi, this.contentResolverApi, this.packageManagerApi, this.remoteViews, this.miscPlatform, this.icuText, this.toasts, this.platformData, this.imageDecoder, this.imageViewApi, this.progressBarApi, this.viewGroupApi, this.viewInternals, this.uriApi, this.formatter, this.icuBidi, this.security, this.jca, this.reflection, this.serialization, this.bitmapCodec, this.bitmapDrawable, this.imageView, this.webView, this.contentExtras, this.preferenceManager, this.processHost, this.statsHost, this.telephonyExtras, this.surfaceTextureHost, this.buildHost, this.sensorHost, this.geocoderHost, this.coreLangHost, this.resourcesExtras, this.simpleTimeZone, this.activityManagerExtras, this.settings, this.hardwareServices, this.peripheralServices, this.storageServices, this.systemManagers, this.typefaceBuilder, this.viewTouch, this.magnifier, this.displayHost, this.notifications, this.databaseSupport, this.shaderHost, this.deviceState, this.jobScheduler, this.pendingIntents, this.binderHost, this.inputManagerHost, this.backDispatcher]; }
+  constructor({ resources = null, applicationName = null, packageName = null, manifest = null, apkBytes = null, device = null } = {}) { this.device = resolveDevice(device || {}); this.userDevice = this.device; this.clock = new VMClock(); this.apkBytes = apkBytes; this.manifest = manifest; this.resources = resources; this.applicationName = applicationName; this.packageName = packageName; this.application = null; this.applicationState = 'new'; this.tasks = []; this.nextTaskId = 1; this.starter = new ActivityStarter(this); this.activityInfos = new Map(); this.lastTransition = null; this.taskClosed = false; this.resourceObject = null; this.finishedActivities = new Set(); this.eventQueue = []; this.eventSequence = 0; this.virtualProcess = { source: 'browser-vm', pid: 1, uid: 10000, foreground: true }; this.transactionSequence = 0; this.porterModes = new Map(); this.inflaters = new Map(); this.applicationCallbacks = []; this.styleBackend = new AndroidStyleBackend(this); this.viewTreeHost = createViewTreeHost(this); this.viewWindowHost = createViewWindowHost(this); this.canvasHost = createVectorCanvasHost(); this.paintHost = createPaintHost(); this.contentHost = createContentResolverHost(this); this.drawableViewHost = createDrawableViewHost(this); this.deviceServices = createDeviceServicesHost(this); this.insetsHost = createWindowInsetsHost(this); this.accessibilityService = createAccessibilityServiceHost(this); this.viewLayoutHost = createViewLayoutHost(this); this.autofillService = createAutofillServiceHost(this); this.inputMethodService = createInputMethodServiceHost(this); this.clipboardService = createClipboardServiceHost(this); this.viewInputHost = createViewInputHost(this); this.xmlHost = new AndroidXmlHost(this); this.localeService = createLocaleServiceHost(this); this.viewStateHost = createViewStateHost(); this.componentCallbacksHost = createComponentCallbacksHost(this); this.editableTextHost = createEditableTextHost(this); this.viewCoordinateHost = createViewCoordinateHost(this); this.viewTransformHost = createViewTransformHost(this); this.viewPropertyAnimatorHost = createViewPropertyAnimatorHost(this); this.viewOutlineHost = createViewOutlineHost(this); this.composeCanvasHost = createComposeCanvasHost(this); this.dialogWindowHost = createDialogWindowHost(this); this.systemServices = createSystemServicesHost(this); this.javaIo = createJavaIoHost(this); this.classLoaders = createClassLoaderHost(this); this.appServices = createAppServicesHost(this); this.concurrency = createConcurrencyHost(this); this.dateTime = createDateTimeHost(this); this.numberFormat = createNumberFormatHost(this); this.cookies = createCookieHost(this); this.viewApi = createViewApiHost(this); this.textViewApi = createTextViewApiHost(this); this.intentApi = createIntentApiHost(this); this.activityApi = createActivityApiHost(this); this.contentResolverApi = createContentResolverApiHost(this); this.packageManagerApi = createPackageManagerApiHost(this); this.remoteViews = createRemoteViewsHost(this); this.miscPlatform = createMiscPlatformHost(this); this.icuText = createIcuTextHost(this); this.toasts = createToastHost(this); this.platformData = createPlatformDataClassesHost(this); this.imageDecoder = createImageDecoderHost(this); this.imageViewApi = createImageViewApiHost(this); this.progressBarApi = createProgressBarApiHost(this); this.viewGroupApi = createViewGroupApiHost(this); this.viewInternals = createViewInternalsHost(this); this.uriApi = createUriApiHost(this); this.formatter = createFormatterHost(this); this.security = createSecurityHost(this); this.jca = createJcaHost(this); this.reflection = createReflectionHost(this); this.serialization = createSerializationHost(this); this.bitmapCodec = createBitmapCodecHost(this); this.bitmapDrawable = createBitmapDrawableHost(this); this.imageView = createImageViewHost(this); this.webView = createWebViewHost(this); this.contentExtras = createContentExtrasHost(this); this.preferenceManager = createPreferenceManagerHost(this); this.processHost = createProcessHost(this); this.statsHost = createStatsHost(this); this.telephonyExtras = createTelephonyHost(this); this.surfaceTextureHost = createSurfaceTextureHost(); this.buildHost = createBuildHost(this); this.sensorHost = createSensorHost(); this.geocoderHost = createGeocoderHost(this); this.coreLangHost = createCoreLangHost(this); this.resourcesExtras = createResourcesExtrasHost(this); this.simpleTimeZone = createSimpleTimeZoneHost(this); this.activityManagerExtras = createActivityManagerExtrasHost(this); this.settings = createSettingsHost(this); this.systemFeatures = new Set(DEVICE_FEATURES); this.hardwareServices = createHardwareServicesHost(this); this.peripheralServices = createPeripheralServicesHost(this); this.storageServices = createStorageServicesHost(this); this.systemManagers = createSystemManagersHost(this); this.typefaceBuilder = createTypefaceBuilderHost(this); this.viewTouch = createViewTouchHost(this); this.magnifier = createMagnifierHost(this); this.displayHost = createDisplayHost(this); this.notifications = createNotificationHost(this); this.databaseSupport = createDatabaseSupportHost(this); this.shaderHost = createShaderHost(this); this.systemBarsHost = createSystemBarsHost(this); this.deviceState = createDeviceStateHost(this); this.jobScheduler = createJobSchedulerHost(this); this.pendingIntents = createPendingIntentHost(this); this.binderHost = createBinderHost(this); this.inputManagerHost = createInputManagerHost(this); this.backDispatcher = createBackDispatcherHost(this); this.rtAnimators = createRenderThreadAnimators(this); this.icuBidi = createIcuBidiHost(this); this.contractHosts = [this.systemServices, this.javaIo, this.classLoaders, this.appServices, this.concurrency, this.dateTime, this.numberFormat, this.cookies, this.viewApi, this.textViewApi, this.intentApi, this.activityApi, this.contentResolverApi, this.packageManagerApi, this.remoteViews, this.miscPlatform, this.icuText, this.toasts, this.platformData, this.imageDecoder, this.imageViewApi, this.progressBarApi, this.viewGroupApi, this.viewInternals, this.uriApi, this.formatter, this.icuBidi, this.security, this.jca, this.reflection, this.serialization, this.bitmapCodec, this.bitmapDrawable, this.imageView, this.webView, this.contentExtras, this.preferenceManager, this.processHost, this.statsHost, this.telephonyExtras, this.surfaceTextureHost, this.buildHost, this.sensorHost, this.geocoderHost, this.coreLangHost, this.resourcesExtras, this.simpleTimeZone, this.activityManagerExtras, this.settings, this.hardwareServices, this.peripheralServices, this.storageServices, this.systemManagers, this.typefaceBuilder, this.viewTouch, this.magnifier, this.displayHost, this.notifications, this.databaseSupport, this.shaderHost, this.deviceState, this.jobScheduler, this.pendingIntents, this.binderHost, this.inputManagerHost, this.backDispatcher]; }
   readStatic(runtime, field) {
     for (const host of this.contractHosts) { const hosted = host.readStatic(runtime, field); if (hosted) return hosted; }
     // Android 13 Bundle.EMPTY: one singleton whose mMap is the immutable ArrayMap.EMPTY; any insertion throws UnsupportedOperationException("ArrayMap is immutable").
@@ -331,11 +332,11 @@ export class AndroidPlatform {
   }
   /** The orientation ('portrait' | 'landscape') the top Activity forces on the display, or null when the user's device orientation decides (ActivityRecord.getOrientation: BEHIND defers to the Activity below). */
   forcedOrientationFor(top) {
-    let index = top ? this.frames.indexOf(top) : -1; if (index < 0 && top) index = this.frames.length;
+    const stack = (top && this.taskOf(top)?.frames) || this.frames; let index = top ? stack.indexOf(top) : -1; if (index < 0 && top) index = stack.length;
     for (let frame = top; frame; ) {
       const request = this.requestedOrientationOf(frame);
       if (request !== 3) { if (request === 14) { frame.record ??= {}; frame.record.lockedOrientation ??= this.device.orientation; return frame.record.lockedOrientation; } return forcedOrientationOf(request, this.device.orientation); }
-      frame = index > 0 ? this.frames[--index] : null;
+      frame = index > 0 ? stack[--index] : null;
     }
     return null;
   }
@@ -346,18 +347,116 @@ export class AndroidPlatform {
   settleConfiguration(runtime, frame) {
     const pending = frame.pendingDiff | 0; if (!pending) return frame; frame.pendingDiff = 0;
     if (!this.deviceState.needsRelaunch(frame, pending)) { runtime.dispatch({ owner: frame.type, name: 'onConfigurationChanged', signature: '(Landroid/content/res/Configuration;)V', parameters: ['Landroid/content/res/Configuration;'], result: 'V' }, [frame.activity, this.configuration], 'virtual'); return frame; }
-    this.recreateActivity(runtime, frame); return this.frames.at(-1);
+    const task = this.taskOf(frame), at = task.frames.indexOf(frame); this.recreateActivity(runtime, frame); return task.frames[at] ?? frame;
   }
-  /** Activity.moveTaskToBack: the task leaves the foreground (onPause, onStop); resumeTask() brings it back (onRestart, onStart, onResume). */
-  moveTaskToBack(runtime) {
-    const frame = this.frames.at(-1); if (!frame || this.taskInBackground) return; this.taskInBackground = true;
-    if (frame.lifecycleStage === 4) this.lifecycleCall(runtime, frame.activity, 'onPause'); if (frame.lifecycleStage >= 3) this.lifecycleCall(runtime, frame.activity, 'onStop');
+  /** Activity.moveTaskToBack: the task goes to the bottom of the recents. With another task behind it that task's top Activity resumes; with none the app leaves for the launcher (onPause, onStop); resumeTask() brings it back (onRestart, onStart, onResume). */
+  moveTaskToBack(runtime, task = this.tasks.at(-1)) {
+    if (!task || this.taskInBackground) return;
+    const top = task.frames.at(-1);
+    if (this.tasks.length > 1) {
+      if (task !== this.tasks.at(-1)) { this.tasks.splice(this.tasks.indexOf(task), 1); this.tasks.unshift(task); return; }
+      this.pauseForLaunch(runtime, top, false); this.tasks.pop(); this.tasks.unshift(task);
+      this.resumeFrame(runtime, this.tasks.at(-1).frames.at(-1)); this.stopFrame(runtime, top);
+      runtime.record('ACTIVITY task moved to back'); return;
+    }
+    if (!top) return; this.taskInBackground = true;
+    if (top.lifecycleStage === 4) this.lifecycleCall(runtime, top.activity, 'onPause'); this.stopFrame(runtime, top);
     runtime.record('ACTIVITY task moved to back');
   }
   resumeTask(runtime) {
     const frame = this.frames.at(-1); if (!frame || !this.taskInBackground) return false; this.taskInBackground = false;
     if (frame.lifecycleStage === 2) this.lifecycleCall(runtime, frame.activity, 'onRestart'); if (frame.lifecycleStage <= 2) this.lifecycleCall(runtime, frame.activity, 'onStart'); this.lifecycleCall(runtime, frame.activity, 'onResume');
     runtime.record('ACTIVITY task brought to front'); return true;
+  }
+  // ---- Tasks (ActivityTaskManager / Task): the tasks[] list is the recents order, the last entry is the foreground task; `frames` is the foreground task's Activity stack. ----------------------------------
+  get frames() { return this.tasks.at(-1)?.frames ?? []; }
+  allFrames() { return this.tasks.flatMap(task => task.frames); }
+  taskOf(frame) { return this.tasks.find(task => task.frames.includes(frame)) ?? null; }
+  taskById(id) { return this.tasks.find(task => task.id === id) ?? null; }
+  /** The task-related manifest attributes of an Activity class (launchMode, taskAffinity, noHistory, ...). */
+  activityInfo(type) { let info = this.activityInfos.get(type); if (!info) this.activityInfos.set(type, info = activityInfoOf(this.manifest, this.packageName, type)); return info; }
+  newTask(type, info = this.activityInfo(type), { intentKey = null, exclude = false } = {}) {
+    const task = { id: this.nextTaskId++, rootAffinity: info.affinity, affinity: info.affinity, realActivity: type, intentKey, excludeFromRecents: !!exclude, frames: [], pinned: 0, lastActiveTime: this.clock.now() };
+    this.tasks.push(task); this.taskClosed = false; return task;
+  }
+  /** An Activity the platform meets without having started it (the launcher Activity): it joins the foreground task, or founds the app's first task with the MAIN/LAUNCHER intent. */
+  addFrame(runtime, frame) {
+    const task = this.tasks.at(-1) ?? this.newTask(frame.type, this.activityInfo(frame.type), { intentKey: JSON.stringify(['android.intent.action.MAIN', '', '', '', '', frame.type, ['android.intent.category.LAUNCHER']]) });
+    task.frames.push(frame); this.taskClosed = false;
+  }
+  bringTaskToFront(task) { const index = this.tasks.indexOf(task); if (index >= 0 && index !== this.tasks.length - 1) { this.tasks.splice(index, 1); this.tasks.push(task); } task.lastActiveTime = this.clock.now(); }
+  removeFrame(frame) { const task = this.taskOf(frame); if (!task) return null; task.frames.splice(task.frames.indexOf(frame), 1); if (!task.frames.length && !task.pinned) this.tasks.splice(this.tasks.indexOf(task), 1); return task; }
+  dropEmptyTasks() { this.tasks = this.tasks.filter(task => task.frames.length || task.pinned); }
+  makeCurrent(runtime, frame) { runtime.activity = frame.activity; runtime.activityType = frame.type; runtime.root = frame.root; }
+  throwAndroidRuntime(runtime, message) { runtime.throwJava('Landroid/util/AndroidRuntimeException;', message); }
+  /** Runs `body` as a launch by the system (PendingIntent.send): no source Activity, so the starter forces FLAG_ACTIVITY_NEW_TASK. */
+  asSystemLaunch(body) { const before = this.systemLaunch; this.systemLaunch = true; try { return body(); } finally { this.systemLaunch = before; } }
+  isActivityContext(runtime, context) {
+    for (let at = context, depth = 0; at && !nullish(at) && depth < 16; depth++) { const object = runtime.object(at); if (runtime.isSubtype(object.type, ACTIVITY)) return true; at = object.baseContext; }
+    return false;
+  }
+  /** The Intent an Activity receives: a copy of the launching Intent carrying the launch flags the system computed. */
+  copyIntent(runtime, intent, flags) {
+    const out = runtime.makeObject(INTENT);
+    Object.assign(runtime.object(out), { target: intent.target ?? null, action: intent.action ?? null, flags: flags | 0, data: intent.data ?? null, mimeType: intent.mimeType ?? null, identifier: intent.identifier ?? null, package: intent.package ?? null, component: intent.component ?? null,
+      categories: intent.categories ? [...intent.categories] : undefined, clipData: intent.clipData ?? null, extras: new Map(intent.extras || []), extrasPresent: !!intent.extrasPresent || !!intent.extras?.size, extrasClassLoader: intent.extrasClassLoader ?? null });
+    return out;
+  }
+  recordTransition(runtime, transition, source) {
+    const override = source?.overrideTransition ?? null; if (source) source.overrideTransition = null;
+    this.lastTransition = { ...transition, enterAnim: transition.animated && override ? override.enter : 0, exitAnim: transition.animated && override ? override.exit : 0, overridden: transition.animated && !!override };
+  }
+  /** The Activity instance a launch creates (ActivityThread.performLaunchActivity -> onCreate -> onStart -> onResume) inside `task`. */
+  createInstance(runtime, target, delivered, task, { resultReceiver = null, requestCode = -1, flags = 0, noHistory = false } = {}) {
+    const activity = runtime.allocate(target);
+    const frame = { activity, type: target, root: null, intent: delivered, finished: false, resultReceiver, resultRequestCode: requestCode, launchFlags: flags, noHistory };
+    this.deviceState.applyAnimatorScale(runtime, this.device.animatorScale, true);
+    task.frames.push(frame); this.taskClosed = false;
+    runtime.activity = activity; runtime.activityType = target; runtime.root = null;
+    runtime.record(`ACTIVITY start ${target}`);
+    runtime.dispatch({ owner: target, name: '<init>', signature: '()V', parameters: [], result: 'V' }, [activity], 'direct');
+    this.attachActivityContext(runtime, activity);
+    this.performLifecycle(runtime, activity, 'onCreate', [null], () => runtime.dispatch({ owner: target, name: 'onCreate', signature: '(Landroid/os/Bundle;)V', parameters: ['Landroid/os/Bundle;'], result: 'V' }, [activity, null], 'virtual'));
+    this.afterActivityCreate(runtime, activity);
+    frame.root = runtime.root;
+    if (!frame.root && this.allFrames().includes(frame)) error(`Started Activity did not provide a content View: ${target}`);
+    return frame;
+  }
+  /** The resumed Activity about to be covered gets onUserLeaveHint (unless FLAG_ACTIVITY_NO_USER_ACTION) and onPause. */
+  pauseForLaunch(runtime, frame, userLeaving) {
+    if (frame.lifecycleStage !== 4) return;
+    if (userLeaving) runtime.dispatch({ owner: frame.type, name: 'onUserLeaveHint', signature: '()V', parameters: [], result: 'V' }, [frame.activity], 'virtual');
+    this.lifecycleCall(runtime, frame.activity, 'onPause');
+  }
+  /** The Activity is no longer visible: onStop; an android:noHistory / FLAG_ACTIVITY_NO_HISTORY Activity finishes once the user has left it. */
+  stopFrame(runtime, frame) {
+    if (frame.lifecycleStage >= 3) this.lifecycleCall(runtime, frame.activity, 'onStop');
+    if (frame.noHistory && !frame.finishing && !frame.finished && !(frame.lifecycleDepth > 0) && this.allFrames().includes(frame)) this.retireFrame(runtime, frame);
+  }
+  deliverNewIntent(runtime, frame, intent) { runtime.dispatch({ owner: frame.type, name: 'onNewIntent', signature: '(Landroid/content/Intent;)V', parameters: [INTENT], result: 'V' }, [frame.activity, intent], 'virtual'); }
+  /** An Activity comes (back) to the front: orientation / configuration catch-up, then onRestart, onStart, pending results, onNewIntent(s) and onResume (ActivityThread's NewIntentItem runs after onStart). */
+  resumeFrame(runtime, frame, intents = []) {
+    if (frame.lifecycleStage === 4) {   // already resumed: an Activity is always paused before it receives a new intent
+      if (!intents.length) return;
+      this.lifecycleCall(runtime, frame.activity, 'onPause'); for (const intent of intents) this.deliverNewIntent(runtime, frame, intent); this.lifecycleCall(runtime, frame.activity, 'onResume'); return;
+    }
+    this.makeCurrent(runtime, frame);
+    // The Activity coming back meets the orientation / configuration that changed while it was stopped: handled in place, or relaunched (a relaunch already brings it to the resumed state).
+    const task = this.taskOf(frame), at = task.frames.indexOf(frame); this.refreshOrientation(runtime); const current = this.settleConfiguration(runtime, task.frames[at] ?? frame), relaunched = current !== frame;
+    this.makeCurrent(runtime, current);
+    if (relaunched) { this.deliverActivityResults(runtime, current); for (const intent of intents) this.deliverNewIntent(runtime, current, intent); return; }
+    if (current.lifecycleStage === 2) this.lifecycleCall(runtime, current.activity, 'onRestart'); if (current.lifecycleStage <= 2) this.lifecycleCall(runtime, current.activity, 'onStart');
+    this.deliverActivityResults(runtime, current); for (const intent of intents) this.deliverNewIntent(runtime, current, intent);
+    this.lifecycleCall(runtime, current.activity, 'onResume');
+  }
+  /** Brings a task to the foreground (moveTaskToFront): the covered Activity pauses, the task's top Activity resumes, the covered one stops. */
+  moveTaskToFront(runtime, task) {
+    if (!task || !this.tasks.includes(task)) return;
+    const front = this.tasks.at(-1), previous = front?.frames.at(-1) ?? null; this.taskInBackground = false;
+    if (task === front) { if (previous && previous.lifecycleStage !== 4) this.resumeFrame(runtime, previous); return; }
+    if (previous) this.pauseForLaunch(runtime, previous, true);
+    this.bringTaskToFront(task); this.resumeFrame(runtime, task.frames.at(-1));
+    if (previous && this.allFrames().includes(previous)) this.stopFrame(runtime, previous);
   }
   parent(type) { return this.contractHosts.reduce((found, host) => found || host.parent(type), null) || this.systemBarsHost.parent(type) || this.dialogWindowHost.parent(type) || this.viewCoordinateHost.parent(type) || this.viewStateHost.parent(type) || this.localeService.parent(type) || this.viewWindowHost.parent(type) || this.canvasHost.parent(type) || this.paintHost.parent(type) || this.contentHost.parent(type) || this.drawableViewHost.parent(type) || this.deviceServices.parent(type) || this.insetsHost.parent(type) || this.accessibilityService.parent(type) || this.autofillService.parent(type) || this.inputMethodService.parent(type) || this.clipboardService.parent(type) || this.viewInputHost.parent(type) || PARENTS.get(type) || null; }
   /** Implicit Object parents of contract-host classes: consulted only after the VM's EXTERNAL_PARENTS table. */
@@ -371,14 +470,14 @@ export class AndroidPlatform {
     if (object.type === 'Landroid/view/View;' || (runtime.dex.classes.has(object.type) || runtime.classes.has(object.type)) && runtime.isSubtype(object.type, 'Landroid/view/View;') && !['TextView', 'ProgressBar'].some(name => runtime.isSubtype(object.type, `Landroid/widget/${name};`))) return 'view';
     return null;
   }
-  navigationState(runtime) { this.syncCurrent(runtime); const sourceBackHandler = !!runtime.activity && !!runtime.objectOverride(runtime.object(runtime.activity).type, 'onBackPressed()V'); return { sourceBackHandler, canGoBack: this.frames.length > 1 || sourceBackHandler, activityStack: this.frames.map((frame) => frame.type.slice(1, -1).replaceAll('/', '.')), closed: this.taskClosed }; }
+  navigationState(runtime) { this.syncCurrent(runtime); const sourceBackHandler = !!runtime.activity && !!runtime.objectOverride(runtime.object(runtime.activity).type, 'onBackPressed()V'); return { sourceBackHandler, canGoBack: this.frames.length > 1 || this.tasks.length > 1 || sourceBackHandler, activityStack: this.frames.map((frame) => frame.type.slice(1, -1).replaceAll('/', '.')), tasks: this.tasks.map((task) => ({ id: task.id, activityStack: task.frames.map((frame) => frame.type.slice(1, -1).replaceAll('/', '.')) })), closed: this.taskClosed }; }
   frame(runtime, activity = runtime.activity) {
-    let frame = this.frames.find((entry) => sameRef(entry.activity, activity));
+    let frame = this.allFrames().find((entry) => sameRef(entry.activity, activity));
     if (!frame) {
       if (nullish(activity) || !runtime.isSubtype(runtime.object(activity).type, ACTIVITY)) error('Activity context is unavailable');
       frame = { activity, type: runtime.object(activity).type, root: sameRef(activity, runtime.activity) ? runtime.root : null, intent: null, finished: false };
       this.deviceState.applyAnimatorScale(runtime, this.device.animatorScale, true);
-    this.frames.push(frame); this.taskClosed = false;
+      this.addFrame(runtime, frame);
     }
     return frame;
   }
@@ -580,28 +679,20 @@ export class AndroidPlatform {
     if (!frame.intent) { frame.intent = runtime.makeObject(INTENT); const intent = runtime.object(frame.intent); intent.target = frame.type; intent.extras = new Map(); intent.extrasPresent = false; intent.extrasClassLoader = null; intent.flags = 0; }
     return frame.intent;
   }
-  startActivity(runtime, intentValue, resultCaller = null, requestCode = -1) {
+  startActivity(runtime, intentValue, resultCaller = null, requestCode = -1, context = {}) {
     const intent = runtime.object(intentValue); this.syncCurrent(runtime);
     if (!intent.target) error(`External/implicit Intent${intent.action ? ` ${intent.action}` : ''} is unsupported; only explicit Activities packaged inside this APK can start`, { kind: 'external-intent-unsupported', action: intent.action ?? null });
-    if (intent.flags) error(`Intent task flags 0x${(intent.flags >>> 0).toString(16)} require unsupported task-stack semantics`);
     const sourceFrame = this.frame(runtime);
     const target = descriptor(intent.target);
     if (!runtime.dex.classes.has(target) || !runtime.isSubtype(target, ACTIVITY)) error(`Intent target is not an Activity packaged in this APK: ${target}`, { kind: 'external-intent-unsupported', target });
-    if (this.frames.length >= 32) error('Activity stack exceeds 32 frames');
-    const sourceStarted = sourceFrame.lifecycleStage >= 3; if (sourceFrame.lifecycleStage === 4) this.lifecycleCall(runtime, sourceFrame.activity, 'onPause');
-    const activity = runtime.allocate(target), delivered = runtime.makeObject(INTENT);
-    Object.assign(runtime.object(delivered), { target, action: intent.action ?? null, flags: 0, data: intent.data ?? null, mimeType: intent.mimeType ?? null, extras: new Map(intent.extras || []), extrasPresent: !!intent.extrasPresent || !!intent.extras?.size, extrasClassLoader: intent.extrasClassLoader ?? null });
-    const frame = { activity, type: target, root: null, intent: delivered, finished: false, resultReceiver: resultCaller && requestCode >= 0 ? resultCaller : null, resultRequestCode: requestCode };
-    this.deviceState.applyAnimatorScale(runtime, this.device.animatorScale, true);
-    this.frames.push(frame); this.taskClosed = false;
-    runtime.activity = activity; runtime.activityType = target; runtime.root = null;
-    runtime.record(`ACTIVITY start ${target}`);
-    runtime.dispatch({ owner: target, name: '<init>', signature: '()V', parameters: [], result: 'V' }, [activity], 'direct');
-    this.attachActivityContext(runtime, activity);
-    this.performLifecycle(runtime, activity, 'onCreate', [null], () => runtime.dispatch({ owner: target, name: 'onCreate', signature: '(Landroid/os/Bundle;)V', parameters: ['Landroid/os/Bundle;'], result: 'V' }, [activity, null], 'virtual'));
-    this.afterActivityCreate(runtime, activity); if (sourceStarted && this.frames.includes(sourceFrame)) this.lifecycleCall(runtime, sourceFrame.activity, 'onStop');
-    frame.root = runtime.root;
-    if (!frame.root && this.frames.includes(frame)) error(`Started Activity did not provide a content View: ${target}`);
+    if (this.allFrames().length >= 32) error('Activity stack exceeds 32 frames');
+    const fromActivity = context.fromActivity !== false && !this.systemLaunch;
+    // ContextImpl.startActivity: outside an Activity context the NEW_TASK flag is mandatory (apps targeting below N or P and above).
+    if (context.fromActivity === false && !this.systemLaunch && !((intent.flags | 0) & LAUNCH_FLAG.NEW_TASK)) {
+      const targetSdk = Number(this.manifest?.usesSdk?.targetSdkVersion ?? this.manifest?.usesSdk?.minSdkVersion ?? 1);
+      if (targetSdk < 24 || targetSdk >= 28) this.throwAndroidRuntime(runtime, 'Calling startActivity() from outside of an Activity  context requires the FLAG_ACTIVITY_NEW_TASK flag. Is this really what you want?');
+    }
+    this.starter.start(runtime, intent, target, sourceFrame, { resultCaller, requestCode, fromActivity });
   }
   deliverActivityResults(runtime, frame) {
     while (frame.pendingActivityResults?.length) {
@@ -611,32 +702,39 @@ export class AndroidPlatform {
       runtime.dispatch({ owner: ACTIVITY, name: 'onActivityResult', signature: '(IILandroid/content/Intent;)V', parameters: ['I', 'I', INTENT], result: 'V' }, [frame.activity, result.requestCode, result.resultCode, result.data], 'virtual');
     }
   }
-  finish(runtime, activity) {
-    this.syncCurrent(runtime);
-    const frame = this.frames.find(frame => sameRef(frame.activity, activity));
-    if (!frame) { if (this.finishedActivities.has(activity.ref)) return; error('finish() receiver is not a registered Activity'); }
-    if (frame.finishing) return;
-    // finish() inside onCreate/onStart/onResume (a splash that starts the next screen): ActivityThread finishes the activity after that callback returns (onCreate -> onDestroy), so
-    // the teardown waits for the outermost lifecycle callback; isFinishing() is already true.
-    if (frame.lifecycleDepth > 0) { frame.finishRequested = true; return; }
+  /** The teardown of one Activity: result captured, onPause / onStop / onDestroy as its state needs, removed from its task, the result handed to the Activity that asked for it. */
+  retireFrame(runtime, frame) {
+    const activity = frame.activity;
     frame.finishing = true;
     const state = runtime.object(activity); let data = state.activityResultData ?? null;
     if (data) { const copy = runtime.allocate(INTENT); runtime.dispatch({ owner: INTENT, name: '<init>', signature: '(Landroid/content/Intent;)V', parameters: [INTENT], result: 'V' }, [copy, data], 'direct'); data = copy; }
     const result = { requestCode: frame.resultRequestCode, resultCode: state.activityResultCode ?? 0, data };
     if (frame.lifecycleStage === 4) this.lifecycleCall(runtime, frame.activity, 'onPause'); if (frame.lifecycleStage >= 3) this.lifecycleCall(runtime, frame.activity, 'onStop'); this.lifecycleCall(runtime, frame.activity, 'onDestroy');
-    frame.finished = true; this.finishedActivities.add(frame.activity.ref); const index = this.frames.indexOf(frame); if (index >= 0) this.frames.splice(index, 1);
-    const receiver = frame.resultReceiver && this.frames.find(candidate => sameRef(candidate.activity, frame.resultReceiver)); if (receiver) (receiver.pendingActivityResults ||= []).push(result);
+    frame.finished = true; this.finishedActivities.add(frame.activity.ref); this.removeFrame(frame);
+    const receiver = frame.resultReceiver && this.allFrames().find(candidate => sameRef(candidate.activity, frame.resultReceiver)); if (receiver) (receiver.pendingActivityResults ||= []).push(result);
     runtime.record(`ACTIVITY finish ${frame.type}`);
-    if (!sameRef(runtime.activity, activity)) return; // A previous Splash may finish after starting a child.
-    let previous = this.frames.at(-1);
-    if (previous) {
-      runtime.activity = previous.activity; runtime.activityType = previous.type; runtime.root = previous.root;
-      // The Activity coming back meets the orientation / configuration that changed while it was stopped: handled in place, or relaunched (a relaunch already brings it to the resumed state).
-      const original = previous; this.refreshOrientation(runtime); previous = this.settleConfiguration(runtime, this.frames.at(-1) ?? previous); const relaunched = previous !== original;
-      runtime.activity = previous.activity; runtime.activityType = previous.type; runtime.root = previous.root;
-      if (relaunched) this.deliverActivityResults(runtime, previous);
-      else { if (previous.lifecycleStage === 2) this.lifecycleCall(runtime, previous.activity, 'onRestart'); if (previous.lifecycleStage <= 2) this.lifecycleCall(runtime, previous.activity, 'onStart'); this.deliverActivityResults(runtime, previous); this.lifecycleCall(runtime, previous.activity, 'onResume'); }
-    }
+  }
+  /** Finishes several Activities at once (finishAffinity, finishAndRemoveTask, navigateUpTo): the ones that are not on top go first so that nothing in between is resumed; the top one last brings the survivor to the front. */
+  finishFrames(runtime, frames) {
+    const current = this.tasks.at(-1)?.frames.at(-1), list = frames.filter(frame => this.allFrames().includes(frame));
+    if (list.includes(current) && !current.lifecycleDepth) this.pauseForLaunch(runtime, current, false);   // the resumed Activity pauses first, as in ActivityRecord.finishIfPossible
+    for (const frame of list) if (frame !== current && this.allFrames().includes(frame)) this.finish(runtime, frame.activity);
+    if (list.includes(current) && this.allFrames().includes(current)) this.finish(runtime, current.activity);
+  }
+  finish(runtime, activity) {
+    this.syncCurrent(runtime);
+    const frame = this.allFrames().find(frame => sameRef(frame.activity, activity));
+    if (!frame) { if (this.finishedActivities.has(activity.ref)) return; error('finish() receiver is not a registered Activity'); }
+    if (frame.finishing) return;
+    // finish() inside onCreate/onStart/onResume (a splash that starts the next screen): ActivityThread finishes the activity after that callback returns (onCreate -> onDestroy), so
+    // the teardown waits for the outermost lifecycle callback; isFinishing() is already true.
+    if (frame.lifecycleDepth > 0) { frame.finishRequested = true; return; }
+    const wasCurrent = sameRef(runtime.activity, activity), overrides = frame.overrideTransition ?? null;
+    this.retireFrame(runtime, frame);
+    this.lastTransition = { kind: 'close', animated: true, from: frame.type, to: null, enterAnim: overrides ? overrides.enter : 0, exitAnim: overrides ? overrides.exit : 0, overridden: !!overrides };
+    if (!wasCurrent) return; // A previous Splash may finish after starting a child.
+    const previous = this.frames.at(-1);
+    if (previous) this.resumeFrame(runtime, previous);
     else { runtime.activity = null; runtime.activityType = null; runtime.root = null; this.taskClosed = true; }
   }
 
@@ -800,12 +898,12 @@ export class AndroidPlatform {
       if (name === 'onCreate') { const frame = this.frame(runtime, receiver); frame.lifecycleStage = 1; this.moveFragments(runtime, frame, 1); this.notifyActivity(runtime, frame, 'Created', args[1]); return; }
       if (name === 'getResources') return this.resourcesForContext(runtime,receiver);
       if (name === 'getString' || name === 'getText') return this.resource(args[1], ['string']).value;
-      if (name === 'startActivity') return this.startActivity(runtime, args[1]);
+      if (name === 'startActivity') return this.startActivity(runtime, args[1], null, -1, { fromActivity: this.isActivityContext(runtime, receiver) });
       if (name === 'startActivityForResult') { if (args[3] && this.extras(runtime, args[3]).size) error('Non-empty Activity launch options require their original transition/window boundary'); return this.startActivity(runtime, args[1], receiver, args[2]); }
       if (name === 'setResult') { if (args[2] && !runtime.isSubtype(runtime.object(args[2]).type, INTENT)) error('Activity result data must be an Intent'); const object = runtime.object(receiver); object.activityResultCode = args[1]; object.activityResultData = args[2] || null; return; }
       if (name === 'onActivityResult') return; // Empty Activity base callback; APK/AndroidX overrides have DEX priority.
-      if (name === 'isFinishing') return this.finishedActivities.has(receiver.ref) || this.frames.find(frame => sameRef(frame.activity, receiver))?.finishRequested ? 1 : 0;
-      if (name === 'isDestroyed') return this.finishedActivities.has(receiver.ref) || this.frames.find(frame => sameRef(frame.activity, receiver))?.destroyed ? 1 : 0;
+      if (name === 'isFinishing') { const target = this.allFrames().find(frame => sameRef(frame.activity, receiver)); return this.finishedActivities.has(receiver.ref) || target?.finishRequested || target?.finishing ? 1 : 0; }
+      if (name === 'isDestroyed') return this.finishedActivities.has(receiver.ref) || this.allFrames().find(frame => sameRef(frame.activity, receiver))?.destroyed ? 1 : 0;
       const frame = this.frame(runtime, receiver);
       if (name === 'getComponentName') { const component = runtime.makeObject(COMPONENT); Object.assign(runtime.object(component), { packageName: this.packageName, className: frame.type.slice(1, -1).replaceAll('/', '.') }); return component; }
       if (name === 'getLocalClassName') { const className = frame.type.slice(1, -1).replaceAll('/', '.'), prefix = this.packageName + '.'; return className.startsWith(prefix) ? className.slice(prefix.length) : className; }
@@ -1185,7 +1283,7 @@ export class AndroidPlatform {
   /** ActivityThread.performX: Activity.dispatchActivityPre<Event> -> the lifecycle method -> Post<Event> (Pre/Post callbacks exist since API 29; AndroidX Lifecycle's ReportFragment relies on them). */
   performLifecycle(runtime, receiver, name, values, run) {
     const events = { onCreate: 'Created', onStart: 'Started', onResume: 'Resumed', onPause: 'Paused', onStop: 'Stopped', onDestroy: 'Destroyed', onSaveInstanceState: 'SaveInstanceState' };
-    const event = events[name], frame = event && runtime.isSubtype(runtime.object(receiver).type, ACTIVITY) ? this.frames.find(f => sameRef(f.activity, receiver)) : null;
+    const event = events[name], frame = event && runtime.isSubtype(runtime.object(receiver).type, ACTIVITY) ? this.allFrames().find(f => sameRef(f.activity, receiver)) : null;
     if (!frame) return run();
     const bundle = /(Created|SaveInstanceState)$/.test(event) ? (values[0] ?? null) : undefined, legacy = runtime.apiLevel < 29;
     frame.lifecycleDepth = (frame.lifecycleDepth ?? 0) + 1;
@@ -1199,7 +1297,7 @@ export class AndroidPlatform {
     return result;
   }
   lifecycleCall(runtime, receiver, name, parameters = [], values = []) {
-    const activity = runtime.isSubtype(runtime.object(receiver).type, ACTIVITY), frame = activity ? this.frames.find(frame => sameRef(frame.activity, receiver)) : null;
+    const activity = runtime.isSubtype(runtime.object(receiver).type, ACTIVITY), frame = activity ? this.allFrames().find(frame => sameRef(frame.activity, receiver)) : null;
     const before = { onPause: 3, onStop: 2, onDestroy: 0 };
     if (frame && Object.hasOwn(before, name)) { if (name === 'onDestroy') frame.destroyed = true; this.moveFragments(runtime, frame, before[name]); }
     const result = this.performLifecycle(runtime, receiver, name, values, () => runtime.dispatch({ owner: runtime.object(receiver).type, name, signature: `(${parameters.join('')})V`, parameters, result: 'V' }, [receiver, ...values], 'virtual'));
@@ -1246,15 +1344,15 @@ export class AndroidPlatform {
     for (const saved of state) { const ref = this.find(runtime, root, saved.androidId); if (!ref) continue; const view = runtime.object(ref); if (runtime.isSubtype(view.type, 'Landroid/widget/EditText;')) this.setInput(runtime, view.id, saved.text); if (runtime.isSubtype(view.type, 'Landroid/widget/CompoundButton;')) this.setChecked(runtime, ref, !!saved.checked); if (view.type === 'Landroid/widget/ProgressBar;') view.progress = saved.progress; }
   }
   recreateActivity(runtime, frame) {
-    if (!this.frames.includes(frame)) return; this.syncCurrent(runtime); frame.changingConfiguration = true;
+    if (!this.allFrames().includes(frame)) return; this.syncCurrent(runtime); frame.changingConfiguration = true;
     if (frame.lifecycleStage === 4) this.lifecycleCall(runtime, frame.activity, 'onPause'); if (frame.lifecycleStage !== 2) this.lifecycleCall(runtime, frame.activity, 'onStop'); const saved = this.bundle(runtime);
     this.lifecycleCall(runtime, frame.activity, 'onSaveInstanceState', [BUNDLE], [saved]);
     const retained = runtime.dispatch({ owner: frame.type, name: 'onRetainNonConfigurationInstance', signature: '()Ljava/lang/Object;', parameters: [], result: 'Ljava/lang/Object;' }, [frame.activity], 'virtual');
     const retainedFragments = frame.fragmentManager ? runtime.object(frame.fragmentManager).fragments.filter(ref => runtime.object(ref).retained) : [];
     for (const fragment of retainedFragments) runtime.object(fragment).retaining = true;
     this.lifecycleCall(runtime, frame.activity, 'onDestroy');
-    const activity = runtime.allocate(frame.type), replacement = { activity, type: frame.type, intent: frame.intent, root: null, retained, lifecycleStage: 0, savedState: saved, record: frame.record, resultReceiver: frame.resultReceiver, resultRequestCode: frame.resultRequestCode, fragmentRequests: frame.fragmentRequests };
-    this.frames.splice(this.frames.indexOf(frame), 1, replacement); this.finishedActivities.add(frame.activity.ref);
+    const activity = runtime.allocate(frame.type), replacement = { activity, type: frame.type, intent: frame.intent, root: null, retained, lifecycleStage: 0, savedState: saved, record: frame.record, resultReceiver: frame.resultReceiver, resultRequestCode: frame.resultRequestCode, fragmentRequests: frame.fragmentRequests, launchFlags: frame.launchFlags, noHistory: frame.noHistory, overrideTransition: frame.overrideTransition };
+    { const task = this.taskOf(frame); task.frames.splice(task.frames.indexOf(frame), 1, replacement); } this.finishedActivities.add(frame.activity.ref);
     if (retainedFragments.length) { const manager = this.fragmentManager(runtime, replacement); runtime.object(manager).fragments = retainedFragments; for (const fragment of retainedFragments) Object.assign(runtime.object(fragment), { host: activity, manager, fragmentStage: 0, skipCreateOnce: true, retaining: false }); }
     runtime.activity = activity; runtime.activityType = frame.type; runtime.root = null;
     runtime.dispatch({ owner: frame.type, name: '<init>', signature: '()V', parameters: [], result: 'V' }, [activity], 'direct');
@@ -1591,7 +1689,7 @@ export class AndroidPlatform {
     const value = args[0], intent = runtime.object(value), name = method.name;
     if (name === '<init>') {
       intent.extras = new Map(); intent.flags = 0; intent.action = null; intent.target = null; intent.data = null; intent.mimeType = null;
-      if (method.parameters[0] === INTENT) { const source = runtime.object(args[1]); Object.assign(intent, { extras: new Map(source.extras || []), extrasPresent: !!source.extrasPresent || !!source.extras?.size, extrasClassLoader: source.extrasClassLoader ?? null, flags: source.flags || 0, action: source.action, target: source.target, data: source.data ?? null, mimeType: source.mimeType ?? null }); }
+      if (method.parameters[0] === INTENT) { const source = runtime.object(args[1]); Object.assign(intent, { extras: new Map(source.extras || []), extrasPresent: !!source.extrasPresent || !!source.extras?.size, extrasClassLoader: source.extrasClassLoader ?? null, flags: source.flags || 0, action: source.action, target: source.target, data: source.data ?? null, mimeType: source.mimeType ?? null, component: source.component ?? null, identifier: source.identifier ?? null, package: source.package ?? null, categories: source.categories ? [...source.categories] : undefined, clipData: source.clipData ?? null }); }
       else if (method.parameters[1] === 'Landroid/net/Uri;') { intent.action = checkString(args[1], 'Intent action'); if (args[2] && !runtime.isSubtype(runtime.object(args[2]).type, 'Landroid/net/Uri;')) error('Intent data must be a Uri'); intent.data = args[2]; }
       else if (method.parameters.length === 2) intent.target = runtime.object(args[2]).classType;
       else if (method.parameters[0] === 'Ljava/lang/String;') intent.action = checkString(args[1], 'Intent action');

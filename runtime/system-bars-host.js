@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=7995f957f05e';
-import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=7995f957f05e';
+import { APKError } from './apk-error.js?v=039e497067f0';
+import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=039e497067f0';
 // SystemUI of the virtual device: status bar, navigation bar (gesture handle or 3 buttons) and the window policy PhoneWindow/DecorView apply to the app:
 // edge-to-edge (targetSdk >= 35 unless windowOptOutEdgeToEdgeEnforcement, Window.setDecorFitsSystemWindows(false), SYSTEM_UI_FLAG_LAYOUT_*),
 // bar colors/appearance (theme + Window setters + WindowInsetsController + SYSTEM_UI_FLAG_LIGHT_*), hiding (FLAG_FULLSCREEN, SYSTEM_UI_FLAG_FULLSCREEN/HIDE_NAVIGATION,
@@ -99,7 +99,7 @@ export function createSystemBarsHost(platform) {
     supports: key => keys.has(key), parent: type => type === CONTROLLER ? 'Ljava/lang/Object;' : null,
     /** Policy snapshot for the page, the layout and WindowInsets (null while no Activity is running). */
     describe(r, frame = activeFrame(r)) { return frame ? compute(r, frame) : null; },
-    frameForRoot(r, root) { return platform.frames.find(frame => frame.root && frame.root.ref === root.ref || frame.window && r.object(frame.window).decor?.ref === root.ref) ?? null; },
+    frameForRoot(r, root) { return platform.allFrames().find(frame => frame.root && frame.root.ref === root.ref || frame.window && r.object(frame.window).decor?.ref === root.ref) ?? null; },
     snapshot(r) { const frame = activeFrame(r); if (!frame) return null; const value = compute(r, frame); return value; },
     /** WindowInsets dispatched to an Activity root: real values when the window is edge-to-edge, consumed by the decor otherwise. */
     insetsFor(r, root) {
@@ -116,7 +116,7 @@ export function createSystemBarsHost(platform) {
       return metrics;
     },
     contentFrame(r, root) { const frame = this.frameForRoot(r, root); return frame ? compute(r, frame).contentFrame : null; },
-    notifyChanged(r) { for (const frame of platform.frames) changed(r, frame); },
+    notifyChanged(r) { for (const frame of platform.allFrames()) changed(r, frame); },
     invoke(r, method, args) {
       const name = method.name, owner = method.owner, receiver = args[0];
       if (owner === CONTROLLER) {

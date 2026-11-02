@@ -1,6 +1,6 @@
-import { APKError } from './apk-runtime.js?v=7995f957f05e';
-import { getVectorGraphics } from './vector-native.js?v=7995f957f05e';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=7995f957f05e';
+import { APKError } from './apk-runtime.js?v=039e497067f0';
+import { getVectorGraphics } from './vector-native.js?v=039e497067f0';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=039e497067f0';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',FRAME='Landroid/widget/FrameLayout;',WINDOW='Landroid/view/Window;',PHONE='Lcom/android/internal/policy/PhoneWindow;',WM='Landroid/view/WindowManager;',WMI='Landroid/view/WindowManagerImpl;',LP='Landroid/view/WindowManager$LayoutParams;',VLP='Landroid/view/ViewGroup$LayoutParams;',CTX='Landroid/content/Context;',CTXW='Landroid/view/ContextThemeWrapper;',THEME='Landroid/content/res/Resources$Theme;',RECT='Landroid/graphics/Rect;',TOKEN='Lapkweb/bridge/WindowToken;',ACTIVITY='Landroid/app/Activity;',DIALOG='Landroid/app/Dialog;',TYPED='Landroid/util/TypedValue;';
 const floatBuffer=new DataView(new ArrayBuffer(4)),bits=value=>{floatBuffer.setFloat32(0,value,true);return floatBuffer.getInt32(0,true);},number=value=>{floatBuffer.setInt32(0,value,true);return floatBuffer.getFloat32(0,true);};
 const keys=new Set(),add=(owner,methods)=>methods.forEach(method=>keys.add(owner+'->'+method));
@@ -25,7 +25,7 @@ export function createDialogWindowHost(platform){
  const field=(r,ref,name,fallback=0,type='I')=>r.object(ref).fields.get(`${['width','height'].includes(name)?VLP:LP}->${name}:${type}`)??fallback;
  const rootOf=(r,ref)=>{const seen=new Set();while(r.object(ref).parent){if(seen.has(ref.ref)||seen.size>=4096)fail('Cyclic window View hierarchy');seen.add(ref.ref);ref=r.object(ref).parent;}return ref;};
  const recordFor=(r,ref)=>records.get(rootOf(r,ref).ref)||null;
- const ownerActivity=(r,context)=>{const seen=new Set();while(context){if(seen.has(context.ref)||seen.size>=64)fail('Cyclic window context chain');seen.add(context.ref);const frame=platform.frames.find(frame=>same(frame.activity,context)&&!frame.finished);if(frame)return frame;const o=r.object(context);context=o.baseContext||o.fields.get('Landroid/content/ContextWrapper;->mBase:Landroid/content/Context;');}return null;};
+ const ownerActivity=(r,context)=>{const seen=new Set();while(context){if(seen.has(context.ref)||seen.size>=64)fail('Cyclic window context chain');seen.add(context.ref);const frame=platform.allFrames().find(frame=>same(frame.activity,context)&&!frame.finished);if(frame)return frame;const o=r.object(context);context=o.baseContext||o.fields.get('Landroid/content/ContextWrapper;->mBase:Landroid/content/Context;');}return null;};
  const newParams=(r,width=-1,height=-1,type=2,flags=0,format=-1)=>{const ref=r.makeObject(LP);set(r,ref,VLP,'width','I',width);set(r,ref,VLP,'height','I',height);for(const[name,value]of Object.entries({type,flags,format,x:0,y:0,gravity:0,softInputMode:0}))set(r,ref,LP,name,'I',value);set(r,ref,LP,'alpha','F',bits(1));set(r,ref,LP,'dimAmount','F',bits(1));return ref;};
  const frameView=(r,context)=>{const ref=r.allocate(FRAME);call(r,ref,FRAME,'<init>','(Landroid/content/Context;)V',[context],'direct');return ref;};
  const manager=(r,context,parentWindow=null)=>{const key=`${context.ref}:${parentWindow?.ref||0}`;if(!managers.has(key)){const ref=r.makeObject(WMI);Object.assign(r.object(ref),{windowContext:context,parentWindow});managers.set(key,ref);}return managers.get(key);};
@@ -96,13 +96,13 @@ export function createDialogWindowHost(platform){
     if(name==='onWindowFocusChanged'){r.object(ref).surfaceWindowFocused=!!args[1];return;}
     if(name==='dispatchWindowFocusChanged'){call(r,ref,VIEW,'onWindowFocusChanged','(Z)V',[args[1]]);for(const child of [...r.object(ref).children])call(r,child,VIEW,'dispatchWindowFocusChanged','(Z)V',[args[1]]);return;}
     const record=recordFor(r,ref);if(name==='getWindowToken'&&record)return record.attached?record.token:null;
-    if(name==='getApplicationWindowToken'&&record){if(!record.attached||!r.object(ref).attached)return null;const frame=platform.frames.find(frame=>same(frame.activity,record.ownerActivity));return frame?.root?platform.viewWindowHost.invoke(r,{owner:VIEW,name:'getWindowToken',signature:'()Landroid/os/IBinder;',parameters:[],result:'Landroid/os/IBinder;'},[frame.root]):null;}
+    if(name==='getApplicationWindowToken'&&record){if(!record.attached||!r.object(ref).attached)return null;const frame=platform.allFrames().find(frame=>same(frame.activity,record.ownerActivity));return frame?.root?platform.viewWindowHost.invoke(r,{owner:VIEW,name:'getWindowToken',signature:'()Landroid/os/IBinder;',parameters:[],result:'Landroid/os/IBinder;'},[frame.root]):null;}
     if(name==='hasWindowFocus'){if(record)return record.attached&&record.focused?1:0;if(!same(focusedRoot(r),r.root))return 0;return platform.viewWindowHost.invoke(r,method,args);}
     if(name==='getWindowVisibility'&&record)return visible(r,record)?0:8;
     return platform.viewWindowHost.invoke(r,method,args);
    }
    const w=windowData(r,ref);
-   if(name==='getOnBackInvokedDispatcher')return platform.backDispatcher.forOwner(r,platform.frames.find(f=>f.window&&f.window.ref===ref.ref)?.activity??ref);
+   if(name==='getOnBackInvokedDispatcher')return platform.backDispatcher.forOwner(r,platform.allFrames().find(f=>f.window&&f.window.ref===ref.ref)?.activity??ref);
    if(name==='getContext')return w.windowContext;if(name==='getWindowManager')return w.windowManager??=manager(r,w.windowContext,ref);if(name==='getLayoutInflater')return platform.inflater(r,w.windowContext);
    if(name==='getAttributes')return w.attributes;
    if(name==='setCallback'){w.callback=args[1];return;}if(name==='getCallback')return w.callback??null;

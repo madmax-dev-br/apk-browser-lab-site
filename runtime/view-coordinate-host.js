@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=7995f957f05e';
+import { APKError } from './apk-runtime.js?v=039e497067f0';
 
 const VIEW = 'Landroid/view/View;', MATRIX = 'Landroid/graphics/Matrix;';
 const keys = new Set(['getLocationOnScreen([I)V', 'getLocationOnScreen()[I', 'getLocationInWindow([I)V', 'transformFromViewToWindowSpace([I)V', 'transformMatrixToGlobal(Landroid/graphics/Matrix;)V'].map(signature => VIEW + '->' + signature));
@@ -36,7 +36,7 @@ export function createViewCoordinateHost(platform) {
     const surface = platform.dialogWindowHost?.surfaceOffset(runtime, chain[chain.length - 1]);
     if (surface) return { left: surface.x, top: surface.y, rootScrollY: 0 };
     const ids = new Set(chain.map(value => value.ref));
-    const frame = platform.frames.find(frame => ids.has(frame.root?.ref) || frame.window && ids.has(runtime.object(frame.window).decor?.ref));
+    const frame = platform.allFrames().find(frame => ids.has(frame.root?.ref) || frame.window && ids.has(runtime.object(frame.window).decor?.ref));
     // Explicit virtual-window state; a future window-manager bridge can move it.
     const owner = frame?.window ? runtime.object(frame.window) : platform;
     return owner.virtualWindowCoordinates ??= { left: 0, top: 0, rootScrollY: 0 };

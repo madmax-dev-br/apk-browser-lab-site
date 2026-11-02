@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=7995f957f05e';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=7995f957f05e';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=7995f957f05e';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=7995f957f05e';
+import { APKError } from './apk-error.js?v=039e497067f0';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=039e497067f0';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=039e497067f0';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=039e497067f0';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -183,8 +183,8 @@ export function createAppServicesHost(platform) {
   });
   // Context.getAttributionTag() (API 30): null unless the Context came from createAttributionContext, which the lab does not create.
   defContext('getAttributionTag', `()${STRING}`, () => null);
-  // Activity.getTaskId(): the virtual device keeps every Activity of the app in one task, whose id is stable for the process.
-  def('Landroid/app/Activity;', 'getTaskId', '()I', () => 1);
+  // Activity.getTaskId(): the id of the task (platform.tasks, see activity-starter.js) the Activity lives in; the app's first task is 1.
+  def('Landroid/app/Activity;', 'getTaskId', '()I', (r, _m, [self]) => platform.taskOf(platform.frame(r, self))?.id ?? -1);
   defContext('checkSelfPermission', `(${STRING})I`, (r, _m, [, permission]) => check(r, permission));
   defContext('checkPermission', `(${STRING}II)I`, (r, _m, [, permission, pid, uid]) => pid === platform.virtualProcess.pid && uid === platform.virtualProcess.uid ? check(r, permission) : (needPermission(r, permission), PERMISSION_DENIED));   // no other process exists
   defContext('checkCallingPermission', `(${STRING})I`, (r, _m, [, permission]) => { needPermission(r, permission); return PERMISSION_DENIED; });   // not inside a Binder transaction: the calling pid is this process
@@ -687,27 +687,30 @@ export function createAppServicesHost(platform) {
     }
     return list;
   });
-  const openActivities = () => platform.taskClosed ? [] : platform.frames.filter(frame => !frame.finished);
-  const fillTask = (r, info, owner, frames) => {
-    const put = (name, ftype, value) => putField(r, info, owner, name, ftype, value), base = frames[0], top = frames.at(-1);
+  const framesOf = task => task.frames.filter(frame => !frame.finished);
+  const openTasks = () => platform.taskClosed ? [] : [...platform.tasks].reverse().filter(task => framesOf(task).length);   // most recent first, the way the recents list is ordered
+  const fillTask = (r, info, owner, task) => {
+    const put = (name, ftype, value) => putField(r, info, owner, name, ftype, value), frames = framesOf(task), base = frames[0], top = frames.at(-1);
     const baseName = r.typeOf(base.activity).slice(1, -1).replaceAll('/', '.'), topName = r.typeOf(top.activity).slice(1, -1).replaceAll('/', '.');
     const intent = r.allocate(INTENT_T); call(r, INTENT_T, '<init>', [STRING], 'V', [intent, 'android.intent.action.MAIN'], 'direct'); call(r, INTENT_T, 'addCategory', [STRING], INTENT_T, [intent, 'android.intent.category.LAUNCHER']); call(r, INTENT_T, 'setComponent', [COMPONENT_NAME_T], INTENT_T, [intent, componentFor(r, baseName)]);
-    put('taskId', 'I', 1); put('persistentId', 'I', 1); put('baseIntent', INTENT_T, intent); put('baseActivity', COMPONENT_NAME_T, componentFor(r, baseName)); put('topActivity', COMPONENT_NAME_T, componentFor(r, topName)); put('origActivity', COMPONENT_NAME_T, null);
-    put('numActivities', 'I', frames.length); put('isRunning', 'Z', 1); put('lastActiveTime', 'J', BigInt(Math.floor(platform.clock.now()))); put('description', 'Ljava/lang/CharSequence;', null);
-    if (owner === RUNNING_TASK) { put('id', 'I', 1); put('numRunning', 'I', frames.length); }
+    put('taskId', 'I', task.id); put('persistentId', 'I', task.id); put('baseIntent', INTENT_T, intent); put('baseActivity', COMPONENT_NAME_T, componentFor(r, baseName)); put('topActivity', COMPONENT_NAME_T, componentFor(r, topName)); put('origActivity', COMPONENT_NAME_T, null);
+    put('numActivities', 'I', frames.length); put('isRunning', 'Z', 1); put('lastActiveTime', 'J', BigInt(Math.floor(task.lastActiveTime ?? platform.clock.now()))); put('description', 'Ljava/lang/CharSequence;', null);
+    if (owner === RUNNING_TASK) { put('id', 'I', task.id); put('numRunning', 'I', frames.length); }
   };
   def(ACTIVITY_MANAGER, 'getRunningTasks', '(I)Ljava/util/List;', (r, _m, [, maxNum]) => {   // since API 21 the caller's own tasks only
-    const list = newEmptyList(r), frames = openActivities(); if (maxNum <= 0 || !frames.length) return list;
-    const info = r.allocate(RUNNING_TASK); fillTask(r, info, RUNNING_TASK, frames); addTo(r, list, info); return list;
+    const list = newEmptyList(r); if (maxNum <= 0) return list;
+    for (const task of openTasks().slice(0, maxNum)) { const info = r.allocate(RUNNING_TASK); fillTask(r, info, RUNNING_TASK, task); addTo(r, list, info); }
+    return list;
   });
-  def(ACTIVITY_MANAGER, 'getAppTasks', '()Ljava/util/List;', r => { const list = newEmptyList(r); if (openActivities().length) addTo(r, list, r.allocate(APP_TASK)); return list; });
-  def(APP_TASK, 'getTaskInfo', `()${RECENT_TASK}`, r => {
-    const frames = openActivities(); if (!frames.length) return null;   // a finished task has no info
-    const info = r.allocate(RECENT_TASK); fillTask(r, info, RECENT_TASK, frames); return info;
+  def(ACTIVITY_MANAGER, 'getAppTasks', '()Ljava/util/List;', r => { const list = newEmptyList(r); for (const task of openTasks()) { const appTask = r.allocate(APP_TASK); r.object(appTask).taskId = task.id; addTo(r, list, appTask); } return list; });
+  const appTask = (r, self) => { const task = platform.taskById(r.object(self).taskId); return task && framesOf(task).length ? task : null; };
+  def(APP_TASK, 'getTaskInfo', `()${RECENT_TASK}`, (r, _m, [self]) => {
+    const task = appTask(r, self); if (!task) return null;   // a finished task has no info
+    const info = r.allocate(RECENT_TASK); fillTask(r, info, RECENT_TASK, task); return info;
   });
-  def(APP_TASK, 'finishAndRemoveTask', '()V', r => { for (const frame of openActivities().reverse()) call(r, 'Landroid/app/Activity;', 'finish', [], 'V', [frame.activity]); });
-  def(APP_TASK, 'moveToFront', '()V', () => {});   // the only task is already in front
-  def(APP_TASK, 'setExcludeFromRecents', '(Z)V', () => {});
+  def(APP_TASK, 'finishAndRemoveTask', '()V', (r, _m, [self]) => { const task = appTask(r, self); if (task) platform.finishFrames(r, framesOf(task).reverse()); });
+  def(APP_TASK, 'moveToFront', '()V', (r, _m, [self]) => { const task = appTask(r, self); if (task) platform.moveTaskToFront(r, task); });
+  def(APP_TASK, 'setExcludeFromRecents', '(Z)V', (r, _m, [self, exclude]) => { const task = appTask(r, self); if (task) task.excludeFromRecents = !!exclude; });
   // getProcessMemoryInfo: Debug.MemoryInfo per pid; this process's figures describe the VM's own heap (the same numbers Debug.getPss reports), other pids are not visible and read zero.
   const kb = r => Math.floor(((r.heap?.size ?? 0) * 64) / 1024);
   def(ACTIVITY_MANAGER, 'getProcessMemoryInfo', `([I)[${MEMORY_INFO}`, (r, _m, [, pids]) => {

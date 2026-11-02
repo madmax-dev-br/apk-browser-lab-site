@@ -1,7 +1,7 @@
-import { APKError } from './apk-runtime.js?v=7995f957f05e';
-import { breakParagraphs } from './text-layout-native.js?v=7995f957f05e';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=7995f957f05e';
-import { gcRoot } from './heap-gc.js?v=7995f957f05e';
+import { APKError } from './apk-runtime.js?v=039e497067f0';
+import { breakParagraphs } from './text-layout-native.js?v=039e497067f0';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=039e497067f0';
+import { gcRoot } from './heap-gc.js?v=039e497067f0';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -32,7 +32,7 @@ export function createViewLayoutHost(platform) {
     const surface = platform.dialogWindowHost?.recordFor(runtime, receiver); if (surface) return surface.root;
     let ref = receiver; const seen = new Set();
     while (ref) { if (seen.has(ref.ref) || seen.size >= 4096) fail('Cyclic layout hierarchy'); seen.add(ref.ref); if (ref.ref === runtime.root?.ref) return runtime.root;
-      const frame = platform.frames.find(frame => frame.root?.ref === ref.ref || frame.window && [runtime.object(frame.window).decor?.ref,runtime.object(frame.window).content?.ref].includes(ref.ref)); if (frame?.root) return frame.root;
+      const frame = platform.allFrames().find(frame => frame.root?.ref === ref.ref || frame.window && [runtime.object(frame.window).decor?.ref,runtime.object(frame.window).content?.ref].includes(ref.ref)); if (frame?.root) return frame.root;
       ref = runtime.object(ref).parent;
     }
     return null;

@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=7995f957f05e';
-import { APKError } from './apk-error.js?v=7995f957f05e';
-import { gcRoot } from './heap-gc.js?v=7995f957f05e';
+import { createHostRegistry } from './host-contract.js?v=039e497067f0';
+import { APKError } from './apk-error.js?v=039e497067f0';
+import { gcRoot } from './heap-gc.js?v=039e497067f0';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -330,16 +330,20 @@ export function createActivityApiHost(platform) {
 
   // ---- Tasks, parents, finishing, results -----------------------------------------------------------------------------------------------------------------------------------------------------------
   constant('getParent', `()${ACTIVITY}`, null); constant('isChild', '()Z', 0);
-  def(ACTIVITY, 'isTaskRoot', '()Z', (r, _m, [self]) => platform.frames[0] === frameOf(r, self) ? 1 : 0);
+  def(ACTIVITY, 'isTaskRoot', '()Z', (r, _m, [self]) => { const frame = frameOf(r, self); return platform.taskOf(frame)?.frames[0] === frame ? 1 : 0; });
   def(ACTIVITY, 'getChangingConfigurations', '()I', (r, _m, [self]) => frameOf(r, self).changingConfiguration ? (platform.lastConfigurationDiff ?? 0) : 0);
   def(ACTIVITY, 'finishAfterTransition', '()V', (r, _m, [self]) => { call(r, self, ACTIVITY, 'finish', [], 'V'); });
   def(ACTIVITY, 'finishFromChild', `(${ACTIVITY})V`, (r, _m, [self]) => { call(r, self, ACTIVITY, 'finish', [], 'V'); });
-  const finishFrames = (r, frames) => { for (const frame of frames) if (platform.frames.includes(frame)) platform.finish(r, frame.activity); };
+  const finishFrames = (r, frames) => platform.finishFrames(r, frames);
   def(ACTIVITY, 'finishAffinity', '()V', (r, _m, [self]) => {
     const o = own(r, self); if ((o.activityResultCode ?? 0) !== 0 || !nullish(o.activityResultData)) ise(r, 'Can not be called to deliver a result');
-    finishFrames(r, [...platform.frames].reverse());   // every Activity of the task shares the app's task affinity
+    // ActivityRecord.finishActivityAffinity: this Activity and the ones below it in its task that share its task affinity, down to the first with another affinity.
+    const frame = frameOf(r, self), task = platform.taskOf(frame); if (!task) return;
+    const affinity = platform.activityInfo(frame.type).affinity, chain = [];
+    for (let i = task.frames.indexOf(frame); i >= 0 && platform.activityInfo(task.frames[i].type).affinity === affinity; i--) chain.push(task.frames[i]);
+    finishFrames(r, chain);
   });
-  def(ACTIVITY, 'finishAndRemoveTask', '()V', (r, _m) => { finishFrames(r, [...platform.frames].reverse()); });
+  def(ACTIVITY, 'finishAndRemoveTask', '()V', (r, _m, [self]) => { const task = platform.taskOf(frameOf(r, self)); if (task) finishFrames(r, [...task.frames].reverse()); });
   def(ACTIVITY, 'finishActivity', '(I)V', (r, _m, [self, requestCode]) => { finishFrames(r, platform.frames.filter(f => f.resultReceiver && f.resultReceiver.ref === self.ref && f.resultRequestCode === requestCode)); });
   def(ACTIVITY, 'finishActivityFromChild', `(${ACTIVITY}I)V`, (r, _m, [self, , requestCode]) => { call(r, self, ACTIVITY, 'finishActivity', ['I'], 'V', [requestCode]); });
   const intentComponent = (r, intent) => {
@@ -369,8 +373,9 @@ export function createActivityApiHost(platform) {
   });
   def(ACTIVITY, 'navigateUpToFromChild', `(${ACTIVITY}${INTENT})Z`, (r, _m, [self, , intent]) => call(r, self, ACTIVITY, 'navigateUpTo', [INTENT], 'Z', [intent]));
   def(ACTIVITY, 'moveTaskToBack', '(Z)Z', (r, _m, [self, nonRoot]) => {
-    if (!nonRoot && platform.frames[0] !== frameOf(r, self)) return 0;   // ActivityTaskManager.moveActivityTaskToBack(token, nonRoot): without nonRoot only the task root may move it
-    platform.moveTaskToBack(r); return 1;
+    const frame = frameOf(r, self), task = platform.taskOf(frame); if (!task) return 0;
+    if (!nonRoot && task.frames[0] !== frame) return 0;   // ActivityTaskManager.moveActivityTaskToBack(token, nonRoot): without nonRoot only the task root may move it
+    platform.moveTaskToBack(r, task); return 1;
   });
   constant('releaseInstance', '()Z', 0);
   constant('isActivityTransitionRunning', '()Z', 0); constant('isInMultiWindowMode', '()Z', 0); constant('isInPictureInPictureMode', '()Z', 0); constant('isLaunchedFromBubble', '()Z', 0);
@@ -383,7 +388,9 @@ export function createActivityApiHost(platform) {
   noop('startLockTask', '()V'); noop('stopLockTask', '()V'); noop('showLockTaskEscapeMessage', '()V');
   noop('postponeEnterTransition', '()V'); noop('startPostponedEnterTransition', '()V'); noop('reportFullyDrawn', '()V');
   noop('setEnterSharedElementCallback', '(Landroid/app/SharedElementCallback;)V'); noop('setExitSharedElementCallback', '(Landroid/app/SharedElementCallback;)V');
-  noop('overridePendingTransition', '(II)V'); noop('overridePendingTransition', '(III)V');
+  // Activity.overridePendingTransition applies to the next start / finish of this Activity; FLAG_ACTIVITY_NO_ANIMATION on that launch drops it (platform.lastTransition records the outcome).
+  def(ACTIVITY, 'overridePendingTransition', '(II)V', (r, _m, [self, enter, exit]) => { frameOf(r, self).overrideTransition = { enter, exit }; });
+  def(ACTIVITY, 'overridePendingTransition', '(III)V', (r, _m, [self, enter, exit]) => { frameOf(r, self).overrideTransition = { enter, exit }; });
   noop('startLocalVoiceInteraction', `(${BUNDLE})V`); noop('stopLocalVoiceInteraction', '()V');
   constant('getContentScene', '()Landroid/transition/Scene;', null); constant('getContentTransitionManager', '()Landroid/transition/TransitionManager;', null);
   noop('setContentTransitionManager', '(Landroid/transition/TransitionManager;)V');

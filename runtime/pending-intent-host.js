@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=7995f957f05e';
-import { createHostRegistry } from './host-contract.js?v=7995f957f05e';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=7995f957f05e';
+import { APKError } from './apk-error.js?v=039e497067f0';
+import { createHostRegistry } from './host-contract.js?v=039e497067f0';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=039e497067f0';
 
 // android.app.PendingIntent (android-13.0.0_r1 PendingIntent.java + ActivityManagerService.getIntentSenderLocked): tokens are identified by (kind, package, requestCode, Intent.filterEquals),
 // FLAG_NO_CREATE / FLAG_CANCEL_CURRENT / FLAG_UPDATE_CURRENT / FLAG_ONE_SHOT behave as documented, and apps targeting API 31+ must say FLAG_IMMUTABLE or FLAG_MUTABLE.
@@ -62,12 +62,12 @@ export function createPendingIntentHost(platform) {
     const context = platform.application;
     if (token.kind === KIND.result) {
       // Activity.createPendingResult: send(code, intent) delivers onActivityResult(requestCode, code, data) to the Activity, once it is resumed (the result queue of its Activity record)
-      const frame = platform.frames.find(entry => entry.activity.ref === token.activity.ref); if (!frame) throw new APKError('PendingIntent.send(): the Activity that created this result is gone', { kind: 'pending-result-gone' });
+      const frame = platform.allFrames().find(entry => entry.activity.ref === token.activity.ref); if (!frame) throw new APKError('PendingIntent.send(): the Activity that created this result is gone', { kind: 'pending-result-gone' });
       (frame.pendingActivityResults ||= []).push({ requestCode: token.requestCode, resultCode: code | 0, data: extra ?? token.intent ?? null });
-      platform.queueTask(() => { if (platform.frames.includes(frame)) platform.deliverActivityResults(r, frame); }, 0, [token.activity, token.intent, extra]);
+      platform.queueTask(() => { if (platform.allFrames().includes(frame)) platform.deliverActivityResults(r, frame); }, 0, [token.activity, token.intent, extra]);
     } else if (token.kind === KIND.broadcast) call(r, CONTEXT, 'sendBroadcast', [INTENT], 'V', [context, token.intent]);
-    else if (token.kind === KIND.activity && token.intents) { const array = r.newArray(`[${INTENT}`, token.intents.length); r.array(array).elements = [...token.intents]; call(r, CONTEXT, 'startActivities', [`[${INTENT}`], 'V', [context, array]); }
-    else if (token.kind === KIND.activity) call(r, CONTEXT, 'startActivity', [INTENT], 'V', [context, token.intent]);
+    else if (token.kind === KIND.activity && token.intents) { const array = r.newArray(`[${INTENT}`, token.intents.length); r.array(array).elements = [...token.intents]; platform.asSystemLaunch(() => call(r, CONTEXT, 'startActivities', [`[${INTENT}`], 'V', [context, array])); }
+    else if (token.kind === KIND.activity) platform.asSystemLaunch(() => call(r, CONTEXT, 'startActivity', [INTENT], 'V', [context, token.intent]));
     else throw new APKError('PendingIntent.send() for a Service: starting services from a PendingIntent is not modelled by the virtual device', { kind: 'pending-intent-service-unsupported' });
   };
   def(PENDING, 'send', '()V', (r, _m, [self]) => send(r, self));
