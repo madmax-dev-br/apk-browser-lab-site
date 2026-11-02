@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=6f26bf29757e';
-import { Blocked, QUANTUM } from './scheduler.js?v=6f26bf29757e';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=6f26bf29757e';
+import { APKError } from './apk-error.js?v=fa5329d06a5a';
+import { Blocked, QUANTUM } from './scheduler.js?v=fa5329d06a5a';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=fa5329d06a5a';
 
 // Frame-based DEX interpreter.
 //
@@ -612,6 +612,8 @@ function runLoop(rt, owner, base) {
     } catch (error) {
       returning = false; input = null;
       if (error?.vmFatal === true || f === null) throw error;
+      // No frame is left to handle it (the failure happened after the last frame of this run returned, or in the host code that completes the run): the original error is the report, not a TypeError about a missing frame.
+      if (frames.length === 0 || (thread === owner && frames.length <= base)) throw error;
       f = frames[frames.length - 1];                                // compiled code may have entered callees directly: the failing frame is the top one
       regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats;
       if (f.cur >= 0) { start = f.cur; f.cur = -1; }               // thrown by compiled code: the instruction it was executing

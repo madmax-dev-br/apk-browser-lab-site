@@ -1,4 +1,4 @@
-import { bitsDouble, createHostRegistry, doubleBits } from './host-contract.js?v=6f26bf29757e';
+import { bitsDouble, createHostRegistry, doubleBits } from './host-contract.js?v=fa5329d06a5a';
 
 // android.location.Geocoder (frameworks/base/location/java/android/location/Geocoder.java, android-13.0.0_r1) on a device with no geocoder backend: isPresent() is false, and every request is answered
 // with the error LocationManagerService gives when it has no GeocoderProxy, "Service not Available": the deprecated synchronous methods throw IOException with it, the API 33 GeocodeListener
