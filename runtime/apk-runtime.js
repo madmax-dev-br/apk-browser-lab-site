@@ -1,24 +1,24 @@
-import { VMClock } from './vm-clock.js?v=c5d78c3c57c5';
-import { OperationMonitor } from './operation-monitor.js?v=c5d78c3c57c5';
-import { ExecutionProfile } from './execution-profile.js?v=c5d78c3c57c5';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=c5d78c3c57c5';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=c5d78c3c57c5';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=c5d78c3c57c5';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=c5d78c3c57c5';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=c5d78c3c57c5';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=c5d78c3c57c5';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=c5d78c3c57c5';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=c5d78c3c57c5';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=c5d78c3c57c5';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=c5d78c3c57c5';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=c5d78c3c57c5';
-import { APKError } from './apk-error.js?v=c5d78c3c57c5';
-import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=c5d78c3c57c5';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=c5d78c3c57c5';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=c5d78c3c57c5';
-import { Scheduler, Blocked } from './scheduler.js?v=c5d78c3c57c5';
-import { bootClassLacksMember } from './boot-class-members.js?v=c5d78c3c57c5';
-export { APKError } from './apk-error.js?v=c5d78c3c57c5';
+import { VMClock } from './vm-clock.js?v=bd0e62293cb3';
+import { OperationMonitor } from './operation-monitor.js?v=bd0e62293cb3';
+import { ExecutionProfile } from './execution-profile.js?v=bd0e62293cb3';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=bd0e62293cb3';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=bd0e62293cb3';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=bd0e62293cb3';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=bd0e62293cb3';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=bd0e62293cb3';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=bd0e62293cb3';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=bd0e62293cb3';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=bd0e62293cb3';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=bd0e62293cb3';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=bd0e62293cb3';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=bd0e62293cb3';
+import { APKError } from './apk-error.js?v=bd0e62293cb3';
+import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=bd0e62293cb3';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=bd0e62293cb3';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=bd0e62293cb3';
+import { Scheduler, Blocked } from './scheduler.js?v=bd0e62293cb3';
+import { bootClassLacksMember } from './boot-class-members.js?v=bd0e62293cb3';
+export { APKError } from './apk-error.js?v=bd0e62293cb3';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -935,7 +935,7 @@ export class APKRuntime {
     // stopped that legitimate work. A spinning thread still hits the fuse (tests/instruction-budget.test.mjs sets its own small fuse); `maxEventWallMs` bounds host time too.
     this.maxInstructionsPerEvent = maxInstructionsPerEvent; this.maxEventInstructions = maxInstructionsPerEvent * 8;
     // Wall-clock watchdog (host time of one event); 0 = off (tests and probes are deterministic), the Worker turns it on. Checked at every scheduling quantum, so it also trips for code that never switches threads.
-    this.gcSafeDepth = 0; this.hostRoots = []; this.hostAllocs = new Set(); this.bytecodeAlloc = false; this.profile = new ExecutionProfile(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
+    this.gcSafeDepth = 0; this.hostRoots = []; this.hostAllocs = []; this.vmDrainRuntime = null; this.bytecodeAlloc = false; this.profile = new ExecutionProfile(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
     this.dex = dex;
     this.classes = dex.resolvedClasses ?? dex.classes;
     this.launcherActivity = launcherActivity;
@@ -1314,8 +1314,16 @@ export class APKRuntime {
     const id = this.nextId++;
     if ((id & 511) === 0) this.sampleAllocation();
     this.heap.set(id, { id, type, fields: new Map(), text: '', orientation: 0, textSize: 20, children: [], listener: null });
-    if (!this.bytecodeAlloc) this.hostAllocs.add(id);   // allocated by host code (a native, the platform): its JavaScript locals may hold it where no Java frame does -- see hostAllocs in heap-gc.js
+    if (!this.bytecodeAlloc) this.hostAllocs.push(id);   // allocated by host code (a native, the platform): its JavaScript locals may hold it where no Java frame does -- see hostAllocs in heap-gc.js
     return ref(id);
+  }
+  /** Roots for a host task whose closure may capture Java values nobody annotated: the references in the enqueuing frame's registers plus the last host allocations (what the native just created for it).
+   *  Never the whole heap. The collector keeps them alive until the task has run. */
+  conservativeTaskRoots() {
+    const out = [], regs = this.thread?.frames?.at(-1)?.regs;
+    if (regs) for (const value of regs) if (value !== null && typeof value === 'object' && typeof value.ref === 'number' && out.length < 256) out.push(value);
+    for (let i = Math.max(0, this.hostAllocs.length - 64); i < this.hostAllocs.length; i++) out.push(ref(this.hostAllocs[i]));
+    return out;
   }
   /** Test guard (APKWEB_GUARD_ABSTRACT=1): host code must never create an object whose runtime type is an interface or an abstract class -- such an object has no code for most of its API and every call on it fails
    *  as "abstract/missing-code". Every view, iterator or wrapper the host makes gets a concrete class. */
@@ -1507,10 +1515,10 @@ export class APKRuntime {
   }
   dispatch(method, args, mode, callerOwner = null, wantFrame = false) {
     const outcome = this.dispatchCore(method, args, mode, callerOwner, wantFrame);
-    if (wantFrame || (!(outcome instanceof Blocked) && !(outcome instanceof Invoke))) { if (!wantFrame && outcome !== null && typeof outcome === 'object' && typeof outcome.ref === 'number') this.hostAllocs.add(outcome.ref); return outcome; }   // a result handed to host code may sit in a JavaScript local while the next call runs
+    if (wantFrame || (!(outcome instanceof Blocked) && !(outcome instanceof Invoke))) { if (!wantFrame && outcome !== null && typeof outcome === 'object' && typeof outcome.ref === 'number') this.hostAllocs.push(outcome.ref); return outcome; }   // a result handed to host code may sit in a JavaScript local while the next call runs
     // A blocking or call-back native reached through host code (not an interpreter call site) cannot park its thread or push frames: finish it inside the scheduler.
     const finished = this.finishHostStep(outcome);
-    if (finished !== null && typeof finished === 'object' && typeof finished.ref === 'number') this.hostAllocs.add(finished.ref);
+    if (finished !== null && typeof finished === 'object' && typeof finished.ref === 'number') this.hostAllocs.push(finished.ref);
     return finished;
   }
   /** Heap-pressure collection at a thread-switch safepoint of a scheduling run (no host native is in flight there; see heap-gc.js). A no-op unless collection is enabled and the heap passed half its limit. */

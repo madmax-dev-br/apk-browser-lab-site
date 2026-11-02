@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=c5d78c3c57c5';
-import { gcBlockReason } from './heap-gc.js?v=c5d78c3c57c5';
+import { APKError } from './apk-error.js?v=bd0e62293cb3';
+import { gcBlockReason } from './heap-gc.js?v=bd0e62293cb3';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -41,6 +41,12 @@ export class OperationMonitor {
     let slow = holder.slowHost;
     if (slow === undefined) slow = holder.slowHost = SLOW_HOST.test(key);
     if (slow) { const now = performance.now(); if (now - this.lastBeat >= 50) this.beat(now, 'host'); }
+  }
+  /** A long host-side phase (a collection) reports progress: heartbeat when due, labelled, without the operation-budget check (the phase cannot be abandoned half way). */
+  pulse(label) {
+    if (this.sink === null) return;
+    const now = performance.now(); if (now - this.lastBeat < this.intervalMs) return;
+    this.rt.hostCall = label; this.beat(now, 'gc');
   }
   snapshot(now, reason) {
     const rt = this.rt, op = this.op, thread = rt.thread, profile = rt.profile;

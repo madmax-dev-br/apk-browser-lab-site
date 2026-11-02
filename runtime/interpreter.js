@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=c5d78c3c57c5';
-import { Blocked, QUANTUM } from './scheduler.js?v=c5d78c3c57c5';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=c5d78c3c57c5';
+import { APKError } from './apk-error.js?v=bd0e62293cb3';
+import { Blocked, QUANTUM } from './scheduler.js?v=bd0e62293cb3';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=bd0e62293cb3';
 
 // Frame-based DEX interpreter.
 //
@@ -616,6 +616,7 @@ function runLoop(rt, owner, base) {
       regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats;
       if (f.cur >= 0) { start = f.cur; f.cur = -1; }               // thrown by compiled code: the instruction it was executing
       // Unwind: the frame that failed handles it, then its callers (and any host step waiting on them) until the run's base frame.
+      rt.hostCall = null;   // the host call that threw is over: a stale marker would blame it for the silence that follows
       let current = error, innermost = true;
       for (;;) {
         if (current instanceof APKError && /^(Integer|Long) (divide|remainder) by zero/.test(current.message)) {

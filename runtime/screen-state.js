@@ -118,6 +118,8 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
     }
   }
   const shortKey = key => String(key ?? '?').replace(/^L/, '').replace(/;->/, '.');
+  const anonymous = [...(platform.anonymousTaskSites ?? [])].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  out.push(`Tarefas do host sem lista de raízes (enfileiradas com raízes conservadoras), por origem: ${anonymous.length ? anonymous.map(([site, count]) => `${count}× ${site}`).join('; ') : 'nenhuma'}`);
   out.push('Threads (nome, estado, espera, 6 quadros mais internos):');
   for (const thread of [...(mainThread ? [mainThread] : []), ...scheduler.threads.filter(candidate => candidate !== mainThread)]) {
     const frames = (thread.frames ?? []).slice(-6).reverse().map(frame => frame.method ? shortKey(frame.method.key) : frame.cont ? '(chamada do host)' : '?');

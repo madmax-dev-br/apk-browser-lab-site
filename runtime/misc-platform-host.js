@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=c5d78c3c57c5';
-import { APKError } from './apk-error.js?v=c5d78c3c57c5';
-import { cleartextPermitted } from './network-native.js?v=c5d78c3c57c5';
+import { createHostRegistry } from './host-contract.js?v=bd0e62293cb3';
+import { APKError } from './apk-error.js?v=bd0e62293cb3';
+import { cleartextPermitted } from './network-native.js?v=bd0e62293cb3';
 
 // Small platform classes: android.os.WorkSource (a set of (uid, name) pairs the framework blames for work), android.media.MediaMetadataRetriever and android.graphics.Movie.
 // MediaMetadataRetriever and Movie need container / GIF decoders the lab does not carry: a missing or unreadable source fails the way the framework does, a readable one says explicitly that

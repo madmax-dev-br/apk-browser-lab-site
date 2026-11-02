@@ -73,10 +73,8 @@ function quiescent(runtime, safepoint = false) {
 /** Why a safepoint collection could not run right now (null = it could): the same checks collectGarbage makes, for diagnostics (heartbeats). */
 export function gcBlockReason(runtime) { return quiescent(runtime, true) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null); }
 
-function unannotatedTask(runtime) {
-  const queue = runtime.platform?.eventQueue; if (!Array.isArray(queue)) return false;
-  return queue.some(event => event.platformTask && !('roots' in event));
-}
+/** Host tasks are annotated when queued (explicitly, or conservatively by PlatformTask enqueueing -- see AndroidPlatform.queueTask), so none blocks a collection; kept for the audit counters. */
+function unannotatedTask(runtime) { return false; }
 
 /**
  * Registers a Map whose keys are Java object ids and whose values are host-side companions of those objects (a LayoutInflater per Context, ...). The map is not a root: a value stays
@@ -87,8 +85,10 @@ export function ephemeronMap(runtime, map) { (runtime.ephemeronMaps ??= new Set(
 
 /** The marking machinery shared by the collector and the heap census: `scan` follows plain JavaScript data, `drain` closes over the heap records reached so far. */
 const REFERENT_KEY = 'Ljava/lang/ref/Reference;->referent:Ljava/lang/Object;', QUEUE_KEY = 'Ljava/lang/ref/Reference;->queue:Ljava/lang/ref/ReferenceQueue;';
+const weakTypeCaches = new WeakMap();   // per runtime: type -> is a WeakReference subclass (class hierarchies do not change after load)
+const weakTypeCache = runtime => weakTypeCaches.get(runtime) ?? weakTypeCaches.set(runtime, new Map()).get(runtime);
 export function createMarker(runtime) {
-  const heap = runtime.heap, weakIds = [], weakTypes = new Map(), weakMaps = [], traced = new WeakSet();
+  const heap = runtime.heap, weakIds = [], weakTypes = weakTypeCache(runtime), weakMaps = [], traced = new WeakSet();
   /** java.lang.ref.WeakReference and its subclasses (WeakHashMap entries, ThreadLocal map entries ...): the referent does not keep its object alive. SoftReference and PhantomReference stay strong. */
   const isWeak = type => { let weak = weakTypes.get(type); if (weak === undefined) { weak = false; if (type.charCodeAt(0) === 76) try { for (let at = type, depth = 0; at && depth < 64; at = runtime.parent(at), depth++) if (at === 'Ljava/lang/ref/WeakReference;') { weak = true; break; } } catch { weak = false; } /* walks the superclass chain: runtime.isSubtype would memoize every type the collector meets */ weakTypes.set(type, weak); } return weak; };
   const limit = runtime.nextId, marked = new Uint8Array(limit), worklist = [];
@@ -129,8 +129,10 @@ export function createMarker(runtime) {
     }
   };
   let count = 0;
+  let sincePulse = 0;
   const drain = (cap = Infinity) => {
   while (worklist.length && count < cap) {
+    if (++sincePulse >= 2048) { sincePulse = 0; runtime.monitor?.pulse(`coleta de lixo (marcando ${count} objetos)`); }
     const record = heap.list[worklist.pop()], weak = isWeak(record.type);
     if (weak) weakIds.push(record.id);
     for (const key of Object.keys(record)) {
@@ -162,7 +164,11 @@ export function createMarker(runtime) {
  * Collects unreachable objects. Returns { collected, reason?, before, after, freed, ms, markMs }.
  * options: { audit, extraRoots: () => iterable of values | values[], reason, requireQuiescence = true }
  */
-export function collectGarbage(runtime, { audit = globalThis.process?.env?.APKWEB_GC_AUDIT === '1', extraRoots = null, reason = 'manual', safepoint = false } = {}) {
+export function collectGarbage(runtime, options = {}) {
+  const saved = runtime.hostCall; runtime.hostCall = 'coleta de lixo';   // the page must see "garbage collection" (with progress pulses), never a stale host call, while the VM is busy here
+  try { return collectGarbageNow(runtime, options); } finally { runtime.hostCall = saved ?? null; }
+}
+function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC_AUDIT === '1', extraRoots = null, reason = 'manual', safepoint = false } = {}) {
   const started = performance.now(), heap = runtime.heap, before = heap.size;
   const blocked = quiescent(runtime, safepoint) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null);
   if (blocked) { const skips = (runtime.gcSkips ??= {}); skips[blocked] = (skips[blocked] ?? 0) + 1; return { collected: false, reason: blocked, before, after: before, freed: 0, ms: 0 }; }
@@ -178,7 +184,7 @@ export function collectGarbage(runtime, { audit = globalThis.process?.env?.APKWE
   // Host code up the JavaScript stack (a native that called back into Java, a class initializer, a nested wait) may hold values no Java frame references: what host code allocated and every result
   // handed back to it since the last fully quiescent collection stay alive. Outside a safepoint nothing is in flight and the set is dropped.
   const stackQuiet = runtime.depth === 0 && runtime.nestedRuns <= 1 && !runtime.initDepth && !runtime.scheduler?.waitingNested?.size && !runtime.scheduler?.threads.some(thread => thread.nestedDepth > 0 || thread.nestedBlock);
-  if (!safepoint || stackQuiet) runtime.hostAllocs.clear(); else for (const id of runtime.hostAllocs) markId(id);
+  if (!safepoint || stackQuiet) runtime.hostAllocs.length = 0; else for (const id of runtime.hostAllocs) markId(id);
   for (const weak of tracked) { const container = weak.deref(); if (container === undefined) tracked.delete(weak); else scan(container); }
   if (extraRoots) { const values = typeof extraRoots === 'function' ? extraRoots() : extraRoots; for (const item of values ?? []) scan(item); }
   // Heap closure: scan each reachable record's own state.
