@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=32a7c63ec972';
+import { createHostRegistry } from './host-contract.js?v=c86d39fb1524';
 
 // The platform side of android.os.Parcel (original Parcel.java in framework.dex, natives in parcel-native.js): hidden framework hooks Parcel calls around transactions, and the
 // Parcel serialisation of the VM's Bundle/PersistableBundle (BaseBundle.writeToParcelInner / readFromParcelInner wire format: length, BUNDLE_MAGIC, count, then key + typed value
@@ -55,7 +55,7 @@ export function createBinderHost(platform) {
     const count = p(r, parcel, 'readInt', [], 'I');
     for (let i = 0; i < count; i++) {
       const key = p(r, parcel, 'readString', [], 'Ljava/lang/String;'), value = p(r, parcel, 'readValue', [LOADER], 'Ljava/lang/Object;', [loader ?? null]);
-      entries.set(r.stringCharacters(key), entryOf(r, value));
+      entries.set(r.stringCharacters(key), { ...entryOf(r, value), lazy: true });   // a value read from a Parcel is verified against the class of the first typed getter (BaseBundle.getValueAt)
     }
     r.object(bundle).bundleVersion = (r.object(bundle).bundleVersion || 0) + 1;
   }

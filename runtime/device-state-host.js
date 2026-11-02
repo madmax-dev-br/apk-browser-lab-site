@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=32a7c63ec972';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=32a7c63ec972';
-import { createHostRegistry } from './host-contract.js?v=32a7c63ec972';
-import { resolveDevice } from './device-profile.js?v=32a7c63ec972';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=32a7c63ec972';
-import { gcRoot } from './heap-gc.js?v=32a7c63ec972';
+import { APKError } from './apk-error.js?v=c86d39fb1524';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=c86d39fb1524';
+import { createHostRegistry } from './host-contract.js?v=c86d39fb1524';
+import { resolveDevice } from './device-profile.js?v=c86d39fb1524';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=c86d39fb1524';
+import { gcRoot } from './heap-gc.js?v=c86d39fb1524';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -140,6 +140,7 @@ export function createDeviceStateHost(platform) {
     }
     if (changed('connectivity') || changed('battery')) platform.jobScheduler?.constraintsChanged(r);
     if (changed('connectivity')) {
+      platform.telephonyHost?.connectivityChanged(r);
       r.network?.connectivityChanged();
       const network = activeNetwork(r);
       deliver(r, 'android.net.conn.CONNECTIVITY_CHANGE', () => ({ networkType: ['I', network ? (r.object(network).transport === 1 ? 1 : 0) : -1], noConnectivity: ['Z', network ? 0 : 1], isFailover: ['Z', 0], inetCondition: ['I', network ? 100 : 0] }));
