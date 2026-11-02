@@ -1,30 +1,30 @@
-import { APKError, DexFile } from './apk-runtime.js?v=bd0e62293cb3';
-import { createVectorNativeBindings } from './vector-native.js?v=bd0e62293cb3';
-import { createMatrixNativeBindings } from './matrix-native.js?v=bd0e62293cb3';
-import { createCharsetNativeBindings } from './charset-native.js?v=bd0e62293cb3';
-import { createSqliteNativeBindings } from './sqlite-native.js?v=bd0e62293cb3';
-import { createJavaTimeNativeBindings } from './java-time-native.js?v=bd0e62293cb3';
-import { createMathNativeBindings } from './math-native.js?v=bd0e62293cb3';
-import { createUnsafeNativeBindings } from './unsafe-native.js?v=bd0e62293cb3';
-import { createZipNativeBindings } from './zip-native.js?v=bd0e62293cb3';
-import { createLibcoreIoNativeBindings } from './libcore-io-native.js?v=bd0e62293cb3';
-import { createNetworkNativeBindings } from './network-native.js?v=bd0e62293cb3';
-import { createParcelNativeBindings } from './parcel-native.js?v=bd0e62293cb3';
-import { createInputNativeBindings } from './input-native.js?v=bd0e62293cb3';
-import { createViewHiddenNativeBindings } from './view-hidden-native.js?v=bd0e62293cb3';
-import { createAudioNativeBindings } from './audio-native.js?v=bd0e62293cb3';
-import { createFileObserverNativeBindings } from './file-observer-native.js?v=bd0e62293cb3';
-import { createRegionNativeBindings } from './region-native.js?v=bd0e62293cb3';
-import { createRenderThreadAnimators } from './rt-animators.js?v=bd0e62293cb3';
-import { createIcuConverterNativeBindings } from './icu-converter-native.js?v=bd0e62293cb3';
-import { createCoreApiNativeBindings } from './core-api-natives.js?v=bd0e62293cb3';
-import { createProcessNativeBindings } from './process-native.js?v=bd0e62293cb3';
-import { createTextLayoutNativeBindings } from './text-layout-native.js?v=bd0e62293cb3';
-import { createColorFilterNativeBindings } from './color-filter-native.js?v=bd0e62293cb3';
-import { createRenderNodeNativeBindings } from './rendernode-native.js?v=bd0e62293cb3';
-import { createAnimatedVectorNativeBindings } from './animated-vector-native.js?v=bd0e62293cb3';
-import { createRegexNativeBindings } from './regex-native.js?v=bd0e62293cb3';
-import { createMemoryFileNativeBindings } from './memory-file-native.js?v=bd0e62293cb3';
+import { APKError, DexFile } from './apk-runtime.js?v=3007dcaf084a';
+import { createVectorNativeBindings } from './vector-native.js?v=3007dcaf084a';
+import { createMatrixNativeBindings } from './matrix-native.js?v=3007dcaf084a';
+import { createCharsetNativeBindings } from './charset-native.js?v=3007dcaf084a';
+import { createSqliteNativeBindings } from './sqlite-native.js?v=3007dcaf084a';
+import { createJavaTimeNativeBindings } from './java-time-native.js?v=3007dcaf084a';
+import { createMathNativeBindings } from './math-native.js?v=3007dcaf084a';
+import { createUnsafeNativeBindings } from './unsafe-native.js?v=3007dcaf084a';
+import { createZipNativeBindings } from './zip-native.js?v=3007dcaf084a';
+import { createLibcoreIoNativeBindings } from './libcore-io-native.js?v=3007dcaf084a';
+import { createNetworkNativeBindings } from './network-native.js?v=3007dcaf084a';
+import { createParcelNativeBindings } from './parcel-native.js?v=3007dcaf084a';
+import { createInputNativeBindings } from './input-native.js?v=3007dcaf084a';
+import { createViewHiddenNativeBindings } from './view-hidden-native.js?v=3007dcaf084a';
+import { createAudioNativeBindings } from './audio-native.js?v=3007dcaf084a';
+import { createFileObserverNativeBindings } from './file-observer-native.js?v=3007dcaf084a';
+import { createRegionNativeBindings } from './region-native.js?v=3007dcaf084a';
+import { createRenderThreadAnimators } from './rt-animators.js?v=3007dcaf084a';
+import { createIcuConverterNativeBindings } from './icu-converter-native.js?v=3007dcaf084a';
+import { createCoreApiNativeBindings } from './core-api-natives.js?v=3007dcaf084a';
+import { createProcessNativeBindings } from './process-native.js?v=3007dcaf084a';
+import { createTextLayoutNativeBindings } from './text-layout-native.js?v=3007dcaf084a';
+import { createColorFilterNativeBindings } from './color-filter-native.js?v=3007dcaf084a';
+import { createRenderNodeNativeBindings } from './rendernode-native.js?v=3007dcaf084a';
+import { createAnimatedVectorNativeBindings } from './animated-vector-native.js?v=3007dcaf084a';
+import { createRegexNativeBindings } from './regex-native.js?v=3007dcaf084a';
+import { createMemoryFileNativeBindings } from './memory-file-native.js?v=3007dcaf084a';
 
 const MAX_FRAMEWORK_BYTES = 64 * 1024 * 1024;
 const NATIVE_GET_INT = 'Landroid/os/SystemProperties;->native_get_int(Ljava/lang/String;I)I';
@@ -102,6 +102,14 @@ export function createFrameworkNativeBindings({ properties = {}, onBoundary = nu
   });
   // VMRuntime.setDedupeHiddenApiWarnings(boolean): StrictMode toggles whether hidden-API warnings repeat (detectNonSdkApiUsage). The lab raises no hidden-API warnings; the flag is only kept.
   bindings.set('Ldalvik/system/VMRuntime;->setDedupeHiddenApiWarnings(Z)V',(runtime,args)=>{runtime.dedupeHiddenApiWarnings=!!args[0];});
+  // android.media.MediaDrm / MediaCrypto (the original classes): the lab device has no DRM plugin installed (like an emulator image without Widevine), which is what the JNI layer answers
+  // for every scheme -- no crypto scheme is supported and creating a MediaDrm / MediaCrypto fails exactly as frameworks/base/media/jni does when the plugin factory finds no plugin.
+  bindings.set('Landroid/media/MediaDrm;->native_init()V', () => {});
+  bindings.set('Landroid/media/MediaDrm;->isCryptoSchemeSupportedNative([BLjava/lang/String;I)Z', () => 0);
+  bindings.set('Landroid/media/MediaDrm;->native_setup(Ljava/lang/Object;[BLjava/lang/String;)V', (runtime) => { runtime.throwJava('Landroid/media/UnsupportedSchemeException;', 'Failed to instantiate drm object.'); });
+  bindings.set('Landroid/media/MediaCrypto;->native_init()V', () => {});
+  bindings.set('Landroid/media/MediaCrypto;->isCryptoSchemeSupportedNative([B)Z', () => 0);
+  bindings.set('Landroid/media/MediaCrypto;->native_setup([B[B)V', (runtime) => { runtime.throwJava('Landroid/media/MediaCryptoException;', 'Failed to instantiate crypto object.'); });
   // The web device has no atrace/kernel tracing session. Original Trace.java
   // decides whether to emit each section/counter from this explicit tag mask.
   // Emission and enablement natives remain unbound rather than reporting success.

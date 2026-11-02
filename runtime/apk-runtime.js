@@ -1,24 +1,24 @@
-import { VMClock } from './vm-clock.js?v=bd0e62293cb3';
-import { OperationMonitor } from './operation-monitor.js?v=bd0e62293cb3';
-import { ExecutionProfile } from './execution-profile.js?v=bd0e62293cb3';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=bd0e62293cb3';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=bd0e62293cb3';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=bd0e62293cb3';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=bd0e62293cb3';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=bd0e62293cb3';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=bd0e62293cb3';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=bd0e62293cb3';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=bd0e62293cb3';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=bd0e62293cb3';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=bd0e62293cb3';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=bd0e62293cb3';
-import { APKError } from './apk-error.js?v=bd0e62293cb3';
-import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=bd0e62293cb3';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=bd0e62293cb3';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=bd0e62293cb3';
-import { Scheduler, Blocked } from './scheduler.js?v=bd0e62293cb3';
-import { bootClassLacksMember } from './boot-class-members.js?v=bd0e62293cb3';
-export { APKError } from './apk-error.js?v=bd0e62293cb3';
+import { VMClock } from './vm-clock.js?v=3007dcaf084a';
+import { OperationMonitor } from './operation-monitor.js?v=3007dcaf084a';
+import { ExecutionProfile } from './execution-profile.js?v=3007dcaf084a';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=3007dcaf084a';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=3007dcaf084a';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=3007dcaf084a';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=3007dcaf084a';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=3007dcaf084a';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=3007dcaf084a';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=3007dcaf084a';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=3007dcaf084a';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=3007dcaf084a';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=3007dcaf084a';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=3007dcaf084a';
+import { APKError } from './apk-error.js?v=3007dcaf084a';
+import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=3007dcaf084a';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=3007dcaf084a';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=3007dcaf084a';
+import { Scheduler, Blocked } from './scheduler.js?v=3007dcaf084a';
+import { bootClassLacksMember } from './boot-class-members.js?v=3007dcaf084a';
+export { APKError } from './apk-error.js?v=3007dcaf084a';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -2627,6 +2627,7 @@ export class APKRuntime {
       if (name === 'loadLibrary' && text.includes('/')) this.throwJava('Ljava/lang/UnsatisfiedLinkError;', 'Directory separator should not appear in library name: ' + text);
       // A lab-supplied WebAssembly module (never APK bytes) satisfies the request through the JNI bridge; otherwise the genuine failure below stands.
       if (this.jni && (name === 'load' ? this.jni.loadPath(text) : this.jni.loadLibrary(text))) return undefined;
+      if (name === 'loadLibrary' && text === 'media_jni' && this.currentMethod?.owner?.startsWith('Landroid/media/')) return undefined;   // the framework's own media JNI: the lab binds those natives itself (framework-provider.js: no DRM plugin installed)
       if (this.stubNativeLibrary(text)) return undefined;
       this.nativeRequired(key, text);
     }

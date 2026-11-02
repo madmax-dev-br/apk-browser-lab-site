@@ -1,7 +1,7 @@
-import { APKError } from './apk-runtime.js?v=bd0e62293cb3';
-import { breakParagraphs } from './text-layout-native.js?v=bd0e62293cb3';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=bd0e62293cb3';
-import { gcRoot } from './heap-gc.js?v=bd0e62293cb3';
+import { APKError } from './apk-runtime.js?v=3007dcaf084a';
+import { breakParagraphs } from './text-layout-native.js?v=3007dcaf084a';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=3007dcaf084a';
+import { gcRoot } from './heap-gc.js?v=3007dcaf084a';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -56,7 +56,7 @@ export function createViewLayoutHost(platform) {
       const minWidth = platform.dialogWindowHost?.minWidth(runtime, root) ?? 0;
       if (minWidth > 0 && algorithm(runtime, SPEC, 'getMode', '(I)I', [width]) === (0x80000000 | 0) && (view.measuredWidth & SIZE) < minWidth) call(runtime,root,VIEW,'measure','(II)V',[algorithm(runtime, SPEC, 'makeMeasureSpec', '(II)I', [minWidth, 0x40000000]), height]);
       call(runtime,root,VIEW,'layout','(IIII)V',[0,0,view.measuredWidth&SIZE,view.measuredHeight&SIZE]); platform.requestDraw(runtime,root);
-    }, 0, [root]);
+    }, 0, [root], { ui: true });
   };
   const readLP = (runtime, view, name, fallback = 0) => { const fields = view.layoutParams ? runtime.object(view.layoutParams).fields : null; return fields ? [...fields].find(([key]) => key.endsWith(`->${name}:I`))?.[1] ?? fallback : fallback; };
   const measureChild = (runtime, receiver, childRef, widthSpec, widthUsed, heightSpec, heightUsed, margins) => {

@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=bd0e62293cb3';
-import { Blocked, QUANTUM } from './scheduler.js?v=bd0e62293cb3';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=bd0e62293cb3';
+import { APKError } from './apk-error.js?v=3007dcaf084a';
+import { Blocked, QUANTUM } from './scheduler.js?v=3007dcaf084a';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=3007dcaf084a';
 
 // Frame-based DEX interpreter.
 //
@@ -305,7 +305,7 @@ function runLoop(rt, owner, base) {
   let thread = owner, frames = null, f = null, regs = null, prog = null, u = null, dex = null, stats = null, pc = 0, start = 0, returnValue, returning = false;
   let need = owner === null, quantum = QUANTUM, ran = false, input = null;
   const max = rt.maxInstructionsPerEvent, heapList = rt.heap.list, fastCalls = rt.fastCallPaths !== false; let probe = rt.instructionProbe;
-  if (owner !== null) { frames = owner.frames; f = frames[frames.length - 1]; regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc; start = pc; }
+  if (owner !== null) { frames = owner.frames; f = frames[frames.length - 1]; if (f === undefined) fail(`The run owner thread ${owner.name} (${owner.state}) has no frames to run`); regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc; start = pc; }
   for (;;) {
     probe = rt.instructionProbe;
     try {
@@ -630,7 +630,8 @@ function runLoop(rt, owner, base) {
           // A register-type error names the failing opcode and the last host bridge the VM called, which is usually where the bad value came from.
           const where = innermost && /^Expected (int|long|wide|object|reference)/.test(current.message ?? '') ? ` [opcode 0x${(u[start] & 0xff).toString(16).padStart(2, '0')}${rt.lastHostCall ? `; last host call ${rt.lastHostCall}` : ''}]` : '';
           if (globalThis.process?.env?.APKWEB_DEBUG_HOST_ERRORS && innermost) console.error(current.stack);
-          current = new APKError(`${f.method.key} [${prog.filename}] at PC 0x${start.toString(16).padStart(4, '0')}: ${current.message ?? current}${where}`, current.details);
+          const internal = !(current instanceof APKError);   // a JavaScript error inside the VM (TypeError ...): keep where it happened
+          current = new APKError(`${f.method.key} [${prog.filename}] at PC 0x${start.toString(16).padStart(4, '0')}: ${current.message ?? current}${where}`, internal ? { ...(current.details ?? {}), kind: 'internal-js-error', jsStack: String(current.stack ?? '').split('\n').slice(0, 13).join('\n'), vmContext: rt.monitor.context() } : current.details);
         }
         innermost = false;
         frames.pop();

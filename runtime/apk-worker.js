@@ -1,38 +1,38 @@
-import { buildScreenState } from './screen-state.js?v=bd0e62293cb3';
-import { createMessageSink } from './audio-native.js?v=bd0e62293cb3';
-import { loadAPK } from './apk-loader.js?v=bd0e62293cb3';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=bd0e62293cb3';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=bd0e62293cb3';
-import { createWebViewBackend } from './webview-backend.js?v=bd0e62293cb3';
-import { FrameworkProvider } from './framework-provider.js?v=bd0e62293cb3';
-import { createRasterSender } from './raster-cache.js?v=bd0e62293cb3';
-import { isFreedId } from './heap-gc.js?v=bd0e62293cb3';
-import { dispatchPointer } from './pointer-input-host.js?v=bd0e62293cb3';
-import { resolveDevice } from './device-profile.js?v=bd0e62293cb3';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=bd0e62293cb3';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=bd0e62293cb3';
-import { SkiaProvider } from './skia-provider.js?v=bd0e62293cb3';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=bd0e62293cb3';
-import { disposeTextLayout } from './text-layout-native.js?v=bd0e62293cb3';
-import { IcuBreakProvider } from './icu-break-provider.js?v=bd0e62293cb3';
-import { SqliteProvider } from './sqlite-native.js?v=bd0e62293cb3';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=bd0e62293cb3';
-import { TzdataProvider } from './java-time-native.js?v=bd0e62293cb3';
-import { ZlibProvider } from './zip-native.js?v=bd0e62293cb3';
-import { IcuConverterProvider } from './icu-converter-native.js?v=bd0e62293cb3';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=bd0e62293cb3';
-import { JavacryptoProvider } from './javacrypto-native.js?v=bd0e62293cb3';
-import { disposeColorFilters } from './color-filter-native.js?v=bd0e62293cb3';
-import { disposeRegex } from './regex-native.js?v=bd0e62293cb3';
-import { disposeRenderNodes } from './rendernode-native.js?v=bd0e62293cb3';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=bd0e62293cb3';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=bd0e62293cb3';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=bd0e62293cb3';
+import { buildScreenState } from './screen-state.js?v=3007dcaf084a';
+import { createMessageSink } from './audio-native.js?v=3007dcaf084a';
+import { loadAPK } from './apk-loader.js?v=3007dcaf084a';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=3007dcaf084a';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=3007dcaf084a';
+import { createWebViewBackend } from './webview-backend.js?v=3007dcaf084a';
+import { FrameworkProvider } from './framework-provider.js?v=3007dcaf084a';
+import { createRasterSender } from './raster-cache.js?v=3007dcaf084a';
+import { isFreedId } from './heap-gc.js?v=3007dcaf084a';
+import { dispatchPointer } from './pointer-input-host.js?v=3007dcaf084a';
+import { resolveDevice } from './device-profile.js?v=3007dcaf084a';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=3007dcaf084a';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=3007dcaf084a';
+import { SkiaProvider } from './skia-provider.js?v=3007dcaf084a';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=3007dcaf084a';
+import { disposeTextLayout } from './text-layout-native.js?v=3007dcaf084a';
+import { IcuBreakProvider } from './icu-break-provider.js?v=3007dcaf084a';
+import { SqliteProvider } from './sqlite-native.js?v=3007dcaf084a';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=3007dcaf084a';
+import { TzdataProvider } from './java-time-native.js?v=3007dcaf084a';
+import { ZlibProvider } from './zip-native.js?v=3007dcaf084a';
+import { IcuConverterProvider } from './icu-converter-native.js?v=3007dcaf084a';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=3007dcaf084a';
+import { JavacryptoProvider } from './javacrypto-native.js?v=3007dcaf084a';
+import { disposeColorFilters } from './color-filter-native.js?v=3007dcaf084a';
+import { disposeRegex } from './regex-native.js?v=3007dcaf084a';
+import { disposeRenderNodes } from './rendernode-native.js?v=3007dcaf084a';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=3007dcaf084a';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=3007dcaf084a';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=3007dcaf084a';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=bd0e62293cb3';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=bd0e62293cb3';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=bd0e62293cb3';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'bd0e62293cb3';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=3007dcaf084a';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=3007dcaf084a';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=3007dcaf084a';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '3007dcaf084a';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -46,7 +46,7 @@ let inventory = null, archive = null;
 let activeRequestId = null;
 let busy = false;
 let eventTimer = null, lastEventMs = 0;
-function errorData(error) { return { name: error.name || 'Error', message: error.message || String(error), stack: error.stack, details: error.details, navigation: runtime?.platform?.navigationState?.(runtime), trace: Array.isArray(runtime?.trace) ? runtime.trace.slice(-512) : [], stubs: runtime ? [...[...(runtime.missingLibraries ?? [])].map(([key, count]) => [`lib${key}.so`, count]), ...(runtime.missingClasses ?? []), ...(runtime.missingReturns ?? []), ...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`) : [], stubLists: runtime ? { void: [...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`), returns: [...(runtime.missingReturns ?? [])].map(([key, count]) => `${key} x${count}`), classes: [...(runtime.missingClasses ?? [])].map(([key, count]) => `${key} x${count}`) } : null }; }
+function errorData(error) { const internal = !error.details && /^(TypeError|RangeError|ReferenceError|SyntaxError|EvalError)$/.test(error.name ?? ''); return { name: error.name || 'Error', message: error.message || String(error), stack: error.stack, details: internal ? { kind: 'internal-js-error', jsStack: String(error.stack ?? '').split('\n').slice(0, 13).join('\n'), vmContext: runtime?.monitor?.context?.() ?? null } : error.details, navigation: runtime?.platform?.navigationState?.(runtime), trace: Array.isArray(runtime?.trace) ? runtime.trace.slice(-512) : [], stubs: runtime ? [...[...(runtime.missingLibraries ?? [])].map(([key, count]) => [`lib${key}.so`, count]), ...(runtime.missingClasses ?? []), ...(runtime.missingReturns ?? []), ...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`) : [], stubLists: runtime ? { void: [...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`), returns: [...(runtime.missingReturns ?? [])].map(([key, count]) => `${key} x${count}`), classes: [...(runtime.missingClasses ?? [])].map(([key, count]) => `${key} x${count}`) } : null }; }
 const rasterSender = createRasterSender();
 function currentSnapshot() {
   appData?.touch();
@@ -68,13 +68,13 @@ const EVENT_WALL_LIMIT_MS = 25000;
 const OPERATION_WALL_LIMIT_MS = 20000;
 // After the first frame of an operation is committed the Worker settles at most this long on work that is due right now; whatever is still scheduled (animations, polling, timers) continues as
 // ordinary events in later pumps (scheduleEvents), exactly as on a device, where nothing ever "waits for idle".
-const SETTLE_WINDOW_MS = 1500;
+const SETTLE_WINDOW_MS = 1500, FIRST_FRAME_SETTLE_MS = 8000;   // until the first frame is committed the settle window is longer: a launch returns with something drawn, not with the layout still queued
 function drainReadyEvents(maxMs = SETTLE_WINDOW_MS) {
   let processed = 0, result; const started = performance.now();
   for (let round = 0; round < 32; round++) {
     result = runtime.platform.drainEvents(runtime); processed += result.processed;
     if (!result.processed || result.nextDelay !== 0) break;
-    if (performance.now() - started > maxMs) break;   // the rest is left queued for the next pump
+    if (performance.now() - started > ((runtime.platform.viewWindowHost?.frameState?.().framesRun ?? 1) > 0 ? maxMs : Math.max(maxMs, FIRST_FRAME_SETTLE_MS))) break;   // the rest is left queued for the next pump
   }
   return {...result, processed};
 }

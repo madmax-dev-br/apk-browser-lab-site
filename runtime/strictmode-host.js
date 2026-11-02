@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=bd0e62293cb3';
-import { collectGarbage } from './heap-gc.js?v=bd0e62293cb3';
+import { createHostRegistry } from './host-contract.js?v=3007dcaf084a';
+import { collectGarbage } from './heap-gc.js?v=3007dcaf084a';
 
 // The platform side of android.os.StrictMode. StrictMode itself, its ThreadPolicy/VmPolicy builders, the android.os.strictmode violation classes, dalvik.system.CloseGuard and
 // dalvik.system.BlockGuard are the pinned originals (android-13.0.0_r1) in framework.dex; policies live in ThreadLocals and BlockGuard exactly as on a device. What the original
@@ -33,6 +33,7 @@ export function createStrictModeHost(platform) {
 
   // ActivityThread.getIntentBeingBroadcast(): a broadcast receiver's intent is dispatched by the lab itself, not by ActivityThread's receiver handler.
   def('Landroid/app/ActivityThread;', 'getIntentBeingBroadcast', '()Landroid/content/Intent;', () => platform.intentBeingBroadcast ?? null, { static: true });
+  def('Landroid/app/ActivityThread;', 'currentOpPackageName', '()Ljava/lang/String;', () => platform.packageName ?? null, { static: true });   // the package the app's operations are attributed to
   // RuntimeInit.getApplicationObject(): the binder identifying this process to the activity manager, which the lab does not have.
   def(RUNTIME_INIT, 'getApplicationObject', '()Landroid/os/IBinder;', () => null, { static: true });
 

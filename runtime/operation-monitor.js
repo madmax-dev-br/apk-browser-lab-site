@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=bd0e62293cb3';
-import { gcBlockReason } from './heap-gc.js?v=bd0e62293cb3';
+import { APKError } from './apk-error.js?v=3007dcaf084a';
+import { gcBlockReason } from './heap-gc.js?v=3007dcaf084a';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -47,6 +47,11 @@ export class OperationMonitor {
     if (this.sink === null) return;
     const now = performance.now(); if (now - this.lastBeat < this.intervalMs) return;
     this.rt.hostCall = label; this.beat(now, 'gc');
+  }
+  /** The VM context of an internal error: operation, thread, innermost Java frames, host call in progress. */
+  context() {
+    const rt = this.rt;
+    try { return { operation: this.op?.name ?? null, thread: rt.thread?.name ?? null, stack: rt.profile.currentStack(6), hostCall: rt.hostCall ? short(rt.hostCall) : null }; } catch { return { operation: this.op?.name ?? null }; }
   }
   snapshot(now, reason) {
     const rt = this.rt, op = this.op, thread = rt.thread, profile = rt.profile;

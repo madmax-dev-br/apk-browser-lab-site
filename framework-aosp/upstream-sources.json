@@ -30695,5 +30695,105 @@
     "sha256": "3362a66e2b3cbff4202bbc6eeb945d8b6552d9da9f8d9a07ad6c689f5024d8b6",
     "bytes": 6209,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaDrm.java",
+    "localPath": "framework-aosp/upstream/android/media/MediaDrm.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaDrm.java?format=TEXT",
+    "sha256": "5ff01395ea6d529c0e926bfa75d8762b3b3b0bd4cd82bacde0b91f130c5cd679",
+    "bytes": 123030,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaCrypto.java",
+    "localPath": "framework-aosp/upstream/android/media/MediaCrypto.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaCrypto.java?format=TEXT",
+    "sha256": "93eb5f963a9330e6cb5c816716b24c3c7df454589a41af8c298ddf573d6591ce",
+    "bytes": 3937,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaDrmException.java",
+    "localPath": "framework-aosp/upstream/android/media/MediaDrmException.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaDrmException.java?format=TEXT",
+    "sha256": "e9d05a5a4443171e160cd90a31d895327ac28c0b224d06c53cfdd9f5c51d4b63",
+    "bytes": 833,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaCryptoException.java",
+    "localPath": "framework-aosp/upstream/android/media/MediaCryptoException.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaCryptoException.java?format=TEXT",
+    "sha256": "5df4b3ec82843101206e7bc7c497469bff6d84bd6a070c7882853814068b07af",
+    "bytes": 989,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/NotProvisionedException.java",
+    "localPath": "framework-aosp/upstream/android/media/NotProvisionedException.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/NotProvisionedException.java?format=TEXT",
+    "sha256": "260867a6a0f9c5f9c753d1405798f6eb028581b853b16b63a6a2e1c4cce8b011",
+    "bytes": 1061,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/ResourceBusyException.java",
+    "localPath": "framework-aosp/upstream/android/media/ResourceBusyException.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/ResourceBusyException.java?format=TEXT",
+    "sha256": "3b659747a6753714fda5476cc48f8d1dd5c97fc661c2a69dd488e7c5934d10b8",
+    "bytes": 955,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/DeniedByServerException.java",
+    "localPath": "framework-aosp/upstream/android/media/DeniedByServerException.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/DeniedByServerException.java?format=TEXT",
+    "sha256": "f1e1164d6ffbbc92e63d8833187b9d6080c6ae357d07d63d82cbf31b893c3381",
+    "bytes": 932,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/UnsupportedSchemeException.java",
+    "localPath": "framework-aosp/upstream/android/media/UnsupportedSchemeException.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/UnsupportedSchemeException.java?format=TEXT",
+    "sha256": "76773fdfdb8879523c3e6a9c316166117753cfeeb42e79b01f0f534f9453f36f",
+    "bytes": 968,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaDrmResetException.java",
+    "localPath": "framework-aosp/upstream/android/media/MediaDrmResetException.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaDrmResetException.java?format=TEXT",
+    "sha256": "24e152b723042303f4719e90b716b6836c303e9ec97d9f94aabbecd9a66c2a83",
+    "bytes": 1033,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/HandlerExecutor.java",
+    "localPath": "framework-aosp/upstream/android/os/HandlerExecutor.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/HandlerExecutor.java?format=TEXT",
+    "sha256": "c23d152590d6301469cf4c153e317b8d5cbc05cd2d934fe8aad6807f25fd9755",
+    "bytes": 1341,
+    "license": "Apache-2.0"
   }
 ]
