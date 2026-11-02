@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=85b05e34fc63';
+import { createHostRegistry } from './host-contract.js?v=ab5660c71041';
 
 // The platform side of android.os.Parcel (original Parcel.java in framework.dex, natives in parcel-native.js): hidden framework hooks Parcel calls around transactions, and the
 // Parcel serialisation of the VM's Bundle/PersistableBundle (BaseBundle.writeToParcelInner / readFromParcelInner wire format: length, BUNDLE_MAGIC, count, then key + typed value
@@ -9,11 +9,7 @@ const BUNDLE_MAGIC = 0x4C444E42, BOXES = { 'Ljava/lang/Integer;': 'I', 'Ljava/la
 
 export function createBinderHost(platform) {
   const registry = createHostRegistry(), { def } = registry;
-  // Hidden hooks Parcel.writeNoException/readException call (cross-process StrictMode violation transport and AppOps noting): no violations or noted ops exist in-process.
-  def('Landroid/os/StrictMode;', 'hasGatheredViolations', '()Z', () => 0, { static: true });
-  def('Landroid/os/StrictMode;', 'clearGatheredViolations', '()V', () => {}, { static: true });
-  def('Landroid/os/StrictMode;', 'writeGatheredViolationsToParcel', `(${PARCEL})V`, () => {}, { static: true });
-  def('Landroid/os/StrictMode;', 'readAndHandleBinderCallViolations', `(${PARCEL})V`, () => {}, { static: true });
+  // Parcel.writeNoException/readException call StrictMode's gathered-violation hooks (the original StrictMode class in framework.dex); AppOps noting has no in-process work.
   def('Landroid/app/AppOpsManager;', 'prefixParcelWithAppOpsIfNeeded', `(${PARCEL})V`, () => {}, { static: true });
   def('Landroid/app/AppOpsManager;', 'readAndLogNotedAppops', `(${PARCEL})V`, () => {}, { static: true });
 

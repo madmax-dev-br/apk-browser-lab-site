@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=85b05e34fc63';
-import { APKError } from './apk-error.js?v=85b05e34fc63';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=85b05e34fc63';
+import { gcRoot } from './heap-gc.js?v=ab5660c71041';
+import { APKError } from './apk-error.js?v=ab5660c71041';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=ab5660c71041';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -8,57 +8,9 @@ import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bit
 // observe a behavior (e.g. StrictMode violation detection) the policy is *stored* with Android semantics and the
 // absence of detection is documented, never reported as detected/enforced.
 
-// ---- android.os.StrictMode (frameworks/base/core/java/android/os/StrictMode.java) ----------------------------
-const STRICT = 'Landroid/os/StrictMode;', THREAD_POLICY = 'Landroid/os/StrictMode$ThreadPolicy;', THREAD_BUILDER = 'Landroid/os/StrictMode$ThreadPolicy$Builder;';
-const VM_POLICY = 'Landroid/os/StrictMode$VmPolicy;', VM_BUILDER = 'Landroid/os/StrictMode$VmPolicy$Builder;';
-const DETECT_THREAD_DISK_WRITE = 0x01, DETECT_THREAD_DISK_READ = 0x02, DETECT_THREAD_NETWORK = 0x04, DETECT_THREAD_CUSTOM = 0x08,
-  DETECT_THREAD_RESOURCE_MISMATCH = 0x10, DETECT_THREAD_UNBUFFERED_IO = 0x20, DETECT_THREAD_EXPLICIT_GC = 0x40;
-const PENALTY_LOG = 0x01 << 16, PENALTY_DIALOG = 0x02 << 16, PENALTY_DEATH = 0x04 << 16, PENALTY_DROPBOX = 0x08 << 16, PENALTY_FLASH = 0x10 << 16, PENALTY_DEATH_ON_NETWORK = 0x20 << 16, PENALTY_DEATH_ON_CLEARTEXT_NETWORK = 0x40 << 16;
-const ALL_THREAD_DETECT_BITS = DETECT_THREAD_DISK_WRITE | DETECT_THREAD_DISK_READ | DETECT_THREAD_NETWORK | DETECT_THREAD_CUSTOM | DETECT_THREAD_RESOURCE_MISMATCH | DETECT_THREAD_UNBUFFERED_IO | DETECT_THREAD_EXPLICIT_GC;
-
 const STRING_T = 'Ljava/lang/String;';
 export function createSystemServicesHost(platform) {
   const registry = createHostRegistry(), { def } = registry, PARENTS = registry.parents;
-  // The VM has exactly one thread; its StrictMode policy lives here (StrictMode.sThreadPolicy / BlockGuard policy).
-  for (const owner of [THREAD_POLICY, THREAD_BUILDER, VM_POLICY, VM_BUILDER]) registry.type(owner, 'Ljava/lang/Object;', [], { allocatable: true });
-  const state = { threadPolicyMask: 0, vmPolicyMask: 0, violationsDetected: 0 };
-  const policy = (runtime, mask) => { const ref = runtime.makeObject(THREAD_POLICY); runtime.object(ref).strictMask = mask; return ref; };
-  const maskOf = (runtime, ref) => { if (ref === null) runtime.throwJava('Ljava/lang/NullPointerException;', 'policy'); return runtime.object(ref).strictMask ?? 0; };
-  const setMask = (runtime, mask, why) => { if (mask !== state.threadPolicyMask) runtime.record(`STRICTMODE thread policy 0x${mask.toString(16)} (${why}); violations are not detected in the browser VM`); state.threadPolicyMask = mask; };
-
-  def(STRICT, 'allowThreadDiskWrites', `()${THREAD_POLICY}`, (runtime) => {
-    const old = state.threadPolicyMask, next = old & ~(DETECT_THREAD_DISK_WRITE | DETECT_THREAD_DISK_READ);
-    setMask(runtime, next, 'allowThreadDiskWrites'); return policy(runtime, old);
-  }, { static: true });
-  def(STRICT, 'allowThreadDiskReads', `()${THREAD_POLICY}`, (runtime) => {
-    const old = state.threadPolicyMask, next = old & ~DETECT_THREAD_DISK_READ;
-    setMask(runtime, next, 'allowThreadDiskReads'); return policy(runtime, old);
-  }, { static: true });
-  def(STRICT, 'getThreadPolicy', `()${THREAD_POLICY}`, (runtime) => policy(runtime, state.threadPolicyMask), { static: true });
-  def(STRICT, 'setThreadPolicy', `(${THREAD_POLICY})V`, (runtime, _m, [p]) => setMask(runtime, maskOf(runtime, p), 'setThreadPolicy'), { static: true });
-  def(THREAD_POLICY, 'toString', '()Ljava/lang/String;', (runtime, _m, [p]) => `StrictMode.ThreadPolicy{mask=${maskOf(runtime, p)}}`);
-  // ThreadPolicy.LAX is a constant policy of mask 0 (static field; see readStatic).
-  def(THREAD_BUILDER, '<init>', '()V', (runtime, _m, [b]) => { runtime.object(b).strictMask = state.threadPolicyMask; });
-  def(THREAD_BUILDER, '<init>', `(${THREAD_POLICY})V`, (runtime, _m, [b, p]) => { runtime.object(b).strictMask = maskOf(runtime, p); });   // Builder(ThreadPolicy): start from an existing policy's mask
-  const builderBits = (name, bits, enable) => def(THREAD_BUILDER, name, `()${THREAD_BUILDER}`, (runtime, _m, [b]) => { const o = runtime.object(b); o.strictMask = enable ? o.strictMask | bits : o.strictMask & ~bits; return b; });
-  builderBits('detectAll', ALL_THREAD_DETECT_BITS, true); builderBits('permitAll', ALL_THREAD_DETECT_BITS, false);
-  builderBits('detectDiskReads', DETECT_THREAD_DISK_READ, true); builderBits('permitDiskReads', DETECT_THREAD_DISK_READ, false);
-  builderBits('detectDiskWrites', DETECT_THREAD_DISK_WRITE, true); builderBits('permitDiskWrites', DETECT_THREAD_DISK_WRITE, false);
-  builderBits('detectNetwork', DETECT_THREAD_NETWORK, true); builderBits('permitNetwork', DETECT_THREAD_NETWORK, false);
-  builderBits('detectCustomSlowCalls', DETECT_THREAD_CUSTOM, true); builderBits('permitCustomSlowCalls', DETECT_THREAD_CUSTOM, false);
-  builderBits('penaltyLog', PENALTY_LOG, true); builderBits('penaltyDeath', PENALTY_DEATH, true); builderBits('penaltyDialog', PENALTY_DIALOG, true); builderBits('penaltyFlashScreen', PENALTY_FLASH, true);
-  builderBits('detectResourceMismatches', DETECT_THREAD_RESOURCE_MISMATCH, true); builderBits('permitResourceMismatches', DETECT_THREAD_RESOURCE_MISMATCH, false); builderBits('detectUnbufferedIo', DETECT_THREAD_UNBUFFERED_IO, true); builderBits('permitUnbufferedIo', DETECT_THREAD_UNBUFFERED_IO, false);
-  builderBits('detectExplicitGc', DETECT_THREAD_EXPLICIT_GC, true); builderBits('permitExplicitGc', DETECT_THREAD_EXPLICIT_GC, false); builderBits('penaltyDeathOnNetwork', PENALTY_DEATH_ON_NETWORK, true); builderBits('penaltyDropBox', PENALTY_DROPBOX, true);
-  def(THREAD_BUILDER, 'build', `()${THREAD_POLICY}`, (runtime, _m, [b]) => policy(runtime, runtime.object(b).strictMask));
-  // VmPolicy: stored only; none of its detectors (leaks, cleartext, untagged sockets) can fire in the browser VM.
-  def(VM_BUILDER, '<init>', '()V', (runtime, _m, [b]) => { runtime.object(b).strictMask = 0; });
-  for (const name of ['detectAll', 'detectLeakedClosableObjects', 'detectLeakedSqlLiteObjects', 'detectActivityLeaks', 'detectLeakedRegistrationObjects', 'detectFileUriExposure', 'detectCleartextNetwork', 'detectContentUriWithoutPermission', 'detectUntaggedSockets', 'penaltyLog', 'penaltyDeath', 'penaltyDropBox', 'penaltyDeathOnCleartextNetwork', 'penaltyDeathOnFileUriExposure', 'permitUnsafeIntentLaunch', 'detectNonSdkApiUsage', 'permitNonSdkApiUsage'])
-    def(VM_BUILDER, name, `()${VM_BUILDER}`, (_r, _m, [b]) => b);
-  def(VM_BUILDER, 'build', `()${VM_POLICY}`, (runtime) => runtime.makeObject(VM_POLICY));
-  def(STRICT, 'setVmPolicy', `(${VM_POLICY})V`, (runtime, _m, [p]) => { if (p === null) runtime.throwJava('Ljava/lang/NullPointerException;', 'policy'); runtime.record('STRICTMODE vm policy stored; no VM violation detection'); }, { static: true });
-  def(STRICT, 'getVmPolicy', `()${VM_POLICY}`, (runtime) => runtime.makeObject(VM_POLICY), { static: true });
-  def(STRICT, 'enableDefaults', '()V', (runtime) => setMask(runtime, state.threadPolicyMask | ALL_THREAD_DETECT_BITS | PENALTY_LOG, 'enableDefaults'), { static: true });
-
   // ---- android.telephony.cdma.CdmaCellLocation (android-13.0.0_r1) ----------------------------------------------
   const CDMA = 'Landroid/telephony/cdma/CdmaCellLocation;';
   PARENTS.set(CDMA, 'Ljava/lang/Object;');
@@ -528,7 +480,6 @@ export function createSystemServicesHost(platform) {
   const POINTF = 'Landroid/graphics/PointF;';
   def(POINTF, 'length', '(FF)F', (_r, _m, [x, y]) => floatBits(Math.hypot(bitsFloat(x), bitsFloat(y))), { static: true });
 
-  registry.staticField(THREAD_POLICY, 'LAX', THREAD_POLICY, runtime => policy(runtime, 0));
   /** System.getProperty defaults of an Android 13 app process (libcore System.java initUnchangeableSystemProperties/setDefaultChangeableProperties + ActivityThread.setupGraphicsSupport). */
   function initializeSystemProperties(runtime) {
     const pkg = platform.packageName ?? 'app', properties = {
@@ -543,5 +494,5 @@ export function createSystemServicesHost(platform) {
     for (const [key, value] of Object.entries(properties)) if (!runtime.javaProperties.has(key)) runtime.javaProperties.set(key, value);
     runtime.javaProperties.set('os.name', 'Linux'); // System.getProperty("os.name") on Android is the kernel name (uname.sysname)
   }
-  return { state, initializeSystemProperties, ...registry, interfaces: registry.interfacesOf };
+  return { initializeSystemProperties, ...registry, interfaces: registry.interfacesOf };
 }

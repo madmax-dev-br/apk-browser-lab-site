@@ -1,30 +1,18 @@
-import { createHostRegistry } from './host-contract.js?v=85b05e34fc63';
-import { fieldOffset } from './unsafe-native.js?v=85b05e34fc63';
+import { createHostRegistry } from './host-contract.js?v=ab5660c71041';
+import { fieldOffset } from './unsafe-native.js?v=ab5660c71041';
 
 // Platform contract for the hidden/internal framework APIs that android.database and android.database.sqlite (Android 13 sources, compiled into the
 // framework DEX) call: dalvik.system.CloseGuard, dalvik.system.BlockGuard, android.os.FileUtils.setPermissions, android.os.StrictMode SQLite leak
 // reporting, and the few android.os/app/provider lookups the SQLite classes perform. Each follows the libcore/framework behaviour for a process
 // with no StrictMode policy, no ActivityManager service and no Settings provider (see the per-definition notes).
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', THROWABLE = 'Ljava/lang/Throwable;';
-const CLOSE_GUARD = 'Ldalvik/system/CloseGuard;', FILE_UTILS = 'Landroid/os/FileUtils;';
+const FILE_UTILS = 'Landroid/os/FileUtils;';
 
 export function createDatabaseSupportHost(platform) {
   const registry = createHostRegistry(), { def, type, staticField } = registry;
   const fs = () => platform.javaIo.fs();
 
-  // ---- CloseGuard (libcore): get() always returns a guard; warnIfOpen() reports a resource that was open()ed and never close()d.
-  type(CLOSE_GUARD, OBJECT, [], { allocatable: true });
-  def(CLOSE_GUARD, 'get', `()${CLOSE_GUARD}`, r => { const guard = r.allocate(CLOSE_GUARD); r.object(guard).closeGuard = { opened: null }; return guard; }, { static: true });
-  def(CLOSE_GUARD, 'open', `(${STRING})V`, (r, _m, [self, warning]) => {
-    if (warning === null || warning === 0) r.throwJava('Ljava/lang/NullPointerException;', 'closer == null');
-    r.object(self).closeGuard.opened = r.stringCharacters(warning);
-  });
-  def(CLOSE_GUARD, 'close', '()V', (r, _m, [self]) => { r.object(self).closeGuard.opened = null; });
-  def(CLOSE_GUARD, 'warnIfOpen', '()V', (r, _m, [self]) => {
-    const state = r.object(self).closeGuard;
-    if (state.opened !== null) { r.record(`LOG W StrictMode: A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks. (${state.opened})`); state.opened = null; }
-  });
-
+  // dalvik.system.CloseGuard is the original libcore class in framework.dex (its reporter is StrictMode's once a VM policy is set).
   // dalvik.system.BlockGuard is the original libcore class in framework.dex (LAX_POLICY by default; StrictMode installs its own policy).
 
   // ---- android.os.FileUtils.setPermissions(path, mode, uid, gid): chmod over the virtual filesystem, returns an errno (0 = success).

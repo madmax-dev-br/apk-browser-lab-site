@@ -12,6 +12,10 @@ AssetManager, XmlBlock, StrictMode, XmlUtils, Arrays and LinkedHashMap.eldest). 
 packaged in framework.dex. They do not provide runtime algorithms or services.
 Calls to these hidden signatures require the explicitly implemented Java core
 backend; they never execute the declaration's placeholder method bodies.
+
+android.os.StrictMode (with the android.os.strictmode violation classes), dalvik.system.CloseGuard, android.util.Singleton and the FastPrintWriter/HexDump helpers are pinned originals in framework.dex
+(the java.time group is their compilation unit, next to Parcel and BlockGuard); the support/ StrictMode and CloseGuard declarations only serve the runtime group. StrictMode's lab
+transforms (hidden members, absent system services) are recorded in build/strictmode-transforms.json and in the manifest's sourceTransforms.
 No original source annotation or algorithm is deleted or rewritten.
 
 android.jar supplies javac's Android API declarations and D8 verification types.

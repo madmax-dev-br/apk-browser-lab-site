@@ -1,23 +1,23 @@
-import { VMClock } from './vm-clock.js?v=85b05e34fc63';
-import { ExecutionProfile } from './execution-profile.js?v=85b05e34fc63';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=85b05e34fc63';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=85b05e34fc63';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=85b05e34fc63';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=85b05e34fc63';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=85b05e34fc63';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=85b05e34fc63';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=85b05e34fc63';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=85b05e34fc63';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=85b05e34fc63';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=85b05e34fc63';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=85b05e34fc63';
-import { APKError } from './apk-error.js?v=85b05e34fc63';
-import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=85b05e34fc63';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=85b05e34fc63';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=85b05e34fc63';
-import { Scheduler, Blocked } from './scheduler.js?v=85b05e34fc63';
-import { bootClassLacksMember } from './boot-class-members.js?v=85b05e34fc63';
-export { APKError } from './apk-error.js?v=85b05e34fc63';
+import { VMClock } from './vm-clock.js?v=ab5660c71041';
+import { ExecutionProfile } from './execution-profile.js?v=ab5660c71041';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=ab5660c71041';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=ab5660c71041';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=ab5660c71041';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=ab5660c71041';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=ab5660c71041';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=ab5660c71041';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=ab5660c71041';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=ab5660c71041';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=ab5660c71041';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=ab5660c71041';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=ab5660c71041';
+import { APKError } from './apk-error.js?v=ab5660c71041';
+import { collectGarbage, collectionDue, heapCensus } from './heap-gc.js?v=ab5660c71041';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=ab5660c71041';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=ab5660c71041';
+import { Scheduler, Blocked } from './scheduler.js?v=ab5660c71041';
+import { bootClassLacksMember } from './boot-class-members.js?v=ab5660c71041';
+export { APKError } from './apk-error.js?v=ab5660c71041';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -479,7 +479,7 @@ for(const [owner,type]of [['Float','F'],['Double','D']])addBridge('java/lang/'+o
 addBridge('android/os/Trace', ['traceBegin(JLjava/lang/String;)V', 'traceEnd(J)V', 'isTagEnabled(J)Z']);
 addBridge('java/lang/Object',['notify()V','notifyAll()V','wait()V','wait(J)V','wait(JI)V']);
 addBridge('java/lang/Object', ['getClass()Ljava/lang/Class;', 'hashCode()I', 'equals(Ljava/lang/Object;)Z', 'toString()Ljava/lang/String;', 'clone()Ljava/lang/Object;', 'finalize()V']);
-addBridge('java/lang/Class', ['getPackageName()Ljava/lang/String;', 'isSynthetic()Z', 'isAnnotation()Z', 'getDeclaredClasses()[Ljava/lang/Class;', 'getClasses()[Ljava/lang/Class;', 'getName()Ljava/lang/String;', 'getSimpleName()Ljava/lang/String;', 'getSuperclass()Ljava/lang/Class;', 'isInterface()Z',
+addBridge('java/lang/Class', ['toString()Ljava/lang/String;', 'getPackageName()Ljava/lang/String;', 'isSynthetic()Z', 'isAnnotation()Z', 'getDeclaredClasses()[Ljava/lang/Class;', 'getClasses()[Ljava/lang/Class;', 'getName()Ljava/lang/String;', 'getSimpleName()Ljava/lang/String;', 'getSuperclass()Ljava/lang/Class;', 'isInterface()Z',
   'isArray()Z', 'isPrimitive()Z', 'getComponentType()Ljava/lang/Class;', 'isAssignableFrom(Ljava/lang/Class;)Z', 'isInstance(Ljava/lang/Object;)Z',
   'forName(Ljava/lang/String;)Ljava/lang/Class;', 'forName(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;',
   'desiredAssertionStatus()Z', 'isEnum()Z', 'getEnumConstants()[Ljava/lang/Object;']);
@@ -3419,6 +3419,7 @@ export class APKRuntime {
         const constructor = cls.methods.get('<init>()V'); if (!constructor) this.throwJava('Ljava/lang/InstantiationException;', `No no-arg constructor: ${type}`);
         return this.reflectionInvoke(constructor, false, null, null, false);
       }
+      if (name === 'toString') { const primitive = type.length === 1, flags = this.classes.get(type)?.flags ?? 0; return (primitive ? '' : (flags & 0x200) || EXTERNAL_INTERFACE_NAMES.has(type) ? 'interface ' : 'class ') + this.className(type, 'binary'); }   // Class.toString: "interface "/"class " + getName(); primitives print just their name
       if (name === 'getName' || name === 'getSimpleName' || name === 'getCanonicalName') return this.className(type, name === 'getSimpleName' ? 'simple' : name === 'getCanonicalName' ? 'canonical' : 'binary');
       if (name === 'getModifiers') return this.classNesting(type).modifiers ?? this.classes.get(type)?.flags ?? (EXTERNAL_INTERFACE_NAMES.has(type)?0x601:1);
       if (name === 'getPackageName') { let base = type; while (base.startsWith('[')) base = base.slice(1); if (!base.startsWith('L')) return 'java.lang'; const slash = base.lastIndexOf('/'); return slash < 0 ? '' : base.slice(1, slash).replaceAll('/', '.'); }

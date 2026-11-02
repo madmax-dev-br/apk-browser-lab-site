@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=85b05e34fc63';
-import { APKError } from './apk-error.js?v=85b05e34fc63';
+import { createHostRegistry } from './host-contract.js?v=ab5660c71041';
+import { APKError } from './apk-error.js?v=ab5660c71041';
 
 // Hidden (non-SDK) View / ViewGroup members of android-13.0.0_r1 that the original list widgets (AdapterView, AbsListView, ListView, FastScroller, CheckedTextView; compiled in the layouts
 // profile against framework-aosp/compile-contracts/list-widgets.txt) call on the lab's View model. Each has the semantics of View.java / ViewGroup.java for the virtual device: no
@@ -31,12 +31,6 @@ export function createViewInternalsHost(platform) {
   def(ROOT, 'getAccessibilityFocusedHost', `()${VIEW}`, () => null);
   def(ROOT, 'getAccessibilityFocusedVirtualView', `()${INFO}`, () => null);
   def(ROOT, 'isLayoutRequested', '()Z', () => (platform.viewLayoutHost.state().pending ? 1 : 0));   // some root has a layout pass queued
-
-  // ---- StrictMode critical spans (AbsListView reports scrolls and flings): with no thread policy that detects slow calls the span is the shared no-op one ---------------------------------------
-  const SPAN = 'Landroid/os/StrictMode$Span;', STRICT = 'Landroid/os/StrictMode;';
-  registry.type(SPAN, 'Ljava/lang/Object;', [], { allocatable: true });
-  def(STRICT, 'enterCriticalSpan', `(Ljava/lang/String;)${SPAN}`, (r, _m, [name]) => { if (nullish(name)) r.throwJava('Ljava/lang/NullPointerException;', 'name'); return r.platform?.strictModeNoOpSpan ?? (platform.strictModeNoOpSpan ??= r.allocate(SPAN)); }, { static: true });
-  def(SPAN, 'finish', '()V', () => {});
 
   // ---- debug encoding (Layout Inspector): nothing consumes it in the lab ----------------------------------------------------------------------------------------------------------------
   def(VIEW, 'encodeProperties', `(${ENCODER})V`, () => {}); def(VIEW, 'encode', `(${ENCODER})V`, () => {});

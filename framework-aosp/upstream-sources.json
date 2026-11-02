@@ -30165,5 +30165,285 @@
     "sha256": "a8ae267434bd84dad61b1196218c1d01b43835b4030b8d357f68b074cdbcfb13",
     "bytes": 7026,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/CleartextNetworkViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/CleartextNetworkViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/CleartextNetworkViolation.java?format=TEXT",
+    "sha256": "29839bdec502e45cb514070349ec83387c2b37302e5238b65ec57e32327fb28e",
+    "bytes": 813,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/ContentUriWithoutPermissionViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/ContentUriWithoutPermissionViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/ContentUriWithoutPermissionViolation.java?format=TEXT",
+    "sha256": "f4a0b53c30b27dcd8f5f9f9c8b2c1a1d7b0a3ae453971bec944acb558eb403be",
+    "bytes": 1120,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/CredentialProtectedWhileLockedViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/CredentialProtectedWhileLockedViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/CredentialProtectedWhileLockedViolation.java?format=TEXT",
+    "sha256": "30fadc466dcf14a5e6e1a099f51276299f75e9478bfdbe577802e2bc0597a36e",
+    "bytes": 1442,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/CustomViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/CustomViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/CustomViolation.java?format=TEXT",
+    "sha256": "1031dee3b4b994efe1ebcb7887a39759698348a22985e216a3a19902abbf488c",
+    "bytes": 795,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/DiskReadViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/DiskReadViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/DiskReadViolation.java?format=TEXT",
+    "sha256": "531231dd575cdaac32230cbb224061ef2c9782190015ac94106874f9ff5c7cb6",
+    "bytes": 788,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/DiskWriteViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/DiskWriteViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/DiskWriteViolation.java?format=TEXT",
+    "sha256": "d8f3f62e6968617eec97f40aa7da34e6ab05b176b3f90094aa28cdf0b534806c",
+    "bytes": 790,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/ExplicitGcViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/ExplicitGcViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/ExplicitGcViolation.java?format=TEXT",
+    "sha256": "212e840d3f52662397dfc4e6c21f3a1ab6a6c62a90382f800f95bd7f1bf70bfd",
+    "bytes": 936,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/FileUriExposedViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/FileUriExposedViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/FileUriExposedViolation.java?format=TEXT",
+    "sha256": "8faea37d116d27a7eeaa67ef6b2e5109102a8db27b12ea2108075e0d4290f1ed",
+    "bytes": 809,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/ImplicitDirectBootViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/ImplicitDirectBootViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/ImplicitDirectBootViolation.java?format=TEXT",
+    "sha256": "856538c3e79b06853bc6b2d63bc26b664bb3f4c04a38dd32509cc4fc3ecd0809",
+    "bytes": 1171,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/IncorrectContextUseViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/IncorrectContextUseViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/IncorrectContextUseViolation.java?format=TEXT",
+    "sha256": "ce1a6be9fec8c6c4939100d72b9ba18281412dfb0a9e8222ea24b6f652391e3f",
+    "bytes": 1219,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/InstanceCountViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/InstanceCountViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/InstanceCountViolation.java?format=TEXT",
+    "sha256": "49003c5b5847d20ebaa8b4827a67ce2e7f0e3726c8c4f5fb8b4c176e76c75fdb",
+    "bytes": 1257,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/IntentReceiverLeakedViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/IntentReceiverLeakedViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/IntentReceiverLeakedViolation.java?format=TEXT",
+    "sha256": "bd1a4e75b58d370ed4aa345fc9048cfd9e735e226c0f0b2a37fbf97b022a0f17",
+    "bytes": 885,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/LeakedClosableViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/LeakedClosableViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/LeakedClosableViolation.java?format=TEXT",
+    "sha256": "da62349dba42428b15d2118555ef0e1a3392fede3531d645e8ab4ce5210af4e3",
+    "bytes": 979,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/NetworkViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/NetworkViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/NetworkViolation.java?format=TEXT",
+    "sha256": "9f21bce7804520bf5e49800d40d294865b72fd4a77a39690bc4546b106d98779",
+    "bytes": 786,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/NonSdkApiUsedViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/NonSdkApiUsedViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/NonSdkApiUsedViolation.java?format=TEXT",
+    "sha256": "036ecb0718bcebb606ebffee5038c3709bf1e65edf96ee1d8ccc1ede75219d0b",
+    "bytes": 912,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/ResourceMismatchViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/ResourceMismatchViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/ResourceMismatchViolation.java?format=TEXT",
+    "sha256": "2817f3e5474f784092e41ccdef403b730ac4f25f61fe37a5758937f953451ecc",
+    "bytes": 824,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/ServiceConnectionLeakedViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/ServiceConnectionLeakedViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/ServiceConnectionLeakedViolation.java?format=TEXT",
+    "sha256": "aef21f08b5fcc18e13d0eca0e5126ece8d75099d9bc133e1bc28ddff3b2143d4",
+    "bytes": 891,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/SqliteObjectLeakedViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/SqliteObjectLeakedViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/SqliteObjectLeakedViolation.java?format=TEXT",
+    "sha256": "29cbbc8dc61abe36d00f861a52538ccee327013e26f1865af7d0374de1f27e95",
+    "bytes": 881,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/UnbufferedIoViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/UnbufferedIoViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/UnbufferedIoViolation.java?format=TEXT",
+    "sha256": "b0d318b208104b4d633b881f23fcca7716427a0a4a514cb5ac2e8e00a3d63e62",
+    "bytes": 897,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/UnsafeIntentLaunchViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/UnsafeIntentLaunchViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/UnsafeIntentLaunchViolation.java?format=TEXT",
+    "sha256": "2e440bf0fa2083f1665f89ab5d2954d5bc91e9481818e5da56d59676bc199da7",
+    "bytes": 2795,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/UntaggedSocketViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/UntaggedSocketViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/UntaggedSocketViolation.java?format=TEXT",
+    "sha256": "cf16c8a07dabefb90369939702027b4f20db0510e2a58235a1f23f6ff4123b8b",
+    "bytes": 909,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/Violation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/Violation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/Violation.java?format=TEXT",
+    "sha256": "f9382aa508f3e2c82381269a37b71cfd85f0de4d3e8ce7e2a8482f34aff42063",
+    "bytes": 2388,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/strictmode/WebViewMethodCalledOnWrongThreadViolation.java",
+    "localPath": "framework-aosp/upstream/android/os/strictmode/WebViewMethodCalledOnWrongThreadViolation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/strictmode/WebViewMethodCalledOnWrongThreadViolation.java?format=TEXT",
+    "sha256": "2fac66117f145f94b147975a7d59d33dd68f0fcea63db7ef2e54dc3fdd6c5576",
+    "bytes": 909,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/util/Singleton.java",
+    "localPath": "framework-aosp/upstream/android/util/Singleton.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/util/Singleton.java?format=TEXT",
+    "sha256": "9f810fe46605e585bbae5376157e91cc56be92bdd146f87de466ab0b5b3c6e1c",
+    "bytes": 1235,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/com/android/internal/util/FastPrintWriter.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/util/FastPrintWriter.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/util/FastPrintWriter.java?format=TEXT",
+    "sha256": "b65dcc8d8254971a694264f71128c17043182a7a518c9f62cb4bb1ab067614f3",
+    "bytes": 22581,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/com/android/internal/util/HexDump.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/util/HexDump.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/util/HexDump.java?format=TEXT",
+    "sha256": "5e20d20955a90d0d44a867c3dd5a3899c646890189c3470b8c0e22e2eb1f2465",
+    "bytes": 5615,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "dalvik/src/main/java/dalvik/system/CloseGuard.java",
+    "localPath": "framework-aosp/upstream/dalvik/system/CloseGuard.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/dalvik/src/main/java/dalvik/system/CloseGuard.java?format=TEXT",
+    "sha256": "deac183cced202df1f28b34926b1f1611e53c8c31e3fa512acb733e91291365c",
+    "bytes": 13164,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/StrictMode.java",
+    "localPath": "framework-aosp/upstream/android/os/StrictMode.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/StrictMode.java?format=TEXT",
+    "sha256": "98613fb2bf3be1b2ce0d3d8a9314d13768bbf513aa0ed6f84cbf1ba218a1df8f",
+    "bytes": 129074,
+    "license": "Apache-2.0"
   }
 ]
