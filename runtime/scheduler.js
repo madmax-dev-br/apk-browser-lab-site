@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=24a8d21a01ce';
+import { APKError } from './apk-error.js?v=8d293a523b18';
 
 // Green-thread scheduler for the VM.
 //
@@ -90,12 +90,15 @@ export class Scheduler {
       const thread = this.threads[(this.threads.indexOf(current) + i + n) % n];
       if (!thread || thread.state !== 'runnable') continue;
       if (thread !== owner && thread.nestedDepth > 0) continue;   // suspended under the JavaScript stack of an outer run: only that run can resume it
+      if (thread === this.main && thread !== owner && thread.frames.length === 0) continue;   // the main thread between events has no frames and no driver: it is the host event loop, not a guest to resume (running it ends it)
       return { thread, earliest };
     }
     return { thread: null, earliest };
   }
   /** True when some free thread can run now (after waking those whose wait is over). */
-  hasRunnable() { this.wake(); return this.threads.some(thread => thread.state === 'runnable' && thread.nestedDepth === 0 && thread !== this.rt.thread); }
+  hasRunnable() { this.wake(); return this.threads.some(thread => thread.state === 'runnable' && thread.nestedDepth === 0 && thread !== this.rt.thread && !this.idleMain(thread)); }
+  /** The main thread while the host event loop runs: runnable on paper, but with no frames and no driver there is nothing to resume. */
+  idleMain(thread) { return thread === this.main && thread.frames.length === 0 && thread.driver === null; }
   /** Milliseconds until a thread needs the processor again: 0 if one is runnable, the earliest timed wait otherwise, null if none. */
   threadDelay() {
     if (!this.rt.multiThreaded) return null;
@@ -118,7 +121,7 @@ export class Scheduler {
     const platform = this.rt.platform;
     if (this.rt.monitor?.active) this.rt.monitor.tick();   // a nested wait that keeps skipping the virtual clock and running events still ends with the operation budget
     // Readiness can change asynchronously now (a network worker thread writes shared memory while this run loop is deciding): look once more before concluding that nothing can run.
-    this.wake(); if (this.threads.some(thread => thread.state === 'runnable' && (thread.nestedDepth === 0 || this.waitingNested.has(thread)))) return;
+    this.wake(); if (this.threads.some(thread => thread.state === 'runnable' && !this.idleMain(thread) && (thread.nestedDepth === 0 || this.waitingNested.has(thread)))) return;
     const processed = platform.drainEvents?.(this.rt)?.processed ?? 0;
     if (processed) { this.stats.events += processed; this.quietIdles = 0; return; }
     const network = this.rt.network;
@@ -128,7 +131,7 @@ export class Scheduler {
       if (network.syncWait?.(this)) return;
       throw new APKError(`Network wait in a frame that cannot suspend: ${why}. ${network.pending} exchange(s) are in flight and the VM is inside a nested host call, so it cannot yield to the browser event loop (threads: ${this.describe()})`, { kind: 'network-would-block' });
     }
-    this.wake(); if (this.threads.some(thread => thread.state === 'runnable' && thread.nestedDepth === 0)) return;   // same race, after the platform events ran
+    this.wake(); if (this.threads.some(thread => thread.state === 'runnable' && thread.nestedDepth === 0 && !this.idleMain(thread))) return;   // same race, after the platform events ran
     const delay = platform.nextEventDelay?.() ?? null, now = this.clock.now();
     const next = Math.min(earliest === Infinity ? Infinity : Math.max(0, earliest - now), delay === null ? Infinity : delay);
     if (next === Infinity) throw new APKError(`Deadlock: ${why}; no thread is runnable and no timer or event is pending (threads: ${this.describe()})`, { kind: 'cooperative-deadlock' });
@@ -155,7 +158,7 @@ export class Scheduler {
       }
     }
   }
-  describe() { return JSON.stringify(this.stats) + ' ' + this.threads.map(thread => `${thread.name}:${thread.state}${thread.blocked ? '(' + thread.blocked.reason + ')' : ''}${thread.nestedDepth ? '@host' : ''}`).join(', '); }
+  describe() { return JSON.stringify(this.stats) + ' ' + this.threads.map(thread => `${thread.name}:${thread.state}${thread.blocked ? '(' + thread.blocked.reason + (Number.isFinite(thread.blocked.deadline) ? ', prazo em ' + Math.round(thread.blocked.deadline - this.clock.now()) + ' ms' : ', sem prazo') + (thread.blocker ? ', espera ' + String(this.rt.typeOf(thread.blocker)).replace(/^L|;$/g, '') : '') + ')' : ''}${thread.nestedDepth ? '@host' : ''}`).join(', '); }
 
   /**
    * A native returned Blocked to a caller that cannot suspend (host code on the JavaScript stack). Waits by running other threads and events until it is ready; a wait
