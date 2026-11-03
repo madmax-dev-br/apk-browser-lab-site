@@ -1,26 +1,26 @@
-import { VMClock } from './vm-clock.js?v=13242dcff134';
-import { OperationMonitor } from './operation-monitor.js?v=13242dcff134';
-import { ExecutionProfile } from './execution-profile.js?v=13242dcff134';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=13242dcff134';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=13242dcff134';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=13242dcff134';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=13242dcff134';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=13242dcff134';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=13242dcff134';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=13242dcff134';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=13242dcff134';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=13242dcff134';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=13242dcff134';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=13242dcff134';
-import { APKError } from './apk-error.js?v=13242dcff134';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=13242dcff134';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=13242dcff134';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=13242dcff134';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=13242dcff134';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=13242dcff134';
-import { Scheduler, Blocked } from './scheduler.js?v=13242dcff134';
-import { bootClassLacksMember } from './boot-class-members.js?v=13242dcff134';
-export { APKError } from './apk-error.js?v=13242dcff134';
+import { VMClock } from './vm-clock.js?v=24a8d21a01ce';
+import { OperationMonitor } from './operation-monitor.js?v=24a8d21a01ce';
+import { ExecutionProfile } from './execution-profile.js?v=24a8d21a01ce';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=24a8d21a01ce';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=24a8d21a01ce';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=24a8d21a01ce';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=24a8d21a01ce';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=24a8d21a01ce';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=24a8d21a01ce';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=24a8d21a01ce';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=24a8d21a01ce';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=24a8d21a01ce';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=24a8d21a01ce';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=24a8d21a01ce';
+import { APKError } from './apk-error.js?v=24a8d21a01ce';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=24a8d21a01ce';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=24a8d21a01ce';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=24a8d21a01ce';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=24a8d21a01ce';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=24a8d21a01ce';
+import { Scheduler, Blocked } from './scheduler.js?v=24a8d21a01ce';
+import { bootClassLacksMember } from './boot-class-members.js?v=24a8d21a01ce';
+export { APKError } from './apk-error.js?v=24a8d21a01ce';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -955,7 +955,7 @@ export class APKRuntime {
     // stopped that legitimate work. A spinning thread still hits the fuse (tests/instruction-budget.test.mjs sets its own small fuse); `maxEventWallMs` bounds host time too.
     this.maxInstructionsPerEvent = maxInstructionsPerEvent; this.maxEventInstructions = maxInstructionsPerEvent * 8;
     // Wall-clock watchdog (host time of one event); 0 = off (tests and probes are deterministic), the Worker turns it on. Checked at every scheduling quantum, so it also trips for code that never switches threads.
-    this.sliceDeadline = 0; this.gcSafeDepth = 0; this.hostRoots = []; this.hostAllocs = []; this.vmDrainRuntime = null; this.bytecodeAlloc = false; this.profile = new ExecutionProfile(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
+    this.sliceDeadline = 0; this.gcSafeDepth = 0; this.hostRoots = []; this.hostAllocs = []; this.hostGrace = new Int32Array(8192); this.hostGraceAt = 0; this.vmDrainRuntime = null; this.bytecodeAlloc = false; this.profile = new ExecutionProfile(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
     this.dex = dex;
     this.classes = dex.resolvedClasses ?? dex.classes;
     this.launcherActivity = launcherActivity;
@@ -1073,7 +1073,7 @@ export class APKRuntime {
     const dead = typeof id === 'number' ? freedBy(this, id) : null, collected = typeof id === 'number' && id > 0 && id < this.nextId;
     const message = dead ? `Use of a collected object: #${id} of class ${String(dead.type).replace(/^L|;$/g, '').replaceAll('/', '.')} was freed by collection ${dead.collection} (the last collection is ${this.gcStats?.collections ?? 0}): a root the collector did not see`
       : collected ? `Null or invalid object reference: #${id} was allocated (ids up to ${this.nextId - 1}) but is not on the heap now (freed by an older collection or released)` : `Null or invalid object reference: ${JSON.stringify(value)}`;
-    throw new APKError(message, { kind: 'invalid-object-reference', ref: id, collectedBy: dead?.collection ?? null, type: dead?.type ?? null, jsStack: String(new Error().stack ?? '').split('\n').slice(2, 12).join('\n'), vmContext: this.monitor?.context?.() ?? null });
+    throw new APKError(message, { kind: 'invalid-object-reference', ref: id, collectedBy: dead?.collection ?? null, type: dead?.type ?? null, jsStack: `Error: ${message}\n` + String(new Error().stack ?? '').split('\n').slice(2, 12).join('\n'), vmContext: this.monitor?.context?.() ?? null });
   }
   /**
    * Class initialization (JLS 12.4.2). The nested form for host callers: it completes the interpreter-frame protocol of initStep() synchronously, waiting (and letting other
@@ -1538,6 +1538,15 @@ export class APKRuntime {
     }
     return { systemBars: this.platform?.systemBarsHost?.snapshot?.(this) ?? null, activityName: dottedName(this.activityType), views, texts, counters, clicks: this.clicks, trace: [...this.trace], closed: false, canGoBack: !!navigation.canGoBack, navigation, ...this.executionSnapshot() };
   }
+  /**
+   * The end of a host call: its host allocations stop being roots. The most recent 8192 of them stay protected in a ring anyway (a platform closure queued by the call -- a listener delivery, a
+   * posted task -- may capture a value the call just made and run a moment later); beyond that, a host closure that must outlive its call has to declare what it holds.
+   */
+  releaseHostAllocs(mark) {
+    const list = this.hostAllocs, ring = this.hostGrace;
+    for (let i = Math.max(mark, list.length - 8192); i < list.length; i++) ring[this.hostGraceAt++ & 8191] = list[i];
+    list.length = mark;
+  }
   dispatch(method, args, mode, callerOwner = null, wantFrame = false) {
     if (wantFrame) {
       // A call from an interpreter call site: whatever the native allocated is either returned (and lands in a register, a real root, right away), kept by a Java frame or a continuation, or
@@ -1545,7 +1554,7 @@ export class APKRuntime {
       // thread parked in a native) cannot make every boxed Long and String result of the other threads immortal. Entries of natives further out stay below `mark`.
       const mark = this.hostAllocs.length; let keep = false;
       try { const outcome = this.dispatchCore(method, args, mode, callerOwner, true); keep = outcome instanceof Blocked || outcome instanceof Invoke; return outcome; }
-      finally { if (!keep && this.hostAllocs.length > mark) this.hostAllocs.length = mark; }
+      finally { if (!keep && this.hostAllocs.length > mark) this.releaseHostAllocs(mark); }
     }
     const outcome = this.dispatchCore(method, args, mode, callerOwner, wantFrame);
     if (wantFrame || (!(outcome instanceof Blocked) && !(outcome instanceof Invoke))) { if (!wantFrame && outcome !== null && typeof outcome === 'object' && typeof outcome.ref === 'number') this.hostAllocs.push(outcome.ref); return outcome; }   // a result handed to host code may sit in a JavaScript local while the next call runs

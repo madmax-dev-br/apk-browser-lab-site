@@ -18,6 +18,7 @@ export function buildDiagnosticReport({ error, product = 'APK Browser Lab', pack
     ? `Atenção: o modo tolerante substituiu ${libStubs} biblioteca${libStubs > 1 ? 's' : ''} nativa${libStubs > 1 ? 's' : ''} (STUB-LIB) e este erro não menciona nativos: a falha pode ser consequência das bibliotecas substituídas listadas abaixo (os resultados delas são vazios).` : '';
   const text = [
     `${product}${build ? ' ' + build : ''} · ${packageName} · modo tolerante: ${tolerateMissing}`,
+    error?.details?.jsStack ? `Erro interno: ${String(error.details.jsStack).split('\n')[0]}` : '',
     `Erro: ${cause}`,
     error?.summary ? error.summary : '',
     error?.details?.heartbeatText ? error.details.heartbeatText : '',

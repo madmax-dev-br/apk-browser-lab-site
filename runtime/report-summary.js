@@ -4,8 +4,14 @@ const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/',
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
 /** Lines of the summary for `runtime`; never throws (every part is optional). */
-export function reportSummary(runtime, { heartbeat = null } = {}) {
+export function reportSummary(runtime, { heartbeat = null, error = null } = {}) {
   const out = ['== Resumo ==']; const part = fn => { try { fn(); } catch { /* a part of the summary is unavailable */ } };
+  part(() => {   // an internal JavaScript error: its own message and the top frames, so one photo has them
+    const stack = error?.details?.jsStack; if (!stack) return;
+    const lines = String(stack).split('\n'); out.push(`ERRO INTERNO: ${lines[0]}`);
+    const frames = lines.slice(1).filter(line => /\bat\b/.test(line)).slice(0, 3).map(line => line.trim().replace(/file:\/\/\/[^ )]*\//g, '').replace(/^at /, ''));
+    if (frames.length) out.push(`  em: ${frames.join(' ← ')}`);
+  });
   part(() => {   // (a) memory
     const live = runtime.heap.size, limit = runtime.maxHeapObjects, last = runtime.gcPhases?.[0];
     out.push(`Memória: ${live} de ${limit} objetos vivos (${Math.round(100 * live / limit)}%), ~${Math.round(live * BYTES_PER_OBJECT / MiB)} MiB estimados; ${last ? `última coleta liberou ${last.before - last.after} (${last.before} → ${last.after}); ${runtime.gcStats?.collections ?? 0} coletas` : 'nenhuma coleta ainda'}${runtime.oomCount ? `; OutOfMemoryError ${runtime.oomCount}×` : ''}`);

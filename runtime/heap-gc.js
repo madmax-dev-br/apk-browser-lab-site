@@ -262,6 +262,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   setCategory(3);
   const stackQuiet = runtime.depth === 0 && runtime.nestedRuns <= 1 && !runtime.initDepth && !runtime.scheduler?.waitingNested?.size && !runtime.scheduler?.threads.some(thread => thread.nestedDepth > 0 || thread.nestedBlock);
   if (!safepoint || stackQuiet) runtime.hostAllocs.length = 0; else for (const id of runtime.hostAllocs) markId(id);
+  graceRoots(runtime, markId);   // the last host allocations of finished calls (see APKRuntime.releaseHostAllocs)
   for (const weak of tracked) { const container = weak.deref(); if (container === undefined) tracked.delete(weak); else scan(container); }
   if (extraRoots) { const values = typeof extraRoots === 'function' ? extraRoots() : extraRoots; for (const item of values ?? []) scan(item); }
   closeCategory(3, 'raízes do host (alocações do host, contêineres, tarefas)');
@@ -532,6 +533,7 @@ function auditAgainstFullWalk(runtime, { markedHas, extraRoots }) {
   runtime.scheduler?.enumerateRoots?.(item => scan(item));
   if (runtime.thread) scan(runtime.thread);
   for (const id of runtime.hostAllocs ?? []) markId(id);
+  graceRoots(runtime, markId);
   for (const weak of tracked) { const container = weak.deref(); if (container !== undefined) scan(container); }
   if (extraRoots) { const values = typeof extraRoots === 'function' ? extraRoots() : extraRoots; for (const item of values ?? []) scan(item); }
   drain(); ephemerons();
@@ -553,4 +555,11 @@ function auditAgainstFullWalk(runtime, { markedHas, extraRoots }) {
     throw new Error(`GC audit: the pruned root scan lost ${missed.length} object(s) a full conservative walk reaches: #${missed.slice(0, 12).join(', #')}; first reached through ${path || '?'}`);
   }
   if (missed.length) throw new Error(`GC audit: the pruned root scan lost ${missed.length} object(s) a full conservative walk reaches: #${missed.slice(0, 12).join(', #')}`);
+}
+
+/** The ring of host allocations of finished calls: the most recent maxHeapObjects/32 (at most 8192) of them are roots. */
+function graceRoots(runtime, markId) {
+  const ring = runtime.hostGrace; if (!ring) return;
+  const count = Math.min(8192, runtime.maxHeapObjects >> 5, runtime.hostGraceAt);
+  for (let i = 1; i <= count; i++) { const id = ring[(runtime.hostGraceAt - i) & 8191]; if (id > 0) markId(id); }
 }
