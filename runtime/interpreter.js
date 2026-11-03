@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=18ee3639c104';
-import { Blocked, QUANTUM } from './scheduler.js?v=18ee3639c104';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=18ee3639c104';
+import { APKError } from './apk-error.js?v=13242dcff134';
+import { Blocked, QUANTUM } from './scheduler.js?v=13242dcff134';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=13242dcff134';
 
 // Frame-based DEX interpreter.
 //
@@ -537,7 +537,9 @@ function runLoop(rt, owner, base) {
             const bridge = site.bridge;
             if (bridge !== null && site.bridgeEpoch === rt.resolveEpoch && (!site.virtual || (typeof args[0] !== 'string' && args[0] !== null && args[0] !== 0 && rt.typeOf(args[0]) === site.bridgeType && rt.heap.get(args[0].ref).annotationValues === undefined))) {
               rt.callStats.bridged++; if (rt.profile.active) rt.profile.host(bridge.key); rt.monitor.hostEnter(bridge.key, bridge); rt.record(bridge.text);
+              const hostMark = rt.hostAllocs.length;   // see APKRuntime.dispatch: host allocations are scoped to the call
               outcome = rt.bridge(bridge.selected, args, site.mode, bridge.key, bridge); rt.hostCall = null;
+              if (rt.hostAllocs.length > hostMark && !(outcome instanceof Blocked || outcome instanceof Invoke)) rt.hostAllocs.length = hostMark;
             } else {
               rt.callStats.dispatched++; rt.lastBridge = null; const depthBefore = rt.depth;
               outcome = rt.dispatch(site.target, args, site.mode, f.method.owner, true);

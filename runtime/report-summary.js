@@ -36,7 +36,7 @@ export function reportSummary(runtime, { heartbeat = null } = {}) {
     const busiest = heartbeat?.busiest?.length ? heartbeat.busiest : runtime.profile?.top?.(5);
     if (busiest?.length) out.push(`métodos mais ocupados: ${busiest.slice(0, 5).join(', ')}`);
   });
-  return out.length > 1 ? out : [];
+  return out.length > 1 ? [...out, '== fim do resumo =='] : [];
 }
 
 const IDLE_WAIT = /LockSupport\.park|Unsafe\.park|Object\.wait|ThreadPoolExecutor\.getTask|ConditionObject\.await|CountDownLatch\.await|Semaphore\.acquire|SynchronousQueue|LinkedBlockingQueue\.take|DelayedWorkQueue|AbstractQueuedSynchronizer|Thread\.sleep|CoroutineScheduler\$Worker\.park|parkNanos|\.awaitNanos|Looper\.loop/;

@@ -157,8 +157,10 @@ export function createMarker(runtime, { full = false } = {}) {
     while (stack.length) {
       const value = stack.pop();
       if (value === null || typeof value !== 'object') continue;
+      if (value.freed === true) continue;   // a collected record (or its audit tombstone) held by a JavaScript structure: nothing to follow
       if (typeof value.ref === 'number' && Number.isSafeInteger(value.ref) && Object.keys(value).length === 1) { markId(value.ref, true); continue; }
       if (visited.has(value) || skip.has(value) || (!full && noRefs.has(value))) continue;
+      if (full && value.constructor?.name === 'Frame') { visited.add(value); nodes++; for (const key of Object.keys(value)) if (key !== 'prog' && key !== 'code' && key !== 'method') stack.push(value[key]); continue; }   // audit: every field of a frame except its code and decoded caches (which never hold roots)
       if (!full) { const ctor = value.constructor; if (ctor !== Object && ctor !== Array && ctor !== Map && ctor !== undefined && SKIP_CONSTRUCTORS.has(ctor.name)) { skip.add(value); continue; } } visited.add(value); nodes++;
       if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer || value instanceof WeakMap || value instanceof WeakSet || value instanceof Promise) continue;
       if (Array.isArray(value)) {
@@ -535,5 +537,20 @@ function auditAgainstFullWalk(runtime, { markedHas, extraRoots }) {
   drain(); ephemerons();
   const missed = [];
   for (const ci of runtime.heap.usedChunks()) for (let slot = 0; slot < 4096; slot++) { const record = runtime.heap.chunks[ci][slot], id = (ci << 12) + slot; if (record === undefined || id === 0 || record.freed === true) continue; if (full.markedHas(id) && !markedHas(id)) missed.push(`${id} ${record.type}`); }
+  if (missed.length) {   // where does the full walk find the first one? (breadth-first over threads, frames and the runtime tables, generic)
+    const target = Number(missed[0].split(' ')[0]), parent = new Map(), queue = [], skipped = buildSkip(runtime); let found = null;
+    const push = (child, from, label) => { if (child !== null && typeof child === 'object' && !parent.has(child) && !skipped.has(child) && !(child.id !== undefined && child.type !== undefined && child.fields !== undefined) && child !== runtime.heap && !Array.isArray(child.chunks)) { parent.set(child, [from, label]); queue.push(child); } };
+    for (const key of Object.keys(runtime)) if (!SKIP_PROPS.has(key)) push(runtime[key], null, `runtime.${key}`);
+    for (const thread of runtime.scheduler?.threads ?? []) push(thread, null, `thread ${thread.name}`);
+    for (let head = 0; head < queue.length && !found && head < 3_000_000; head++) {
+      const node = queue[head]; if (ArrayBuffer.isView(node) || node instanceof WeakMap || node instanceof WeakSet || node.freed === true) continue;
+      if (typeof node.ref === 'number' && node.ref === target && Object.keys(node).length === 1) { found = node; break; }
+      if (node instanceof Map) { for (const [k, v] of node) { push(v, node, `[${String(k).slice(0, 40)}]`); push(k, node, 'key'); } }
+      else if (node instanceof Set || Array.isArray(node)) { let i = 0; for (const v of node) push(v, node, `[${i++}]`); }
+      else for (const key of Object.keys(node)) push(node[key], node, key);
+    }
+    let path = ''; for (let at = found, guard = 0; at && parent.get(at) && guard < 400; guard++) { const [from, label] = parent.get(at); path = label + (path ? ' → ' + path : ''); at = from; }
+    throw new Error(`GC audit: the pruned root scan lost ${missed.length} object(s) a full conservative walk reaches: #${missed.slice(0, 12).join(', #')}; first reached through ${path || '?'}`);
+  }
   if (missed.length) throw new Error(`GC audit: the pruned root scan lost ${missed.length} object(s) a full conservative walk reaches: #${missed.slice(0, 12).join(', #')}`);
 }

@@ -1,8 +1,8 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=18ee3639c104';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=18ee3639c104';
-import { createDeviceView, createViewState } from './device-view.js?v=18ee3639c104';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=18ee3639c104';
-import { formatApiGapReport } from './api-gap-scan.js?v=18ee3639c104';
+import { APKWorkerClient } from './apk-worker-client.js?v=13242dcff134';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=13242dcff134';
+import { createDeviceView, createViewState } from './device-view.js?v=13242dcff134';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=13242dcff134';
+import { formatApiGapReport } from './api-gap-scan.js?v=13242dcff134';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -69,6 +69,19 @@ document.getElementById('screen-state-copy')?.addEventListener('click', async ev
   catch { $('trace-output').textContent = report; $('trace').open = true; getSelection()?.selectAllChildren($('trace-output')); button.textContent = 'Selecionado: copie com Cmd+C'; }
   setTimeout(() => { button.textContent = 'Copiar estado da tela'; }, 2500);
 });
+/** The "== Resumo ==" block of a report (at most 40 lines): what one photo of the screen must contain. */
+function extractSummary(text) {
+  const lines = String(text ?? '').split('\n'), start = lines.findIndex(line => line === '== Resumo =='); if (start < 0) return null;
+  const end = lines.findIndex((line, index) => index > start && line === '== fim do resumo ==');
+  return lines.slice(start, end > start ? end : start + 40).slice(0, 40).map(line => line.length > 170 ? line.slice(0, 167) + '…' : line).join('\n');
+}
+function showSummary(text) {
+  const summary = extractSummary(text) ?? 'Resumo indisponível: ainda não há dados da VM (nenhum APK em execução, ou o Worker foi encerrado antes de gerar o relatório).';
+  $('summary-text').textContent = summary; $('summary-overlay').hidden = false;
+}
+document.getElementById('summary-close')?.addEventListener('click', () => { $('summary-overlay').hidden = true; });
+document.getElementById('screen-state-summary')?.addEventListener('click', async () => { const screen = await fetchScreenState(); showSummary(screen?.text); });
+document.getElementById('error-summary')?.addEventListener('click', async () => { const report = state.errorReport ?? $('error-message').textContent; showSummary(extractSummary(report) ? report : (await fetchScreenState())?.text ?? report); });
 document.getElementById('error-copy')?.addEventListener('click', async event => {
   const screen = await fetchScreenState();
   const button = event.currentTarget, report = (state.errorReport ?? $('error-message').textContent) + (screen ? '\n\n' + screen.text : '') + (state.apiGaps ? '\n\n' + formatApiGapReport(state.apiGaps) : '');   // the static API estimate may arrive after the error was shown

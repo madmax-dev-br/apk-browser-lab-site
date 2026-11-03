@@ -1,26 +1,26 @@
-import { VMClock } from './vm-clock.js?v=18ee3639c104';
-import { OperationMonitor } from './operation-monitor.js?v=18ee3639c104';
-import { ExecutionProfile } from './execution-profile.js?v=18ee3639c104';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=18ee3639c104';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=18ee3639c104';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=18ee3639c104';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=18ee3639c104';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=18ee3639c104';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=18ee3639c104';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=18ee3639c104';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=18ee3639c104';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=18ee3639c104';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=18ee3639c104';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=18ee3639c104';
-import { APKError } from './apk-error.js?v=18ee3639c104';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=18ee3639c104';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=18ee3639c104';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=18ee3639c104';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=18ee3639c104';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=18ee3639c104';
-import { Scheduler, Blocked } from './scheduler.js?v=18ee3639c104';
-import { bootClassLacksMember } from './boot-class-members.js?v=18ee3639c104';
-export { APKError } from './apk-error.js?v=18ee3639c104';
+import { VMClock } from './vm-clock.js?v=13242dcff134';
+import { OperationMonitor } from './operation-monitor.js?v=13242dcff134';
+import { ExecutionProfile } from './execution-profile.js?v=13242dcff134';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=13242dcff134';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=13242dcff134';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=13242dcff134';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=13242dcff134';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=13242dcff134';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=13242dcff134';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=13242dcff134';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=13242dcff134';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=13242dcff134';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=13242dcff134';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=13242dcff134';
+import { APKError } from './apk-error.js?v=13242dcff134';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=13242dcff134';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=13242dcff134';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=13242dcff134';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=13242dcff134';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=13242dcff134';
+import { Scheduler, Blocked } from './scheduler.js?v=13242dcff134';
+import { bootClassLacksMember } from './boot-class-members.js?v=13242dcff134';
+export { APKError } from './apk-error.js?v=13242dcff134';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1337,7 +1337,7 @@ export class APKRuntime {
     if (this.heap.size >= this.maxHeapObjects && !this.oomHeadroom()) this.outOfMemory(`Object limit (${this.maxHeapObjects}) exceeded`);
     if (ABSTRACT_GUARD && !this.bytecodeAlloc) this.assertConcreteHostType(type);
     const id = this.nextId++;
-    if ((id & 511) === 0) this.sampleAllocation();
+    if ((id & 511) === 0) { this.sampleAllocation(); if (this.gcEnabled && this.heap.size > this.gcSafepointFloor && collectionDue(this)) this.q = 0; }   // allocation-driven: the next back-edge or call reaches the safepoint instead of waiting out the quantum (a loop that allocates 5 objects per iteration filled the heap inside one)
     this.heap.set(id, { id, type, fields: new Map(), text: '', orientation: 0, textSize: 20, children: [], listener: null });
     if (!this.bytecodeAlloc) this.hostAllocs.push(id);   // allocated by host code (a native, the platform): its JavaScript locals may hold it where no Java frame does -- see hostAllocs in heap-gc.js
     return ref(id);
@@ -1539,6 +1539,14 @@ export class APKRuntime {
     return { systemBars: this.platform?.systemBarsHost?.snapshot?.(this) ?? null, activityName: dottedName(this.activityType), views, texts, counters, clicks: this.clicks, trace: [...this.trace], closed: false, canGoBack: !!navigation.canGoBack, navigation, ...this.executionSnapshot() };
   }
   dispatch(method, args, mode, callerOwner = null, wantFrame = false) {
+    if (wantFrame) {
+      // A call from an interpreter call site: whatever the native allocated is either returned (and lands in a register, a real root, right away), kept by a Java frame or a continuation, or
+      // garbage. The host-allocation set protects values that JavaScript locals hold *while a host native is in flight*; it is scoped to this call, so a long nested wait elsewhere (a main
+      // thread parked in a native) cannot make every boxed Long and String result of the other threads immortal. Entries of natives further out stay below `mark`.
+      const mark = this.hostAllocs.length; let keep = false;
+      try { const outcome = this.dispatchCore(method, args, mode, callerOwner, true); keep = outcome instanceof Blocked || outcome instanceof Invoke; return outcome; }
+      finally { if (!keep && this.hostAllocs.length > mark) this.hostAllocs.length = mark; }
+    }
     const outcome = this.dispatchCore(method, args, mode, callerOwner, wantFrame);
     if (wantFrame || (!(outcome instanceof Blocked) && !(outcome instanceof Invoke))) { if (!wantFrame && outcome !== null && typeof outcome === 'object' && typeof outcome.ref === 'number') this.hostAllocs.push(outcome.ref); return outcome; }   // a result handed to host code may sit in a JavaScript local while the next call runs
     // A blocking or call-back native reached through host code (not an interpreter call site) cannot park its thread or push frames: finish it inside the scheduler.
@@ -2040,8 +2048,8 @@ export class APKRuntime {
     if (type === 'Z') return this.readStatic({ owner: 'Ljava/lang/Boolean;', name: value ? 'TRUE' : 'FALSE', type: 'Ljava/lang/Boolean;', key: `Ljava/lang/Boolean;->${value ? 'TRUE' : 'FALSE'}:Ljava/lang/Boolean;` });
     const owner = BOX_TYPES[type]; if (!owner) fail(`Cannot box primitive ${type}`);
     const cacheable = ['B', 'S', 'I', 'J'].includes(type) ? value >= -128 && value <= 127 : type === 'C' && value >= 0 && value <= 127;
-    this.boxCache ??= new Map(); const key = `${type}:${value}`;
-    if (cacheable && this.boxCache.has(key)) return this.boxCache.get(key);
+    let key = null;
+    if (cacheable) { key = `${type}:${value}`; const hit = (this.boxCache ??= new Map()).get(key); if (hit !== undefined) return hit; }   // Android's cache: -128..127 (and \u0000..\u007f for Character) are the same object
     const boxed = this.makeObject(owner), obj = this.object(boxed); obj.boxed = value; obj.primitiveType = type;
     if (cacheable) this.boxCache.set(key, boxed);
     return boxed;
