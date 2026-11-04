@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=eb1d4de6032a';
-import { queueObject } from './hidden-members.js?v=eb1d4de6032a';
-import { createHostRegistry } from './host-contract.js?v=eb1d4de6032a';
-import { Blocked, VMThread } from './scheduler.js?v=eb1d4de6032a';
-import { Invoke } from './interpreter.js?v=eb1d4de6032a';
-import { GC_ROOTS } from './heap-gc.js?v=eb1d4de6032a';
+import { APKError } from './apk-error.js?v=5312f5d53b01';
+import { queueObject } from './hidden-members.js?v=5312f5d53b01';
+import { createHostRegistry } from './host-contract.js?v=5312f5d53b01';
+import { Blocked, VMThread } from './scheduler.js?v=5312f5d53b01';
+import { Invoke } from './interpreter.js?v=5312f5d53b01';
+import { GC_ROOTS } from './heap-gc.js?v=5312f5d53b01';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -111,7 +111,7 @@ export function createConcurrencyHost(platform) {
     const st = state(r, ref), handler = st.handler ?? st.group ?? mainGroup(r);
     try { r.noteUncaught(st.name, throwable); } catch { /* diagnostics only */ }
     r.record(`RUNTIME uncaught exception in thread "${st.name}": ${r.typeOf(throwable)}: ${r.object(throwable).message ?? ''}`);
-    return new Invoke({ owner: UEH, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [handler, ref, throwable], 'virtual');
+    return new Invoke({ owner: UEH, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [handler, ref, throwable], 'virtual', null, error => { try { if (error?.value) r.noteHandlerFailure(st.name, error.value); } catch { /* diagnostics only */ } return undefined; });   // an exception the handler throws is ignored, as in Java -- but recorded
   }
   const uncaught = (r, ref, throwable) => r.finishHostStep(uncaughtInvoke(r, ref, throwable));
   function fatal(r, ref, throwable) {
@@ -232,8 +232,9 @@ export function createConcurrencyHost(platform) {
   // ThreadGroup.uncaughtException: the parent group first; the root group hands it to the default handler, and with none installed the process dies the way Android's does (FATAL EXCEPTION).
   def(GROUP, 'uncaughtException', `(${THREAD}${THROWABLE})V`, (r, _m, [self, thread, throwable]) => {
     const g = groupState(r, self);
+    try { r.noteUncaught(state(r, thread).name, throwable); } catch { /* diagnostics only */ }   // the root of every uncaught-exception path, also when an app (a coroutine exception handler) calls it directly
     if (g.parent) return new Invoke({ owner: GROUP, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [g.parent, thread, throwable], 'virtual');
-    if (defaultHandler) return new Invoke({ owner: UEH, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [defaultHandler, thread, throwable], 'virtual');
+    if (defaultHandler) return new Invoke({ owner: UEH, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [defaultHandler, thread, throwable], 'virtual', null, error => { try { if (error?.value) r.noteHandlerFailure(state(r, thread).name, error.value); } catch { /* diagnostics only */ } throw error; });
     fatal(r, thread, throwable);
   });
   def(GROUP, '<init>', `(${STRING})V`, (r, _m, [self, n]) => { r.object(self).group = { name: nullish(n) ? null : r.stringCharacters(n), parent: current ? state(r, current).group : mainGroup(r), maxPriority: 10, daemon: false }; });

@@ -1,27 +1,27 @@
-import { VMClock } from './vm-clock.js?v=eb1d4de6032a';
-import { OperationMonitor } from './operation-monitor.js?v=eb1d4de6032a';
-import { ExecutionProfile } from './execution-profile.js?v=eb1d4de6032a';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=eb1d4de6032a';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=eb1d4de6032a';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=eb1d4de6032a';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=eb1d4de6032a';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=eb1d4de6032a';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=eb1d4de6032a';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=eb1d4de6032a';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=eb1d4de6032a';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=eb1d4de6032a';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=eb1d4de6032a';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=eb1d4de6032a';
-import { APKError } from './apk-error.js?v=eb1d4de6032a';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=eb1d4de6032a';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=eb1d4de6032a';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=eb1d4de6032a';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=eb1d4de6032a';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=eb1d4de6032a';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=eb1d4de6032a';
-import { Scheduler, Blocked } from './scheduler.js?v=eb1d4de6032a';
-import { bootClassLacksMember } from './boot-class-members.js?v=eb1d4de6032a';
-export { APKError } from './apk-error.js?v=eb1d4de6032a';
+import { VMClock } from './vm-clock.js?v=5312f5d53b01';
+import { OperationMonitor } from './operation-monitor.js?v=5312f5d53b01';
+import { ExecutionProfile } from './execution-profile.js?v=5312f5d53b01';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=5312f5d53b01';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=5312f5d53b01';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=5312f5d53b01';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=5312f5d53b01';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=5312f5d53b01';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=5312f5d53b01';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=5312f5d53b01';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=5312f5d53b01';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=5312f5d53b01';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=5312f5d53b01';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=5312f5d53b01';
+import { APKError } from './apk-error.js?v=5312f5d53b01';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=5312f5d53b01';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=5312f5d53b01';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=5312f5d53b01';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=5312f5d53b01';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=5312f5d53b01';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=5312f5d53b01';
+import { Scheduler, Blocked } from './scheduler.js?v=5312f5d53b01';
+import { bootClassLacksMember } from './boot-class-members.js?v=5312f5d53b01';
+export { APKError } from './apk-error.js?v=5312f5d53b01';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1597,24 +1597,37 @@ export class APKRuntime {
   }
   /** An exception reached a catch block of app/framework code: counted by class and message (the first distinct ones are kept) for "Estado da tela", since libraries often swallow them. */
   /** An exception reached Thread.dispatchUncaughtException (whether the thread's handler swallows it or not): the last one per thread, with class, message, cause and the top of its stack. */
-  noteUncaught(threadName, value) {
-    const table = this.uncaughtExceptions ??= new Map();
-    let entry; try {
-      const object = this.object(value), name = type => String(type).replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');
+  /** Class, message, cause and the top frames of a throwable, as plain text for the reports. */
+  describeThrowable(value) {
+    const name = type => String(type).replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');
+    try {
+      const object = this.object(value);
       const text = o => { let m = o.message; if (m === undefined || m === null) for (const [key, field] of o.fields ?? []) if (key.endsWith('->detailMessage:Ljava/lang/String;')) { m = field; break; } return typeof m === 'string' ? m.slice(0, 240) : (m && typeof m === 'object' && m.ref !== undefined ? (() => { try { return this.stringCharacters(m).slice(0, 240); } catch { return ''; } })() : ''); };
       const stack = (Array.isArray(object.stack) ? object.stack : []).slice(0, 10).map(method => `${name(method.owner)}.${method.name}`);
       let cause = null; try { if (object.cause && object.cause.ref !== undefined && object.cause.ref !== value.ref) { const c = this.object(object.cause); cause = `${name(this.typeOf(object.cause))}: ${text(c)}`; } } catch { /* no cause */ }
-      entry = { thread: String(threadName), type: name(this.typeOf(value)), message: text(object), stack, cause };
-    } catch { entry = { thread: String(threadName), type: '?', message: '', stack: [], cause: null }; }
-    const previous = table.get(entry.thread); entry.count = (previous?.count ?? 0) + 1;
-    table.delete(entry.thread); table.set(entry.thread, entry); if (table.size > 60) table.delete(table.keys().next().value);
+      return { type: name(this.typeOf(value)), message: text(object), stack, cause };
+    } catch { return { type: '?', message: '', stack: [], cause: null }; }
+  }
+  /** An exception reached Thread.dispatchUncaughtException or a ThreadGroup/default handler (whether the handler swallows it or not): the last one per thread, recorded BEFORE any handler runs. */
+  noteUncaught(threadName, value) {
+    const table = this.uncaughtExceptions ??= new Map(), key = String(threadName), previous = table.get(key);
+    if (previous && value && (previous.ref === value.ref || previous.handlerFailure?.ref === value.ref)) return;   // the same throwable reaching a second dispatch point, or the failure of the handler that was just recorded as such   // the same throwable reaching a second dispatch point (thread death, then the ThreadGroup)
+    const entry = { thread: key, ref: value?.ref, ...this.describeThrowable(value), count: (previous?.count ?? 0) + 1, handlerFailure: null };
+    table.delete(key); table.set(key, entry); if (table.size > 60) table.delete(table.keys().next().value);
+  }
+  /** The uncaught-exception handler itself threw: keeps the original and records what the handler threw. */
+  noteHandlerFailure(threadName, value) {
+    const key = String(threadName), entry = this.uncaughtExceptions?.get(key);
+    const failure = { ...this.describeThrowable(value), ref: value?.ref };
+    if (entry) entry.handlerFailure = failure; else this.noteUncaught(key, value);
   }
   uncaughtText() {
     const table = this.uncaughtExceptions; if (!table?.size) return '';
     const lines = ['Exceções não tratadas (a última de cada thread; chegaram a Thread.dispatchUncaughtException, mesmo que o handler do app as descarte):'];
     for (const entry of [...table.values()].reverse().slice(0, 12)) {
-      lines.push(`  thread "${entry.thread}" (${entry.count}x): ${entry.type}${entry.message ? ': ' + entry.message : ''}${entry.cause ? ' [causa: ' + entry.cause + ']' : ''}`);
+      lines.push(`  thread "${entry.thread}" (${entry.count}x): exceção original ${entry.type}${entry.message ? ': ' + entry.message : ''}${entry.cause ? ' [causa: ' + entry.cause + ']' : ''}`);
       for (const frame of entry.stack) lines.push(`      at ${frame}`);
+      if (entry.handlerFailure) { const h = entry.handlerFailure; lines.push(`    o tratador também falhou: ${h.type}${h.message ? ': ' + h.message : ''}${h.cause ? ' [causa: ' + h.cause + ']' : ''}`); for (const frame of h.stack) lines.push(`      at ${frame}`); }
     }
     return lines.join('\n');
   }

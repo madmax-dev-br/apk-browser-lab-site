@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=eb1d4de6032a';
-import { BUCKET } from './time-breakdown.js?v=eb1d4de6032a';
-import { Blocked, QUANTUM } from './scheduler.js?v=eb1d4de6032a';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=eb1d4de6032a';
+import { APKError } from './apk-error.js?v=5312f5d53b01';
+import { BUCKET } from './time-breakdown.js?v=5312f5d53b01';
+import { Blocked, QUANTUM } from './scheduler.js?v=5312f5d53b01';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=5312f5d53b01';
 
 // Frame-based DEX interpreter.
 //
@@ -199,6 +199,38 @@ function numericBinary(group, operation, x, y) {
  * frame was pushed on top), OUT_BLOCKED (thread.blocked is set), {done} (the thread's driver finished), {value} (deliver to the DEX frame on top, or the thread's driver when
  * the stack is empty) or {error} (raise at the DEX frame on top, or in the driver). It does not throw, except for fatal uncaught-thread errors.
  */
+/** A Java type descriptor as ART prints it in messages: I -> int, Ljava/lang/String; -> java.lang.String, [B -> byte[]. */
+const PRIMITIVE_NAMES = { Z: 'boolean', B: 'byte', S: 'short', C: 'char', I: 'int', J: 'long', F: 'float', D: 'double', V: 'void' };
+function typeName(descriptor) {
+  let dimensions = 0; while (descriptor[dimensions] === '[') dimensions++;
+  const base = descriptor.slice(dimensions), name = base[0] === 'L' ? base.slice(1, -1).replaceAll('/', '.') : PRIMITIVE_NAMES[base] ?? base;
+  return name + '[]'.repeat(dimensions);
+}
+/**
+ * Android 13's NullPointerException messages name the dereference ("Attempt to invoke virtual method 'int java.lang.String.length()' on a null object reference"); the lab's host raises the bare
+ * "null object reference" wherever a reference is dereferenced. At the catch site the failing instruction is known: when its receiver/array register really holds null, the message is rewritten.
+ */
+function refineNullPointerMessage(rt, error, dex, u, pc, regs) {
+  try {
+    const w = u[pc], op = w & 255, a = (w >> 8) & 15, b = w >> 12;
+    let message = null;
+    const nullAt = register => { const v = regs[register]; return v === null || v === undefined || v === 0; };
+    if ((op >= 0x6e && op <= 0x72) || (op >= 0x74 && op <= 0x78)) {
+      const first = op >= 0x74 ? u[pc + 2] : u[pc + 2] & 15, target = dex.methods[u[pc + 1]];
+      if (target && nullAt(first)) {
+        const kind = op === 0x72 || op === 0x78 ? 'interface' : op === 0x70 || op === 0x76 ? 'direct' : 'virtual';
+        message = `Attempt to invoke ${kind} method '${typeName(target.result)} ${typeName(target.owner)}.${target.name}(${target.parameters.map(typeName).join(', ')})' on a null object reference`;
+      }
+    } else if (op >= 0x52 && op <= 0x58 && nullAt(b)) { const field = dex.fields[u[pc + 1]]; if (field) message = `Attempt to read from field '${typeName(field.type)} ${typeName(field.owner)}.${field.name}' on a null object reference`; }
+    else if (op >= 0x59 && op <= 0x5f && nullAt(b)) { const field = dex.fields[u[pc + 1]]; if (field) message = `Attempt to write to field '${typeName(field.type)} ${typeName(field.owner)}.${field.name}' on a null object reference`; }
+    else if (op >= 0x44 && op <= 0x4a && nullAt(u[pc + 1] & 255)) message = 'Attempt to read from null array';
+    else if (op >= 0x4b && op <= 0x51 && nullAt(u[pc + 1] & 255)) message = 'Attempt to write to null array';
+    else if (op === 0x21 && nullAt(b)) message = 'Attempt to get length of null array';
+    void a;
+    if (message !== null) { error.message = message; const record = rt.object(error.value); record.message = message; }
+  } catch { /* the bare message stays */ }
+}
+
 function pump(rt, thread, input) {
   const frames = thread.frames;
   for (;;) {
@@ -415,7 +447,7 @@ function runLoop(rt, owner, base) {
           case 0x21: regs[lo] = rt.array(regs[hi]).elements.length; pc++; break;
           case 0x22: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid allocation type'); if (rt.initialized.get(type)?.status !== 'initialized') { const gate = rt.initStep(type); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.bytecodeAlloc = true; try { regs[a] = rt.allocate(type); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
           case 0x23: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid array type'); rt.bytecodeAlloc = true; try { regs[lo] = rt.newArray(type, int(regs[hi])); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
-          case 0x27: { const value = regs[a]; if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'throw null'); throw new JavaException(value, rt.object(value).message ?? rt.typeOf(value), rt.object(value).exceptionDetails); }
+          case 0x27: { const value = regs[a]; if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'throw with null exception'); throw new JavaException(value, rt.object(value).message ?? rt.typeOf(value), rt.object(value).exceptionDetails); }
           case 0x28: { const target = pc + ((a << 24) >> 24); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
           case 0x29: { const target = pc + ((u[pc + 1] << 16) >> 16); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
           case 0x2a: { const target = pc + (u[pc + 1] | (u[pc + 2] << 16)); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
@@ -625,6 +657,7 @@ function runLoop(rt, owner, base) {
       f = frames[frames.length - 1];                                // compiled code may have entered callees directly: the failing frame is the top one
       regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats;
       if (f.cur >= 0) { start = f.cur; f.cur = -1; }               // thrown by compiled code: the instruction it was executing
+      if (error instanceof JavaException && error.message === 'null object reference') refineNullPointerMessage(rt, error, dex, u, start, regs);   // ART's wording: which method, field or array was dereferenced
       // Unwind: the frame that failed handles it, then its callers (and any host step waiting on them) until the run's base frame.
       rt.hostCall = null;   // the host call that threw is over: a stale marker would blame it for the silence that follows
       let current = error, innermost = true;

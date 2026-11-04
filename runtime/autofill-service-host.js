@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=eb1d4de6032a';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=eb1d4de6032a';
+import { APKError } from './apk-runtime.js?v=5312f5d53b01';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=5312f5d53b01';
 
 const MANAGER = 'Landroid/view/autofill/AutofillManager;';
 const VIEW = 'Landroid/view/View;';

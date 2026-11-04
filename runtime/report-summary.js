@@ -1,6 +1,6 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=eb1d4de6032a';
+import { TimeBreakdown } from './time-breakdown.js?v=5312f5d53b01';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -38,7 +38,10 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     const table = runtime.uncaughtExceptions; if (!table?.size) return;
     out.push('exceções não tratadas (uma linha por thread; pilhas completas mais abaixo):');
     const shortFrame = frame => String(frame).split('.').slice(-2).join('.');
-    for (const entry of [...table.values()].reverse().slice(0, 8)) out.push(`  ${entry.thread}${entry.count > 1 ? ` (${entry.count}x)` : ''}: ${entry.type.split('.').pop()}${entry.message ? ': ' + entry.message.slice(0, 100) : ''}${entry.stack?.length ? '  em ' + entry.stack.slice(0, 3).map(shortFrame).join(' ← ') : ''}`);
+    for (const entry of [...table.values()].reverse().slice(0, 8)) {
+      out.push(`  exceção original (${entry.thread}${entry.count > 1 ? `, ${entry.count}x` : ''}): ${entry.type.split('.').pop()}${entry.message ? ': ' + entry.message.slice(0, 140) : ''}${entry.stack?.length ? '  em ' + entry.stack.slice(0, 6).map(shortFrame).join(' ← ') : ''}`);
+      if (entry.handlerFailure) { const h = entry.handlerFailure; out.push(`    o tratador também falhou: ${h.type.split('.').pop()}${h.message ? ': ' + h.message.slice(0, 140) : ''}${h.stack?.length ? '  em ' + h.stack.slice(0, 6).map(shortFrame).join(' ← ') : ''}`); }
+    }
   });
   part(() => {   // (e) main thread
     const main = runtime.scheduler?.main; if (!main) return;

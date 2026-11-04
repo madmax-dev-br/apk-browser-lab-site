@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=eb1d4de6032a';
-import { throwNew } from './java-throw.js?v=eb1d4de6032a';
+import { APKError } from './apk-error.js?v=5312f5d53b01';
+import { throwNew } from './java-throw.js?v=5312f5d53b01';
 
 // com.android.icu.charset.NativeConverter converter natives (open/close/decode/encode/reset/callbacks) over the unmodified ICU4C 70.1 ucnv implementation compiled to
 // WebAssembly (vendor/icu/70.1/icu-converter.wasm, scripts/build-icu-converter.sh). The wrapper code follows external/icu android-13.0.0_r1

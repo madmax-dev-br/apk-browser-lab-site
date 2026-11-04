@@ -1,5 +1,5 @@
-import { createFileMappings, MappingError, MAP } from './file-mapping.js?v=eb1d4de6032a';
-import { WASI_ERRNO as ERRNO } from './native-posix-files.js?v=eb1d4de6032a';   // the Emscripten libc ABI's errno numbers (WASI values), not Linux's
+import { createFileMappings, MappingError, MAP } from './file-mapping.js?v=5312f5d53b01';
+import { WASI_ERRNO as ERRNO } from './native-posix-files.js?v=5312f5d53b01';   // the Emscripten libc ABI's errno numbers (WASI values), not Linux's
 
 // mmap, munmap, msync, mprotect and ftruncate for lab-built native libraries (androidx datastore's SharedCounter, ...): the file-backed part goes to src/file-mapping.js over the
 // VM's virtual file system, everything anonymous stays with the base module's own libc. The NativeLinker consults `override` before it binds a library's import to the base
