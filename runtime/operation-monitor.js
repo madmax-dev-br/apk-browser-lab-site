@@ -1,5 +1,6 @@
-import { APKError } from './apk-error.js?v=8d293a523b18';
-import { gcBlockReason } from './heap-gc.js?v=8d293a523b18';
+import { TimeBreakdown } from './time-breakdown.js?v=767bada4613b';
+import { APKError } from './apk-error.js?v=767bada4613b';
+import { gcBlockReason } from './heap-gc.js?v=767bada4613b';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -13,17 +14,17 @@ const typeName = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '')
 
 export class OperationMonitor {
   constructor(runtime) {
-    this.rt = runtime; this.backgroundBudgetMs = 120000; this.sink = null; this.intervalMs = 250; this.budgetMs = 0; this.op = null; this.lastBeat = 0; this.beats = 0; this.active = false;
+    this.rt = runtime; this.hardCapMs = 180000; this.backgroundBudgetMs = 120000; this.sink = null; this.intervalMs = 250; this.budgetMs = 0; this.op = null; this.lastBeat = 0; this.beats = 0; this.active = false;
   }
   /** sink(message) posts a heartbeat; budgetMs = wall budget per operation (0 = none); intervalMs = heartbeat period. */
   configure({ sink = null, budgetMs = 0, intervalMs = 250 } = {}) { this.sink = sink; this.budgetMs = budgetMs; this.intervalMs = intervalMs; this.active = sink !== null || budgetMs > 0; return this; }
   begin(name) {
     const now = performance.now();
     this.op = { name, start: now, events: 0, pump: new Map(), slices: new Map(), wakes: new Map(), expired: false, startInstructions: this.instructions() };
-    this.lastBeat = now; this.rt.hostCall = null;
+    this.lastBeat = now; this.rt.hostCall = null; this.rt.tb?.reset();
     if (this.sink) this.beat(now, 'begin');
   }
-  end() { this.lastWakes = this.op?.wakes ?? this.lastWakes; this.op = null; this.rt.hostCall = null; }
+  end() { this.lastWakes = this.op?.wakes ?? this.lastWakes; if (this.op !== null) this.lastBreakdown = { operation: this.op.name, wallMs: Math.round(performance.now() - this.op.start), instructions: this.instructions() - this.op.startInstructions, events: this.op.events, ...this.rt.tb.snapshot() }; if (this.lastBreakdown && this.lastBreakdown.wallMs > (this.biggestBreakdown?.wallMs ?? -1)) this.biggestBreakdown = this.lastBreakdown; this.op = null; this.rt.hostCall = null; }
   instructions() { const by = this.rt.executionByOrigin; return (by?.apk?.instructions ?? 0) + (by?.framework?.instructions ?? 0); }
 
   /** Cheap check at the scheduler tick, thread switches, idle rounds and event dispatch: heartbeat when due, operation budget. */
@@ -40,8 +41,25 @@ export class OperationMonitor {
         if (background && rt.sliceDeadline !== 0) { rt.sliceDeadline = 1; op.backgroundOverruns = (op.backgroundOverruns ?? 0) + 1; return; }
         if (now - op.start <= this.backgroundBudgetMs) return;   // a nested wait cannot be unwound; the heartbeat keeps the page informed, the extended budget bounds it
       }
+      if (this.progressing(op, now)) return;   // the soft limit passed but the operation is advancing: it keeps running until the hard cap, and the page is told it is still working
       this.expire(now);
     }
+  }
+  /**
+   * Past the soft wall budget (budgetMs): an operation whose instruction count keeps advancing -- a first composition in the browser runs at hundreds of ns per instruction, so a big app needs
+   * far more than 20 s -- is not killed. It is checked every 2 s of host time: at least 20k instructions since the previous check is progress. The hard cap (hardCapMs) still ends it.
+   */
+  progressing(op, now) {
+    if (now - op.start > this.hardCapMs) return false;
+    const instructions = this.instructions();
+    if (op.soft === undefined && op.events * 1000 / Math.max(1, now - op.start) > 100) return false;   // thousands of tiny events per second: a pump that spins, not a long event that works
+    if (op.soft === undefined) { op.soft = { checkAt: now + 2000, instructions, events: op.events, stalls: 0 }; this.beat(now, 'soft'); return true; }
+    if (now < op.soft.checkAt) return true;
+    // Progress is long-running events that execute instructions (a first composition: tens of events in 20 s). A pump that runs thousands of tiny events (a self-rescheduling loop) is spinning, not progressing.
+    const advanced = instructions - op.soft.instructions, events = op.events - op.soft.events;
+    op.soft.instructions = instructions; op.soft.events = op.events; op.soft.checkAt = now + 2000;
+    if (advanced >= 100000 && events < 400) { op.soft.stalls = 0; this.beat(now, 'soft'); return true; }
+    return ++op.soft.stalls < 2;   // two windows (4 s) of no real progress: expire with the report
   }
   /** A host call is starting: remember it (the page sees it in the next heartbeat) and, for the calls known to run long, post a heartbeat right away so a hang inside names its culprit. */
   hostEnter(key, holder) {
@@ -67,7 +85,7 @@ export class OperationMonitor {
     let nextDelay = null, queueDepth = null;
     try { queueDepth = rt.platform?.eventQueue?.length ?? null; nextDelay = rt.platform?.nextEventDelay?.() ?? null; } catch { /* a heartbeat never fails the VM */ }
     return {
-      type: 'heartbeat', reason, gc: { count: op?.gcCount ?? 0, ms: Math.round(op?.gcMs ?? 0), total: rt.gcStats?.collections ?? 0 }, operation: op?.name ?? null, wallMs: op ? Math.round(now - op.start) : null, instructions: this.instructions(), events: op?.events ?? 0, thread: thread?.name ?? null,
+      type: 'heartbeat', reason, soft: op?.soft !== undefined, gc: { count: op?.gcCount ?? 0, ms: Math.round(op?.gcMs ?? 0), total: rt.gcStats?.collections ?? 0 }, operation: op?.name ?? null, wallMs: op ? Math.round(now - op.start) : null, instructions: this.instructions(), events: op?.events ?? 0, thread: thread?.name ?? null,
       stack: profile.currentStack(6), hostCall: rt.hostCall ? short(rt.hostCall) : null, queueDepth, nextDelay, busiest: profile.top(3), heartbeat: ++this.beats,
       vm: { objects: rt.heap?.size ?? null, limit: rt.maxHeapObjects ?? null, collections: rt.gcStats?.collections ?? 0, gcMs: Math.round(rt.gcStats?.totalMs ?? 0), activity: rt.activityType ?? null, gcEnabled: !!rt.gcEnabled, gcBlocked: safe(() => gcBlockReason(rt)), gcSkips: { ...(rt.gcSkips ?? {}) }, nestedRuns: rt.nestedRuns ?? 0, gcFloor: rt.gcSafepointFloor ?? null },   // what the page can still show when the Worker is too busy to answer a request
     };
@@ -164,8 +182,8 @@ export class OperationMonitor {
   expire(now) {
     const op = this.op; op.expired = true;
     const rt = this.rt, profile = rt.profile.report(), pump = this.pumpReport(), ms = Math.round(now - op.start);
-    this.beat(now, 'expired');
-    throw new APKError(`A operação ${op.name} usou ${ms} ms de tempo do host (limite ${this.budgetMs} ms) sem chegar ao fim; ${op.events} eventos e ${this.instructions() - op.startInstructions} instruções nesta operação${rt.hostCall ? `; chamada do host em andamento: ${short(rt.hostCall)}` : ''}.${rt.profile.summary()}`,
-      { kind: 'operation-wall-budget', operation: op.name, wallMs: ms, limitMs: this.budgetMs, events: op.events, pump, profile: { ...profile, text: `${profile.text}\n${pump.text}` } });
+    this.beat(now, 'expired'); const breakdown = rt.tb.snapshot();
+    throw new APKError(`A operação ${op.name} usou ${ms} ms de tempo do host (limite ${this.budgetMs} ms${op.soft ? `, estendido enquanto havia progresso até ${this.hardCapMs} ms` : ''}) sem chegar ao fim; ${op.events} eventos e ${this.instructions() - op.startInstructions} instruções nesta operação${rt.hostCall ? `; chamada do host em andamento: ${short(rt.hostCall)}` : ''}.${rt.profile.summary()}`,
+      { kind: 'operation-wall-budget', operation: op.name, wallMs: ms, limitMs: this.budgetMs, events: op.events, pump, timeBreakdown: breakdown, profile: { ...profile, text: `${profile.text}\n${pump.text}\n${TimeBreakdown.text(breakdown)}` } });
   }
 }

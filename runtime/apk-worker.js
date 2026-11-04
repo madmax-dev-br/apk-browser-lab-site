@@ -1,39 +1,40 @@
-import { buildScreenState } from './screen-state.js?v=8d293a523b18';
-import { reportSummary } from './report-summary.js?v=8d293a523b18';
-import { createMessageSink } from './audio-native.js?v=8d293a523b18';
-import { loadAPK } from './apk-loader.js?v=8d293a523b18';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=8d293a523b18';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=8d293a523b18';
-import { createWebViewBackend } from './webview-backend.js?v=8d293a523b18';
-import { FrameworkProvider } from './framework-provider.js?v=8d293a523b18';
-import { createRasterSender } from './raster-cache.js?v=8d293a523b18';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=8d293a523b18';
-import { dispatchPointer } from './pointer-input-host.js?v=8d293a523b18';
-import { resolveDevice } from './device-profile.js?v=8d293a523b18';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=8d293a523b18';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=8d293a523b18';
-import { SkiaProvider } from './skia-provider.js?v=8d293a523b18';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=8d293a523b18';
-import { disposeTextLayout } from './text-layout-native.js?v=8d293a523b18';
-import { IcuBreakProvider } from './icu-break-provider.js?v=8d293a523b18';
-import { SqliteProvider } from './sqlite-native.js?v=8d293a523b18';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=8d293a523b18';
-import { TzdataProvider } from './java-time-native.js?v=8d293a523b18';
-import { ZlibProvider } from './zip-native.js?v=8d293a523b18';
-import { IcuConverterProvider } from './icu-converter-native.js?v=8d293a523b18';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=8d293a523b18';
-import { JavacryptoProvider } from './javacrypto-native.js?v=8d293a523b18';
-import { disposeColorFilters } from './color-filter-native.js?v=8d293a523b18';
-import { disposeRegex } from './regex-native.js?v=8d293a523b18';
-import { disposeRenderNodes } from './rendernode-native.js?v=8d293a523b18';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=8d293a523b18';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=8d293a523b18';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=8d293a523b18';
+import { buildScreenState } from './screen-state.js?v=767bada4613b';
+import { reportSummary } from './report-summary.js?v=767bada4613b';
+import { TimeBreakdown } from './time-breakdown.js?v=767bada4613b';
+import { createMessageSink } from './audio-native.js?v=767bada4613b';
+import { loadAPK } from './apk-loader.js?v=767bada4613b';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=767bada4613b';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=767bada4613b';
+import { createWebViewBackend } from './webview-backend.js?v=767bada4613b';
+import { FrameworkProvider } from './framework-provider.js?v=767bada4613b';
+import { createRasterSender } from './raster-cache.js?v=767bada4613b';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=767bada4613b';
+import { dispatchPointer } from './pointer-input-host.js?v=767bada4613b';
+import { resolveDevice } from './device-profile.js?v=767bada4613b';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=767bada4613b';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=767bada4613b';
+import { SkiaProvider } from './skia-provider.js?v=767bada4613b';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=767bada4613b';
+import { disposeTextLayout } from './text-layout-native.js?v=767bada4613b';
+import { IcuBreakProvider } from './icu-break-provider.js?v=767bada4613b';
+import { SqliteProvider } from './sqlite-native.js?v=767bada4613b';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=767bada4613b';
+import { TzdataProvider } from './java-time-native.js?v=767bada4613b';
+import { ZlibProvider } from './zip-native.js?v=767bada4613b';
+import { IcuConverterProvider } from './icu-converter-native.js?v=767bada4613b';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=767bada4613b';
+import { JavacryptoProvider } from './javacrypto-native.js?v=767bada4613b';
+import { disposeColorFilters } from './color-filter-native.js?v=767bada4613b';
+import { disposeRegex } from './regex-native.js?v=767bada4613b';
+import { disposeRenderNodes } from './rendernode-native.js?v=767bada4613b';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=767bada4613b';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=767bada4613b';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=767bada4613b';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=8d293a523b18';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=8d293a523b18';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=8d293a523b18';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '8d293a523b18';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=767bada4613b';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=767bada4613b';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=767bada4613b';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '767bada4613b';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -149,6 +150,11 @@ self.onmessage = async ({ data }) => {
       const value = runtime.dispatch({ owner, name, parameters: ['Ljava/lang/String;'], result: 'Ljava/lang/String;', signature }, runtime.argumentWords(['Ljava/lang/String;'], [runtime.javaString(argument)]), 'static');
       send({ type: 'result', ms: performance.now() - start, instructions: counted() - before, value: runtime.stringCharacters(value) });
     } catch (error) { send({ type: 'error', error: errorData(error) }); }
+    return;
+  }
+  if (type === 'debug-exec') {   // measurement aid (scripts/validation/bench-launch.mjs): the time breakdown of the last operation and the execution counters
+    const biggest = runtime?.monitor?.biggestBreakdown ?? null;
+    send({ type: 'result', breakdown: biggest, text: biggest ? TimeBreakdown.text(biggest) : null, execution: runtime?.executionByOrigin ?? null, callStats: runtime?.callStats ?? null, jitCompiled: runtime?.jitCompiled ?? null });
     return;
   }
   if (type === 'debug-gc') {   // measurement aid (scripts/validation/bench-gc.mjs): keeps `live` small objects of mixed shapes reachable, then collects and reports the phase timings

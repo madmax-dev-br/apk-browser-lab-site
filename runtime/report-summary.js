@@ -1,5 +1,6 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
+import { TimeBreakdown } from './time-breakdown.js?v=767bada4613b';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -38,6 +39,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null } = {}) 
     const frames = (main.frames ?? []).slice(-6).reverse().map(frame => frame.method ? `${dotted(frame.method.owner)}.${frame.method.name}` : frame.cont ? '(chamada do host)' : '?');
     out.push(`thread principal: ${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'espera'})` : ''}${main.nestedDepth ? `, dentro de chamada nativa aninhada (${main.nestedDepth})` : ''}${frames.length ? '; ' + frames.join(' ← ') : ''}`);
   });
+  part(() => { const tb = runtime.tb?.snapshot(); if (tb) out.push(TimeBreakdown.text(tb)); });   // where the host time of this operation went
   part(() => {   // (f) busiest methods
     const busiest = heartbeat?.busiest?.length ? heartbeat.busiest : runtime.profile?.top?.(5);
     if (busiest?.length) out.push(`métodos mais ocupados: ${busiest.slice(0, 5).join(', ')}`);

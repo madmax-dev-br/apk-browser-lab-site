@@ -22,6 +22,7 @@
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
+import { BUCKET } from './time-breakdown.js?v=767bada4613b';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -218,6 +219,10 @@ export function createMarker(runtime, { full = false } = {}) {
  * options: { audit, extraRoots: () => iterable of values | values[], reason, requireQuiescence = true }
  */
 export function collectGarbage(runtime, options = {}) {
+  const tbPrevious = runtime.tb?.enter(BUCKET.GC);
+  try { return collectGarbageTimed(runtime, options); } finally { runtime.tb?.leave(tbPrevious); }
+}
+function collectGarbageTimed(runtime, options) {
   const saved = runtime.hostCall, started = performance.now(); runtime.hostCall = 'coleta de lixo';   // the page must see "garbage collection" (with progress pulses), never a stale host call, while the VM is busy here
   try { return collectGarbageNow(runtime, options); } finally {
     runtime.hostCall = saved ?? null;

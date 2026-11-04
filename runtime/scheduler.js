@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=8d293a523b18';
+import { APKError } from './apk-error.js?v=767bada4613b';
 
 // Green-thread scheduler for the VM.
 //
@@ -45,6 +45,7 @@ export class Scheduler {
    */
   beginEvent(rt) { if (rt.steps === 0) { rt.profile.reset(); rt.eventWallStart = performance.now(); this.eventTotal = 0; this.lastSteps = 0; for (const thread of this.threads) thread.budget = 0; } }
   switching(rt, previous, next) {
+    rt.tb?.thread(next?.name ?? 'main');
     const steps = rt.steps; if (steps > (rt.peakThreadSteps ?? 0)) rt.peakThreadSteps = steps;
     this.eventTotal += steps >= this.lastSteps ? steps - this.lastSteps : steps;
     if (previous) previous.budget = previous.state === 'runnable' ? steps : 0;

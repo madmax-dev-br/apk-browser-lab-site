@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=8d293a523b18';
-import { createRasterReceiver } from './raster-cache.js?v=8d293a523b18';
+import { createWebAudioPlayer } from './web-audio-player.js?v=767bada4613b';
+import { createRasterReceiver } from './raster-cache.js?v=767bada4613b';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=8d293a523b18', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=767bada4613b', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -75,7 +75,7 @@ export class APKWorkerClient {
         error.name = 'TimeoutError'; if (signal) error.details = { kind: 'vm-timeout', operation: type, heartbeat: signal.heartbeat, silentSeconds: signal.silentSeconds, heartbeatText: signal.text }; this.cancel(error);
       };
       // Silence, not total time: every heartbeat of this operation re-arms the timer (up to 5x the timeout in all); without heartbeats the original timeout stands.
-      this.rearm = () => { const pending = this.pending; if (!pending || pending.requestId !== requestId || Date.now() - pending.startedAt > timeoutMs * 5) return; clearTimeout(pending.timer); pending.timer = setTimeout(fire, timeoutMs); };
+      this.rearm = () => { const pending = this.pending; if (!pending || pending.requestId !== requestId || Date.now() - pending.startedAt > timeoutMs * 8) return; clearTimeout(pending.timer); pending.timer = setTimeout(fire, timeoutMs); };
       try { this.worker.postMessage({ type, requestId, ...payload }, transfer); }
       catch (error) { this.cancel(error); }
     });

@@ -1,8 +1,8 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=8d293a523b18';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=8d293a523b18';
-import { createDeviceView, createViewState } from './device-view.js?v=8d293a523b18';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=8d293a523b18';
-import { formatApiGapReport } from './api-gap-scan.js?v=8d293a523b18';
+import { APKWorkerClient } from './apk-worker-client.js?v=767bada4613b';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=767bada4613b';
+import { createDeviceView, createViewState } from './device-view.js?v=767bada4613b';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=767bada4613b';
+import { formatApiGapReport } from './api-gap-scan.js?v=767bada4613b';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -46,6 +46,8 @@ function updateTrace(snapshot) {
 }
 function resetWebViews() { try { deviceView.resetWebViews?.(); } catch { /* the device view is not created yet: no WebView exists either */ } }
 function hideError() { $('error-panel').hidden = true; }
+/** A launch or click that passed the soft wall budget keeps running while it makes progress: say so instead of looking frozen. */
+apkVM.onHeartbeat = beat => { if (beat?.soft && state.mode === 'apk') setStatus(`Ainda executando (${Math.round((beat.wallMs ?? 0) / 1000)} s) · a VM continua avançando: ${(beat.stack ?? []).slice(0, 1).join('') || 'sem pilha Java'}`); };
 /** "Estado da tela" from the live Worker (null when it is gone or has nothing loaded). */
 /** The page-side account of a VM that cannot answer: why (no Worker, an operation still running, a failed request), the last signal it sent, its memory at the last snapshot and the tail of the log. */
 function screenStateUnavailable(reason) {

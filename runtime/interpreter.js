@@ -1,6 +1,7 @@
-import { APKError } from './apk-error.js?v=8d293a523b18';
-import { Blocked, QUANTUM } from './scheduler.js?v=8d293a523b18';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=8d293a523b18';
+import { APKError } from './apk-error.js?v=767bada4613b';
+import { BUCKET } from './time-breakdown.js?v=767bada4613b';
+import { Blocked, QUANTUM } from './scheduler.js?v=767bada4613b';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=767bada4613b';
 
 // Frame-based DEX interpreter.
 //
@@ -41,6 +42,11 @@ export class Frame {
 const LITTLE_ENDIAN = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 /** Per-method decoded state: the code units as a Uint16Array, lazily resolved operands per pc, and the decoded exception table. */
 function prepare(rt, method, code) {
+  const known = code.progs?.get(rt); if (known !== undefined) return known;
+  const tb = rt.tb, previous = tb.enter(BUCKET.DECODE);
+  try { return prepareCore(rt, method, code); } finally { tb.leave(previous); }
+}
+function prepareCore(rt, method, code) {
   let progs = code.progs; if (progs === undefined) progs = code.progs = new WeakMap();   // DEX code objects can be shared by several runtimes: decoded state is per runtime
   const existing = progs.get(rt); if (existing !== undefined) return existing;
   const dex = method.dex ?? rt.dex;
@@ -96,7 +102,7 @@ function compileHot(rt, prog, frame = null) {
   const code = prog.code, method = prog.method;
   if (prog.fn === null && rt.jit && rt.instructionProbe === undefined && code.units <= MAX_COMPILED_UNITS) {
     const tries = prog.tries ??= decodeTries(rt, code, prog.dex);
-    prog.fn = compileMethod(rt, method, code, prog, tries, jitSupport(rt));
+    const tb = rt.tb, previous = tb.enter(BUCKET.COMPILE); try { prog.fn = compileMethod(rt, method, code, prog, tries, jitSupport(rt)); } finally { tb.leave(previous); }
     if (prog.fn !== null) rt.jitCompiled++;
   }
   return false;

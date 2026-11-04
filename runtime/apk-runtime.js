@@ -1,26 +1,27 @@
-import { VMClock } from './vm-clock.js?v=8d293a523b18';
-import { OperationMonitor } from './operation-monitor.js?v=8d293a523b18';
-import { ExecutionProfile } from './execution-profile.js?v=8d293a523b18';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=8d293a523b18';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=8d293a523b18';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=8d293a523b18';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=8d293a523b18';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=8d293a523b18';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=8d293a523b18';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=8d293a523b18';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=8d293a523b18';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=8d293a523b18';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=8d293a523b18';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=8d293a523b18';
-import { APKError } from './apk-error.js?v=8d293a523b18';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=8d293a523b18';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=8d293a523b18';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=8d293a523b18';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=8d293a523b18';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=8d293a523b18';
-import { Scheduler, Blocked } from './scheduler.js?v=8d293a523b18';
-import { bootClassLacksMember } from './boot-class-members.js?v=8d293a523b18';
-export { APKError } from './apk-error.js?v=8d293a523b18';
+import { VMClock } from './vm-clock.js?v=767bada4613b';
+import { OperationMonitor } from './operation-monitor.js?v=767bada4613b';
+import { ExecutionProfile } from './execution-profile.js?v=767bada4613b';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=767bada4613b';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=767bada4613b';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=767bada4613b';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=767bada4613b';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=767bada4613b';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=767bada4613b';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=767bada4613b';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=767bada4613b';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=767bada4613b';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=767bada4613b';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=767bada4613b';
+import { APKError } from './apk-error.js?v=767bada4613b';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=767bada4613b';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=767bada4613b';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=767bada4613b';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=767bada4613b';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=767bada4613b';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=767bada4613b';
+import { Scheduler, Blocked } from './scheduler.js?v=767bada4613b';
+import { bootClassLacksMember } from './boot-class-members.js?v=767bada4613b';
+export { APKError } from './apk-error.js?v=767bada4613b';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -955,7 +956,7 @@ export class APKRuntime {
     // stopped that legitimate work. A spinning thread still hits the fuse (tests/instruction-budget.test.mjs sets its own small fuse); `maxEventWallMs` bounds host time too.
     this.maxInstructionsPerEvent = maxInstructionsPerEvent; this.maxEventInstructions = maxInstructionsPerEvent * 8;
     // Wall-clock watchdog (host time of one event); 0 = off (tests and probes are deterministic), the Worker turns it on. Checked at every scheduling quantum, so it also trips for code that never switches threads.
-    this.sliceDeadline = 0; this.gcSafeDepth = 0; this.hostRoots = []; this.hostAllocs = []; this.hostGrace = new Int32Array(8192); this.hostGraceAt = 0; this.vmDrainRuntime = null; this.bytecodeAlloc = false; this.profile = new ExecutionProfile(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
+    this.sliceDeadline = 0; this.gcSafeDepth = 0; this.tb = new TimeBreakdown(); this.hostRoots = []; this.hostAllocs = []; this.hostGrace = new Int32Array(8192); this.hostGraceAt = 0; this.vmDrainRuntime = null; this.bytecodeAlloc = false; this.profile = new ExecutionProfile(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
     this.dex = dex;
     this.classes = dex.resolvedClasses ?? dex.classes;
     this.launcherActivity = launcherActivity;
@@ -1082,7 +1083,8 @@ export class APKRuntime {
   initialize(type) {
     const state = this.initialized.get(type);
     if (state?.status === 'initialized') return;
-    for (let step; (step = this.initStep(type)) !== undefined;) this.finishHostStep(step);
+    const tb = this.tb, previous = tb.enter(BUCKET.INIT);
+    try { for (let step; (step = this.initStep(type)) !== undefined;) this.finishHostStep(step); } finally { tb.leave(previous); }
   }
   /**
    * Returns undefined when `type` is usable by the current thread now (initialized, or being initialized by this very thread), a Blocked(retry) while another thread
@@ -1704,7 +1706,7 @@ export class APKRuntime {
         }
         this.executionByOrigin.host.calls++;
         this.record(`HOST ${definition.method.key} [AOSP:${definition.method.dex.filename}]`); this.lastHostCall = definition.method.key; this.monitor.hostEnter(definition.method.key, definition.method);
-        const result = binding(this, this.hostArguments(definition.method, args, mode), definition.method); this.hostCall = null;
+        const tb = this.tb, previousBucket = tb.enter(BUCKET.HOST); let result; try { result = binding(this, this.hostArguments(definition.method, args, mode), definition.method); } finally { tb.leave(previousBucket); } this.hostCall = null;
         if (result && typeof result.then === 'function') fail(`Framework native binding must be synchronous: ${definition.method.key}`);
         return hostReturn(definition.method, result);
       }
@@ -2209,6 +2211,10 @@ export class APKRuntime {
     return words;
   }
   bridge(method, words, mode, knownKey, resolution) {
+    const tb = this.tb, previous = tb.enter(BUCKET.HOST);
+    try { return this.bridgeCore(method, words, mode, knownKey, resolution); } finally { tb.leave(previous); }
+  }
+  bridgeCore(method, words, mode, knownKey, resolution) {
     // Object.<init>() on a live object does nothing: no registry, Skia or platform bridge claims it and the generic tail only validates the receiver.
     if (knownKey === OBJECT_INIT_KEY && words.length === 1 && this.fastCallPaths !== false) {
       const receiver = words[0];
@@ -3819,7 +3825,7 @@ export class APKRuntime {
     return null;
   }
   /** Runs a DEX body to completion on the current thread's frame stack (src/interpreter.js). */
-  execute(method, code, args) { return runNested(this, method, code, args); }
+  execute(method, code, args) { const tb = this.tb, previous = tb.enter(BUCKET.INTERP); try { return runNested(this, method, code, args); } finally { tb.leave(previous); } }
   get currentMethod() { const frames = currentThread(this).frames; return frames.length ? frames[frames.length - 1].method : null; }
   set currentMethod(value) { /* derived from the frame stack; kept assignable for legacy callers */ }
   get methodStack() { return currentThread(this).frames.map(frame => frame.method); }
