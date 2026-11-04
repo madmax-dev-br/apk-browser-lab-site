@@ -1,8 +1,8 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=342446b1482f';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=342446b1482f';
-import { createDeviceView, createViewState } from './device-view.js?v=342446b1482f';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=342446b1482f';
-import { formatApiGapReport } from './api-gap-scan.js?v=342446b1482f';
+import { APKWorkerClient } from './apk-worker-client.js?v=dab932c11eb4';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=dab932c11eb4';
+import { createDeviceView, createViewState } from './device-view.js?v=dab932c11eb4';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=dab932c11eb4';
+import { formatApiGapReport } from './api-gap-scan.js?v=dab932c11eb4';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -75,7 +75,9 @@ document.getElementById('screen-state-copy')?.addEventListener('click', async ev
 function extractSummary(text) {
   const lines = String(text ?? '').split('\n'), start = lines.findIndex(line => line === '== Resumo =='); if (start < 0) return null;
   const end = lines.findIndex((line, index) => index > start && line === '== fim do resumo ==');
-  return lines.slice(start, end > start ? end : start + 40).slice(0, 40).map(line => line.length > 170 ? line.slice(0, 167) + '…' : line).join('\n');
+  // wrapped at ~70 characters with a hanging indent, never cut with an ellipsis: the overlay scrolls if the block is longer than the screen
+  const wrap = line => { if (line.length <= 70) return [line]; const out = []; let rest = line, first = true; while (rest.length > 0) { const width = first ? 70 : 66; if (rest.length <= width) { out.push((first ? '' : '    ') + rest); break; } let cut = rest.lastIndexOf(' ', width); if (cut < 20) cut = width; out.push((first ? '' : '    ') + rest.slice(0, cut)); rest = rest.slice(cut).trimStart(); first = false; } return out; };
+  return lines.slice(start, end > start ? end : start + 60).flatMap(wrap).join('\n');
 }
 function showSummary(text) {
   const summary = extractSummary(text) ?? 'Resumo indisponível: ainda não há dados da VM (nenhum APK em execução, ou o Worker foi encerrado antes de gerar o relatório).';

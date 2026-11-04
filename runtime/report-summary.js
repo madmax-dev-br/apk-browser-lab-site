@@ -1,11 +1,11 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=342446b1482f';
+import { TimeBreakdown } from './time-breakdown.js?v=dab932c11eb4';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
 /** Lines of the summary for `runtime`; never throws (every part is optional). */
-export function reportSummary(runtime, { heartbeat = null, error = null } = {}) {
+export function reportSummary(runtime, { heartbeat = null, error = null, tela = null } = {}) {
   const out = ['== Resumo ==']; const part = fn => { try { fn(); } catch { /* a part of the summary is unavailable */ } };
   part(() => {   // an internal JavaScript error: its own message and the top frames, so one photo has them
     const stack = error?.details?.jsStack; if (!stack) return;
@@ -16,6 +16,11 @@ export function reportSummary(runtime, { heartbeat = null, error = null } = {}) 
   part(() => {   // (a) memory
     const live = runtime.heap.size, limit = runtime.maxHeapObjects, last = runtime.gcPhases?.[0];
     out.push(`Memória: ${live} de ${limit} objetos vivos (${Math.round(100 * live / limit)}%), ~${Math.round(live * BYTES_PER_OBJECT / MiB)} MiB estimados; ${last ? `última coleta liberou ${last.before - last.after} (${last.before} → ${last.after}); ${runtime.gcStats?.collections ?? 0} coletas` : 'nenhuma coleta ainda'}${runtime.oomCount ? `; OutOfMemoryError ${runtime.oomCount}×` : ''}`);
+  });
+  if (tela?.length) out.push(...tela);   // "Tela:" lines computed by the screen-state report (activity, first frame verdict, Compose, layout)
+  part(() => {   // every OutOfMemoryError: which limit, where
+    const log = runtime.oomLog; if (!log?.length) return;
+    for (const entry of log.slice(-3)) out.push(`OOM (${entry.kind}) em ${entry.thread ?? '?'}: ${entry.frames.join(' ← ') || entry.hostCall || 'código do host'}; objetos ${entry.objects}/${entry.maxObjects}, campos ${entry.fieldSlots}/${entry.maxFieldSlots}, células de arrays ${entry.arrayCells}/${entry.maxArrayCells}, de coleções ${entry.collectionCells}/${entry.maxCollectionCells}`);
   });
   part(() => {   // (b) survivors, (c) who keeps them, retention paths
     const last = runtime.gcPhases?.[0]; if (!last) return;
@@ -32,14 +37,30 @@ export function reportSummary(runtime, { heartbeat = null, error = null } = {}) 
   part(() => {   // (d) one line per thread
     const table = runtime.uncaughtExceptions; if (!table?.size) return;
     out.push('exceções não tratadas (uma linha por thread; pilhas completas mais abaixo):');
-    for (const entry of [...table.values()].reverse().slice(0, 8)) out.push(`  ${entry.thread}${entry.count > 1 ? ` (${entry.count}x)` : ''}: ${entry.type}${entry.message ? ': ' + entry.message.slice(0, 120) : ''}`);
+    const shortFrame = frame => String(frame).split('.').slice(-2).join('.');
+    for (const entry of [...table.values()].reverse().slice(0, 8)) out.push(`  ${entry.thread}${entry.count > 1 ? ` (${entry.count}x)` : ''}: ${entry.type.split('.').pop()}${entry.message ? ': ' + entry.message.slice(0, 100) : ''}${entry.stack?.length ? '  em ' + entry.stack.slice(0, 3).map(shortFrame).join(' ← ') : ''}`);
   });
   part(() => {   // (e) main thread
     const main = runtime.scheduler?.main; if (!main) return;
     const frames = (main.frames ?? []).slice(-6).reverse().map(frame => frame.method ? `${dotted(frame.method.owner)}.${frame.method.name}` : frame.cont ? '(chamada do host)' : '?');
+    if (main.blocked && main.blocker) { try { const releasers = (runtime.scheduler.threads ?? []).filter(t => t !== main && (t.state === 'runnable' || (t.state === 'blocked' && Number.isFinite(t.blocked?.deadline)))).slice(0, 4).map(t => `${t.name} ${t.state}${t.frames?.length ? ' em ' + (t.frames.at(-1).method ? dotted(t.frames.at(-1).method.owner).split('.').pop() + '.' + t.frames.at(-1).method.name : '(host)') : ''}`); out.push(`a thread principal espera por um ${dotted(runtime.typeOf(main.blocker))}; podem liberá-lo: ${releasers.join(', ') || 'nenhuma thread ativa'}`); } catch { /* blocker not inspectable */ } }
     out.push(`thread principal: ${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'espera'})` : ''}${main.nestedDepth ? `, dentro de chamada nativa aninhada (${main.nestedDepth})` : ''}${frames.length ? '; ' + frames.join(' ← ') : ''}`);
   });
-  part(() => { const tb = runtime.tb?.snapshot(); if (tb) out.push(TimeBreakdown.text(tb)); });   // where the host time of this operation went
+  part(() => { const tb = runtime.tb?.snapshot(); if (tb) { for (const p of tb.pollers ?? []) out.push(`thread ${p.thread} está em polling (${p.perSecond} chamadas do host/s): ${p.calls.map(([key, n]) => `${key} ${n}×`).join(', ')}`); out.push(TimeBreakdown.text(tb)); } });   // where the host time of this operation went
+  part(() => {   // the virtual clocks, all on one timeline, and where the queue head sits
+    const clock = runtime.platform?.clock; if (!clock?.readings) return; const c = clock.readings(), queue = runtime.platform.eventQueue ?? [];
+    const whens = queue.map(event => event.when ?? c.uptime).sort((a, b) => a - b);
+    out.push(`Relógios: uptimeMillis ${Math.round(c.uptime)}, elapsedRealtime ${Math.round(c.elapsedRealtime)}, nanoTime−uptime ${c.nanoMinusUptimeUs} µs, currentTimeMillis−(origem+uptime) ${c.wallMinusTimelineMs} ms; tempo virtual adiantado ${c.skippedMs} ms de ${Math.round(c.uptime)} ms${whens.length ? `; fila: primeiro evento em ${Math.round(whens[0] - c.uptime)} ms, último em ${Math.round(whens.at(-1) - c.uptime)} ms` : ''}`);
+  });
+  part(() => {   // the Handler targets that keep recurring in the event queue
+    const queue = runtime.platform?.eventQueue ?? []; if (!queue.length) return;
+    const now = runtime.platform.clock.now(), groups = new Map();
+    for (const event of queue) {
+      let what; try { what = event.platformTask ? `tarefa do host ${event.platformTask.name || '(anônima)'}` : event.windowFrameTime !== undefined ? 'quadro (Choreographer)' : `${dotted(runtime.typeOf(event.handler)).split('.').pop()} → ${runtime.object(event.message).messageCallback ? dotted(runtime.typeOf(runtime.object(event.message).messageCallback)) : 'what=' + runtime.platform.messageField(runtime, event.message, 'what', 'I')}`; } catch { what = '(mensagem)'; }
+      const group = groups.get(what) ?? groups.set(what, { n: 0, overdue: -Infinity }).get(what); group.n++; group.overdue = Math.max(group.overdue, now - (event.when ?? now));
+    }
+    out.push(`fila de eventos (${queue.length}): ${[...groups].sort((a, b) => b[1].n - a[1].n).slice(0, 3).map(([what, g]) => `${g.n}× ${what}${g.overdue > 0 ? `, atraso máx ${Math.round(g.overdue)} ms` : ''}`).join('; ')}`);
+  });
   part(() => {   // (f) busiest methods
     const busiest = heartbeat?.busiest?.length ? heartbeat.busiest : runtime.profile?.top?.(5);
     if (busiest?.length) out.push(`métodos mais ocupados: ${busiest.slice(0, 5).join(', ')}`);

@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=342446b1482f';
-import { gcRoot } from './heap-gc.js?v=342446b1482f';
-import { UNICODE_BLOCKS, UNICODE_SCRIPTS } from './unicode-data.js?v=342446b1482f';
+import { createHostRegistry } from './host-contract.js?v=dab932c11eb4';
+import { gcRoot } from './heap-gc.js?v=dab932c11eb4';
+import { UNICODE_BLOCKS, UNICODE_SCRIPTS } from './unicode-data.js?v=dab932c11eb4';
 
 // java.lang.Character.UnicodeBlock and Character.UnicodeScript (libcore android-13.0.0_r1 Character.java). The tables (block constants with aliases, range starts, script ranges and aliases)
 // are generated from that source by scripts/build-unicode-data.py; the lookups below are the methods' own algorithms.

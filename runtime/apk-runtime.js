@@ -1,27 +1,27 @@
-import { VMClock } from './vm-clock.js?v=342446b1482f';
-import { OperationMonitor } from './operation-monitor.js?v=342446b1482f';
-import { ExecutionProfile } from './execution-profile.js?v=342446b1482f';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=342446b1482f';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=342446b1482f';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=342446b1482f';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=342446b1482f';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=342446b1482f';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=342446b1482f';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=342446b1482f';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=342446b1482f';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=342446b1482f';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=342446b1482f';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=342446b1482f';
-import { APKError } from './apk-error.js?v=342446b1482f';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=342446b1482f';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=342446b1482f';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=342446b1482f';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=342446b1482f';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=342446b1482f';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=342446b1482f';
-import { Scheduler, Blocked } from './scheduler.js?v=342446b1482f';
-import { bootClassLacksMember } from './boot-class-members.js?v=342446b1482f';
-export { APKError } from './apk-error.js?v=342446b1482f';
+import { VMClock } from './vm-clock.js?v=dab932c11eb4';
+import { OperationMonitor } from './operation-monitor.js?v=dab932c11eb4';
+import { ExecutionProfile } from './execution-profile.js?v=dab932c11eb4';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=dab932c11eb4';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=dab932c11eb4';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=dab932c11eb4';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=dab932c11eb4';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=dab932c11eb4';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=dab932c11eb4';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=dab932c11eb4';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=dab932c11eb4';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=dab932c11eb4';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=dab932c11eb4';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=dab932c11eb4';
+import { APKError } from './apk-error.js?v=dab932c11eb4';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=dab932c11eb4';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=dab932c11eb4';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=dab932c11eb4';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=dab932c11eb4';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=dab932c11eb4';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=dab932c11eb4';
+import { Scheduler, Blocked } from './scheduler.js?v=dab932c11eb4';
+import { bootClassLacksMember } from './boot-class-members.js?v=dab932c11eb4';
+export { APKError } from './apk-error.js?v=dab932c11eb4';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -591,6 +591,7 @@ for (const [name, type] of [['AtomicReference', 'Ljava/lang/Object;'], ['AtomicI
   if (type === 'I' || type === 'J') addBridge(owner, [`getAndIncrement()${type}`, `incrementAndGet()${type}`, `getAndDecrement()${type}`, `decrementAndGet()${type}`, `getAndAdd(${type})${type}`, `addAndGet(${type})${type}`, 'intValue()I', 'longValue()J']);
 }
 const ABSTRACT_GUARD = globalThis.process?.env?.APKWEB_GUARD_ABSTRACT === '1', ABSTRACT_HOST_TYPES = new Set(['Ljava/util/AbstractMap;', 'Ljava/util/AbstractList;', 'Ljava/util/AbstractCollection;', 'Ljava/util/AbstractSet;']);
+const FINAL_BOX_TYPES = new Set(['Ljava/lang/Long;', 'Ljava/lang/Integer;', 'Ljava/lang/Short;', 'Ljava/lang/Byte;', 'Ljava/lang/Character;', 'Ljava/lang/Boolean;', 'Ljava/lang/Double;', 'Ljava/lang/Float;']);
 const MAP_TYPES = ['HashMap', 'WeakHashMap', 'LinkedHashMap', 'concurrent/ConcurrentHashMap'];
 EXTERNAL_PARENTS.set('Ljava/util/concurrent/atomic/AtomicReferenceArray;', 'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set('Ljava/util/concurrent/atomic/AtomicReferenceArray;', ['Ljava/io/Serializable;']);
@@ -942,7 +943,7 @@ export class APKRuntime {
   constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off' } = {}) {
     if (!Number.isInteger(maxCallDepth) || maxCallDepth < 16 || maxCallDepth > 100000) fail('VM maxCallDepth must be an integer from 16 to 100000');
     if(!Number.isInteger(maxHeapObjects)||maxHeapObjects<1024||maxHeapObjects>2097152)fail('VM maxHeapObjects must be an integer from 1024 to 2097152');
-    this.maxHeapObjects=maxHeapObjects; { const scale = Math.max(1, maxHeapObjects / 262144); this.maxFieldSlots = Math.round(1000000 * scale); this.maxArrayCells = Math.round(4000000 * scale); this.maxCollectionCells = Math.round(4000000 * scale); } /* storage budgets grow with the object limit */ this.gcSafepointFloor=Math.floor(maxHeapObjects*0.25); this.apkEntries=apkEntries; this.apkReader=apkReader;
+    this.maxHeapObjects=maxHeapObjects; { const scale = Math.max(1, maxHeapObjects / 262144); this.maxFieldSlots = Math.round(3000000 * scale); this.maxArrayCells = Math.round(8000000 * scale); this.maxCollectionCells = Math.round(8000000 * scale); } /* storage budgets grow with the object limit: about 11 field slots, 30 array cells and 30 collection cells per object (a Kotlin/Compose object carries many fields; the old 3.8 slots per object made the field budget run out at half the object limit) */ this.gcSafepointFloor=Math.floor(maxHeapObjects*0.25); this.apkEntries=apkEntries; this.apkReader=apkReader;
     // Opt-in tolerant mode for platform methods the lab does not implement: 'void' skips void ones; 'primitives' also answers
     // boolean/byte/short/char/int/long/float/double methods with 0/false; 'all' also answers object methods with null. Every stubbed call is counted and traced (STUB-VOID / STUB-RETURN), so the run
     // doubles as the to-do list of missing bridges; a run that stubbed anything is never treated as validated. The default stays strict.
@@ -980,7 +981,15 @@ export class APKRuntime {
     this.skia=skia;this.skiaHost=skia?.createHost?.(this)??null;
     this.icuBreakBackend=icuBreakBackend;this.sqliteBackend=sqliteBackend;this.tzdata=tzdata;this.zlibBackend=zlibBackend;this.icuConverterBackend=icuConverterBackend;
   }
-  parent(type) { return type?.startsWith('[') ? 'Ljava/lang/Object;' : this.classes.get(type)?.superclass ?? this.skiaHost?.parent?.(type) ?? this.platform?.parent?.(type) ?? EXTERNAL_PARENTS.get(type) ?? this.platform?.fallbackParent?.(type) ?? (type === 'Ljava/lang/Object;' || type.length === 1 ? null : 'Ljava/lang/Object;'); }   // every reference type reaches Object (a host class declared without a parent, e.g. Resources$Theme, still answers Object.hashCode/equals)
+  /** Superclass of `type` (DEX classes, then every host registry): memoised per class-graph epoch, since the lookup asks about thirty host registries and runs for every hashCode/equals/toString of a host object. */
+  parent(type) {
+    const epoch = this.dex.dynamicFiles?.length ?? 0;
+    if (this.parentEpoch !== epoch) { this.parentEpoch = epoch; this.parentMemo = new Map(); this.overrideMemo = new Map(); this.externalMemo = new Map(); }
+    if (typeof type === 'string' && type.charCodeAt(0) === 91) return 'Ljava/lang/Object;';   // arrays: no memo entry per array type
+    let answer = this.parentMemo.get(type); if (answer === undefined) { answer = this.parentUncached(type); if (this.parentMemo.size < 200000) this.parentMemo.set(type, answer); }
+    return answer;
+  }
+  parentUncached(type) { return type?.startsWith('[') ? 'Ljava/lang/Object;' : this.classes.get(type)?.superclass ?? this.skiaHost?.parent?.(type) ?? this.platform?.parent?.(type) ?? EXTERNAL_PARENTS.get(type) ?? this.platform?.fallbackParent?.(type) ?? (type === 'Ljava/lang/Object;' || type.length === 1 ? null : 'Ljava/lang/Object;'); }   // every reference type reaches Object (a host class declared without a parent, e.g. Resources$Theme, still answers Object.hashCode/equals)
   interfaces(type) { return this.classes.get(type)?.interfaces ?? [...new Set([...(EXTERNAL_INTERFACES.get(type) ?? []), ...(this.skiaHost?.interfaces?.(type) ?? []), ...(this.platform?.interfaces?.(type) ?? [])])]; }
   /** Memoized subtype test (the class graph only grows when more DEX files are loaded, which clears the memo). */
   isSubtype(child, ancestor) {
@@ -1372,7 +1381,7 @@ export class APKRuntime {
     length = int(length);
     if (length < 0) this.throwJava('Ljava/lang/NegativeArraySizeException;', `negative array length ${length}`);
     if (!type.startsWith('[')) fail('Invalid/excessive array allocation');
-    if (length > 1000000 || this.arrayCells + length > this.maxArrayCells) this.outOfMemory(length > 1000000 ? `Array of ${length} elements exceeds the array size limit` : `Array storage limit (${this.maxArrayCells} cells) exceeded`);
+    if (length > 16777216 || this.arrayCells + length > this.maxArrayCells) this.outOfMemory(length > 16777216 ? `Array of ${length} elements exceeds the array size limit` : `Array storage limit (${this.maxArrayCells} cells) exceeded`);
     this.arrayCells += length;
     const array = this.makeObject(type); this.object(array).elements = new Array(length).fill(defaultValue(type.slice(1))); return array;
   }
@@ -1874,6 +1883,14 @@ export class APKRuntime {
    * heapBudget of executionSnapshot and the Worker's snapshot), so an app that catches Throwable cannot hide it from the page, the harness or the validation flows.
    * The collector (src/heap-gc.js) runs between events; an event that allocates more than the free headroom still fails here.
    */
+  /** Every OutOfMemoryError the VM raises, with what ran: which limit (objects, field slots, array size or cells, collection cells), the budgets at that moment, the thread and the allocating Java frame. */
+  noteOom(reason) {
+    const log = this.oomLog ??= []; const frames = this.thread?.frames ?? [], top = []; 
+    for (let i = frames.length - 1; i >= 0 && top.length < 3; i--) { const m = frames[i].method; if (m) top.push(`${String(m.owner).replace(/^L|;$/g, '').replaceAll('/', '.')}.${m.name}`); }
+    const kind = /^Object limit/.test(reason) ? 'limite de objetos' : /field storage/.test(reason) ? 'limite de campos' : /^Array of/.test(reason) ? 'tamanho de um array' : /^Array storage/.test(reason) ? 'orçamento de células de arrays' : /^Collection storage/.test(reason) ? 'orçamento de coleções' : 'outro';
+    log.push({ kind, reason: String(reason).slice(0, 140), thread: this.thread?.name ?? null, frames: top, hostCall: this.hostCall ? String(this.hostCall).replace(/^L|;->/g, m => m === ';->' ? '.' : '').slice(0, 80) : null, objects: this.heap.size, maxObjects: this.maxHeapObjects, fieldSlots: this.fieldSlots, maxFieldSlots: this.maxFieldSlots, arrayCells: this.arrayCells, maxArrayCells: this.maxArrayCells, collectionCells: this.collectionCells, maxCollectionCells: this.maxCollectionCells });
+    if (log.length > 12) log.shift();
+  }
   /**
    * ART lets an allocation that failed once succeed when a collection freed enough, and lets the unwinding handlers allocate. The collector only runs at safepoints, so a full heap whose last
    * collection did free something is granted 2% of the limit (once per collection, undone by the next collection) and a collection is requested; a heap the last collection could not shrink
@@ -1888,6 +1905,7 @@ export class APKRuntime {
     return true;
   }
   outOfMemory(reason) {
+    this.noteOom(reason);
     this.oomCount = (this.oomCount ?? 0) + 1; this.lastOom = { reason, liveObjects: this.heap.size, limit: this.maxHeapObjects, fieldSlots: this.fieldSlots, count: this.oomCount };
     this.record(`OOM java.lang.OutOfMemoryError: ${reason}; ${this.heap.size} live objects`);
     if (this.inOutOfMemory) fail(reason);
@@ -1947,11 +1965,23 @@ export class APKRuntime {
     return `${obj.type.startsWith('[') ? obj.type.replaceAll('/', '.') : dottedName(obj.type)}@${obj.id.toString(16)}`;
   }
   objectOverride(type, signature) {
+    this.parent(type);   // refreshes the memo tables when the class graph changed
+    let row = this.overrideMemo.get(type); if (row === undefined) this.overrideMemo.set(type, row = new Map());
+    let answer = row.get(signature); if (answer === undefined) row.set(signature, answer = this.objectOverrideUncached(type, signature));
+    return answer;
+  }
+  objectOverrideUncached(type, signature) {
     const seen = new Set();
     while (type && !seen.has(type)) { seen.add(type); const definition = this.classes.get(type)?.methods.get(signature); if (definition) return definition.method; type = this.parent(type); }
     return null;
   }
   externalObjectMethod(type,name,parameters,result){
+    this.parent(type);
+    let row=this.externalMemo.get(type);if(row===undefined)this.externalMemo.set(type,row=new Map());
+    const memoKey=name+'('+parameters.join('')+')'+result;let answer=row.get(memoKey);if(answer===undefined)row.set(memoKey,answer=this.externalObjectMethodUncached(type,name,parameters,result));
+    return answer;
+  }
+  externalObjectMethodUncached(type,name,parameters,result){
     const signature=`(${parameters.join('')})${result}`,seen=new Set();while(type&&type!=='Ljava/lang/Object;'){
       if(seen.has(type)||seen.size>=128)fail('Invalid external object hierarchy');seen.add(type);const key=`${type}->${name}${signature}`;
       const labHelpers=LAB_HELPERS.get(type);if(labHelpers!==undefined&&this.labHelper(labHelpers,type,{name,signature},'virtual')!==null)return {owner:type,name,parameters,result,signature};
@@ -1974,7 +2004,8 @@ export class APKRuntime {
   javaHash(value) {
     if (isNull(value)) return 0;
     if (typeof value === 'string') return stringHash(value);
-    const obj = this.object(value);if(obj.annotationValues)return annotationHash(this,obj);const method = this.objectOverride(obj.type, 'hashCode()I');
+    const obj = this.object(value);if(obj.boxed!==undefined&&FINAL_BOX_TYPES.has(obj.type))return this.boxedHash(obj);   // final java.lang box classes: no override to look up, no call to make
+    if(obj.annotationValues)return annotationHash(this,obj);const method = this.objectOverride(obj.type, 'hashCode()I');
     if (method) return int(this.dispatch(method, [value], 'virtual'));
     const external=this.externalObjectMethod(obj.type,'hashCode',[],'I');if(external)return int(this.dispatch(external,[value],'virtual'));
     if (obj.member) { const member = obj.member, owner = member.field?.owner ?? member.method.owner; return stringHash(dottedName(owner)) ^ (member.kind === 'constructor' ? 0 : stringHash(member.field?.name ?? member.method.name)); }
@@ -1985,7 +2016,9 @@ export class APKRuntime {
     if (equal(a, b)) return true;
     if (isNull(a) || isNull(b)) return false;
     if(typeof a==='string')return this.isStringValue(b)&&a===this.stringCharacters(b);
-    const obj = this.object(a), method = this.objectOverride(obj.type, 'equals(Ljava/lang/Object;)Z');
+    const obj = this.object(a);
+    if (obj.boxed !== undefined && FINAL_BOX_TYPES.has(obj.type)) { if (typeof b === 'string') return false; const other = this.object(b); return other.boxed !== undefined && this.boxedEquals(obj, other); }
+    const method = this.objectOverride(obj.type, 'equals(Ljava/lang/Object;)Z');
     if (method) return int(this.dispatch(method, [a, b], 'virtual')) !== 0;
     if(typeof b==='string')return obj.type==='Ljava/lang/String;'&&this.stringCharacters(a)===b;
     if(obj.annotationValues)return annotationEquals(this,obj,b);

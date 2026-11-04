@@ -1,6 +1,6 @@
 // "Estado da tela": a plain-text picture of what the VM shows and why it may be blank, for "Copiar diagnóstico" and for a button that works without any error. Read-only on the VM.
 // Pure data: no app or library names are written here; class names come from the running app and only reach the user's clipboard.
-import { reportSummary, collapseThreads } from './report-summary.js?v=342446b1482f';
+import { reportSummary, collapseThreads } from './report-summary.js?v=dab932c11eb4';
 const MiB = 1024 * 1024, BYTES_PER_OBJECT = 1600;
 const STAGES = { 0: 'destruída', 1: 'criada', 2: 'parada', 3: 'iniciada/pausada', 4: 'retomada (em primeiro plano)' };
 const dotted = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');
@@ -50,7 +50,7 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
   const tasks = platform.tasks ?? [], frames = platform.allFrames?.() ?? [];
   const top = frames.length ? frames[frames.length - 1] : null;
   out.push('Estado da tela');
-  out.push(...reportSummary(runtime, { heartbeat }));
+  const summaryAt = out.length;
   // ---- activity stack
   out.push('Pilha de Activities (tarefa: Activity, estágio):');
   for (const task of tasks) for (const frame of task.frames) out.push(`  tarefa ${task.id}: ${dotted(frame.type)}, ${STAGES[frame.lifecycleStage] ?? frame.lifecycleStage}${frame.finished ? ', finalizada' : ''}${frame === top ? '  ← topo' : ''}`);
@@ -144,7 +144,13 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
   if (!caught?.total) out.push('  (nenhuma)');
   { const uncaught = runtime.uncaughtText?.(); if (uncaught) out.push(uncaught); }
   const blank = reasons.length > 0;
+  // The "Tela:" lines of the summary, read back from the sections above (activity on top, first-frame verdict, Compose, layout)
+  const tela = [], find = pattern => out.find(line => pattern.test(line));
+  { const top = find(/← topo/)?.trim().replace(/^tarefa \d+: /, '').replace(/\s+← topo$/, ''); tela.push(`Tela: ${top ?? 'nenhuma Activity'} — ${blank ? 'primeiro quadro em BRANCO: ' + reasons.join('; ') : 'a tela tem conteúdo'}`);
+    const semantics = find(/semântica: \d+ nós/)?.trim(), frames = find(/relógio de quadros:/)?.trim(); if (semantics || frames) tela.push(`  Compose: ${[semantics?.replace(/^semântica: /, 'semântica '), frames?.replace(/^relógio de quadros: /, 'quadros ')].filter(Boolean).join('; ')}`);
+    const layout = find(/^Layout: /), why = find(/por que não rodou:/)?.trim(); if (layout) tela.push(`  ${layout}${why ? '; ' + why : ''}`); }
+  out.splice(summaryAt, 0, ...reportSummary(runtime, { heartbeat, tela }));
   if (blank) out.splice(1, 0, `primeiro quadro em branco — motivo(s): ${reasons.join('; ')}`);
   else out.splice(1, 0, 'a tela tem conteúdo: nenhum motivo de tela em branco encontrado');
-  return { text: out.join('\n'), blank, reasons };
+  return { text: out.join('\n'), blank, reasons, tela };
 }

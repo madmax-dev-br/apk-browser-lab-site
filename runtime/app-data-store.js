@@ -101,8 +101,8 @@ export function defaultBackend() { try { return globalThis.indexedDB ? createInd
 
 // ---------------------------------------------------------------- persistence of one app
 export class AppDataPersistence {
-  constructor({ backend, key, certSha256 = 'unsigned', packageName, fs, limitBytes = DEFAULT_LIMIT_BYTES, debounceMs = DEFAULT_DEBOUNCE_MS, now = () => Date.now(), record = () => {}, onStatus = null, timers = null }) {
-    this.backend = backend; this.key = key; this.certSha256 = certSha256; this.packageName = packageName; this.fs = fs; this.limitBytes = limitBytes; this.debounceMs = debounceMs;
+  constructor({ backend, key, certSha256 = 'unsigned', packageName, fs, limitBytes = DEFAULT_LIMIT_BYTES, debounceMs = DEFAULT_DEBOUNCE_MS, now = () => Date.now(), record = () => {}, onStatus = null, timers = null, onClockBehind = null }) {
+    this.onClockBehind = onClockBehind; this.backend = backend; this.key = key; this.certSha256 = certSha256; this.packageName = packageName; this.fs = fs; this.limitBytes = limitBytes; this.debounceMs = debounceMs;
     this.now = now; this.record = record; this.onStatus = onStatus; this.setTimer = timers?.set ?? ((fn, ms) => setTimeout(fn, ms)); this.clearTimer = timers?.clear ?? (handle => clearTimeout(handle));
     this.persisted = new Map();   // path -> fingerprint of the file as last handed to the backend
     this.persistedDirs = new Set();
@@ -125,6 +125,9 @@ export class AppDataPersistence {
     const stored = await this.backend.load(this.key); if (!stored) return this.status();
     const { manifest, files } = stored;
     if (manifest.version !== MANIFEST_VERSION || manifest.packageName !== this.packageName || manifest.certSha256 !== this.certSha256) { this.record('APPDATA stored data ignored (incompatible manifest)'); return this.status(); }
+    // The VM's wall clock skips idle time, so the last session may have stored timestamps (file times, scheduled work, tokens) later than a fresh session's clock: time must not run backwards for
+    // the app, whose persisted deadlines would otherwise sit hours in the future. The clock moves forward to the last stored instant.
+    { const behind = Number(manifest.updatedAt) - this.now(); if (Number.isFinite(behind) && behind > 0) { this.onClockBehind?.(behind); this.record(`APPDATA wall clock advanced ${Math.round(behind)} ms to the last stored instant`); } }
     const dirs = Object.entries(manifest.dirs ?? {}).sort((a, b) => a[0].length - b[0].length);
     for (const [path, meta] of dirs) {
       if (!this.inScope(path)) continue;
@@ -227,7 +230,7 @@ export async function attachAppData(runtime, { backend = defaultBackend(), keep 
   const { key, certSha256 } = await appKeyFor(packageName, (runtime.apkSigningCertificates?.() ?? []));
   if (clear) await backend.clear(key);   // `clear-data`: start from empty storage
   if (!keep) { const stored = await backend.manifest(key).catch(() => null); return { persistence: null, key, status: { enabled: false, reason: 'disabled', key, packageName, certSha256, bytes: stored?.bytes ?? 0, files: Object.keys(stored?.files ?? {}).length, limitBytes } }; }
-  const persistence = new AppDataPersistence({ backend, key, certSha256, packageName, fs: platform.javaIo.fs(), limitBytes, debounceMs, now: () => runtime.clock?.wall?.() ?? Date.now(), record: line => runtime.record(line), onStatus, timers });
+  const persistence = new AppDataPersistence({ backend, key, certSha256, packageName, fs: platform.javaIo.fs(), limitBytes, debounceMs, now: () => runtime.clock?.wall?.() ?? Date.now(), onClockBehind: ms => runtime.clock?.skip?.(ms), record: line => runtime.record(line), onStatus, timers });
   await persistence.restore();
   platform.appData = persistence;
   return { persistence, key, status: persistence.status() };
