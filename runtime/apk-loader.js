@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=767bada4613b';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=767bada4613b';
-import { inspectELF } from './native-inspector.js?v=767bada4613b';
-import { inflateRaw } from './inflate.js?v=767bada4613b';
-import { resolveDevice } from './device-profile.js?v=767bada4613b';
-import { resourceProfileFor } from './device-configuration.js?v=767bada4613b';
-import { JniBridge } from './jni-host.js?v=767bada4613b';
-import { providerForApk } from './native-provider-variants.js?v=767bada4613b';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=767bada4613b';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=767bada4613b';
-import { AndroidResources } from './android-resources.js?v=767bada4613b';
-import { AndroidPlatform } from './android-platform.js?v=767bada4613b';
-import { FrameworkProvider } from './framework-provider.js?v=767bada4613b';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=342446b1482f';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=342446b1482f';
+import { inspectELF } from './native-inspector.js?v=342446b1482f';
+import { inflateRaw } from './inflate.js?v=342446b1482f';
+import { resolveDevice } from './device-profile.js?v=342446b1482f';
+import { resourceProfileFor } from './device-configuration.js?v=342446b1482f';
+import { JniBridge } from './jni-host.js?v=342446b1482f';
+import { providerForApk } from './native-provider-variants.js?v=342446b1482f';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=342446b1482f';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=342446b1482f';
+import { AndroidResources } from './android-resources.js?v=342446b1482f';
+import { AndroidPlatform } from './android-platform.js?v=342446b1482f';
+import { FrameworkProvider } from './framework-provider.js?v=342446b1482f';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -165,13 +165,13 @@ export class APKArchive {
 /** Reads binary Android XML launcher declarations; no Android process or remote service. */
 // AOSP frameworks/base/core/res/res/values/public-final.xml (api 1-34) ids for the AndroidManifest attributes this loader reads.
 // Production bundles blank the attribute-name strings; Android's XmlBlock then resolves them from the RES_XML_RESOURCE_MAP chunk.
-const MANIFEST_ATTRIBUTE_IDS = new Map(Object.entries({ theme: 0x01010000, label: 0x01010001, icon: 0x01010002, name: 0x01010003, permission: 0x01010006, enabled: 0x0101000e, exported: 0x01010010, process: 0x01010011, authorities: 0x01010018, initOrder: 0x0101001a, multiprocess: 0x01010013, grantUriPermissions: 0x0101001b, launchMode: 0x0101001d, taskAffinity: 0x01010012, finishOnTaskLaunch: 0x01010014, clearTaskOnLaunch: 0x01010015, excludeFromRecents: 0x01010017, alwaysRetainTaskState: 0x01010203, allowTaskReparenting: 0x01010204, noHistory: 0x0101022d, documentLaunchMode: 0x01010445, autoRemoveFromRecents: 0x01010447, screenOrientation: 0x0101001e, configChanges: 0x0101001f, value: 0x01010024, resource: 0x01010025, targetActivity: 0x01010202, minSdkVersion: 0x0101020c, versionCode: 0x0101021b, versionName: 0x0101021c, windowSoftInputMode: 0x0101022b, targetSdkVersion: 0x01010270, maxSdkVersion: 0x01010271, allowBackup: 0x01010280, parentActivityName: 0x010103a7, appComponentFactory: 0x0101057a, extractNativeLibs: 0x010104ea, usesCleartextTraffic: 0x010104ec, enableOnBackInvokedCallback: 0x0101066c, networkSecurityConfig: 0x01010527, foregroundServiceType: 0x01010599 }).map(([name, id]) => [id, name]));
+const MANIFEST_ATTRIBUTE_IDS = new Map(Object.entries({ scheme: 0x01010027, host: 0x01010028, autoVerify: 0x010104ee, theme: 0x01010000, label: 0x01010001, icon: 0x01010002, name: 0x01010003, permission: 0x01010006, enabled: 0x0101000e, exported: 0x01010010, process: 0x01010011, authorities: 0x01010018, initOrder: 0x0101001a, multiprocess: 0x01010013, grantUriPermissions: 0x0101001b, launchMode: 0x0101001d, taskAffinity: 0x01010012, finishOnTaskLaunch: 0x01010014, clearTaskOnLaunch: 0x01010015, excludeFromRecents: 0x01010017, alwaysRetainTaskState: 0x01010203, allowTaskReparenting: 0x01010204, noHistory: 0x0101022d, documentLaunchMode: 0x01010445, autoRemoveFromRecents: 0x01010447, screenOrientation: 0x0101001e, configChanges: 0x0101001f, value: 0x01010024, resource: 0x01010025, targetActivity: 0x01010202, minSdkVersion: 0x0101020c, versionCode: 0x0101021b, versionName: 0x0101021c, windowSoftInputMode: 0x0101022b, targetSdkVersion: 0x01010270, maxSdkVersion: 0x01010271, allowBackup: 0x01010280, parentActivityName: 0x010103a7, appComponentFactory: 0x0101057a, extractNativeLibs: 0x010104ea, usesCleartextTraffic: 0x010104ec, enableOnBackInvokedCallback: 0x0101066c, networkSecurityConfig: 0x01010527, foregroundServiceType: 0x01010599 }).map(([name, id]) => [id, name]));
 export function parseManifest(data) {
   const b = new BinaryReader(data);
   let resourceMap = null;
   if (b.length < 8 || b.u16(0) !== 0x0003 || b.u16(2) < 8 || b.u32(4) !== b.length) fail('Unsupported/malformed binary AndroidManifest.xml');
   let strings = null, packageName = null, applicationName = null;
-  const activities = [], services = [], providers = [], receivers = [], providerDetails = [], componentDetails = [], stack = [];
+  const activities = [], services = [], providers = [], receivers = [], providerDetails = [], componentDetails = [], stack = [], autoVerifyHosts = new Set();
   let application = {}, usesSdk = {}, manifestAttrs = {};
   const usesPermissions = [], declaredPermissions = [];   // <uses-permission>/<uses-permission-sdk-23> names and the app's own <permission> declarations
   const str = i => { if (!strings || i >= strings.length) fail('Invalid AXML string reference'); return strings[i]; };
@@ -239,9 +239,12 @@ export function parseManifest(data) {
         activities.push(node.activity);
       }
       const owner = [...stack].reverse().find(n => n.activity)?.activity;
-      if (name === 'intent-filter' && owner) node.filter = { activity: owner, main: false, launcher: false };
+      if (name === 'intent-filter' && owner) node.filter = { activity: owner, main: false, launcher: false, view: false, browsable: false, autoVerify: typeof attrs.autoVerify === 'number' ? attrs.autoVerify !== 0 : attrs.autoVerify === 'true', schemes: [], hosts: [] };
       const filter = [...stack].reverse().find(n => n.filter)?.filter;
       if (name === 'action' && filter && attrs.name === 'android.intent.action.MAIN') filter.main = true;
+      if (name === 'action' && filter && attrs.name === 'android.intent.action.VIEW') filter.view = true;
+      if (name === 'category' && filter && attrs.name === 'android.intent.category.BROWSABLE') filter.browsable = true;
+      if (name === 'data' && filter) { if (typeof attrs.scheme === 'string') filter.schemes.push(attrs.scheme); if (typeof attrs.host === 'string') filter.hosts.push(attrs.host); }
       if (name === 'category' && filter && attrs.name === 'android.intent.category.LAUNCHER') filter.launcher = true;
       stack.push(node);
     } else if (type === 0x0103) {
@@ -249,6 +252,7 @@ export function parseManifest(data) {
       const node = stack.pop();
       if (node.name !== str(b.u32(p + 20))) fail('Mismatched AXML closing element');
       if (node.filter?.main && node.filter.launcher) node.filter.activity.launcher = true;
+      if (node.filter?.view && node.filter.browsable && node.filter.autoVerify && node.filter.schemes.some(scheme => scheme === 'http' || scheme === 'https')) for (const host of node.filter.hosts) autoVerifyHosts.add(host);   // the domains DomainVerificationManager reports for this package
     }
     p += size;
   }
@@ -259,7 +263,7 @@ export function parseManifest(data) {
     else deduplicated.set(a.name, { ...a, descriptor: `L${a.name.replaceAll('.', '/')};` });
   }
   const launchers = [...deduplicated.values()].filter(a => a.launcher);
-  return { packageName, applicationName, application, usesSdk, usesPermissions, declaredPermissions, activities: [...deduplicated.values()], services, providers, receivers, providerDetails, componentDetails, manifestAttrs,
+  return { packageName, applicationName, application, usesSdk, usesPermissions, declaredPermissions, activities: [...deduplicated.values()], services, providers, receivers, providerDetails, componentDetails, manifestAttrs, autoVerifyHosts: [...autoVerifyHosts],
     componentCounts: { activities: deduplicated.size, services: services.length, providers: providers.length, receivers: receivers.length },
     launcherActivity: launchers.length === 1 ? launchers[0].name : null };
 }

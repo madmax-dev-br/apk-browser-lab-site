@@ -1,5 +1,5 @@
-import { floatBits } from './host-contract.js?v=767bada4613b';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=767bada4613b';
+import { floatBits } from './host-contract.js?v=342446b1482f';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=342446b1482f';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,
@@ -18,7 +18,7 @@ export function createSystemManagersHost(platform) {
   const denied = (r, what) => r.throwJava('Ljava/lang/SecurityException;', what);
   const requireText = (r, value, message) => { if (nullish(value)) npe(r, message); return text(r, value); };
   const empty = (r, name) => { if (!r.classes?.has?.(name)) return r.makeObject(name); return r.allocate(name); };
-  const NULL_SERVICES = ['credential'];
+  const NULL_SERVICES = ['credential', 'wifiaware', 'wifirtt'];   // wifiaware / wifirtt: the device has no such radio features
   service('credential', 'Landroid/credentials/CredentialManager;');   // API 34 service; on this API 33 device Context.getSystemService answers null, like a phone without a credential provider
 
   // ---- AppOpsManager
@@ -287,6 +287,90 @@ export function createSystemManagersHost(platform) {
   def(WALLPAPER, 'addOnColorsChangedListener', '(Landroid/app/WallpaperManager$OnColorsChangedListener;Landroid/os/Handler;)V', (r, _m, [, listener]) => { if (nullish(listener)) npe(r); });
   def(WALLPAPER, 'removeOnColorsChangedListener', '(Landroid/app/WallpaperManager$OnColorsChangedListener;)V', (r, _m, [, listener]) => { if (nullish(listener)) npe(r); });
 
+  // ---- DomainVerificationManager (API 31, Context.DOMAIN_VERIFICATION_SERVICE): a device where nothing was ever verified or selected. The user state of the app's own package lists the hosts of its
+  // android:autoVerify web intent filters, each DOMAIN_STATE_NONE, with link handling allowed; other packages are not installed; the verification-agent / user-selection calls are privileged.
+  const DOMAIN = service('domain_verification', 'Landroid/content/pm/verify/domain/DomainVerificationManager;'), DOMAIN_STATE = 'Landroid/content/pm/verify/domain/DomainVerificationUserState;', DOMAIN_INFO = 'Landroid/content/pm/verify/domain/DomainVerificationInfo;';
+  type(DOMAIN_STATE, 'Ljava/lang/Object;', [], { allocatable: true }); type(DOMAIN_INFO, 'Ljava/lang/Object;', [], { allocatable: true });
+  registry.staticField(DOMAIN_STATE, 'DOMAIN_STATE_NONE', 'I', () => 0); registry.staticField(DOMAIN_STATE, 'DOMAIN_STATE_SELECTED', 'I', () => 1); registry.staticField(DOMAIN_STATE, 'DOMAIN_STATE_VERIFIED', 'I', () => 2);
+  const packageGone = (r, name) => r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', name);
+  const domainState = (r, packageName) => { const o = r.allocate(DOMAIN_STATE), record = r.object(o); record.packageName = packageName; record.hosts = [...(platform.manifest?.autoVerifyHosts ?? [])]; return o; };
+  def(DOMAIN, 'getDomainVerificationUserState', `(${STRING})${DOMAIN_STATE}`, (r, _m, [, packageName]) => {
+    const name = requireText(r, packageName, 'packageName'); if (name !== pkg()) packageGone(r, name);
+    return domainState(r, name);
+  });
+  const privileged = (r, permission) => { if (!holds(r, permission)) r.throwJava('Ljava/lang/SecurityException;', `Neither user ${uid()} nor current process has ${permission}.`); };
+  def(DOMAIN, 'getDomainVerificationInfo', `(${STRING})${DOMAIN_INFO}`, (r, _m, [, packageName]) => { const name = requireText(r, packageName, 'packageName'); privileged(r, 'android.permission.DOMAIN_VERIFICATION_AGENT'); packageGone(r, name); });
+  def(DOMAIN, 'getOwnersForDomain', `(${STRING})Ljava/util/List;`, (r, _m, [, domain]) => { requireText(r, domain, 'domain'); privileged(r, 'android.permission.DOMAIN_VERIFICATION_AGENT'); return emptyList(r); });
+  def(DOMAIN, 'queryValidVerificationPackageNames', '()Ljava/util/List;', r => { privileged(r, 'android.permission.DOMAIN_VERIFICATION_AGENT'); return emptyList(r); });
+  for (const [name, signature, permission] of [['setDomainVerificationStatus', '(Ljava/util/UUID;Ljava/util/Set;I)V', 'android.permission.DOMAIN_VERIFICATION_AGENT'], ['setDomainVerificationUserSelection', '(Ljava/util/UUID;Ljava/util/Set;Z)V', 'android.permission.UPDATE_DOMAIN_VERIFICATION_USER_SELECTION'], ['setDomainVerificationLinkHandlingAllowed', `(${STRING}Z)V`, 'android.permission.UPDATE_DOMAIN_VERIFICATION_USER_SELECTION']]) {
+    def(DOMAIN, name, signature, r => { privileged(r, permission); r.throwJava('Ljava/lang/IllegalArgumentException;', 'Unknown domain verification id'); });
+  }
+  def(DOMAIN_STATE, 'getPackageName', `()${STRING}`, (r, _m, [self]) => r.javaString(r.object(self).packageName));
+  def(DOMAIN_STATE, 'isLinkHandlingAllowed', '()Z', () => 1);
+  def(DOMAIN_STATE, 'getUser', `()${USER_HANDLE}`, r => callStatic(r, USER_HANDLE, 'of', ['I'], USER_HANDLE, [0]));
+  def(DOMAIN_STATE, 'getIdentifier', '()Ljava/util/UUID;', (r, _m, [self]) => {
+    const bytes = Array.from(new TextEncoder().encode('domain-verification:' + r.object(self).packageName)), array_ = r.newArray('[B', bytes.length); r.array(array_).elements = bytes.map(b => (b << 24) >> 24);
+    return callStatic(r, 'Ljava/util/UUID;', 'nameUUIDFromBytes', ['[B'], 'Ljava/util/UUID;', [array_]);
+  });
+  def(DOMAIN_STATE, 'getHostToStateMap', '()Ljava/util/Map;', (r, _m, [self]) => {
+    const map = construct(r, 'Ljava/util/HashMap;'), none = r.boxPrimitive('I', 0);
+    for (const host of r.object(self).hosts) call(r, map, 'Ljava/util/HashMap;', 'put', [OBJECT, OBJECT], OBJECT, [r.javaString(host), none]);
+    return callStatic(r, 'Ljava/util/Collections;', 'unmodifiableMap', ['Ljava/util/Map;'], 'Ljava/util/Map;', [map]);
+  });
+  def(DOMAIN_STATE, 'describeContents', '()I', () => 0);
+  def(DOMAIN_STATE, 'writeToParcel', '(Landroid/os/Parcel;I)V', r => r.throwJava('Ljava/lang/UnsupportedOperationException;', 'DomainVerificationUserState is not parceled by the lab'));
+
+  // ---- Services of a phone-shaped device with nothing behind them (API 25-34 additions swept by scripts/service-sweep.mjs). Each answers what the real manager answers when its backing system
+  // service has no data: no widget providers, no phone accounts, no work profile, no eUICC, no fs-verity, no performance-hint HAL. Hardware the device lacks (Wi-Fi Aware, Wi-Fi RTT) is a null service.
+  const APPWIDGET = service('appwidget', 'Landroid/appwidget/AppWidgetManager;');
+  def(APPWIDGET, 'getInstance', `(${CONTEXT_T})Landroid/appwidget/AppWidgetManager;`, (r, _m, [context]) => { if (nullish(context)) npe(r); return call(r, context, CONTEXT_T, 'getSystemService', [STRING], OBJECT, ['appwidget']); }, { static: true });
+  for (const name of ['getInstalledProviders', 'getInstalledProvidersForProfile']) def(APPWIDGET, name, name === 'getInstalledProviders' ? '()Ljava/util/List;' : `(${USER_HANDLE})Ljava/util/List;`, r => emptyList(r));
+  def(APPWIDGET, 'getInstalledProviders', '(I)Ljava/util/List;', r => emptyList(r));
+  def(APPWIDGET, 'getInstalledProvidersForPackage', `(${STRING}${USER_HANDLE})Ljava/util/List;`, (r, _m, [, packageName]) => { requireText(r, packageName, 'packageName'); return emptyList(r); });
+  def(APPWIDGET, 'getAppWidgetIds', '(Landroid/content/ComponentName;)[I', (r, _m, [, provider]) => { if (nullish(provider)) npe(r); return array(r, 'I', []); });
+  def(APPWIDGET, 'getAppWidgetInfo', '(I)Landroid/appwidget/AppWidgetProviderInfo;', () => null);
+  def(APPWIDGET, 'isRequestPinAppWidgetSupported', '()Z', () => 0);
+  def(APPWIDGET, 'requestPinAppWidget', '(Landroid/content/ComponentName;Landroid/os/Bundle;Landroid/app/PendingIntent;)Z', () => 0);
+  for (const signature of ['([ILandroid/widget/RemoteViews;)V', '(ILandroid/widget/RemoteViews;)V', '(Landroid/content/ComponentName;Landroid/widget/RemoteViews;)V', '([II)V', '(II)V']) def(APPWIDGET, signature.includes('RemoteViews') ? 'updateAppWidget' : 'notifyAppWidgetViewDataChanged', signature, () => {});
+
+  const TELECOM = service('telecom', 'Landroid/telecom/TelecomManager;'), PHONE_STATE = r => { if (!holds(r, 'android.permission.READ_PHONE_STATE') && !holds(r, 'android.permission.READ_PRIVILEGED_PHONE_STATE')) r.throwJava('Ljava/lang/SecurityException;', `Neither user ${uid()} nor current process has android.permission.READ_PHONE_STATE.`); };
+  def(TELECOM, 'isInCall', '()Z', r => { PHONE_STATE(r); return 0; });
+  def(TELECOM, 'isInManagedCall', '()Z', r => { PHONE_STATE(r); return 0; });
+  def(TELECOM, 'getDefaultDialerPackage', `()${STRING}`, () => null);
+  def(TELECOM, 'getSystemDialerPackage', `()${STRING}`, () => null);
+  for (const name of ['getCallCapablePhoneAccounts', 'getSelfManagedPhoneAccounts', 'getAllPhoneAccounts']) def(TELECOM, name, '()Ljava/util/List;', r => { PHONE_STATE(r); return emptyList(r); });
+  def(TELECOM, 'getCallCapablePhoneAccounts', '(Z)Ljava/util/List;', r => { PHONE_STATE(r); return emptyList(r); });
+  def(TELECOM, 'getPhoneAccount', '(Landroid/telecom/PhoneAccountHandle;)Landroid/telecom/PhoneAccount;', (r, _m, [, handle]) => { if (nullish(handle)) npe(r); return null; });
+  def(TELECOM, 'getDefaultOutgoingPhoneAccount', `(${STRING})Landroid/telecom/PhoneAccountHandle;`, () => null);
+  def(TELECOM, 'getUserSelectedOutgoingPhoneAccount', '()Landroid/telecom/PhoneAccountHandle;', () => null);
+  def(TELECOM, 'getSimCallManager', '()Landroid/telecom/PhoneAccountHandle;', () => null);
+  def(TELECOM, 'isTtySupported', '()Z', r => { PHONE_STATE(r); return 0; });
+  def(TELECOM, 'getCurrentTtyMode', '()I', r => { PHONE_STATE(r); return 0; });
+  def(TELECOM, 'isVoiceMailNumber', `(Landroid/telecom/PhoneAccountHandle;${STRING})Z`, r => { PHONE_STATE(r); return 0; });
+  def(TELECOM, 'getVoiceMailNumber', `(Landroid/telecom/PhoneAccountHandle;)${STRING}`, r => { PHONE_STATE(r); return null; });
+  def(TELECOM, 'isOutgoingCallPermitted', '(Landroid/telecom/PhoneAccountHandle;)Z', () => 0);
+  def(TELECOM, 'isIncomingCallPermitted', '(Landroid/telecom/PhoneAccountHandle;)Z', () => 0);
+
+  const PERF_HINT = service('performance_hint', 'Landroid/os/PerformanceHintManager;');
+  def(PERF_HINT, 'getPreferredUpdateRateNanos', '()J', () => -1n);
+  def(PERF_HINT, 'createHintSession', '([IJ)Landroid/os/PerformanceHintManager$Session;', (r, _m, [, tids, target]) => { if (nullish(tids)) npe(r); if (Number(target) <= 0) iae(r, 'Target duration should be positive.'); return null; });   // no hint HAL: no session
+
+  const EUICC = service('euicc', 'Landroid/telephony/euicc/EuiccManager;');
+  def(EUICC, 'isEnabled', '()Z', () => 0); def(EUICC, 'getEid', `()${STRING}`, () => null);
+
+  const INTEGRITY = service('file_integrity', 'Landroid/security/FileIntegrityManager;');
+  def(INTEGRITY, 'isApkVeritySupported', '()Z', () => 0);
+  def(INTEGRITY, 'isAppSourceCertificateTrusted', '(Ljava/security/cert/X509Certificate;)Z', (r, _m, [, certificate]) => { if (nullish(certificate)) npe(r); return 0; });
+
+  const CROSS = service('crossprofileapps', 'Landroid/content/pm/CrossProfileApps;');
+  def(CROSS, 'getTargetUserProfiles', '()Ljava/util/List;', r => emptyList(r));
+  def(CROSS, 'canInteractAcrossProfiles', '()Z', () => 0);
+  def(CROSS, 'canRequestInteractAcrossProfiles', '()Z', () => 0);
+
+  const DIAGNOSTICS = service('connectivity_diagnostics', 'Landroid/net/ConnectivityDiagnosticsManager;');
+  def(DIAGNOSTICS, 'registerConnectivityDiagnosticsCallback', '(Landroid/net/NetworkRequest;Ljava/util/concurrent/Executor;Landroid/net/ConnectivityDiagnosticsManager$ConnectivityDiagnosticsCallback;)V', (r, _m, [, request, executor, callback]) => { if (nullish(request) || nullish(executor) || nullish(callback)) npe(r); });
+  def(DIAGNOSTICS, 'unregisterConnectivityDiagnosticsCallback', '(Landroid/net/ConnectivityDiagnosticsManager$ConnectivityDiagnosticsCallback;)V', (r, _m, [, callback]) => { if (nullish(callback)) npe(r); });
+
   // ---- SearchManager: no searchable activities, no global search provider
   const SEARCH = service('search', 'Landroid/app/SearchManager;');
   strings(SEARCH, { QUERY: 'query', USER_QUERY: 'user_query', APP_DATA: 'app_data', ACTION_KEY: 'action_key', EXTRA_SELECT_QUERY: 'select_query', ACTION_MSG: 'action_msg', SUGGEST_COLUMN_TEXT_1: 'suggest_text_1', SUGGEST_COLUMN_TEXT_2: 'suggest_text_2', SUGGEST_COLUMN_INTENT_ACTION: 'suggest_intent_action',
@@ -443,5 +527,6 @@ export function createSystemManagersHost(platform) {
   });
   def(BUGREPORT, 'cancelBugreport', '()V', r => enforce(r, 'android.permission.DUMP'));
 
+  kit.byClass.set('Landroid/net/wifi/aware/WifiAwareManager;', 'wifiaware'); kit.byClass.set('Landroid/net/wifi/rtt/WifiRttManager;', 'wifirtt');
   return kit.finish({ nullServices: NULL_SERVICES, getService: (r, name) => (NULL_SERVICES.includes(name) ? null : kit.getService(r, name)) });
 }

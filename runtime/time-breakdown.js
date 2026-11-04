@@ -5,7 +5,7 @@ const NAMES = ['interpretador e código compilado', 'chamadas do host', 'decodif
 export class TimeBreakdown {
   constructor() { this.reset(); }
   reset() {
-    this.ms = new Float64Array(6); this.counts = new Float64Array(6); this.cur = BUCKET.INTERP; this.last = performance.now(); this.threads = new Map(); this.acc = this.accumulatorFor('main');
+    this.ms = new Float64Array(6); this.counts = new Float64Array(6); this.cur = BUCKET.INTERP; this.last = performance.now(); this.threads = new Map(); this.acc = this.accumulatorFor('main'); this.host = new Map();
   }
   accumulatorFor(name) { let acc = this.threads.get(name); if (acc === undefined) this.threads.set(name, acc = { ms: 0 }); return acc; }
   /** The running thread changed (scheduler): interpreter time from now on counts for `name`. */
@@ -13,15 +13,22 @@ export class TimeBreakdown {
   charge(now) { const d = now - this.last; this.last = now; this.ms[this.cur] += d; if (this.cur === 0) this.acc.ms += d; }
   enter(bucket) { const now = performance.now(); this.charge(now); const previous = this.cur; this.cur = bucket; this.counts[bucket]++; return previous; }
   leave(previous) { this.charge(performance.now()); this.cur = previous; }
+  /** One bridged host call finished: its key, and its inclusive time (host code that runs Java inside counts that Java). */
+  hostCall(key, ms) {
+    let entry = this.host.get(key); if (entry === undefined) { if (this.host.size >= 4000) return; this.host.set(key, entry = { n: 0, ms: 0 }); }
+    entry.n++; entry.ms += ms;
+  }
   snapshot() {
     const copy = new Float64Array(this.ms), now = performance.now(); copy[this.cur] += now - this.last;
     const threads = [...this.threads].map(([name, acc]) => [name, acc.ms]).sort((a, b) => b[1] - a[1]).slice(0, 6);
     if (threads.length) { const live = this.acc; for (const row of threads) if (this.threads.get(row[0]) === live && this.cur === 0) row[1] += now - this.last; }
-    return { ms: Array.from(copy, v => Math.round(v)), counts: Array.from(this.counts, v => Math.round(v)), threads: threads.map(([name, ms]) => [name, Math.round(ms)]) };
+    const short = key => String(key).replace(/^L/, '').replace(/;->/, '.').replace(/\(.*$/, '');
+    const hostRows = [...this.host]; const top = (field) => hostRows.sort((a, b) => b[1][field] - a[1][field]).slice(0, 5).map(([key, v]) => [short(key), v.n, Math.round(v.ms)]);
+    return { hostByCount: top('n'), hostByTime: top('ms'), ms: Array.from(copy, v => Math.round(v)), counts: Array.from(this.counts, v => Math.round(v)), threads: threads.map(([name, ms]) => [name, Math.round(ms)]) };
   }
   static text(snapshot) {
     if (!snapshot) return '';
     const total = snapshot.ms.reduce((a, b) => a + b, 0) || 1;
-    return `Tempo do host: ${snapshot.ms.map((v, i) => `${NAMES[i]} ${v} ms (${Math.round(100 * v / total)}%${snapshot.counts[i] ? ', ' + snapshot.counts[i] + '×' : ''})`).join('; ')}; interpretador por thread: ${snapshot.threads.map(([name, ms]) => `${name} ${ms} ms`).join(', ') || '-'}`;
+    return `Tempo do host: ${snapshot.ms.map((v, i) => `${NAMES[i]} ${v} ms (${Math.round(100 * v / total)}%${snapshot.counts[i] ? ', ' + snapshot.counts[i] + '×' : ''})`).join('; ')}; interpretador por thread: ${snapshot.threads.map(([name, ms]) => `${name} ${ms} ms`).join(', ') || '-'}; chamadas do host mais frequentes: ${(snapshot.hostByCount ?? []).map(([key, n, ms]) => `${key} ${n}× (${ms} ms)`).join(', ') || '-'}; mais lentas (tempo inclusivo): ${(snapshot.hostByTime ?? []).map(([key, n, ms]) => `${key} ${ms} ms (${n}×)`).join(', ') || '-'}`;
   }
 }

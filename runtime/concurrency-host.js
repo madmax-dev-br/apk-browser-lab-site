@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=767bada4613b';
-import { queueObject } from './hidden-members.js?v=767bada4613b';
-import { createHostRegistry } from './host-contract.js?v=767bada4613b';
-import { Blocked, VMThread } from './scheduler.js?v=767bada4613b';
-import { Invoke } from './interpreter.js?v=767bada4613b';
-import { GC_ROOTS } from './heap-gc.js?v=767bada4613b';
+import { APKError } from './apk-error.js?v=342446b1482f';
+import { queueObject } from './hidden-members.js?v=342446b1482f';
+import { createHostRegistry } from './host-contract.js?v=342446b1482f';
+import { Blocked, VMThread } from './scheduler.js?v=342446b1482f';
+import { Invoke } from './interpreter.js?v=342446b1482f';
+import { GC_ROOTS } from './heap-gc.js?v=342446b1482f';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -193,9 +193,11 @@ export function createConcurrencyHost(platform) {
   // deadline); a park that no task can ever end raises the cooperative-deadlock error instead of hanging.
   const LOCK_SUPPORT = 'Ljava/util/concurrent/locks/LockSupport;';
   // park returns a Blocked: the thread leaves the processor until unpark(), an interrupt or the deadline (the permit is consumed on return, like LockSupport.park).
+  const PARK_GRID_MS = 2;
   const parkUntil = (r, ms) => {
     if (ms < (r.stormMitigation ? 5 : 1)) ms = r.stormMitigation ? 5 : 1;   // a park shorter than a millisecond of virtual time would wake every thread of a pool in lockstep, once per host microsecond
     const st = state(r, currentThread(r));     if (st.permit || st.interrupted) { st.permit = false; return undefined; }
+    if (ms < 50) { const now = platform.clock.now(); ms = Math.ceil((now + ms) / PARK_GRID_MS) * PARK_GRID_MS - now; }   // short parks end on a shared grid: a pool of idle workers wakes in one scheduler round instead of one round each
     return block(r, { reason: 'LockSupport.park', ready: () => st.permit, timeoutMs: ms, finish: () => { st.permit = false; } });
   };
   def(LOCK_SUPPORT, 'park', '()V', r => parkUntil(r, Infinity), { static: true });
