@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=dab932c11eb4';
+import { createHostRegistry } from './host-contract.js?v=eb1d4de6032a';
 
 // The system-manager methods an ordinary app calls that the first host passes left out, for a one-user, unmanaged, unlocked phone without fingerprint hardware or thermal HAL
 // (android-13.0.0_r1 UserManager / UserManagerService, KeyguardManager / PhoneWindowManager, PowerManager / ThermalManagerService, FingerprintManager):
@@ -24,9 +24,9 @@ export function createManagersExtrasHost(platform) {
   const userHandle = r => r.dispatch({ owner: HANDLE, name: 'of', parameters: ['I'], result: HANDLE, signature: `(I)${HANDLE}` }, [0], 'static');
   const isUser0 = (r, handle) => !nullish(handle) && r.dispatch({ owner: HANDLE, name: 'getIdentifier', parameters: [], result: 'I', signature: '()I' }, [handle], 'virtual') === 0;
   const callback = (r, target, name, parameters, values) => platform.queueTask(() => { try { call(r, target, r.typeOf(target), name, parameters, 'V', values); } catch (error) { if (!String(error?.message).startsWith('Unsupported API/method')) throw error; } }, 0, [target]);
-  const runOn = (r, executor, task) => {   // Executor.execute(Runnable) with a platform closure
-    if (nullish(executor)) { platform.queueTask(task, 0, []); return; }
-    const runnable = r.allocate(DELIVERY); r.object(runnable).task = task; call(r, executor, EXECUTOR, 'execute', [RUNNABLE], 'V', [runnable]);
+  const runOn = (r, executor, task, roots = []) => {   // Executor.execute(Runnable) with a platform closure; `roots`: the Java values the closure holds (the collector cannot see into it)
+    if (nullish(executor)) { platform.queueTask(task, 0, roots); return; }
+    const runnable = r.allocate(DELIVERY); r.object(runnable).task = task; r.object(runnable).held = roots; call(r, executor, EXECUTOR, 'execute', [RUNNABLE], 'V', [runnable]);
   };
 
   // ---- UserManager
@@ -68,7 +68,7 @@ export function createManagersExtrasHost(platform) {
 
   // ---- PowerManager
   const thermal = platform.thermalListeners ??= [];
-  const notifyThermal = (r, listener, executor) => runOn(r, executor, () => { if (thermal.some(entry => entry.listener.ref === listener.ref)) call(r, listener, r.typeOf(listener), 'onThermalStatusChanged', ['I'], 'V', [0]); });   // THERMAL_STATUS_NONE
+  const notifyThermal = (r, listener, executor) => runOn(r, executor, () => { if (thermal.some(entry => entry.listener.ref === listener.ref)) call(r, listener, r.typeOf(listener), 'onThermalStatusChanged', ['I'], 'V', [0]); }, [listener]);   // THERMAL_STATUS_NONE
   for (const signature of [`(${THERMAL})V`, `(${EXECUTOR}${THERMAL})V`]) def(POWER, 'addThermalStatusListener', signature, (r, _m, args) => {
     const listener = args.at(-1), executor = args.length > 2 ? args[1] : null;
     if (nullish(listener)) r.throwJava('Ljava/lang/NullPointerException;', null);
@@ -150,7 +150,7 @@ export function createManagersExtrasHost(platform) {
     if (!holds(r, 'android.permission.USE_BIOMETRIC')) denied(r, 'Must have android.permission.USE_BIOMETRIC permission.');
     if (call(r, cancel, SIGNAL, 'isCanceled', [], 'Z')) return;   // "Authentication already canceled": the request is dropped
     const i = promptInfo(r, self), error = i.deviceCredential || (i.authenticators & 0x8000) !== 0 ? 14 : 12;
-    runOn(r, executor, () => call(r, authCallback, PROMPT_CALLBACK, 'onAuthenticationError', ['I', CHARS_T], 'V', [error, ERROR_STRINGS[error]]));
+    runOn(r, executor, () => call(r, authCallback, PROMPT_CALLBACK, 'onAuthenticationError', ['I', CHARS_T], 'V', [error, ERROR_STRINGS[error]]), [authCallback]);
   };
   def(PROMPT, 'authenticate', `(${SIGNAL}${EXEC}${PROMPT_CALLBACK})V`, (r, _m, [self, cancel, executor, authCallback]) => authenticate(r, self, null, cancel, executor, authCallback));
   def(PROMPT, 'authenticate', `(${PROMPT_CRYPTO}${SIGNAL}${EXEC}${PROMPT_CALLBACK})V`, (r, _m, [self, crypto, cancel, executor, authCallback]) => {

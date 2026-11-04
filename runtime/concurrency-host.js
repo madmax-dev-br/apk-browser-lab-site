@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=dab932c11eb4';
-import { queueObject } from './hidden-members.js?v=dab932c11eb4';
-import { createHostRegistry } from './host-contract.js?v=dab932c11eb4';
-import { Blocked, VMThread } from './scheduler.js?v=dab932c11eb4';
-import { Invoke } from './interpreter.js?v=dab932c11eb4';
-import { GC_ROOTS } from './heap-gc.js?v=dab932c11eb4';
+import { APKError } from './apk-error.js?v=eb1d4de6032a';
+import { queueObject } from './hidden-members.js?v=eb1d4de6032a';
+import { createHostRegistry } from './host-contract.js?v=eb1d4de6032a';
+import { Blocked, VMThread } from './scheduler.js?v=eb1d4de6032a';
+import { Invoke } from './interpreter.js?v=eb1d4de6032a';
+import { GC_ROOTS } from './heap-gc.js?v=eb1d4de6032a';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -595,7 +595,7 @@ export function createConcurrencyHost(platform) {
     platform.queueTask(fire, delayMs, [futureTask, self]); return futureTask;
   };
   // A recurring task runs its body, then re-arms itself; a one-shot is the FutureTask itself.
-  const runnableFor = (r, futureTask, f, self, fire) => { const s = r.object(futureTask).schedule; if (s.period === 0) return futureTask; const task = r.allocate(WORKER); r.object(task).held = [futureTask, self, f.runnable]; r.object(task).periodic = () => { const wasNew = f.state === 'new'; if (!wasNew) return; try { vcall(r, f.runnable, RUNNABLE, 'run', [], 'V'); } catch (error) { if (!error?.value) throw error; f.state = 'failed'; f.failure = error.value; return; } if (f.state === 'new' && !pool(r, self).shutdown) platform.queueTask(fire, s.period > 0 ? s.period : -s.period); }; return task; };
+  const runnableFor = (r, futureTask, f, self, fire) => { const s = r.object(futureTask).schedule; if (s.period === 0) return futureTask; const task = r.allocate(WORKER); r.object(task).held = [futureTask, self, f.runnable]; r.object(task).periodic = () => { const wasNew = f.state === 'new'; if (!wasNew) return; try { vcall(r, f.runnable, RUNNABLE, 'run', [], 'V'); } catch (error) { if (!error?.value) throw error; f.state = 'failed'; f.failure = error.value; return; } if (f.state === 'new' && !pool(r, self).shutdown) platform.queueTask(fire, s.period > 0 ? s.period : -s.period, [futureTask, self, f.runnable]); }; return task; };
   const ms = (r, t, unit) => Number(vcall(r, unit, UNIT, 'toMillis', ['J'], 'J', [t]));
   def(STPE, 'schedule', `(${RUNNABLE}J${UNIT})Ljava/util/concurrent/ScheduledFuture;`, (r, _m, [self, c, t, u]) => scheduled(r, self, c, ms(r, t, u), 0, () => ({ callable: null, runnable: c, result: null, value: null, state: 'new' })));
   def(STPE, 'schedule', `(${CALLABLE}J${UNIT})Ljava/util/concurrent/ScheduledFuture;`, (r, _m, [self, c, t, u]) => scheduled(r, self, c, ms(r, t, u), 0, () => ({ callable: c, runnable: null, state: 'new' })));

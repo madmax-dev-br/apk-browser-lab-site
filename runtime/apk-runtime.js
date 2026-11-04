@@ -1,27 +1,27 @@
-import { VMClock } from './vm-clock.js?v=dab932c11eb4';
-import { OperationMonitor } from './operation-monitor.js?v=dab932c11eb4';
-import { ExecutionProfile } from './execution-profile.js?v=dab932c11eb4';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=dab932c11eb4';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=dab932c11eb4';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=dab932c11eb4';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=dab932c11eb4';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=dab932c11eb4';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=dab932c11eb4';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=dab932c11eb4';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=dab932c11eb4';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=dab932c11eb4';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=dab932c11eb4';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=dab932c11eb4';
-import { APKError } from './apk-error.js?v=dab932c11eb4';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=dab932c11eb4';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=dab932c11eb4';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=dab932c11eb4';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=dab932c11eb4';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=dab932c11eb4';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=dab932c11eb4';
-import { Scheduler, Blocked } from './scheduler.js?v=dab932c11eb4';
-import { bootClassLacksMember } from './boot-class-members.js?v=dab932c11eb4';
-export { APKError } from './apk-error.js?v=dab932c11eb4';
+import { VMClock } from './vm-clock.js?v=eb1d4de6032a';
+import { OperationMonitor } from './operation-monitor.js?v=eb1d4de6032a';
+import { ExecutionProfile } from './execution-profile.js?v=eb1d4de6032a';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=eb1d4de6032a';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=eb1d4de6032a';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=eb1d4de6032a';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=eb1d4de6032a';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=eb1d4de6032a';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=eb1d4de6032a';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=eb1d4de6032a';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=eb1d4de6032a';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=eb1d4de6032a';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=eb1d4de6032a';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=eb1d4de6032a';
+import { APKError } from './apk-error.js?v=eb1d4de6032a';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=eb1d4de6032a';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=eb1d4de6032a';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=eb1d4de6032a';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=eb1d4de6032a';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=eb1d4de6032a';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=eb1d4de6032a';
+import { Scheduler, Blocked } from './scheduler.js?v=eb1d4de6032a';
+import { bootClassLacksMember } from './boot-class-members.js?v=eb1d4de6032a';
+export { APKError } from './apk-error.js?v=eb1d4de6032a';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -592,6 +592,8 @@ for (const [name, type] of [['AtomicReference', 'Ljava/lang/Object;'], ['AtomicI
 }
 const ABSTRACT_GUARD = globalThis.process?.env?.APKWEB_GUARD_ABSTRACT === '1', ABSTRACT_HOST_TYPES = new Set(['Ljava/util/AbstractMap;', 'Ljava/util/AbstractList;', 'Ljava/util/AbstractCollection;', 'Ljava/util/AbstractSet;']);
 const FINAL_BOX_TYPES = new Set(['Ljava/lang/Long;', 'Ljava/lang/Integer;', 'Ljava/lang/Short;', 'Ljava/lang/Byte;', 'Ljava/lang/Character;', 'Ljava/lang/Boolean;', 'Ljava/lang/Double;', 'Ljava/lang/Float;']);
+/** APKWEB_GC_STRESS=1: collect at every safepoint and before every queued platform task, so a Java reference held only by host code (a closure, a table the collector cannot see) fails at once instead of weeks later. */
+const GC_STRESS = globalThis.process?.env?.APKWEB_GC_STRESS === '1';
 const MAP_TYPES = ['HashMap', 'WeakHashMap', 'LinkedHashMap', 'concurrent/ConcurrentHashMap'];
 EXTERNAL_PARENTS.set('Ljava/util/concurrent/atomic/AtomicReferenceArray;', 'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set('Ljava/util/concurrent/atomic/AtomicReferenceArray;', ['Ljava/io/Serializable;']);
@@ -957,7 +959,7 @@ export class APKRuntime {
     // stopped that legitimate work. A spinning thread still hits the fuse (tests/instruction-budget.test.mjs sets its own small fuse); `maxEventWallMs` bounds host time too.
     this.maxInstructionsPerEvent = maxInstructionsPerEvent; this.maxEventInstructions = maxInstructionsPerEvent * 8;
     // Wall-clock watchdog (host time of one event); 0 = off (tests and probes are deterministic), the Worker turns it on. Checked at every scheduling quantum, so it also trips for code that never switches threads.
-    this.sliceDeadline = 0; this.gcSafeDepth = 0; this.tb = new TimeBreakdown(); this.hostRoots = []; this.hostAllocs = []; this.hostGrace = new Int32Array(8192); this.hostGraceAt = 0; this.vmDrainRuntime = null; this.bytecodeAlloc = false; this.profile = new ExecutionProfile(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
+    this.sliceDeadline = 0; this.gcSafeDepth = 0; this.tb = new TimeBreakdown(); if (GC_STRESS) this.gcEnabled = true; this.hostRoots = []; this.hostAllocs = []; this.hostGrace = new Int32Array(8192); this.hostGraceAt = 0; this.vmDrainRuntime = null; this.bytecodeAlloc = false; this.profile = new ExecutionProfile(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
     this.dex = dex;
     this.classes = dex.resolvedClasses ?? dex.classes;
     this.launcherActivity = launcherActivity;
@@ -1642,9 +1644,11 @@ export class APKRuntime {
     }
   }
   /** True when a collection is due and a long run should reach a safepoint for it (checked at every scheduling quantum, not only at thread switches). */
-  gcWanted() { return this.gcEnabled && this.heap.size > this.gcSafepointFloor && collectionDue(this); }
+  gcWanted() { return this.gcEnabled && (GC_STRESS || (this.heap.size > this.gcSafepointFloor && collectionDue(this))); }
+  /** Stress mode only: a collection at an event boundary (nothing in flight), before the next queued task runs. */
+  stressCollect() { if (GC_STRESS && this.gcEnabled) collectGarbage(this, { reason: 'stress' }); }
   safepointCollect() {
-    if (!this.gcEnabled || !collectionDue(this)) return;
+    if (!this.gcEnabled || (!GC_STRESS && !collectionDue(this))) return;
     collectGarbage(this, { reason: 'safepoint', safepoint: true });
   }
   /** Completes a native's Blocked / Invoke result synchronously for a host caller (nested waits and nested runs). */

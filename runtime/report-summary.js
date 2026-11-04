@@ -1,6 +1,6 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=dab932c11eb4';
+import { TimeBreakdown } from './time-breakdown.js?v=eb1d4de6032a';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -46,7 +46,13 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     if (main.blocked && main.blocker) { try { const releasers = (runtime.scheduler.threads ?? []).filter(t => t !== main && (t.state === 'runnable' || (t.state === 'blocked' && Number.isFinite(t.blocked?.deadline)))).slice(0, 4).map(t => `${t.name} ${t.state}${t.frames?.length ? ' em ' + (t.frames.at(-1).method ? dotted(t.frames.at(-1).method.owner).split('.').pop() + '.' + t.frames.at(-1).method.name : '(host)') : ''}`); out.push(`a thread principal espera por um ${dotted(runtime.typeOf(main.blocker))}; podem liberá-lo: ${releasers.join(', ') || 'nenhuma thread ativa'}`); } catch { /* blocker not inspectable */ } }
     out.push(`thread principal: ${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'espera'})` : ''}${main.nestedDepth ? `, dentro de chamada nativa aninhada (${main.nestedDepth})` : ''}${frames.length ? '; ' + frames.join(' ← ') : ''}`);
   });
-  part(() => { const tb = runtime.tb?.snapshot(); if (tb) { for (const p of tb.pollers ?? []) out.push(`thread ${p.thread} está em polling (${p.perSecond} chamadas do host/s): ${p.calls.map(([key, n]) => `${key} ${n}×`).join(', ')}`); out.push(TimeBreakdown.text(tb)); } });   // where the host time of this operation went
+  part(() => { const tb = runtime.tb?.snapshot(); if (tb) { for (const p of tb.pollers ?? []) {
+      out.push(`thread ${p.thread} está em polling (${p.perSecond} chamadas do host/s): ${p.calls.map(([key, n]) => `${key} ${n}×`).join(', ')}`);
+      // where the loop is: the innermost frames of that thread, application code first (the loop and its exit condition live in the innermost app method)
+      const thread = runtime.scheduler?.threads?.find(candidate => candidate.name === p.thread), frames = (thread?.frames ?? []).filter(frame => frame.method).reverse();
+      const app = frames.filter(frame => !runtime.dex.bootDexes?.has(frame.method.dex)), chosen = (app.length ? app : frames).slice(0, 4);
+      if (chosen.length) out.push(`  laço em: ${chosen.map(frame => `${dotted(frame.method.owner)}.${frame.method.name}`).join(' ← ')} (a condição de saída está no método mais interno)`);
+    } out.push(TimeBreakdown.text(tb)); } });   // where the host time of this operation went
   part(() => {   // the virtual clocks, all on one timeline, and where the queue head sits
     const clock = runtime.platform?.clock; if (!clock?.readings) return; const c = clock.readings(), queue = runtime.platform.eventQueue ?? [];
     const whens = queue.map(event => event.when ?? c.uptime).sort((a, b) => a - b);
