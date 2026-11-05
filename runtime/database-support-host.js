@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=17ba9bd8e48f';
-import { fieldOffset } from './unsafe-native.js?v=17ba9bd8e48f';
+import { createHostRegistry } from './host-contract.js?v=e6a5660dc93e';
+import { fieldOffset } from './unsafe-native.js?v=e6a5660dc93e';
 
 // Platform contract for the hidden/internal framework APIs that android.database and android.database.sqlite (Android 13 sources, compiled into the
 // framework DEX) call: dalvik.system.CloseGuard, dalvik.system.BlockGuard, android.os.FileUtils.setPermissions, android.os.StrictMode SQLite leak

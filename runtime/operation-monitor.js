@@ -1,6 +1,6 @@
-import { TimeBreakdown } from './time-breakdown.js?v=17ba9bd8e48f';
-import { APKError } from './apk-error.js?v=17ba9bd8e48f';
-import { gcBlockReason } from './heap-gc.js?v=17ba9bd8e48f';
+import { TimeBreakdown } from './time-breakdown.js?v=e6a5660dc93e';
+import { APKError } from './apk-error.js?v=e6a5660dc93e';
+import { gcBlockReason } from './heap-gc.js?v=e6a5660dc93e';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,

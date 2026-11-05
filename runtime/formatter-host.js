@@ -1,4 +1,4 @@
-import { createHostRegistry, bitsDouble, bitsFloat } from './host-contract.js?v=17ba9bd8e48f';
+import { createHostRegistry, bitsDouble, bitsFloat } from './host-contract.js?v=e6a5660dc93e';
 
 // java.lang.String.format(...) / java.util.Formatter conversions: %s %S %d %x %X %o %c %b %B %h %n %% %f %e %E %g %G with the flags - # + space 0 , ( and
 // argument indices (%1$s, %<s). Number formatting uses ASCII digits with the locale's decimal/grouping separators from Intl. Date/time (%t) and
@@ -7,6 +7,27 @@ const STRING = 'Ljava/lang/String;', LOCALE = 'Ljava/util/Locale;', OBJECTS = '[
 const SPEC = /%(\d+\$|<)?([-#+ 0,(]*)(\d+)?(?:\.(\d+))?([tT]?[a-zA-Z%])/g;
 
 export function createFormatterHost(platform) {
+
+/**
+ * java.util.Formatter %f / %e of a double (OpenJDK FormattedFloatingDecimal): the digits are the SHORTEST decimal that round-trips (Double.toString's digits), rounded HALF_UP at the requested
+ * precision -- so 1.005 prints 1.01 and 0.125 prints 0.13, where rounding the exact binary value (JavaScript's toFixed) would print 1.00.
+ */
+function shortestDigits(a) { const [mantissa, exponent] = a.toExponential().split('e'); return { digits: mantissa.replace('.', ''), exp10: Number(exponent) }; }
+function javaFixed(a, precision) {
+  if (a === 0) return precision > 0 ? '0.' + '0'.repeat(precision) : '0';
+  const { digits, exp10 } = shortestDigits(a), n = BigInt(digits), k = exp10 - (digits.length - 1) + precision;
+  const rounded = k >= 0 ? n * 10n ** BigInt(k) : (n + 5n * 10n ** BigInt(-k - 1)) / 10n ** BigInt(-k);
+  let text = rounded.toString().padStart(precision + 1, '0');
+  return precision > 0 ? text.slice(0, text.length - precision) + '.' + text.slice(text.length - precision) : text;
+}
+function javaExponential(a, precision) {
+  if (a === 0) return (precision > 0 ? '0.' + '0'.repeat(precision) : '0') + 'e0';
+  const { digits, exp10 } = shortestDigits(a); let exponent = exp10, kept = digits;
+  if (digits.length > precision + 1) { let n = BigInt(digits.slice(0, precision + 1)); if (digits.charCodeAt(precision + 1) >= 53) n += 1n; kept = n.toString(); if (kept.length > precision + 1) { kept = kept.slice(0, precision + 1); exponent++; } }
+  kept = kept.padEnd(precision + 1, '0');
+  return (precision > 0 ? kept[0] + '.' + kept.slice(1) : kept) + 'e' + exponent;
+}
+
   const registry = createHostRegistry(), { def, type } = registry;
   for (const name of ['IllegalFormatException', 'MissingFormatArgumentException', 'UnknownFormatConversionException', 'IllegalFormatConversionException', 'FormatFlagsConversionMismatchException', 'MissingFormatWidthException', 'IllegalFormatPrecisionException'])
     type(`Ljava/util/${name};`, name === 'IllegalFormatException' ? 'Ljava/lang/IllegalArgumentException;' : 'Ljava/util/IllegalFormatException;');
@@ -62,8 +83,8 @@ export function createFormatterHost(platform) {
         const v = b.type === 'Ljava/lang/Float;' ? bitsFloat(b.value) : bitsDouble(b.value);
         if (!Number.isFinite(v)) return Number.isNaN(v) ? 'NaN' : v > 0 ? (flags.includes('+') ? '+Infinity' : 'Infinity') : (flags.includes('(') ? '(Infinity)' : '-Infinity');
         const neg = v < 0 || Object.is(v, -0), a = Math.abs(v), p = precision < 0 ? 6 : precision; let body;
-        if (c === 'f') { body = a.toFixed(Math.min(p, 100)); const [i, f] = body.split('.'); body = (flags.includes(',') ? i.replace(/\B(?=(\d{3})+(?!\d))/g, sep.group) : i) + (f ? sep.decimal + f : (flags.includes('#') ? sep.decimal : '')); }
-        else if (c === 'e') { const [mant, exp] = a.toExponential(Math.min(p, 100)).split('e'); body = mant.replace('.', sep.decimal) + 'e' + (exp[0] === '-' ? '-' : '+') + exp.replace(/^[+-]/, '').padStart(2, '0'); }
+        if (c === 'f') { body = javaFixed(a, Math.min(p, 100)); const [i, f] = body.split('.'); body = (flags.includes(',') ? i.replace(/\B(?=(\d{3})+(?!\d))/g, sep.group) : i) + (f ? sep.decimal + f : (flags.includes('#') ? sep.decimal : '')); }
+        else if (c === 'e') { const [mant, exp] = javaExponential(a, Math.min(p, 100)).split('e'); body = mant.replace('.', sep.decimal) + 'e' + (exp[0] === '-' ? '-' : '+') + exp.replace(/^[+-]/, '').padStart(2, '0'); }
         else { const pp = p === 0 ? 1 : p, rounded = Number(a.toPrecision(pp)); if (rounded !== 0 && (rounded < 1e-4 || rounded >= 10 ** pp)) { const [mant, exp] = a.toExponential(pp - 1).split('e'); body = mant.replace('.', sep.decimal) + 'e' + (exp[0] === '-' ? '-' : '+') + exp.replace(/^[+-]/, '').padStart(2, '0'); } else { const digitsBefore = rounded === 0 ? 1 : Math.floor(Math.log10(rounded)) + 1; body = a.toFixed(Math.max(0, pp - digitsBefore)).replace('.', sep.decimal); } }
         return (neg ? (flags.includes('(') ? '(' : '-') : flags.includes('+') ? '+' : flags.includes(' ') ? ' ' : '') + body + (neg && flags.includes('(') ? ')' : '');
       }

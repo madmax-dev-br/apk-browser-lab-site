@@ -1,12 +1,18 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=17ba9bd8e48f';
+import { TimeBreakdown } from './time-breakdown.js?v=e6a5660dc93e';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
 /** Lines of the summary for `runtime`; never throws (every part is optional). */
 export function reportSummary(runtime, { heartbeat = null, error = null, tela = null } = {}) {
   const out = ['== Resumo ==']; const part = fn => { try { fn(); } catch { /* a part of the summary is unavailable */ } };
+  part(() => {   // a VM error: its message and the innermost Java frames (the message lists them outermost first), so one photo has them
+    const message = error?.message; if (!message || error?.details?.jsStack) return;
+    const frames = [...String(message).matchAll(/(L[^\s:]+?;->[^\s]+?) \[[^\]]+\] at PC (0x[\da-f]+)/gi)].map(([, frame, pc]) => `${dotted(frame.split('->')[0])}.${frame.split('->')[1].replace(/\(.*$/, '')}@${pc}`);
+    const text = String(message).replace(/^(?:L[^\s:]+?;->[^\s]+? \[[^\]]+\] at PC 0x[\da-f]+: )+/i, '');
+    out.push(`ERRO DA VM: ${text.slice(0, 240)}`); if (frames.length) out.push(`  em: ${frames.slice(-6).reverse().join(' ← ')}`);
+  });
   part(() => {   // an internal JavaScript error: its own message and the top frames, so one photo has them
     const stack = error?.details?.jsStack; if (!stack) return;
     const lines = String(stack).split('\n'); out.push(`ERRO INTERNO: ${lines[0]}`);
@@ -55,6 +61,12 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
   part(() => {   // (e) main thread
     const main = runtime.scheduler?.main; if (!main) return;
     const frames = (main.frames ?? []).slice(-6).reverse().map(frame => frame.method ? `${dotted(frame.method.owner)}.${frame.method.name}` : frame.cont ? '(chamada do host)' : '?');
+    { const target = main.blocked?.blocker ?? main.blocker;
+      if (main.blocked && target && !(main.blocker)) { try {
+        const record = runtime.object(target), owner = runtime.monitors?.get(record.id)?.owner;
+        const releasers = (runtime.scheduler.threads ?? []).filter(t => t !== main && (t.state === 'runnable' || (t.state === 'blocked' && Number.isFinite(t.blocked?.deadline)))).slice(0, 4).map(t => `${t.name} ${t.state}`);
+        out.push(`a thread principal espera no monitor de um ${dotted(runtime.typeOf(target))} (${main.blocked.reason}); ${owner ? `monitor em poder de ${owner.name}` : 'nenhuma thread detém o monitor'}; podem chamar notify: ${releasers.join(', ') || 'nenhuma thread ativa'}`);
+      } catch { /* the monitor object is not inspectable */ } } }
     if (main.blocked && main.blocker) { try { const releasers = (runtime.scheduler.threads ?? []).filter(t => t !== main && (t.state === 'runnable' || (t.state === 'blocked' && Number.isFinite(t.blocked?.deadline)))).slice(0, 4).map(t => `${t.name} ${t.state}${t.frames?.length ? ' em ' + (t.frames.at(-1).method ? dotted(t.frames.at(-1).method.owner).split('.').pop() + '.' + t.frames.at(-1).method.name : '(host)') : ''}`); out.push(`a thread principal espera por um ${dotted(runtime.typeOf(main.blocker))}; podem liberá-lo: ${releasers.join(', ') || 'nenhuma thread ativa'}`); } catch { /* blocker not inspectable */ } }
     out.push(`thread principal: ${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'espera'})` : ''}${main.nestedDepth ? `, dentro de chamada nativa aninhada (${main.nestedDepth})` : ''}${frames.length ? '; ' + frames.join(' ← ') : ''}`);
   });
@@ -78,6 +90,16 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
       const group = groups.get(what) ?? groups.set(what, { n: 0, overdue: -Infinity }).get(what); group.n++; group.overdue = Math.max(group.overdue, now - (event.when ?? now));
     }
     out.push(`fila de eventos (${queue.length}): ${[...groups].sort((a, b) => b[1].n - a[1].n).slice(0, 3).map(([what, g]) => `${g.n}× ${what}${g.overdue > 0 ? `, atraso máx ${Math.round(g.overdue)} ms` : ''}`).join('; ')}`);
+  });
+  part(() => {   // a thread that has been executing for a long time without returning
+    const tb = runtime.tb?.snapshot(); if (!tb) return;
+    for (const [name, ms] of tb.threads ?? []) {
+      if (ms < 10000) continue;
+      const thread = runtime.scheduler?.threads?.find(candidate => candidate.name === name); if (!thread || !(thread.frames?.length > 0)) continue;
+      const frames = thread.frames.filter(frame => frame.method).slice(-6).reverse().map(frame => `${dotted(frame.method.owner)}.${frame.method.name}`);
+      const hot = runtime.profile?.topOf?.(name, 3) ?? [];
+      out.push(`thread ${name} executando há ${Math.round(ms / 1000)} s sem retornar (${thread.state}): ${frames.join(' ← ') || '(sem quadros Java)'}${hot.length ? `; métodos mais quentes: ${hot.join(', ')}` : ''}`);
+    }
   });
   part(() => {   // (f) busiest methods
     const busiest = heartbeat?.busiest?.length ? heartbeat.busiest : runtime.profile?.top?.(5);

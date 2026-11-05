@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=17ba9bd8e48f';
+import { APKError } from './apk-error.js?v=e6a5660dc93e';
 
 // Green-thread scheduler for the VM.
 //
@@ -12,7 +12,7 @@ import { APKError } from './apk-error.js?v=17ba9bd8e48f';
 
 /** What a blocking native returns (`roots`: the Java values its closures keep alive while the thread is parked, so a collector can see them): park the calling thread until ready() or the deadline; finish(timedOut) then produces the call's result (or throws, or blocks again). */
 export class Blocked {
-  constructor({ ready, deadline = Infinity, finish = () => undefined, reason = 'blocked', retry = false, interruptible = false, roots = [] }) { this.roots = roots; this.ready = ready; this.deadline = deadline; this.finish = finish; this.reason = reason; this.retry = retry; this.interruptible = interruptible; }
+  constructor({ ready, deadline = Infinity, finish = () => undefined, reason = 'blocked', retry = false, interruptible = false, roots = [], blocker = null }) { this.roots = roots; this.blocker = blocker; this.ready = ready; this.deadline = deadline; this.finish = finish; this.reason = reason; this.retry = retry; this.interruptible = interruptible; }
 }
 
 let nextThreadId = 2;

@@ -9,13 +9,14 @@ const pct = (count, total) => `${Math.round(1000 * count / Math.max(1, total)) /
 export class ExecutionProfile {
   constructor(runtime) { this.rt = runtime; this.active = false; this.reset(); }
   /** A new host event begins: drop what the previous one collected. */
-  reset() { this.active = false; this.samples = 0; this.self = new Map(); this.stacks = new Map(); this.baseline = null; this.hostCalls = new Map(); this.startSteps = 0; }
+  reset() { this.active = false; this.byThread = new Map(); this.samples = 0; this.self = new Map(); this.stacks = new Map(); this.baseline = null; this.hostCalls = new Map(); this.startSteps = 0; }
   /** Called at every scheduling tick of the running thread. */
   tick() {
     if (!this.active) { if (this.rt.steps >= Math.min(PROFILE_AFTER, Math.floor(this.rt.maxInstructionsPerEvent / 10))) this.#start(); return; }
     const frames = this.rt.thread?.frames; if (!frames || frames.length === 0) return;
     const top = frames[frames.length - 1]?.method?.key; if (top === undefined) return;
     this.samples++; this.self.set(top, (this.self.get(top) ?? 0) + 1);
+    { const name = this.rt.thread?.name ?? '?'; let mine = this.byThread.get(name); if (mine === undefined && this.byThread.size < 40) this.byThread.set(name, mine = { samples: 0, self: new Map() }); if (mine) { mine.samples++; mine.self.set(top, (mine.self.get(top) ?? 0) + 1); } }   // per thread: the hottest methods of a thread that runs for a long time
     let signature = short(top); for (let at = frames.length - 2, depth = 0; at >= 0 && depth < 3; at--, depth++) signature += ' < ' + short(frames[at]?.method?.key);
     if (this.stacks.size < 512 || this.stacks.has(signature)) this.stacks.set(signature, (this.stacks.get(signature) ?? 0) + 1);
   }
@@ -25,6 +26,8 @@ export class ExecutionProfile {
   }
   /** A call that reached a host bridge (SHIM/platform) while the profile is active. */
   host(key) { this.hostCalls.set(key, (this.hostCalls.get(key) ?? 0) + 1); }
+  /** The hottest methods of one thread in this window, as `name share`. */
+  topOf(threadName, limit = 3) { const mine = this.byThread.get(threadName); return mine?.samples ? [...mine.self].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => `${short(key)} ${pct(count, mine.samples)}`) : []; }
   /** The `limit` methods with the most own-instruction samples so far (empty until the profile started), as `name share`. */
   top(limit = 3) { return this.active && this.samples ? [...this.self].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => `${short(key)} ${pct(count, this.samples)}`) : []; }
   /** The innermost frames of the running thread, innermost first. */

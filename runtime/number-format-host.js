@@ -1,5 +1,5 @@
-import { gcRoot } from './heap-gc.js?v=17ba9bd8e48f';
-import { createHostRegistry, doubleBits, bitsDouble, bitsFloat } from './host-contract.js?v=17ba9bd8e48f';
+import { gcRoot } from './heap-gc.js?v=e6a5660dc93e';
+import { createHostRegistry, doubleBits, bitsDouble, bitsFloat } from './host-contract.js?v=e6a5660dc93e';
 
 // java.text.NumberFormat / DecimalFormat / DecimalFormatSymbols / FieldPosition and java.util.Currency for the browser VM.
 //
@@ -12,14 +12,31 @@ const STRING = 'Ljava/lang/String;', OBJECT = 'Ljava/lang/Object;', LOCALE = 'Lj
 const MAX_DIGITS = 2147483647, ROUNDING = ['UP', 'DOWN', 'CEILING', 'FLOOR', 'HALF_UP', 'HALF_DOWN', 'HALF_EVEN', 'UNNECESSARY'];
 const CURRENCY_SIGN = '¤', PER_MILLE = '‰';
 
-// ISO 3166 region -> ISO 4217 currency, for Currency.getInstance(Locale) (the engine has no region-to-currency table).
-const REGION_CURRENCY = Object.fromEntries(Object.entries({
-  USD: 'US PR GU VI AS MP EC SV PA TL FM MH PW', EUR: 'DE FR ES IT NL BE AT PT IE FI GR LU SK SI EE LV LT MT CY HR AD MC SM VA ME XK', GBP: 'GB IM JE GG', BRL: 'BR', JPY: 'JP', CNY: 'CN', INR: 'IN', CAD: 'CA', AUD: 'AU', NZD: 'NZ', CHF: 'CH LI',
-  MXN: 'MX', ARS: 'AR', CLP: 'CL', COP: 'CO', PEN: 'PE', UYU: 'UY', PYG: 'PY', BOB: 'BO', VES: 'VE', SEK: 'SE', NOK: 'NO', DKK: 'DK', PLN: 'PL', CZK: 'CZ', HUF: 'HU', RON: 'RO', BGN: 'BG', RUB: 'RU', UAH: 'UA', TRY: 'TR', ILS: 'IL', AED: 'AE',
-  SAR: 'SA', EGP: 'EG', ZAR: 'ZA', NGN: 'NG', KES: 'KE', KRW: 'KR', SGD: 'SG', HKD: 'HK', TWD: 'TW', THB: 'TH', IDR: 'ID', MYR: 'MY', PHP: 'PH', VND: 'VN', PKR: 'PK', BDT: 'BD', AOA: 'AO', MZN: 'MZ',
-}).flatMap(([code, regions]) => regions.split(' ').map(region => [region, code])));
-const NUMERIC = { USD: 840, EUR: 978, GBP: 826, BRL: 986, JPY: 392, CNY: 156, INR: 356, CAD: 124, AUD: 36, NZD: 554, CHF: 756, MXN: 484, ARS: 32, CLP: 152, COP: 170, PEN: 604, UYU: 858, SEK: 752, NOK: 578, DKK: 208, PLN: 985, CZK: 203, HUF: 348,
-  RON: 946, RUB: 643, UAH: 980, TRY: 949, ILS: 376, AED: 784, SAR: 682, EGP: 818, ZAR: 710, NGN: 566, KES: 404, KRW: 410, SGD: 702, HKD: 344, TWD: 901, THB: 764, IDR: 360, MYR: 458, PHP: 608, VND: 704, PKR: 586 };
+// ISO 3166 region -> ISO 4217 currency, for Currency.getInstance(Locale) (the engine has no region-to-currency table); a region without a currency (Antarctica) is absent and gives null, as on Android.
+const REGION_CURRENCY = Object.fromEntries([
+  ['USD', 'US PR GU VI AS MP EC SV PA TL FM MH PW BQ IO TC UM VG'],
+  ['EUR', 'AD AT AX BE BL CY DE EE ES FI FR GF GP GR HR IE IT LT LU LV MC ME MF MQ MT NL PM PT RE SI SK SM TF VA XK YT'],
+  ['GBP', 'GB GG IM JE GS'],
+  ['AUD', 'AU CC CX HM KI NF NR TV'],
+  ['NZD', 'NZ CK NU PN TK'],
+  ['CAD', 'CA'],
+  ['CHF', 'CH LI'],
+  ['DKK', 'DK FO GL'],
+  ['NOK', 'NO SJ BV'],
+  ['XOF', 'BF BJ CI GW ML NE SN TG'],
+  ['XAF', 'CF CG CM GA GQ TD'],
+  ['XCD', 'AG AI DM GD KN LC MS VC'],
+  ['XPF', 'NC PF WF'],
+  ['ILS', 'IL PS'],
+  ['MAD', 'MA EH'],
+  ['ZAR', 'ZA'],
+  ['ANG', 'CW SX'],
+  ['FKP', 'FK'],
+  ['GIP', 'GI'],
+  ['SHP', 'SH'],
+].flatMap(([code, list]) => list.split(' ').map(region => [region, code])).concat('AE AED,AF AFN,AL ALL,AM AMD,AO AOA,AR ARS,AW AWG,AZ AZN,BA BAM,BB BBD,BD BDT,BG BGN,BH BHD,BI BIF,BM BMD,BN BND,BO BOB,BR BRL,BS BSD,BT BTN,BW BWP,BY BYN,BZ BZD,CD CDF,CL CLP,CN CNY,CO COP,CR CRC,CU CUP,CV CVE,CZ CZK,DJ DJF,DO DOP,DZ DZD,EG EGP,ER ERN,ET ETB,FJ FJD,GE GEL,GH GHS,GM GMD,GN GNF,GT GTQ,GY GYD,HK HKD,HN HNL,HT HTG,HU HUF,ID IDR,IN INR,IQ IQD,IR IRR,IS ISK,JM JMD,JO JOD,JP JPY,KE KES,KG KGS,KH KHR,KM KMF,KP KPW,KR KRW,KW KWD,KY KYD,KZ KZT,LA LAK,LB LBP,LK LKR,LR LRD,LS LSL,LY LYD,MD MDL,MG MGA,MK MKD,MM MMK,MN MNT,MO MOP,MR MRU,MU MUR,MV MVR,MW MWK,MX MXN,MY MYR,MZ MZN,NA NAD,NG NGN,NI NIO,NP NPR,OM OMR,PE PEN,PG PGK,PH PHP,PK PKR,PL PLN,PY PYG,QA QAR,RO RON,RS RSD,RU RUB,RW RWF,SA SAR,SB SBD,SC SCR,SD SDG,SE SEK,SG SGD,SL SLL,SO SOS,SR SRD,SS SSP,ST STN,SY SYP,SZ SZL,TH THB,TJ TJS,TM TMT,TN TND,TO TOP,TR TRY,TT TTD,TW TWD,TZ TZS,UA UAH,UG UGX,UY UYU,UZ UZS,VE VES,VN VND,VU VUV,WS WST,YE YER,ZM ZMW,ZW ZWL'.split(',').map(pair => pair.split(' '))));
+// ISO 4217 numeric codes (every currency ICU 70 lists, with the funds codes and the X-codes).
+const NUMERIC = Object.fromEntries(`AED 784, AFN 971, ALL 8, AMD 51, ANG 532, AOA 973, ARS 32, AUD 36, AWG 533, AZN 944, BAM 977, BBD 52, BDT 50, BGN 975, BHD 48, BIF 108, BMD 60, BND 96, BOB 68, BOV 984, BRL 986, BSD 44, BTN 64, BWP 72, BYN 933, BZD 84, CAD 124, CDF 976, CHE 947, CHF 756, CHW 948, CLF 990, CLP 152, CNY 156, COP 170, COU 970, CRC 188, CUC 931, CUP 192, CVE 132, CZK 203, DJF 262, DKK 208, DOP 214, DZD 12, EGP 818, ERN 232, ETB 230, EUR 978, FJD 242, FKP 238, GBP 826, GEL 981, GHS 936, GIP 292, GMD 270, GNF 324, GTQ 320, GYD 328, HKD 344, HNL 340, HRK 191, HTG 332, HUF 348, IDR 360, ILS 376, INR 356, IQD 368, IRR 364, ISK 352, JMD 388, JOD 400, JPY 392, KES 404, KGS 417, KHR 116, KMF 174, KPW 408, KRW 410, KWD 414, KYD 136, KZT 398, LAK 418, LBP 422, LKR 144, LRD 430, LSL 426, LYD 434, MAD 504, MDL 498, MGA 969, MKD 807, MMK 104, MNT 496, MOP 446, MRU 929, MUR 480, MVR 462, MWK 454, MXN 484, MXV 979, MYR 458, MZN 943, NAD 516, NGN 566, NIO 558, NOK 578, NPR 524, NZD 554, OMR 512, PAB 590, PEN 604, PGK 598, PHP 608, PKR 586, PLN 985, PYG 600, QAR 634, RON 946, RSD 941, RUB 643, RWF 646, SAR 682, SBD 90, SCR 690, SDG 938, SEK 752, SGD 702, SHP 654, SLL 694, SOS 706, SRD 968, SSP 728, STN 930, SVC 222, SYP 760, SZL 748, THB 764, TJS 972, TMT 934, TND 788, TOP 776, TRY 949, TTD 780, TWD 901, TZS 834, UAH 980, UGX 800, USD 840, USN 997, UYI 940, UYU 858, UYW 927, UZS 860, VES 928, VND 704, VUV 548, WST 882, XAF 950, XAG 961, XAU 959, XBA 955, XBB 956, XBC 957, XBD 958, XCD 951, XDR 960, XOF 952, XPD 964, XPF 953, XPT 962, XSU 994, XTS 963, XUA 965, XXX 999, YER 886, ZAR 710, ZMW 967, ZWL 932`.split(',').map(pair => pair.trim().split(' ')).map(([code, n]) => [code, Number(n)]));
 
 // ---- exact decimal arithmetic on {digits, scale} (value = BigInt(digits) / 10^scale) --------------------------------------------------------------------------------------------
 const bitsView = new DataView(new ArrayBuffer(8));
@@ -99,7 +116,7 @@ export function createNumberFormatHost(platform) {
   const localeRef = (r, tag) => callStatic(r, LOCALE, 'forLanguageTag', [STRING], LOCALE, [tag]);
 
   // ---- Currency ----------------------------------------------------------------------------------------------------------------------------------------------------------
-  const currencyCodes = new Set(typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('currency') : Object.keys(NUMERIC));
+  const currencyCodes = new Set([...(typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('currency') : []), ...Object.keys(NUMERIC)]);   // ICU's list includes the X-codes (XXX, XAU ...) that Intl leaves out
   const instances = new WeakMap();
   const currencyOf = (r, code) => {
     const table = instances.get(r) ?? instances.set(r, gcRoot(new Map())).get(r);
@@ -107,15 +124,15 @@ export function createNumberFormatHost(platform) {
     return table.get(code);
   };
   const cur = (r, self) => r.object(self).currency ?? r.throwJava('Ljava/lang/IllegalStateException;', 'Currency used before construction');
-  const fractionDigits = code => { try { return new Intl.NumberFormat('en', { style: 'currency', currency: code }).resolvedOptions().maximumFractionDigits; } catch { return 2; } };
+  const fractionDigits = code => { if (code === 'XXX') return -1; try { return new Intl.NumberFormat('en', { style: 'currency', currency: code }).resolvedOptions().maximumFractionDigits; } catch { return 2; } };
   const symbolIn = (code, tag) => { try { return new Intl.NumberFormat(tag, { numberingSystem: 'latn', style: 'currency', currency: code, currencyDisplay: 'symbol' }).formatToParts(1).find(p => p.type === 'currency')?.value ?? code; } catch { return code; } };
   def(CUR, 'getInstance', `(${STRING})${CUR}`, (r, _m, [codeRef]) => {
     if (nullish(codeRef)) npe(r); const code = r.stringCharacters(codeRef);
-    if (!/^[A-Z]{3}$/.test(code) || !currencyCodes.has(code)) iae(r, null); return currencyOf(r, code);
+    if (!/^[A-Z]{3}$/.test(code) || !currencyCodes.has(code)) iae(r, `Unsupported ISO 4217 currency code: ${code}`); return currencyOf(r, code);
   }, { static: true });
   def(CUR, 'getInstance', `(${LOCALE})${CUR}`, (r, _m, [locale]) => {
-    if (nullish(locale)) npe(r); const region = (tagOf(r, locale).split('-').find((p, i) => i > 0 && /^[A-Za-z]{2}$/.test(p)) ?? '').toUpperCase();
-    if (!region) iae(r, null); const code = REGION_CURRENCY[region]; return code ? currencyOf(r, code) : null;
+    if (nullish(locale)) npe(r); const data = r.object(locale).localeData, country = data?.country ?? '';   // the Locale's own country: Locale.ROOT and a bare language have none
+    if (!/^[a-zA-Z]{2}$/.test(country)) iae(r, `Bad country: ${data?.tag ?? ''}`); const code = REGION_CURRENCY[country.toUpperCase()]; return code ? currencyOf(r, code) : null;
   }, { static: true });
   def(CUR, 'getAvailableCurrencies', '()Ljava/util/Set;', r => { const set = r.allocate('Ljava/util/HashSet;'); r.dispatch({ owner: 'Ljava/util/HashSet;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [set], 'direct'); for (const code of currencyCodes) call(r, set, 'Ljava/util/HashSet;', 'add', [OBJECT], 'Z', [currencyOf(r, code)]); return set; }, { static: true });
   def(CUR, 'getCurrencyCode', `()${STRING}`, (r, _m, [self]) => cur(r, self).code);

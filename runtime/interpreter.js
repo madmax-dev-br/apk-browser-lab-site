@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=17ba9bd8e48f';
-import { BUCKET } from './time-breakdown.js?v=17ba9bd8e48f';
-import { Blocked, QUANTUM } from './scheduler.js?v=17ba9bd8e48f';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=17ba9bd8e48f';
+import { APKError } from './apk-error.js?v=e6a5660dc93e';
+import { BUCKET } from './time-breakdown.js?v=e6a5660dc93e';
+import { Blocked, QUANTUM } from './scheduler.js?v=e6a5660dc93e';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=e6a5660dc93e';
 
 // Frame-based DEX interpreter.
 //
@@ -91,8 +91,20 @@ function makeInvokeSite(dex, u, pc, op, a, hi) {
   if (argc !== wordCount(target.parameters) + (mode === 'static' ? 0 : 1)) fail('Invalid invoke argument shape');
   return { target, mode, virtual: mode === 'virtual', isStatic: mode === 'static', argc, first: range ? u[pc + 2] : -1, definition: null, type: null, callee: null, calleeProg: null, poly: null, initialized: false, bridge: null, bridgeEpoch: -1, bridgeType: null };
 }
+/** What kind of value a receiver is, for the "Invalid field/receiver" report: a DEX class instance, a host-modelled object, an array, a class object, a boxed primitive. */
+function receiverKind(rt, type, object) {
+  if (typeof type !== 'string') return 'not an object';
+  if (type.startsWith('[')) return 'array';
+  if (type === 'Ljava/lang/Class;') return 'class object';
+  if (object?.boxed !== undefined) return 'boxed primitive';
+  return rt.classes.has(type) ? 'instance of a DEX class' : 'host-modelled object';
+}
+function invalidField(rt, reference, type, object) {
+  const field = reference ? `${reference.owner}->${reference.name}:${reference.type}` : '(no field reference)';
+  fail(`Invalid field/receiver: the field ${field} (declared by ${reference?.owner ?? '?'}) was accessed on a ${receiverKind(rt, type, object)} of class ${type}, which is not a ${reference?.owner ?? 'subclass'}; thread ${rt.thread?.name ?? '?'}`);
+}
 function fieldSiteFor(rt, reference, type) {
-  if (!reference || !rt.isSubtype(type, reference.owner)) fail('Invalid field/receiver');
+  if (!reference || !rt.isSubtype(type, reference.owner)) invalidField(rt, reference, type, null);
   const field = rt.resolveField(reference);
   return { type, key: field.key, def: defaultValue(field.type) };
 }
@@ -135,7 +147,7 @@ function jitSupport(rt) {
     fuse(max, rt) { rt.budgetExceeded(`Instruction budget (${max}/event) exceeded`); },
     castFail(rt, value, type) { rt.throwJava('Ljava/lang/ClassCastException;', `Cannot cast ${rt.typeOf(value)} to ${type}`); },
     fieldSite(rt, site, reference, object) {
-      if (!reference || !rt.isSubtype(object.type, reference.owner)) fail('Invalid field/receiver');
+      if (!reference || !rt.isSubtype(object.type, reference.owner)) invalidField(rt, reference, object.type, object);
       const field = rt.resolveField(reference); site.key = field.key; site.def = defaultValue(field.type); site.type = object.type;
     },
     staticSite(rt, site, reference, afterWrite = false) {
