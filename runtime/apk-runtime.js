@@ -1,27 +1,27 @@
-import { VMClock } from './vm-clock.js?v=cfff791366ee';
-import { OperationMonitor } from './operation-monitor.js?v=cfff791366ee';
-import { ExecutionProfile } from './execution-profile.js?v=cfff791366ee';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=cfff791366ee';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=cfff791366ee';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=cfff791366ee';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=cfff791366ee';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=cfff791366ee';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=cfff791366ee';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=cfff791366ee';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=cfff791366ee';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=cfff791366ee';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=cfff791366ee';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=cfff791366ee';
-import { APKError } from './apk-error.js?v=cfff791366ee';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=cfff791366ee';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=cfff791366ee';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=cfff791366ee';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=cfff791366ee';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=cfff791366ee';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=cfff791366ee';
-import { Scheduler, Blocked } from './scheduler.js?v=cfff791366ee';
-import { bootClassLacksMember } from './boot-class-members.js?v=cfff791366ee';
-export { APKError } from './apk-error.js?v=cfff791366ee';
+import { VMClock } from './vm-clock.js?v=17ba9bd8e48f';
+import { OperationMonitor } from './operation-monitor.js?v=17ba9bd8e48f';
+import { ExecutionProfile } from './execution-profile.js?v=17ba9bd8e48f';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=17ba9bd8e48f';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=17ba9bd8e48f';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=17ba9bd8e48f';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=17ba9bd8e48f';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=17ba9bd8e48f';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=17ba9bd8e48f';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=17ba9bd8e48f';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=17ba9bd8e48f';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=17ba9bd8e48f';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=17ba9bd8e48f';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=17ba9bd8e48f';
+import { APKError } from './apk-error.js?v=17ba9bd8e48f';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=17ba9bd8e48f';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=17ba9bd8e48f';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=17ba9bd8e48f';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=17ba9bd8e48f';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=17ba9bd8e48f';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=17ba9bd8e48f';
+import { Scheduler, Blocked } from './scheduler.js?v=17ba9bd8e48f';
+import { bootClassLacksMember } from './boot-class-members.js?v=17ba9bd8e48f';
+export { APKError } from './apk-error.js?v=17ba9bd8e48f';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -546,7 +546,7 @@ for(const builder of ['StringBuilder','StringBuffer']){
  // The synthetic covariant bridges javac emits for Appendable (what an Appendable.append call resolves to).
  addBridge('java/lang/'+builder, ['append(Ljava/lang/CharSequence;)Ljava/lang/Appendable;', 'append(Ljava/lang/CharSequence;II)Ljava/lang/Appendable;', 'append(C)Ljava/lang/Appendable;']);
  const self=`Ljava/lang/${builder};`;
- addBridge('java/lang/'+builder, [`delete(II)${self}`,`deleteCharAt(I)${self}`,'setCharAt(IC)V','setLength(I)V',`replace(IILjava/lang/String;)${self}`,`reverse()${self}`,'indexOf(Ljava/lang/String;)I','indexOf(Ljava/lang/String;I)I','lastIndexOf(Ljava/lang/String;)I','lastIndexOf(Ljava/lang/String;I)I','capacity()I','ensureCapacity(I)V','trimToSize()V','substring(I)Ljava/lang/String;','substring(II)Ljava/lang/String;','codePointAt(I)I',`appendCodePoint(I)${self}`,'getChars(II[CI)V',`insert(I[C)${self}`,`insert(I[CII)${self}`,`insert(ILjava/lang/CharSequence;II)${self}`]);
+ addBridge('java/lang/'+builder, [`delete(II)${self}`,`deleteCharAt(I)${self}`,'setCharAt(IC)V','setLength(I)V',`replace(IILjava/lang/String;)${self}`,`reverse()${self}`,'indexOf(Ljava/lang/String;)I','indexOf(Ljava/lang/String;I)I','lastIndexOf(Ljava/lang/String;)I','lastIndexOf(Ljava/lang/String;I)I','capacity()I','ensureCapacity(I)V','trimToSize()V','substring(I)Ljava/lang/String;','substring(II)Ljava/lang/String;','codePointAt(I)I','codePointBefore(I)I','codePointCount(II)I','offsetByCodePoints(II)I',`appendCodePoint(I)${self}`,'getChars(II[CI)V',`insert(I[C)${self}`,`insert(I[CII)${self}`,`insert(ILjava/lang/CharSequence;II)${self}`]);
  for (const t of ['Ljava/lang/String;','Ljava/lang/Object;','Ljava/lang/CharSequence;','I','J','Z','C']) addBridge('java/lang/'+builder, [`insert(I${t})${self}`]);
 }
 for (const type of ['Ljava/lang/String;', 'Ljava/lang/Object;', 'Ljava/lang/CharSequence;', 'I', 'J', 'F', 'D', 'Z', 'C']) {
@@ -569,7 +569,7 @@ addBridge('java/lang/String', ['length()I', 'isEmpty()Z', 'charAt(I)C', 'equals(
 addBridge('java/lang/String', ['indexOf(II)I', 'indexOf(Ljava/lang/String;I)I', 'lastIndexOf(I)I', 'lastIndexOf(II)I',
   'lastIndexOf(Ljava/lang/String;)I', 'lastIndexOf(Ljava/lang/String;I)I', 'startsWith(Ljava/lang/String;I)Z',
   'compareTo(Ljava/lang/String;)I', 'trim()Ljava/lang/String;', 'subSequence(II)Ljava/lang/CharSequence;']);
-addBridge('java/lang/String', ['contains(Ljava/lang/CharSequence;)Z', 'equalsIgnoreCase(Ljava/lang/String;)Z', 'compareToIgnoreCase(Ljava/lang/String;)I', 'codePointAt(I)I', 'intern()Ljava/lang/String;', 'repeat(I)Ljava/lang/String;', 'isBlank()Z',
+addBridge('java/lang/String', ['contains(Ljava/lang/CharSequence;)Z', 'equalsIgnoreCase(Ljava/lang/String;)Z', 'compareToIgnoreCase(Ljava/lang/String;)I', 'codePointAt(I)I', 'codePointBefore(I)I', 'codePointCount(II)I', 'offsetByCodePoints(II)I', 'intern()Ljava/lang/String;', 'repeat(I)Ljava/lang/String;', 'isBlank()Z',
   'contentEquals(Ljava/lang/CharSequence;)Z', 'toLowerCase()Ljava/lang/String;', 'toUpperCase()Ljava/lang/String;']);
 addBridge('java/lang/String', ['copyValueOf([C)Ljava/lang/String;']);
 addBridge('java/lang/String', ['split(Ljava/lang/String;I)[Ljava/lang/String;', 'split(Ljava/lang/String;)[Ljava/lang/String;']);
@@ -2011,6 +2011,23 @@ export class APKRuntime {
       if(SHIMS.has(key)||this.platform?.supports?.(key)||this.skiaHost?.supports?.(key))return {owner:type,name,parameters,result,signature};type=this.parent(type);
     }return null;
   }
+  /** String / AbstractStringBuilder codePointBefore, codePointCount and offsetByCodePoints over UTF-16 text, with the exceptions of libcore. */
+  codePointOps(text, name, args) {
+    const bad = (type, message) => this.throwJava(type, message), high = c => c >= 0xd800 && c <= 0xdbff, low = c => c >= 0xdc00 && c <= 0xdfff;
+    if (name === 'codePointBefore') {
+      const index = int(args[1]); if (index < 1 || index > text.length) bad('Ljava/lang/StringIndexOutOfBoundsException;', `index=${index}, length=${text.length}`);
+      const l = text.charCodeAt(index - 1); if (low(l) && index > 1) { const h = text.charCodeAt(index - 2); if (high(h)) return ((h - 0xd800) << 10) + (l - 0xdc00) + 0x10000; } return l;
+    }
+    if (name === 'codePointCount') {
+      const begin = int(args[1]), end = int(args[2]); if (begin < 0 || begin > end || end > text.length) bad('Ljava/lang/IndexOutOfBoundsException;', `begin ${begin}, end ${end}, length ${text.length}`);
+      let count = end - begin; for (let i = begin; i < end - 1; i++) if (high(text.charCodeAt(i)) && low(text.charCodeAt(i + 1))) { count--; i++; } return count;
+    }
+    let index = int(args[1]); const offset = int(args[2]);   // offsetByCodePoints
+    if (index < 0 || index > text.length) bad('Ljava/lang/IndexOutOfBoundsException;', `index ${index}, length ${text.length}`);
+    if (offset >= 0) { let n = offset; for (; n > 0 && index < text.length; n--) { if (high(text.charCodeAt(index++)) && index < text.length && low(text.charCodeAt(index))) index++; } if (n > 0) bad('Ljava/lang/IndexOutOfBoundsException;', null); }
+    else { let n = -offset; for (; n > 0 && index > 0; n--) { if (low(text.charCodeAt(--index)) && index > 0 && high(text.charCodeAt(index - 1))) index--; } if (n > 0) bad('Ljava/lang/IndexOutOfBoundsException;', null); }
+    return index;
+  }
   boxedHash(object){
     if(object.type==='Ljava/lang/Boolean;')return object.boxed?1231:1237;
     let value=object.boxed;
@@ -3102,6 +3119,7 @@ export class APKRuntime {
       if(name==='copyValueOf'){const source=this.array(args[0]);if(source.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','copyValueOf requires char[]');return utf16String(source.elements.slice());}
       const value = this.stringCharacters(args[0]);
       if(name==='getBytes'){const bytes=encodeString(value,this.stringCodec(method.parameters.length?args[1]:null,false)),result=this.newArray('[B',bytes.length);this.array(result).elements=Array.from(bytes);return result;}
+      if(['codePointBefore','codePointCount','offsetByCodePoints'].includes(name)&&!isNull(args[0])&&this.isStringValue(args[0]))return this.codePointOps(this.stringCharacters(args[0]),name,args);
       if(['contains','equalsIgnoreCase','compareToIgnoreCase','codePointAt','intern','repeat','isBlank','contentEquals'].includes(name)||(['toLowerCase','toUpperCase'].includes(name)&&method.parameters.length===0)){
         const sequence=x=>{if(isNull(x))this.throwJava('Ljava/lang/NullPointerException;',null);return this.isStringValue(x)?this.stringCharacters(x):this.javaString(x);};
         // java.lang.String semantics (libcore android-13.0.0_r1): case folding for equalsIgnoreCase/compareToIgnoreCase is per UTF-16 unit (Character.toUpperCase then toLowerCase).
@@ -3785,6 +3803,7 @@ export class APKRuntime {
         }
         obj.builder=(obj.builder??'')+value;return args[0];
       }
+      if (['codePointBefore','codePointCount','offsetByCodePoints'].includes(name)) return this.codePointOps(obj.builder ?? '', name, args);
       if (['delete','deleteCharAt','setCharAt','setLength','replace','reverse','indexOf','lastIndexOf','capacity','ensureCapacity','trimToSize','substring','codePointAt','appendCodePoint','getChars','insert'].includes(name)) {
         const text = obj.builder ?? '', bad = (kind, message) => this.throwJava(kind, message), limit = value => { if (value.length > 4000000) fail('StringBuilder length limit exceeded'); return value; };
         if (name === 'delete') { const start = int(args[1]); let end = int(args[2]); if (end > text.length) end = text.length; if (start < 0 || start > end) bad('Ljava/lang/StringIndexOutOfBoundsException;', `start ${start}, end ${end}, length ${text.length}`); obj.builder = text.slice(0, start) + text.slice(end); return args[0]; }

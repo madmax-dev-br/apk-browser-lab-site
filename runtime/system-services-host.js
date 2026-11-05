@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=cfff791366ee';
-import { APKError } from './apk-error.js?v=cfff791366ee';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=cfff791366ee';
+import { gcRoot } from './heap-gc.js?v=17ba9bd8e48f';
+import { APKError } from './apk-error.js?v=17ba9bd8e48f';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=17ba9bd8e48f';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -83,17 +83,35 @@ export function createSystemServicesHost(platform) {
     if (!(flags & 2)) { const eol = flags & 4 ? '\r\n' : '\n', lines = out.match(/.{1,76}/g) ?? []; out = lines.length ? lines.join(eol) + (bytes.length ? eol : '') : ''; }
     return out;
   };
-  const b64decode = (r, text, flags) => {
-    const alphabet = flags & 8 ? urlSafe : std, out = []; let acc = 0, bits = 0, pad = 0, sawData = 0;
-    for (const ch of text) {
-      if (ch === ' ' || ch === '\n' || ch === '\r' || ch === '\t') continue;
-      if (ch === '=') { pad++; continue; }
-      const v = alphabet.indexOf(ch); if (v < 0 || pad) r.throwJava('Ljava/lang/IllegalArgumentException;', 'bad base-64');
-      acc = (acc << 6) | v; bits += 6; sawData++; if (bits >= 8) { bits -= 8; out.push((acc >> bits) & 255); acc &= (1 << bits) - 1; }
+  // android.util.Base64.Decoder (android-13.0.0_r1), ported state by state. NOT a strict decoder: every byte that is not in the alphabet (and not '=') is SKIPPED, not rejected -- '-', '_' in a standard
+  // stream, spaces, tabs, line breaks, header text, any byte >= 0x80. "bad base-64" comes only from the state machine: a character after the padding, a lone final symbol (state 1), or a half-finished
+  // padding (state 4). Missing padding is accepted. URL_SAFE swaps '+' '/' for '-' '_' (the other pair is then skipped).
+  const DECODE = new Int8Array(256).fill(-1), DECODE_WEBSAFE = new Int8Array(256).fill(-1);
+  for (let i = 0; i < 64; i++) { DECODE[std.charCodeAt(i)] = i; DECODE_WEBSAFE[urlSafe.charCodeAt(i)] = i; }
+  DECODE[61] = -2; DECODE_WEBSAFE[61] = -2;
+  const b64decodeBytes = (r, input, flags) => {
+    const alphabet = flags & 8 ? DECODE_WEBSAFE : DECODE, output = [];
+    let state = 0, value = 0;
+    for (let p = 0; p < input.length; p++) {
+      const d = alphabet[input[p] & 255];
+      switch (state) {
+        case 0: if (d >= 0) { value = d; state = 1; } else if (d !== -1) return r.throwJava('Ljava/lang/IllegalArgumentException;', 'bad base-64'); break;
+        case 1: if (d >= 0) { value = (value << 6) | d; state = 2; } else if (d !== -1) return r.throwJava('Ljava/lang/IllegalArgumentException;', 'bad base-64'); break;
+        case 2: if (d >= 0) { value = (value << 6) | d; state = 3; } else if (d === -2) { output.push((value >> 4) & 255); state = 4; } else if (d !== -1) return r.throwJava('Ljava/lang/IllegalArgumentException;', 'bad base-64'); break;
+        case 3: if (d >= 0) { value = (value << 6) | d; output.push((value >> 16) & 255, (value >> 8) & 255, value & 255); state = 0; } else if (d === -2) { output.push((value >> 10) & 255, (value >> 2) & 255); state = 5; } else if (d !== -1) return r.throwJava('Ljava/lang/IllegalArgumentException;', 'bad base-64'); break;
+        case 4: if (d === -2) state = 5; else if (d !== -1) return r.throwJava('Ljava/lang/IllegalArgumentException;', 'bad base-64'); break;
+        default: if (d !== -1) return r.throwJava('Ljava/lang/IllegalArgumentException;', 'bad base-64');   // state 5: only skipped bytes may follow the padding
+      }
     }
-    if (sawData % 4 === 1) r.throwJava('Ljava/lang/IllegalArgumentException;', 'bad base-64');
-    return Int8Array.from(out, v => (v << 24) >> 24);
+    switch (state) {   // finish
+      case 1: case 4: return r.throwJava('Ljava/lang/IllegalArgumentException;', 'bad base-64');
+      case 2: output.push((value >> 4) & 255); break;
+      case 3: output.push((value >> 10) & 255, (value >> 2) & 255); break;
+      default: break;
+    }
+    return Int8Array.from(output, v => (v << 24) >> 24);
   };
+  const b64decode = (r, text, flags) => b64decodeBytes(r, new TextEncoder().encode(text), flags);   // String.getBytes(): UTF-8
   const toUnsigned = (r, ref, offset, length) => { const a = r.array(ref).elements; checkRange(r, a, offset, length); return a.slice(offset, offset + length).map(v => v & 255); };
   const bytesArray = (r, signed) => { const array = r.newArray('[B', signed.length); r.array(array).elements = Array.from(signed); return array; };
   def(B64, 'encodeToString', '([BI)Ljava/lang/String;', (r, _m, [a, flags]) => b64encode(toUnsigned(r, a, 0, r.array(a).elements.length), flags), { static: true });
@@ -114,13 +132,13 @@ export function createSystemServicesHost(platform) {
   def(B64OS, 'write', '([B)V', (r, _m, [self, array]) => { const state = b64state(r, self); for (const v of toUnsigned(r, array, 0, r.array(array).elements.length)) state.buffer.push(v); });
   def(B64OS, 'close', '()V', (r, _m, [self]) => {
     const state = b64state(r, self); if (state.closed) return; state.closed = true;
-    const output = state.encode ? new TextEncoder().encode(b64encode(state.buffer, state.flags)) : Uint8Array.from(b64decode(r, String.fromCharCode(...state.buffer), state.flags), v => v & 255);
+    const output = state.encode ? new TextEncoder().encode(b64encode(state.buffer, state.flags)) : Uint8Array.from(b64decodeBytes(r, state.buffer, state.flags), v => v & 255);
     const array = bytesArray(r, Int8Array.from(output, v => (v << 24) >> 24)), stream = (name, parameters, args2) => r.dispatch({ owner: OUTPUT_STREAM, name, parameters, result: 'V', signature: `(${parameters.join('')})V` }, args2, 'virtual');
     stream('write', ['[B', 'I', 'I'], [state.out, array, 0, output.length]);
     if (state.flags & 16) stream('flush', [], [state.out]); else stream('close', [], [state.out]);
   });
-  def(B64, 'decode', '([BI)[B', (r, _m, [a, flags]) => bytesArray(r, b64decode(r, String.fromCharCode(...toUnsigned(r, a, 0, r.array(a).elements.length)), flags)), { static: true });
-  def(B64, 'decode', '([BIII)[B', (r, _m, [a, o, l, flags]) => bytesArray(r, b64decode(r, String.fromCharCode(...toUnsigned(r, a, o, l)), flags)), { static: true });
+  def(B64, 'decode', '([BI)[B', (r, _m, [a, flags]) => bytesArray(r, b64decodeBytes(r, toUnsigned(r, a, 0, r.array(a).elements.length), flags)), { static: true });
+  def(B64, 'decode', '([BIII)[B', (r, _m, [a, o, l, flags]) => bytesArray(r, b64decodeBytes(r, toUnsigned(r, a, o, l), flags)), { static: true });
 
   // ---- String regex helpers = Pattern.compile(regex).matcher(this)... (java.lang.String: replaceAll, replaceFirst, matches) -----------------------------------
   const PATTERN = 'Ljava/util/regex/Pattern;', MATCHER = 'Ljava/util/regex/Matcher;', CS = 'Ljava/lang/CharSequence;';
