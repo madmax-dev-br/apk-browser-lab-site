@@ -1,8 +1,8 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=5312f5d53b01';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=5312f5d53b01';
-import { createDeviceView, createViewState } from './device-view.js?v=5312f5d53b01';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=5312f5d53b01';
-import { formatApiGapReport } from './api-gap-scan.js?v=5312f5d53b01';
+import { APKWorkerClient } from './apk-worker-client.js?v=cfff791366ee';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=cfff791366ee';
+import { createDeviceView, createViewState } from './device-view.js?v=cfff791366ee';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=cfff791366ee';
+import { formatApiGapReport } from './api-gap-scan.js?v=cfff791366ee';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -322,7 +322,7 @@ async function importSource(source, autoRun = false) {
     if (buffer.byteLength > 1024 * 1024 * 1024) throw new Error('O APK excede o limite de 1 GiB.');
     $('file-size').textContent = `${formatSize(buffer.byteLength)} · processado no navegador`;
     state.apiGaps = null;
-    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceState.settings, tolerateMissing: $('tolerate-missing')?.value ?? 'off', keepData: $('keep-app-data')?.checked !== false }); // Ownership transfers to the Worker.
+    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceState.settings, tolerateMissing: $('tolerate-missing')?.value ?? 'off', strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false }); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
     state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);
     showInventory(result.inventory);

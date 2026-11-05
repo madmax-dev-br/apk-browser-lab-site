@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=5312f5d53b01';
-import { queueObject } from './hidden-members.js?v=5312f5d53b01';
-import { createHostRegistry } from './host-contract.js?v=5312f5d53b01';
-import { Blocked, VMThread } from './scheduler.js?v=5312f5d53b01';
-import { Invoke } from './interpreter.js?v=5312f5d53b01';
-import { GC_ROOTS } from './heap-gc.js?v=5312f5d53b01';
+import { APKError } from './apk-error.js?v=cfff791366ee';
+import { queueObject } from './hidden-members.js?v=cfff791366ee';
+import { createHostRegistry } from './host-contract.js?v=cfff791366ee';
+import { Blocked, VMThread } from './scheduler.js?v=cfff791366ee';
+import { Invoke } from './interpreter.js?v=cfff791366ee';
+import { GC_ROOTS } from './heap-gc.js?v=cfff791366ee';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -51,7 +51,10 @@ export function createConcurrencyHost(platform) {
   // ---- java.lang.Thread ---------------------------------------------------------------------------------------------------------------------
   type(THREAD, OBJECT, [RUNNABLE], { allocatable: true });
   type('Ljava/lang/ThreadGroup;', OBJECT, [UEH], { allocatable: true }); type('Ljava/lang/IllegalThreadStateException;', 'Ljava/lang/IllegalArgumentException;'); type(UEH, OBJECT); registry.interfaces.set(UEH, []);
-  let defaultHandler = null, current = null;
+  let current = null;
+  // The default uncaught-exception handler of a process: RuntimeInit installs KillApplicationHandler before app code runs. Libraries chain to it (Thread.getDefaultUncaughtExceptionHandler() at install time).
+  const KILL = 'Lcom/android/internal/os/RuntimeInit$KillApplicationHandler;';
+  const defaultOf = r => r.defaultUncaughtHandler === undefined ? (r.defaultUncaughtHandler = r.allocate(KILL)) : r.defaultUncaughtHandler;
   const nullish = v => v === null || v === undefined || v === 0;
   const mainThread = r => {
     r.mainThread ??= r.makeObject(THREAD); const o = r.object(r.mainThread);
@@ -115,8 +118,10 @@ export function createConcurrencyHost(platform) {
   }
   const uncaught = (r, ref, throwable) => r.finishHostStep(uncaughtInvoke(r, ref, throwable));
   function fatal(r, ref, throwable) {
+    try { r.noteUncaught(state(r, ref).name, throwable); if (r.strictCrash) r.appCrash = { thread: state(r, ref).name, ...r.describeThrowable(throwable), phase: r.monitor?.op?.name ?? null, atMs: Math.round(platform.clock.now()) }; } catch { /* diagnostics only */ }
     r.record(`LOG E AndroidRuntime: FATAL EXCEPTION: ${state(r, ref).name}: ${r.typeOf(throwable)}: ${r.object(throwable).message ?? ''}`);
-    throw new APKError(`Uncaught exception in thread "${state(r, ref).name}": ${r.typeOf(throwable)}${r.object(throwable).message ? ': ' + r.object(throwable).message : ''}`, { kind: 'uncaught-thread-exception' });
+    if (!r.strictCrash) { try { r.noteTolerated(state(r, ref).name, throwable); } catch { /* diagnostics only */ } return undefined; }   // tolerant mode: never silent (see the Resumo), but the app and the other threads keep running
+    const crash = new APKError(`Uncaught exception in thread "${state(r, ref).name}": ${r.typeOf(throwable)}${r.object(throwable).message ? ': ' + r.object(throwable).message : ''}`, { kind: 'uncaught-thread-exception' }); crash.vmFatal = true; throw crash;
   }
   // Thread.start(): a real green thread. Its first frame is the DEX run() (a Thread subclass override, or the Runnable target) so the body can park and resume.
   const THREAD_RUN = { owner: THREAD, name: 'run', parameters: [], result: 'V', signature: '()V' }, RUNNABLE_RUN = { owner: RUNNABLE, name: 'run', parameters: [], result: 'V', signature: '()V' };
@@ -187,8 +192,8 @@ export function createConcurrencyHost(platform) {
   def(THREAD, 'setUncaughtExceptionHandler', `(${UEH})V`, (r, _m, [self, h]) => { state(r, self).handler = h; });
   // A live thread always has a handler on Android: its own, else its ThreadGroup, which forwards to the default handler (apps call it: `thread.getUncaughtExceptionHandler().uncaughtException(t, e)`).
   def(THREAD, 'getUncaughtExceptionHandler', `()${UEH}`, (r, _m, [self]) => { const st = state(r, self); return st.finished ? null : st.handler ?? st.group ?? mainGroup(r); });   // Thread.exit() clears the handler and the group of a terminated thread
-  def(THREAD, 'setDefaultUncaughtExceptionHandler', `(${UEH})V`, (r, _m, [h]) => { defaultHandler = h; }, { static: true });
-  def(THREAD, 'getDefaultUncaughtExceptionHandler', `()${UEH}`, () => defaultHandler, { static: true });
+  def(THREAD, 'setDefaultUncaughtExceptionHandler', `(${UEH})V`, (r, _m, [h]) => { r.defaultUncaughtHandler = nullish(h) ? null : h; }, { static: true });
+  def(THREAD, 'getDefaultUncaughtExceptionHandler', `()${UEH}`, r => defaultOf(r), { static: true });
   // ---- java.util.concurrent.locks.LockSupport over the cooperative scheduler: park() runs the other queued tasks until unpark()/interrupt (or, with a timeout, the
   // deadline); a park that no task can ever end raises the cooperative-deadlock error instead of hanging.
   const LOCK_SUPPORT = 'Ljava/util/concurrent/locks/LockSupport;';
@@ -234,9 +239,13 @@ export function createConcurrencyHost(platform) {
     const g = groupState(r, self);
     try { r.noteUncaught(state(r, thread).name, throwable); } catch { /* diagnostics only */ }   // the root of every uncaught-exception path, also when an app (a coroutine exception handler) calls it directly
     if (g.parent) return new Invoke({ owner: GROUP, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [g.parent, thread, throwable], 'virtual');
-    if (defaultHandler) return new Invoke({ owner: UEH, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [defaultHandler, thread, throwable], 'virtual', null, error => { try { if (error?.value) r.noteHandlerFailure(state(r, thread).name, error.value); } catch { /* diagnostics only */ } throw error; });
-    fatal(r, thread, throwable);
+    if (defaultOf(r)) return new Invoke({ owner: UEH, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [defaultOf(r), thread, throwable], 'virtual', null, error => { try { if (error?.value) r.noteHandlerFailure(state(r, thread).name, error.value); } catch { /* diagnostics only */ } throw error; });
+    // ThreadGroup.uncaughtException with no default handler: Android prints `Exception in thread "name"` and the stack to System.err and carries on
+    r.record(`LOG E System.err: Exception in thread "${state(r, thread).name}" ${r.typeOf(throwable)}: ${r.object(throwable).message ?? ''}`);
   });
+  type(KILL, OBJECT, [UEH], { allocatable: true });
+  // RuntimeInit.KillApplicationHandler: logs `FATAL EXCEPTION: <thread>` with the stack, records the app crash for the reports and ends the app run (the process dies on Android).
+  def(KILL, 'uncaughtException', `(${THREAD}${THROWABLE})V`, (r, _m, [, thread, throwable]) => fatal(r, thread, throwable));   // strict: the run ends; tolerant (the default): the crash is recorded, loudly, and only the failing thread ends
   def(GROUP, '<init>', `(${STRING})V`, (r, _m, [self, n]) => { r.object(self).group = { name: nullish(n) ? null : r.stringCharacters(n), parent: current ? state(r, current).group : mainGroup(r), maxPriority: 10, daemon: false }; });
   def(GROUP, '<init>', `(${GROUP}${STRING})V`, (r, _m, [self, parent, n]) => {
     if (nullish(parent)) r.throwJava('Ljava/lang/NullPointerException;', 'parent == null');

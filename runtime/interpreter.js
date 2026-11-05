@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=5312f5d53b01';
-import { BUCKET } from './time-breakdown.js?v=5312f5d53b01';
-import { Blocked, QUANTUM } from './scheduler.js?v=5312f5d53b01';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=5312f5d53b01';
+import { APKError } from './apk-error.js?v=cfff791366ee';
+import { BUCKET } from './time-breakdown.js?v=cfff791366ee';
+import { Blocked, QUANTUM } from './scheduler.js?v=cfff791366ee';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=cfff791366ee';
 
 // Frame-based DEX interpreter.
 //
@@ -282,6 +282,7 @@ function pump(rt, thread, input) {
         input = { kind: 'result', R, fresh: false }; continue;
       }
       case 'error': {
+        if (input.error?.vmFatal === true) throw input.error;   // the process-ending crash (KillApplicationHandler) is not an exception a handler frame may swallow
         const top = frames[frames.length - 1];
         if (top === undefined || top.cont === undefined) return { error: input.error };
         if (top.cont.onError !== null) {

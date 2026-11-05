@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=5312f5d53b01';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=5312f5d53b01';
-import { inspectELF } from './native-inspector.js?v=5312f5d53b01';
-import { inflateRaw } from './inflate.js?v=5312f5d53b01';
-import { resolveDevice } from './device-profile.js?v=5312f5d53b01';
-import { resourceProfileFor } from './device-configuration.js?v=5312f5d53b01';
-import { JniBridge } from './jni-host.js?v=5312f5d53b01';
-import { providerForApk } from './native-provider-variants.js?v=5312f5d53b01';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=5312f5d53b01';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=5312f5d53b01';
-import { AndroidResources } from './android-resources.js?v=5312f5d53b01';
-import { AndroidPlatform } from './android-platform.js?v=5312f5d53b01';
-import { FrameworkProvider } from './framework-provider.js?v=5312f5d53b01';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=cfff791366ee';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=cfff791366ee';
+import { inspectELF } from './native-inspector.js?v=cfff791366ee';
+import { inflateRaw } from './inflate.js?v=cfff791366ee';
+import { resolveDevice } from './device-profile.js?v=cfff791366ee';
+import { resourceProfileFor } from './device-configuration.js?v=cfff791366ee';
+import { JniBridge } from './jni-host.js?v=cfff791366ee';
+import { providerForApk } from './native-provider-variants.js?v=cfff791366ee';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=cfff791366ee';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=cfff791366ee';
+import { AndroidResources } from './android-resources.js?v=cfff791366ee';
+import { AndroidPlatform } from './android-platform.js?v=cfff791366ee';
+import { FrameworkProvider } from './framework-provider.js?v=cfff791366ee';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -641,6 +641,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
       applicationName: manifest.applicationName, packageName: manifest.packageName, manifest, apkBytes: arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer) }) });
   // Canvas raster cache (src/skia-canvas-host.js): on by default; `rasterCache: false` switches it off for A/B comparison, `rasterCacheVerify: true` re-rasters every hit and fails on a difference.
   runtime.rasterCacheDisabled = options.rasterCache === false; runtime.rasterCacheVerify = options.rasterCacheVerify === true;
+  runtime.strictCrash = options.strictCrash === true;   // an uncaught exception ends the app run (Android) instead of only the thread that failed
   runtime.platform.resourceSelector = resourceConfiguration ?? null; // live device changes re-select resources through the same original ResTable_config matcher
   if (nativeLibraryProvider && [...nativeLibraryProvider.modules.values()].some(entry => entry.apkSha256)) {
     // libraries scoped to one APK (its own generated native code) are offered only to that APK: compared by the SHA-256 of the file

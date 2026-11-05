@@ -1,27 +1,27 @@
-import { VMClock } from './vm-clock.js?v=5312f5d53b01';
-import { OperationMonitor } from './operation-monitor.js?v=5312f5d53b01';
-import { ExecutionProfile } from './execution-profile.js?v=5312f5d53b01';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=5312f5d53b01';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=5312f5d53b01';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=5312f5d53b01';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=5312f5d53b01';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=5312f5d53b01';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=5312f5d53b01';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=5312f5d53b01';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=5312f5d53b01';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=5312f5d53b01';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=5312f5d53b01';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=5312f5d53b01';
-import { APKError } from './apk-error.js?v=5312f5d53b01';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=5312f5d53b01';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=5312f5d53b01';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=5312f5d53b01';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=5312f5d53b01';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=5312f5d53b01';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=5312f5d53b01';
-import { Scheduler, Blocked } from './scheduler.js?v=5312f5d53b01';
-import { bootClassLacksMember } from './boot-class-members.js?v=5312f5d53b01';
-export { APKError } from './apk-error.js?v=5312f5d53b01';
+import { VMClock } from './vm-clock.js?v=cfff791366ee';
+import { OperationMonitor } from './operation-monitor.js?v=cfff791366ee';
+import { ExecutionProfile } from './execution-profile.js?v=cfff791366ee';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=cfff791366ee';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=cfff791366ee';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=cfff791366ee';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=cfff791366ee';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=cfff791366ee';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=cfff791366ee';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=cfff791366ee';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=cfff791366ee';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=cfff791366ee';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=cfff791366ee';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=cfff791366ee';
+import { APKError } from './apk-error.js?v=cfff791366ee';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=cfff791366ee';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=cfff791366ee';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=cfff791366ee';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=cfff791366ee';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=cfff791366ee';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=cfff791366ee';
+import { Scheduler, Blocked } from './scheduler.js?v=cfff791366ee';
+import { bootClassLacksMember } from './boot-class-members.js?v=cfff791366ee';
+export { APKError } from './apk-error.js?v=cfff791366ee';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1614,6 +1614,12 @@ export class APKRuntime {
     if (previous && value && (previous.ref === value.ref || previous.handlerFailure?.ref === value.ref)) return;   // the same throwable reaching a second dispatch point, or the failure of the handler that was just recorded as such   // the same throwable reaching a second dispatch point (thread death, then the ThreadGroup)
     const entry = { thread: key, ref: value?.ref, ...this.describeThrowable(value), count: (previous?.count ?? 0) + 1, handlerFailure: null };
     table.delete(key); table.set(key, entry); if (table.size > 60) table.delete(table.keys().next().value);
+  }
+  /** Tolerant mode: a fatal exception the default handler let pass. Counted per distinct exception (class, message, top frame) so the report says it once with a count. */
+  noteTolerated(threadName, value) {
+    const table = this.toleratedFatals ??= new Map(), described = this.describeThrowable(value), key = `${described.type}|${described.message}|${described.stack[0] ?? ''}`;
+    const entry = table.get(key) ?? (table.size < 40 ? table.set(key, { ...described, threads: new Set(), count: 0, firstAtMs: Math.round(this.platform?.clock?.now?.() ?? 0), phase: this.monitor?.op?.name ?? null }).get(key) : null);
+    if (entry) { entry.count++; entry.threads.add(String(threadName)); }
   }
   /** The uncaught-exception handler itself threw: keeps the original and records what the handler threw. */
   noteHandlerFailure(threadName, value) {

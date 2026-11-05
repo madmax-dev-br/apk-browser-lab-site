@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=5312f5d53b01">
-  <meta name="apk-browser-build" content="5312f5d53b01">
+  <link rel="stylesheet" href="./styles.css?v=cfff791366ee">
+  <meta name="apk-browser-build" content="cfff791366ee">
 </head>
 <body>
   <header class="topbar">
@@ -64,6 +64,7 @@
           </details>
           <label class="tolerant-toggle" for="tolerate-missing"><span>Modo tolerante: APIs do Android que faltam viram <code>STUB-VOID</code>/<code>STUB-RETURN</code> no log em vez de parar o app</span><select id="tolerate-missing"><option value="off">Desligado (estrito)</option><option value="void">Só métodos void</option><option value="primitives" selected>void e primitivos (0, false)</option><option value="all">Todos os tipos (0, false, null)</option></select></label>
           <div class="app-data-row" id="app-data-row">
+            <label class="tolerant-toggle" for="strict-crash"><span>Modo estrito de falhas: uma exceção fatal em qualquer thread encerra o app (como o Android). Desligado, ela é registrada como <code>FATAL (tolerada)</code> no resumo e só a thread que falhou termina</span><input id="strict-crash" type="checkbox"></label>
             <label class="tolerant-toggle" for="keep-app-data"><span>Manter dados do app entre recargas (SharedPreferences, bancos SQLite, arquivos e cache do app, por pacote e certificado)</span><input id="keep-app-data" type="checkbox" checked></label>
             <p id="app-data-usage" class="support-note" role="status" aria-live="polite">Dados do app: abra um APK para ver o uso.</p>
             <button id="clear-app-data" class="device-reset" type="button" disabled>Limpar dados do app</button>
@@ -103,7 +104,7 @@
     </details>
     <footer><span><span class="footer-dot"></span> Sem instalação. Sem emulador. Sem upload.</span><a href="./hermes-proof/">Experimento Hermes no navegador ↗</a><span>APK Browser Lab <span class="footer-slash">/</span> protótipo técnico</span></footer>
   </main>
-  <script type="module" src="./app.js?v=5312f5d53b01"></script>
+  <script type="module" src="./app.js?v=cfff791366ee"></script>
 <div id="summary-overlay" class="summary-overlay" role="dialog" aria-label="Resumo" hidden><button id="summary-close" type="button">Fechar</button><pre id="summary-text"></pre></div>
 </body>
 </html>

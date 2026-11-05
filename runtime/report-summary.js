@@ -1,6 +1,6 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=5312f5d53b01';
+import { TimeBreakdown } from './time-breakdown.js?v=cfff791366ee';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -18,6 +18,15 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     out.push(`Memória: ${live} de ${limit} objetos vivos (${Math.round(100 * live / limit)}%), ~${Math.round(live * BYTES_PER_OBJECT / MiB)} MiB estimados; ${last ? `última coleta liberou ${last.before - last.after} (${last.before} → ${last.after}); ${runtime.gcStats?.collections ?? 0} coletas` : 'nenhuma coleta ainda'}${runtime.oomCount ? `; OutOfMemoryError ${runtime.oomCount}×` : ''}`);
   });
   if (tela?.length) out.push(...tela);   // "Tela:" lines computed by the screen-state report (activity, first frame verdict, Compose, layout)
+  part(() => {   // fatal exceptions the tolerant mode let pass: never silent
+    const table = runtime.toleratedFatals; if (!table?.size) return;
+    out.push(`FATAL (tolerada) — o modo tolerante deixou o app continuar; só a thread que falhou terminou (${[...table.values()].reduce((sum, e) => sum + e.count, 0)} ocorrências, ${table.size} distintas):`);
+    for (const e of [...table.values()].slice(0, 4)) out.push(`  ${e.count}× ${e.type}${e.message ? ': ' + e.message.slice(0, 140) : ''} [${[...e.threads].slice(0, 3).join(', ')}]${e.stack?.length ? '  em ' + e.stack.slice(0, 6).map(frame => String(frame).split('.').slice(-2).join('.')).join(' ← ') : ''}`);
+  });
+  part(() => {   // the app crash: the default handler (KillApplicationHandler) ended the run
+    const crash = runtime.appCrash; if (!crash) return;
+    out.push(`FATAL EXCEPTION: ${crash.thread}: ${crash.type}${crash.message ? ': ' + crash.message.slice(0, 140) : ''}${crash.stack?.length ? '  em ' + crash.stack.slice(0, 6).map(frame => String(frame).split('.').slice(-2).join('.')).join(' ← ') : ''}${crash.phase ? ` (fase: ${crash.phase}, ${crash.atMs} ms virtuais)` : ''}`);
+  });
   part(() => {   // every OutOfMemoryError: which limit, where
     const log = runtime.oomLog; if (!log?.length) return;
     for (const entry of log.slice(-3)) out.push(`OOM (${entry.kind}) em ${entry.thread ?? '?'}: ${entry.frames.join(' ← ') || entry.hostCall || 'código do host'}; objetos ${entry.objects}/${entry.maxObjects}, campos ${entry.fieldSlots}/${entry.maxFieldSlots}, células de arrays ${entry.arrayCells}/${entry.maxArrayCells}, de coleções ${entry.collectionCells}/${entry.maxCollectionCells}`);
