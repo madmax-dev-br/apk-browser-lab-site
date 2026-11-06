@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=2af81fe8368d';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=2af81fe8368d';
-import { installNetworkCallbacks } from './network-callbacks.js?v=2af81fe8368d';
-import { createHostRegistry } from './host-contract.js?v=2af81fe8368d';
-import { resolveDevice } from './device-profile.js?v=2af81fe8368d';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=2af81fe8368d';
-import { gcRoot } from './heap-gc.js?v=2af81fe8368d';
+import { APKError } from './apk-error.js?v=e35c2f3b606f';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=e35c2f3b606f';
+import { installNetworkCallbacks } from './network-callbacks.js?v=e35c2f3b606f';
+import { createHostRegistry } from './host-contract.js?v=e35c2f3b606f';
+import { resolveDevice } from './device-profile.js?v=e35c2f3b606f';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=e35c2f3b606f';
+import { gcRoot } from './heap-gc.js?v=e35c2f3b606f';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -23,7 +23,7 @@ export function createDeviceStateHost(platform) {
   const INTENT = 'Landroid/content/Intent;', RECEIVER = 'Landroid/content/BroadcastReceiver;', FILTER = 'Landroid/content/IntentFilter;', CONTEXT = 'Landroid/content/Context;', CONTEXT_WRAPPER = 'Landroid/content/ContextWrapper;', STRING = 'Ljava/lang/String;', HANDLER = 'Landroid/os/Handler;';
   const BATTERY = 'Landroid/os/BatteryManager;', CONNECTIVITY = 'Landroid/net/ConnectivityManager;', NETWORK = 'Landroid/net/Network;', CAPABILITIES = 'Landroid/net/NetworkCapabilities;', NET_INFO = 'Landroid/net/NetworkInfo;', CALLBACK = 'Landroid/net/ConnectivityManager$NetworkCallback;', REQUEST = 'Landroid/net/NetworkRequest;', REQUEST_BUILDER = 'Landroid/net/NetworkRequest$Builder;';
   type(RECEIVER, 'Ljava/lang/Object;', [], { allocatable: true }); type(FILTER, 'Ljava/lang/Object;', [], { allocatable: true }); type(CALLBACK, 'Ljava/lang/Object;', [], { allocatable: true });
-  type(BATTERY, 'Ljava/lang/Object;'); type(CONNECTIVITY, 'Ljava/lang/Object;'); type(NETWORK, 'Ljava/lang/Object;', [], { allocatable: true }); type(CAPABILITIES, 'Ljava/lang/Object;', [], { allocatable: true }); type(NET_INFO, 'Ljava/lang/Object;', [], { allocatable: true }); type(REQUEST, 'Ljava/lang/Object;', [], { allocatable: true }); type(REQUEST_BUILDER, 'Ljava/lang/Object;', [], { allocatable: true });
+  type(BATTERY, 'Ljava/lang/Object;'); type(CONNECTIVITY, 'Ljava/lang/Object;'); type(NETWORK, 'Ljava/lang/Object;', [], { allocatable: true }); type(CAPABILITIES, 'Ljava/lang/Object;', [], { allocatable: true }); type(REQUEST, 'Ljava/lang/Object;', [], { allocatable: true }); type(REQUEST_BUILDER, 'Ljava/lang/Object;', [], { allocatable: true });
   const registrations = gcRoot([]), callbacks = gcRoot([]), sent = { broadcasts: 0 };
   const filterOf = (r, ref) => { const o = r.object(ref); return o.intentFilter ??= { actions: [] }; };
   def(RECEIVER, '<init>', '()V', () => {}); def(RECEIVER, 'isOrderedBroadcast', '()Z', () => 0); def(RECEIVER, 'isInitialStickyBroadcast', '()Z', (r, _m, [self]) => r.object(self).initialSticky ? 1 : 0);
@@ -92,13 +92,7 @@ export function createDeviceStateHost(platform) {
   // NetworkCapabilities.getSignalStrength: a Wi-Fi network reports its RSSI (the same -50 dBm WifiInfo.getRssi gives for the connected virtual access point); a cellular network leaves it unspecified.
   def(CAPABILITIES, 'getSignalStrength', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? -50 : -2147483648);
   def(CAPABILITIES, 'toString', `()${STRING}`, (r, _m, [self]) => `[ Transports: ${r.object(self).transport === 1 ? 'WIFI' : 'CELLULAR'} Capabilities: INTERNET${r.object(self).metered ? '' : '&NOT_METERED'}&VALIDATED ]`);
-  const netInfo = r => { const network = activeNetwork(r); if (!network) return null; const info = r.makeObject(NET_INFO); r.object(info).transport = r.object(network).transport; return info; };
-  def(NET_INFO, 'isConnected', '()Z', (r, _m, [self]) => r.object(self).connected === false ? 0 : 1); def(NET_INFO, 'isConnectedOrConnecting', '()Z', (r, _m, [self]) => r.object(self).connected === false ? 0 : 1); def(NET_INFO, 'isAvailable', '()Z', (r, _m, [self]) => r.object(self).connected === false ? 0 : 1); def(NET_INFO, 'getType', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? 1 : 0);
-  def(NET_INFO, 'getTypeName', `()${STRING}`, (r, _m, [self]) => r.object(self).transport === 1 ? 'WIFI' : 'MOBILE'); def(NET_INFO, 'isRoaming', '()Z', () => 0);
-  def(CONNECTIVITY, 'getActiveNetwork', `()${NETWORK}`, r => activeNetwork(r)); def(CONNECTIVITY, 'getActiveNetworkInfo', `()${NET_INFO}`, r => netInfo(r));
-  def(CONNECTIVITY, 'getNetworkInfo', `(${NETWORK})${NET_INFO}`, (r, _m, [, network]) => network ? netInfo(r) : null);   // deprecated since API 29, still called by NetInfo/Sentry-era code
-  // getNetworkInfo(type) (deprecated): the device has the Wi-Fi (1) and mobile (0) radios; the info is connected when that transport is the active network and disconnected otherwise. Other types do not exist (null).
-  def(CONNECTIVITY, 'getNetworkInfo', '(I)' + NET_INFO, (r, _m, [, type_]) => { if (type_ !== 0 && type_ !== 1) return null; const active = activeNetwork(r), info = r.makeObject(NET_INFO); r.object(info).transport = type_; r.object(info).connected = !!active && r.object(active).transport === type_; return info; });
+  def(CONNECTIVITY, 'getActiveNetwork', `()${NETWORK}`, r => activeNetwork(r));   // NetworkInfo answers: network-info-host.js
   def(CONNECTIVITY, 'getNetworkCapabilities', `(${NETWORK})${CAPABILITIES}`, (r, _m, [, network]) => network ? capabilitiesFor(r, network) : null);
   def(CONNECTIVITY, 'isActiveNetworkMetered', '()Z', r => { const n = activeNetwork(r); return n && r.object(n).transport === 0 ? 1 : 0; });
   def(CONNECTIVITY, 'getAllNetworks', `()[${NETWORK}`, r => { const n = activeNetwork(r), array = r.newArray(`[${NETWORK}`, n ? 1 : 0); if (n) r.array(array).elements = [n]; return array; });
@@ -134,8 +128,6 @@ export function createDeviceStateHost(platform) {
   def(TELEPHONY, 'getNetworkType', '()I', () => onMobile() ? 13 : 0);   // NETWORK_TYPE_LTE / UNKNOWN
   def(TELEPHONY, 'isNetworkRoaming', '()Z', () => 0); def(TELEPHONY, 'hasCarrierPrivileges', '()Z', () => 0); def(TELEPHONY, 'isVoiceCapable', '()Z', () => 1);
   def(TELEPHONY, 'getPhoneCount', '()I', () => 1); def(TELEPHONY, 'getActiveModemCount', '()I', () => 1); def(TELEPHONY, 'isDataEnabled', '()Z', () => onMobile() ? 1 : 0);
-  def(NET_INFO, 'getSubtype', '()I', (r, _m, [self]) => r.object(self).transport === 1 ? 0 : 13);
-  def(NET_INFO, 'getSubtypeName', `()${STRING}`, (r, _m, [self]) => r.object(self).transport === 1 ? '' : 'LTE');
   const SERVICE_TYPES = { batterymanager: BATTERY, connectivity: CONNECTIVITY, phone: TELEPHONY };
   const getService = (r, name) => { const typeName = SERVICE_TYPES[name]; if (!typeName) return null; const cache = platform.deviceServiceObjects ??= new Map(); if (!cache.has(name)) cache.set(name, r.makeObject(typeName)); return cache.get(name); };
   const notify = (r, previous, next, diff) => {
@@ -154,7 +146,10 @@ export function createDeviceStateHost(platform) {
       platform.telephonyHost?.connectivityChanged(r);
       r.network?.connectivityChanged();
       const network = activeNetwork(r);
-      deliver(r, 'android.net.conn.CONNECTIVITY_CHANGE', () => ({ networkType: ['I', network ? (r.object(network).transport === 1 ? 1 : 0) : -1], noConnectivity: ['Z', network ? 0 : 1], isFailover: ['Z', 0], inetCondition: ['I', network ? 100 : 0] }));
+      deliver(r, 'android.net.conn.CONNECTIVITY_CHANGE', () => {   // ConnectivityService.sendConnectedBroadcast: networkInfo (the changed network, disconnected when none is left), networkType, noConnectivity, extraInfo, inetCondition
+        const described = platform.networkInfoHost.connectivityBroadcastInfo(r, previous.connectivity), extra = r.object(described.current).networkInfo.extra;
+        return { networkInfo: ['Landroid/os/Parcelable;', described.current], networkType: ['I', network ? (r.object(network).transport === 1 ? 1 : 0) : -1], noConnectivity: ['Z', network ? 0 : 1], isFailover: ['Z', 0], ...(extra ? { extraInfo: [STRING, extra] } : {}), inetCondition: ['I', network ? 100 : 0] };
+      });
       networkCallbacks.connectivityChanged(r);
     }
   };

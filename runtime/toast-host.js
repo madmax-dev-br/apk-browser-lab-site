@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=2af81fe8368d';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=2af81fe8368d';
+import { createHostRegistry } from './host-contract.js?v=e35c2f3b606f';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=e35c2f3b606f';
 
 // android.widget.Toast (android-13.0.0_r1 Toast.java + NotificationManagerService toast queue) for the virtual device: toasts of this app are shown one at a time in the order they were shown;
 // a toast stays LENGTH_SHORT (2000 ms) or LENGTH_LONG (3500 ms) of VM time, then the next one comes up. At most 5 toasts of the package wait in the queue (MAX_PACKAGE_TOASTS): later ones are

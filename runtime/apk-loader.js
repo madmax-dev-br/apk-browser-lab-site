@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=2af81fe8368d';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=2af81fe8368d';
-import { inspectELF } from './native-inspector.js?v=2af81fe8368d';
-import { inflateRaw } from './inflate.js?v=2af81fe8368d';
-import { resolveDevice } from './device-profile.js?v=2af81fe8368d';
-import { resourceProfileFor } from './device-configuration.js?v=2af81fe8368d';
-import { JniBridge } from './jni-host.js?v=2af81fe8368d';
-import { providerForApk } from './native-provider-variants.js?v=2af81fe8368d';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=2af81fe8368d';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=2af81fe8368d';
-import { AndroidResources } from './android-resources.js?v=2af81fe8368d';
-import { AndroidPlatform } from './android-platform.js?v=2af81fe8368d';
-import { FrameworkProvider } from './framework-provider.js?v=2af81fe8368d';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=e35c2f3b606f';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=e35c2f3b606f';
+import { inspectELF } from './native-inspector.js?v=e35c2f3b606f';
+import { inflateRaw } from './inflate.js?v=e35c2f3b606f';
+import { resolveDevice } from './device-profile.js?v=e35c2f3b606f';
+import { resourceProfileFor } from './device-configuration.js?v=e35c2f3b606f';
+import { JniBridge } from './jni-host.js?v=e35c2f3b606f';
+import { providerForApk } from './native-provider-variants.js?v=e35c2f3b606f';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=e35c2f3b606f';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=e35c2f3b606f';
+import { AndroidResources } from './android-resources.js?v=e35c2f3b606f';
+import { AndroidPlatform } from './android-platform.js?v=e35c2f3b606f';
+import { FrameworkProvider } from './framework-provider.js?v=e35c2f3b606f';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -724,5 +724,6 @@ export async function loadAPK(arrayBuffer, options = {}) {
   await report('complete', dexFiles.length, dexFiles.length, undefined, `Loaded ${dexFiles.length} DEX files and ${program.classes.size} classes`);
   let signingCertificates;   // read on first PackageManager request: the APK's signer certificates
   runtime.apkSigningCertificates = () => signingCertificates ??= apkSigningCertificates(archive);
+  runtime.apkFileSource = () => ({ bytes: archive.reader.bytes, archive });   // the loaded base APK: PackageManager.requestChecksums
   return { runtime, inventory, inspectNativeLibraries, archive };
 }

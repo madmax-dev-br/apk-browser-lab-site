@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=2af81fe8368d';
-import { APKError } from './apk-error.js?v=2af81fe8368d';
+import { createHostRegistry } from './host-contract.js?v=e35c2f3b606f';
+import { APKError } from './apk-error.js?v=e35c2f3b606f';
 
 // android.content.pm.PackageManager public API (API 33) that the package model of app-services-host does not answer yet, ported from android-13.0.0_r1 PackageManager.java /
 // ApplicationPackageManager.java for a device with this app and the system packages of that model. Flag-holder overloads (ComponentInfoFlags / PackageInfoFlags / ResolveInfoFlags) forward to the
@@ -175,7 +175,6 @@ export function createPackageManagerApiHost(platform) {
   // PackageManager.getInstallSourceInfo(String): InstallSourceInfo is the original class. The loaded APK was side-loaded into the lab, so no installer, initiating or originating package exists
   // (and with no initiating package there is no initiating signing info); an unknown package is a NameNotFoundException, exactly as ApplicationPackageManager turns the service's null.
   def(PM, 'getInstallSourceInfo', `(${STRING})Landroid/content/pm/InstallSourceInfo;`, (r, _m, [, name]) => { known(r, name); return construct(r, 'Landroid/content/pm/InstallSourceInfo;', [STRING, 'Landroid/content/pm/SigningInfo;', STRING, STRING], [null, null, null, null]); });
-  def(PM, 'requestChecksums', `(${STRING}ZILjava/util/List;Landroid/content/pm/PackageManager$OnChecksumsReadyListener;)V`, () => unsupported('PackageManager.requestChecksums: APK checksums are not computed by the lab', 'checksums-unsupported'));
   def(PM, 'getChangedPackages', '(I)Landroid/content/pm/ChangedPackages;', () => null);
   def(PM, 'getInstalledModules', `(I)${LIST}`, r => emptyList(r)); def(PM, 'getModuleInfo', `(${STRING}I)Landroid/content/pm/ModuleInfo;`, (r, _m, [, name]) => notFound(r, text(r, name)));
   def(PM, 'queryInstrumentation', `(${STRING}I)${LIST}`, r => emptyList(r)); def(PM, 'getInstrumentationInfo', `(${COMPONENT}I)Landroid/content/pm/InstrumentationInfo;`, (r, _m, [, component]) => notFound(r, text(r, call(r, component, OBJECT, 'toString', [], STRING))));
