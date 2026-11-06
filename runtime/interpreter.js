@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=e35c2f3b606f';
-import { BUCKET } from './time-breakdown.js?v=e35c2f3b606f';
-import { Blocked, QUANTUM } from './scheduler.js?v=e35c2f3b606f';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=e35c2f3b606f';
+import { APKError } from './apk-error.js?v=3f91c6782bdb';
+import { BUCKET } from './time-breakdown.js?v=3f91c6782bdb';
+import { Blocked, QUANTUM } from './scheduler.js?v=3f91c6782bdb';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=3f91c6782bdb';
 
 // Frame-based DEX interpreter.
 //
@@ -380,6 +380,7 @@ function runLoop(rt, owner, base) {
         // ---- thread switch: pick a runnable thread (waiting for events/timers while the owner is blocked), then resume it
         let picked = null;
         for (;;) {
+          if (owner !== null && owner.state === 'blocked') sched.serviceEvents();   // threads that never stop must not starve the host event queue while the owner waits
           const choice = sched.pick(thread, owner);
           if (choice.thread !== null) { picked = choice.thread; break; }
           if (owner === null) return undefined;                         // nothing runnable: this slice is over
@@ -453,10 +454,10 @@ function runLoop(rt, owner, base) {
           }
           case 0x1f: {
             const type = dex.types[u[pc + 1]], value = regs[a]; if (!type) fail('Invalid type index');
-            if (!isNull(value) && !rt.isSubtype(rt.typeOf(value), type)) rt.throwJava('Ljava/lang/ClassCastException;', `Cannot cast ${rt.typeOf(value)} to ${type}`);
+            if (!isNull(value) && !rt.isSubtype(rt.typeOf(value), type)) { rt.assertResolvable(type); rt.throwJava('Ljava/lang/ClassCastException;', `Cannot cast ${rt.typeOf(value)} to ${type}`); }
             pc += 2; break;
           }
-          case 0x20: { const type = dex.types[u[pc + 1]], value = regs[hi]; if (!type) fail('Invalid instanceof type'); regs[lo] = !isNull(value) && rt.isSubtype(rt.typeOf(value), type) ? 1 : 0; pc += 2; break; }
+          case 0x20: { const type = dex.types[u[pc + 1]], value = regs[hi]; if (!type) fail('Invalid instanceof type'); regs[lo] = !isNull(value) && rt.isSubtype(rt.typeOf(value), type) ? 1 : (rt.assertResolvable(type), 0); pc += 2; break; }
           case 0x21: regs[lo] = rt.array(regs[hi]).elements.length; pc++; break;
           case 0x22: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid allocation type'); if (rt.initialized.get(type)?.status !== 'initialized') { const gate = rt.initStep(type); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.bytecodeAlloc = true; try { regs[a] = rt.allocate(type); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
           case 0x23: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid array type'); rt.bytecodeAlloc = true; try { regs[lo] = rt.newArray(type, int(regs[hi])); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
@@ -712,7 +713,7 @@ function stepRare(rt, f, regs, u, dex, pc, op, a, lo, hi) {
       case 0x17: regs[a] = BigInt(u[pc + 1] | (u[pc + 2] << 16)); regs[a + 1] = WIDE_HIGH; pc += 3; break;
       case 0x18: regs[a] = BigInt.asIntN(64, BigInt(u[pc + 1]) | BigInt(u[pc + 2]) << 16n | BigInt(u[pc + 3]) << 32n | BigInt(u[pc + 4]) << 48n); regs[a + 1] = WIDE_HIGH; pc += 5; break;
       case 0x19: regs[a] = BigInt.asIntN(64, BigInt(u[pc + 1]) << 48n); regs[a + 1] = WIDE_HIGH; pc += 2; break;
-      case 0x1c: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid class type'); regs[a] = rt.classObject(type); pc += 2; break; }
+      case 0x1c: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid class type'); if (!rt.classes.has(type)) rt.assertResolvable(type); regs[a] = rt.classObject(type); pc += 2; break; }
       case 0x24: case 0x25: {
         const type = dex.types[u[pc + 1]]; if (!type?.startsWith('[') || ['J', 'D'].includes(type.slice(1))) fail('Invalid filled-new-array type');
         const registers = invokeRegisters(u, pc, regs, op, a, lo, hi); rt.bytecodeAlloc = true; let value; try { value = rt.newArray(type, registers.length); } finally { rt.bytecodeAlloc = false; } const array = rt.object(value);

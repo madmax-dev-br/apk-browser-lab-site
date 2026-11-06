@@ -1,27 +1,27 @@
-import { VMClock } from './vm-clock.js?v=e35c2f3b606f';
-import { OperationMonitor } from './operation-monitor.js?v=e35c2f3b606f';
-import { ExecutionProfile } from './execution-profile.js?v=e35c2f3b606f';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=e35c2f3b606f';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=e35c2f3b606f';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=e35c2f3b606f';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=e35c2f3b606f';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e35c2f3b606f';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=e35c2f3b606f';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=e35c2f3b606f';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=e35c2f3b606f';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=e35c2f3b606f';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=e35c2f3b606f';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=e35c2f3b606f';
-import { APKError } from './apk-error.js?v=e35c2f3b606f';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=e35c2f3b606f';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=e35c2f3b606f';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=e35c2f3b606f';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=e35c2f3b606f';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=e35c2f3b606f';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=e35c2f3b606f';
-import { Scheduler, Blocked } from './scheduler.js?v=e35c2f3b606f';
-import { bootClassLacksMember } from './boot-class-members.js?v=e35c2f3b606f';
-export { APKError } from './apk-error.js?v=e35c2f3b606f';
+import { VMClock } from './vm-clock.js?v=3f91c6782bdb';
+import { OperationMonitor } from './operation-monitor.js?v=3f91c6782bdb';
+import { ExecutionProfile } from './execution-profile.js?v=3f91c6782bdb';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=3f91c6782bdb';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=3f91c6782bdb';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=3f91c6782bdb';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=3f91c6782bdb';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=3f91c6782bdb';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=3f91c6782bdb';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=3f91c6782bdb';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=3f91c6782bdb';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=3f91c6782bdb';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=3f91c6782bdb';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=3f91c6782bdb';
+import { APKError } from './apk-error.js?v=3f91c6782bdb';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=3f91c6782bdb';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=3f91c6782bdb';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=3f91c6782bdb';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=3f91c6782bdb';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=3f91c6782bdb';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=3f91c6782bdb';
+import { Scheduler, Blocked } from './scheduler.js?v=3f91c6782bdb';
+import { bootClassLacksMember } from './boot-class-members.js?v=3f91c6782bdb';
+export { APKError } from './apk-error.js?v=3f91c6782bdb';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1192,6 +1192,33 @@ export class APKRuntime {
     }
     return thrown;
   }
+  /** The class path ART prints in "Didn't find class" messages: the app's base APK and native library directory (virtual filesystem). */
+  classPathText() {
+    let code = '/data/app/base'; try { code = this.platform.javaIo.fs().codePath ?? code; } catch { /* no filesystem model */ }
+    return `DexPathList[[zip file "${code}/base.apk"], nativeLibraryDirectories=[${code}/lib/wasm32, /system/lib64, /system_ext/lib64]]`;
+  }
+  /** A class outside the platform's own namespaces (androidx, third-party libraries, the app): when it is not in the APK it does not exist anywhere. Platform namespaces the lab may lack stay "unsupported". */
+  static isPlatformSpace(type) { return /^L(android|java|javax|dalvik|libcore|sun|jdk|com\/android|org\/(w3c|xml\/sax|json|apache\/http|apache\/harmony|ccil\/cowan)|junit)\//.test(type); }
+  /** ClassNotFoundException as the class loader raises it: Didn't find class "a.b.C" on path: DexPathList[...]. */
+  classNotFound(type) {
+    const name = type.replace(/^\[+/, '').replace(/^L(.*);$/, '$1').replaceAll('/', '.'), value = this.makeObject('Ljava/lang/ClassNotFoundException;'), obj = this.object(value);
+    obj.message = `Didn't find class "${name}" on path: ${this.classPathText()}`; obj.cause = null; obj.causeInitialized = true; obj.stack = this.captureStack();
+    return value;
+  }
+  /** NoClassDefFoundError: Failed resolution of: Lx/Y; caused by the ClassNotFoundException above -- what ART throws when bytecode names a class that cannot be resolved. */
+  throwNoClassDef(type) {
+    const cause = this.classNotFound(type), message = `Failed resolution of: ${type.replace(/^\[+/, '')}`, value = this.makeObject('Ljava/lang/NoClassDefFoundError;'), obj = this.object(value);
+    obj.message = message; obj.cause = cause; obj.causeInitialized = true; obj.stack = this.captureStack();
+    throw new JavaException(value, message);
+  }
+  /** Bytecode touches `type`: a class that cannot be resolved and is not in a platform namespace throws NoClassDefFoundError (catchable), whatever the tolerance mode. Platform classes the lab lacks keep their own errors. */
+  assertResolvable(type) {
+    if (this.classes.has(type) || typeof type !== 'string') return;
+    const component = type.replace(/^\[+/, ''); if (component.length === 1 || this.classes.has(component)) return;
+    const memo = this.resolvableMemo ??= new Set(); if (memo.has(component)) return;
+    if (APKRuntime.isPlatformSpace(component) || this.classResolvable(component)) { memo.add(component); return; }
+    this.throwNoClassDef(component);
+  }
   throwErroneous(type, state) {
     const message = `Could not initialize class ${type.slice(1, -1).replaceAll('/', '.')}`;
     const value = this.makeObject('Ljava/lang/NoClassDefFoundError;'), obj = this.object(value);
@@ -1251,6 +1278,7 @@ export class APKRuntime {
     return field;
   }
   readStatic(reference) {
+    this.assertResolvable(reference.owner);
     const field = this.resolveField(reference); this.initialize(field.owner);
     if (this.staticFields.has(field.key)) return this.staticFields.get(field.key);
     const skiaValue=this.skiaHost?.readStatic?.(this,field);if(skiaValue?.handled)return skiaValue.value;
@@ -1292,6 +1320,7 @@ export class APKRuntime {
     fail(`Unsupported external static field: ${field.key}`);
   }
   writeStatic(reference, value) {
+    this.assertResolvable(reference.owner);
     const field = this.resolveField(reference); this.initialize(field.owner);
     if (!this.classes.has(field.owner) || !this.staticFields.has(field.key)) fail(`Unresolved static field: ${field.key}`);
     this.staticFields.set(field.key, value);
@@ -1434,7 +1463,8 @@ export class APKRuntime {
     if (this.allocatable(type) === false) {
       // Tolerant mode 'all': a platform class the lab lacks becomes an opaque object whose every call is a traced stub.
       const widget = this.platform?.unimplementedWidgetMessage?.(type, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' });
-      if (this.tolerateMissing !== 'all') fail(`Unsupported allocation: ${type}`);
+      if (!APKRuntime.isPlatformSpace(type)) this.throwNoClassDef(type);   // not a platform class: it does not exist, tolerance never stubs it
+      if (this.tolerateMissing !== 'all') fail(`Unsupported allocation: ${type} (a platform class the lab lacks; searched ${this.dex.files?.length ?? '?'} DEX file(s)${(this.dex.files ?? []).slice(0, 6).map(f => ' ' + (f.filename ?? '?')).join(',')} and the framework tables: framework DEX, host contract registries, bridge owners, platform allocatable classes)`);
       const count = (this.missingClasses.get(type) ?? 0) + 1; this.missingClasses.set(type, count);
       if (count === 1) this.record(`STUB-CLASS ${type}`);
     }
@@ -1790,6 +1820,14 @@ export class APKRuntime {
     const platformDefault = this.platformInterfaceDefault(mode === 'virtual' ? this.typeOf(args[0]) : method.owner, method);
     if (platformDefault) return { kind: 'platform-default', run: platformDefault, key: methodKey(method) };
     if (method.name === '<init>') { const widget = this.platform?.unimplementedWidgetMessage?.(method.owner, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' }); }   // never a stubbed constructor: a half-working View
+    // Tolerance stubs gaps of the PLATFORM, never code of the app or its libraries: a class that cannot be resolved is NoClassDefFoundError; a method missing from a class whose whole chain is
+    // app/library code is NoSuchMethodError (the code that is there runs, the code that is not there does not exist).
+    this.assertResolvable(method.owner);
+    if (!APKRuntime.isPlatformSpace(method.owner)) {
+      let platformAncestor = false;
+      for (let at = method.owner, depth = 0; at && at !== 'Ljava/lang/Object;' && depth < 64; at = this.parent(at), depth++) { const cls = this.classes.get(at); if (!cls || this.dex.bootDexes?.has(cls.dex)) { platformAncestor = true; break; } }
+      if (!platformAncestor) this.throwJava('Ljava/lang/NoSuchMethodError;', `No ${mode === 'static' ? 'static' : mode === 'direct' ? 'direct' : 'virtual'} method ${method.name}${method.signature} in class ${method.owner} or its super classes`);
+    }
     if (this.toleratesMissing(method)) return { kind: 'missing-stub', key: methodKey(method), result: method.result };
     fail(`Unsupported API/method: ${methodKey(method)}`);
   }
@@ -2123,7 +2161,10 @@ export class APKRuntime {
       if (mapped === false) this.throwJava('Ljava/lang/ClassNotFoundException;', name);
       if (mapped !== component) { type = type.slice(0, type.length - component.length) + mapped; component = mapped; }
     }
-    if (!this.classResolvable(component)) this.throwJava('Ljava/lang/ClassNotFoundException;', name);
+    if (!this.classResolvable(component)) {   // Class.forName: ClassNotFoundException(name) caused by the class loader's Didn't find class ... on path message
+      const value = this.makeObject('Ljava/lang/ClassNotFoundException;'), obj = this.object(value); obj.message = name; obj.cause = this.classNotFound(component); obj.causeInitialized = true; obj.stack = this.captureStack();
+      throw new JavaException(value, name);
+    }
     if (initialize && !type.startsWith('[')) this.initialize(type);
     return this.classObject(type);
   }

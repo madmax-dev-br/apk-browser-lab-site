@@ -1,16 +1,16 @@
-import { APKError } from './apk-error.js?v=e35c2f3b606f';
-import { createHostRegistry } from './host-contract.js?v=e35c2f3b606f';
-import { CONTENT_DIGEST, TYPE, TYPE_NAMES, merkleRoot4kSha256, signatureContentDigests } from './apk-checksums.js?v=e35c2f3b606f';
+import { APKError } from './apk-error.js?v=3f91c6782bdb';
+import { createHostRegistry } from './host-contract.js?v=3f91c6782bdb';
+import { CONTENT_DIGEST, TYPE, TYPE_NAMES, digestSteps, merkleSteps, signatureContentDigests } from './apk-checksums.js?v=3f91c6782bdb';
 
 // PackageManager.requestChecksums (API 31+) with android.content.pm.Checksum / ApkChecksum, as ApplicationPackageManager and PackageManagerService/ApkChecksums (android-13.0.0_r1) answer for an app that
 // was side-loaded (no installer: no installer-provided checksums, so the trusted-installer part is empty):
-//   - whole-file MD5 / SHA-1 / SHA-256 / SHA-512 are computed over the loaded base APK with the VM's own java.security.MessageDigest;
+//   - whole-file MD5 / SHA-1 / SHA-256 / SHA-512 are computed over the loaded base APK by host-native streaming digests (src/fast-digests.js), in slices that do not block the VM;
 //   - the 4K Merkle root is the fs-verity/apk-verity tree root over the whole file (apk-checksums.js);
 //   - the partial 1 MiB Merkle roots are the APK Signature Scheme v3/v2 content digests read from the signing block (absent for an APK without a v2/v3 signature, as on a device);
 //   - the listener runs on a "Binder:<pid>_N" thread, as the framework delivers it from the package manager service; split APKs: none are installed.
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', LIST = 'Ljava/util/List;', PM = 'Landroid/content/pm/PackageManager;', CHECKSUM = 'Landroid/content/pm/Checksum;', APK_CHECKSUM = 'Landroid/content/pm/ApkChecksum;';
 const LISTENER = 'Landroid/content/pm/PackageManager$OnChecksumsReadyListener;', DELIVERY = 'Landroid/content/pm/ApplicationPackageManager$ChecksumDelivery;', PARCEL = 'Landroid/os/Parcel;', CREATOR = 'Landroid/os/Parcelable$Creator;', PARCELABLE = 'Landroid/os/Parcelable;';
-const CERTIFICATE = 'Ljava/security/cert/Certificate;', MESSAGE_DIGEST = 'Ljava/security/MessageDigest;';
+const CERTIFICATE = 'Ljava/security/cert/Certificate;';
 const WHOLE = [[TYPE.WHOLE_MD5, 'MD5'], [TYPE.WHOLE_SHA1, 'SHA-1'], [TYPE.WHOLE_SHA256, 'SHA-256'], [TYPE.WHOLE_SHA512, 'SHA-512']];
 
 export function createApkChecksumsHost(platform) {
@@ -75,34 +75,44 @@ export function createApkChecksumsHost(platform) {
   staticField(PM, 'TRUST_ALL', LIST, r => trust(r, 'ALL')); staticField(PM, 'TRUST_NONE', LIST, r => trust(r, 'NONE'));
 
   // ---- the work -----------------------------------------------------------------------------------------------------------------------------------
-  /** The checksums of the base APK for the `required` types, in ascending type order. Whole-file digests go through java.security.MessageDigest in 64 KiB updates over one reused buffer. */
-  const compute = (r, required) => {
-    const source = r.apkFileSource?.(); if (!source) throw new APKError('PackageManager.requestChecksums: the loaded APK bytes are not available to this runtime', { kind: 'checksums-apk-unavailable' });
-    const { bytes, archive } = source, result = [];
-    const wholeDigest = algorithm => {
-      const digest = callStatic(r, MESSAGE_DIGEST, 'getInstance', [STRING], MESSAGE_DIGEST, [algorithm]), chunk = r.newArray('[B', 65536);
-      for (let at = 0; at < bytes.length; at += 65536) { const n = Math.min(65536, bytes.length - at), view = r.array(chunk); view.elements = Array.from(bytes.subarray(at, at + n), v => (v << 24) >> 24); call(r, digest, MESSAGE_DIGEST, 'update', ['[B', 'I', 'I'], 'V', [chunk, 0, n]); }
-      return Uint8Array.from(r.array(call(r, digest, MESSAGE_DIGEST, 'digest', [], '[B')).elements, v => v & 0xff);
-    };
-    const contentDigests = required & (TYPE.PARTIAL_MERKLE_ROOT_1M_SHA256 | TYPE.PARTIAL_MERKLE_ROOT_1M_SHA512) ? signatureContentDigests(archive) : null;
+  // The checksums are computed by host-native code (src/fast-digests.js: streaming MD5/SHA-1/SHA-256/SHA-512 on the raw bytes; the 4K Merkle tree), in slices of about 1 MiB queued as host tasks, so
+  // the main thread and every other VM thread keep running while they are computed. Results are cached per loaded APK and type. When they are ready a "Binder:<pid>_N" thread delivers them to the
+  // listener: only that thread runs app code for the delivery, and the requesting call itself returns immediately.
+  const cache = new WeakMap();   // bytes -> Map(type -> Uint8Array | null)
+  const SIGNATURE_BACKED = new Map([[TYPE.PARTIAL_MERKLE_ROOT_1M_SHA256, CONTENT_DIGEST.CHUNKED_SHA256], [TYPE.PARTIAL_MERKLE_ROOT_1M_SHA512, CONTENT_DIGEST.CHUNKED_SHA512]]);
+  /** Generator that fills `known` (Map type -> bytes | null) for the required types, yielding between slices. */
+  function* computeSteps(source, required, known) {
+    const { bytes, archive } = source;
     for (const wanted of Object.values(TYPE).sort((a, b) => a - b)) {
-      if (!(required & wanted)) continue;
-      if (wanted === TYPE.WHOLE_MERKLE_ROOT_4K_SHA256) result.push([wanted, merkleRoot4kSha256(bytes)]);
-      else if (wanted === TYPE.PARTIAL_MERKLE_ROOT_1M_SHA256) { const digest = contentDigests.get(CONTENT_DIGEST.CHUNKED_SHA256); if (digest) result.push([wanted, digest]); }
-      else if (wanted === TYPE.PARTIAL_MERKLE_ROOT_1M_SHA512) { const digest = contentDigests.get(CONTENT_DIGEST.CHUNKED_SHA512); if (digest) result.push([wanted, digest]); }
-      else result.push([wanted, wholeDigest(WHOLE.find(([t]) => t === wanted)[1])]);
+      if (!(required & wanted) || known.has(wanted)) continue;
+      if (wanted === TYPE.WHOLE_MERKLE_ROOT_4K_SHA256) known.set(wanted, yield* merkleSteps(bytes));
+      else if (SIGNATURE_BACKED.has(wanted)) known.set(wanted, signatureContentDigests(archive).get(SIGNATURE_BACKED.get(wanted)) ?? null);   // absent when the APK is not signed with that digest
+      else known.set(wanted, yield* digestSteps(WHOLE.find(([t]) => t === wanted)[1], bytes));
     }
-    return result;
+  }
+  const SLICE_MS = 12;
+  const runJob = (r, steps, finished, roots) => {
+    const slice = () => {
+      const started = performance.now();
+      for (;;) { const next = steps.next(); if (next.done) { finished(); return; } if (performance.now() - started >= SLICE_MS) break; }
+      platform.queueTask(slice, 0, roots);
+    };
+    platform.queueTask(slice, 0, roots);
   };
 
-  // The delivery runs as a Runnable on a new "Binder:<pid>_N" thread: it computes, then calls the listener with the List<ApkChecksum>.
+  // The delivery runs as a Runnable on a new "Binder:<pid>_N" thread: it turns the computed values into ApkChecksum objects and calls the listener with the List<ApkChecksum>.
   type(DELIVERY, OBJECT, ['Ljava/lang/Runnable;'], { allocatable: true });
   def(DELIVERY, 'run', '()V', (r, _m, [self]) => {
-    const listener = get(r, self, DELIVERY, 'listener', LISTENER), required = get(r, self, DELIVERY, 'required', 'I'), list = construct(r, 'Ljava/util/ArrayList;', [], []);
-    for (const [checksumType, value] of compute(r, required)) call(r, list, 'Ljava/util/ArrayList;', 'add', [OBJECT], 'Z', [makeApkChecksum(r, null, checksumType, value)]);
+    const listener = get(r, self, DELIVERY, 'listener', LISTENER), results = r.object(self).checksums, list = construct(r, 'Ljava/util/ArrayList;', [], []);
+    for (const [checksumType, value] of results) call(r, list, 'Ljava/util/ArrayList;', 'add', [OBJECT], 'Z', [makeApkChecksum(r, null, checksumType, value)]);
     call(r, listener, LISTENER, 'onChecksumsReady', [LIST], 'V', [list]);
   });
   let binderThreads = 0;
+  const deliver = (r, listener, results) => {
+    const delivery = r.allocate(DELIVERY); put(r, delivery, DELIVERY, 'listener', LISTENER, listener); r.object(delivery).checksums = results;
+    const thread = construct(r, 'Ljava/lang/Thread;', ['Ljava/lang/Runnable;', STRING], [delivery, `Binder:${platform.virtualProcess.pid}_${++binderThreads}`]);
+    call(r, thread, 'Ljava/lang/Thread;', 'start', [], 'V');
+  };
   def(PM, 'requestChecksums', `(${STRING}ZI${LIST}${LISTENER})V`, (r, _m, [, packageName, , required, trustedInstallers, listener]) => {
     if (nullish(packageName)) npe(r); if (nullish(listener)) npe(r); if (nullish(trustedInstallers)) npe(r);
     // ApplicationPackageManager.requestChecksums: TRUST_ALL / TRUST_NONE by identity, any other list must be non-empty; certificates are encoded (getEncoded) before the request is made.
@@ -113,10 +123,10 @@ export function createApkChecksumsHost(platform) {
     }
     const name = text(r, packageName), entry = platform.appServices.findPackage(r, name);   // NameNotFoundException(packageName) for an unknown package
     if (entry.system) throw new APKError(`PackageManager.requestChecksums: the APK of the system package ${name} is not part of the lab, its checksums cannot be computed`, { kind: 'checksums-system-package-unsupported' });
-    if (!r.apkFileSource) throw new APKError('PackageManager.requestChecksums: the loaded APK bytes are not available to this runtime', { kind: 'checksums-apk-unavailable' });
-    const delivery = r.allocate(DELIVERY); put(r, delivery, DELIVERY, 'listener', LISTENER, listener); put(r, delivery, DELIVERY, 'required', 'I', required | 0);
-    const thread = construct(r, 'Ljava/lang/Thread;', ['Ljava/lang/Runnable;', STRING], [delivery, `Binder:${platform.virtualProcess.pid}_${++binderThreads}`]);
-    call(r, thread, 'Ljava/lang/Thread;', 'start', [], 'V');
+    const source = r.apkFileSource?.(); if (!source) throw new APKError('PackageManager.requestChecksums: the loaded APK bytes are not available to this runtime', { kind: 'checksums-apk-unavailable' });
+    const known = cache.get(source.bytes) ?? cache.set(source.bytes, new Map()).get(source.bytes), wanted = required | 0;
+    const answer = () => deliver(r, listener, [...known].filter(([t, v]) => (wanted & t) && v).sort((a, b) => a[0] - b[0]));
+    runJob(r, computeSteps(source, wanted, known), () => answer(), [listener]);   // already cached: the first slice finishes at once
   });
   return registry;
 }

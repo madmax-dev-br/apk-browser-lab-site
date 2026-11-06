@@ -1,6 +1,6 @@
 // Embeddable APK runner. Usage: <script type="module" src="…/player/apk-player.js"></script> then <apk-player src="app.apk" device="phone" locale="pt-BR" theme="dark">.
 // The APK runs inside an iframe (player/frame.html) served from the runtime's origin; this script only talks to it through versioned postMessage.
-import { ATTRIBUTES, configFromAttributes, parseConfig, envelope, validateFrameMessage } from './protocol.js?v=e35c2f3b606f';
+import { ATTRIBUTES, configFromAttributes, parseConfig, envelope, validateFrameMessage } from './protocol.js?v=3f91c6782bdb';
 
 const FRAME_TIMEOUT_MS = 20000;
 const DEFAULT_ASSETS_BASE = new URL('../', import.meta.url).href;

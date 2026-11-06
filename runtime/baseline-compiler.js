@@ -153,9 +153,9 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         case 0x18: return putWide(a, `${BigInt.asIntN(64, BigInt(u[pc + 1]) | BigInt(u[pc + 2]) << 16n | BigInt(u[pc + 3]) << 32n | BigInt(u[pc + 4]) << 48n)}n`);
         case 0x19: return putWide(a, `${BigInt.asIntN(64, BigInt(u[pc + 1]) << 48n)}n`);
         case 0x1a: case 0x1b: { const i = op === 0x1a ? u[pc + 1] : u[pc + 1] + u[pc + 2] * 65536; return `r[${a}] = S[${i}];`; }
-        case 0x1c: return `r[${a}] = rt.classObject(T[${u[pc + 1]}]);`;
-        case 0x1f: return `{ const v = r[${a}]; if (v !== null && v !== 0 && !rt.isSubtype(rt.typeOf(v), T[${u[pc + 1]}])) H.castFail(rt, v, T[${u[pc + 1]}]); }`;
-        case 0x20: return `{ const v = r[${hi}]; r[${lo}] = v !== null && v !== 0 && rt.isSubtype(rt.typeOf(v), T[${u[pc + 1]}]) ? 1 : 0; }`;
+        case 0x1c: return `{ const t = T[${u[pc + 1]}]; if (!rt.classes.has(t)) rt.assertResolvable(t); r[${a}] = rt.classObject(t); }`;
+        case 0x1f: return `{ const v = r[${a}]; if (v !== null && v !== 0 && !rt.isSubtype(rt.typeOf(v), T[${u[pc + 1]}])) { rt.assertResolvable(T[${u[pc + 1]}]); H.castFail(rt, v, T[${u[pc + 1]}]); } }`;
+        case 0x20: return `{ const v = r[${hi}]; r[${lo}] = v !== null && v !== 0 && rt.isSubtype(rt.typeOf(v), T[${u[pc + 1]}]) ? 1 : (rt.assertResolvable(T[${u[pc + 1]}]), 0); }`;
         case 0x21: return `r[${lo}] = rt.array(r[${hi}]).elements.length;`;
         case 0x22: return `rt.bytecodeAlloc = true; try { r[${a}] = rt.allocate(T[${u[pc + 1]}]); } finally { rt.bytecodeAlloc = false; }`;
         case 0x23: return `rt.bytecodeAlloc = true; try { r[${lo}] = rt.newArray(T[${u[pc + 1]}], r[${hi}] | 0); } finally { rt.bytecodeAlloc = false; }`;

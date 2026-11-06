@@ -1,6 +1,6 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=e35c2f3b606f';
+import { TimeBreakdown } from './time-breakdown.js?v=3f91c6782bdb';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -76,7 +76,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
   });
   part(() => {   // (e) main thread
     const main = runtime.scheduler?.main; if (!main) return;
-    const frames = (main.frames ?? []).slice(-6).reverse().map(frame => frame.method ? `${dotted(frame.method.owner)}.${frame.method.name}` : frame.cont ? '(chamada do host)' : '?');
+    const frames = (main.frames ?? []).slice(-8).reverse().map(frame => frame.method ? `${dotted(frame.method.owner)}.${frame.method.name}` : frame.cont ? '(chamada do host)' : '?');
     { const target = main.blocked?.blocker ?? main.blocker;
       if (main.blocked && target && !(main.blocker)) { try {
         const record = runtime.object(target), owner = runtime.monitors?.get(record.id)?.owner;
@@ -85,7 +85,20 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
         const thread = threadObjectNote(runtime, target); if (thread) out.push(thread);
       } catch { /* the monitor object is not inspectable */ } } }
     if (main.blocked && main.blocker) { try { const releasers = (runtime.scheduler.threads ?? []).filter(t => t !== main && (t.state === 'runnable' || (t.state === 'blocked' && Number.isFinite(t.blocked?.deadline)))).slice(0, 4).map(t => `${t.name} ${t.state}${t.frames?.length ? ' em ' + (t.frames.at(-1).method ? dotted(t.frames.at(-1).method.owner).split('.').pop() + '.' + t.frames.at(-1).method.name : '(host)') : ''}`); out.push(`a thread principal espera por um ${dotted(runtime.typeOf(main.blocker))}; podem liberá-lo: ${releasers.join(', ') || 'nenhuma thread ativa'}`); } catch { /* blocker not inspectable */ } }
-    out.push(`thread principal: ${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'espera'})` : ''}${main.nestedDepth ? `, dentro de chamada nativa aninhada (${main.nestedDepth})` : ''}${frames.length ? '; ' + frames.join(' ← ') : ''}`);
+    out.push(`thread principal: ${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'espera'})` : ''}${main.nestedDepth ? `, dentro de chamada nativa aninhada (${main.nestedDepth})` : ''}${frames.length ? '; ' + frames.join(' ← ') : '; sem frames Java (ociosa no looper' + (runtime.lastHostCall ? `, última chamada do host ${String(runtime.lastHostCall).replace(/^L|;->/g, m => m === ';->' ? '.' : '').replaceAll('/', '.')}` : '') + ')'}`);
+    // park / wait details: what it waits on, with or without a deadline, and who could release it -- also when the thread is already runnable (woken, not yet resumed)
+    if (main.blocked) {
+      const now = runtime.platform?.clock?.now?.() ?? 0, deadline = main.blocked.deadline, timed = Number.isFinite(deadline);
+      const blockerClass = main.blocker ? dotted(runtime.typeOf(main.blocker)) : main.blocked.blocker ? dotted(runtime.typeOf(main.blocked.blocker)) : 'nenhum (park sem LockSupport.getBlocker)';
+      const releasers = (runtime.scheduler.threads ?? []).filter(t => t !== main && (t.state === 'runnable' || (t.state === 'blocked' && Number.isFinite(t.blocked?.deadline)))).slice(0, 5).map(t => `${t.name} ${t.state}`);
+      out.push(`  espera: ${main.blocked.reason ?? '?'}; ${timed ? `com prazo em ${Math.round(deadline - now)} ms` : 'sem prazo'}; objeto bloqueador: ${blockerClass}; ${main.state === 'runnable' ? 'já foi acordada e aguarda ser retomada; ' : ''}threads que podem liberá-la (unpark/notify): ${releasers.join(', ') || 'nenhuma'}`);
+    }
+    // main-looper messages the thread owes: queued events already due
+    { const queue = runtime.platform?.eventQueue ?? [], now = runtime.platform?.clock?.now?.() ?? 0, overdue = queue.filter(event => !event.front && Number.isFinite(event.when) && event.when < now - 50);
+      if (overdue.length) {
+        const oldest = Math.max(...overdue.map(event => now - event.when)), top = frames[0] ?? (runtime.lastHostCall ? `chamada do host ${runtime.lastHostCall}` : 'o looper (ocioso)');
+        out.push(`${overdue.length} mensagens do Looper principal atrasadas, a mais antiga há ${(oldest / 1000).toFixed(1)} s, aguardando a thread principal sair de: ${top}`);
+      } }
   });
   part(() => { const tb = runtime.tb?.snapshot(); if (tb) { for (const p of tb.pollers ?? []) {
       out.push(`thread ${p.thread} está em polling (${p.perSecond} chamadas do host/s): ${p.calls.map(([key, n]) => `${key} ${n}×`).join(', ')}`);

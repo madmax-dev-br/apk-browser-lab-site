@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=e35c2f3b606f';
+import { APKError } from './apk-error.js?v=3f91c6782bdb';
 
 // Green-thread scheduler for the VM.
 //
@@ -29,7 +29,7 @@ export const QUANTUM = 20000;   // instructions a thread runs before another run
 
 const QUIET_IDLE_LIMIT = 50000;   // consecutive clock skips with no host event in between
 export class Scheduler {
-  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0 }; this.otherTick = 0; this.otherCached = false; this.quietIdles = 0; this.eventTotal = 0; this.lastSteps = 0; }
+  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0 }; this.otherTick = 0; this.otherCached = false; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; }
   get clock() { return this.rt.platform.clock; }
 
   /** The thread that runs host events (Looper/main). */
@@ -113,10 +113,22 @@ export class Scheduler {
     // With dozens of threads this check, made at every scheduling quantum, was O(threads); the answer is refreshed every 4th call (preemption granularity stays far below a millisecond).
     if ((++this.otherTick & 3) !== 0 && !this.otherCached) return false;
     this.wake();                                   // timers and conditions that came due while `current` ran
+    if (owner && owner.state === 'blocked' && this.rt.platform.nextEventDelay?.() === 0) return (this.otherCached = true);   // host events are due while the run owner waits: switch so that they run
     for (const thread of this.threads) if (thread !== current && thread.state === 'runnable' && (thread === owner || thread.nestedDepth === 0)) return (this.otherCached = true);
     return (this.otherCached = false);
   }
 
+  /**
+   * Fairness for the host event queue. A run whose owner is blocked (a wait inside an event, a nested host call) keeps switching between the threads that can run; the queued host events
+   * (main-looper messages, posted tasks) used to be served only when NO thread was runnable, so one thread that never stops running starved them for good. At each thread switch the events that
+   * are already due run, the same way the idle path runs them (a runnable thread is preempted for them: see hasOtherRunnable).
+   */
+  serviceEvents() {
+    const platform = this.rt.platform, delay = platform.nextEventDelay?.();
+    if (delay === null || delay === undefined || delay > 0) return;
+    const previous = this.rt.thread; this.rt.thread = this.mainThread();
+    try { const processed = platform.drainEvents?.(this.rt)?.processed ?? 0; if (processed) { this.stats.events += processed; this.quietIdles = 0; } } finally { this.rt.thread = previous; }
+  }
   /** What to do when nothing is runnable: run due platform events, skip the clock to the earliest deadline, or report the deadlock. `owner` is the blocked loop owner. */
   idle(earliest, why) {
     const platform = this.rt.platform;
@@ -176,7 +188,7 @@ export class Scheduler {
           const earliest = this.wake();
           if (thread.state === 'runnable') { timedOut = thread.timedOut; break; }
           const { thread: next } = this.pick(thread, null);
-          if (next) { this.rt.runThreads(); idleRounds = 0; continue; }
+          if (next) { this.rt.runThreads(); this.serviceEvents(); idleRounds = 0; continue; }
           this.idle(earliest, `${thread.name} is waiting (${blocked.reason}) and cannot be woken: the threads that could do it are suspended below this host call`);
           if (++idleRounds > 100000) throw new APKError(`Deadlock: ${thread.name} waited ${idleRounds} idle rounds (${blocked.reason})`, { kind: 'cooperative-deadlock' });
         }

@@ -1,5 +1,6 @@
-import { floatBits } from './host-contract.js?v=e35c2f3b606f';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=e35c2f3b606f';
+import { floatBits } from './host-contract.js?v=3f91c6782bdb';
+import { gcRoot } from './heap-gc.js?v=3f91c6782bdb';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=3f91c6782bdb';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,
@@ -56,15 +57,43 @@ export function createSystemManagersHost(platform) {
     def(APPOPS, name, `(${STRING}I${STRING}${STRING}${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op); checkPackage(r, id, packageName); return name === 'noteOp' ? mustBeAllowed(r, modeOf(r, o), o) : modeOf(r, o); });
   }
   for (const name of ['noteProxyOp', 'noteProxyOpNoThrow']) def(APPOPS, name, `(${STRING}${STRING}I${STRING}${STRING})I`, (r, _m, [, op, proxiedPackage, proxiedUid]) => { const o = opOf(r, op); checkPackage(r, proxiedUid, proxiedPackage); return name === 'noteProxyOp' ? mustBeAllowed(r, modeOf(r, o), o) : modeOf(r, o); });
-  def(APPOPS, 'startOp', `(${STRING}I${STRING}${STRING}${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op); checkPackage(r, id, packageName); return mustBeAllowed(r, modeOf(r, o), o); });
-  def(APPOPS, 'startOpNoThrow', `(${STRING}I${STRING}${STRING}${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op); checkPackage(r, id, packageName); return modeOf(r, o); });
-  def(APPOPS, 'finishOp', `(${STRING}I${STRING}${STRING})V`, (r, _m, [, op, id, packageName]) => { opOf(r, op); checkPackage(r, id, packageName); });
-  def(APPOPS, 'finishOp', `(${STRING}I${STRING})V`, (r, _m, [, op, id, packageName]) => { opOf(r, op); checkPackage(r, id, packageName); });
+  // Active operations (startOp ... finishOp, counted per op) and the watchers of their changes: AppOpsService notifies a watcher of its own uid through the watcher's executor.
+  const activeCounts = new Map(), activeWatchers = gcRoot([]);
+  const ACTIVE_LISTENER = 'Landroid/app/AppOpsManager$OnOpActiveChangedListener;', DELIVERY = 'Landroid/app/AppOpsManager$ActiveChangedDelivery;';
+  type(DELIVERY, OBJECT, ['Ljava/lang/Runnable;'], { allocatable: true });
+  def(DELIVERY, 'run', '()V', (r, _m, [self]) => {
+    const f = r.object(self).fields, get = name => f.get(`${DELIVERY}->${name}`);
+    call(r, get('listener'), ACTIVE_LISTENER, 'onOpActiveChanged', [STRING, 'I', STRING, 'Z'], 'V', [get('op'), uid(), pkg(), get('active')]);
+  });
+  const setActive = (r, opString, active) => {
+    const before = activeCounts.get(opString) ?? 0, after = Math.max(0, before + (active ? 1 : -1)); activeCounts.set(opString, after);
+    if ((before > 0) === (after > 0)) return;   // only the transitions inactive <-> active are reported
+    for (const watcher of [...activeWatchers]) {
+      if (!watcher.ops.includes(opString)) continue;
+      const delivery = r.allocate(DELIVERY), fields = r.object(delivery).fields;
+      r.storeField(fields, `${DELIVERY}->listener`, watcher.listener); r.storeField(fields, `${DELIVERY}->op`, opString); r.storeField(fields, `${DELIVERY}->active`, after > 0 ? 1 : 0);
+      call(r, watcher.executor, 'Ljava/util/concurrent/Executor;', 'execute', ['Ljava/lang/Runnable;'], 'V', [delivery]);
+    }
+  };
+  def(APPOPS, 'startOp', `(${STRING}I${STRING}${STRING}${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op); checkPackage(r, id, packageName); const mode = mustBeAllowed(r, modeOf(r, o), o); if (mode === ALLOWED) setActive(r, o, true); return mode; });
+  def(APPOPS, 'startOpNoThrow', `(${STRING}I${STRING}${STRING}${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op); checkPackage(r, id, packageName); const mode = modeOf(r, o); if (mode === ALLOWED) setActive(r, o, true); return mode; });
+  const finish = (r, op, id, packageName) => { const o = opOf(r, op); checkPackage(r, id, packageName); if ((activeCounts.get(o) ?? 0) > 0) setActive(r, o, false); };
+  def(APPOPS, 'finishOp', `(${STRING}I${STRING}${STRING})V`, (r, _m, [, op, id, packageName]) => finish(r, op, id, packageName));
+  def(APPOPS, 'finishOp', `(${STRING}I${STRING})V`, (r, _m, [, op, id, packageName]) => finish(r, op, id, packageName));
+  // startWatchingActive(String[] ops, Executor, OnOpActiveChangedListener) (API 29): an app without WATCH_APPOPS watches its own uid only; null arguments and unknown ops fail as AppOpsManager does.
+  def(APPOPS, 'startWatchingActive', `([${STRING}Ljava/util/concurrent/Executor;${ACTIVE_LISTENER})V`, (r, _m, [, ops, executor, listener]) => {
+    if (nullish(ops)) npe(r); if (nullish(executor)) npe(r); if (nullish(listener)) npe(r);
+    const names = r.array(ops).elements.map(op => opOf(r, op)), existing = activeWatchers.findIndex(w => r.object(w.listener).id === r.object(listener).id);
+    if (existing >= 0) activeWatchers.splice(existing, 1);
+    activeWatchers.push({ ops: names, executor, listener });
+  });
+  def(APPOPS, 'stopWatchingActive', `(${ACTIVE_LISTENER})V`, (r, _m, [, listener]) => { if (nullish(listener)) npe(r); const at = activeWatchers.findIndex(w => r.object(w.listener).id === r.object(listener).id); if (at >= 0) activeWatchers.splice(at, 1); });
   def(APPOPS, 'checkPackage', `(I${STRING})V`, (r, _m, [, id, packageName]) => checkPackage(r, id, packageName));
   def(APPOPS, 'permissionToOp', `(${STRING})${STRING}`, (r, _m, [permission]) => { const name = requireText(r, permission, 'permission'); for (const [op, [p]] of OPS) if (p === name) return op; return null; }, { static: true });
-  def(APPOPS, 'isOpActive', `(${STRING}I${STRING})Z`, (r, _m, [, op]) => { opOf(r, op); return 0; });
-  def(APPOPS, 'isOperationActive', `(${STRING}I${STRING})Z`, (r, _m, [, op]) => { opOf(r, op); return 0; });
+  def(APPOPS, 'isOpActive', `(${STRING}I${STRING})Z`, (r, _m, [, op]) => (activeCounts.get(opOf(r, op)) ?? 0) > 0 ? 1 : 0);
+  def(APPOPS, 'isOperationActive', `(${STRING}I${STRING})Z`, (r, _m, [, op]) => (activeCounts.get(opOf(r, op)) ?? 0) > 0 ? 1 : 0);
   def(APPOPS, 'startWatchingMode', `(${STRING}${STRING}Landroid/app/AppOpsManager$OnOpChangedListener;)V`, (r, _m, [, op, packageName, listener]) => { opOf(r, op); if (nullish(listener)) npe(r, 'callback'); void packageName; });
+  def(APPOPS, 'startWatchingMode', `(${STRING}${STRING}ILandroid/app/AppOpsManager$OnOpChangedListener;)V`, (r, _m, [, op, packageName, , listener]) => { opOf(r, op); if (nullish(listener)) npe(r, 'callback'); void packageName; });
   def(APPOPS, 'stopWatchingMode', '(Landroid/app/AppOpsManager$OnOpChangedListener;)V', (r, _m, [, listener]) => { if (nullish(listener)) npe(r, 'callback'); });
   for (const name of ['setMode', 'setUidMode']) def(APPOPS, name, `(${STRING}I${STRING}I)V`, (r, _m, [, op]) => { opOf(r, op); enforce(r, 'android.permission.MANAGE_APP_OPS_MODES'); });
   def(APPOPS, 'getPackagesForOps', `([${STRING})${LIST}`, r => enforce(r, 'android.permission.GET_APP_OPS_STATS'));

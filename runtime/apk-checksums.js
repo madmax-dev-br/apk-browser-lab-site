@@ -1,4 +1,4 @@
-import { DIGESTS } from './crypto-host.js?v=e35c2f3b606f';
+import { HASHERS, Sha256 } from './fast-digests.js?v=3f91c6782bdb';
 
 // APK checksums as PackageManager.requestChecksums reports them (android-13.0.0_r1 ApkChecksums): the file-level data, with no VM involved.
 export const TYPE = { WHOLE_MERKLE_ROOT_4K_SHA256: 1, WHOLE_MD5: 2, WHOLE_SHA1: 4, WHOLE_SHA256: 8, WHOLE_SHA512: 16, PARTIAL_MERKLE_ROOT_1M_SHA256: 32, PARTIAL_MERKLE_ROOT_1M_SHA512: 64 };
@@ -15,17 +15,33 @@ const BLOCK = 4096, HASHES_PER_BLOCK = BLOCK / 32;
  * are packed 128 to a zero-padded 4096-byte block, each block is hashed into the next level, until a level is a single block; the root is the SHA-256 of that block (of the data block itself
  * for a file of up to 4096 bytes).
  */
-export function merkleRoot4kSha256(bytes) {
+export function merkleRoot4kSha256(bytes) { const steps = merkleSteps(bytes); for (;;) { const next = steps.next(); if (next.done) return next.value; } }
+
+/** The same tree as a generator that yields after every `batch` bytes of hashing, so a host job can interleave with the rest of the VM. */
+export function* merkleSteps(bytes, batch = 1 << 20) {
   if (bytes.length === 0) throw new RangeError('A Merkle tree needs at least one byte of data');
-  const sha256 = DIGESTS['SHA-256'].fn;
-  let level = [];
-  for (let at = 0; at < bytes.length; at += BLOCK) { const block = new Uint8Array(BLOCK); block.set(bytes.subarray(at, Math.min(at + BLOCK, bytes.length))); level.push(block); }
-  for (;;) {
-    const hashes = level.map(block => sha256(block));
-    if (level.length === 1) return Uint8Array.from(hashes[0]);
-    level = [];
-    for (let at = 0; at < hashes.length; at += HASHES_PER_BLOCK) { const block = new Uint8Array(BLOCK); hashes.slice(at, at + HASHES_PER_BLOCK).forEach((hash, i) => block.set(hash, i * 32)); level.push(block); }
+  const hash = block => new Sha256().update(block).digest();
+  let hashes = [], work = 0;
+  for (let at = 0; at < bytes.length; at += BLOCK) {
+    let block = bytes.subarray(at, at + BLOCK); if (block.length < BLOCK) { const padded = new Uint8Array(BLOCK); padded.set(block); block = padded; }
+    hashes.push(hash(block)); work += BLOCK; if (work >= batch) { work = 0; yield; }
   }
+  for (;;) {
+    if (hashes.length === 1 && bytes.length <= BLOCK) return hashes[0];
+    // pack the hashes 128 to a zero-padded block; a level of a single block ends the tree: its hash is the root
+    const blocks = [];
+    for (let at = 0; at < hashes.length; at += HASHES_PER_BLOCK) { const block = new Uint8Array(BLOCK); hashes.slice(at, at + HASHES_PER_BLOCK).forEach((h, i) => block.set(h, i * 32)); blocks.push(block); }
+    hashes = blocks.map(hash);
+    if (blocks.length === 1) return hashes[0];
+    yield;
+  }
+}
+
+/** Whole-file digest by java.security algorithm name, as a generator yielding every `batch` bytes. */
+export function* digestSteps(algorithm, bytes, batch = 1 << 20) {
+  const hasher = new HASHERS[algorithm]();
+  for (let at = 0; at < bytes.length; at += batch) { hasher.update(bytes.subarray(at, Math.min(at + batch, bytes.length))); if (at + batch < bytes.length) yield; }
+  return hasher.digest();
 }
 
 /**
