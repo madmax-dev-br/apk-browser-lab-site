@@ -1,117 +1,117 @@
-import { Invoke } from './interpreter.js?v=68fb2f8dd331';
-import { PACKAGE_VALUE_PARENTS } from './package-value-fields.js?v=68fb2f8dd331';
-import { createComposeCanvasHost } from './compose-canvas-host.js?v=68fb2f8dd331';
-import { createViewTransformHost } from './view-transform-host.js?v=68fb2f8dd331';
-import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=68fb2f8dd331';
-import { createViewOutlineHost } from './view-outline-host.js?v=68fb2f8dd331';
-import { createShaderHost } from './shader-host.js?v=68fb2f8dd331';
-import { createSystemBarsHost } from './system-bars-host.js?v=68fb2f8dd331';
-import { createDeviceStateHost } from './device-state-host.js?v=68fb2f8dd331';
-import { createJobSchedulerHost } from './job-scheduler-host.js?v=68fb2f8dd331';
-import { createPendingIntentHost } from './pending-intent-host.js?v=68fb2f8dd331';
-import { ActivityStarter, activityInfoOf, FLAG as LAUNCH_FLAG } from './activity-starter.js?v=68fb2f8dd331';
-import { createBinderHost } from './binder-host.js?v=68fb2f8dd331';
-import { createInputManagerHost } from './input-native.js?v=68fb2f8dd331';
-import { createBackDispatcherHost } from './back-dispatcher-host.js?v=68fb2f8dd331';
-import { createRenderThreadAnimators } from './rt-animators.js?v=68fb2f8dd331';
-import { renderNodeByHandle } from './rendernode-native.js?v=68fb2f8dd331';
-import { resolveDevice } from './device-profile.js?v=68fb2f8dd331';
-import { configurationFor } from './device-configuration.js?v=68fb2f8dd331';
-import { createViewCoordinateHost } from './view-coordinate-host.js?v=68fb2f8dd331';
-import { createEditableTextHost } from './editable-text-host.js?v=68fb2f8dd331';
-import { createComponentCallbacksHost } from './component-callbacks-host.js?v=68fb2f8dd331';
-import { createViewStateHost } from './view-state-host.js?v=68fb2f8dd331';
-import { createLocaleServiceHost } from './locale-service-host.js?v=68fb2f8dd331';
-import { APKError } from './apk-runtime.js?v=68fb2f8dd331';
-import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=68fb2f8dd331';
-import { createViewTreeHost } from './view-tree-host.js?v=68fb2f8dd331';
-import { createDialogWindowHost } from './dialog-window-host.js?v=68fb2f8dd331';
-import { createStrictModeHost } from './strictmode-host.js?v=68fb2f8dd331';
-import { createProgressBarApiHost } from './progress-bar-api-host.js?v=68fb2f8dd331';
-import { createViewGroupApiHost } from './viewgroup-api-host.js?v=68fb2f8dd331';
-import { createViewInternalsHost } from './view-internals-host.js?v=68fb2f8dd331';
-import { createViewWindowHost } from './view-window-host.js?v=68fb2f8dd331';
-import { createVectorCanvasHost } from './vector-native.js?v=68fb2f8dd331';
-import { createPaintHost } from './paint-host.js?v=68fb2f8dd331';
-import { createContentResolverHost } from './content-resolver-host.js?v=68fb2f8dd331';
-import { createDrawableViewHost } from './drawable-view-host.js?v=68fb2f8dd331';
-import { createDeviceServicesHost } from './device-services-host.js?v=68fb2f8dd331';
-import { createSystemServicesHost } from './system-services-host.js?v=68fb2f8dd331';
-import { createJavaIoHost } from './java-io-host.js?v=68fb2f8dd331';
-import { createClassLoaderHost } from './class-loader-host.js?v=68fb2f8dd331';
-import { createAppServicesHost } from './app-services-host.js?v=68fb2f8dd331';
-import { createConcurrencyHost } from './concurrency-host.js?v=68fb2f8dd331';
-import { createDateTimeHost } from './datetime-host.js?v=68fb2f8dd331';
+import { Invoke } from './interpreter.js?v=b60e95a62870';
+import { PACKAGE_VALUE_PARENTS } from './package-value-fields.js?v=b60e95a62870';
+import { createComposeCanvasHost } from './compose-canvas-host.js?v=b60e95a62870';
+import { createViewTransformHost } from './view-transform-host.js?v=b60e95a62870';
+import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=b60e95a62870';
+import { createViewOutlineHost } from './view-outline-host.js?v=b60e95a62870';
+import { createShaderHost } from './shader-host.js?v=b60e95a62870';
+import { createSystemBarsHost } from './system-bars-host.js?v=b60e95a62870';
+import { createDeviceStateHost } from './device-state-host.js?v=b60e95a62870';
+import { createJobSchedulerHost } from './job-scheduler-host.js?v=b60e95a62870';
+import { createPendingIntentHost } from './pending-intent-host.js?v=b60e95a62870';
+import { ActivityStarter, activityInfoOf, FLAG as LAUNCH_FLAG } from './activity-starter.js?v=b60e95a62870';
+import { createBinderHost } from './binder-host.js?v=b60e95a62870';
+import { createInputManagerHost } from './input-native.js?v=b60e95a62870';
+import { createBackDispatcherHost } from './back-dispatcher-host.js?v=b60e95a62870';
+import { createRenderThreadAnimators } from './rt-animators.js?v=b60e95a62870';
+import { renderNodeByHandle } from './rendernode-native.js?v=b60e95a62870';
+import { resolveDevice } from './device-profile.js?v=b60e95a62870';
+import { configurationFor } from './device-configuration.js?v=b60e95a62870';
+import { createViewCoordinateHost } from './view-coordinate-host.js?v=b60e95a62870';
+import { createEditableTextHost } from './editable-text-host.js?v=b60e95a62870';
+import { createComponentCallbacksHost } from './component-callbacks-host.js?v=b60e95a62870';
+import { createViewStateHost } from './view-state-host.js?v=b60e95a62870';
+import { createLocaleServiceHost } from './locale-service-host.js?v=b60e95a62870';
+import { APKError } from './apk-runtime.js?v=b60e95a62870';
+import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=b60e95a62870';
+import { createViewTreeHost } from './view-tree-host.js?v=b60e95a62870';
+import { createDialogWindowHost } from './dialog-window-host.js?v=b60e95a62870';
+import { createStrictModeHost } from './strictmode-host.js?v=b60e95a62870';
+import { createProgressBarApiHost } from './progress-bar-api-host.js?v=b60e95a62870';
+import { createViewGroupApiHost } from './viewgroup-api-host.js?v=b60e95a62870';
+import { createViewInternalsHost } from './view-internals-host.js?v=b60e95a62870';
+import { createViewWindowHost } from './view-window-host.js?v=b60e95a62870';
+import { createVectorCanvasHost } from './vector-native.js?v=b60e95a62870';
+import { createPaintHost } from './paint-host.js?v=b60e95a62870';
+import { createContentResolverHost } from './content-resolver-host.js?v=b60e95a62870';
+import { createDrawableViewHost } from './drawable-view-host.js?v=b60e95a62870';
+import { createDeviceServicesHost } from './device-services-host.js?v=b60e95a62870';
+import { createSystemServicesHost } from './system-services-host.js?v=b60e95a62870';
+import { createJavaIoHost } from './java-io-host.js?v=b60e95a62870';
+import { createClassLoaderHost } from './class-loader-host.js?v=b60e95a62870';
+import { createAppServicesHost } from './app-services-host.js?v=b60e95a62870';
+import { createConcurrencyHost } from './concurrency-host.js?v=b60e95a62870';
+import { createDateTimeHost } from './datetime-host.js?v=b60e95a62870';
 const LOCALE_CONSTANTS = { US: 'en-US', UK: 'en-GB', ENGLISH: 'en', ROOT: 'und', CANADA: 'en-CA', CANADA_FRENCH: 'fr-CA', FRANCE: 'fr-FR', FRENCH: 'fr', GERMAN: 'de', GERMANY: 'de-DE', ITALIAN: 'it', ITALY: 'it-IT', JAPAN: 'ja-JP', JAPANESE: 'ja', KOREA: 'ko-KR', KOREAN: 'ko', CHINA: 'zh-CN', CHINESE: 'zh', PRC: 'zh-CN', SIMPLIFIED_CHINESE: 'zh-CN', TAIWAN: 'zh-TW', TRADITIONAL_CHINESE: 'zh-TW' };
-import { createNumberFormatHost } from './number-format-host.js?v=68fb2f8dd331';
-import { createCookieHost } from './cookie-host.js?v=68fb2f8dd331';
-import { createViewApiHost } from './view-api-host.js?v=68fb2f8dd331';
-import { createTextViewApiHost } from './textview-api-host.js?v=68fb2f8dd331';
-import { createIntentApiHost } from './intent-api-host.js?v=68fb2f8dd331';
-import { createImageDecoderHost } from './image-decoder-host.js?v=68fb2f8dd331';
-import { createPlatformDataClassesHost } from './platform-data-classes-host.js?v=68fb2f8dd331';
-import { createToastHost } from './toast-host.js?v=68fb2f8dd331';
-import { createIcuTextHost } from './icu-text-host.js?v=68fb2f8dd331';
-import { createMiscPlatformHost } from './misc-platform-host.js?v=68fb2f8dd331';
-import { createRemoteViewsHost } from './remote-views-host.js?v=68fb2f8dd331';
-import { createPackageManagerApiHost } from './package-manager-api-host.js?v=68fb2f8dd331';
-import { createPackageValueObjectsHost } from './package-value-objects.js?v=68fb2f8dd331';
-import { createNetworkInfoHost } from './network-info-host.js?v=68fb2f8dd331';
-import { createApkChecksumsHost } from './apk-checksums-host.js?v=68fb2f8dd331';
-import { createContentResolverApiHost } from './content-resolver-api-host.js?v=68fb2f8dd331';
-import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=68fb2f8dd331';
-import { createImageViewApiHost } from './image-view-api-host.js?v=68fb2f8dd331';
-import { createUriApiHost } from './uri-api-host.js?v=68fb2f8dd331';
-import { createFormatterHost } from './formatter-host.js?v=68fb2f8dd331';
-import { createJcaHost } from './jca-host.js?v=68fb2f8dd331';
-import { createIcuBidiHost } from './icu-bidi-host.js?v=68fb2f8dd331';
-import { createSecurityHost } from './security-host.js?v=68fb2f8dd331';
-import { createReflectionHost } from './reflection-host.js?v=68fb2f8dd331';
-import { createSerializationHost } from './serialization-host.js?v=68fb2f8dd331';
-import { createBitmapCodecHost } from './bitmap-codec-host.js?v=68fb2f8dd331';
-import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=68fb2f8dd331';
-import { createImageViewHost } from './image-view-host.js?v=68fb2f8dd331';
-import { createWebViewHost } from './webview-host.js?v=68fb2f8dd331';
-import { createContentExtrasHost } from './content-extras-host.js?v=68fb2f8dd331';
-import { createPreferenceManagerHost } from './preference-manager-host.js?v=68fb2f8dd331';
-import { createProcessHost } from './process-host.js?v=68fb2f8dd331';
-import { createStatsHost } from './stats-host.js?v=68fb2f8dd331';
-import { createTelephonyHost } from './telephony-host.js?v=68fb2f8dd331';
-import { createSurfaceTextureHost } from './surface-texture-host.js?v=68fb2f8dd331';
-import { createBuildHost } from './build-host.js?v=68fb2f8dd331';
-import { createSensorHost } from './sensor-host.js?v=68fb2f8dd331';
-import { createGeocoderHost } from './geocoder-host.js?v=68fb2f8dd331';
-import { createCoreLangHost } from './core-lang-host.js?v=68fb2f8dd331';
-import { createResourcesExtrasHost } from './resources-extras-host.js?v=68fb2f8dd331';
-import { createSimpleTimeZoneHost } from './simple-timezone-host.js?v=68fb2f8dd331';
-import { createActivityManagerExtrasHost } from './activity-manager-extras-host.js?v=68fb2f8dd331';
-import { createManagersExtrasHost } from './managers-extras-host.js?v=68fb2f8dd331';
-import { createStrictMathHost } from './strict-math-host.js?v=68fb2f8dd331';
-import { createLocaleExtrasHost } from './locale-extras-host.js?v=68fb2f8dd331';
-import { createUnicodeHost } from './unicode-host.js?v=68fb2f8dd331';
-import { createMessageFormatHost } from './message-format-host.js?v=68fb2f8dd331';
-import { createSettingsHost } from './settings-host.js?v=68fb2f8dd331';
-import { createHardwareServicesHost } from './hardware-services-host.js?v=68fb2f8dd331';
-import { createPeripheralServicesHost } from './peripheral-services-host.js?v=68fb2f8dd331';
-import { createStorageServicesHost } from './storage-services-host.js?v=68fb2f8dd331';
-import { createSystemManagersHost } from './system-managers-host.js?v=68fb2f8dd331';
-import { DEVICE_FEATURES } from './service-kit.js?v=68fb2f8dd331';
-import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=68fb2f8dd331';
-import { createViewTouchHost } from './view-touch-host.js?v=68fb2f8dd331';
-import { createMagnifierHost } from './magnifier-host.js?v=68fb2f8dd331';
-import { createDisplayHost } from './display-host.js?v=68fb2f8dd331';
-import { createNotificationHost } from './notification-host.js?v=68fb2f8dd331';
-import { createDatabaseSupportHost } from './database-support-host.js?v=68fb2f8dd331';
-import { VMClock } from './vm-clock.js?v=68fb2f8dd331';
-import { createWindowInsetsHost } from './window-insets-host.js?v=68fb2f8dd331';
-import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=68fb2f8dd331';
-import { createViewLayoutHost } from './view-layout-host.js?v=68fb2f8dd331';
-import { createInputMethodServiceHost } from './input-method-service-host.js?v=68fb2f8dd331';
-import { createAutofillServiceHost } from './autofill-service-host.js?v=68fb2f8dd331';
-import { createClipboardServiceHost } from './clipboard-service-host.js?v=68fb2f8dd331';
-import { createViewInputHost } from './view-input-host.js?v=68fb2f8dd331';
-import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=68fb2f8dd331';
-import { maybeCollect, ephemeronMap } from './heap-gc.js?v=68fb2f8dd331';
+import { createNumberFormatHost } from './number-format-host.js?v=b60e95a62870';
+import { createCookieHost } from './cookie-host.js?v=b60e95a62870';
+import { createViewApiHost } from './view-api-host.js?v=b60e95a62870';
+import { createTextViewApiHost } from './textview-api-host.js?v=b60e95a62870';
+import { createIntentApiHost } from './intent-api-host.js?v=b60e95a62870';
+import { createImageDecoderHost } from './image-decoder-host.js?v=b60e95a62870';
+import { createPlatformDataClassesHost } from './platform-data-classes-host.js?v=b60e95a62870';
+import { createToastHost } from './toast-host.js?v=b60e95a62870';
+import { createIcuTextHost } from './icu-text-host.js?v=b60e95a62870';
+import { createMiscPlatformHost } from './misc-platform-host.js?v=b60e95a62870';
+import { createRemoteViewsHost } from './remote-views-host.js?v=b60e95a62870';
+import { createPackageManagerApiHost } from './package-manager-api-host.js?v=b60e95a62870';
+import { createPackageValueObjectsHost } from './package-value-objects.js?v=b60e95a62870';
+import { createNetworkInfoHost } from './network-info-host.js?v=b60e95a62870';
+import { createApkChecksumsHost } from './apk-checksums-host.js?v=b60e95a62870';
+import { createContentResolverApiHost } from './content-resolver-api-host.js?v=b60e95a62870';
+import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=b60e95a62870';
+import { createImageViewApiHost } from './image-view-api-host.js?v=b60e95a62870';
+import { createUriApiHost } from './uri-api-host.js?v=b60e95a62870';
+import { createFormatterHost } from './formatter-host.js?v=b60e95a62870';
+import { createJcaHost } from './jca-host.js?v=b60e95a62870';
+import { createIcuBidiHost } from './icu-bidi-host.js?v=b60e95a62870';
+import { createSecurityHost } from './security-host.js?v=b60e95a62870';
+import { createReflectionHost } from './reflection-host.js?v=b60e95a62870';
+import { createSerializationHost } from './serialization-host.js?v=b60e95a62870';
+import { createBitmapCodecHost } from './bitmap-codec-host.js?v=b60e95a62870';
+import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=b60e95a62870';
+import { createImageViewHost } from './image-view-host.js?v=b60e95a62870';
+import { createWebViewHost } from './webview-host.js?v=b60e95a62870';
+import { createContentExtrasHost } from './content-extras-host.js?v=b60e95a62870';
+import { createPreferenceManagerHost } from './preference-manager-host.js?v=b60e95a62870';
+import { createProcessHost } from './process-host.js?v=b60e95a62870';
+import { createStatsHost } from './stats-host.js?v=b60e95a62870';
+import { createTelephonyHost } from './telephony-host.js?v=b60e95a62870';
+import { createSurfaceTextureHost } from './surface-texture-host.js?v=b60e95a62870';
+import { createBuildHost } from './build-host.js?v=b60e95a62870';
+import { createSensorHost } from './sensor-host.js?v=b60e95a62870';
+import { createGeocoderHost } from './geocoder-host.js?v=b60e95a62870';
+import { createCoreLangHost } from './core-lang-host.js?v=b60e95a62870';
+import { createResourcesExtrasHost } from './resources-extras-host.js?v=b60e95a62870';
+import { createSimpleTimeZoneHost } from './simple-timezone-host.js?v=b60e95a62870';
+import { createActivityManagerExtrasHost } from './activity-manager-extras-host.js?v=b60e95a62870';
+import { createManagersExtrasHost } from './managers-extras-host.js?v=b60e95a62870';
+import { createStrictMathHost } from './strict-math-host.js?v=b60e95a62870';
+import { createLocaleExtrasHost } from './locale-extras-host.js?v=b60e95a62870';
+import { createUnicodeHost } from './unicode-host.js?v=b60e95a62870';
+import { createMessageFormatHost } from './message-format-host.js?v=b60e95a62870';
+import { createSettingsHost } from './settings-host.js?v=b60e95a62870';
+import { createHardwareServicesHost } from './hardware-services-host.js?v=b60e95a62870';
+import { createPeripheralServicesHost } from './peripheral-services-host.js?v=b60e95a62870';
+import { createStorageServicesHost } from './storage-services-host.js?v=b60e95a62870';
+import { createSystemManagersHost } from './system-managers-host.js?v=b60e95a62870';
+import { DEVICE_FEATURES } from './service-kit.js?v=b60e95a62870';
+import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=b60e95a62870';
+import { createViewTouchHost } from './view-touch-host.js?v=b60e95a62870';
+import { createMagnifierHost } from './magnifier-host.js?v=b60e95a62870';
+import { createDisplayHost } from './display-host.js?v=b60e95a62870';
+import { createNotificationHost } from './notification-host.js?v=b60e95a62870';
+import { createDatabaseSupportHost } from './database-support-host.js?v=b60e95a62870';
+import { VMClock } from './vm-clock.js?v=b60e95a62870';
+import { createWindowInsetsHost } from './window-insets-host.js?v=b60e95a62870';
+import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=b60e95a62870';
+import { createViewLayoutHost } from './view-layout-host.js?v=b60e95a62870';
+import { createInputMethodServiceHost } from './input-method-service-host.js?v=b60e95a62870';
+import { createAutofillServiceHost } from './autofill-service-host.js?v=b60e95a62870';
+import { createClipboardServiceHost } from './clipboard-service-host.js?v=b60e95a62870';
+import { createViewInputHost } from './view-input-host.js?v=b60e95a62870';
+import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=b60e95a62870';
+import { maybeCollect, ephemeronMap } from './heap-gc.js?v=b60e95a62870';
 
 const ACTIVITY = 'Landroid/app/Activity;', INTENT = 'Landroid/content/Intent;', BUNDLE = 'Landroid/os/Bundle;';
 const APPLICATION = 'Landroid/app/Application;', APP_CONTEXT = 'Landroid/app/ContextImpl;';
@@ -135,9 +135,9 @@ add('Landroid/app/ActivityThread;', ['currentApplication()Landroid/app/Applicati
 add(ACTIVITY, ['onConfigurationChanged(Landroid/content/res/Configuration;)V']);
 add(ACTIVITY, ['getWindowManager()Landroid/view/WindowManager;', 'getOnBackInvokedDispatcher()Landroid/window/OnBackInvokedDispatcher;', 'registerActivityLifecycleCallbacks(Landroid/app/Application$ActivityLifecycleCallbacks;)V', 'unregisterActivityLifecycleCallbacks(Landroid/app/Application$ActivityLifecycleCallbacks;)V']);
 add(ACTIVITY, ['setResult(I)V', 'setResult(ILandroid/content/Intent;)V', 'startActivityForResult(Landroid/content/Intent;I)V', 'startActivityForResult(Landroid/content/Intent;ILandroid/os/Bundle;)V', 'onActivityResult(IILandroid/content/Intent;)V', 'onCreateView(Ljava/lang/String;Landroid/content/Context;Landroid/util/AttributeSet;)Landroid/view/View;', 'onCreateView(Landroid/view/View;Ljava/lang/String;Landroid/content/Context;Landroid/util/AttributeSet;)Landroid/view/View;', 'getTitle()Ljava/lang/CharSequence;', 'setTitle(Ljava/lang/CharSequence;)V', 'setTitle(I)V', 'getWindow()Landroid/view/Window;', 'getFragmentManager()Landroid/app/FragmentManager;', 'getLastNonConfigurationInstance()Ljava/lang/Object;', 'onRetainNonConfigurationInstance()Ljava/lang/Object;', 'isChangingConfigurations()Z', 'isDestroyed()Z', 'recreate()V', 'onPostResume()V', 'onRestart()V', 'onStart()V', 'onResume()V', 'onPause()V', 'onStop()V', 'onDestroy()V', 'onSaveInstanceState(Landroid/os/Bundle;)V', 'onRestoreInstanceState(Landroid/os/Bundle;)V', 'onPostCreate(Landroid/os/Bundle;)V']);
-add(FRAGMENT, ['<init>()V', 'getActivity()Landroid/app/Activity;', 'getContext()Landroid/content/Context;', 'getFragmentManager()Landroid/app/FragmentManager;', 'setArguments(Landroid/os/Bundle;)V', 'getArguments()Landroid/os/Bundle;', 'setRetainInstance(Z)V', 'getRetainInstance()Z', 'isAdded()Z', 'getView()Landroid/view/View;', 'onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;', 'onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V', 'onDestroyView()V', 'onAttach(Landroid/content/Context;)V', 'onAttach(Landroid/app/Activity;)V', 'onCreate(Landroid/os/Bundle;)V', 'onActivityCreated(Landroid/os/Bundle;)V', 'onStart()V', 'onResume()V', 'onPause()V', 'onStop()V', 'onDestroy()V', 'onDetach()V']);
-add(FRAGMENT_MANAGER, ['findFragmentByTag(Ljava/lang/String;)Landroid/app/Fragment;', 'beginTransaction()Landroid/app/FragmentTransaction;', 'executePendingTransactions()Z', 'isDestroyed()Z', 'registerFragmentLifecycleCallbacks(Landroid/app/FragmentManager$FragmentLifecycleCallbacks;Z)V', 'unregisterFragmentLifecycleCallbacks(Landroid/app/FragmentManager$FragmentLifecycleCallbacks;)V', 'findFragmentById(I)Landroid/app/Fragment;', 'getFragments()Ljava/util/List;', 'getBackStackEntryCount()I']);
-add(TRANSACTION, ['add(ILandroid/app/Fragment;Ljava/lang/String;)Landroid/app/FragmentTransaction;', 'add(Landroid/app/Fragment;Ljava/lang/String;)Landroid/app/FragmentTransaction;', 'remove(Landroid/app/Fragment;)Landroid/app/FragmentTransaction;', 'commit()I', 'commitAllowingStateLoss()I', 'commitNow()V', 'commitNowAllowingStateLoss()V']);
+add(FRAGMENT, ['<init>()V', 'getActivity()Landroid/app/Activity;', 'getContext()Landroid/content/Context;', 'getFragmentManager()Landroid/app/FragmentManager;', 'setArguments(Landroid/os/Bundle;)V', 'getArguments()Landroid/os/Bundle;', 'setRetainInstance(Z)V', 'getRetainInstance()Z', 'isAdded()Z', 'getView()Landroid/view/View;', 'onCreateView(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;', 'onViewCreated(Landroid/view/View;Landroid/os/Bundle;)V', 'onDestroyView()V', 'onAttach(Landroid/content/Context;)V', 'onAttach(Landroid/app/Activity;)V', 'onCreate(Landroid/os/Bundle;)V', 'onActivityCreated(Landroid/os/Bundle;)V', 'onStart()V', 'onResume()V', 'onPause()V', 'onStop()V', 'onDestroy()V', 'onDetach()V', 'getTag()Ljava/lang/String;', 'getId()I', 'isHidden()Z', 'isVisible()Z', 'isDetached()Z', 'isRemoving()Z', 'isResumed()Z', 'getParentFragment()Landroid/app/Fragment;', 'getChildFragmentManager()Landroid/app/FragmentManager;', 'getResources()Landroid/content/res/Resources;', 'getString(I)Ljava/lang/String;', 'getString(I[Ljava/lang/Object;)Ljava/lang/String;', 'startActivity(Landroid/content/Intent;)V', 'startActivityForResult(Landroid/content/Intent;I)V', 'onActivityResult(IILandroid/content/Intent;)V', 'onHiddenChanged(Z)V', 'onSaveInstanceState(Landroid/os/Bundle;)V', 'onConfigurationChanged(Landroid/content/res/Configuration;)V', 'onDestroyOptionsMenu()V', 'setHasOptionsMenu(Z)V', 'setUserVisibleHint(Z)V', 'getUserVisibleHint()Z']);
+add(FRAGMENT_MANAGER, ['findFragmentByTag(Ljava/lang/String;)Landroid/app/Fragment;', 'beginTransaction()Landroid/app/FragmentTransaction;', 'executePendingTransactions()Z', 'isDestroyed()Z', 'registerFragmentLifecycleCallbacks(Landroid/app/FragmentManager$FragmentLifecycleCallbacks;Z)V', 'unregisterFragmentLifecycleCallbacks(Landroid/app/FragmentManager$FragmentLifecycleCallbacks;)V', 'findFragmentById(I)Landroid/app/Fragment;', 'getFragments()Ljava/util/List;', 'getBackStackEntryCount()I', 'popBackStack()V', 'popBackStackImmediate()Z', 'popBackStack(Ljava/lang/String;I)V', 'popBackStackImmediate(Ljava/lang/String;I)Z', 'popBackStack(II)V', 'popBackStackImmediate(II)Z']);
+add(TRANSACTION, ['add(ILandroid/app/Fragment;Ljava/lang/String;)Landroid/app/FragmentTransaction;', 'add(Landroid/app/Fragment;Ljava/lang/String;)Landroid/app/FragmentTransaction;', 'remove(Landroid/app/Fragment;)Landroid/app/FragmentTransaction;', 'add(ILandroid/app/Fragment;)Landroid/app/FragmentTransaction;', 'replace(ILandroid/app/Fragment;)Landroid/app/FragmentTransaction;', 'replace(ILandroid/app/Fragment;Ljava/lang/String;)Landroid/app/FragmentTransaction;', 'hide(Landroid/app/Fragment;)Landroid/app/FragmentTransaction;', 'show(Landroid/app/Fragment;)Landroid/app/FragmentTransaction;', 'attach(Landroid/app/Fragment;)Landroid/app/FragmentTransaction;', 'detach(Landroid/app/Fragment;)Landroid/app/FragmentTransaction;', 'addToBackStack(Ljava/lang/String;)Landroid/app/FragmentTransaction;', 'setCustomAnimations(II)Landroid/app/FragmentTransaction;', 'setCustomAnimations(IIII)Landroid/app/FragmentTransaction;', 'setTransition(I)Landroid/app/FragmentTransaction;', 'setReorderingAllowed(Z)Landroid/app/FragmentTransaction;', 'isAddToBackStackAllowed()Z', 'disallowAddToBackStack()Landroid/app/FragmentTransaction;', 'isEmpty()Z', 'commit()I', 'commitAllowingStateLoss()I', 'commitNow()V', 'commitNowAllowingStateLoss()V']);
 add(APPLICATION, ['<init>()V', 'onCreate()V', 'registerActivityLifecycleCallbacks(Landroid/app/Application$ActivityLifecycleCallbacks;)V', 'unregisterActivityLifecycleCallbacks(Landroid/app/Application$ActivityLifecycleCallbacks;)V']);
 add('Landroid/content/ContextWrapper;', ['<init>(Landroid/content/Context;)V', 'attachBaseContext(Landroid/content/Context;)V', 'getBaseContext()Landroid/content/Context;']);
 add(ACTIVITY, ['getApplication()Landroid/app/Application;', '<init>()V', 'onCreate(Landroid/os/Bundle;)V', 'setContentView(I)V', 'setContentView(Landroid/view/View;)V', 'setContentView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V', 'findViewById(I)Landroid/view/View;', 'getIntent()Landroid/content/Intent;', 'setIntent(Landroid/content/Intent;)V', 'finish()V', 'isFinishing()Z', 'onBackPressed()V']);
@@ -236,6 +236,7 @@ PARENTS.set(KEY_SET, 'Ljava/util/Set;'); PARENTS.set(KEY_ITERATOR, 'Ljava/util/I
 const descriptor = (name) => name?.startsWith('L') ? name : `L${name.replaceAll('.', '/')};`;
 const sameRef = (a, b) => a != null && b != null && typeof a.ref === 'number' && a.ref === b.ref;
 const nullish = (value) => value == null || value === 0;
+const nullishString = (runtime, value) => nullish(value) ? null : typeof value === 'string' ? value : runtime.stringCharacters(value);
 function error(message, details = {}) { throw new APKError(`Android platform: ${message}`, { kind: 'android-platform-unsupported', ...details }); }
 function floatBits(value) { const bits = new DataView(new ArrayBuffer(4)); bits.setFloat32(0, value, true); return bits.getInt32(0, true); }
 function bitsFloat(value) { const bits = new DataView(new ArrayBuffer(4)); bits.setInt32(0, value, true); return bits.getFloat32(0, true); }
@@ -1595,7 +1596,9 @@ export class AndroidPlatform {
         this.notifyFragment(runtime, value, 'onFragmentPreAttached', ['Landroid/content/Context;'], [fragment.host]); this.fragmentCall(runtime, value, 'onAttach', ['Landroid/content/Context;'], [fragment.host]); this.notifyFragment(runtime, value, 'onFragmentAttached', ['Landroid/content/Context;'], [fragment.host]);
         if (!fragment.skipCreateOnce) { this.notifyFragment(runtime, value, 'onFragmentPreCreated', [BUNDLE], [null]); this.fragmentCall(runtime, value, 'onCreate', [BUNDLE], [null]); this.notifyFragment(runtime, value, 'onFragmentCreated', [BUNDLE], [null]); } fragment.skipCreateOnce = false;
       }
-      if (next === 2) { const frame = this.frame(runtime, fragment.host); const container = fragment.containerId ? this.find(runtime, frame.root, fragment.containerId) : null; fragment.root = runtime.dispatch({ owner: runtime.object(value).type, name: 'onCreateView', signature: '(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;', parameters: [INFLATER, 'Landroid/view/ViewGroup;', BUNDLE], result: 'Landroid/view/View;' }, [value, this.inflater(runtime, fragment.host), container, frame.savedState || null], 'virtual'); if (!nullish(fragment.root)) { if (container) runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'addView', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [container, fragment.root], 'virtual'); this.fragmentCall(runtime, value, 'onViewCreated', ['Landroid/view/View;', BUNDLE], [fragment.root, frame.savedState || null]); this.notifyFragment(runtime, value, 'onFragmentViewCreated', ['Landroid/view/View;', BUNDLE], [fragment.root, frame.savedState || null]); } this.fragmentCall(runtime, value, 'onActivityCreated', [BUNDLE], [frame.savedState || null]); this.notifyFragment(runtime, value, 'onFragmentActivityCreated', [BUNDLE], [frame.savedState || null]); }
+      // The Activity that owns the fragment's FragmentManager, never a global current Activity; a fragment with no owner left (detached) has no view to create.
+      if (next === 2 && nullish(fragment.host ?? (nullish(fragment.manager) ? null : runtime.object(fragment.manager).host))) { state = fragment.fragmentStage = next; continue; }
+      if (next === 2) { fragment.host ??= runtime.object(fragment.manager).host; const frame = this.frame(runtime, fragment.host); const container = fragment.containerId ? this.find(runtime, frame.root, fragment.containerId) : null; fragment.root = runtime.dispatch({ owner: runtime.object(value).type, name: 'onCreateView', signature: '(Landroid/view/LayoutInflater;Landroid/view/ViewGroup;Landroid/os/Bundle;)Landroid/view/View;', parameters: [INFLATER, 'Landroid/view/ViewGroup;', BUNDLE], result: 'Landroid/view/View;' }, [value, this.inflater(runtime, fragment.host), container, frame.savedState || null], 'virtual'); if (!nullish(fragment.root)) { if (container) runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'addView', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [container, fragment.root], 'virtual'); this.fragmentCall(runtime, value, 'onViewCreated', ['Landroid/view/View;', BUNDLE], [fragment.root, frame.savedState || null]); this.notifyFragment(runtime, value, 'onFragmentViewCreated', ['Landroid/view/View;', BUNDLE], [fragment.root, frame.savedState || null]); } this.fragmentCall(runtime, value, 'onActivityCreated', [BUNDLE], [frame.savedState || null]); this.notifyFragment(runtime, value, 'onFragmentActivityCreated', [BUNDLE], [frame.savedState || null]); }
       if (next === 3) { this.fragmentCall(runtime, value, 'onStart'); this.notifyFragment(runtime, value, 'onFragmentStarted'); }
       if (next === 4) { this.fragmentCall(runtime, value, 'onResume'); this.notifyFragment(runtime, value, 'onFragmentResumed'); }
       state = fragment.fragmentStage = next;
@@ -1614,21 +1617,74 @@ export class AndroidPlatform {
     for (const fragment of manager.fragments) this.moveFragment(runtime, fragment, target);
     manager.destroyed = target === 0;
   }
+  /** The lifecycle stage a manager's fragments follow: that of the Activity that owns the manager (never a global "current" Activity). */
+  hostStage(runtime, manager) { const host = manager.host; if (nullish(host)) return 0; return this.frame(runtime, host).lifecycleStage || 0; }
+  fragmentRemove(runtime, manager, value, keep) {
+    const fragment = runtime.object(value);
+    if (!manager.fragments.some(ref => sameRef(ref, value))) return false;
+    this.moveFragment(runtime, value, keep ? 1 : 0); manager.fragments = manager.fragments.filter(ref => !sameRef(ref, value)); fragment.added = false;
+    if (keep) fragment.stashed = true; else { fragment.manager = null; fragment.stashed = false; }
+    return true;
+  }
+  fragmentAdd(runtime, managerValue, manager, value, containerId, tag) {
+    const fragment = runtime.object(value);
+    if (fragment.manager && !fragment.stashed) runtime.throwJava('Ljava/lang/IllegalStateException;', `Fragment already added: ${runtime.typeOf(value).slice(1, -1).replaceAll('/', '.')}`);
+    Object.assign(fragment, { manager: managerValue, host: manager.host, tag: tag ?? fragment.tag ?? null, containerId: containerId || fragment.containerId || 0, added: true, stashed: false, hidden: !!fragment.hidden, detached: false });
+    if (!fragment.fragmentStage) fragment.fragmentStage = 0;
+    manager.fragments.push(value); this.moveFragment(runtime, value, this.hostStage(runtime, manager));
+  }
+  fragmentSetHidden(runtime, value, hidden) {
+    const fragment = runtime.object(value); if (!!fragment.hidden === hidden) return; fragment.hidden = hidden;
+    if (!nullish(fragment.root)) runtime.dispatch({ owner: 'Landroid/view/View;', name: 'setVisibility', signature: '(I)V', parameters: ['I'], result: 'V' }, [fragment.root, hidden ? 8 : 0], 'virtual');
+    this.fragmentCall(runtime, value, 'onHiddenChanged', ['Z'], [hidden ? 1 : 0]);
+  }
   executeTransactions(runtime, managerValue) {
-    const manager = runtime.object(managerValue); if (manager.destroyed) error('FragmentManager has been destroyed'); let executed = false;
+    const manager = runtime.object(managerValue); let executed = false;
+    if (manager.destroyed) { manager.pending.length = 0; return 0; }   // the owning Activity is gone: nothing left to run against (commit() on a destroyed manager already threw)
     while (manager.pending.length) {
-      const transaction = manager.pending.shift();
+      if (manager.pending[0].pop) { const action = manager.pending.shift().pop; this.popRecords(runtime, managerValue, action.name, action.id, action.flags); executed = true; continue; }
+      const transaction = manager.pending.shift(), record = transaction.backStackName !== undefined ? { name: transaction.backStackName, id: transaction.id, undo: [] } : null;
       for (const operation of transaction.operations) {
         const fragment = runtime.object(operation.fragment);
-        if (operation.kind === 'add') {
-          if (fragment.manager) error('Fragment is already added');
-          Object.assign(fragment, { manager: managerValue, host: manager.host, tag: operation.tag, containerId: operation.containerId, added: true, fragmentStage: 0 }); manager.fragments.push(operation.fragment);
-          const frame = this.frame(runtime, manager.host); this.moveFragment(runtime, operation.fragment, frame.lifecycleStage || 0);
-        } else { this.moveFragment(runtime, operation.fragment, 0); manager.fragments = manager.fragments.filter((value) => !sameRef(value, operation.fragment)); fragment.added = false; fragment.manager = null; }
+        if (operation.kind === 'add') { this.fragmentAdd(runtime, managerValue, manager, operation.fragment, operation.containerId, operation.tag); record?.undo.push({ kind: 'remove-added', fragment: operation.fragment }); }
+        else if (operation.kind === 'remove') { if (this.fragmentRemove(runtime, manager, operation.fragment, !!record)) record?.undo.push({ kind: 'readd', fragment: operation.fragment }); }
+        else if (operation.kind === 'replace') {
+          for (const existing of [...manager.fragments]) if (!sameRef(existing, operation.fragment) && (operation.containerId ? runtime.object(existing).containerId === operation.containerId : false)) { if (this.fragmentRemove(runtime, manager, existing, !!record)) record?.undo.push({ kind: 'readd', fragment: existing }); }
+          this.fragmentAdd(runtime, managerValue, manager, operation.fragment, operation.containerId, operation.tag); record?.undo.push({ kind: 'remove-added', fragment: operation.fragment });
+        }
+        else if (operation.kind === 'hide' || operation.kind === 'show') { const hide = operation.kind === 'hide'; if (!!fragment.hidden !== hide) { this.fragmentSetHidden(runtime, operation.fragment, hide); record?.undo.push({ kind: hide ? 'show' : 'hide', fragment: operation.fragment }); } }
+        else if (operation.kind === 'detach') { if (fragment.added && !fragment.detached) { this.moveFragment(runtime, operation.fragment, 1); fragment.detached = true; record?.undo.push({ kind: 'attach', fragment: operation.fragment }); } }
+        else if (operation.kind === 'attach') { if (fragment.detached) { fragment.detached = false; this.moveFragment(runtime, operation.fragment, this.hostStage(runtime, manager)); record?.undo.push({ kind: 'detach', fragment: operation.fragment }); } }
       }
+      if (record) (manager.backStack ??= []).push(record);
       executed = true;
     }
     return executed ? 1 : 0;
+  }
+  /** FragmentManager.popBackStack: undoes back-stack records from the top. With a name or id, down to the first record that matches (POP_BACK_STACK_INCLUSIVE = 1 pops it as well); returns whether anything was popped. */
+  popRecords(runtime, managerValue, name, id, flags) {
+    const manager = runtime.object(managerValue);
+    const stack = manager.backStack ?? []; if (!stack.length) return 0;
+    let keep = stack.length - 1;   // index of the last record that is popped
+    let first = stack.length - 1;
+    if (name === undefined && id === undefined) { first = stack.length - 1; keep = first; }
+    else {
+      let index = stack.length - 1; for (; index >= 0; index--) if ((name !== null && name !== undefined && stack[index].name === name) || (id !== undefined && id >= 0 && stack[index].id === id)) break;
+      if (index < 0) return 0;
+      keep = (flags & 1) ? index : index + 1; if (keep >= stack.length) return 0;
+    }
+    for (let at = stack.length - 1; at >= keep; at--) {
+      const record = stack.pop();
+      for (const step of [...record.undo].reverse()) {
+        const fragment = runtime.object(step.fragment);
+        if (step.kind === 'remove-added') this.fragmentRemove(runtime, manager, step.fragment, false);
+        else if (step.kind === 'readd') { fragment.added = true; fragment.stashed = false; manager.fragments.push(step.fragment); this.moveFragment(runtime, step.fragment, this.hostStage(runtime, manager)); }
+        else if (step.kind === 'hide' || step.kind === 'show') this.fragmentSetHidden(runtime, step.fragment, step.kind === 'hide');
+        else if (step.kind === 'detach') { this.moveFragment(runtime, step.fragment, 1); fragment.detached = true; }
+        else if (step.kind === 'attach') { fragment.detached = false; this.moveFragment(runtime, step.fragment, this.hostStage(runtime, manager)); }
+      }
+    }
+    void first; return 1;
   }
   fragmentInvoke(runtime, method, args) {
     const owner = method.owner, name = method.name, value = args[0], object = runtime.object(value);
@@ -1641,12 +1697,30 @@ export class AndroidPlatform {
       if (name === 'unregisterFragmentLifecycleCallbacks') { object.callbacks = (object.callbacks ?? []).filter(entry => !sameRef(entry.callbacks, args[1])); return; }
       if (name === 'findFragmentById') return [...object.fragments].reverse().find(ref => runtime.object(ref).containerId === args[1]) ?? null;
       if (name === 'getFragments') { const list = runtime.allocate('Ljava/util/ArrayList;'); runtime.dispatch({ owner: 'Ljava/util/ArrayList;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [list], 'direct'); for (const ref of object.fragments) runtime.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: ['Ljava/lang/Object;'], result: 'Z', signature: '(Ljava/lang/Object;)Z' }, [list, ref], 'virtual'); return list; }
-      if (name === 'getBackStackEntryCount') return 0;
+      if (name === 'getBackStackEntryCount') return (object.backStack ?? []).length;
+      if (name.startsWith('popBackStack')) {
+        const immediate = name === 'popBackStackImmediate', p = method.parameters;
+        const action = p.length === 0 ? { name: undefined, id: undefined, flags: 0 } : p[0] === 'Ljava/lang/String;' ? { name: nullish(args[1]) ? null : runtime.stringCharacters(args[1]), id: undefined, flags: args[2] } : { name: undefined, id: args[1], flags: args[2] };
+        if (object.destroyed) { if (immediate) runtime.throwJava('Ljava/lang/IllegalStateException;', 'Activity has been destroyed'); return; }
+        object.pending.push({ pop: action });   // FragmentManager.enqueueAction: popBackStack() runs with the pending transactions, in order
+        if (immediate) { const before = (object.backStack ?? []).length; this.executeTransactions(runtime, value); return (object.backStack ?? []).length < before ? 1 : 0; }
+        this.queueTask(() => { if (object.pending.length) this.executeTransactions(runtime, value); }, 0, [value]); return;
+      }
     }
     if (owner === TRANSACTION) {
       if (object.committed) error('FragmentTransaction is already committed');
-      if (name === 'add' || name === 'remove') { object.operations.push({ kind: name, fragment: typeof args[1] === 'number' ? args[2] : args[1], tag: typeof args[1] === 'number' ? args[3] : args[2], containerId: typeof args[1] === 'number' ? args[1] : 0 }); return value; }
-      object.committed = true; const manager = runtime.object(object.manager); manager.pending.push(object); const id = ++this.transactionSequence;
+      if (name === 'add' || name === 'remove' || name === 'replace' || name === 'hide' || name === 'show' || name === 'attach' || name === 'detach') {
+        const p = method.parameters, withContainer = p[0] === 'I', fragment = withContainer ? args[2] : args[1], tag = withContainer ? (p[2] === 'Ljava/lang/String;' ? args[3] : null) : (p[1] === 'Ljava/lang/String;' ? args[2] : null);
+        if (nullish(fragment)) runtime.throwJava('Ljava/lang/NullPointerException;', 'Fragment must not be null');
+        object.operations.push({ kind: name, fragment, tag: nullishString(runtime, tag), containerId: withContainer ? args[1] : 0 }); return value;
+      }
+      if (name === 'addToBackStack') { if (object.backStackDisallowed) runtime.throwJava('Ljava/lang/IllegalStateException;', 'This FragmentTransaction is not allowed to be added to the back stack.'); object.backStackName = nullish(args[1]) ? null : runtime.stringCharacters(args[1]); return value; }
+      if (name === 'disallowAddToBackStack') { if (object.backStackName !== undefined) runtime.throwJava('Ljava/lang/IllegalStateException;', 'This transaction is already being added to the back stack'); object.backStackDisallowed = true; return value; }
+      if (name === 'isAddToBackStackAllowed') return object.backStackDisallowed ? 0 : 1;
+      if (name === 'isEmpty') return object.operations.length === 0 ? 1 : 0;
+      if (name === 'setCustomAnimations' || name === 'setTransition' || name === 'setReorderingAllowed') return value;   // animations and transition styles have no effect on the lab's lifecycle
+      const manager = runtime.object(object.manager); if (manager.destroyed) runtime.throwJava('Ljava/lang/IllegalStateException;', 'Activity has been destroyed');
+      object.committed = true; manager.pending.push(object); const id = object.id = ++this.transactionSequence;
       if (name.startsWith('commitNow')) { this.executeTransactions(runtime, object.manager); return; }
       this.queueTask(() => { if (manager.pending.length) this.executeTransactions(runtime, object.manager); }, 0, [object.manager]); return id;
     }
@@ -1660,6 +1734,29 @@ export class AndroidPlatform {
     if (name === 'setRetainInstance') { object.retained = !!args[1]; return; }
     if (name === 'getRetainInstance') return object.retained ? 1 : 0;
     if (name === 'isAdded') return object.added ? 1 : 0;
+    if (name === 'getTag') return object.tag ?? null;
+    if (name === 'getId') return object.containerId ?? 0;
+    if (name === 'isHidden') return object.hidden ? 1 : 0;
+    if (name === 'isDetached') return object.detached ? 1 : 0;
+    if (name === 'isRemoving') return 0;
+    if (name === 'isResumed') return object.fragmentStage === 4 ? 1 : 0;
+    if (name === 'isVisible') return object.added && !nullish(object.host) && !object.hidden && !nullish(object.root) && !object.detached ? 1 : 0;
+    if (name === 'getParentFragment') return null;
+    if (name === 'getChildFragmentManager') error('Fragment.getChildFragmentManager: nested fragment managers are not part of the lab; use getFragmentManager()');
+    if (name === 'getUserVisibleHint') return object.userVisibleHint === false ? 0 : 1;
+    if (name === 'setUserVisibleHint') { object.userVisibleHint = !!args[1]; return; }
+    if (name === 'setHasOptionsMenu') { object.hasOptionsMenu = !!args[1]; return; }
+    if (name === 'getResources' || name === 'getString') {
+      if (nullish(object.host)) runtime.throwJava('Ljava/lang/IllegalStateException;', `Fragment ${runtime.typeOf(value).slice(1, -1).replaceAll('/', '.')} not attached to Activity`);
+      const parameters = name === 'getResources' ? [] : method.parameters, result = name === 'getResources' ? 'Landroid/content/res/Resources;' : 'Ljava/lang/String;';
+      return runtime.dispatch({ owner: ACTIVITY, name, signature: `(${parameters.join('')})${result}`, parameters, result }, [object.host, ...args.slice(1)], 'virtual');
+    }
+    if (name === 'startActivity' || name === 'startActivityForResult') {
+      if (nullish(object.host)) runtime.throwJava('Ljava/lang/IllegalStateException;', `Fragment ${runtime.typeOf(value).slice(1, -1).replaceAll('/', '.')} not attached to Activity`);
+      const frame = this.frame(runtime, object.host);
+      if (name === 'startActivityForResult' && args[2] >= 0) (frame.fragmentRequests ??= new Map()).set(args[2], value);
+      return this.startActivity(runtime, args[1], name === 'startActivityForResult' && args[2] >= 0 ? object.host : null, name === 'startActivityForResult' ? args[2] : -1);
+    }
     if (name === 'onDetach') { object.host = null; return; }
     if (name === 'onAttach' && method.parameters[0] === 'Landroid/content/Context;') return this.fragmentCall(runtime, value, 'onAttach', [ACTIVITY], [args[1]]);
     if (name.startsWith('on')) return; // Framework base Fragment lifecycle methods have no user callback body.
@@ -1734,6 +1831,7 @@ export class AndroidPlatform {
       if (runtime.multiThreaded && slices < 64 && runtime.scheduler.hasRunnable()) { runtime.steps = 0; runtime.sliceDeadline = performance.now() + sliceMs; try { runtime.monitor.sliceRan(); runtime.runThreads(); } finally { runtime.sliceDeadline = 0; } processed++; slices++; ran++; }
       if (!ran) break;
     }
+    if (this.idleHandlers?.length && !this.runningIdleHandlers && (this.nextEventDelay() ?? 1) > 0) { this.runningIdleHandlers = true; try { this.runIdleHandlers(runtime); } finally { this.runningIdleHandlers = false; } }   // MessageQueue.next(): nothing due, the IdleHandlers get their turn
     const eventDelay = this.nextEventDelay(), threadDelay = runtime.scheduler.threadDelay();
     let waitingIO = 0; if (this.externalSources) for (const source of this.externalSources) waitingIO += source.pending?.() ?? 0;
     return { processed, pending: this.eventQueue.length, waitingIO, nextDelay: eventDelay === null ? threadDelay : threadDelay === null ? eventDelay : Math.min(eventDelay, threadDelay) };

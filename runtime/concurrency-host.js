@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=68fb2f8dd331';
-import { queueObject } from './hidden-members.js?v=68fb2f8dd331';
-import { createHostRegistry } from './host-contract.js?v=68fb2f8dd331';
-import { Blocked, VMThread } from './scheduler.js?v=68fb2f8dd331';
-import { Invoke } from './interpreter.js?v=68fb2f8dd331';
-import { GC_ROOTS } from './heap-gc.js?v=68fb2f8dd331';
+import { APKError } from './apk-error.js?v=b60e95a62870';
+import { queueObject } from './hidden-members.js?v=b60e95a62870';
+import { createHostRegistry } from './host-contract.js?v=b60e95a62870';
+import { Blocked, VMThread } from './scheduler.js?v=b60e95a62870';
+import { Invoke } from './interpreter.js?v=b60e95a62870';
+import { GC_ROOTS } from './heap-gc.js?v=b60e95a62870';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -714,5 +714,19 @@ export function createConcurrencyHost(platform) {
   def(LOOPER, 'quit', '()V', (r, _m, [self]) => { const state = r.object(self); if (state === r.object(r.mainLooper ?? self) && !state.looperQueue) r.throwJava('Ljava/lang/IllegalStateException;', 'Main thread not allowed to quit.'); state.quitting = true; state.safeQuit = false; for (const event of state.looperQueue) { const message = r.object(event.message); message.inUse = false; message.recycled = true; } state.looperQueue.length = 0; platform.onExternalActivity?.(); });
   def(LOOPER, 'quitSafely', '()V', (r, _m, [self]) => { const state = r.object(self); if (!state.looperQueue) r.throwJava('Ljava/lang/IllegalStateException;', 'Main thread not allowed to quit.'); state.quitting = true; state.safeQuit = true; platform.onExternalActivity?.(); });
   def(LOOPER, 'getQueue', '()Landroid/os/MessageQueue;', (r, _m, [self]) => queueObject(r, self));   // an object that exposes MessageQueue.mMessages to reflection; its methods are not modelled
-  return { ...registry, interfaces: registry.interfacesOf, helpUntil, currentThread, mainThread, [GC_ROOTS](visit) { for (const hook of shutdownHooks.values()) visit(hook); } };
+  // ---- MessageQueue as libraries use it for main-thread checks and idle work: Looper.myQueue(), isIdle(), IdleHandlers (run when the main queue has nothing due, as MessageQueue.next() does before it blocks)
+  const MESSAGE_QUEUE = 'Landroid/os/MessageQueue;', IDLE_HANDLER = 'Landroid/os/MessageQueue$IdleHandler;';
+  const idleHandlers = platform.idleHandlers = [];   // { looper, handler }: GC roots through the hook below
+  def(LOOPER, 'myQueue', `()${MESSAGE_QUEUE}`, r => { const looper = r.dispatch({ owner: LOOPER, name: 'myLooper', parameters: [], result: LOOPER, signature: `()${LOOPER}` }, [], 'static'); if (looper === null) r.throwJava('Ljava/lang/NullPointerException;', "Attempt to read from field 'android.os.MessageQueue android.os.Looper.mQueue' on a null object reference"); return queueObject(r, looper); }, { static: true });
+  def(MESSAGE_QUEUE, 'isIdle', '()Z', (r, _m, [self]) => { const queue = platform.queueOf(r, r.object(self).looper), now = platform.clock.now(); return !queue.length || (!queue[0].front && queue[0].when > now) ? 1 : 0; });
+  def(MESSAGE_QUEUE, 'addIdleHandler', `(${IDLE_HANDLER})V`, (r, _m, [self, handler]) => { if (handler === null) r.throwJava('Ljava/lang/NullPointerException;', "Can't add a null IdleHandler"); idleHandlers.push({ looper: r.object(self).looper, handler }); });
+  def(MESSAGE_QUEUE, 'removeIdleHandler', `(${IDLE_HANDLER})V`, (r, _m, [, handler]) => { const at = idleHandlers.findIndex(entry => entry.handler === handler || (entry.handler?.ref !== undefined && entry.handler.ref === handler?.ref)); if (at >= 0) idleHandlers.splice(at, 1); });
+  platform.runIdleHandlers = r => {
+    for (const entry of [...idleHandlers]) {
+      if (!idleHandlers.includes(entry)) continue;
+      const keep = r.dispatch({ owner: IDLE_HANDLER, name: 'queueIdle', parameters: [], result: 'Z', signature: '()Z' }, [entry.handler], 'virtual');
+      if (!keep) { const at = idleHandlers.indexOf(entry); if (at >= 0) idleHandlers.splice(at, 1); }
+    }
+  };
+  return { ...registry, interfaces: registry.interfacesOf, helpUntil, currentThread, mainThread, [GC_ROOTS](visit) { for (const hook of shutdownHooks.values()) visit(hook); for (const entry of idleHandlers) { visit(entry.looper); visit(entry.handler); } } };
 }

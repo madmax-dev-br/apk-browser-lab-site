@@ -1,6 +1,6 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=68fb2f8dd331';
+import { TimeBreakdown } from './time-breakdown.js?v=b60e95a62870';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -89,6 +89,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     // the longest episode of the main thread inside one event (kept after it ended): where it was, what it was doing, the hottest methods of the last seconds
     { const busy = runtime.monitor?.mainBusy;
       if (busy) out.push(`principal ocupada há ${(busy.busyMs / 1000).toFixed(0)} s num único evento (${busy.event})${busy.capped ? `; evento encerrado pelo limite após ${(busy.endedAfterMs / 1000).toFixed(0)} s (a pilha já foi desfeita: os frames abaixo são os da última amostra)` : busy.ended ? `; o evento terminou após ${(busy.endedAfterMs / 1000).toFixed(0)} s` : ' e ainda está em execução'}; laço da thread principal: ${busy.hot.join(', ') || '(sem amostras)'}; frames mais internos: ${busy.frames.join(' <- ') || '(nenhum)'}${busy.hostCall ? `; dentro da chamada do host ${busy.hostCall}${busy.resourceCall ? ` (${busy.resourceCall})` : ''}` : ''}${busy.overdue?.count ? `; ${busy.overdue.count} mensagens atrasadas, a mais antiga há ${(busy.overdue.oldestMs / 1000).toFixed(1)} s` : ''}`); }
+    for (const line of runtime.sampler?.lines?.() ?? []) out.push(line);   // the sampled profile of the last 30 s: the busiest threads and their stacks, independent of any event boundary
     // park / wait details: what it waits on, with or without a deadline, and who could release it -- also when the thread is already runnable (woken, not yet resumed)
     if (main.blocked) {
       const now = runtime.platform?.clock?.now?.() ?? 0, deadline = main.blocked.deadline, timed = Number.isFinite(deadline);
