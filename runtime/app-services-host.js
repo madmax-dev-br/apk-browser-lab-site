@@ -1,7 +1,8 @@
-import { APKError } from './apk-error.js?v=e6a5660dc93e';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=e6a5660dc93e';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=e6a5660dc93e';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=e6a5660dc93e';
+import { APKError } from './apk-error.js?v=2af81fe8368d';
+import { registerPackageValueFields } from './package-value-fields.js?v=2af81fe8368d';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=2af81fe8368d';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=2af81fe8368d';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=2af81fe8368d';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -362,6 +363,7 @@ export function createAppServicesHost(platform) {
   });
 
   // ---- ProviderInfo / ContentProvider -----------------------------------------------------------------------------------------------------------
+  registerPackageValueFields(registry);
   type(ITEM_INFO, OBJECT, [], { allocatable: true }); type(COMPONENT_INFO, ITEM_INFO, [], { allocatable: true }); type(PROVIDER_INFO, COMPONENT_INFO, [], { allocatable: true });
   for (const [owner, name, ftype] of [[ITEM_INFO, 'name', STRING], [ITEM_INFO, 'packageName', STRING], [ITEM_INFO, 'metaData', BUNDLE], [COMPONENT_INFO, 'applicationInfo', APPLICATION_INFO], [COMPONENT_INFO, 'processName', STRING],
     [COMPONENT_INFO, 'enabled', 'Z'], [COMPONENT_INFO, 'exported', 'Z'], [COMPONENT_INFO, 'directBootAware', 'Z'], [PROVIDER_INFO, 'authority', STRING], [PROVIDER_INFO, 'readPermission', STRING], [PROVIDER_INFO, 'writePermission', STRING],
@@ -377,11 +379,11 @@ export function createAppServicesHost(platform) {
         const resolved = platform.resource(value), data = resolved.rawData ?? resolved.data, type = resolved.dataType;
         if (type === 3) dispatchBundle(r, bundle, 'putString', [STRING, STRING], [name, resolved.value]);          // TYPE_STRING
         else if (type === 0x12) dispatchBundle(r, bundle, 'putBoolean', [STRING, 'Z'], [name, (data | 0) !== 0 ? 1 : 0]);                              // TYPE_INT_BOOLEAN
-        else if (type === 4) dispatchBundle(r, bundle, 'putFloat', [STRING, 'F'], [name, data | 0]);                                                   // TYPE_FLOAT
+        else if (type === 4) dispatchBundle(r, bundle, 'putFloat', [STRING, 'F'], [name, bitsFloat(data | 0)]);                                                   // TYPE_FLOAT
         else if (type >= 0x10 && type <= 0x1f) dispatchBundle(r, bundle, 'putInt', [STRING, 'I'], [name, data | 0]);                                   // TYPE_FIRST_INT..TYPE_LAST_INT: integers, hex, colors
         else throw new APKError(`<meta-data> ${name}: only string, integer, float, color, boolean and resource reference types are supported (resource type ${type})`, { kind: 'manifest-meta-data-unsupported' });
       } else if (valueType === 0x12) dispatchBundle(r, bundle, 'putBoolean', [STRING, 'Z'], [name, isTrue(value) ? 1 : 0]);
-      else if (valueType === 4) dispatchBundle(r, bundle, 'putFloat', [STRING, 'F'], [name, value | 0]);
+      else if (valueType === 4) dispatchBundle(r, bundle, 'putFloat', [STRING, 'F'], [name, bitsFloat(value | 0)]);
       else dispatchBundle(r, bundle, 'putInt', [STRING, 'I'], [name, value | 0]);
     }
     return bundle;
@@ -666,14 +668,19 @@ export function createAppServicesHost(platform) {
   // ---- running services, tasks, app tasks, process memory (Android 13): a normal app sees only its own process, services and tasks (since API 26 / 21) -------------------------------------
   const RUNNING_SERVICE = 'Landroid/app/ActivityManager$RunningServiceInfo;', RUNNING_TASK = 'Landroid/app/ActivityManager$RunningTaskInfo;', RECENT_TASK = 'Landroid/app/ActivityManager$RecentTaskInfo;', APP_TASK = 'Landroid/app/ActivityManager$AppTask;';
   const MEMORY_INFO = 'Landroid/os/Debug$MemoryInfo;', COMPONENT_NAME_T = 'Landroid/content/ComponentName;', INTENT_T = 'Landroid/content/Intent;';
-  for (const t of [RUNNING_SERVICE, RUNNING_TASK, RECENT_TASK, APP_TASK, MEMORY_INFO]) type(t, OBJECT, [], { allocatable: true });
+  const TASK_INFO = 'Landroid/app/TaskInfo;';   // RunningTaskInfo and RecentTaskInfo extend TaskInfo, which declares taskId, baseIntent, baseActivity, topActivity, origActivity, numActivities and isRunning
+  type(TASK_INFO, OBJECT, [], { allocatable: true });
+  for (const t of [RUNNING_TASK, RECENT_TASK]) type(t, TASK_INFO, ['Landroid/os/Parcelable;'], { allocatable: true });
+  for (const t of [RUNNING_SERVICE, APP_TASK, MEMORY_INFO]) type(t, OBJECT, [], { allocatable: true });
   for (const t of [RUNNING_SERVICE, RUNNING_TASK, RECENT_TASK, MEMORY_INFO]) def(t, '<init>', '()V', () => {});
   for (const [name, ftype] of [['service', COMPONENT_NAME_T], ['pid', 'I'], ['uid', 'I'], ['process', STRING], ['foreground', 'Z'], ['activeSince', 'J'], ['started', 'Z'], ['clientCount', 'I'], ['crashCount', 'I'], ['lastActivityTime', 'J'], ['restarting', 'J'], ['flags', 'I'], ['clientPackage', STRING], ['clientLabel', 'I']]) registry.instanceField(RUNNING_SERVICE, name, ftype, { reflect: true });
   const taskFields = [['taskId', 'I'], ['persistentId', 'I'], ['baseIntent', INTENT_T], ['baseActivity', COMPONENT_NAME_T], ['topActivity', COMPONENT_NAME_T], ['origActivity', COMPONENT_NAME_T], ['numActivities', 'I'], ['isRunning', 'Z'], ['lastActiveTime', 'J'], ['description', 'Ljava/lang/CharSequence;']];
-  for (const t of [RUNNING_TASK, RECENT_TASK]) for (const [name, ftype] of taskFields) registry.instanceField(t, name, ftype, { reflect: true });
-  registry.instanceField(RUNNING_TASK, 'id', 'I', { reflect: true }); registry.instanceField(RUNNING_TASK, 'numRunning', 'I', { reflect: true });
+  const taskOwner = { taskId: TASK_INFO, baseIntent: TASK_INFO, baseActivity: TASK_INFO, topActivity: TASK_INFO, origActivity: TASK_INFO, numActivities: TASK_INFO, isRunning: TASK_INFO, lastActiveTime: TASK_INFO };
+  for (const [name, ftype] of taskFields) if (taskOwner[name]) registry.instanceField(TASK_INFO, name, ftype, { reflect: true });
+  for (const t of [RUNNING_TASK, RECENT_TASK]) { registry.instanceField(t, 'description', 'Ljava/lang/CharSequence;', { reflect: true }); registry.instanceField(t, 'id', 'I', { reflect: true }); }
+  registry.instanceField(RUNNING_TASK, 'numRunning', 'I', { reflect: true }); registry.instanceField(RECENT_TASK, 'persistentId', 'I', { reflect: true }); registry.instanceField(RECENT_TASK, 'affiliatedTaskId', 'I', { reflect: true });
   for (const [name, ftype] of [['dalvikPss', 'I'], ['dalvikPrivateDirty', 'I'], ['dalvikSharedDirty', 'I'], ['nativePss', 'I'], ['nativePrivateDirty', 'I'], ['nativeSharedDirty', 'I'], ['otherPss', 'I'], ['otherPrivateDirty', 'I'], ['otherSharedDirty', 'I']]) registry.instanceField(MEMORY_INFO, name, ftype, { reflect: true });
-  const putField = (r, ref, owner, name, ftype, value) => r.storeField(r.object(ref).fields, `${owner}->${name}:${ftype}`, value);
+  const putField = (r, ref, owner, name, ftype, value) => r.storeField(r.object(ref).fields, r.resolveField({ owner, name, type: ftype, key: `${owner}->${name}:${ftype}` }).key, value);   // stored under the declaring class
   const addTo = (r, list, item) => r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, item], 'virtual');
   const componentFor = (r, className) => { const c = r.allocate(COMPONENT_NAME_T); call(r, COMPONENT_NAME_T, '<init>', [STRING, STRING], 'V', [c, pkg(), className], 'direct'); return c; };
   def(ACTIVITY_MANAGER, 'getRunningServices', '(I)Ljava/util/List;', (r, _m, [, maxNum]) => {
@@ -696,7 +703,8 @@ export function createAppServicesHost(platform) {
     const intent = r.allocate(INTENT_T); call(r, INTENT_T, '<init>', [STRING], 'V', [intent, 'android.intent.action.MAIN'], 'direct'); call(r, INTENT_T, 'addCategory', [STRING], INTENT_T, [intent, 'android.intent.category.LAUNCHER']); call(r, INTENT_T, 'setComponent', [COMPONENT_NAME_T], INTENT_T, [intent, componentFor(r, baseName)]);
     put('taskId', 'I', task.id); put('persistentId', 'I', task.id); put('baseIntent', INTENT_T, intent); put('baseActivity', COMPONENT_NAME_T, componentFor(r, baseName)); put('topActivity', COMPONENT_NAME_T, componentFor(r, topName)); put('origActivity', COMPONENT_NAME_T, null);
     put('numActivities', 'I', frames.length); put('isRunning', 'Z', 1); put('lastActiveTime', 'J', BigInt(Math.floor(task.lastActiveTime ?? platform.clock.now()))); put('description', 'Ljava/lang/CharSequence;', null);
-    if (owner === RUNNING_TASK) { put('id', 'I', task.id); put('numRunning', 'I', frames.length); }
+    put('id', 'I', task.id);
+    if (owner === RUNNING_TASK) put('numRunning', 'I', frames.length); else put('affiliatedTaskId', 'I', task.id);
   };
   def(ACTIVITY_MANAGER, 'getRunningTasks', '(I)Ljava/util/List;', (r, _m, [, maxNum]) => {   // since API 21 the caller's own tasks only
     const list = newEmptyList(r); if (maxNum <= 0) return list;
@@ -844,9 +852,9 @@ export function createAppServicesHost(platform) {
   def(PACKAGE_MANAGER, 'queryIntentServices', `(${INTENT_TYPE}I)Ljava/util/List;`, (r, _m, [, intent, flags]) => resolveInfos(r, intent, 'service', (flags & 128) !== 0));
   def(PACKAGE_MANAGER, 'queryBroadcastReceivers', `(${INTENT_TYPE}I)Ljava/util/List;`, (r, _m, [, intent, flags]) => resolveInfos(r, intent, 'receiver', (flags & 128) !== 0));
   // Activities resolve the same way: only this app is installed, so an external intent (a browser, the Play Store, the dialer) truthfully resolves to nothing.
-  def(PACKAGE_MANAGER, 'queryIntentActivities', `(${INTENT_TYPE}I)Ljava/util/List;`, (r, _m, [, intent]) => resolveInfos(r, intent, 'activity', false));
-  def(PACKAGE_MANAGER, 'resolveActivity', `(${INTENT_TYPE}I)${RESOLVE_INFO}`, (r, _m, [, intent]) => {
-    const list = resolveInfos(r, intent, 'activity', false);
+  def(PACKAGE_MANAGER, 'queryIntentActivities', `(${INTENT_TYPE}I)Ljava/util/List;`, (r, _m, [, intent, flags]) => resolveInfos(r, intent, 'activity', (flags & 128) !== 0));
+  def(PACKAGE_MANAGER, 'resolveActivity', `(${INTENT_TYPE}I)${RESOLVE_INFO}`, (r, _m, [, intent, flags]) => {
+    const list = resolveInfos(r, intent, 'activity', (flags & 128) !== 0);
     return r.dispatch({ owner: 'Ljava/util/List;', name: 'isEmpty', parameters: [], result: 'Z', signature: '()Z' }, [list], 'virtual') ? null : r.dispatch({ owner: 'Ljava/util/List;', name: 'get', parameters: ['I'], result: OBJECT, signature: `(I)${OBJECT}` }, [list, 0], 'virtual');
   });
   def(PACKAGE_MANAGER, 'resolveService', `(${INTENT_TYPE}I)${RESOLVE_INFO}`, (r, _m, [, intent, flags]) => { const list = resolveInfos(r, intent, 'service', (flags & 128) !== 0); return r.dispatch({ owner: 'Ljava/util/List;', name: 'isEmpty', parameters: [], result: 'Z', signature: '()Z' }, [list], 'virtual') ? null : r.dispatch({ owner: 'Ljava/util/List;', name: 'get', parameters: ['I'], result: OBJECT, signature: `(I)${OBJECT}` }, [list, 0], 'virtual'); });
@@ -970,6 +978,7 @@ export function createAppServicesHost(platform) {
     const info = r.allocate(PACKAGE_INFO), put = (name2, ftype, value) => r.storeField(r.object(info).fields, `${PACKAGE_INFO}->${name2}:${ftype}`, value), attrs = platform.manifest?.manifestAttrs ?? {};
     const system = entry.system, code = system ? 33 : Number(attrs.versionCode ?? 0) | 0;
     put('packageName', STRING, entry.name); put('versionName', STRING, system ? '13' : typeof attrs.versionName === 'string' ? attrs.versionName : null); put('versionCode', 'I', code); put('longVersionCode', 'J', BigInt(code));
+    put('installLocation', 'I', Number.isInteger(attrs.installLocation) && !system ? attrs.installLocation : -1);   // android:installLocation, else INSTALL_LOCATION_UNSPECIFIED
     put('firstInstallTime', 'J', BigInt(installTime)); put('lastUpdateTime', 'J', BigInt(installTime)); put('applicationInfo', APPLICATION_INFO, applicationInfoOf(r, entry, (flags & 128) !== 0));
     if (!system) {
       // GET_SIGNATURES (0x40) / GET_SIGNING_CERTIFICATES (0x08000000): the APK's real signer certificates (v3, v2 or v1 block).
@@ -1020,17 +1029,17 @@ export function createAppServicesHost(platform) {
   def(RESOLVE_FLAGS, 'of', `(J)${RESOLVE_FLAGS}`, (r, _m, [value]) => { const holder = r.makeObject(RESOLVE_FLAGS); r.object(holder).flagsValue = BigInt(value); return holder; }, { static: true });
   def(RESOLVE_FLAGS, 'getValue', '()J', (r, _m, [self]) => r.object(self).flagsValue ?? 0n);
   for (const [name, kind] of [['queryIntentActivities', 'activity'], ['queryIntentServices', 'service'], ['queryBroadcastReceivers', 'receiver']]) {
-    def(PACKAGE_MANAGER, name, `(${INTENT_TYPE}${RESOLVE_FLAGS})Ljava/util/List;`, (r, _m, [, intent, holder]) => resolveInfos(r, intent, kind, kind !== 'activity' && (int32(holderValue(r, holder)) & 128) !== 0));
+    def(PACKAGE_MANAGER, name, `(${INTENT_TYPE}${RESOLVE_FLAGS})Ljava/util/List;`, (r, _m, [, intent, holder]) => resolveInfos(r, intent, kind, (int32(holderValue(r, holder)) & 128) !== 0));
   }
 
   // The lab installs the APK itself: no store recorded it, so the installer package is null (what adb/sideloaded installs report).
   def(PACKAGE_MANAGER, 'checkPermission', `(${STRING}${STRING})I`, (r, _m, [, permission, name]) => { const permissionName = needPermission(r, permission); if (name === null) r.throwJava('Ljava/lang/NullPointerException;', null); return text(r, name) === pkg() && holdsPermission(r, permissionName) ? PERMISSION_GRANTED : PERMISSION_DENIED; });   // other packages are not installed on the virtual device
   // PackageManager.getApplicationLabel / ApplicationInfo.loadLabel: nonLocalizedLabel, else the string behind labelRes, else the package name (ApplicationInfo.loadLabel in PackageItemInfo.java).
   const loadLabel = (r, info) => {
-    const fields = r.object(info).fields, literal = fields.get(`${APPLICATION_INFO}->nonLocalizedLabel:Ljava/lang/CharSequence;`) ?? null, resource = fields.get(`${APPLICATION_INFO}->labelRes:I`) ?? 0;
+    const fields = r.object(info).fields, literal = fields.get(`${ITEM_INFO}->nonLocalizedLabel:Ljava/lang/CharSequence;`) ?? null, resource = fields.get(`${ITEM_INFO}->labelRes:I`) ?? 0;
     if (literal !== null && literal !== 0) return literal;
     if (resource) { try { const value = platform.resource(resource, ['string']).value; if (typeof value === 'string') return value; } catch { /* unresolvable label: fall through to the package name */ } }
-    return fields.get(`${APPLICATION_INFO}->packageName:Ljava/lang/String;`) ?? pkg();
+    return fields.get(`${ITEM_INFO}->packageName:Ljava/lang/String;`) ?? pkg();
   };
   def(PACKAGE_MANAGER, 'isInstantApp', '()Z', () => 0); def(PACKAGE_MANAGER, 'isInstantApp', `(${STRING})Z`, () => 0);   // an installed APK is never an instant app
   def(PACKAGE_MANAGER, 'getApplicationLabel', `(${APPLICATION_INFO})Ljava/lang/CharSequence;`, (r, _m, [, info]) => { if (info === null) r.throwJava('Ljava/lang/NullPointerException;', null); return loadLabel(r, info); });

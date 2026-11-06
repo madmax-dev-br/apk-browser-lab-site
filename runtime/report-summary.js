@@ -1,10 +1,26 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=e6a5660dc93e';
+import { TimeBreakdown } from './time-breakdown.js?v=2af81fe8368d';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
 /** Lines of the summary for `runtime`; never throws (every part is optional). */
+/** When the monitor the main thread waits on belongs to a java.lang.Thread (HandlerThread.getLooper waits on the HandlerThread until its run() reached Looper.prepare): that thread's name, state, whether it started, ran run(), died, and whether Looper.prepare was reached. */
+function threadObjectNote(runtime, target) {
+  const type = runtime.typeOf(target); if (!runtime.isSubtype(type, 'Ljava/lang/Thread;')) return null;
+  const id = runtime.object(target).id, vt = (runtime.scheduler.threads ?? []).find(t => t.javaObject && runtime.object(t.javaObject).id === id);
+  const handlerThread = runtime.isSubtype(type, 'Landroid/os/HandlerThread;'), label = handlerThread ? 'HandlerThread' : 'Thread';
+  if (!vt) return `  a thread esperada é um ${dotted(type)} (${label}) que o escalonador não conhece: start() ainda não foi chamado ou a thread já foi descartada`;
+  const looper = handlerThread ? runtime.object(target).fields.get('Landroid/os/HandlerThread;->mLooper:Landroid/os/Looper;') : undefined;
+  const crash = [...(runtime.uncaughtExceptions?.values() ?? [])].find(entry => entry.thread === vt.name);
+  const parts = [`${label} "${vt.name}" (${dotted(type)}): estado ${vt.state}`, vt.started ? 'start() foi chamado' : 'start() ainda não foi chamado'];
+  const ran = vt.began || vt.finished || (vt.frames?.length ?? 0) > 0; parts.push(ran ? 'run() já executou' : 'run() ainda não começou a executar (a thread não foi escalonada)');
+  if (handlerThread) parts.push(looper ? 'Looper.prepare foi alcançado' : 'Looper.prepare ainda não foi alcançado (getLooper continua esperando)');
+  if (vt.finished) parts.push(crash ? `terminou com a exceção ${crash.type.split('.').pop()}${crash.message ? ': ' + crash.message.slice(0, 100) : ''}` : 'terminou sem exceção registrada');
+  else if (vt.frames?.length) parts.push(`agora em ${vt.frames.filter(frame => frame.method).slice(-3).reverse().map(frame => `${dotted(frame.method.owner)}.${frame.method.name}`).join(' ← ')}`);
+  return `  ${parts.join('; ')}`;
+}
+
 export function reportSummary(runtime, { heartbeat = null, error = null, tela = null } = {}) {
   const out = ['== Resumo ==']; const part = fn => { try { fn(); } catch { /* a part of the summary is unavailable */ } };
   part(() => {   // a VM error: its message and the innermost Java frames (the message lists them outermost first), so one photo has them
@@ -66,6 +82,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
         const record = runtime.object(target), owner = runtime.monitors?.get(record.id)?.owner;
         const releasers = (runtime.scheduler.threads ?? []).filter(t => t !== main && (t.state === 'runnable' || (t.state === 'blocked' && Number.isFinite(t.blocked?.deadline)))).slice(0, 4).map(t => `${t.name} ${t.state}`);
         out.push(`a thread principal espera no monitor de um ${dotted(runtime.typeOf(target))} (${main.blocked.reason}); ${owner ? `monitor em poder de ${owner.name}` : 'nenhuma thread detém o monitor'}; podem chamar notify: ${releasers.join(', ') || 'nenhuma thread ativa'}`);
+        const thread = threadObjectNote(runtime, target); if (thread) out.push(thread);
       } catch { /* the monitor object is not inspectable */ } } }
     if (main.blocked && main.blocker) { try { const releasers = (runtime.scheduler.threads ?? []).filter(t => t !== main && (t.state === 'runnable' || (t.state === 'blocked' && Number.isFinite(t.blocked?.deadline)))).slice(0, 4).map(t => `${t.name} ${t.state}${t.frames?.length ? ' em ' + (t.frames.at(-1).method ? dotted(t.frames.at(-1).method.owner).split('.').pop() + '.' + t.frames.at(-1).method.name : '(host)') : ''}`); out.push(`a thread principal espera por um ${dotted(runtime.typeOf(main.blocker))}; podem liberá-lo: ${releasers.join(', ') || 'nenhuma thread ativa'}`); } catch { /* blocker not inspectable */ } }
     out.push(`thread principal: ${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'espera'})` : ''}${main.nestedDepth ? `, dentro de chamada nativa aninhada (${main.nestedDepth})` : ''}${frames.length ? '; ' + frames.join(' ← ') : ''}`);

@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=e6a5660dc93e';
-import { APKError } from './apk-error.js?v=e6a5660dc93e';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=e6a5660dc93e';
+import { gcRoot } from './heap-gc.js?v=2af81fe8368d';
+import { APKError } from './apk-error.js?v=2af81fe8368d';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=2af81fe8368d';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -13,7 +13,7 @@ export function createSystemServicesHost(platform) {
   const registry = createHostRegistry(), { def } = registry, PARENTS = registry.parents;
   // ---- android.telephony.cdma.CdmaCellLocation (android-13.0.0_r1) ----------------------------------------------
   const CDMA = 'Landroid/telephony/cdma/CdmaCellLocation;';
-  PARENTS.set(CDMA, 'Ljava/lang/Object;');
+  PARENTS.set(CDMA, 'Landroid/telephony/CellLocation;');
   def(CDMA, 'convertQuartSecToDecDegrees', '(I)D', (runtime, _m, [quartSec]) => {
     // if (Double.isNaN(quartSec) || quartSec < -2592000 || quartSec > 2592000) throw IAE("Invalid coordiante value:" + quartSec);
     if (quartSec < -2592000 || quartSec > 2592000) runtime.throwJava('Ljava/lang/IllegalArgumentException;', 'Invalid coordiante value:' + quartSec);

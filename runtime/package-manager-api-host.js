@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=e6a5660dc93e';
-import { APKError } from './apk-error.js?v=e6a5660dc93e';
+import { createHostRegistry } from './host-contract.js?v=2af81fe8368d';
+import { APKError } from './apk-error.js?v=2af81fe8368d';
 
 // android.content.pm.PackageManager public API (API 33) that the package model of app-services-host does not answer yet, ported from android-13.0.0_r1 PackageManager.java /
 // ApplicationPackageManager.java for a device with this app and the system packages of that model. Flag-holder overloads (ComponentInfoFlags / PackageInfoFlags / ResolveInfoFlags) forward to the
@@ -68,7 +68,7 @@ export function createPackageManagerApiHost(platform) {
   def(PM, 'getLaunchIntentSenderForPackage', `(${STRING})Landroid/content/IntentSender;`, () => unsupported('PackageManager.getLaunchIntentSenderForPackage: IntentSender is not part of the lab framework', 'intent-sender-unsupported'));
   const resourcesOf = (r, name) => { if (text(r, name) !== own()) notFound(r, text(r, name)); return call(r, platform.application, 'Landroid/content/Context;', 'getResources', [], RESOURCES); };
   def(PM, 'getResourcesForApplication', `(${STRING})${RESOURCES}`, (r, _m, [, name]) => { if (nullish(name)) npe(r); return resourcesOf(r, name); });
-  def(PM, 'getResourcesForApplication', `(${APP_INFO})${RESOURCES}`, (r, _m, [, info]) => { if (nullish(info)) npe(r); return resourcesOf(r, r.object(info).fields.get(`${APP_INFO}->packageName:${STRING}`)); });
+  def(PM, 'getResourcesForApplication', `(${APP_INFO})${RESOURCES}`, (r, _m, [, info]) => { if (nullish(info)) npe(r); return resourcesOf(r, r.object(info).fields.get(`Landroid/content/pm/PackageItemInfo;->packageName:${STRING}`)); });
   def(PM, 'getResourcesForApplication', `(${APP_INFO}${CONFIG})${RESOURCES}`, (r, _m, [self, info]) => call(r, self, PM, 'getResourcesForApplication', [APP_INFO], RESOURCES, [info]));
   def(PM, 'getResourcesForActivity', `(${COMPONENT})${RESOURCES}`, (r, _m, [, component]) => resourcesOf(r, call(r, component, COMPONENT, 'getPackageName', [], STRING)));
   const iconOf = (r, resId) => resId ? call(r, resourcesOf(r, own()), RESOURCES, 'getDrawable', ['I', 'Landroid/content/res/Resources$Theme;'], DRAWABLE, [resId, null]) : null;
@@ -76,7 +76,7 @@ export function createPackageManagerApiHost(platform) {
   const appIcon = (r, name, kind) => { const n = known(r, name); if (n !== own()) return defaultIcon(r); const icon = platform.manifest?.application?.[kind]; return typeof icon === 'number' && icon ? iconOf(r, icon) : defaultIcon(r); };
   for (const [name, kind] of [['getApplicationIcon', 'icon'], ['getApplicationLogo', 'logo'], ['getApplicationBanner', 'banner']]) {
     def(PM, name, `(${STRING})${DRAWABLE}`, (r, _m, [, pkg]) => kind === 'icon' ? appIcon(r, pkg, kind) : (known(r, pkg), kind === 'logo' && typeof platform.manifest?.application?.logo === 'number' ? iconOf(r, platform.manifest.application.logo) : null));
-    def(PM, name, `(${APP_INFO})${DRAWABLE}`, (r, _m, [self, info]) => call(r, self, PM, name, [STRING], DRAWABLE, [r.object(info).fields.get(`${APP_INFO}->packageName:${STRING}`)]));
+    def(PM, name, `(${APP_INFO})${DRAWABLE}`, (r, _m, [self, info]) => call(r, self, PM, name, [STRING], DRAWABLE, [r.object(info).fields.get(`Landroid/content/pm/PackageItemInfo;->packageName:${STRING}`)]));
   }
   const activityIcon = (r, component, kind) => {
     const n = text(r, call(r, component, COMPONENT, 'getPackageName', [], STRING)); if (n !== own()) notFound(r, n);

@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=e6a5660dc93e';
+import { APKError } from './apk-error.js?v=2af81fe8368d';
 
 // Registry for "contract hosts": JS reimplementations of named platform methods, each registered with its exact JVM
 // signature. The registry answers the runtime's supports()/invoke()/parent()/reflection queries uniformly so that
@@ -30,9 +30,9 @@ export function createHostRegistry() {
       (byName.get(name) ?? byName.set(name, []).get(name)).push({ ...parseSignature(signature), signature, static: isStatic });
     },
     /** staticField(owner, name, type, (runtime) => value) -- lazily computed, cached per runtime. */
-    staticField(owner, name, type, compute) { fields.set(`${owner}->${name}:${type}`, { compute, cache: new WeakMap() }); if (!parents.has(owner)) parents.set(owner, 'Ljava/lang/Object;'); },
+    staticField(owner, name, type, compute) { fields.set(`${owner}->${name}:${type}`, { compute, cache: new WeakMap() }); if (!parents.has(owner)) { parents.set(owner, 'Ljava/lang/Object;'); defaultedParents.add(owner); } },
     /** instanceField(owner, name, type): a protected/public instance field of a host class (subclasses in APK code access it through their own class reference). */
-    instanceField(owner, name, type, { reflect = false } = {}) { if (reflect) { const byName = reflectedFields.get(owner) ?? reflectedFields.set(owner, new Map()).get(owner); byName.set(name, type); } instanceFields.set(`${name}:${type}`, [...(instanceFields.get(`${name}:${type}`) ?? []), owner]); if (!parents.has(owner)) parents.set(owner, 'Ljava/lang/Object;'); },
+    instanceField(owner, name, type, { reflect = false } = {}) { if (reflect) { const byName = reflectedFields.get(owner) ?? reflectedFields.set(owner, new Map()).get(owner); byName.set(name, type); } instanceFields.set(`${name}:${type}`, [...(instanceFields.get(`${name}:${type}`) ?? []), owner]); if (!parents.has(owner)) { parents.set(owner, 'Ljava/lang/Object;'); defaultedParents.add(owner); } },
     resolveExternalField(runtime, field) {
       const owners = instanceFields.get(`${field.name}:${field.type}`); if (!owners) return null;
       for (let type = field.owner, depth = 0; type && depth < 64; type = runtime.parent(type), depth++) if (owners.includes(type)) return { owner: type, name: field.name, type: field.type };

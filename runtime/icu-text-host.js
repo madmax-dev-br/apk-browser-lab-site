@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=e6a5660dc93e';
-import { APKError } from './apk-error.js?v=e6a5660dc93e';
+import { createHostRegistry } from './host-contract.js?v=2af81fe8368d';
+import { APKError } from './apk-error.js?v=2af81fe8368d';
 
 // android.icu.text / android.icu.util classes mapped over the lab's java.text hosts and the engine's CLDR data (Intl). Android 13 ships ICU4J as android.icu.*; the lab does not carry ICU4J (hundreds
 // of classes plus its resource bundles), so each android.icu class below is a thin object holding the java.text / java.util object it maps to (`inner`) and forwarding the same-named API:
@@ -26,7 +26,7 @@ export function createIcuTextHost(platform) {
   const text = (r, v) => nullish(v) ? null : typeof v === 'string' ? v : r.stringCharacters(v);
   const npe = (r, m = null) => r.throwJava('Ljava/lang/NullPointerException;', m);
   const unsupported = (what, kind = 'icu-text-unsupported') => { throw new APKError(`${what}: not modelled by the lab's android.icu mapping over java.text / Intl (see docs/ICU-TEXT-MAPPING.md)`, { kind }); };
-  for (const [icu, parent] of [[I_NF, 'Ljava/text/Format;'], [I_DF, I_NF], [I_DFS, OBJECT], [I_CUR, OBJECT], [I_DATEF, 'Ljava/text/Format;'], [I_SDF, I_DATEF], [I_TZ, OBJECT], [I_COLL, OBJECT], [I_RBC, I_COLL]]) type(icu, parent, [], { allocatable: true });
+  for (const [icu, parent] of [['Landroid/icu/text/UFormat;', 'Ljava/text/Format;'], ['Landroid/icu/util/MeasureUnit;', OBJECT], [I_NF, 'Landroid/icu/text/UFormat;'], [I_DF, I_NF], [I_DFS, OBJECT], [I_CUR, 'Landroid/icu/util/MeasureUnit;'], [I_DATEF, 'Landroid/icu/text/UFormat;'], [I_SDF, I_DATEF], [I_TZ, OBJECT], [I_COLL, OBJECT], [I_RBC, I_COLL]]) type(icu, parent, [], { allocatable: true });
   const inner = (r, self) => r.object(self).inner ?? r.throwJava('Ljava/lang/IllegalStateException;', 'android.icu object used before construction');
   const wrap = (r, icuType, javaObject) => { if (nullish(javaObject)) return null; const o = r.allocate(icuType); r.object(o).inner = javaObject; return o; };
   const localeOf = (r, v) => nullish(v) ? null : (r.object(v).locale ?? v);   // a ULocale carries its java.util.Locale; a Locale is itself

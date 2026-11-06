@@ -1,27 +1,27 @@
-import { VMClock } from './vm-clock.js?v=e6a5660dc93e';
-import { OperationMonitor } from './operation-monitor.js?v=e6a5660dc93e';
-import { ExecutionProfile } from './execution-profile.js?v=e6a5660dc93e';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=e6a5660dc93e';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=e6a5660dc93e';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=e6a5660dc93e';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=e6a5660dc93e';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e6a5660dc93e';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=e6a5660dc93e';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=e6a5660dc93e';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=e6a5660dc93e';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=e6a5660dc93e';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=e6a5660dc93e';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=e6a5660dc93e';
-import { APKError } from './apk-error.js?v=e6a5660dc93e';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=e6a5660dc93e';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=e6a5660dc93e';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=e6a5660dc93e';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=e6a5660dc93e';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=e6a5660dc93e';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=e6a5660dc93e';
-import { Scheduler, Blocked } from './scheduler.js?v=e6a5660dc93e';
-import { bootClassLacksMember } from './boot-class-members.js?v=e6a5660dc93e';
-export { APKError } from './apk-error.js?v=e6a5660dc93e';
+import { VMClock } from './vm-clock.js?v=2af81fe8368d';
+import { OperationMonitor } from './operation-monitor.js?v=2af81fe8368d';
+import { ExecutionProfile } from './execution-profile.js?v=2af81fe8368d';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=2af81fe8368d';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=2af81fe8368d';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=2af81fe8368d';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=2af81fe8368d';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=2af81fe8368d';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=2af81fe8368d';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=2af81fe8368d';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=2af81fe8368d';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=2af81fe8368d';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=2af81fe8368d';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=2af81fe8368d';
+import { APKError } from './apk-error.js?v=2af81fe8368d';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=2af81fe8368d';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=2af81fe8368d';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=2af81fe8368d';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=2af81fe8368d';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=2af81fe8368d';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=2af81fe8368d';
+import { Scheduler, Blocked } from './scheduler.js?v=2af81fe8368d';
+import { bootClassLacksMember } from './boot-class-members.js?v=2af81fe8368d';
+export { APKError } from './apk-error.js?v=2af81fe8368d';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1340,6 +1340,7 @@ export class APKRuntime {
     }
     if (kind === 'binary') return dottedName(type);
     const info = this.classNesting(type);
+    if (kind === 'simple' && !info.inner && !this.classes.has(type)) { const bare = dottedName(type).split('.').pop(), dollar = bare.lastIndexOf('$'); if (dollar >= 0) { const tail = bare.slice(dollar + 1); return /^\d+$/.test(tail) ? '' : tail; } return bare; }   // a host-modelled nested class: the part after the last $
     if (kind === 'simple') return info.inner ? info.simpleName ?? '' : dottedName(type).split('.').pop();
     if (info.enclosingMethod || (info.inner && info.simpleName === null)) return null;
     if (info.declaringClass) { const outer = this.className(info.declaringClass, 'canonical', depth + 1); return outer === null ? null : outer + '.' + info.simpleName; }
@@ -2169,6 +2170,7 @@ export class APKRuntime {
       if (seen.size > 512) fail('Reflection hierarchy limit exceeded'); seen.add(owner);
       const cls = this.classes.get(owner);
       if (!cls) {
+        if (publicOnly && kind === 'field') { const up = this.parent(owner); if (up && up !== 'Ljava/lang/Object;') pending.push(up); }   // Class.getField also finds the public fields a host-modelled class inherits (ApplicationInfo.metaData is declared by PackageItemInfo)
         // Class can reflect on these same implemented Class APIs. Compose on
         // API 28 uses this two-stage lookup; invocation still goes through the
         // normal checked reflection dispatcher, never an app-specific shortcut.

@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=e6a5660dc93e';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=e6a5660dc93e';
-import { inspectELF } from './native-inspector.js?v=e6a5660dc93e';
-import { inflateRaw } from './inflate.js?v=e6a5660dc93e';
-import { resolveDevice } from './device-profile.js?v=e6a5660dc93e';
-import { resourceProfileFor } from './device-configuration.js?v=e6a5660dc93e';
-import { JniBridge } from './jni-host.js?v=e6a5660dc93e';
-import { providerForApk } from './native-provider-variants.js?v=e6a5660dc93e';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=e6a5660dc93e';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=e6a5660dc93e';
-import { AndroidResources } from './android-resources.js?v=e6a5660dc93e';
-import { AndroidPlatform } from './android-platform.js?v=e6a5660dc93e';
-import { FrameworkProvider } from './framework-provider.js?v=e6a5660dc93e';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=2af81fe8368d';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=2af81fe8368d';
+import { inspectELF } from './native-inspector.js?v=2af81fe8368d';
+import { inflateRaw } from './inflate.js?v=2af81fe8368d';
+import { resolveDevice } from './device-profile.js?v=2af81fe8368d';
+import { resourceProfileFor } from './device-configuration.js?v=2af81fe8368d';
+import { JniBridge } from './jni-host.js?v=2af81fe8368d';
+import { providerForApk } from './native-provider-variants.js?v=2af81fe8368d';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=2af81fe8368d';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=2af81fe8368d';
+import { AndroidResources } from './android-resources.js?v=2af81fe8368d';
+import { AndroidPlatform } from './android-platform.js?v=2af81fe8368d';
+import { FrameworkProvider } from './framework-provider.js?v=2af81fe8368d';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -235,6 +235,7 @@ export function parseManifest(data) {
         const rawName = name === 'activity-alias' ? attrs.targetActivity : attrs.name;
         if (typeof packageName !== 'string' || typeof rawName !== 'string') fail('Manifest activity/package name is missing');
         node.activity = { ...attrs, name: resolveName(rawName), launcher: false };
+        node.component = { metaData: [] }; node.activity.metaData = node.component.metaData;   // an activity's <meta-data> belongs to the activity, not to <application>
         if (typeof attrs.parentActivityName === 'string') node.activity.parentActivityName = resolveName(attrs.parentActivityName);
         activities.push(node.activity);
       }
