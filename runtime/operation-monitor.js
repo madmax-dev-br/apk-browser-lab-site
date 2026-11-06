@@ -1,6 +1,6 @@
-import { TimeBreakdown } from './time-breakdown.js?v=3f91c6782bdb';
-import { APKError } from './apk-error.js?v=3f91c6782bdb';
-import { gcBlockReason } from './heap-gc.js?v=3f91c6782bdb';
+import { TimeBreakdown } from './time-breakdown.js?v=68fb2f8dd331';
+import { APKError } from './apk-error.js?v=68fb2f8dd331';
+import { gcBlockReason } from './heap-gc.js?v=68fb2f8dd331';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -14,7 +14,7 @@ const typeName = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '')
 
 export class OperationMonitor {
   constructor(runtime) {
-    this.rt = runtime; this.hardCapMs = 180000; this.backgroundBudgetMs = 120000; this.sink = null; this.intervalMs = 250; this.budgetMs = 0; this.op = null; this.lastBeat = 0; this.beats = 0; this.active = false;
+    this.rt = runtime; this.mainEvent = null; this.mainBusy = null; this.mainBusyReportMs = 10000; this.mainEventCapMs = 120000; this.hardCapMs = 180000; this.backgroundBudgetMs = 120000; this.sink = null; this.intervalMs = 250; this.budgetMs = 0; this.op = null; this.lastBeat = 0; this.beats = 0; this.active = false;
   }
   /** sink(message) posts a heartbeat; budgetMs = wall budget per operation (0 = none); intervalMs = heartbeat period. */
   configure({ sink = null, budgetMs = 0, intervalMs = 250 } = {}) { this.sink = sink; this.budgetMs = budgetMs; this.intervalMs = intervalMs; this.active = sink !== null || budgetMs > 0; return this; }
@@ -28,7 +28,34 @@ export class OperationMonitor {
   instructions() { const by = this.rt.executionByOrigin; return (by?.apk?.instructions ?? 0) + (by?.framework?.instructions ?? 0); }
 
   /** Cheap check at the scheduler tick, thread switches, idle rounds and event dispatch: heartbeat when due, operation budget. */
+  /** A host event is about to run on the main thread (a Handler message, a posted task): the watchdog below measures how long it keeps the main thread without returning to the looper. */
+  mainEventBegin(what) { this.mainEvent = { start: performance.now(), what, captured: 0, capturedAt: 0, parent: this.mainEvent }; }
+  mainEventEnd() {
+    const event = this.mainEvent; if (!event) return; this.mainEvent = event.parent ?? null;
+    if (event?.captured && this.mainBusy) { this.mainBusy.endedAfterMs = Math.round(performance.now() - event.start); this.mainBusy.ended = true; }   // the report keeps the last long episode
+  }
+  /** Main thread busy for more than 10 s inside one event: remember its frames, hottest methods of the last seconds and the host call in progress (every 2 s), and end it with a named error at the hard cap. */
+  watchMain(now) {
+    const event = this.mainEvent; if (event === null || event === undefined) return;
+    const busyMs = now - event.start;
+    if (busyMs >= this.mainBusyReportMs && now - event.capturedAt >= 2000) this.captureMainBusy(event, now);
+    if (busyMs >= this.mainEventCapMs && this.rt.thread === this.rt.scheduler.main) {
+      this.captureMainBusy(event, now); this.mainBusy.ended = true; this.mainBusy.endedAfterMs = Math.round(busyMs); this.mainBusy.capped = true; this.mainEvent = event.parent ?? null;
+      throw new APKError(`A thread principal ficou ${Math.round(busyMs / 1000)} s dentro de um único evento (${event.what}) sem voltar ao looper; limite ${Math.round(this.mainEventCapMs / 1000)} s. ${this.mainBusyText()}`, { kind: 'main-event-hard-cap', busyMs: Math.round(busyMs), event: event.what, mainBusy: this.mainBusy });
+    }
+  }
+  captureMainBusy(event, now) {
+    const rt = this.rt, main = rt.scheduler?.main, frames = [];
+    for (let at = (main?.frames?.length ?? 0) - 1; at >= 0 && frames.length < 8; at--) { const key = main.frames[at]?.method?.key; if (key !== undefined) frames.push(short(key)); }
+    event.captured++; event.capturedAt = now;
+    let hot = []; try { hot = rt.profile.recentTopOf('main', 3); if (!hot.length) hot = rt.profile.topOf('main', 3); } catch { /* profile not collecting yet */ }
+    const inside = main?.nestedDepth > 0 || rt.thread !== main;
+    this.mainBusy = { event: event.what, busyMs: Math.round(now - event.start), frames, hot, hostCall: rt.hostCall ? short(rt.hostCall) : null, resourceCall: rt.lastResourceCall ?? null, thread: rt.thread?.name ?? null, nested: !!inside, ended: false, overdue: this.overdueMessages() };
+  }
+  overdueMessages() { const platform = this.rt.platform, queue = platform?.eventQueue ?? [], clock = platform?.clock?.now?.() ?? 0, late = queue.filter(event => !event.front && Number.isFinite(event.when) && event.when < clock - 50); return { count: late.length, oldestMs: late.length ? Math.round(Math.max(...late.map(event => clock - event.when))) : 0 }; }
+  mainBusyText() { const b = this.mainBusy; return b ? `Laço da thread principal: ${b.hot.join(', ') || '(sem amostras)'}; frames: ${b.frames.join(' <- ') || '(nenhum)'}${b.hostCall ? `; dentro da chamada do host ${b.hostCall}` : ''}${b.resourceCall ? ` [${b.resourceCall}]` : ''}.` : ''; }
   tick() {
+    if (this.mainEvent) this.watchMain(performance.now());
     if (!this.active) return;
     const now = performance.now();
     if (this.sink !== null && now - this.lastBeat >= this.intervalMs) this.beat(now, 'tick');

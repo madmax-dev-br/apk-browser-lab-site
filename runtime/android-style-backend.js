@@ -1,7 +1,7 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=3f91c6782bdb';
-import { APKError } from './apk-runtime.js?v=3f91c6782bdb';
-import { ephemeronMap } from './heap-gc.js?v=3f91c6782bdb';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=3f91c6782bdb';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=68fb2f8dd331';
+import { APKError } from './apk-runtime.js?v=68fb2f8dd331';
+import { ephemeronMap } from './heap-gc.js?v=68fb2f8dd331';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=68fb2f8dd331';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -96,6 +96,8 @@ export class AndroidStyleBackend {
     if (result.kind === 'bag') return { ...value, kind: 'reference', dataType: 1, rawData: result.id, reference: result.id, resourceId: result.id };
     return result;
   }
+  /** The resource name of an attribute id for diagnostics ("attr/name"), or "(unnamed)". */
+  attributeName(id) { try { const table = this.platform.resources.table; for (const [name, value] of table.names) if (value === (id >>> 0) && name.startsWith('attr/')) return name; } catch { /* diagnostics only */ } return '(unnamed)'; }
   typedValue(runtime, ref, value) {
     for (const [name, type, data] of [['type', 'I', value.dataType || 0], ['data', 'I', value.rawData | 0], ['assetCookie', 'I', value.sourceCookie || 0], ['resourceId', 'I', value.resourceId || 0], ['changingConfigurations', 'I', value.changingConfigurations || 0], ['density', 'I', value.density || 0], ['sourceResourceId', 'I', value.sourceResourceId || 0], ['string', 'Ljava/lang/CharSequence;', value.kind === 'string' ? value.value : null]]) this.put(runtime, ref, VALUE, name, type, data);
   }
@@ -242,7 +244,12 @@ export class AndroidStyleBackend {
       if (name === 'getKey')return this.themeKey(runtime,receiver);
       if (name === 'setTo') return this.copyTheme(runtime, receiver, args[1]);
       if (name === 'getResources') return this.resourceObject(runtime);
-      if (name === 'resolveAttribute') { if (!object.themeValues.has(args[1])) return 0; this.typedValue(runtime, args[2], this.resolved(object.themeValues.get(args[1]), object.themeValues, !!args[3])); return 1; }
+      if (name === 'resolveAttribute') {
+        const found = this.platform.resources.table.getThemeAttribute(object.themeValues, args[1], !!args[3]);
+        runtime.lastResourceCall = `Resources$Theme.resolveAttribute(0x${(args[1] >>> 0).toString(16)}${this.platform.resources.table.names ? ' ' + this.attributeName(args[1]) : ''}, resolveRefs=${!!args[3]}) -> ${found ? `type ${found.value.dataType}, data 0x${(found.value.rawData >>> 0).toString(16)}, resourceId 0x${found.ref.toString(16)}` : 'false'}`;
+        if (!found) return 0;
+        this.typedValue(runtime, args[2], { ...found.value, resourceId: found.ref }); return 1;
+      }
       if (method.parameters.length === 1) return this.obtain(runtime, receiver, null, args[1]);
       if (method.parameters[0] === 'I') return this.obtain(runtime, receiver, null, args[2], 0, 0, args[1]);
       return this.obtain(runtime, receiver, args[1], args[2], args[3], args[4]);

@@ -153,6 +153,33 @@ export class AndroidResources {
     }
     return { ...value };
   }
+  /**
+   * Theme::GetAttribute + AssetManager2::ResolveReference as Resources.Theme.resolveAttribute reaches them (android-13.0.0_r1). `theme` maps attribute id -> value. A theme entry that is itself an
+   * attribute reference (?attr/x) is followed at most 20 times (a cycle ends as "not found"); an attribute that is absent, or a @null entry, is "not found". With `resolveRefs`, a TYPE_REFERENCE value is
+   * followed one resource per iteration for at most 20 iterations (kMaxIterations): a longer or cyclic chain ends as a TYPE_REFERENCE value to the next resource, still found; a reference to a resource
+   * that does not exist is "not found". Returns null for "not found", else { value, ref } where ref is the last resource id followed (TypedValue.resourceId, 0 without resolveRefs or references).
+   */
+  getThemeAttribute(theme, attribute, resolveRefs) {
+    let id = Number(attribute) >>> 0, value, count = 20;
+    for (;;) {
+      value = theme.get(id); if (!value) return null;
+      if (value.kind === 'attribute') { if (count > 0) { count--; id = value.reference >>> 0; continue; } return null; }
+      break;
+    }
+    if (value.kind === 'null' && !(value.rawData & 1) && !(value.dataType)) return null;   // @null (TYPE_NULL with DATA_NULL_EMPTY unset) is not a value; @empty is
+    let ref = 0;
+    if (resolveRefs) {
+      for (let iteration = 0; value.kind === 'reference' && (value.reference >>> 0) !== 0 && iteration < 20; iteration++) {
+        ref = value.reference >>> 0;
+        const raw = this.entries.has(ref) ? this.selectVariant(ref) : this.options.resolveExternal?.(ref);
+        if (!raw || raw.kind === 'unresolved') return null;
+        if (raw.kind === 'bag') { value = { kind: 'reference', dataType: 1, rawData: ref, reference: ref, sourceResourceId: raw.id }; break; }   // a style/array resource: the value stays a reference to it
+        if (raw.reference !== undefined && raw.resolved !== undefined) value = { kind: 'reference', dataType: 1, rawData: raw.reference >>> 0, reference: raw.reference >>> 0, sourceCookie: raw.sourceCookie };   // an alias: one more hop
+        else value = { ...raw };
+      }
+    }
+    return { value, ref };
+  }
   warn(message) { if (!this.warnings.includes(message)) { this.warnings.push(message); this.options.onWarning?.(message); } }
   parseTable(bytes) {
     const r = new Reader(bytes), root = r.chunk(0);
