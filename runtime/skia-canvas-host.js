@@ -1,14 +1,14 @@
-import {APKError} from './apk-runtime.js?v=50eafcfb729e';
-import {getVectorGraphics} from './vector-native.js?v=50eafcfb729e';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=50eafcfb729e';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=50eafcfb729e';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=50eafcfb729e';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=50eafcfb729e';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=50eafcfb729e';
-import {createBitmapHost} from './bitmap-host.js?v=50eafcfb729e';
-import { gcRoot } from './heap-gc.js?v=50eafcfb729e';
-import {sha256Hex} from './sha256-sync.js?v=50eafcfb729e';
-import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=50eafcfb729e';
+import {APKError} from './apk-runtime.js?v=514b56884167';
+import {getVectorGraphics} from './vector-native.js?v=514b56884167';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=514b56884167';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=514b56884167';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=514b56884167';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=514b56884167';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=514b56884167';
+import {createBitmapHost} from './bitmap-host.js?v=514b56884167';
+import { gcRoot } from './heap-gc.js?v=514b56884167';
+import {sha256Hex} from './sha256-sync.js?v=514b56884167';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=514b56884167';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -588,7 +588,8 @@ export function createSkiaCanvasHost(runtime,backend){
     if(hasOp){if(!args.at(-1))vm.throwJava('Ljava/lang/NullPointerException;','Region.Op is null');operation=vm.object(args.at(-1)).fields.get('Landroid/graphics/Region$Op;->nativeInt:I');if(!Number.isInteger(operation)||operation<0||operation>5)fail('Clip operation requires the original Region.Op enum');if(operation>1){if((vm.canvasCompatibilityVersion??vm.targetSdkVersion??Number(vm.platform?.manifest?.usesSdk?.targetSdkVersion??1))>=28)vm.throwJava('Ljava/lang/IllegalArgumentException;','Invalid Region.Op - only INTERSECT and DIFFERENCE are allowed');fail('Legacy expanding Region.Op clip needs Skia path-operation clip state');}}
     let clip;if(name==='clipPath'||name==='clipOutPath')clip={...snapshot(args[1]),matrix:state.matrix.slice()};else{let rect;if(method.parameters[0]==='Landroid/graphics/Rect;'){const fields=vm.object(args[1]).fields;rect=['left','top','right','bottom'].map(n=>fields.get(`Landroid/graphics/Rect;->${n}:I`)??0);}else if(method.parameters[0]==='Landroid/graphics/RectF;')rect=rectF(args[1]);else rect=finite(hasOp?values.slice(0,-1):values);clip={rect,matrix:state.matrix.slice()};}clip.difference=operation===0;clip.antiAlias=false;
     clipCells+=clip.commands?.length??8;if(clipCells>1000000)fail('Aggregate Skia clip storage limit exceeded');if((state.clips??=[]).length>=128)fail('Skia clip limit exceeded');state.clips.push(clip);
-    const surface=CK.MakeSurface(state.width??411,state.height??840);try{const canvas=surface.getCanvas();applyClips(CK,canvas,state.clips);return canvas.quickReject(CK.LTRBRect(0,0,state.width??411,state.height??840))?0:1;}finally{surface.dispose();}
+    const width=state.width??411,height=state.height??840;if(!(width>0&&height>0))return 0;   // a canvas with no area (a RenderNode recorded at 0x0): every clip leaves it empty, as Canvas.clipRect answers false; Skia cannot even allocate the scratch surface
+    const surface=CK.MakeSurface(width,height);if(!surface)fail('Skia clip scratch allocation failed');try{const canvas=surface.getCanvas();applyClips(CK,canvas,state.clips);return canvas.quickReject(CK.LTRBRect(0,0,width,height))?0:1;}finally{surface.dispose();}
    }
    if(name==='drawColor'){
     if(method.parameters.length===2){const mode=vm.object(args[2]).fields.get('Landroid/graphics/PorterDuff$Mode;->nativeInt:I');if(!Number.isInteger(mode)||mode<0||mode>28)fail('drawColor needs an original PorterDuff.Mode');record(receiver,{op:'color',color:args[1],blendMode:mode});return;}
