@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=7eb1aef98446';
-import { createHostRegistry } from './host-contract.js?v=7eb1aef98446';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=7eb1aef98446';
+import { APKError } from './apk-error.js?v=c762a1a45a69';
+import { createHostRegistry } from './host-contract.js?v=c762a1a45a69';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=c762a1a45a69';
 
 // android.app.job: JobScheduler, JobInfo (+ Builder), JobParameters and the JobService base class, with the scheduling rules of Android 13's JobSchedulerService for the
 // constraints a virtual device can answer. AOSP references: frameworks/base/apex/jobscheduler (JobSchedulerService.validateJob, JobStatus.isReady / wouldBeReadyWithConstraint,
@@ -11,9 +11,17 @@ import { gcRoot, GC_ROOTS } from './heap-gc.js?v=7eb1aef98446';
 //  * Time is the VM clock; latency, deadlines, periods and back-off are VM events, so they advance with animations and Looper time and skip when the VM is idle.
 //  * The service runs on the main thread (JobService's handler uses the main Looper). onStartJob returning true keeps the job running until jobFinished(); losing a constraint while
 //    running calls onStopJob (and re-queues the job when it returns true).
-//  * Not modelled: persistence across a lab restart (setPersisted is recorded; the permission is checked), content-URI triggers (setTriggerContentUri fails explicitly), JobWorkItem
-//    queues, expedited quotas, doze/standby buckets, the 10 minute execution cap.
+//  * Work queues (Android 8+, JobScheduler.enqueue / JobParameters.dequeueWork / completeWork; JobStatus.enqueueWorkLocked / dequeueWorkLocked / completeWorkLocked): enqueue with the same
+//    JobInfo appends to the job (also while it runs); a different JobInfo for the same id replaces the job and drops its work. dequeueWork moves the next pending item to "executing" and
+//    bumps its delivery count; completeWork removes it from there. When a run ends (jobFinished or onStopJob) the executing items go back to the FRONT of the pending queue, and a job
+//    that finished without reschedule but still has pending work stays scheduled and starts again (JobSchedulerService keeps a job with work). JobWorkItem is a host class (the AOSP
+//    class is a Parcelable around an Intent plus bookkeeping the host owns, so there is nothing for the app VM to execute that the host does not already hold).
+//  * Not modelled: persistence across a lab restart (setPersisted is recorded; the permission is checked), content-URI triggers (setTriggerContentUri fails explicitly), URI grants carried
+//    by a work item's Intent (a persisted job rejects such an Intent like AOSP; for other jobs the grants are not applied), per-work network estimate accounting, expedited quotas,
+//    doze/standby buckets, the 10 minute execution cap.
 const SCHEDULER = 'Landroid/app/job/JobScheduler;', INFO = 'Landroid/app/job/JobInfo;', BUILDER = 'Landroid/app/job/JobInfo$Builder;', PARAMS = 'Landroid/app/job/JobParameters;', JOB_SERVICE = 'Landroid/app/job/JobService;', SERVICE = 'Landroid/app/Service;';
+const WORK = 'Landroid/app/job/JobWorkItem;', WORK_CREATOR = 'Landroid/app/job/JobWorkItem$1;', PARCEL = 'Landroid/os/Parcel;', INTENT = 'Landroid/content/Intent;', CREATOR = 'Landroid/os/Parcelable$Creator;';
+const NETWORK_BYTES_UNKNOWN = -1n;
 const COMPONENT = 'Landroid/content/ComponentName;', PERSISTABLE = 'Landroid/os/PersistableBundle;', BUNDLE = 'Landroid/os/Bundle;', STRING = 'Ljava/lang/String;', NETWORK = 'Landroid/net/Network;', WRAPPER = 'Landroid/content/ContextWrapper;', LIST = 'Ljava/util/List;';
 const NETWORK_NONE = 0, NETWORK_ANY = 1, NETWORK_UNMETERED = 2, NETWORK_NOT_ROAMING = 3, NETWORK_METERED = 4;
 const MIN_PERIOD = 15 * 60 * 1000, MIN_FLEX = 5 * 60 * 1000, MIN_BACKOFF = 10 * 1000, MAX_BACKOFF = 5 * 60 * 60 * 1000, DEFAULT_BACKOFF = 30 * 1000;
@@ -24,6 +32,7 @@ export function createJobSchedulerHost(platform) {
   const registry = createHostRegistry(), { def, type } = registry;
   type(SERVICE, WRAPPER, [], { allocatable: true }); type(JOB_SERVICE, SERVICE, [], { allocatable: true });
   type(SCHEDULER, 'Ljava/lang/Object;'); type(INFO, 'Ljava/lang/Object;', [], { allocatable: true }); type(BUILDER, 'Ljava/lang/Object;', [], { allocatable: true }); type(PARAMS, 'Ljava/lang/Object;', ['Landroid/os/Parcelable;'], { allocatable: true });
+  type(WORK, 'Ljava/lang/Object;', ['Landroid/os/Parcelable;'], { allocatable: true }); type(WORK_CREATOR, 'Ljava/lang/Object;', [CREATOR], { allocatable: true });
   const constants = { NETWORK_TYPE_NONE: NETWORK_NONE, NETWORK_TYPE_ANY: NETWORK_ANY, NETWORK_TYPE_UNMETERED: NETWORK_UNMETERED, NETWORK_TYPE_NOT_ROAMING: NETWORK_NOT_ROAMING, NETWORK_TYPE_METERED: NETWORK_METERED,
     BACKOFF_POLICY_LINEAR: 0, BACKOFF_POLICY_EXPONENTIAL: 1, PRIORITY_DEFAULT: 300, PRIORITY_LOW: 200, PRIORITY_MIN: 100, PRIORITY_HIGH: 400, PRIORITY_MAX: 500 };
   for (const [name, value] of Object.entries(constants)) registry.staticField(INFO, name, 'I', () => value);
@@ -118,24 +127,28 @@ export function createJobSchedulerHost(platform) {
   /** The job is over: remove it, re-queue it (back-off) or arm the next period. */
   function finish(r, job, reschedule, why) {
     if (!job.running) return;
-    job.running = false; job.params = null; stats.finished++;
+    job.running = false; job.params = null; stats.finished++; releaseWork(job);
     r.record(`JOB finished ${describe(job.spec)} reschedule=${reschedule} (${why})`);
     if (!jobs.has(job.spec.id) || jobs.get(job.spec.id) !== job) return;           // cancelled or replaced meanwhile
     if (reschedule) { job.backoffAttempts++; job.earliest = clock() + backoffDelay(job); job.deadline = null; stats.rescheduled++; }
     else if (job.spec.periodic) { job.backoffAttempts = 0; nextPeriod(job); }
+    else if (job.pending?.length) { job.backoffAttempts = 0; r.record(`JOB work left ${describe(job.spec)} items=${job.pending.length}`); }   // JobSchedulerService keeps a job that still has work and runs it again
     else jobs.delete(job.spec.id);
     kick(r);
   }
+  /** A run ended: items handed out by dequeueWork but never completed return to the front of the pending queue, delivery count already bumped (JobStatus.stopTrackingJobLocked / JobServiceContext cleanup). */
+  const releaseWork = job => { if (job.executing?.length) { job.pending = [...job.executing, ...(job.pending ?? [])]; job.executing = []; } };
   /** The system stops a running job (constraint lost, cancel): onStopJob(params) decides whether it comes back. */
   function stop(r, job, reason, constraint) {
     if (!job.running) return;
     stats.stopped++; r.object(job.params).stopReason = reason;
     const reschedule = dispatch(r, job.service.descriptor, 'onStopJob', [PARAMS], 'Z', [job.service.ref, job.params]);
     r.record(`JOB stopped ${describe(job.spec)} reason=${reason} reschedule=${!!reschedule}`);
-    job.running = false; job.params = null;
+    job.running = false; job.params = null; releaseWork(job);
     if (constraint === false) return;                                                // cancelled: removed by the caller
     if (jobs.get(job.spec.id) !== job) return;
     if (reschedule || job.spec.periodic) { if (reschedule) { job.backoffAttempts++; job.earliest = clock() + backoffDelay(job); } else nextPeriod(job); stats.rescheduled++; }
+    else if (job.pending?.length) { job.earliest = clock(); stats.rescheduled++; }
     else jobs.delete(job.spec.id);
     kick(r);
   }
@@ -180,8 +193,61 @@ export function createJobSchedulerHost(platform) {
   def(PARAMS, 'getTriggeredContentUris', '()[Landroid/net/Uri;', () => null); def(PARAMS, 'getTriggeredContentAuthorities', `()[${STRING}`, () => null);
   def(PARAMS, 'getNetwork', `()${NETWORK}`, r => { const manager = platform.deviceState.getService(r, 'connectivity'); return manager ? dispatch(r, 'Landroid/net/ConnectivityManager;', 'getActiveNetwork', [], NETWORK, [manager]) : null; });
   def(PARAMS, 'getStopReason', '()I', (r, _m, [self]) => r.object(self).stopReason);
-  def(PARAMS, 'getClipData', '()Landroid/content/ClipData;', () => null); def(PARAMS, 'dequeueWork', '()Landroid/app/job/JobWorkItem;', () => null);
+  def(PARAMS, 'getClipData', '()Landroid/content/ClipData;', () => null); 
+  // JobParameters.dequeueWork / completeWork: only the run that received these parameters may use them (JobServiceContext.assertCallerLocked); a stale caller gets null / true.
+  def(PARAMS, 'dequeueWork', `()${WORK}`, (r, _m, [self]) => {
+    const job = r.object(self).job;
+    if (!job?.running || job.params !== self) return null;
+    const item = job.pending?.shift(); if (!item) return null;
+    r.object(item).deliveryCount++; (job.executing ??= []).push(item); return item;
+  });
+  def(PARAMS, 'completeWork', `(${WORK})V`, (r, _m, [self, item]) => {
+    if (item === null || item === 0) r.throwJava('Ljava/lang/NullPointerException;', 'work');
+    const job = r.object(self).job;
+    if (!job?.running || job.params !== self) return;
+    const index = job.executing?.indexOf(item) ?? -1;
+    if (index < 0) r.throwJava('Ljava/lang/IllegalArgumentException;', `Given work is not active: ${r.stringCharacters(dispatch(r, WORK, 'toString', [], STRING, [item]))}`);
+    job.executing.splice(index, 1);
+  });
   def(PARAMS, 'describeContents', '()I', () => 0);
+
+  // ---- JobWorkItem (core/java/android/app/job/JobWorkItem.java) ---------------------------------------------------------------------------------
+  const work = (r, ref) => r.object(ref);
+  const initWork = (r, self, intent, download, upload, chunk) => {
+    if (chunk !== NETWORK_BYTES_UNKNOWN && chunk <= 0n) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Minimum chunk size must be positive');
+    Object.assign(work(r, self), { intent: intent === 0 ? null : intent, downloadBytes: download, uploadBytes: upload, minimumChunkBytes: chunk, deliveryCount: 0, workId: 0 });
+  };
+  def(WORK, '<init>', `(${INTENT})V`, (r, _m, [self, intent]) => initWork(r, self, intent, NETWORK_BYTES_UNKNOWN, NETWORK_BYTES_UNKNOWN, NETWORK_BYTES_UNKNOWN));
+  def(WORK, '<init>', `(${INTENT}JJ)V`, (r, _m, [self, intent, download, upload]) => initWork(r, self, intent, download, upload, NETWORK_BYTES_UNKNOWN));
+  def(WORK, '<init>', `(${INTENT}JJJ)V`, (r, _m, [self, intent, download, upload, chunk]) => initWork(r, self, intent, download, upload, chunk));
+  def(WORK, 'getIntent', `()${INTENT}`, (r, _m, [self]) => work(r, self).intent);
+  def(WORK, 'getDeliveryCount', '()I', (r, _m, [self]) => work(r, self).deliveryCount);
+  def(WORK, 'getEstimatedNetworkDownloadBytes', '()J', (r, _m, [self]) => work(r, self).downloadBytes);
+  def(WORK, 'getEstimatedNetworkUploadBytes', '()J', (r, _m, [self]) => work(r, self).uploadBytes);
+  def(WORK, 'getMinimumNetworkChunkBytes', '()J', (r, _m, [self]) => work(r, self).minimumChunkBytes);
+  def(WORK, 'describeContents', '()I', () => 0);
+  def(WORK, 'toString', `()${STRING}`, (r, _m, [self]) => {
+    const w = work(r, self), intent = w.intent === null ? 'null' : r.stringCharacters(dispatch(r, INTENT, 'toString', [], STRING, [w.intent]));
+    return `JobWorkItem{id=${w.workId} intent=${intent} dcount=${w.deliveryCount}}`;
+  });
+  // Parcel layout of the original: intent flag + Intent, three long network byte counts, delivery count, work id (the URI grants a system caller attaches are not carried).
+  const parcel = (r, p, name, parameters, result, args = []) => dispatch(r, PARCEL, name, parameters, result, [p, ...args]);
+  def(WORK, 'writeToParcel', `(${PARCEL}I)V`, (r, _m, [self, out]) => {
+    const w = work(r, self);
+    if (w.intent !== null) throw new APKError('JobWorkItem.writeToParcel: the lab has no Intent.writeToParcel, so a work item carrying an Intent cannot be parcelled', { kind: 'job-work-item-parcel-unsupported' });
+    parcel(r, out, 'writeInt', ['I'], 'V', [0]);
+    for (const value of [w.downloadBytes, w.uploadBytes, w.minimumChunkBytes]) parcel(r, out, 'writeLong', ['J'], 'V', [value]);
+    parcel(r, out, 'writeInt', ['I'], 'V', [w.deliveryCount]); parcel(r, out, 'writeInt', ['I'], 'V', [w.workId]);
+  });
+  def(WORK_CREATOR, 'createFromParcel', `(${PARCEL})Ljava/lang/Object;`, (r, _m, [, input]) => {
+    const item = r.allocate(WORK);
+    if (parcel(r, input, 'readInt', [], 'I')) throw new APKError('JobWorkItem.CREATOR: the lab has no Intent.CREATOR, so a parcelled Intent cannot be read', { kind: 'job-work-item-parcel-unsupported' });
+    const intent = null;
+    const download = parcel(r, input, 'readLong', [], 'J'), upload = parcel(r, input, 'readLong', [], 'J'), chunk = parcel(r, input, 'readLong', [], 'J');
+    initWork(r, item, intent, download, upload, chunk); work(r, item).deliveryCount = parcel(r, input, 'readInt', [], 'I'); work(r, item).workId = parcel(r, input, 'readInt', [], 'I'); return item;
+  });
+  def(WORK_CREATOR, 'newArray', '(I)[Ljava/lang/Object;', (r, _m, [, size]) => r.newArray(`[${WORK}`, size));
+  registry.staticField(WORK, 'CREATOR', CREATOR, r => r.allocate(WORK_CREATOR));
 
   // ---- JobInfo / Builder ------------------------------------------------------------------------------------------------------------------------
   const specOf = (r, ref) => r.object(ref).spec;
@@ -276,7 +342,20 @@ export function createJobSchedulerHost(platform) {
     return list;
   });
   def(SCHEDULER_STUB, 'getPendingJob', `(I)${INFO}`, (r, _m, [, id]) => jobs.get(id)?.info ?? null);
-  def(SCHEDULER_STUB, 'enqueue', `(${INFO}Landroid/app/job/JobWorkItem;)I`, () => { throw new APKError('JobScheduler.enqueue(JobWorkItem) work queues are not implemented by the virtual device', { kind: 'job-work-item-unsupported' }); });
+  // JobSchedulerService.enqueue: the same JobInfo as the pending job appends to it (even while it runs); another JobInfo replaces the job (the old one is stopped, its work dropped).
+  def(SCHEDULER_STUB, 'enqueue', `(${INFO}${WORK})I`, (r, _m, [, info, item]) => {
+    if (info === null || info === 0) r.throwJava('Ljava/lang/NullPointerException;', 'job');
+    if (item === null || item === 0) r.throwJava('Ljava/lang/NullPointerException;', 'work');
+    const spec = specOf(r, info); validate(r, spec);
+    const w = r.object(item);
+    if (w.workId !== 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Already enqueued');
+    if (spec.persisted && w.intent !== null && (dispatch(r, INTENT, 'getFlags', [], 'I', [w.intent]) & 3) !== 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Work items with URI grants cannot be enqueued on a persisted job');
+    const previous = jobs.get(spec.id);
+    if (previous && dispatch(r, INFO, 'equals', ['Ljava/lang/Object;'], 'Z', [previous.info, info])) { addWork(r, previous, item); r.record(`JOB enqueue ${describe(spec)} work=${w.workId}`); kick(r); return RESULT_SUCCESS; }
+    const result = schedule(r, info); addWork(r, jobs.get(spec.id), item); r.record(`JOB enqueue ${describe(spec)} work=${w.workId}`); return result;
+  });
+  /** JobStatus.enqueueWorkLocked: work ids count from 1 per job. */
+  function addWork(r, job, item) { job.nextWorkId ??= 1; r.object(item).workId = job.nextWorkId++; (job.pending ??= []).push(item); job.executing ??= []; }
 
   return {
     ...registry,
