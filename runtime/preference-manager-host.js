@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=c762a1a45a69';
+import { createHostRegistry } from './host-contract.js?v=0121b87c7254';
 
 // android.preference.PreferenceManager's statics, following android-13.0.0_r1 frameworks/base/core/java/android/preference/PreferenceManager.java:
 //   getDefaultSharedPreferences(Context)  = context.getSharedPreferences(packageName + "_preferences", MODE_PRIVATE)   (the same SharedPreferences instance, listeners and files as getSharedPreferences by that name)

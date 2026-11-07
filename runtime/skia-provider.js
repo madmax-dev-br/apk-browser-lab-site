@@ -1,8 +1,8 @@
-import {APKError} from './apk-runtime.js?v=c762a1a45a69';
-import {PathApproxProvider} from './path-approx-provider.js?v=c762a1a45a69';
-import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=c762a1a45a69';
-import {createFontFallback} from './font-fallback.js?v=c762a1a45a69';
-import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=c762a1a45a69';
+import {APKError} from './apk-runtime.js?v=0121b87c7254';
+import {PathApproxProvider} from './path-approx-provider.js?v=0121b87c7254';
+import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=0121b87c7254';
+import {createFontFallback} from './font-fallback.js?v=0121b87c7254';
+import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=0121b87c7254';
 const MAX_WASM=16*1024*1024,MAX_FONT=4*1024*1024,MAX_MODULE=1024*1024;
 const hash=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
 async function read(fetchImpl,url,limit){
