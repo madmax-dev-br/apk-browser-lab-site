@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=ccd10c551257';
-import { createHostRegistry } from './host-contract.js?v=ccd10c551257';
+import { APKError } from './apk-error.js?v=f8769cb2e9a2';
+import { createHostRegistry } from './host-contract.js?v=f8769cb2e9a2';
 
 // android.app.Notification, Notification.Builder / Action / BigTextStyle / BigPictureStyle / InboxStyle, NotificationChannel and android.graphics.drawable.Icon (android-13.0.0_r1).
 // None of these is in the framework DEX. The Builder is a recorder, exactly as in Notification.java: every setter stores a value and build() writes the public fields of
