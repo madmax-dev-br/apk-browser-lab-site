@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=4bc73c32ad67';
-import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=4bc73c32ad67';
-import { isInterfaceName } from './webview-bridge.js?v=4bc73c32ad67';
-import { APKError } from './apk-error.js?v=4bc73c32ad67';
+import { gcRoot } from './heap-gc.js?v=e5b986420eb3';
+import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=e5b986420eb3';
+import { isInterfaceName } from './webview-bridge.js?v=e5b986420eb3';
+import { APKError } from './apk-error.js?v=e5b986420eb3';
 
 // android.webkit.WebView and its public companions for the browser VM (design: docs/APK-REAL-TASKS.md, task 33).
 //
@@ -21,6 +21,8 @@ export const WEBVIEW = 'Landroid/webkit/WebView;', SETTINGS = 'Landroid/webkit/W
   CALLBACK = 'Landroid/webkit/ValueCallback;', LIST = 'Landroid/webkit/WebBackForwardList;', ITEM = 'Landroid/webkit/WebHistoryItem;', JS_INTERFACE = 'Landroid/webkit/JavascriptInterface;',
   HIT = 'Landroid/webkit/WebView$HitTestResult;', LAB_REQUEST = 'Llab/webkit/LabResourceRequest;', LAB_ERROR = 'Llab/webkit/LabResourceError;',
   LAB_LIST = 'Llab/webkit/LabBackForwardList;', LAB_ITEM = 'Llab/webkit/LabHistoryItem;', LAB_RESULT = 'Llab/webkit/LabJsResult;';
+/** WebViewProviderFactoryBoundaryInterface.getSupportedFeatures(): support-library feature strings this WebView implements. None yet (a listed feature must work). */
+export const LAB_PROVIDER_FEATURES = Object.freeze([]);
 const isNull = v => v === null || v === undefined || v === 0;
 /** WebViewClient.ERROR_* (android-13.0.0_r1). */
 export const WEBVIEW_ERRORS = Object.freeze({ UNKNOWN: -1, HOST_LOOKUP: -2, UNSUPPORTED_AUTH_SCHEME: -3, AUTHENTICATION: -4, PROXY_AUTHENTICATION: -5, CONNECT: -6, IO: -7, TIMEOUT: -8, REDIRECT_LOOP: -9, UNSUPPORTED_SCHEME: -10, FAILED_SSL_HANDSHAKE: -11, BAD_URL: -12, FILE: -13, FILE_NOT_FOUND: -14, TOO_MANY_REQUESTS: -15, UNSAFE_RESOURCE: -16 });
@@ -264,7 +266,41 @@ export function createWebViewHost(platform) {
   });
   def(WEBVIEW, 'addJavascriptInterface', `(${OBJECT}${STRING})V`, (r, _m, [self, object, name]) => { if (isNull(object)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'object == null'); stateOf(r, self).interfaces.set(stringArg(r, name, 'name'), object); backend()?.interfaceChanged?.(r, self, stateOf(r, self)); });
   def(WEBVIEW, 'removeJavascriptInterface', `(${STRING})V`, (r, _m, [self, name]) => { stateOf(r, self).interfaces.delete(stringArg(r, name, 'name')); backend()?.interfaceChanged?.(r, self, stateOf(r, self)); });
-  def(WEBVIEW, 'getCurrentWebViewPackage', '()Landroid/content/pm/PackageInfo;', () => null, { static: true });
+  def(WEBVIEW, 'getCurrentWebViewPackage', '()Landroid/content/pm/PackageInfo;', () => null, { static: true });   // no WebView provider package is installed: AOSP answers null in that case
+
+  // ---- the WebView provider's class loader and its support-library glue (WebView.getWebViewClassLoader, API 28) -----------------------------------------------------------
+  // In AOSP the loader belongs to the installed WebView provider package; androidx.webkit loads org.chromium.support_lib_glue.SupportLibReflectionUtil from it by reflection, calls
+  // its static createWebViewProviderFactory() and wraps the returned InvocationHandler in a java.lang.reflect.Proxy of WebViewProviderFactoryBoundaryInterface (an interface that
+  // ships in the app's own APK, so the Proxy is built by the app against its class loader; the handler below only sees Method objects and plain values).
+  // The lab's provider answers getSupportedFeatures() with LAB_PROVIDER_FEATURES, the support-library features whose WebView-side behavior this WebView implements (none: the
+  // platform-level features, e.g. SAFE_BROWSING_ENABLE or FORCE_DARK, are decided by androidx.webkit from the framework API the WebView has). Every other factory method fails with a
+  // named error (or, in the tolerant modes, is recorded as a STUB-WEBVIEW line and answers null).
+  const GLUE = 'Lorg/chromium/support_lib_glue/SupportLibReflectionUtil;', FACTORY_HANDLER = 'Llab/webkit/LabProviderFactoryHandler;', INVOCATION_HANDLER = 'Ljava/lang/reflect/InvocationHandler;',
+    REFLECT_METHOD = 'Ljava/lang/reflect/Method;', PATH_CLASS_LOADER = 'Ldalvik/system/PathClassLoader;', BOUNDARY = 'org.chromium.support_lib_boundary.WebViewProviderFactoryBoundaryInterface';
+  type(GLUE, OBJECT, [], { allocatable: true }); type(FACTORY_HANDLER, OBJECT, [INVOCATION_HANDLER], { allocatable: true });
+  const provider = gcRoot({ loader: null, factory: null });
+  def(WEBVIEW, 'getWebViewClassLoader', '()Ljava/lang/ClassLoader;', (r) => {
+    if (isNull(provider.loader)) {   // a PathClassLoader of the boot loader with no dex path: the provider's classes are lab host classes, visible by name through it
+      const ref = r.allocate(PATH_CLASS_LOADER); r.dispatch({ owner: PATH_CLASS_LOADER, name: '<init>', parameters: [STRING, 'Ljava/lang/ClassLoader;'], result: 'V', signature: `(${STRING}Ljava/lang/ClassLoader;)V` }, [ref, '', null], 'direct');
+      provider.loader = ref;
+    }
+    return provider.loader;
+  }, { static: true });
+  def(GLUE, 'createWebViewProviderFactory', `()${INVOCATION_HANDLER}`, (r) => provider.factory ??= r.allocate(FACTORY_HANDLER), { static: true });
+  const boxBoolean = (r, v) => staticCall(r, 'Ljava/lang/Boolean;', 'valueOf', ['Z'], 'Ljava/lang/Boolean;', [v ? 1 : 0]);
+  def(FACTORY_HANDLER, 'invoke', `(${OBJECT}${REFLECT_METHOD}[${OBJECT})${OBJECT}`, (r, _m, [self, proxy, method, args]) => {
+    const name = r.stringCharacters(call(r, method, REFLECT_METHOD, 'getName', [], STRING, []));
+    if (name === 'getSupportedFeatures') {
+      const array = r.newArray(`[${STRING}`, LAB_PROVIDER_FEATURES.length); r.array(array).elements = [...LAB_PROVIDER_FEATURES]; return array;
+    }
+    if (name === 'hashCode') return r.javaHash(proxy);
+    if (name === 'equals') return boxBoolean(r, !isNull(args) && r.array(args).elements[0] === proxy);
+    if (name === 'toString') return `lab-webview-provider-factory@${(r.javaHash(proxy) >>> 0).toString(16)}`;
+    const message = `${BOUNDARY}.${name}() is not implemented by the lab's WebView provider (only getSupportedFeatures() is); the support-library feature behind it is not supported`;
+    if (r.tolerateMissing === 'off' || r.tolerateMissing === undefined) throw new APKError(message, { kind: 'webview-provider-unsupported', method: name });
+    if (!unavailableOnce.has(`provider.${name}`)) { unavailableOnce.add(`provider.${name}`); r.record(`STUB-WEBVIEW provider.${name} (${message})`); }
+    return null;
+  });
 
   // ---- WebSettings -----------------------------------------------------------------------------------------------------------------------------------------------------
   for (const [name, kind] of SETTINGS_TABLE) {

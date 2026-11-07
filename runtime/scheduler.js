@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=4bc73c32ad67';
+import { APKError } from './apk-error.js?v=e5b986420eb3';
 
 // Green-thread scheduler for the VM.
 //
@@ -29,7 +29,7 @@ export const QUANTUM = 20000;   // instructions a thread runs before another run
 
 const QUIET_IDLE_LIMIT = 50000;   // consecutive clock skips with no host event in between
 export class Scheduler {
-  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0 }; this.otherTick = 0; this.otherCached = false; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; }
+  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; }
   get clock() { return this.rt.platform.clock; }
 
   /** The thread that runs host events (Looper/main). */
@@ -110,13 +110,18 @@ export class Scheduler {
   hasOtherRunnable(current, owner) {
     // The main thread runs host events (UI, Looper callbacks) that assume they are not interleaved with other Java threads mid-event: it yields only by blocking or finishing.
     if (current === this.main) return false;
-    // With dozens of threads this check, made at every scheduling quantum, was O(threads); the answer is refreshed every 4th call (preemption granularity stays far below a millisecond).
-    if ((++this.otherTick & 3) !== 0 && !this.otherCached) return false;
+    // Asked once per scheduling quantum (20000 loop iterations or calls: microseconds to milliseconds), so the O(threads) scan is cheap. It used to be sampled every 4th call, which
+    // multiplied the time a thread woken at its deadline waited for the processor by four; a woken thread must get it within one quantum.
     this.wake();                                   // timers and conditions that came due while `current` ran
-    if (owner && owner.state === 'blocked' && this.rt.platform.nextEventDelay?.() === 0) return (this.otherCached = true);   // host events are due while the run owner waits: switch so that they run
-    for (const thread of this.threads) if (thread !== current && thread.state === 'runnable' && (thread === owner || thread.nestedDepth === 0)) return (this.otherCached = true);
-    return (this.otherCached = false);
+    if (owner && owner.state === 'blocked' && this.rt.platform.nextEventDelay?.() === 0) return true;   // host events are due while the run owner waits: switch so that they run
+    // A slice with no owner (runThreads, called from a nested host wait or the event pump) is not a thread of its own: the thread whose host wait this slice serves is parked on the JavaScript stack
+    // below it. When its wait is over (woken by its deadline, notify or unpark) the slice must end so that it can continue, however many other threads are runnable -- or whether `current` is the only one.
+    if (owner === null && this.waitingNested.size && this.innermostNestedReady()) return true;
+    for (const thread of this.threads) if (thread !== current && thread.state === 'runnable' && (thread === owner || thread.nestedDepth === 0)) return true;
+    return false;
   }
+  /** True when the innermost nested host wait (the only one whose JavaScript stack is on top) can continue. */
+  innermostNestedReady() { let innermost = null; for (const thread of this.waitingNested) innermost = thread; return innermost !== null && innermost.state === 'runnable'; }
 
   /**
    * Fairness for the host event queue. A run whose owner is blocked (a wait inside an event, a nested host call) keeps switching between the threads that can run; the queued host events
