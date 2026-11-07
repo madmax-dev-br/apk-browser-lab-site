@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=75ef95700f6e';
-import { BUCKET } from './time-breakdown.js?v=75ef95700f6e';
-import { Blocked, QUANTUM } from './scheduler.js?v=75ef95700f6e';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=75ef95700f6e';
+import { APKError } from './apk-error.js?v=4bc73c32ad67';
+import { BUCKET } from './time-breakdown.js?v=4bc73c32ad67';
+import { Blocked, QUANTUM } from './scheduler.js?v=4bc73c32ad67';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=4bc73c32ad67';
 
 // Frame-based DEX interpreter.
 //
@@ -354,6 +354,9 @@ export function runSlice(rt) {
 function runLoop(rt, owner, base) {
   const sched = rt.scheduler;
   let thread = owner, frames = null, f = null, regs = null, prog = null, u = null, dex = null, stats = null, pc = 0, start = 0, returnValue, returning = false;
+  // Interpreted code counts its quantum in the local `quantum` (back-edges and calls); compiled code counts in rt.q. Both boundaries are safepoints: the thread may switch, and a collection runs
+  // when one is due (rt.gcWanted). An allocation that finds a collection due zeroes rt.q (APKRuntime.makeObject), so the next back-edge or call of either kind reaches the safepoint at once:
+  // a loop that allocates several objects per iteration can otherwise fill the whole headroom inside one quantum, and a run stays interpreted for its first JIT_LOOPS iterations.
   let need = owner === null, quantum = QUANTUM, ran = false, input = null;
   const max = rt.maxInstructionsPerEvent, heapChunks = rt.heap.chunks, heapList = { get: id => { const chunk = heapChunks[id >>> 12]; return chunk === undefined ? undefined : chunk[id & 4095]; } }, fastCalls = rt.fastCallPaths !== false; let probe = rt.instructionProbe;
   if (owner !== null) { frames = owner.frames; f = frames[frames.length - 1]; if (f === undefined) fail(`The run owner thread ${owner.name} (${owner.state}) has no frames to run`); regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc; start = pc; }
@@ -462,19 +465,19 @@ function runLoop(rt, owner, base) {
           case 0x22: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid allocation type'); if (rt.initialized.get(type)?.status !== 'initialized') { const gate = rt.initStep(type); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.bytecodeAlloc = true; try { regs[a] = rt.allocate(type); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
           case 0x23: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid array type'); rt.bytecodeAlloc = true; try { regs[lo] = rt.newArray(type, int(regs[hi])); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
           case 0x27: { const value = regs[a]; if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'throw with null exception'); throw new JavaException(value, rt.object(value).message ?? rt.typeOf(value), rt.object(value).exceptionDetails); }
-          case 0x28: { const target = pc + ((a << 24) >> 24); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
-          case 0x29: { const target = pc + ((u[pc + 1] << 16) >> 16); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
-          case 0x2a: { const target = pc + (u[pc + 1] | (u[pc + 2] << 16)); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
+          case 0x28: { const target = pc + ((a << 24) >> 24); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, (--quantum <= 0 || rt.q <= 0))) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
+          case 0x29: { const target = pc + ((u[pc + 1] << 16) >> 16); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, (--quantum <= 0 || rt.q <= 0))) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
+          case 0x2a: { const target = pc + (u[pc + 1] | (u[pc + 2] << 16)); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, (--quantum <= 0 || rt.q <= 0))) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } break; }
           case 0x32: case 0x33: case 0x34: case 0x35: case 0x36: case 0x37: {
             const x = regs[lo], y = regs[hi];
             const match = op === 0x32 ? (x === y || equal(x, y)) : op === 0x33 ? (x !== y && !equal(x, y)) : op === 0x34 ? x < y : op === 0x35 ? x >= y : op === 0x36 ? x > y : x <= y;
-            if (match) { const t = pc + ((u[pc + 1] << 16) >> 16); pc = t; if (t <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } } else pc += 2;
+            if (match) { const t = pc + ((u[pc + 1] << 16) >> 16); pc = t; if (t <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, (--quantum <= 0 || rt.q <= 0))) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } } else pc += 2;
             break;
           }
           case 0x38: case 0x39: case 0x3a: case 0x3b: case 0x3c: case 0x3d: {
             const x = regs[a];
             const match = op === 0x38 ? (x === null || x === 0) : op === 0x39 ? (x !== null && x !== 0) : op === 0x3a ? x < 0 : op === 0x3b ? x >= 0 : op === 0x3c ? x > 0 : x <= 0;
-            if (match) { const t = pc + ((u[pc + 1] << 16) >> 16); pc = t; if (t <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, --quantum <= 0)) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } } else pc += 2;
+            if (match) { const t = pc + ((u[pc + 1] << 16) >> 16); pc = t; if (t <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, (--quantum <= 0 || rt.q <= 0))) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = pc; need = true; break inner; } } } else pc += 2;
             break;
           }
           case 0x44: case 0x45: case 0x46: case 0x47: case 0x48: case 0x49: case 0x4a: {
@@ -576,7 +579,7 @@ function runLoop(rt, owner, base) {
                 }
                 f = new Frame(cached.method, calleeCode, nr, calleeProg); frames.push(f);
                 regs = nr; prog = calleeProg; u = prog.units; dex = prog.dex; stats = prog.stats; pc = 0;
-                if (--quantum <= 0) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = 0; need = true; break inner; } }
+                if (--quantum <= 0 || rt.q <= 0) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = 0; need = true; break inner; } }
                 break;
               }
             }
@@ -613,7 +616,7 @@ function runLoop(rt, owner, base) {
               f.pc = pc + 3; f.callPc = start; if (frames.length + rt.depth + 1 > rt.peakCallDepth) rt.peakCallDepth = frames.length + rt.depth + 1;
               f = makeFrame(rt, outcome.method, outcome.code, outcome.args); frames.push(f);
               regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = 0;
-              if (--quantum <= 0) { quantum = QUANTUM; rt.budgetTick(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = 0; need = true; break inner; } }
+              if (--quantum <= 0 || rt.q <= 0) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = 0; need = true; break inner; } }
               break;
             }
             if (outcome instanceof Blocked) {

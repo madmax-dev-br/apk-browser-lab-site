@@ -1,5 +1,6 @@
-// Mark-and-sweep reclamation of the VM heap (runtime.heap), run at quiescent points between host requests and, under heap pressure, at the scheduler's thread-switch safepoints
-// inside one long scheduling run (runtime.safepointCollect): there no host native is in flight, so every live Java value is in a thread's frames or in the rooted tables below.
+// Mark-and-sweep reclamation of the VM heap (runtime.heap), run at quiescent points between host requests and, under heap pressure, at the safepoints of one long scheduling run
+// (runtime.safepointCollect: thread switches and the quantum boundaries of interpreted and compiled code, reached at once when an allocation finds a collection due): there no host native
+// is in flight on the running thread, so every live Java value is in a thread's frames, in the rooted tables below, or in the host-allocation set that protects what host code further out holds.
 //
 // Why: Java objects live in runtime.heap and are never freed otherwise; a few dozen UI interactions (Compose recomposition, layout, semantics snapshots) exhaust the
 // 262,144-object limit. Ids are never reused, so a stale id can only be *absent*, never the wrong object.
@@ -22,7 +23,7 @@
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=75ef95700f6e';
+import { BUCKET } from './time-breakdown.js?v=4bc73c32ad67';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -384,6 +385,11 @@ export function collectionDue(runtime, threshold = Math.floor(runtime.maxHeapObj
 /** Collects when the live heap passed `threshold` (default 40% of the limit) or in audit mode (every call). */
 export function maybeCollect(runtime, options = {}) {
   const audit = options.audit ?? globalThis.process?.env?.APKWEB_GC_AUDIT === '1';
+  // Between host events nothing host-side is in flight, so the host-allocation set (what host code allocated or was handed since the last quiescent point) stops being a root here even when no
+  // collection is due -- a quiescent collection drops it the same way. The safepoint collections inside the next event must keep the set alive; left to grow across events (a driver reading the
+  // semantics tree between steps hands thousands of entries to host code), they would retain an ever larger part of the heap and free almost nothing, while the quiescent collection that would
+  // have dropped the set never comes due because the safepoint ones ran first.
+  if (runtime.hostAllocs && runtime.hostAllocs.length > 0 && quiescent(runtime) === null) runtime.hostAllocs.length = 0;
   if (!audit && !runtime.gcEnabled) return { collected: false, reason: 'disabled', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // opt-in until the audit suites are clean
   const threshold = options.threshold ?? Math.floor(runtime.maxHeapObjects * GC_START_FRACTION);
   // Audit mode collects after every event that allocated at least APKWEB_GC_AUDIT_MIN (default 200) objects: a collection scans the whole live graph (~100 ms), and an event that allocates fewer

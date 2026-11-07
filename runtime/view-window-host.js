@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=75ef95700f6e';
-import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=75ef95700f6e';
+import { APKError } from './apk-runtime.js?v=4bc73c32ad67';
+import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=4bc73c32ad67';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -75,7 +75,10 @@ export function createViewWindowHost(platform){
    let animationClockLocked=false;
    const animationClock=(name,parameters,values)=>runtime.dispatch({owner:'Landroid/view/animation/AnimationUtils;',name,parameters,result:'V',signature:`(${parameters.join('')})V`},runtime.argumentWords(parameters,values),'static');
    try{if(runtime.dex.bootClasses?.has('Landroid/view/animation/AnimationUtils;')){animationClock('lockAnimationClock',['J'],[frameTime/1000000n]);animationClockLocked=true;}for(currentPhase=0;currentPhase<=4;currentPhase++){const due=pendingFrames.filter(x=>x.when<=when&&x.phase===currentPhase);for(const item of due)pendingFrames.splice(pendingFrames.indexOf(item),1);
-    for(const item of due){callbacksRun++;runtime.record(`FRAME callback phase=${currentPhase}`);if(item.js)item.js(runtime,vsync);else if(item.runnable)run(runtime,item.callback);else runtime.dispatch({owner:CALLBACK,name:'doFrame',signature:'(J)V',parameters:['J'],result:'V'},runtime.argumentWords(['J'],[frameTime],{receiver:item.callback}),'virtual');}
+    // Choreographer.doCallbacks: the due callbacks are extracted before any of them runs (a callback removed meanwhile still runs). Extracted, they are referenced only by this JavaScript local, so the batch is rooted while it runs: a collection at a safepoint inside the first doFrame would otherwise free the callbacks still waiting.
+    runtime.hostRoots.push(due);
+    try{for(const item of due){callbacksRun++;runtime.record(`FRAME callback phase=${currentPhase}`);if(item.js)item.js(runtime,vsync);else if(item.runnable)run(runtime,item.callback);else runtime.dispatch({owner:CALLBACK,name:'doFrame',signature:'(J)V',parameters:['J'],result:'V'},runtime.argumentWords(['J'],[frameTime],{receiver:item.callback}),'virtual');}}
+    finally{runtime.hostRoots.pop();}
    }}finally{try{if(animationClockLocked)animationClock('unlockAnimationClock',[],[]);}finally{frameTime=null;currentPhase=-1;}}
   },{windowFrameTime:when,roots:[]});
  };
