@@ -51,6 +51,7 @@ export function installNetworkCallbacks({ platform, registry, activeNetwork, cap
   for (const name of ['getLinkAddresses', 'getAllLinkAddresses', 'getDnsServers', 'getValidatedPrivateDnsServers', 'getPcscfServers', 'getRoutes', 'getAllRoutes', 'getAllInterfaceNames']) def(LINK_PROPERTIES, name, `()${LIST}`, r => emptyList(r));
   for (const name of ['getDomains', 'getPrivateDnsServerName', 'getTcpBufferSizes']) def(LINK_PROPERTIES, name, `()${STRING}`, () => null);
   def(LINK_PROPERTIES, 'getHttpProxy', '()Landroid/net/ProxyInfo;', () => null); def(LINK_PROPERTIES, 'getNat64Prefix', '()Landroid/net/IpPrefix;', () => null);
+  def(LINK_PROPERTIES, 'getDhcpServerAddress', '()Ljava/net/Inet4Address;', () => null);   // API 30: the link carries no addresses in the virtual device (see getLinkAddresses), so no DHCP server either, as on a statically configured or VPN link
   def(LINK_PROPERTIES, 'isPrivateDnsActive', '()Z', () => 0); def(LINK_PROPERTIES, 'isWakeOnLanSupported', '()Z', () => 0); def(LINK_PROPERTIES, 'getMtu', '()I', () => 0);
   def(LINK_PROPERTIES, 'toString', `()${STRING}`, (r, _m, [self]) => `{InterfaceName: ${interfaceName(r, self)} LinkAddresses: [] DnsAddresses: [] Domains: null MTU: 0 Routes: [] }`);
   const linkProperties = (r, network) => { const lp = r.makeObject(LINK_PROPERTIES); r.object(lp).interfaceName = r.object(network).transport === 1 ? 'wlan0' : 'rmnet_data0'; return lp; };

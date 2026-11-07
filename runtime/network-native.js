@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=d6386b812e54';
-import { throwNew } from './java-throw.js?v=d6386b812e54';
-import { Blocked } from './scheduler.js?v=d6386b812e54';
-import { OS_CONSTANTS } from './os-constants-data.js?v=d6386b812e54';
-import { openExchange, describeFailure } from './network-transport.js?v=d6386b812e54';
-import { WorkerExecutor } from './network-worker-executor.js?v=d6386b812e54';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=d6386b812e54';
+import { APKError } from './apk-error.js?v=cfc12cc19192';
+import { throwNew } from './java-throw.js?v=cfc12cc19192';
+import { Blocked } from './scheduler.js?v=cfc12cc19192';
+import { OS_CONSTANTS } from './os-constants-data.js?v=cfc12cc19192';
+import { openExchange, describeFailure } from './network-transport.js?v=cfc12cc19192';
+import { WorkerExecutor } from './network-worker-executor.js?v=cfc12cc19192';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=cfc12cc19192';
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
 //

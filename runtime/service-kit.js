@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=d6386b812e54';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=d6386b812e54';
+import { createHostRegistry } from './host-contract.js?v=cfc12cc19192';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=cfc12cc19192';
 
 // Shared plumbing of the system-service hosts (hardware-services-host.js, device-services-host.js, system-managers-host.js): a host contract registry plus the Context service
 // table -- each service has a Context.*_SERVICE name and a manager class; the manager object is a host object created once per runtime. Behaviour follows what an API 33 phone
