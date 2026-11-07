@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=acd14f39ac96';
+import { APKError } from './apk-error.js?v=668482d9f625';
 
 // The lab's JPEG and WebP codecs: libjpeg-turbo 2.1.0 and libwebp 1.2.2 built to WebAssembly (scripts/wasm/build-codecs.sh, vendor/lab-codecs/<n>), the libraries Android's Skia uses, behind the C API of
 // scripts/wasm/codecs/lab-codecs.c. CanvasKit 0.42 has neither a JPEG nor a WebP encoder, applies a JPEG's EXIF orientation when it decodes (BitmapFactory does not), and has no libjpeg DCT scaling
