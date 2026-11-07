@@ -1,14 +1,14 @@
-import {APKError} from './apk-runtime.js?v=668482d9f625';
-import {getVectorGraphics} from './vector-native.js?v=668482d9f625';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=668482d9f625';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=668482d9f625';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=668482d9f625';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo} from './rendernode-native.js?v=668482d9f625';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=668482d9f625';
-import {createBitmapHost} from './bitmap-host.js?v=668482d9f625';
-import { gcRoot } from './heap-gc.js?v=668482d9f625';
-import {sha256Hex} from './sha256-sync.js?v=668482d9f625';
-import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=668482d9f625';
+import {APKError} from './apk-runtime.js?v=50eafcfb729e';
+import {getVectorGraphics} from './vector-native.js?v=50eafcfb729e';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=50eafcfb729e';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=50eafcfb729e';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=50eafcfb729e';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=50eafcfb729e';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=50eafcfb729e';
+import {createBitmapHost} from './bitmap-host.js?v=50eafcfb729e';
+import { gcRoot } from './heap-gc.js?v=50eafcfb729e';
+import {sha256Hex} from './sha256-sync.js?v=50eafcfb729e';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=50eafcfb729e';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -191,6 +191,7 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
      if(node.clipToOutline&&node.outline){if(node.outline.commands){const path=CK.Path.MakeFromCmds(node.outline.commands);path.setFillType({value:node.outline.fillType});canvas.clipPath(path,CK.ClipOp.Intersect,true);path.delete();}else if(node.outline.empty)canvas.clipRect(CK.LTRBRect(0,0,0,0),CK.ClipOp.Intersect,false);else canvas.clipRRect(CK.RRectXY(node.outline.rect,node.outline.radius,node.outline.radius),CK.ClipOp.Intersect,true);}
      const isolate=!!node.layerPaint||node.layerType!==0||node.alpha<1;   // hwui only renders a node into an offscreen layer when it has alpha / a layer paint / a layer type
      if(isolate){const layer=node.layerPaint?makePaint(CK,node.layerPaint):new CK.Paint();layer.setAlphaf((node.layerPaint?.alpha??1)*Math.max(0,Math.min(1,node.alpha)));canvas.saveLayer(layer);layer.delete();}
+     const stretch=renderNodeStretchMatrix(node);if(stretch)canvas.concat(stretch);   // hwui StretchEffect (approximation documented at renderNodeStretchMatrix); after the clips so the bounds stay fixed
      replay(node.displayList);if(isolate)canvas.restore();activeNodes.delete(command.node);
     }
    }else if(command.vectorTree){const tree=command.vectorState??graphics.get(command.vectorTree,'tree');canvas.translate(command.x,command.y);canvas.scale(command.width/tree.viewportWidth,command.height/tree.viewportHeight);if(command.mirrored){canvas.translate(tree.viewportWidth,0);canvas.scale(-1,1);}canvas.clipRect(CK.LTRBRect(0,0,tree.viewportWidth,tree.viewportHeight),CK.ClipOp.Intersect,true);sourceVector(CK,canvas,graphics,tree,command.colorFilter);

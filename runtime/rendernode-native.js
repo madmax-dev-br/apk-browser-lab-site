@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=668482d9f625';
-import {getVectorGraphics} from './vector-native.js?v=668482d9f625';
-import {getSolidPaintByHandle} from './paint-host.js?v=668482d9f625';
-import {createMatrixNativeBindings} from './matrix-native.js?v=668482d9f625';
+import {APKError} from './apk-error.js?v=50eafcfb729e';
+import {getVectorGraphics} from './vector-native.js?v=50eafcfb729e';
+import {getSolidPaintByHandle} from './paint-host.js?v=50eafcfb729e';
+import {createMatrixNativeBindings} from './matrix-native.js?v=50eafcfb729e';
 
 const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;',RECORD='Landroid/view/RecordingCanvas;';
 const NODE33='Landroid/graphics/RenderNode;',RC33='Landroid/graphics/RecordingCanvas;',BRC='Landroid/graphics/BaseRecordingCanvas;';
@@ -18,7 +18,7 @@ const stateFor=r=>{if(!states.has(r))states.set(r,{next:0x600000000n,nodes:new M
 const node=(r,h,retained=false)=>{const value=stateFor(r).nodes.get(h);if(!value||value.javaReleased&&!retained)fail('Invalid or released RenderNode VM token');return value;};
 const finite=values=>{if(values.some(v=>!Number.isFinite(v)))fail('Non-finite RenderNode geometry');return values;};
 const identity=()=>[1,0,0,0,1,0,0,0,1];
-function newNode(r,name){const s=stateFor(r);if(s.nodes.size>=4096)fail('RenderNode handle limit4096 exceeded');const h=s.next++;s.nodes.set(h,{name,displayList:null,left:0,top:0,right:0,bottom:0,alpha:1,translationX:0,translationY:0,translationZ:0,elevation:0,rotation:0,rotationX:0,rotationY:0,scaleX:1,scaleY:1,pivotX:0,pivotY:0,pivotExplicit:false,clipToBounds:true,clipBounds:null,clipToOutline:false,outline:null,overlap:false,layerType:0,layerPaint:null,staticMatrix:null,animationMatrix:null,spotShadowColor:0xff000000|0,ambientShadowColor:0xff000000|0,cameraDistance:8});return h;}
+function newNode(r,name){const s=stateFor(r);if(s.nodes.size>=4096)fail('RenderNode handle limit4096 exceeded');const h=s.next++;s.nodes.set(h,{name,displayList:null,left:0,top:0,right:0,bottom:0,alpha:1,translationX:0,translationY:0,translationZ:0,elevation:0,rotation:0,rotationX:0,rotationY:0,scaleX:1,scaleY:1,pivotX:0,pivotY:0,pivotExplicit:false,clipToBounds:true,clipBounds:null,clipToOutline:false,outline:null,overlap:false,layerType:0,layerPaint:null,staticMatrix:null,animationMatrix:null,spotShadowColor:0xff000000|0,ambientShadowColor:0xff000000|0,cameraDistance:8,stretch:null});return h;}
 function copyCommand(c){return {...c,args:c.args?.slice(),matrix:c.matrix?.slice(),clips:c.clips?.map(v=>({...v,rect:v.rect?.slice(),matrix:v.matrix?.slice(),commands:v.commands?new Float32Array(v.commands):undefined})),commands:c.commands?new Float32Array(c.commands):undefined,paint:c.paint?{...c.paint}:null};}
 function canvas(r,h){return getVectorGraphics(r).get(h,'canvas');}
 function storageBytes(commands){let bytes=0;for(const c of commands)bytes+=128+(c.commands?.byteLength??0)+(c.text?.length??0)*2+(c.raster?.dataURL?.length??0)+(c.clips??[]).reduce((n,v)=>n+64+(v.commands?.byteLength??0),0);return bytes;}
@@ -26,6 +26,17 @@ function finish(r,h){const c=canvas(r,h);if(c.stack.length)fail('Unbalanced Canv
 function set(r,h,key,value){const n=node(r,h),old=n[key];n[key]=value;return old!==value?1:0;}
 function matrixFromHandle(r,h){if(!h)return null;const arr=r.newArray('[F',9);createMatrixNativeBindings().get('Landroid/graphics/Matrix;->nGetValues(J[F)V')(r,[h,arr]);return r.array(arr).elements.map(decode);}
 export function renderNodeTransform(r,n){const CK=r.skia?.CanvasKit;if(!CK)fail('RenderNode requires verified Skia');const surface=CK.MakeSurface(1,1);if(!surface)fail('RenderNode matrix scratch allocation failed');try{const c=surface.getCanvas(),px=n.pivotExplicit?n.pivotX:(n.right-n.left)/2,py=n.pivotExplicit?n.pivotY:(n.bottom-n.top)/2;c.translate(n.translationX,n.translationY);c.rotate(n.rotation,px,py);c.translate(px,py);c.scale(n.scaleX,n.scaleY);c.translate(-px,-py);return Array.from(c.getTotalMatrix());}finally{surface.dispose();}}
+/** Matrix (in the node's own coordinates, applied to its content inside the bounds clip) for the node's recorded stretch, or null.
+ * APPROXIMATION of hwui StretchEffect (effects/StretchEffect.cpp): hwui runs a per-pixel runtime shader that displaces each pixel non-linearly
+ * (strongest at the overscrolled edge, easing to none at the opposite edge). Here each axis is a UNIFORM scale anchored at the edge opposite to the
+ * stretch direction (vec>0 stretches toward right/bottom so the left/top edge stays; vec<0 the reverse), by the same far-edge displacement hwui
+ * uses: max*ease(|vec|), with ease(v)=1-(1-v)^2 (ease-out, v clamped to 0..1). Content is not re-clipped, so the node's own clipToBounds still applies. */
+export function renderNodeStretchMatrix(n){
+ const s=n.stretch;if(!s)return null;
+ const axis=(vec,max,size)=>{const v=Math.min(1,Math.abs(vec));if(!(size>0)||!(max>0)||v===0)return [1,0];const d=max*(1-(1-v)*(1-v)),k=1+d/size;return vec>0?[k,0]:[k,size*(1-k)];};
+ const [sx,tx]=axis(s.vecX,s.maxX,n.right-n.left),[sy,ty]=axis(s.vecY,s.maxY,n.bottom-n.top);
+ return sx===1&&sy===1?null:[sx,0,tx,0,sy,ty,0,0,1];
+}
 /** hwui RenderProperties::hasShadow: positive Z and a non-empty outline with nonzero alpha. */
 export function renderNodeShadowCaster(n){const z=n.elevation+n.translationZ;return z>0&&n.outline&&!n.outline.empty&&n.outline.alpha>0&&n.alpha>0&&n.scaleX!==0&&n.scaleY!==0?z:0;}
 /** Lighting from the window theme, exactly like ThreadedRenderer: context.obtainStyledAttributes(null, R.styleable.Lighting)
@@ -155,8 +166,9 @@ export function createRenderNodeNativeBindings(){const map=new Map();
  n3('nGetWidth',['J'],'I',(r,[h])=>{const x=node(r,h);return x.right-x.left;});n3('nGetHeight',['J'],'I',(r,[h])=>{const x=node(r,h);return x.bottom-x.top;});
  n3('nGetLayerType',['J'],'I',(r,[h])=>node(r,h).layerType);
  n3('nGetClipToBounds',['J'],'Z',(r,[h])=>node(r,h).clipToBounds?1:0);
- n3('nStretch',['J','F','F','F','F'],'Z',(r,[h,...v])=>{node(r,h);if(v.some(x=>x!==0))fail('RenderNode.stretch (overscroll stretch) requires the hwui stretch shader backend');return 0;});
- n3('nClearStretch',['J'],'Z',(r,[h])=>{node(r,h);return 0;});
+ // RenderNode.stretch: hwui records a StretchEffect on the node (RenderProperties::mStretchEffect); the node's layer is drawn through it. Returns true when the value changed.
+ n3('nStretch',['J','F','F','F','F'],'Z',(r,[h,...v])=>{const x=node(r,h);finite(v);const [vecX,vecY,maxX,maxY]=v,old=x.stretch,empty=vecX===0&&vecY===0,same=old?old.vecX===vecX&&old.vecY===vecY&&old.maxX===maxX&&old.maxY===maxY:empty;if(same)return 0;x.stretch=empty?null:{vecX,vecY,maxX,maxY};return 1;});
+ n3('nClearStretch',['J'],'Z',(r,[h])=>{const x=node(r,h),changed=x.stretch!==null&&x.stretch!==undefined;x.stretch=null;return changed?1:0;});
  n3('nSetRenderEffect',['J','J'],'Z',(r,[h,effect])=>{node(r,h);if(effect)fail('RenderNode RenderEffect (blur / shader effects) requires a Skia image-filter backend');return 0;});
  n3('nSetUsageHint',['J','I'],'V',(r,[h,v])=>{node(r,h).usageHint=v;});
  for(const [suffix,key]of[['AllowForceDark','allowForceDark']]){n3('nSet'+suffix,['J','Z'],'Z',(r,[h,v])=>{const x=node(r,h),old=x[key]??true;x[key]=!!v;return old!==!!v?1:0;});n3('nGet'+suffix,['J'],'Z',(r,[h])=>(node(r,h)[key]??true)?1:0);}
