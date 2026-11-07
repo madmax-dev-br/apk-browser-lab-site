@@ -6,11 +6,12 @@ runtime-sources.txt selects the classes compiled into the boot DEX. Additional
 downloaded upstream classes are retained as reference, not falsely advertised as
 executing framework code.
 
-support/ contains compile-only declarations for Android/ART/JDK annotations,
-hidden API contracts (Resources,
-AssetManager, XmlBlock, StrictMode, XmlUtils, Arrays and LinkedHashMap.eldest). No support class is
-packaged in framework.dex. They do not provide runtime algorithms or services.
-Calls to these hidden signatures require the explicitly implemented Java core
+support/, support-javatime/ and support-jca/ contain the few compile-only declarations the
+android-all jar cannot provide (see "Compile-time classpath" below): java.* / sun.* / jdk.*
+core members (libcore is not part of the jar), the lab's own host contracts
+(dev.apkweb.*) and the android.compat.annotation.UnsupportedAppUsage annotation. No support
+class is packaged in framework.dex. They do not provide runtime algorithms or services.
+Calls to hidden signatures require the explicitly implemented Java core
 backend; they never execute the declaration's placeholder method bodies.
 
 android.os.StrictMode (with the android.os.strictmode violation classes), dalvik.system.CloseGuard, android.util.Singleton and the FastPrintWriter/HexDump helpers are pinned originals in framework.dex
@@ -18,10 +19,20 @@ android.os.StrictMode (with the android.os.strictmode violation classes), dalvik
 transforms (hidden members, absent system services) are recorded in build/strictmode-transforms.json and in the manifest's sourceTransforms.
 No original source annotation or algorithm is deleted or rewritten.
 
-android.jar supplies javac's Android API declarations and D8 verification types.
-It is never an implementation input to the boot artifact. The only executable
-inputs are the original sources listed in runtime-sources.txt and compiler-
-generated nested/lambda classes derived from those sources.
+Compile-time classpath. The AOSP-built android-all jar (org.robolectric:android-all
+13-robolectric-9030017, the Android 13 / API 33 framework, libcore and ICU classes with all
+hidden members, pinned with its SHA-256 in android-all.json and fetched into work/android-all/
+by scripts/fetch-android-all.py) is used only to resolve declarations at compile time: it is on
+javac's bootclasspath of every group (after the lab's own compile-only overlays, so an overlay
+that deliberately shadows a declaration still wins) and on D8's --classpath. It is AOSP build
+output, not an AOSP original source: it is never a D8 input, never packaged, never executed and
+never committed. What runs is still exactly the pinned original sources listed in the
+*-sources.txt files and the compiler-generated nested/lambda classes derived from them. Adding
+an original class therefore needs only its line in runtime-sources.txt; hidden members, constants
+and annotations of the classes it touches resolve from the jar.
+android.jar stays behind it for java.* (libcore java.* is not in the jar), as D8's --lib, and for
+the public android.R resource ids (the lab's resource table follows the API36 profile; the
+internal R is the lab-generated one). It is never an implementation input to the boot artifact.
 
 SystemProperties retains its original Java implementation and native method
 declarations. The browser binds only explicitly supported native method keys
@@ -44,19 +55,12 @@ or ELF pointer. The ART rule that only nonmovable primitive arrays have handles
 is preserved. VMRuntime.getRuntime itself executes original Java singleton code.
 ViewTreeObserver and its copy-on-write listener dispatch also run original Java.
 
-The support compilation bootstraps original Pools.java once solely to type-check
-Resources.mTypedArrayPool; it is then recompiled from the selected original source
-into the implementation jar. No support declaration enters that implementation jar.
-
 ActivityInfo, Parcelable, Parcelling, ArrayMap, ArraySet and MapCollections now
 also come from complete unmodified original sources. ActivityInfo conversion
 therefore executes its actual CONFIG_NATIVE_BITS loop and original cache setup.
-Its inherited platform/service APIs (ComponentInfo, Parcel, compat policy) remain
-compile-only contracts. Configuration.NATIVE_CONFIG_* values are regenerated
-verbatim from the pinned full original Configuration.java; no Configuration
-runtime/service algorithm is claimed. bootstrap/ supplies only the cyclic
-ActivityInfo.Config annotation owner during metadata compilation; the original
-ActivityInfo implementation replaces it in the runtime jar.
+Its inherited platform/service APIs (ComponentInfo, Parcel, compat policy) and the
+Configuration constants resolve from the compile-time classpath; no Configuration
+runtime/service algorithm is claimed.
 
 Graphics source compilation includes original Drawable, VectorDrawable, Rect,
 RectF, Insets, Color, ColorStateList, StateSet, BlendMode/PorterDuff/Xfermode,

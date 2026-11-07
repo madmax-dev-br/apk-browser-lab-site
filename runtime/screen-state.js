@@ -1,6 +1,6 @@
 // "Estado da tela": a plain-text picture of what the VM shows and why it may be blank, for "Copiar diagnóstico" and for a button that works without any error. Read-only on the VM.
 // Pure data: no app or library names are written here; class names come from the running app and only reach the user's clipboard.
-import { reportSummary, collapseThreads } from './report-summary.js?v=b60e95a62870';
+import { reportSummary, collapseThreads } from './report-summary.js?v=0a3a52e395d4';
 const MiB = 1024 * 1024, BYTES_PER_OBJECT = 1600;
 const STAGES = { 0: 'destruída', 1: 'criada', 2: 'parada', 3: 'iniciada/pausada', 4: 'retomada (em primeiro plano)' };
 const dotted = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');
@@ -104,7 +104,7 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
   const now = platform.clock.now(), queue = platform.eventQueue ?? [];
   out.push(`Fila de eventos (${queue.length}, agora=${Math.round(now)} ms virtuais):`);
   for (const event of queue.slice(0, 12)) {
-    let what; try { what = event.platformTask ? `tarefa do host ${event.platformTask.name || '(anônima)'}` : event.windowFrameTime !== undefined ? 'quadro (Choreographer)' : `Handler ${dotted(runtime.typeOf(event.handler))} → ${runtime.object(event.message).messageCallback ? dotted(runtime.typeOf(runtime.object(event.message).messageCallback)) : 'what=' + platform.messageField(runtime, event.message, 'what', 'I')}`; } catch { what = 'evento'; }
+    let what; try { what = event.platformTask ? `tarefa do host ${event.platformTask.name || '(anônima)'}` : event.windowFrameTime !== undefined ? 'quadro (Choreographer)' : `Handler ${dotted(runtime.typeOf(event.handler))} → ${platform.looperHost.callbackOf(runtime, event.message) ? dotted(runtime.typeOf(platform.looperHost.callbackOf(runtime, event.message))) : 'what=' + platform.looperHost.whatOf(runtime, event.message)}`; } catch { what = 'evento'; }
     out.push(`  em ${Math.round((event.when ?? now) - now)} ms: ${what}`);
   }
   if (queue.length > 12) out.push(`  … +${queue.length - 12}`);
@@ -152,5 +152,21 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
   out.splice(summaryAt, 0, ...reportSummary(runtime, { heartbeat, tela }));
   if (blank) out.splice(1, 0, `primeiro quadro em branco — motivo(s): ${reasons.join('; ')}`);
   else out.splice(1, 0, 'a tela tem conteúdo: nenhum motivo de tela em branco encontrado');
-  return { text: out.join('\n'), blank, reasons, tela };
+  return { text: spaced(out), blank, reasons, tela };
+}
+
+/** The report as text with room between its parts: each entry of the Resumo is set off by a blank line, and each section after it (Activities, windows, Compose, queue, threads, memory,
+ * exceptions...) starts after a blank line and a rule, so that a photo or a printout shows where one part ends. Lines that start with spaces stay with the entry above them. */
+function spaced(lines) {
+  const RULE = '────────────────────────────────────────';
+  const out = []; let inSummary = false;
+  lines.flatMap(entry => String(entry).split('\n')).forEach((line, index) => {   // a part that returned several lines at once (execution, GC) is split so each of its sections is set off too
+    if (line === '== Resumo ==') { out.push('', line); inSummary = true; return; }
+    if (line === '== fim do resumo ==') { out.push('', line); inSummary = false; return; }
+    const topLevel = index > 1 && line !== '' && !/^\s/.test(line);
+    if (topLevel && inSummary) out.push('');
+    else if (topLevel) out.push('', RULE);
+    out.push(line);
+  });
+  return out.join('\n');
 }

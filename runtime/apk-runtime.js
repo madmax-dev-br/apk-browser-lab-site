@@ -1,28 +1,28 @@
-import { VMClock } from './vm-clock.js?v=b60e95a62870';
-import { OperationMonitor } from './operation-monitor.js?v=b60e95a62870';
-import { ExecutionProfile } from './execution-profile.js?v=b60e95a62870';
-import { SamplingProfiler } from './sampling-profiler.js?v=b60e95a62870';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=b60e95a62870';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=b60e95a62870';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=b60e95a62870';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=b60e95a62870';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=b60e95a62870';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=b60e95a62870';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=b60e95a62870';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=b60e95a62870';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=b60e95a62870';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=b60e95a62870';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=b60e95a62870';
-import { APKError } from './apk-error.js?v=b60e95a62870';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=b60e95a62870';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=b60e95a62870';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=b60e95a62870';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=b60e95a62870';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=b60e95a62870';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=b60e95a62870';
-import { Scheduler, Blocked } from './scheduler.js?v=b60e95a62870';
-import { bootClassLacksMember } from './boot-class-members.js?v=b60e95a62870';
-export { APKError } from './apk-error.js?v=b60e95a62870';
+import { VMClock } from './vm-clock.js?v=0a3a52e395d4';
+import { OperationMonitor } from './operation-monitor.js?v=0a3a52e395d4';
+import { ExecutionProfile } from './execution-profile.js?v=0a3a52e395d4';
+import { SamplingProfiler } from './sampling-profiler.js?v=0a3a52e395d4';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=0a3a52e395d4';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=0a3a52e395d4';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=0a3a52e395d4';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=0a3a52e395d4';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=0a3a52e395d4';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=0a3a52e395d4';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=0a3a52e395d4';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=0a3a52e395d4';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=0a3a52e395d4';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=0a3a52e395d4';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=0a3a52e395d4';
+import { APKError } from './apk-error.js?v=0a3a52e395d4';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=0a3a52e395d4';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=0a3a52e395d4';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=0a3a52e395d4';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=0a3a52e395d4';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=0a3a52e395d4';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=0a3a52e395d4';
+import { Scheduler, Blocked } from './scheduler.js?v=0a3a52e395d4';
+import { bootClassLacksMember } from './boot-class-members.js?v=0a3a52e395d4';
+export { APKError } from './apk-error.js?v=0a3a52e395d4';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -274,7 +274,7 @@ export class DexProgram {
       if (bootBytes > 128 * 1024 * 1024) fail('Framework DEX layer exceeds 128 MiB');
       this.bootFiles.push({ filename, dex }); this.bootDexes.add(dex);
       for (const [name, cls] of dex.classes) {
-        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/w3c\/dom\/|org\/apache\/harmony\/xml\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore)\/|com\/(?:android\/(?:internal|icu|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/collect|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
+        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/w3c\/dom\/|org\/apache\/harmony\/xml\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore|services)\/|com\/(?:android\/(?:internal|icu|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/collect|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
         if (this.bootClasses.has(name)) fail(`Duplicate framework class: ${name}`);
         this.bootClasses.set(name, cls);
       }
@@ -691,10 +691,8 @@ for (const name of ['WeakReference', 'SoftReference']) {
 }
 addBridge('java/lang/ref/Reference', ['get()Ljava/lang/Object;', 'clear()V', 'refersTo(Ljava/lang/Object;)Z']);
 EXTERNAL_PARENTS.set('Ljava/lang/Thread;', 'Ljava/lang/Object;');
-EXTERNAL_PARENTS.set('Landroid/os/Looper;', 'Ljava/lang/Object;');
 EXTERNAL_PARENTS.set('Landroid/view/Choreographer;', 'Ljava/lang/Object;');
 addBridge('java/lang/Thread', ['currentThread()Ljava/lang/Thread;', 'getName()Ljava/lang/String;', 'isAlive()Z', 'getId()J']);
-addBridge('android/os/Looper', ['getMainLooper()Landroid/os/Looper;', 'myLooper()Landroid/os/Looper;', 'getThread()Ljava/lang/Thread;', 'isCurrentThread()Z']);
 // ContextImpl.getMainLooper() returns the process main thread's Looper for every Context (Activity, Application, Service, wrappers).
 addBridge('android/content/Context', ['getMainLooper()Landroid/os/Looper;']);
 addBridge('android/content/ContextWrapper', ['getMainLooper()Landroid/os/Looper;']);
@@ -787,9 +785,6 @@ EXTERNAL_PARENTS.set('Ljava/util/concurrent/ThreadPoolExecutor;', 'Ljava/lang/Ob
 EXTERNAL_INTERFACES.set('Ljava/util/concurrent/ThreadPoolExecutor;', ['Ljava/util/concurrent/Executor;', 'Ljava/util/concurrent/ExecutorService;']);
 addBridge('java/util/concurrent/Executors', ['newFixedThreadPool(I)Ljava/util/concurrent/ExecutorService;', 'newFixedThreadPool(ILjava/util/concurrent/ThreadFactory;)Ljava/util/concurrent/ExecutorService;']);
 addBridge('java/util/concurrent/ThreadPoolExecutor', ['execute(Ljava/lang/Runnable;)V', 'shutdown()V', 'isShutdown()Z']);
-EXTERNAL_PARENTS.set('Landroid/os/Handler;', 'Ljava/lang/Object;');
-addBridge('android/os/Handler', ['<init>()V', '<init>(Landroid/os/Looper;)V', '<init>(Landroid/os/Looper;Landroid/os/Handler$Callback;)V',
-  '<init>(Landroid/os/Handler$Callback;)V', 'getLooper()Landroid/os/Looper;', 'createAsync(Landroid/os/Looper;)Landroid/os/Handler;', 'post(Ljava/lang/Runnable;)Z']);
 addBridge('android/util/Log', ['isLoggable(Ljava/lang/String;I)Z', 'println(ILjava/lang/String;Ljava/lang/String;)I', 'wtf(Ljava/lang/String;Ljava/lang/String;)I', 'wtf(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I', 'wtf(Ljava/lang/String;Ljava/lang/Throwable;)I', 'getStackTraceString(Ljava/lang/Throwable;)Ljava/lang/String;']);
 addBridge('android/util/Log', ['w(Ljava/lang/String;Ljava/lang/Throwable;)I']);
 for (const name of ['v', 'd', 'i', 'w', 'e']) addBridge('android/util/Log', [`${name}(Ljava/lang/String;Ljava/lang/String;)I`, `${name}(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I`]);
@@ -942,6 +937,7 @@ const LAB_HELPERS = new Map([
   ['Ljava/util/concurrent/CopyOnWriteArrayList;', [`${UTIL}CollectionOps;`]], ['Ljava/util/HashSet;', [`${UTIL}CollectionOps;`]], ['Ljava/util/LinkedHashSet;', [`${UTIL}CollectionOps;`]],
 ]);
 
+const LOOPER_PLUMBING = /^Landroid\/os\/(?:Looper|MessageQueue|Handler|Message|ThreadLocalWorkSource)(?:\$[^;]*)?;$/;
 export class APKRuntime {
   constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off' } = {}) {
     if (!Number.isInteger(maxCallDepth) || maxCallDepth < 16 || maxCallDepth > 100000) fail('VM maxCallDepth must be an integer from 16 to 100000');
@@ -1036,7 +1032,9 @@ export class APKRuntime {
   // Execution trace: the first 128 entries are kept forever and the most recent 384 in a ring (the former splice(128,1)-per-call kept exactly this
   // content but moved ~380 elements on every VM call). Entries may be strings or {method, origin} pairs, rendered to text only when `trace` is read.
   record(line) {
-    if (this.traceMuted) return; // host plumbing that must not evict APK-visible trace entries (e.g. building WindowInsets for the virtual system bars)
+    if (this.traceMuted) return; // host plumbing
+    if (typeof line === 'object') { if (line.exempt === true) return; }
+    else { const frames = this.thread?.frames, method = frames?.length ? frames[frames.length - 1].method : null; if (method && (method.plumbing ??= LOOPER_PLUMBING.test(method.owner))) return; }   // a host call made by the pump's own Looper/MessageQueue/Handler code that must not evict APK-visible trace entries (e.g. building WindowInsets for the virtual system bars)
     const ring = this.traceRing ??= { head: [], tail: new Array(384), start: 0, length: 0 };
     if (ring.head.length < 128) { ring.head.push(line); return; }
     if (ring.length === 384) { ring.tail[ring.start] = line; ring.start = (ring.start + 1) % 384; this.traceDropped = (this.traceDropped ?? 0) + 1; return; }
@@ -1060,7 +1058,8 @@ export class APKRuntime {
         if (this.methodEvidence.size < 8192) { evidence = { key: method.key, owner: method.owner, name: method.name, signature: method.signature, origin, filename: method.dex.filename, calls: 0 }; this.methodEvidence.set(evidenceKey, evidence); }
         else this.methodEvidenceTruncated = true;
       }
-      info = method.recordInfo = { origin, stats: this.executionByOrigin[origin], evidence, entry: { method, origin } };
+      const exempt = LOOPER_PLUMBING.test(method.owner);   // the original Looper/MessageQueue/Handler/Message code the pump runs around every message is plumbing: counted, but not part of the APK-visible trace
+      info = method.recordInfo = { origin, stats: this.executionByOrigin[origin], evidence, exempt, entry: { method, origin, exempt } };
     }
     info.stats.methods++;
     if (info.evidence !== undefined && info.evidence.calls < Number.MAX_SAFE_INTEGER) info.evidence.calls++;
@@ -1456,7 +1455,7 @@ export class APKRuntime {
       && !/^Ljava\/util\/(HashMap|WeakHashMap|LinkedHashMap|ArrayList|Vector|Stack);$/.test(type)
       && !/^Ljava\/lang\/ref\/(WeakReference|SoftReference);$/.test(type)
       && !SET_TYPES.some(owner => type === `L${owner};`)
-      && !['Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/concurrent/ConcurrentHashMap;', 'Ljava/lang/ThreadLocal;', 'Ljava/lang/InheritableThreadLocal;', 'Ljava/util/Random;', 'Landroid/os/Handler;'].includes(type)
+      && !['Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/concurrent/ConcurrentHashMap;', 'Ljava/lang/ThreadLocal;', 'Ljava/lang/InheritableThreadLocal;', 'Ljava/util/Random;'].includes(type)
       && !this.skiaHost?.canAllocate?.(type) && !this.platform?.canAllocate?.(type)
       && !this.isSubtype(type, 'Ljava/lang/Throwable;'));
   }
@@ -1483,6 +1482,7 @@ export class APKRuntime {
     this.frameworkRuntimeConfigured=true;
   }
   launch(activity) {
+    this.platform?.looperHost?.hostEventRan(this);   // a launch is a message of the main Looper in Android: the thread is back in MessageQueue.next() afterwards (IdleHandlers)
     const savedSafeDepth = this.gcSafeDepth; this.gcSafeDepth = 1;   // onCreate/onStart/onResume run as one long event: collect at its safepoints (the JavaScript callers hold only the Activity and rooted frames)
     try { return this.launchActivity(activity); } finally { this.gcSafeDepth = savedSafeDepth; }
   }
@@ -1509,6 +1509,7 @@ export class APKRuntime {
     return this.snapshot();
   }
   click(id) {
+    this.platform?.looperHost?.hostEventRan(this);
     const view = this.object(ref(id));
     if (view.enabled === false) fail('Cannot click a disabled View');
     this.steps = 0;
@@ -1520,6 +1521,7 @@ export class APKRuntime {
     return this.snapshot();
   }
   back() {
+    this.platform?.looperHost?.hostEventRan(this);
     if (!this.platform?.back) fail('Back navigation is not implemented for this runtime');
     this.steps = 0; this.platform.back(this); return this.snapshot();
   }
@@ -1619,7 +1621,9 @@ export class APKRuntime {
   runDiagnostic(fn, fallback = null, onError = null) {
     const scheduler = this.scheduler, saved = { steps: this.steps, wall: this.maxEventWallMs, eventWallStart: this.eventWallStart, total: scheduler?.eventTotal, last: scheduler?.lastSteps };
     this.steps = 0; this.maxEventWallMs = 0; if (scheduler) { scheduler.eventTotal = 0; scheduler.lastSteps = 0; }
+    this.diagnosticDepth = (this.diagnosticDepth ?? 0) + 1;
     try { return fn(); } catch (error) { onError?.(error); return fallback; } finally {
+      this.diagnosticDepth--;
       this.steps = saved.steps; this.maxEventWallMs = saved.wall; this.eventWallStart = saved.eventWallStart; if (scheduler) { scheduler.eventTotal = saved.total; scheduler.lastSteps = saved.last; }
     }
   }
@@ -1699,7 +1703,9 @@ export class APKRuntime {
   /** Stress mode only: a collection at an event boundary (nothing in flight), before the next queued task runs. */
   stressCollect() { if (GC_STRESS && this.gcEnabled) collectGarbage(this, { reason: 'stress' }); }
   safepointCollect() {
-    if (!this.gcEnabled || (!GC_STRESS && !collectionDue(this))) return;
+    const tries = this.gcSafepointTries ??= { calls: 0, notDue: 0, disabled: 0 }; tries.calls++;   // reported by OperationMonitor.gcLine: a heap that fills with no collection says whether safepoints were reached at all
+    if (!this.gcEnabled) { tries.disabled++; return; }
+    if (!GC_STRESS && !collectionDue(this)) { tries.notDue++; return; }
     collectGarbage(this, { reason: 'safepoint', safepoint: true });
   }
   /** Completes a native's Blocked / Invoke result synchronously for a host caller (nested waits and nested runs). */
@@ -1951,7 +1957,7 @@ export class APKRuntime {
     const log = this.oomLog ??= []; const frames = this.thread?.frames ?? [], top = []; 
     for (let i = frames.length - 1; i >= 0 && top.length < 3; i--) { const m = frames[i].method; if (m) top.push(`${String(m.owner).replace(/^L|;$/g, '').replaceAll('/', '.')}.${m.name}`); }
     const kind = /^Object limit/.test(reason) ? 'limite de objetos' : /field storage/.test(reason) ? 'limite de campos' : /^Array of/.test(reason) ? 'tamanho de um array' : /^Array storage/.test(reason) ? 'orçamento de células de arrays' : /^Collection storage/.test(reason) ? 'orçamento de coleções' : 'outro';
-    log.push({ kind, reason: String(reason).slice(0, 140), thread: this.thread?.name ?? null, frames: top, hostCall: this.hostCall ? String(this.hostCall).replace(/^L|;->/g, m => m === ';->' ? '.' : '').slice(0, 80) : null, objects: this.heap.size, maxObjects: this.maxHeapObjects, fieldSlots: this.fieldSlots, maxFieldSlots: this.maxFieldSlots, arrayCells: this.arrayCells, maxArrayCells: this.maxArrayCells, collectionCells: this.collectionCells, maxCollectionCells: this.maxCollectionCells });
+    log.push({ kind, reason: String(reason).slice(0, 140), thread: this.thread?.name ?? null, frames: top, hostCall: this.hostCall ? String(this.hostCall).replace(/^L|;->/g, m => m === ';->' ? '.' : '').slice(0, 80) : null, objects: this.heap.size, maxObjects: this.maxHeapObjects, fieldSlots: this.fieldSlots, maxFieldSlots: this.maxFieldSlots, arrayCells: this.arrayCells, maxArrayCells: this.maxArrayCells, collectionCells: this.collectionCells, maxCollectionCells: this.maxCollectionCells, gcTries: { ...(this.gcSafepointTries ?? {}) }, gcSkips: { ...(this.gcSkips ?? {}) }, sinceGc: Math.max(0, this.nextId - (this.gcLastNextId ?? 0)) });
     if (log.length > 12) log.shift();
   }
   /**
@@ -2227,9 +2233,6 @@ export class APKRuntime {
         if(kind==='constructor'&&name==='<init>'&&this.isSubtype(owner,'Landroid/view/View;')&&parameters[0]==='Landroid/content/Context;'){
           const signature=`(${parameters.join('')})V`;
           if(this.platform?.supports?.(`${owner}-><init>${signature}`))return {method:{owner,name,parameters,result:'V',signature,key:`${owner}->${name}${signature}`},flags:1};
-        }
-        if(kind==='method'&&owner==='Landroid/os/Handler;'&&name==='createAsync'&&parameters.join('')==='Landroid/os/Looper;'){
-          const result=owner,signature=`(${parameters.join('')})${result}`;return {method:{owner,name,parameters,result,signature,key:`${owner}->${name}${signature}`},flags:9};
         }
         if(kind==='field'&&owner==='Landroid/os/Build$VERSION;'&&['SDK_INT','SDK','CODENAME'].includes(name)){
           const type=name==='SDK_INT'?'I':'Ljava/lang/String;';return {field:{owner,name,type,key:`${owner}->${name}:${type}`},flags:0x19};
@@ -3024,10 +3027,8 @@ export class APKRuntime {
     }
     if (method.owner === 'Ljava/lang/ThreadLocal;' && name === 'withInitial') { const local = this.makeObject('Ljava/lang/ThreadLocal;'); this.object(local).threadLocalSupplier = args[0]; return local; } // SuppliedThreadLocal
     if (method.owner === 'Ljava/lang/Thread;' && name === 'currentThread') return this.mainThread ??= this.makeObject('Ljava/lang/Thread;');
-    if ((method.owner === 'Landroid/os/Looper;' || method.owner === 'Landroid/content/Context;' || method.owner === 'Landroid/content/ContextWrapper;') && name === 'getMainLooper') return this.mainLooper ??= this.makeObject('Landroid/os/Looper;');
-    // The main thread's Looper is the platform event queue; any other thread has one only after Looper.prepare() (HandlerThread does that) -- see concurrency-host.js.
-    if (method.owner === 'Landroid/os/Looper;' && name === 'myLooper') return this.thread === null || this.thread === this.scheduler.main ? (this.mainLooper ??= this.makeObject('Landroid/os/Looper;')) : (this.thread.looper ?? null);
-    if (method.owner === 'Landroid/os/Looper;' && name === 'isCurrentThread') return this.thread === null || this.thread === this.scheduler.main ? 1 : (this.thread.looper ? 1 : 0);
+    // ContextImpl.getMainLooper(): the process main thread's Looper (the original android.os.Looper prepared at process start, see looper-host.js).
+    if ((method.owner === 'Landroid/content/Context;' || method.owner === 'Landroid/content/ContextWrapper;') && name === 'getMainLooper') return this.platform.looperHost.mainLooper(this);
     if (method.owner === 'Landroid/os/SystemClock;') {
       if (name === 'sleep') {   // SystemClock.sleep: Thread.sleep that swallows InterruptedException, finishing the wait and restoring the interrupt flag
         const until = this.clock.now() + Number(wide(args[0])); let interrupted = false;
@@ -3062,9 +3063,6 @@ export class APKRuntime {
       const trace = throwable => this.dispatch({ owner: 'Landroid/util/Log;', name: 'getStackTraceString', parameters: ['Ljava/lang/Throwable;'], result: 'Ljava/lang/String;', signature: '(Ljava/lang/Throwable;)Ljava/lang/String;' }, [throwable], 'static');
       const text = method.parameters.length === 3 ? `${args[1] ?? ''}\n${trace(args[2])}` : method.parameters[1] === 'Ljava/lang/Throwable;' ? trace(args[1]) : (args[1] ?? '');
       const message = `${args[0]}: ${text}`; this.record(`LOG ${name === 'wtf' ? 'A' : name.toUpperCase()} ${message}`); return new TextEncoder().encode(message).length;
-    }
-    if (method.owner === 'Landroid/os/Handler;' && name === 'createAsync') {
-      this.object(args[0]); const value = this.makeObject(method.owner); this.object(value).looper = args[0]; this.object(value).async = true; return value;
     }
     if (method.owner === 'Ljava/util/concurrent/Executors;') {
       const count = int(args[0]); if (count <= 0) this.throwJava('Ljava/lang/IllegalArgumentException;', 'Executor pool size must be positive');
@@ -3368,15 +3366,6 @@ export class APKRuntime {
       try { return this.dispatch({ ...method, owner: this.typeOf(obj.delegate) }, [obj.delegate, ...words.slice(1)], 'virtual'); }
       finally { this.monitorExit(args[0]); }
     }
-    if (method.owner === 'Landroid/os/Handler;') {
-      if (name === '<init>') {
-        if (method.parameters[0] === 'Landroid/os/Looper;') { this.object(args[1]); obj.looper = args[1]; obj.callback = args[2] ?? null; }
-        else { obj.looper = this.mainLooper ??= this.makeObject('Landroid/os/Looper;'); obj.callback = args[1] ?? null; }
-        return undefined;
-      }
-      if (name === 'getLooper') return obj.looper;
-      throw new APKError('Handler message queue scheduling is not implemented; no Runnable was executed or discarded.', { kind: 'unsupported-messagequeue', method: key });
-    }
     if (method.owner === 'Ljava/util/concurrent/ThreadPoolExecutor;') {
       if (name === 'shutdown') { obj.shutdown = true; return undefined; }
       if (name === 'isShutdown') return obj.shutdown ? 1 : 0;
@@ -3455,7 +3444,6 @@ export class APKRuntime {
       if (name === 'getId') return obj.threadId ??= this.nextThreadId++;
       return name === 'getName' ? 'APK main' : 1;
     }
-    if (method.owner === 'Landroid/os/Looper;' && name === 'getThread') { const looper = this.object(args[0]); return looper.thread?.javaObject ?? (this.mainThread ??= this.makeObject('Ljava/lang/Thread;')); }
     if (method.owner.startsWith('Ljava/lang/ref/')) {
       if (name === '<init>') { obj.referent = args[1]; return undefined; }
       if (name === 'get') return obj.referent ?? null;

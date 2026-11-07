@@ -1,9 +1,8 @@
-import { APKError } from './apk-error.js?v=b60e95a62870';
-import { queueObject } from './hidden-members.js?v=b60e95a62870';
-import { createHostRegistry } from './host-contract.js?v=b60e95a62870';
-import { Blocked, VMThread } from './scheduler.js?v=b60e95a62870';
-import { Invoke } from './interpreter.js?v=b60e95a62870';
-import { GC_ROOTS } from './heap-gc.js?v=b60e95a62870';
+import { APKError } from './apk-error.js?v=0a3a52e395d4';
+import { createHostRegistry } from './host-contract.js?v=0a3a52e395d4';
+import { Blocked, VMThread } from './scheduler.js?v=0a3a52e395d4';
+import { Invoke } from './interpreter.js?v=0a3a52e395d4';
+import { GC_ROOTS } from './heap-gc.js?v=0a3a52e395d4';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -673,19 +672,9 @@ export function createConcurrencyHost(platform) {
     'Ljava/util/concurrent/AbstractExecutorService;': ['Ljava/util/concurrent/ExecutorService;'], 'Ljava/util/Queue;': [COLLECTION], [QUEUE]: ['Ljava/util/Queue;'], 'Ljava/util/concurrent/BlockingDeque;': [QUEUE] };
   for (const [iface, parents] of Object.entries(hierarchy)) { if (!registry.parents.has(iface)) registry.parents.set(iface, OBJECT); registry.interfaces.set(iface, parents); }
   registry.interfaces.set(TPE, ['Ljava/util/concurrent/ExecutorService;', 'Ljava/util/concurrent/Executor;']);
-  // ---- android.os.Looper on non-main threads (HandlerThread, Looper.prepare()/loop()). The main Looper is the platform event queue; another thread's Looper owns a message queue of its
-  // own (Looper object .looperQueue, filled by Handler.enqueue) that its thread drains inside Looper.loop(): the thread parks until the first message is due, dispatches it as an
-  // ordinary Java call, and continues. quit() drops everything pending; quitSafely() lets the messages that are already due run first. ---------------------------------------------
-  const LOOPER = 'Landroid/os/Looper;', HANDLER_CLASS = 'Landroid/os/Handler;', MESSAGE = 'Landroid/os/Message;';
-  type(LOOPER, OBJECT);
-  const prepare = r => {
-    const thread = r.thread ?? r.scheduler.mainThread();
-    if (thread === r.scheduler.main) throw new APKError('Looper.prepare() on the main thread: its Looper already exists', { kind: 'looper-main' });
-    if (thread.looper) r.throwJava('Ljava/lang/RuntimeException;', 'Only one Looper may be created per thread');
-    const looper = r.makeObject(LOOPER); Object.assign(r.object(looper), { looperQueue: [], thread, quitting: false, safeQuit: false });
-    thread.looper = looper;
-  };
-  // Activity.runOnUiThread (android-13.0.0_r1 Activity.java): run now when already on the UI thread, otherwise post to the main Looper's Handler.
+  // ---- Activity.runOnUiThread (android-13.0.0_r1 Activity.java): run now when already on the UI thread, otherwise post to the main Looper's Handler. Looper, MessageQueue, Handler and Message are the
+  // original framework classes (see looper-host.js); Looper.prepare()/loop() and HandlerThread run as ordinary green threads parked in MessageQueue.nativePollOnce. ----------------------
+  const LOOPER = 'Landroid/os/Looper;', HANDLER_CLASS = 'Landroid/os/Handler;';
   def('Landroid/app/Activity;', 'runOnUiThread', `(${RUNNABLE})V`, (r, _m, [, action]) => {
     if (action === null) throwNew(r, 'Ljava/lang/NullPointerException;');
     if ((r.thread ?? r.scheduler.mainThread()) === r.scheduler.main) return new Invoke({ owner: RUNNABLE, name: 'run', parameters: [], result: 'V', signature: '()V' }, [action], 'virtual');
@@ -693,40 +682,5 @@ export function createConcurrencyHost(platform) {
     r.dispatch({ owner: HANDLER_CLASS, name: '<init>', parameters: [LOOPER], result: 'V', signature: `(${LOOPER})V` }, [handler, looper], 'direct');
     vcall(r, handler, HANDLER_CLASS, 'post', [RUNNABLE], 'Z', [action]);
   });
-  def(LOOPER, 'prepare', '()V', prepare, { static: true }); def(LOOPER, 'prepare', '(Z)V', prepare, { static: true });
-  const dueFirst = looper => { const queue = looper.looperQueue; return queue.length && (queue[0].front || queue[0].when <= platform.clock.now()) ? queue[0] : null; };
-  def(LOOPER, 'loop', '()V', r => {
-    const thread = r.thread, looper = thread?.looper;
-    if (!looper) r.throwJava('Ljava/lang/RuntimeException;', "No Looper; Looper.prepare() wasn't called on this thread.");
-    const state = r.object(looper);
-    const step = () => {
-      const event = dueFirst(state);
-      if (event) {
-        state.looperQueue.shift(); const message = r.object(event.message);
-        const done = () => { message.inUse = false; message.recycled = true; };
-        return new Invoke({ owner: HANDLER_CLASS, name: 'dispatchMessage', parameters: [MESSAGE], result: 'V', signature: `(${MESSAGE})V` }, [event.handler, event.message], 'virtual', () => { done(); return step(); }, error => { done(); throw error; });
-      }
-      if (state.quitting && (!state.safeQuit || !state.looperQueue.length)) { state.looperQueue.length = 0; return undefined; }          // loop() returns once the queue is quit
-      return new Blocked({ ready: () => state.quitting || dueFirst(state) !== null, deadline: state.looperQueue.length ? Math.min(...state.looperQueue.map(item => item.when)) : Infinity, reason: 'Looper.loop', roots: [looper], finish: () => step() });
-    };
-    return step();
-  }, { static: true });
-  def(LOOPER, 'quit', '()V', (r, _m, [self]) => { const state = r.object(self); if (state === r.object(r.mainLooper ?? self) && !state.looperQueue) r.throwJava('Ljava/lang/IllegalStateException;', 'Main thread not allowed to quit.'); state.quitting = true; state.safeQuit = false; for (const event of state.looperQueue) { const message = r.object(event.message); message.inUse = false; message.recycled = true; } state.looperQueue.length = 0; platform.onExternalActivity?.(); });
-  def(LOOPER, 'quitSafely', '()V', (r, _m, [self]) => { const state = r.object(self); if (!state.looperQueue) r.throwJava('Ljava/lang/IllegalStateException;', 'Main thread not allowed to quit.'); state.quitting = true; state.safeQuit = true; platform.onExternalActivity?.(); });
-  def(LOOPER, 'getQueue', '()Landroid/os/MessageQueue;', (r, _m, [self]) => queueObject(r, self));   // an object that exposes MessageQueue.mMessages to reflection; its methods are not modelled
-  // ---- MessageQueue as libraries use it for main-thread checks and idle work: Looper.myQueue(), isIdle(), IdleHandlers (run when the main queue has nothing due, as MessageQueue.next() does before it blocks)
-  const MESSAGE_QUEUE = 'Landroid/os/MessageQueue;', IDLE_HANDLER = 'Landroid/os/MessageQueue$IdleHandler;';
-  const idleHandlers = platform.idleHandlers = [];   // { looper, handler }: GC roots through the hook below
-  def(LOOPER, 'myQueue', `()${MESSAGE_QUEUE}`, r => { const looper = r.dispatch({ owner: LOOPER, name: 'myLooper', parameters: [], result: LOOPER, signature: `()${LOOPER}` }, [], 'static'); if (looper === null) r.throwJava('Ljava/lang/NullPointerException;', "Attempt to read from field 'android.os.MessageQueue android.os.Looper.mQueue' on a null object reference"); return queueObject(r, looper); }, { static: true });
-  def(MESSAGE_QUEUE, 'isIdle', '()Z', (r, _m, [self]) => { const queue = platform.queueOf(r, r.object(self).looper), now = platform.clock.now(); return !queue.length || (!queue[0].front && queue[0].when > now) ? 1 : 0; });
-  def(MESSAGE_QUEUE, 'addIdleHandler', `(${IDLE_HANDLER})V`, (r, _m, [self, handler]) => { if (handler === null) r.throwJava('Ljava/lang/NullPointerException;', "Can't add a null IdleHandler"); idleHandlers.push({ looper: r.object(self).looper, handler }); });
-  def(MESSAGE_QUEUE, 'removeIdleHandler', `(${IDLE_HANDLER})V`, (r, _m, [, handler]) => { const at = idleHandlers.findIndex(entry => entry.handler === handler || (entry.handler?.ref !== undefined && entry.handler.ref === handler?.ref)); if (at >= 0) idleHandlers.splice(at, 1); });
-  platform.runIdleHandlers = r => {
-    for (const entry of [...idleHandlers]) {
-      if (!idleHandlers.includes(entry)) continue;
-      const keep = r.dispatch({ owner: IDLE_HANDLER, name: 'queueIdle', parameters: [], result: 'Z', signature: '()Z' }, [entry.handler], 'virtual');
-      if (!keep) { const at = idleHandlers.indexOf(entry); if (at >= 0) idleHandlers.splice(at, 1); }
-    }
-  };
-  return { ...registry, interfaces: registry.interfacesOf, helpUntil, currentThread, mainThread, [GC_ROOTS](visit) { for (const hook of shutdownHooks.values()) visit(hook); for (const entry of idleHandlers) { visit(entry.looper); visit(entry.handler); } } };
+  return { ...registry, interfaces: registry.interfacesOf, helpUntil, currentThread, mainThread, [GC_ROOTS](visit) { for (const hook of shutdownHooks.values()) visit(hook); } };
 }

@@ -1,6 +1,6 @@
-import { TimeBreakdown } from './time-breakdown.js?v=b60e95a62870';
-import { APKError } from './apk-error.js?v=b60e95a62870';
-import { gcBlockReason } from './heap-gc.js?v=b60e95a62870';
+import { TimeBreakdown } from './time-breakdown.js?v=0a3a52e395d4';
+import { APKError } from './apk-error.js?v=0a3a52e395d4';
+import { gcBlockReason } from './heap-gc.js?v=0a3a52e395d4';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -131,7 +131,7 @@ export class OperationMonitor {
     try {
       if (event.platformTask) key = `tarefa do host ${event.platformTask.name || '(anônima)'}`;
       else {
-        const handler = typeName(rt.typeOf(event.handler)), callback = rt.object(event.message).messageCallback ?? null, what = callback ? 0 : rt.platform.messageField(rt, event.message, 'what', 'I');
+        const handler = typeName(rt.typeOf(event.handler)), host = rt.platform.looperHost, callback = host.callbackOf(rt, event.message), what = callback ? 0 : host.whatOf(rt, event.message);
         key = `Handler ${handler} → ${callback ? typeName(rt.typeOf(callback)) : 'what=' + what}`;
       }
     } catch { key = 'evento'; }
@@ -179,7 +179,10 @@ export class OperationMonitor {
   gcLine() {
     const rt = this.rt, op = this.op, phases = rt.gcPhases ?? [];
     const share = op && op.gcMs ? ` (${Math.round(100 * op.gcMs / Math.max(1, op.gcMs + performance.now() - op.start))}% do tempo da operação)` : '';
-    const head = `Coleta de lixo: ${op?.gcCount ?? 0} coletas / ${Math.round(op?.gcMs ?? 0)} ms nesta operação${share}; no total ${rt.gcStats?.collections ?? 0} coletas, ${Math.round(rt.gcTotalMs ?? 0)} ms`;
+    const tries = rt.gcSafepointTries ?? { calls: 0, notDue: 0, disabled: 0 }, skips = Object.entries(rt.gcSkips ?? {}).map(([why, n]) => `${why} ${n}x`).join(', ') || 'nenhuma';
+    let blocked = null; try { blocked = gcBlockReason(rt); } catch { blocked = '?'; }
+    const gate = `\n  coletor: ${rt.gcEnabled ? 'ligado' : 'DESLIGADO'}; safepoints que pediram coleta ${tries.calls} (não devida ${tries.notDue}, coletor desligado ${tries.disabled}); coletas puladas: ${skips}; agora ${blocked ? `bloqueado por "${blocked}"` : 'livre'}; alocados desde a última ${Math.max(0, (rt.nextId ?? 0) - (rt.gcLastNextId ?? 0))}, espera mínima ${rt.gcMinAlloc ?? 0}, próxima a partir de ${rt.gcNextAt ?? '?'} vivos, piso ${rt.gcSafepointFloor ?? '?'}, pressão ${rt.gcPressure ? 'sim' : 'não'}, última levou ${Math.round(rt.gcLastMs ?? 0)} ms`;
+    const head = `Coleta de lixo: ${op?.gcCount ?? 0} coletas / ${Math.round(op?.gcMs ?? 0)} ms nesta operação${share}; no total ${rt.gcStats?.collections ?? 0} coletas, ${Math.round(rt.gcTotalMs ?? 0)} ms${gate}`;
     const last = phases[0], census = last ? [
       last.survivorsByCount?.length ? `\n  sobreviventes (por quantidade): ${last.survivorsByCount.slice(0, 12).map(c => `${c.n} ${c.type}`).join(', ')}` : '',
       last.survivorsByBytes?.length ? `\n  sobreviventes (por bytes estimados): ${last.survivorsByBytes.slice(0, 12).map(c => `${Math.round(c.bytes / 1024)} KiB ${c.type}`).join(', ')}` : '',

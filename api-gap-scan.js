@@ -10,15 +10,15 @@
 // The report holds ONLY framework/JDK names and counts (and the native library file names the user asked for): app class names, method names and strings never
 // enter it, so it can be pasted into a chat. DOM-free and process-free: it runs in the Worker and in Node.
 
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=b60e95a62870';
-import { describeNativeLibrary } from './native-library-hints.js?v=b60e95a62870';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=0a3a52e395d4';
+import { describeNativeLibrary } from './native-library-hints.js?v=0a3a52e395d4';
 
-const FRAMEWORK = /^L(android|java|javax|dalvik|libcore|sun|org\/(json|xml|w3c))\//;
+export const FRAMEWORK = /^L(android|java|javax|dalvik|libcore|sun|org\/(json|xml|w3c))\//;
 const SDK_INT_FIELD = 'Landroid/os/Build$VERSION;->SDK_INT:I';
 const API_HOLDER = /(^|[$\/])Api\d+(Impl)?;?$|\$Api\d+/;
 
 // Width in 16-bit code units of each Dalvik instruction, by opcode.
-const WIDTH = new Uint8Array(256).fill(1);
+export const WIDTH = new Uint8Array(256).fill(1);
 for (const [from, to, width] of [[0x02, 0x02, 2], [0x03, 0x03, 3], [0x05, 0x05, 2], [0x06, 0x06, 3], [0x08, 0x08, 2], [0x09, 0x09, 3], [0x13, 0x13, 2], [0x14, 0x14, 3], [0x15, 0x16, 2], [0x17, 0x17, 3],
   [0x18, 0x18, 5], [0x19, 0x19, 2], [0x1a, 0x1a, 2], [0x1b, 0x1b, 3], [0x1c, 0x1c, 2], [0x1f, 0x20, 2], [0x22, 0x23, 2], [0x24, 0x26, 3], [0x29, 0x29, 2], [0x2a, 0x2c, 3], [0x2d, 0x3d, 2],
   [0x44, 0x6d, 2], [0x6e, 0x72, 3], [0x74, 0x78, 3], [0x90, 0xaf, 2], [0xd0, 0xe2, 2], [0xfa, 0xfb, 4], [0xfc, 0xfd, 3], [0xfe, 0xff, 2]]) WIDTH.fill(width, from, to + 1);

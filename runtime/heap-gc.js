@@ -22,7 +22,7 @@
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=b60e95a62870';
+import { BUCKET } from './time-breakdown.js?v=0a3a52e395d4';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -261,7 +261,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
     threads.forEach((thread, index) => { const id = 10 + Math.min(index, 200); setCategory(id); const view = Object.create(runtime.scheduler); view.threads = [thread]; runtime.scheduler.enumerateRoots.call(view, item => scan(item)); closeCategory(id, `thread ${thread.name ?? index}`); });
     for (const extra of [runtime.thread]) if (extra && Array.isArray(extra.frames) && runtime.scheduler && !threads.includes(extra)) { setCategory(5); const view = Object.create(runtime.scheduler); view.threads = [extra]; runtime.scheduler.enumerateRoots.call(view, item => scan(item)); closeCategory(5, 'thread em execução aninhada'); }
   }
-  setCategory(2); for (const queue of [runtime.platform?.eventQueue]) if (queue) scan(queue); closeCategory(2, 'filas de Handler / eventos do host');
+  setCategory(2); for (const queue of [runtime.platform?.looperHost?.pendingEvents?.()]) if (queue) scan([...queue]); closeCategory(2, 'filas de Handler / eventos do host');
   // Host code up the JavaScript stack (a native that called back into Java, a class initializer, a nested wait) may hold values no Java frame references: what host code allocated and every result
   // handed back to it since the last fully quiescent collection stay alive. Outside a safepoint nothing is in flight and the set is dropped.
   setCategory(3);

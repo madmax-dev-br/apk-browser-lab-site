@@ -1,12 +1,12 @@
-import { APKError } from './apk-error.js?v=b60e95a62870';
-import { gcRoot } from './heap-gc.js?v=b60e95a62870';
-import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=b60e95a62870';
-import { createHostRegistry } from './host-contract.js?v=b60e95a62870';
-import { GC_ROOTS } from './heap-gc.js?v=b60e95a62870';
+import { APKError } from './apk-error.js?v=0a3a52e395d4';
+import { gcRoot } from './heap-gc.js?v=0a3a52e395d4';
+import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=0a3a52e395d4';
+import { createHostRegistry } from './host-contract.js?v=0a3a52e395d4';
+import { GC_ROOTS } from './heap-gc.js?v=0a3a52e395d4';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
-// contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes, and an AlarmManager that
-// really schedules PendingIntents on the VM clock. Each service exists only through this contract; Context.getSystemService returns it for the service name or its class.
+// contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes
+// (AlarmManager is Java now: src/java-services-host.js, docs/SERVICES.md). Each service exists only through this contract; Context.getSystemService returns it for the service name or its class.
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', PENDING = 'Landroid/app/PendingIntent;', CONTEXT = 'Landroid/content/Context;';
 
 export function createHardwareServicesHost(platform) {
@@ -47,43 +47,6 @@ export function createHardwareServicesHost(platform) {
 
   // ---- AudioManager: src/audio-manager-host.js (volumes, ringer/DND rule, focus stack, devices, session ids) ---------------------------------------------------
   const audioManager = installAudioManager({ platform, def, service, call, holds, emptyList }), ringtones = installRingtoneManager({ platform, def, type, holds });
-
-  // ---- AlarmManager: alarms fire as PendingIntent.send() when the VM clock reaches them (RTC types on the wall clock, ELAPSED types on the monotonic one) --------------
-  const ALARM = service('alarm', 'Landroid/app/AlarmManager;'), CLOCK_INFO = 'Landroid/app/AlarmManager$AlarmClockInfo;';
-  type(CLOCK_INFO, OBJECT, [], { allocatable: true });
-  const alarms = new Map(); let nextAlarm = 1;
-  const dueIn = (type_, trigger) => Math.max(0, Number(trigger) - ((type_ === 0 || type_ === 1) ? platform.clock.wall() : platform.clock.now()));
-  const arm = (r, id) => platform.queueTask(() => fire(r, id), Math.max(1, dueIn(alarms.get(id)?.type, alarms.get(id)?.trigger)), []);
-  const fire = (r, id) => {
-    const alarm = alarms.get(id); if (!alarm) return;
-    if (dueIn(alarm.type, alarm.trigger) > 5) { arm(r, id); return; }   // the VM clock may not have reached it yet
-    if (alarm.interval > 0) alarm.trigger = Number(alarm.trigger) + alarm.interval; else alarms.delete(id);
-    try { call(r, alarm.operation, PENDING, 'send', [], 'V'); } catch (error) { if (!(error?.value && r.isSubtype(r.typeOf(error.value), 'Landroid/app/PendingIntent$CanceledException;'))) throw error; alarms.delete(id); return; }
-    r.record(`ALARM fired ${id}`); if (alarm.interval > 0 && alarms.has(id)) arm(r, id);
-  };
-  const exactAllowed = r => { const target = Number(platform.manifest?.usesSdk?.targetSdkVersion ?? 1); return target < 31 || holds(r, 'android.permission.SCHEDULE_EXACT_ALARM') || holds(r, 'android.permission.USE_EXACT_ALARM'); };
-  const schedule = (exact, interval = 0) => (r, _m, [, type_, trigger, , operation]) => {
-    // the operation is the last PendingIntent argument; signatures differ in their middle parameters
-    if (operation === null || operation === undefined) r.throwJava('Ljava/lang/NullPointerException;', 'operation'); if (type_ < 0 || type_ > 3) r.throwJava('Ljava/lang/IllegalArgumentException;', `Invalid alarm type ${type_}`);
-    if (exact && !exactAllowed(r)) r.throwJava('Ljava/lang/SecurityException;', `Caller ${platform.packageName} needs to hold android.permission.SCHEDULE_EXACT_ALARM or android.permission.USE_EXACT_ALARM to set exact alarms.`);
-    for (const [id, alarm] of alarms) if (alarm.operation === operation || (alarm.operation?.ref !== undefined && alarm.operation.ref === operation.ref)) alarms.delete(id);   // a new alarm replaces the previous one for the same PendingIntent
-    const id = nextAlarm++; alarms.set(id, { type: type_, trigger: Number(trigger), interval, operation }); arm(r, id);
-  };
-  def(ALARM, 'set', `(IJ${PENDING})V`, (r, m, [self, type_, trigger, operation]) => schedule(false)(r, m, [self, type_, trigger, null, operation]));
-  def(ALARM, 'setExact', `(IJ${PENDING})V`, (r, m, [self, type_, trigger, operation]) => schedule(true)(r, m, [self, type_, trigger, null, operation]));
-  def(ALARM, 'setAndAllowWhileIdle', `(IJ${PENDING})V`, (r, m, [self, type_, trigger, operation]) => schedule(false)(r, m, [self, type_, trigger, null, operation]));
-  def(ALARM, 'setExactAndAllowWhileIdle', `(IJ${PENDING})V`, (r, m, [self, type_, trigger, operation]) => schedule(true)(r, m, [self, type_, trigger, null, operation]));
-  def(ALARM, 'setWindow', `(IJJ${PENDING})V`, (r, m, [self, type_, trigger, , operation]) => schedule(false)(r, m, [self, type_, trigger, null, operation]));
-  def(ALARM, 'setRepeating', `(IJJ${PENDING})V`, (r, m, [self, type_, trigger, interval, operation]) => schedule(false, Math.max(Number(interval), 60000))(r, m, [self, type_, trigger, null, operation]));   // the platform raises intervals below 60 s
-  def(ALARM, 'setInexactRepeating', `(IJJ${PENDING})V`, (r, m, [self, type_, trigger, interval, operation]) => schedule(false, Math.max(Number(interval), 60000))(r, m, [self, type_, trigger, null, operation]));
-  def(ALARM, 'setAlarmClock', `(${CLOCK_INFO}${PENDING})V`, (r, m, [self, info, operation]) => schedule(true)(r, m, [self, 0, r.object(info).trigger, null, operation]));
-  def(CLOCK_INFO, '<init>', `(J${PENDING})V`, (r, _m, [self, trigger, show]) => Object.assign(r.object(self), { trigger: Number(trigger), show }));
-  def(CLOCK_INFO, 'getTriggerTime', '()J', (r, _m, [self]) => BigInt(r.object(self).trigger)); def(CLOCK_INFO, 'getShowIntent', `()${PENDING}`, (r, _m, [self]) => r.object(self).show);
-  def(ALARM, 'cancel', `(${PENDING})V`, (r, _m, [, operation]) => { for (const [id, alarm] of alarms) if (alarm.operation?.ref === operation?.ref) alarms.delete(id); });
-  def(ALARM, 'getNextAlarmClock', `()${CLOCK_INFO}`, () => null);
-  def(ALARM, 'canScheduleExactAlarms', '()Z', r => exactAllowed(r) ? 1 : 0);
-  for (const [name, value] of Object.entries({ RTC_WAKEUP: 0, RTC: 1, ELAPSED_REALTIME_WAKEUP: 2, ELAPSED_REALTIME: 3 })) registry.staticField(ALARM, name, 'I', () => value);
-  for (const [name, value] of Object.entries({ INTERVAL_FIFTEEN_MINUTES: 900000n, INTERVAL_HALF_HOUR: 1800000n, INTERVAL_HOUR: 3600000n, INTERVAL_HALF_DAY: 43200000n, INTERVAL_DAY: 86400000n })) registry.staticField(ALARM, name, 'J', () => value);
 
   // ---- LocationManager: an emulator with location services off (android-13.0.0_r1 LocationManager / LocationManagerService) ----------------------------------------------------------------
   // The providers exist (passive, gps, network, fused) but the user setting is off, so none is enabled and none ever produces a fix: isLocationEnabled/isProviderEnabled are false, there is no last
@@ -189,5 +152,5 @@ export function createHardwareServicesHost(platform) {
   const FINGERPRINT = service('fingerprint', 'Landroid/hardware/fingerprint/FingerprintManager;');
   def(FINGERPRINT, 'isHardwareDetected', '()Z', () => 0); def(FINGERPRINT, 'hasEnrolledFingerprints', '()Z', () => 0);
 
-  return { ...registry, getService, serviceNameForClass: classType => byClass.get(classType) ?? null, [GC_ROOTS](visit) { for (const alarm of alarms.values()) visit(alarm); for (const entry of registrations.values()) visit(entry); audioManager.roots(visit); ringtones.roots(visit); } };
+  return { ...registry, getService, serviceNameForClass: classType => byClass.get(classType) ?? null, [GC_ROOTS](visit) { for (const entry of registrations.values()) visit(entry); audioManager.roots(visit); ringtones.roots(visit); } };
 }

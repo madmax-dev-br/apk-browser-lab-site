@@ -72,7 +72,7 @@
       },
       {
         "path": "framework-aosp/legacy-rendernode/build/metadata/android/graphics/Canvas.java",
-        "sha256": "16f2592a6485cf24f788d4839010c763f37ed24544ee8a468e0737eb806bece0"
+        "sha256": "4746a8c1f71f1903656c2b7f3daa94873422146c894f3ea2f87a1dce9437ca67"
       },
       {
         "path": "framework-aosp/legacy-rendernode/build/metadata/android/graphics/Matrix.java",
@@ -209,7 +209,7 @@
         },
         {
           "path": "framework-aosp/legacy-rendernode/build/metadata/android/graphics/Canvas.java",
-          "sha256": "16f2592a6485cf24f788d4839010c763f37ed24544ee8a468e0737eb806bece0"
+          "sha256": "4746a8c1f71f1903656c2b7f3daa94873422146c894f3ea2f87a1dce9437ca67"
         },
         {
           "path": "framework-aosp/legacy-rendernode/build/metadata/android/graphics/Matrix.java",
@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 7967732,
-  "sha256": "583d9bf4be4efddd86043812a845865d611b366ac70e78fcc32b9f30ecafbd51",
-  "classCount": 6097,
+  "bytes": 8133640,
+  "sha256": "8954a88001c0718da9fea41c070b01de4f8025990439df3bda7ab2f9c04fee1b",
+  "classCount": 6226,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -610,6 +610,15 @@
     "Landroid/animation/ValueAnimator$AnimatorUpdateListener;",
     "Landroid/animation/ValueAnimator$DurationScaleChangeListener;",
     "Landroid/animation/ValueAnimator$RepeatMode;",
+    "Landroid/app/AlarmManager$AlarmClockInfo$1;",
+    "Landroid/app/AlarmManager$AlarmClockInfo;",
+    "Landroid/app/AlarmManager$AlarmType;",
+    "Landroid/os/IInterface;",
+    "Landroid/app/IAlarmListener;",
+    "Landroid/app/IAlarmListener$Stub;",
+    "Landroid/app/AlarmManager$ListenerWrapper;",
+    "Landroid/app/AlarmManager$OnAlarmListener;",
+    "Landroid/app/AlarmManager;",
     "Landroid/app/AppComponentFactory;",
     "Landroid/app/ApplicationExitInfo$1;",
     "Landroid/app/ApplicationExitInfo$Reason;",
@@ -617,9 +626,33 @@
     "Landroid/app/ApplicationExitInfo;",
     "Landroid/app/Dialog$$ExternalSyntheticLambda0;",
     "Landroid/app/Dialog$$ExternalSyntheticLambda1;",
+    "Landroid/os/Handler;",
     "Landroid/app/Dialog$ListenersHandler;",
     "Landroid/view/KeyEvent$Callback;",
     "Landroid/app/Dialog;",
+    "Landroid/app/IAlarmCompleteListener;",
+    "Landroid/app/IAlarmCompleteListener$Default;",
+    "Landroid/app/IAlarmCompleteListener$Stub$Proxy;",
+    "Landroid/app/IAlarmCompleteListener$Stub;",
+    "Landroid/app/IAlarmListener$Default;",
+    "Landroid/app/IAlarmListener$Stub$Proxy;",
+    "Landroid/app/IAlarmManager;",
+    "Landroid/app/IAlarmManager$Default;",
+    "Landroid/app/IAlarmManager$Stub$Proxy;",
+    "Landroid/app/IAlarmManager$Stub;",
+    "Landroid/app/IAlarmManager$_Parcel;",
+    "Landroid/app/LabAlarmManagerFactory;",
+    "Ljava/util/Map;",
+    "Ljava/util/AbstractMap;",
+    "Ljava/util/HashMap;",
+    "Ljava/util/LinkedHashMap;",
+    "Landroid/app/PropertyInvalidatedCache$1;",
+    "Landroid/app/PropertyInvalidatedCache$AutoCorker$1;",
+    "Landroid/app/PropertyInvalidatedCache$AutoCorker;",
+    "Landroid/app/PropertyInvalidatedCache$QueryHandler;",
+    "Landroid/app/PropertyInvalidatedCache$DefaultComputer;",
+    "Landroid/app/PropertyInvalidatedCache$NoPreloadHolder;",
+    "Landroid/app/PropertyInvalidatedCache;",
     "Landroid/app/usage/StorageStats$1;",
     "Landroid/app/usage/StorageStats;",
     "Landroid/audio/policy/configuration/V7_0/AudioUsage;",
@@ -958,9 +991,6 @@
     "Landroid/graphics/drawable/VectorDrawable$VObject;",
     "Landroid/graphics/drawable/VectorDrawable$VPath;",
     "Landroid/graphics/drawable/VectorDrawable$VClipPath;",
-    "Ljava/util/Map;",
-    "Ljava/util/AbstractMap;",
-    "Ljava/util/HashMap;",
     "Landroid/graphics/drawable/VectorDrawable$VFullPath$10;",
     "Landroid/graphics/drawable/VectorDrawable$VFullPath$1;",
     "Landroid/graphics/drawable/VectorDrawable$VFullPath$2;",
@@ -1023,7 +1053,6 @@
     "Landroid/hardware/security/keymint/HardwareAuthToken$_Parcel;",
     "Landroid/hardware/security/keymint/HardwareAuthToken;",
     "Landroid/hardware/security/keymint/HardwareAuthenticatorType;",
-    "Landroid/os/IInterface;",
     "Landroid/hardware/security/keymint/IKeyMintDevice;",
     "Landroid/hardware/security/keymint/IKeyMintDevice$Default;",
     "Landroid/hardware/security/keymint/IKeyMintDevice$Stub$Proxy;",
@@ -1309,17 +1338,57 @@
     "Landroid/os/RemoteException;",
     "Landroid/os/DeadObjectException;",
     "Landroid/os/DeadSystemRuntimeException;",
+    "Landroid/os/DeviceIdleManager;",
     "Landroid/os/FileObserver$NotifyEventType;",
     "Landroid/os/FileObserver$ObserverThread;",
     "Landroid/os/FileObserver;",
+    "Landroid/os/Handler$1;",
+    "Landroid/os/Handler$BlockingRunnable;",
+    "Landroid/os/Handler$Callback;",
+    "Landroid/os/Handler$MessengerImpl;",
     "Landroid/os/HandlerExecutor;",
     "Landroid/os/HandlerThread;",
     "Landroid/os/IBinder$DeathRecipient;",
     "Landroid/os/IBinder;",
+    "Landroid/os/IDeviceIdleController;",
+    "Landroid/os/IDeviceIdleController$Default;",
+    "Landroid/os/IDeviceIdleController$Stub$Proxy;",
+    "Landroid/os/IDeviceIdleController$Stub;",
+    "Landroid/os/IPowerManager;",
+    "Landroid/os/IPowerManager$Default;",
+    "Landroid/os/IPowerManager$Stub$Proxy;",
+    "Landroid/os/IPowerManager$Stub;",
+    "Landroid/os/IPowerManager$_Parcel;",
+    "Landroid/os/IThermalEventListener;",
+    "Landroid/os/IThermalEventListener$Default;",
+    "Landroid/os/IThermalEventListener$Stub$Proxy;",
+    "Landroid/os/IThermalEventListener$Stub;",
+    "Landroid/os/IThermalEventListener$_Parcel;",
+    "Landroid/os/IThermalService;",
+    "Landroid/os/IThermalService$Default;",
+    "Landroid/os/IThermalService$Stub$Proxy;",
+    "Landroid/os/IThermalService$Stub;",
+    "Landroid/os/IThermalStatusListener;",
+    "Landroid/os/IThermalStatusListener$Default;",
+    "Landroid/os/IThermalStatusListener$Stub$Proxy;",
+    "Landroid/os/IThermalStatusListener$Stub;",
+    "Landroid/os/IWakeLockCallback;",
+    "Landroid/os/IWakeLockCallback$Default;",
+    "Landroid/os/IWakeLockCallback$Stub$Proxy;",
+    "Landroid/os/IWakeLockCallback$Stub;",
+    "Landroid/os/Looper$Observer;",
+    "Landroid/os/Looper;",
     "Landroid/os/MemoryFile$1;",
     "Landroid/os/MemoryFile$MemoryInputStream;",
     "Landroid/os/MemoryFile$MemoryOutputStream;",
     "Landroid/os/MemoryFile;",
+    "Landroid/os/Message$1;",
+    "Landroid/os/Message;",
+    "Landroid/os/MessageQueue$FileDescriptorRecord;",
+    "Landroid/os/MessageQueue$IdleHandler;",
+    "Landroid/os/MessageQueue$OnFileDescriptorEventListener$Events;",
+    "Landroid/os/MessageQueue$OnFileDescriptorEventListener;",
+    "Landroid/os/MessageQueue;",
     "Landroid/os/NetworkOnMainThreadException;",
     "Landroid/os/OperationCanceledException;",
     "Ljava/util/function/IntFunction;",
@@ -1353,6 +1422,37 @@
     "Landroid/os/ParcelableException;",
     "Landroid/os/ParcelableParcel$1;",
     "Landroid/os/ParcelableParcel;",
+    "Landroid/os/PowerExemptionManager$AllowListEvent;",
+    "Landroid/os/PowerExemptionManager$ReasonCode;",
+    "Landroid/os/PowerExemptionManager$TempAllowListType;",
+    "Landroid/os/PowerExemptionManager;",
+    "Landroid/os/PowerManager$1;",
+    "Landroid/os/PowerManager$2;",
+    "Landroid/os/PowerManager$3$$ExternalSyntheticLambda0;",
+    "Landroid/os/PowerManager$3;",
+    "Landroid/os/PowerManager$AutoPowerSaveModeTriggers;",
+    "Landroid/os/PowerManager$BrightnessConstraint;",
+    "Landroid/os/PowerManager$GoToSleepReason;",
+    "Landroid/os/PowerManager$LocationPowerSaveMode;",
+    "Landroid/os/PowerManager$OnThermalStatusChangedListener;",
+    "Landroid/os/PowerManager$ServiceType;",
+    "Landroid/os/PowerManager$ShutdownReason;",
+    "Landroid/os/PowerManager$SleepData;",
+    "Landroid/os/PowerManager$SoundTriggerPowerSaveMode;",
+    "Landroid/os/PowerManager$ThermalStatus;",
+    "Landroid/os/PowerManager$WakeData;",
+    "Landroid/os/PowerManager$WakeLock$$ExternalSyntheticLambda0;",
+    "Landroid/os/PowerManager$WakeLock$$ExternalSyntheticLambda1;",
+    "Landroid/os/PowerManager$WakeLock$1$$ExternalSyntheticLambda0;",
+    "Landroid/os/PowerManager$WakeLock$1;",
+    "Landroid/os/PowerManager$WakeLock;",
+    "Landroid/os/PowerManager$WakeLockStateListener;",
+    "Landroid/os/PowerManager$WakeReason;",
+    "Landroid/os/PowerManager;",
+    "Landroid/os/PowerSaveState$1;",
+    "Landroid/os/PowerSaveState$Builder;",
+    "Landroid/os/PowerSaveState;",
+    "Landroid/os/ServiceManager$ServiceNotFoundException;",
     "Landroid/os/ServiceSpecificException;",
     "Landroid/os/SharedMemory$1;",
     "Landroid/os/SharedMemory;",
@@ -1395,6 +1495,8 @@
     "Landroid/os/SystemProperties$1;",
     "Landroid/os/SystemProperties$Handle;",
     "Landroid/os/SystemProperties;",
+    "Landroid/os/ThreadLocalWorkSource$$ExternalSyntheticLambda0;",
+    "Landroid/os/ThreadLocalWorkSource;",
     "Landroid/os/Trace;",
     "Landroid/os/TransactionTooLargeException;",
     "Landroid/os/UserHandle$1;",
@@ -2056,6 +2158,7 @@
     "Landroid/util/Pools$SimplePool;",
     "Landroid/util/Pools$SynchronizedPool;",
     "Landroid/util/Pools;",
+    "Landroid/util/Printer;",
     "Landroid/util/PrefixPrinter;",
     "Landroid/util/Range;",
     "Landroid/util/Rational;",
@@ -3582,7 +3685,6 @@
     "Lcom/android/org/conscrypt/PeerInfoProvider;",
     "Lcom/android/org/conscrypt/AbstractConscryptSocket$1;",
     "Lcom/android/org/conscrypt/AbstractConscryptSocket;",
-    "Ljava/util/LinkedHashMap;",
     "Lcom/android/org/conscrypt/AbstractSessionContext$1;",
     "Lcom/android/org/conscrypt/AbstractSessionContext$2;",
     "Lcom/android/org/conscrypt/AbstractSessionContext;",
@@ -3989,6 +4091,33 @@
     "Ljava/time/Clock;",
     "Ldev/apkweb/os/NetworkTimeClock;",
     "Ldev/apkweb/pm/PmHidden;",
+    "Ldev/apkweb/services/Host;",
+    "Ldev/apkweb/services/LabAlarmManagerService$1;",
+    "Ldev/apkweb/services/LabAlarmManagerService$Alarm;",
+    "Ldev/apkweb/services/refusals/RefusingAlarmCompleteListener;",
+    "Ldev/apkweb/services/LabAlarmManagerService$Completion;",
+    "Ldev/apkweb/services/refusals/RefusingAlarmManager;",
+    "Ldev/apkweb/services/LabAlarmManagerService;",
+    "Ldev/apkweb/services/refusals/RefusingDeviceIdleController;",
+    "Ldev/apkweb/services/LabDeviceIdleService;",
+    "Ldev/apkweb/services/LabPowerManagerService$Held;",
+    "Ldev/apkweb/services/refusals/RefusingPowerManager;",
+    "Ldev/apkweb/services/LabPowerManagerService;",
+    "Ldev/apkweb/services/LabServiceManager$Factory;",
+    "Ldev/apkweb/services/LabServiceManager$1;",
+    "Ldev/apkweb/services/LabServiceManager$2;",
+    "Ldev/apkweb/services/LabServiceManager$3;",
+    "Ldev/apkweb/services/LabServiceManager$4;",
+    "Ldev/apkweb/services/LabServiceManager$5;",
+    "Ldev/apkweb/services/LabServiceManager;",
+    "Ldev/apkweb/services/LabSystemServices;",
+    "Ldev/apkweb/services/LabThermalService$1;",
+    "Ldev/apkweb/services/refusals/RefusingThermalService;",
+    "Ldev/apkweb/services/LabThermalService;",
+    "Ldev/apkweb/services/refusals/RefusingAlarmListener;",
+    "Ldev/apkweb/services/refusals/RefusingThermalEventListener;",
+    "Ldev/apkweb/services/refusals/RefusingThermalStatusListener;",
+    "Ldev/apkweb/services/refusals/RefusingWakeLockCallback;",
     "Ldev/apkweb/util/ArrayCas;",
     "Ldev/apkweb/util/ArraysOps;",
     "Ldev/apkweb/util/AtomicBooleanOps;",
@@ -37538,6 +37667,326 @@
       "sha256": "c23d152590d6301469cf4c153e317b8d5cbc05cd2d934fe8aad6807f25fd9755",
       "bytes": 1341,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/PowerManager.java",
+      "localPath": "framework-aosp/upstream/android/os/PowerManager.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/PowerManager.java?format=TEXT",
+      "sha256": "bea82f14c1ddd051c1c2a8c80d69fd8486ea7a39cfdca16c7d2848ffdf769f92",
+      "bytes": 120659,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/app/PropertyInvalidatedCache.java",
+      "localPath": "framework-aosp/upstream/android/app/PropertyInvalidatedCache.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/PropertyInvalidatedCache.java?format=TEXT",
+      "sha256": "d5bd651d7b15448a876e049b122b6a90dcb3acc2ca177cfd5b0f495ed018634c",
+      "bytes": 61057,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "apex/jobscheduler/framework/java/android/app/AlarmManager.java",
+      "localPath": "framework-aosp/upstream/android/app/AlarmManager.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/apex/jobscheduler/framework/java/android/app/AlarmManager.java?format=TEXT",
+      "sha256": "056b22d7249dd52873318a4ba884cc053ee651936e2a71112f105b08b4b8b66d",
+      "bytes": 68178,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "apex/jobscheduler/framework/java/android/os/PowerExemptionManager.java",
+      "localPath": "framework-aosp/upstream/android/os/PowerExemptionManager.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/apex/jobscheduler/framework/java/android/os/PowerExemptionManager.java?format=TEXT",
+      "sha256": "9b8efc0eb4f7a85ded8388bdb100c3643d3bf924f1db9cb50c18a04083635aa9",
+      "bytes": 31715,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "apex/jobscheduler/framework/java/android/os/DeviceIdleManager.java",
+      "localPath": "framework-aosp/upstream/android/os/DeviceIdleManager.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/apex/jobscheduler/framework/java/android/os/DeviceIdleManager.java?format=TEXT",
+      "sha256": "e25a55915e20ff6105f839e306fb3136a9765e9de514fc31397276b052440a31",
+      "bytes": 2746,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/IPowerManager.aidl",
+      "localPath": "framework-aosp/upstream/android/os/IPowerManager.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/IPowerManager.aidl?format=TEXT",
+      "sha256": "24b3a28ba6149364490ad3610055cc32d6a8c6e1a130a5a5daaeaba3a24e2ac3",
+      "bytes": 6192,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/IThermalService.aidl",
+      "localPath": "framework-aosp/upstream/android/os/IThermalService.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/IThermalService.aidl?format=TEXT",
+      "sha256": "8aadd4b538d34983ec0d11cb6188fcad9346143291d87004dfe3416193ebc2fe",
+      "bytes": 3856,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/IThermalStatusListener.aidl",
+      "localPath": "framework-aosp/upstream/android/os/IThermalStatusListener.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/IThermalStatusListener.aidl?format=TEXT",
+      "sha256": "5d02a8628bcafb1bc7073353bda896fb422de80f7f4e86c8188e9000987149bf",
+      "bytes": 928,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/IThermalEventListener.aidl",
+      "localPath": "framework-aosp/upstream/android/os/IThermalEventListener.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/IThermalEventListener.aidl?format=TEXT",
+      "sha256": "fed8c5b87d7a4750a2b16895f8a0d58d6a0aa29f25cf79615fb384035a0775ed",
+      "bytes": 980,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/IWakeLockCallback.aidl",
+      "localPath": "framework-aosp/upstream/android/os/IWakeLockCallback.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/IWakeLockCallback.aidl?format=TEXT",
+      "sha256": "2d1101149f05125ce5edb7b7e255bf869156f56c0d9e2ecee607f894e1a967f2",
+      "bytes": 747,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/BatterySaverPolicyConfig.aidl",
+      "localPath": "framework-aosp/upstream/android/os/BatterySaverPolicyConfig.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/BatterySaverPolicyConfig.aidl?format=TEXT",
+      "sha256": "7a7d87b257201174ed7a87fed99f402ab7eb6f22512c948a2af83a38f9de176b",
+      "bytes": 727,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/ParcelDuration.aidl",
+      "localPath": "framework-aosp/upstream/android/os/ParcelDuration.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/ParcelDuration.aidl?format=TEXT",
+      "sha256": "7a39ad9fdd5ea0d929318b75f462bce3054fcb9c741d3334f38a11b42468cff0",
+      "bytes": 706,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/PowerSaveState.aidl",
+      "localPath": "framework-aosp/upstream/android/os/PowerSaveState.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/PowerSaveState.aidl?format=TEXT",
+      "sha256": "beb2ba269ab9a1f210f8d108befbded17e318a9e88b37717ae20bdafa6168417",
+      "bytes": 701,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/WorkSource.aidl",
+      "localPath": "framework-aosp/upstream/android/os/WorkSource.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/WorkSource.aidl?format=TEXT",
+      "sha256": "dd4ae5b6990084150d0d8b560176484eb60d22491bda264f5e880590933babc1",
+      "bytes": 691,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/CoolingDevice.aidl",
+      "localPath": "framework-aosp/upstream/android/os/CoolingDevice.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/CoolingDevice.aidl?format=TEXT",
+      "sha256": "3b593491f15181a900656428da2e5ec92d1f4c5c42decd0f73de85159577b39f",
+      "bytes": 700,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/Temperature.aidl",
+      "localPath": "framework-aosp/upstream/android/os/Temperature.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/Temperature.aidl?format=TEXT",
+      "sha256": "8ef0020316562fe37eef06005828cf4839c22dce82367954f48e0b39fed60818",
+      "bytes": 696,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/UserHandle.aidl",
+      "localPath": "framework-aosp/upstream/android/os/UserHandle.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/UserHandle.aidl?format=TEXT",
+      "sha256": "a5d4017351970ed3cfae4d2dacd0a41ba7b863f130d286c3ad765b0438cedc25",
+      "bytes": 666,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "apex/jobscheduler/framework/java/android/app/IAlarmManager.aidl",
+      "localPath": "framework-aosp/upstream/android/app/IAlarmManager.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/apex/jobscheduler/framework/java/android/app/IAlarmManager.aidl?format=TEXT",
+      "sha256": "0a9a95bfdf44b8e815a656e87ebab62560e1895c2b819ccce2315890358da945",
+      "bytes": 1982,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "apex/jobscheduler/framework/java/android/app/IAlarmListener.aidl",
+      "localPath": "framework-aosp/upstream/android/app/IAlarmListener.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/apex/jobscheduler/framework/java/android/app/IAlarmListener.aidl?format=TEXT",
+      "sha256": "9410b8de3eb90001ace6ddca3cc2bf83228eed5a1bd50b2e8d59824a49aae563",
+      "bytes": 982,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "apex/jobscheduler/framework/java/android/app/IAlarmCompleteListener.aidl",
+      "localPath": "framework-aosp/upstream/android/app/IAlarmCompleteListener.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/apex/jobscheduler/framework/java/android/app/IAlarmCompleteListener.aidl?format=TEXT",
+      "sha256": "2ea3aedd260c5c10f8d1398e9e92a043dfb4db538091bb022cbbd491dabada3d",
+      "bytes": 871,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "apex/jobscheduler/framework/java/android/app/AlarmManager.aidl",
+      "localPath": "framework-aosp/upstream/android/app/AlarmManager.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/apex/jobscheduler/framework/java/android/app/AlarmManager.aidl?format=TEXT",
+      "sha256": "a8cdd0dea16104bbb006fbdadd9d67bd995e81875f73709baf162169be83e568",
+      "bytes": 684,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/app/PendingIntent.aidl",
+      "localPath": "framework-aosp/upstream/android/app/PendingIntent.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/PendingIntent.aidl?format=TEXT",
+      "sha256": "94a75436e40782ea09941138818a86bba31d15a999956b483b13d43b7445bc1e",
+      "bytes": 725,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/content/Intent.aidl",
+      "localPath": "framework-aosp/upstream/android/content/Intent.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/Intent.aidl?format=TEXT",
+      "sha256": "d5efd73f7a2ab8f35ada1dd8b5e125d0660f1699bdaf71833f552568ca9e5a90",
+      "bytes": 722,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "apex/jobscheduler/framework/java/android/os/IDeviceIdleController.aidl",
+      "localPath": "framework-aosp/upstream/android/os/IDeviceIdleController.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/apex/jobscheduler/framework/java/android/os/IDeviceIdleController.aidl?format=TEXT",
+      "sha256": "d0079f16491cd3755633e133654e25e71959b733a14f6d8294d1a4ad4a6c3dc3",
+      "bytes": 2473,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/PowerSaveState.java",
+      "localPath": "framework-aosp/upstream/android/os/PowerSaveState.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/PowerSaveState.java?format=TEXT",
+      "sha256": "886e4a83c95db77adf776fc5edb2f7b63c74ace7d57aebe9689e39373069016b",
+      "bytes": 3989,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/ServiceManager.java",
+      "localPath": "framework-aosp/upstream/android/os/ServiceManager.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/ServiceManager.java?format=TEXT",
+      "sha256": "a23e406d7b3650f60294b7ff8abce6908d247e31d817cf383bc0647766f323ba",
+      "bytes": 14374,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/Looper.java",
+      "localPath": "framework-aosp/upstream/android/os/Looper.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/Looper.java?format=TEXT",
+      "sha256": "10c120f5c53e2e2231e977b81fb2d4fde05421d2ed30e985b2cc5c52c18f42e6",
+      "bytes": 17649,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/MessageQueue.java",
+      "localPath": "framework-aosp/upstream/android/os/MessageQueue.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/MessageQueue.java?format=TEXT",
+      "sha256": "9645371eb17866a5ad97bfd68ca328506baf9bcb19fb5b24759794ab8050833c",
+      "bytes": 36512,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/Handler.java",
+      "localPath": "framework-aosp/upstream/android/os/Handler.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/Handler.java?format=TEXT",
+      "sha256": "5f5b183631895c690479bac3872c28a8e3cea25302fdb2f3d0e35f5674863993",
+      "bytes": 40618,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/Message.java",
+      "localPath": "framework-aosp/upstream/android/os/Message.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/Message.java?format=TEXT",
+      "sha256": "30b7ebaeed12ddbbd820da74776fd7cc5591ce9efc6ec4fc9831150bfa5232f2",
+      "bytes": 21060,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/ThreadLocalWorkSource.java",
+      "localPath": "framework-aosp/upstream/android/os/ThreadLocalWorkSource.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/ThreadLocalWorkSource.java?format=TEXT",
+      "sha256": "f9914e820de850258e92ae3a8acbd5c96a8f35c1fc951b9d6497bf2fc01f51ff",
+      "bytes": 3762,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/util/Printer.java",
+      "localPath": "framework-aosp/upstream/android/util/Printer.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/util/Printer.java?format=TEXT",
+      "sha256": "9c0ee0efc19ecd352edf514e9216ee11c7203e01470bf964cb1db27f2f7c7bb3",
+      "bytes": 1079,
+      "license": "Apache-2.0"
     }
   ],
   "algorithmPatches": [],
@@ -38258,6 +38707,130 @@
       {
         "path": "framework-aosp/lab-java/sun/net/www/protocol/jar/Handler.java",
         "sha256": "d8bce757a6e239e016319d3c31d669a87500c4e42eeef6e98a311f1cfc3ab520"
+      }
+    ]
+  },
+  "servicesGroup": {
+    "transforms": [
+      {
+        "path": "android/os/PowerManager.java",
+        "kind": "resource ids",
+        "inputSha256": "bea82f14c1ddd051c1c2a8c80d69fd8486ea7a39cfdca16c7d2848ffdf769f92",
+        "outputSha256": "eb255f9ea6150f2e79638a6b9e3f01f66fd6ae9ab1b52a1c935c57fee4b65c6c"
+      },
+      {
+        "path": "android/app/PropertyInvalidatedCache.java",
+        "kind": "language level, generics",
+        "inputSha256": "d5bd651d7b15448a876e049b122b6a90dcb3acc2ca177cfd5b0f495ed018634c",
+        "outputSha256": "eaf514034d384c1d21097f992d1afba865eb3cdf6769d877e9cf9367b9d6971b"
+      }
+    ],
+    "labAuthored": [
+      {
+        "path": "framework-aosp/lab-java-services/android/app/LabAlarmManagerFactory.java",
+        "sha256": "64bf0d1fe3780981d788a2a7911f1dd944c20cd1b957193727dc225fabb1ddc5"
+      },
+      {
+        "path": "framework-aosp/lab-java-services/dev/apkweb/services/Host.java",
+        "sha256": "63c13efefed1d0525d91648085db7247e7ef6bb25ad4b559f0ebe284e128cbcb"
+      },
+      {
+        "path": "framework-aosp/lab-java-services/dev/apkweb/services/LabAlarmManagerService.java",
+        "sha256": "62a81529645bf8515739148c284775cae63baec41b1a0c74b7844f1043450ee0"
+      },
+      {
+        "path": "framework-aosp/lab-java-services/dev/apkweb/services/LabDeviceIdleService.java",
+        "sha256": "a874b858baee0d04b3e49f2e2827198092b5ed459e6a9bbb8266e22036f033d7"
+      },
+      {
+        "path": "framework-aosp/lab-java-services/dev/apkweb/services/LabPowerManagerService.java",
+        "sha256": "f1ddaa39a6004ddcf0b8cb84e7f95903273003dc10038665ffc76f74bbcc52b4"
+      },
+      {
+        "path": "framework-aosp/lab-java-services/dev/apkweb/services/LabServiceManager.java",
+        "sha256": "3ec570ce320767dd7c4edd1b5c67b3a3df2bc196e34cf6ff0d6d16082bb54458"
+      },
+      {
+        "path": "framework-aosp/lab-java-services/dev/apkweb/services/LabSystemServices.java",
+        "sha256": "9c5aaeb6591a7cded7ddc5b85428c9c5a91bfe81d38deba937d268e0c0a65a34"
+      },
+      {
+        "path": "framework-aosp/lab-java-services/dev/apkweb/services/LabThermalService.java",
+        "sha256": "d2194a99ef1be8400d968edc117e199d21b96fb1d1b0817d08fdff61bc5831ae"
+      }
+    ],
+    "generated": [
+      {
+        "path": "framework-aosp/generated-services/android/app/IAlarmCompleteListener.java",
+        "sha256": "78aaa7c4068ace2f0e3cfd7c7a13d51fa37afd86438aaadf7db785c3e07282da"
+      },
+      {
+        "path": "framework-aosp/generated-services/android/app/IAlarmListener.java",
+        "sha256": "56abbd078e1d2317f1f1d7f0b0455163d603f657a570bf384567dec4ed7727f6"
+      },
+      {
+        "path": "framework-aosp/generated-services/android/app/IAlarmManager.java",
+        "sha256": "7bfda2fd00e60ec1ae94dda90bbfb7e77e69f906ea316dcbc59da406bc38e0ab"
+      },
+      {
+        "path": "framework-aosp/generated-services/android/os/IDeviceIdleController.java",
+        "sha256": "0f38fc491b0b750560bbb00374d67ef25a0c58ae5bc49d21dc1acfe945b85596"
+      },
+      {
+        "path": "framework-aosp/generated-services/android/os/IPowerManager.java",
+        "sha256": "4acc93c6fb7f412fc3bcb9cc53401ac9d6b34a5605a0e0661fc3151a79593841"
+      },
+      {
+        "path": "framework-aosp/generated-services/android/os/IThermalEventListener.java",
+        "sha256": "38f2204953c3d6fbc4aad5f8ddd8ab18fc17b8d001d2efd0ed1c72c550c31fad"
+      },
+      {
+        "path": "framework-aosp/generated-services/android/os/IThermalService.java",
+        "sha256": "fe0f11f9c71863d671d95f35d41521d7ce3aa2153fcdb8555cc8d49d878b6174"
+      },
+      {
+        "path": "framework-aosp/generated-services/android/os/IThermalStatusListener.java",
+        "sha256": "4bbde0e9ed73ccd89e58876b1f8772657fe94eee1ff0579d3c3649909b26c07b"
+      },
+      {
+        "path": "framework-aosp/generated-services/android/os/IWakeLockCallback.java",
+        "sha256": "e6759fcc77bf0c596fa43485255c0c45fe10f11c2431f83c3192fd24f5d2b45d"
+      },
+      {
+        "path": "framework-aosp/generated-services/dev/apkweb/services/refusals/RefusingAlarmCompleteListener.java",
+        "sha256": "ab93f59705eff668a4ba6bfd1919370367435d374feecca7e2db8169d3f7ad28"
+      },
+      {
+        "path": "framework-aosp/generated-services/dev/apkweb/services/refusals/RefusingAlarmListener.java",
+        "sha256": "dbf52d1377ca36c5ded4fe924869e2a7a22cd424b90b304c4cf7637ee0d371b1"
+      },
+      {
+        "path": "framework-aosp/generated-services/dev/apkweb/services/refusals/RefusingAlarmManager.java",
+        "sha256": "98ee37388cbcbb56afc18b0a6e78e96063a306e7a45b97146484b6fa142df02c"
+      },
+      {
+        "path": "framework-aosp/generated-services/dev/apkweb/services/refusals/RefusingDeviceIdleController.java",
+        "sha256": "2085984d8a8886d838c57d258d924656e9bbf9ce39213c4cfb3a9c3df004faf8"
+      },
+      {
+        "path": "framework-aosp/generated-services/dev/apkweb/services/refusals/RefusingPowerManager.java",
+        "sha256": "405d7c31d7b5912783a62bb6d0014abfac68842ef52ea223bbc74d843fac65c0"
+      },
+      {
+        "path": "framework-aosp/generated-services/dev/apkweb/services/refusals/RefusingThermalEventListener.java",
+        "sha256": "328f774c9bd102c9ea715980219c348e131e82c774700697573b33ad98f233b8"
+      },
+      {
+        "path": "framework-aosp/generated-services/dev/apkweb/services/refusals/RefusingThermalService.java",
+        "sha256": "bb74623ea4830b1d8d6c0aa3ea22e7854848826227447fbd2eb42933f3f7d726"
+      },
+      {
+        "path": "framework-aosp/generated-services/dev/apkweb/services/refusals/RefusingThermalStatusListener.java",
+        "sha256": "09cc9637b497561436b8d65d165fad1addaefaafa9070a909b530f41521c907d"
+      },
+      {
+        "path": "framework-aosp/generated-services/dev/apkweb/services/refusals/RefusingWakeLockCallback.java",
+        "sha256": "623996998a6a18a787a71738804fad05196bc98423b67f2173fe2f7c4116db33"
       }
     ]
   },
@@ -39986,44 +40559,6 @@
   ],
   "generatedCompileOnlyMetadata": [
     {
-      "originalSource": {
-        "project": "platform/frameworks/base",
-        "tag": "android-13.0.0_r1",
-        "path": "core/java/android/view/KeyEvent.java",
-        "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/KeyEvent.java?format=TEXT",
-        "sha256": "287780a6cd1492a83fad1e529d56cb44102b37f555ba7baf0701c0cb92be7de3",
-        "bytes": 134791,
-        "license": "Apache-2.0",
-        "localPath": "framework-aosp/upstream/android/view/KeyEvent.java",
-        "role": "compile-only-ABI-reference"
-      },
-      "SDKJar": "$ANDROID_SDK/platforms/android-36/android.jar",
-      "sdkClassSha256": "75fb42ab51cc87e5e090cc513977b4951ae33ab4eab4a867c32e67f295eb990e",
-      "metadataClassSha256": "ffafc7e5fb3f4e99ff1df8233a19d7b8ef70813b6b53282dbb91d903f9db83a8",
-      "addedConstants": {
-        "META_CAP_LOCKED": 256,
-        "META_ALT_LOCKED": 512,
-        "META_SYM_LOCKED": 1024,
-        "META_SELECTING": 2048
-      },
-      "packaged": false,
-      "adaptation": "Only four field_info ConstantValue records and required pool constants are added to compile-only SDK ABI. No runtime class or SDK method implementation is packaged."
-    },
-    {
-      "SDKJar": "$ANDROID_SDK/platforms/android-36/android.jar",
-      "sdkClassSha256": "3642cde9adacd5503bac07ba5d74cfd34779536537d0889d6b465754dee07b1c",
-      "metadataClassSha256": "584665d99abb161c7b20bfcd0bfdbf8b6310a0f1e1ae90cbd803ea494f798f22",
-      "addedNativeMethodDeclarations": [
-        "getNativeInstance()J"
-      ],
-      "addedInnerAnnotationDeclarations": [
-        "Paint.StartHyphenEdit",
-        "Paint.EndHyphenEdit"
-      ],
-      "adaptation": "Compile-only InnerClasses metadata restores two hidden annotations and the hidden getNativeInstance declaration removed from SDK36. Annotation declarations carry no behavior. All SDK Paint/annotation metadata files remain excluded from D8.",
-      "packaged": false
-    },
-    {
       "schemaVersion": 1,
       "SDKJar": "$ANDROID_SDK/platforms/android-36/android.jar",
       "classes": [
@@ -40031,6 +40566,11 @@
           "SDKClass": "java/lang/System.class",
           "sdkClassSha256": "8fb1db2241ea2a60ba8791baa7bd5b1d506c39322b6476ad89372701711565a7",
           "metadataSha256": "c20c58c4a84ca45faad633b50e5be5151d2095454d29a8e5e45f88703d6aedd3"
+        },
+        {
+          "SDKClass": "java/io/FileDescriptor.class",
+          "sdkClassSha256": "8d2cabb8bd678fe8e67795897357a4e9db176072f0a40e48438ce3dc838a36f2",
+          "metadataSha256": "40537566d83d7d7d62dd19a5cd09bad74d5af0e2376886d3847d09887ebbf751"
         }
       ],
       "additionalProtectedFields": {},
@@ -40058,178 +40598,61 @@
       "role": "AAPT2 generated framework resource attribute data"
     }
   ],
-  "compileOnlyBootstrapDeclarations": [
-    "android.content.pm.ActivityInfo.Config (forward metadata; original ActivityInfo replaces it)"
-  ],
+  "compileOnlyBootstrapDeclarations": [],
   "compileOnlyDeclarations": [
-    "android.annotation.AnimRes",
-    "android.annotation.AnimatorRes",
-    "android.annotation.AnyRes",
-    "android.annotation.AnyThread",
-    "android.annotation.AppIdInt",
-    "android.annotation.AttrRes",
-    "android.annotation.BytesLong",
-    "android.annotation.CallSuper",
-    "android.annotation.CallbackExecutor",
-    "android.annotation.CheckResult",
-    "android.annotation.ColorInt",
-    "android.annotation.ColorLong",
-    "android.annotation.CurrentTimeMillisLong",
-    "android.annotation.DrawableRes",
-    "android.annotation.FloatRange",
-    "android.annotation.HalfFloat",
-    "android.annotation.IntDef",
-    "android.annotation.IntRange",
-    "android.annotation.InterpolatorRes",
-    "android.annotation.LayoutRes",
-    "android.annotation.MainThread",
-    "android.annotation.NonNull",
-    "android.annotation.Nullable",
-    "android.annotation.Px",
-    "android.annotation.RequiresFeature",
-    "android.annotation.RequiresPermission",
-    "android.annotation.SdkConstant",
-    "android.annotation.Size",
-    "android.annotation.StringDef",
-    "android.annotation.StyleRes",
-    "android.annotation.StyleableRes",
-    "android.annotation.SuppressAutoDoc",
-    "android.annotation.SystemApi",
-    "android.annotation.SystemService",
-    "android.annotation.TestApi",
-    "android.annotation.UiContext",
-    "android.annotation.UptimeMillisLong",
-    "android.annotation.UserIdInt",
-    "android.app.ActivityManager",
-    "android.app.ActivityThread",
-    "android.app.AppGlobals",
-    "android.app.ApplicationExitInfoProto",
-    "android.app.IActivityManager",
-    "android.app.IAppTraceRetriever",
-    "android.app.IParcelFileDescriptorRetriever",
-    "android.app.OnActivityPausedListener",
-    "android.app.WindowConfiguration",
-    "android.app.compat.CompatChanges",
-    "android.compat.annotation.ChangeId",
-    "android.compat.annotation.Disabled",
-    "android.compat.annotation.EnabledAfter",
-    "android.compat.annotation.EnabledSince",
-    "android.compat.annotation.Overridable",
     "android.compat.annotation.UnsupportedAppUsage",
-    "android.content.ClipDataProto",
-    "android.content.ClipDescriptionProto",
-    "android.content.ContentProvider",
-    "android.content.ContentResolver",
-    "android.content.Context",
-    "android.content.Intent",
-    "android.content.pm.ApplicationInfo",
-    "android.content.pm.ComponentInfo",
-    "android.content.pm.ConstrainDisplayApisConfig",
-    "android.content.pm.IPackageManager",
-    "android.content.pm.PackageManager",
-    "android.content.res.AssetManager",
-    "android.content.res.Configuration",
-    "android.content.res.GradientColor",
-    "android.content.res.Resources",
-    "android.content.res.XmlBlock",
-    "android.database.IContentObserver",
-    "android.graphics.BaseCanvas",
-    "android.graphics.Bitmap",
-    "android.graphics.Canvas",
-    "android.graphics.ColorFilter",
-    "android.graphics.ColorSpace",
-    "android.graphics.ImageDecoder",
-    "android.graphics.Path",
-    "android.graphics.PorterDuffColorFilter",
-    "android.graphics.RecordingCanvas",
-    "android.graphics.RectProto",
-    "android.graphics.RenderNode",
-    "android.graphics.Shader",
-    "android.graphics.animation.FallbackLUTInterpolator",
-    "android.graphics.animation.RenderNodeAnimator",
-    "android.graphics.drawable.AnimatedVectorDrawable",
-    "android.graphics.drawable.ClipDrawable",
-    "android.graphics.drawable.DrawableInflater",
-    "android.graphics.drawable.NinePatchDrawable",
-    "android.hardware.DataSpace",
-    "android.hardware.SensorDirectChannel",
-    "android.hardware.SyncFence",
-    "android.hardware.input.InputSensorInfo",
-    "android.net.Uri",
-    "android.nfc.NdefMessageProto",
-    "android.nfc.NdefRecordProto",
-    "android.nfc.NfcActivityManager",
-    "android.nfc.NfcControllerAlwaysOnListener",
-    "android.os.Build",
-    "android.os.FileUtils",
-    "android.os.ICancellationSignal",
-    "android.os.INetworkManagementService",
-    "android.os.Parcel",
-    "android.os.PersistableBundle",
-    "android.os.Process",
-    "android.os.ServiceManager",
-    "android.os.StrictMode",
-    "android.os.Trace",
-    "android.os.storage.IStorageManager",
-    "android.provider.Settings",
-    "android.sysprop.DisplayProperties",
-    "android.text.TextUtils",
-    "android.text.method.QwertyKeyListener",
-    "android.text.method.WordIterator",
-    "android.util.DebugUtils",
-    "android.util.DisplayUtils",
-    "android.util.Slog",
-    "android.util.TimeUtils",
-    "android.util.proto.ProtoInputStream",
-    "android.util.proto.WireTypeMismatchException",
-    "android.view.Choreographer",
-    "android.view.DisplayCutout",
-    "android.view.IWindowManager",
-    "android.view.Surface",
-    "android.view.View",
-    "android.view.WindowManager",
-    "android.view.WindowManagerGlobal",
-    "android.view.animation.AnimationUtils",
-    "android.view.textclassifier.TextClassifier",
-    "android.widget.TextView",
-    "com.android.internal.annotations.GuardedBy",
-    "com.android.internal.annotations.VisibleForTesting",
-    "com.android.internal.graphics.ColorUtils",
-    "com.android.internal.graphics.cam.Cam",
-    "com.android.internal.os.RuntimeInit",
-    "com.android.internal.util.CollectionUtils",
-    "com.android.internal.util.DataClass",
-    "com.android.internal.util.XmlUtils",
-    "dalvik.annotation.compat.VersionCodes",
-    "dalvik.annotation.optimization.CriticalNative",
-    "dalvik.annotation.optimization.FastNative",
-    "dalvik.annotation.optimization.ReachabilitySensitive",
-    "dalvik.system.BlockGuard",
-    "dalvik.system.CloseGuard",
-    "dalvik.system.VMDebug",
     "dev.apkweb.os.NfcHost",
     "dev.apkweb.os.StrictModeHost",
     "java.lang.invoke.LambdaMetafactory",
-    "java.lang.ref.FinalizerReference",
     "java.util.Arrays",
     "java.util.LinkedHashMap",
     "jdk.internal.HotSpotIntrinsicCandidate",
-    "libcore.api.IntraCoreApi",
-    "libcore.io.IoUtils",
-    "libcore.util.NativeAllocationRegistry",
-    "libcore.util.NonNull",
     "sun.misc.Cleaner"
   ],
+  "compileOnlyDeclarationGroups": {
+    "support": [
+      "android.compat.annotation.UnsupportedAppUsage",
+      "dev.apkweb.os.NfcHost",
+      "dev.apkweb.os.StrictModeHost",
+      "java.lang.invoke.LambdaMetafactory",
+      "java.util.Arrays",
+      "java.util.LinkedHashMap",
+      "jdk.internal.HotSpotIntrinsicCandidate",
+      "sun.misc.Cleaner"
+    ],
+    "support-javatime": [
+      "android.compat.annotation.UnsupportedAppUsage",
+      "java.lang.Class",
+      "java.lang.Math",
+      "java.lang.System",
+      "java.lang.Thread",
+      "java.lang.invoke.LambdaMetafactory",
+      "java.lang.invoke.SerializedLambda",
+      "java.lang.reflect.Field",
+      "java.net.Socket",
+      "java.security.Security",
+      "java.util.Calendar",
+      "java.util.TimeZone",
+      "jdk.internal.HotSpotIntrinsicCandidate",
+      "sun.nio.ch.AsynchronousFileChannelImpl",
+      "sun.nio.ch.Interruptible",
+      "sun.nio.ch.SelChImpl",
+      "sun.nio.ch.SinkChannelImpl",
+      "sun.reflect.CallerSensitive",
+      "sun.reflect.Reflection",
+      "sun.reflect.misc.ReflectUtil",
+      "sun.util.locale.provider.CalendarDataUtility",
+      "sun.util.locale.provider.LocaleProviderAdapter",
+      "sun.util.locale.provider.LocaleResources",
+      "sun.util.locale.provider.TimeZoneNameUtility"
+    ],
+    "support-jca": [
+      "dev.apkweb.keystore.Host"
+    ]
+  },
   "sourceReplacesCompileOnlyContracts": [
     "java.util.Arrays (selected original methods only)",
-    "java.util.LinkedHashMap (complete original class)",
-    "android.os.Trace (complete original class)",
-    "android.text.TextUtils (selected original helpers and locale direction)",
-    "android.graphics.drawable.DrawableInflater (complete original class)",
-    "android.graphics.ColorFilter (complete original class)",
-    "android.graphics.PorterDuffColorFilter (complete original class)",
-    "android.graphics.drawable.AnimatedVectorDrawable (complete original class)",
-    "android.view.animation.AnimationUtils (selected original clock and interpolator XML loading)"
+    "java.util.LinkedHashMap (complete original class)"
   ],
   "compileOnlyDeclarationsPackaged": false,
   "charsetLookupProvenance": {
@@ -40260,7 +40683,21 @@
     "generatedRuntimeData": "src/charset-data.js",
     "nativeBoundary": "NativeConverter exact boot-only JNI keys; no ELF execution; finalizers are opaque managed VM handles, not native pointers"
   },
-  "androidJarUsage": "API declarations for Android javac/D8 verification only; Java-core uses --release 8 JDK metadata. No SDK or JDK class implementation is packaged; only selected original source classfiles are D8 inputs",
+  "compileClasspath": [
+    {
+      "groupId": "org.robolectric",
+      "artifactId": "android-all",
+      "version": "13-robolectric-9030017",
+      "url": "https://repo1.maven.org/maven2/org/robolectric/android-all/13-robolectric-9030017/android-all-13-robolectric-9030017.jar",
+      "sha256": "6e67dca81d30295e31ee6a28cfb601b6b66aaeaee51a92386ed099a64cea5996",
+      "bytes": 178380165,
+      "aospBuildId": "9030017",
+      "role": "compile-time classpath for javac and D8 --classpath only; never a D8 input, never packaged, never executed",
+      "usedBy": "javac bootclasspath of every group (after the lab compile-only overlays, ahead of android.jar) and D8 --classpath"
+    }
+  ],
+  "androidJarUsage": "API declarations for Android javac and D8 --lib only (java.* from libcore, which android-all does not contain; the public android.R resource ids of the API36 profile). Java-core uses --release 8 JDK metadata. No SDK or JDK class implementation is packaged; only selected original source classfiles are D8 inputs",
+  "androidAllUsage": "The AOSP-built android-all jar resolves the declarations (including hidden members and constants) of original AOSP classes at compile time. It is never a D8 input, never packaged, never executed, never committed; the build verifies its SHA-256 against framework-aosp/android-all.json",
   "licenses": [
     "LICENSE",
     "NOTICE"

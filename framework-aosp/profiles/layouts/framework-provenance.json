@@ -4,8 +4,8 @@
   "enabledByDefault": false,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "sha256": "066dd623c6ca4e443af7fcc65b858ae1358685cdf89d3cb89d08cbc87e86f865",
-  "bytes": 496960,
+  "sha256": "318b5e2142bcff89a8f973106c101a864f697f406ad3379102aa0e5d719fbeec",
+  "bytes": 497160,
   "classes": [
     "Landroid/R$styleable;",
     "Landroid/app/AlertDialog$Builder;",
@@ -1274,7 +1274,7 @@
       "license": "Apache-2.0"
     }
   ],
-  "requiresDefaultFrameworkSha256": "583d9bf4be4efddd86043812a845865d611b366ac70e78fcc32b9f30ecafbd51",
+  "requiresDefaultFrameworkSha256": "8954a88001c0718da9fea41c070b01de4f8025990439df3bda7ab2f9c04fee1b",
   "sourceTransforms": [
     {
       "path": "com/android/internal/app/AlertController.java",

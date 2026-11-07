@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=b60e95a62870';
-import { APKError } from './apk-error.js?v=b60e95a62870';
-import { gcRoot } from './heap-gc.js?v=b60e95a62870';
+import { createHostRegistry } from './host-contract.js?v=0a3a52e395d4';
+import { APKError } from './apk-error.js?v=0a3a52e395d4';
+import { gcRoot } from './heap-gc.js?v=0a3a52e395d4';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -471,6 +471,7 @@ export function createActivityApiHost(platform) {
   defContext('getPackageCodePath', `()${STRING}`, () => codePath());
   defContext('getPackageResourcePath', `()${STRING}`, () => codePath());
   defContext('getOpPackageName', `()${STRING}`, () => platform.packageName);
+  defContext('getUserId', '()I', () => 0);   // the virtual device has one user, 0 (UserHandle.USER_SYSTEM); the hidden Context.getUserId the originals of the system managers read
   defContext('getColorStateList', `(I)Landroid/content/res/ColorStateList;`, (r, _m, [self, id]) => call(r, call(r, self, CONTEXT, 'getTheme', [], 'Landroid/content/res/Resources$Theme;'), 'Landroid/content/res/Resources;', 'getColorStateList', ['I', 'Landroid/content/res/Resources$Theme;'], 'Landroid/content/res/ColorStateList;', [id, call(r, self, CONTEXT, 'getTheme', [], 'Landroid/content/res/Resources$Theme;')]) );
   defContext('getString', `(I[Ljava/lang/Object;)${STRING}`, (r, _m, [self, id, args]) => call(r, call(r, self, CONTEXT, 'getResources', [], 'Landroid/content/res/Resources;'), 'Landroid/content/res/Resources;', 'getString', ['I', '[Ljava/lang/Object;'], STRING, [id, args]));
   defContext('getDisplay', '()Landroid/view/Display;', (r) => platform.displayHost.get(r));

@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=b60e95a62870';
-import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=b60e95a62870';
+import { APKError } from './apk-runtime.js?v=0a3a52e395d4';
+import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=0a3a52e395d4';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -57,9 +57,8 @@ export function createViewWindowHost(platform){
  const isAttached=(runtime,receiver)=>{const view=runtime.object(receiver);if(view.attached)return true;const frame=frameOf(runtime,receiver);if(!frame?.window||!frame.root)return false;const window=runtime.object(frame.window);return (same(receiver,window.decor)||same(receiver,window.content))&&!!runtime.object(frame.root).attached;};
  const windowToken=(runtime,receiver)=>{if(!isAttached(runtime,receiver))return null;ephemeronMap(runtime,tokens);const frame=frameOf(runtime,receiver),key=frame?.activity.ref??rootOf(runtime,receiver).ref;
   if(!tokens.has(key)){const value=runtime.makeObject(TOKEN);runtime.object(value).windowOwner=frame?.activity??rootOf(runtime,receiver);tokens.set(key,value);}return tokens.get(key);};
- const mainHandler=runtime=>{if(!handler){handler=runtime.allocate('Landroid/os/Handler;');runtime.dispatch({owner:'Landroid/os/Handler;',name:'<init>',signature:'()V',parameters:[],result:'V'},[handler],'direct');}return handler;};
- const sortQueue=()=>platform.eventQueue.sort((a,b)=>a.front!==b.front?a.front?-1:1:a.front?b.sequence-a.sequence:a.when-b.when||a.sequence-b.sequence);
- const schedule=(runtime,when,task,metadata={})=>{if(platform.eventQueue.length>=1024)error('Window/frame queue exceeds1024events');const event={when,sequence:++platform.eventSequence,front:false,platformTask:task,...metadata};platform.eventQueue.push(event);sortQueue();return event;};
+ const mainHandler=runtime=>platform.looperHost.mainHandler(runtime);
+ const schedule=(runtime,when,task,metadata={})=>{const event={when,sequence:++platform.eventSequence,front:false,platformTask:task,...metadata},now=platform.clock.now();/* a Message of the main Looper's MessageQueue (looper-host.js); frame work and Choreographer callbacks are asynchronous, as in ViewRootImpl/Choreographer, so they pass sync barriers */platform.looperHost.postAt(runtime,event,when<=now?Math.floor(now):Math.ceil(when),{asynchronous:metadata.windowFrameTime!==undefined||metadata.windowCallback?.onAnimation===true});return event;};
  const run=(runtime,callback)=>runtime.dispatch({owner:RUNNABLE,name:'run',signature:'()V',parameters:[],result:'V'},[callback],'virtual');
  const enqueueView=(runtime,receiver,callback,delay,onAnimation)=>{
   if(nullish(callback))runtime.throwJava('Ljava/lang/NullPointerException;','View.post requires Runnable');runtime.object(callback);
@@ -70,7 +69,7 @@ export function createViewWindowHost(platform){
  };
  const ensureFrameEvent=(runtime,when)=>{
   // One queue task per frame lets callbacks posted while dispatching wait until a later frame.
-  if(platform.eventQueue.some(event=>event.windowFrameTime===when))return;
+  for(const event of platform.looperHost.pendingEvents())if(event.windowFrameTime===when)return;
   schedule(runtime,when,()=>{
    const vsync=Math.max(when,Math.floor(platform.clock.now()/frameInterval)*frameInterval);/* Choreographer skips frames it was too late for: the frame time is the latest vsync not after now */lastFrameMs=vsync;platform.lastFrameMs=vsync;frameTime=BigInt(Math.round(vsync*1000000));runtime.record(`FRAME ${frameTime} [explicit60HzwebVMclock]`);framesRun++;
    let animationClockLocked=false;
@@ -151,7 +150,7 @@ export function createViewWindowHost(platform){
     const match=item=>same(item.receiver,receiver)&&same(item.callback,args[1]);
     const before=pendingViews.get(receiver.ref)||[],after=before.filter(item=>!match(item));pendingViewCount-=before.length-after.length;
     if(after.length)pendingViews.set(receiver.ref,after);else pendingViews.delete(receiver.ref);
-    platform.eventQueue=platform.eventQueue.filter(event=>!event.windowCallback||!match(event.windowCallback));return 1;
+    platform.cancelEvents(runtime,event=>event.windowCallback&&match(event.windowCallback));return 1;
    }
    if(name.startsWith('post')){enqueueView(runtime,receiver,args[1],args[2]??0n,name.startsWith('postOnAnimation'));return name==='post'||name==='postDelayed'?1:undefined;}
    error(`Unsupported View window operation ${name}`);

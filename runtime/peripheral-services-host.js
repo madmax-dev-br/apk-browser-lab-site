@@ -1,6 +1,6 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=b60e95a62870';
-import { APKError } from './apk-error.js?v=b60e95a62870';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=b60e95a62870';
+import { bitsFloat, floatBits } from './host-contract.js?v=0a3a52e395d4';
+import { APKError } from './apk-error.js?v=0a3a52e395d4';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=0a3a52e395d4';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB
@@ -114,8 +114,7 @@ export function createPeripheralServicesHost(platform) {
   // NfcManager is the original framework class: its constructor asks NfcAdapter.getNfcAdapter, which on a device without FEATURE_NFC logs "this device does not have NFC support" and throws
   // UnsupportedOperationException, so getDefaultAdapter() is null (NfcAdapter.getDefaultAdapter(Context) answers null earlier still: there is no "nfc" service). No adapter object ever exists.
   kit.classService('nfc', 'Landroid/nfc/NfcManager;', r => construct(r, 'Landroid/nfc/NfcManager;', ['Landroid/content/Context;'], [platform.application]));
-  // The hidden process accessors the NFC originals read: ServiceManager.getService (no binder services in the process) and the IPackageManager feature query.
-  def('Landroid/os/ServiceManager;', 'getService', '(Ljava/lang/String;)Landroid/os/IBinder;', () => null, { static: true });
+  // The hidden process accessors the NFC originals read: ServiceManager.getService (the Java registry, src/java-services-host.js: no "nfc" binder) and the IPackageManager feature query.
   const IPM = 'Landroid/content/pm/IPackageManager;', PM_BINDER = 'Ldev/apkweb/pm/PackageManagerBinder;';
   type(PM_BINDER, OBJECT, [IPM], { allocatable: true });
   def('Landroid/app/ActivityThread;', 'getPackageManager', `()${IPM}`, r => { platform.packageManagerBinder ??= r.allocate(PM_BINDER); return platform.packageManagerBinder; }, { static: true });

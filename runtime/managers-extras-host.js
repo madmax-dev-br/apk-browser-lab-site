@@ -1,15 +1,14 @@
-import { createHostRegistry } from './host-contract.js?v=b60e95a62870';
+import { createHostRegistry } from './host-contract.js?v=0a3a52e395d4';
 
 // The system-manager methods an ordinary app calls that the first host passes left out, for a one-user, unmanaged, unlocked phone without fingerprint hardware or thermal HAL
 // (android-13.0.0_r1 UserManager / UserManagerService, KeyguardManager / PhoneWindowManager, PowerManager / ThermalManagerService, FingerprintManager):
 //  UserManager     one user (0, "Owner"), no restrictions, MANAGE_USERS operations refused with the platform's text
 //  KeyguardManager the keyguard is not showing: KeyguardLock needs DISABLE_KEYGUARD, exitKeyguardSecurely succeeds, requestDismissKeyguard reports an error (nothing to dismiss)
-//  PowerManager    thermal listeners hear the current status (NONE), no headroom (NaN), no standby / idle modes, reboot() needs the REBOOT permission
+//  (PowerManager moved to the Java system_server: src/java-services-host.js, docs/SERVICES.md)
 //  BiometricPrompt (Builder checks, CryptoObject, callbacks; no sensor, so authenticate() reports the service's error), FingerprintManager.authenticate / CryptoObject / AuthenticationCallback: no hardware, so nothing is ever authenticated and no success is reported
-const USER = 'Landroid/os/UserManagerImpl;', USER_STATIC = 'Landroid/os/UserManager;', KEYGUARD = 'Landroid/app/KeyguardManagerImpl;', POWER = 'Landroid/os/PowerManagerImpl;', FINGERPRINT = 'Landroid/hardware/fingerprint/FingerprintManagerImpl;';
+const USER = 'Landroid/os/UserManagerImpl;', USER_STATIC = 'Landroid/os/UserManager;', KEYGUARD = 'Landroid/app/KeyguardManagerImpl;', FINGERPRINT = 'Landroid/hardware/fingerprint/FingerprintManagerImpl;';
 const HANDLE = 'Landroid/os/UserHandle;', BUNDLE = 'Landroid/os/Bundle;', LIST = 'Ljava/util/List;', STRING = 'Ljava/lang/String;', EXECUTOR = 'Ljava/util/concurrent/Executor;', RUNNABLE = 'Ljava/lang/Runnable;', DELIVERY = 'Lapkweb/bridge/TelephonyDelivery;';
 const LOCK = 'Landroid/app/KeyguardManager$KeyguardLock;', EXIT = 'Landroid/app/KeyguardManager$OnKeyguardExitResult;', DISMISS = 'Landroid/app/KeyguardManager$KeyguardDismissCallback;', ACTIVITY = 'Landroid/app/Activity;';
-const THERMAL = 'Landroid/os/PowerManager$OnThermalStatusChangedListener;';
 const FP = 'Landroid/hardware/fingerprint/FingerprintManager', FP_CALLBACK = `${FP}$AuthenticationCallback;`, FP_RESULT = `${FP}$AuthenticationResult;`, FP_CRYPTO = `${FP}$CryptoObject;`;
 const SIGNAL = 'Landroid/os/CancellationSignal;', HANDLER = 'Landroid/os/Handler;';
 
@@ -65,22 +64,6 @@ export function createManagersExtrasHost(platform) {
   def(DISMISS, '<init>', '()V', () => {});
   def(KEYGUARD, 'addKeyguardLockedStateListener', `(${EXECUTOR}Landroid/app/KeyguardManager$KeyguardLockedStateListener;)V`, r => denied(r, `Neither user ${uid()} nor current process has android.permission.SUBSCRIBE_TO_KEYGUARD_LOCKED_STATE.`));
   def(KEYGUARD, 'removeKeyguardLockedStateListener', '(Landroid/app/KeyguardManager$KeyguardLockedStateListener;)V', r => denied(r, `Neither user ${uid()} nor current process has android.permission.SUBSCRIBE_TO_KEYGUARD_LOCKED_STATE.`));
-
-  // ---- PowerManager
-  const thermal = platform.thermalListeners ??= [];
-  const notifyThermal = (r, listener, executor) => runOn(r, executor, () => { if (thermal.some(entry => entry.listener.ref === listener.ref)) call(r, listener, r.typeOf(listener), 'onThermalStatusChanged', ['I'], 'V', [0]); }, [listener]);   // THERMAL_STATUS_NONE
-  for (const signature of [`(${THERMAL})V`, `(${EXECUTOR}${THERMAL})V`]) def(POWER, 'addThermalStatusListener', signature, (r, _m, args) => {
-    const listener = args.at(-1), executor = args.length > 2 ? args[1] : null;
-    if (nullish(listener)) r.throwJava('Ljava/lang/NullPointerException;', null);
-    if (thermal.some(entry => entry.listener.ref === listener.ref)) return;   // a listener registered twice is not registered again
-    thermal.push({ listener, executor }); notifyThermal(r, listener, executor);
-  });
-  def(POWER, 'removeThermalStatusListener', `(${THERMAL})V`, (r, _m, [, listener]) => { const at = thermal.findIndex(entry => entry.listener.ref === listener?.ref); if (at >= 0) thermal.splice(at, 1); });
-  def(POWER, 'getThermalHeadroom', '(I)F', () => 0x7fc00000 | 0);   // Float.NaN: this device has no thermal HAL
-  def(POWER, 'getLocationPowerSaveMode', '()I', () => 0);   // LOCATION_MODE_NO_CHANGE
-  for (const name of ['isLowPowerStandbyEnabled', 'isDeviceLightIdleMode', 'isBatteryDischargePredictionPersonalized']) def(POWER, name, '()Z', () => 0);
-  def(POWER, 'isRebootingUserspaceSupported', '()Z', () => 0, { static: true }); def(POWER, 'getBatteryDischargePrediction', '()Ljava/time/Duration;', () => null);
-  def(POWER, 'reboot', `(${STRING})V`, r => denied(r, `Neither user ${uid()} nor current process has android.permission.REBOOT.`));
 
   // ---- FingerprintManager: no sensor. authenticate() with a missing callback or an already cancelled signal behaves as the framework does; otherwise nothing happens (no FingerprintService).
   type(FP_CALLBACK, 'Ljava/lang/Object;', [], { allocatable: true }); type(FP_RESULT, 'Ljava/lang/Object;', [], { allocatable: true }); type(FP_CRYPTO, 'Ljava/lang/Object;', [], { allocatable: true });

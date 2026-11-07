@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=b60e95a62870';
-import { registerPackageValueFields } from './package-value-fields.js?v=b60e95a62870';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=b60e95a62870';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=b60e95a62870';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=b60e95a62870';
+import { APKError } from './apk-error.js?v=0a3a52e395d4';
+import { registerPackageValueFields } from './package-value-fields.js?v=0a3a52e395d4';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=0a3a52e395d4';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=0a3a52e395d4';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=0a3a52e395d4';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -741,40 +741,6 @@ export function createAppServicesHost(platform) {
   def(ACTIVITY_MANAGER, 'isBackgroundRestricted', '()Z', () => 0);
   def(ACTIVITY_MANAGER, 'getHistoricalProcessExitReasons', `(${STRING}II)Ljava/util/List;`, r => newEmptyList(r)); // a fresh virtual process has no exit history
 
-  // PowerManager / WakeLock (frameworks/base/core/java/android/os/PowerManager.java): the device is awake and interactive; wake locks keep the AOSP reference counting
-  // (RuntimeException "WakeLock under-locked <tag>"), and acquire(timeout) lapses against the VM's virtual clock. Holding one has no further effect on this device.
-  const POWER_MANAGER = service('power', 'Landroid/os/PowerManager;'), WAKE_LOCK = 'Landroid/os/PowerManager$WakeLock;', WAKE_LOCK_LEVELS = new Set([1, 6, 10, 26, 32, 64, 128]);
-  type(WAKE_LOCK, OBJECT, [], { allocatable: true });
-  def(POWER_MANAGER, 'newWakeLock', `(I${STRING})${WAKE_LOCK}`, (r, _m, [, levelAndFlags, tag]) => {
-    if (tag === null) r.throwJava('Ljava/lang/IllegalArgumentException;', 'The tag must not be null.');
-    if (!WAKE_LOCK_LEVELS.has(levelAndFlags & 0xffff)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Must specify a valid wake lock level.');
-    const lock = r.allocate(WAKE_LOCK); r.object(lock).wakeLock = { levelAndFlags, tag: r.stringCharacters(tag), refCounted: true, internal: 0, external: 0, held: false, timeouts: [] }; return lock;
-  });
-  const wakeLock = (r, ref) => {
-    const state = r.object(ref).wakeLock, now = r.clock.wall();
-    for (const due of state.timeouts.filter(at => at <= now)) { state.timeouts.splice(state.timeouts.indexOf(due), 1); releaseWakeLock(state, true); }   // the Handler.postDelayed(mReleaser) of acquire(timeout)
-    return state;
-  };
-  const releaseWakeLock = (state, byTimeout) => {
-    state.internal--; if (!byTimeout) state.external--;
-    if (!state.refCounted || state.internal === 0) state.held = false;
-    return state.refCounted && state.external < 0;
-  };
-  def(WAKE_LOCK, 'acquire', '()V', (r, _m, [self]) => { const state = wakeLock(r, self); state.internal++; state.external++; if (!state.refCounted || state.internal === 1) state.held = true; });
-  def(WAKE_LOCK, 'acquire', '(J)V', (r, _m, [self, timeout]) => {
-    const state = wakeLock(r, self); state.internal++; state.external++; if (!state.refCounted || state.internal === 1) state.held = true;
-    state.timeouts.push(r.clock.wall() + Number(timeout));
-  });
-  const release = (r, self, flags) => { const state = wakeLock(r, self); if (releaseWakeLock(state, (flags & 1) !== 0)) r.throwJava('Ljava/lang/RuntimeException;', `WakeLock under-locked ${state.tag}`); };
-  def(WAKE_LOCK, 'release', '()V', (r, _m, [self]) => release(r, self, 0)); def(WAKE_LOCK, 'release', '(I)V', (r, _m, [self, flags]) => release(r, self, flags));
-  def(WAKE_LOCK, 'isHeld', '()Z', (r, _m, [self]) => wakeLock(r, self).held ? 1 : 0);
-  def(WAKE_LOCK, 'setReferenceCounted', '(Z)V', (r, _m, [self, value]) => { const state = wakeLock(r, self); state.refCounted = !!value; });
-  def(WAKE_LOCK, 'toString', `()${STRING}`, (r, _m, [self]) => { const state = wakeLock(r, self); return `WakeLock{${(r.object(self).id >>> 0).toString(16)} held=${state.held}, refCount=${state.internal}}`; });
-  def(POWER_MANAGER, 'isInteractive', '()Z', () => 1); def(POWER_MANAGER, 'isScreenOn', '()Z', () => 1);
-  def(POWER_MANAGER, 'isPowerSaveMode', '()Z', () => 0); def(POWER_MANAGER, 'isDeviceIdleMode', '()Z', () => 0); def(POWER_MANAGER, 'isLightDeviceIdleMode', '()Z', () => 0);
-  def(POWER_MANAGER, 'isIgnoringBatteryOptimizations', `(${STRING})Z`, () => 0); def(POWER_MANAGER, 'isSustainedPerformanceModeSupported', '()Z', () => 0);
-  def(POWER_MANAGER, 'getCurrentThermalStatus', '()I', () => 0); def(POWER_MANAGER, 'isWakeLockLevelSupported', '(I)Z', (_r, _m, [, level]) => level === 1 || level === 6 || level === 10 || level === 26 || level === 128 ? 1 : 0);
-
   // ---- PackageManager.getServiceInfo (ServiceInfo = ComponentInfo + permission/flags/foregroundServiceType) --------------------------------------
   const SERVICE_INFO = 'Landroid/content/pm/ServiceInfo;';
   type(SERVICE_INFO, COMPONENT_INFO, [], { allocatable: true });
@@ -877,18 +843,14 @@ export function createAppServicesHost(platform) {
 
   // Context.getMainExecutor (API 28): ContextImpl hands out the main thread's HandlerExecutor; execute() posts to the main Looper and refuses when the post fails.
   const HANDLER_EXECUTOR = 'Landroid/os/HandlerExecutor;', EXECUTOR = 'Ljava/util/concurrent/Executor;';
-  type(HANDLER_EXECUTOR, OBJECT, [EXECUTOR], { allocatable: true });
+  // The executor is the original android.os.HandlerExecutor of framework.dex over a Handler on the main Looper (its execute() posts and refuses when the post fails).
   defContext('getMainExecutor', `()${EXECUTOR}`, r => {
     if (!platform.mainExecutor) {
       const looper = r.dispatch({ owner: 'Landroid/os/Looper;', name: 'getMainLooper', parameters: [], result: 'Landroid/os/Looper;', signature: '()Landroid/os/Looper;' }, [], 'static');
       const handler = r.allocate('Landroid/os/Handler;'); r.dispatch({ owner: 'Landroid/os/Handler;', name: '<init>', parameters: ['Landroid/os/Looper;'], result: 'V', signature: '(Landroid/os/Looper;)V' }, [handler, looper], 'direct');
-      const executor = r.allocate(HANDLER_EXECUTOR); r.object(executor).handler = handler; platform.mainExecutor = executor;
+      const executor = r.allocate(HANDLER_EXECUTOR); r.dispatch({ owner: HANDLER_EXECUTOR, name: '<init>', parameters: ['Landroid/os/Handler;'], result: 'V', signature: '(Landroid/os/Handler;)V' }, [executor, handler], 'direct'); platform.mainExecutor = executor;
     }
     return platform.mainExecutor;
-  });
-  def(HANDLER_EXECUTOR, 'execute', '(Ljava/lang/Runnable;)V', (r, _m, [self, command]) => {
-    const posted = r.dispatch({ owner: 'Landroid/os/Handler;', name: 'post', parameters: ['Ljava/lang/Runnable;'], result: 'Z', signature: '(Ljava/lang/Runnable;)Z' }, [r.object(self).handler, command], 'virtual');
-    if (!posted) r.throwJava('Ljava/util/concurrent/RejectedExecutionException;', `${r.typeOf(r.object(self).handler)} is shutting down`);
   });
   // Context.getColor (API 23): getResources().getColor(id, getTheme())
   defContext('getColor', '(I)I', (r, _m, [context, id]) => {

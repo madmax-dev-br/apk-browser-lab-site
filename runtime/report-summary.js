@@ -1,6 +1,6 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=b60e95a62870';
+import { TimeBreakdown } from './time-breakdown.js?v=0a3a52e395d4';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -51,7 +51,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
   });
   part(() => {   // every OutOfMemoryError: which limit, where
     const log = runtime.oomLog; if (!log?.length) return;
-    for (const entry of log.slice(-3)) out.push(`OOM (${entry.kind}) em ${entry.thread ?? '?'}: ${entry.frames.join(' ← ') || entry.hostCall || 'código do host'}; objetos ${entry.objects}/${entry.maxObjects}, campos ${entry.fieldSlots}/${entry.maxFieldSlots}, células de arrays ${entry.arrayCells}/${entry.maxArrayCells}, de coleções ${entry.collectionCells}/${entry.maxCollectionCells}`);
+    for (const entry of log.slice(-3)) out.push(`OOM (${entry.kind}) em ${entry.thread ?? '?'}: ${entry.frames.join(' ← ') || entry.hostCall || 'código do host'}; objetos ${entry.objects}/${entry.maxObjects}, campos ${entry.fieldSlots}/${entry.maxFieldSlots}, células de arrays ${entry.arrayCells}/${entry.maxArrayCells}, de coleções ${entry.collectionCells}/${entry.maxCollectionCells}${entry.gcTries ? `; coletor: ${entry.gcTries.calls ?? 0} safepoints pediram coleta (${entry.gcTries.notDue ?? 0} não devidas), puladas ${JSON.stringify(entry.gcSkips ?? {})}, ${entry.sinceGc} alocados desde a última coleta` : ''}`);
   });
   part(() => {   // (b) survivors, (c) who keeps them, retention paths
     const last = runtime.gcPhases?.[0]; if (!last) return;
@@ -120,7 +120,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     const queue = runtime.platform?.eventQueue ?? []; if (!queue.length) return;
     const now = runtime.platform.clock.now(), groups = new Map();
     for (const event of queue) {
-      let what; try { what = event.platformTask ? `tarefa do host ${event.platformTask.name || '(anônima)'}` : event.windowFrameTime !== undefined ? 'quadro (Choreographer)' : `${dotted(runtime.typeOf(event.handler)).split('.').pop()} → ${runtime.object(event.message).messageCallback ? dotted(runtime.typeOf(runtime.object(event.message).messageCallback)) : 'what=' + runtime.platform.messageField(runtime, event.message, 'what', 'I')}`; } catch { what = '(mensagem)'; }
+      let what; try { what = event.platformTask ? `tarefa do host ${event.platformTask.name || '(anônima)'}` : event.windowFrameTime !== undefined ? 'quadro (Choreographer)' : `${dotted(runtime.typeOf(event.handler)).split('.').pop()} → ${runtime.platform.looperHost.callbackOf(runtime, event.message) ? dotted(runtime.typeOf(runtime.platform.looperHost.callbackOf(runtime, event.message))) : 'what=' + runtime.platform.looperHost.whatOf(runtime, event.message)}`; } catch { what = '(mensagem)'; }
       const group = groups.get(what) ?? groups.set(what, { n: 0, overdue: -Infinity }).get(what); group.n++; group.overdue = Math.max(group.overdue, now - (event.when ?? now));
     }
     out.push(`fila de eventos (${queue.length}): ${[...groups].sort((a, b) => b[1].n - a[1].n).slice(0, 3).map(([what, g]) => `${g.n}× ${what}${g.overdue > 0 ? `, atraso máx ${Math.round(g.overdue)} ms` : ''}`).join('; ')}`);

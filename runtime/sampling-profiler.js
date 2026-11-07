@@ -12,7 +12,11 @@ export class SamplingProfiler {
   tick() { const now = performance.now(); if (now - this.last >= this.intervalMs) { this.last = now; this.sample(now); } }
   signature(thread) {
     const rt = this.rt, frames = thread.frames ?? [], parts = [];
-    for (let at = frames.length - 1; at >= 0 && parts.length < DEPTH; at--) {
+    // Time spent in a framework callee of app code (Looper.myLooper, a collection call, ...) belongs to the app frame that called it: the stack starts at the innermost app method when there is one,
+    // so a busy loop is one stack however many framework methods it happens to be inside at the instant of a sample.
+    let top = frames.length - 1;
+    for (let at = top; at >= 0; at--) { const method = frames[at]?.method; if (method && rt.methodOrigin(method) === 'apk') { top = at; break; } }
+    for (let at = top; at >= 0 && parts.length < DEPTH; at--) {
       const frame = frames[at], method = frame?.method;
       if (method) parts.push(`${simple(method.owner)}.${method.name}`);
       else if (frame?.cont) parts.push(thread === rt.thread && rt.hostCall ? `host ${short(rt.hostCall)}` : '(chamada do host)');

@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=b60e95a62870';
-import { BUCKET } from './time-breakdown.js?v=b60e95a62870';
-import { Blocked, QUANTUM } from './scheduler.js?v=b60e95a62870';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=b60e95a62870';
+import { APKError } from './apk-error.js?v=0a3a52e395d4';
+import { BUCKET } from './time-breakdown.js?v=0a3a52e395d4';
+import { Blocked, QUANTUM } from './scheduler.js?v=0a3a52e395d4';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=0a3a52e395d4';
 
 // Frame-based DEX interpreter.
 //
@@ -324,7 +324,7 @@ export function currentThread(rt) { return rt.thread ?? rt.scheduler.mainThread(
 /** Runs `method` to completion on the current thread; the entry point behind APKRuntime.execute(). */
 const EMPTY_MONITORS = Symbol('no monitors held');
 export function runNested(rt, method, code, args) {
-  if (rt.nestedRuns === 0) rt.thread = rt.scheduler.mainThread();   // host events (UI, Looper) run on the main thread
+  if (rt.nestedRuns === 0) { rt.thread = rt.scheduler.mainThread(); rt.platform?.looperHost?.autoStart(rt); }   // host events (UI, Looper) run on the main thread; the process's main Looper exists before the first Java code runs
   const thread = rt.thread, base = thread.frames.length;
   if (args.length !== code.incoming) fail(`Argument/register mismatch: ${method.key}`);
   if (base >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
@@ -336,7 +336,7 @@ export function runNested(rt, method, code, args) {
   const checkpoint = rt.nestedRuns === 1 ? (rt.monitors?.size ? new Map(rt.monitors) : EMPTY_MONITORS) : null;
   try { return runLoop(rt, thread, base); }
   catch (error) { if (checkpoint && !(error instanceof JavaException)) rt.monitors = checkpoint === EMPTY_MONITORS ? new Map() : checkpoint; throw error; }
-  finally { thread.frames.length = base; thread.nestedDepth--; rt.nestedRuns--; rt.thread = thread; }
+  finally { thread.frames.length = base; thread.nestedDepth--; rt.nestedRuns--; rt.thread = thread; if (rt.nestedRuns === 0 && thread === rt.scheduler.main) rt.platform?.looperHost?.hostEventRan(rt); }   // the host event is over: its Looper goes back to MessageQueue.next() (IdleHandlers run once)
 }
 
 /** One scheduling slice with no owner: runs whichever thread the scheduler picks until it blocks, ends or uses its quantum (used by drainEvents and nested waits). */
@@ -548,7 +548,7 @@ function runLoop(rt, owner, base) {
                 if (site.isStatic && !site.initialized) { { const gate = rt.initStep(cached.method.owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } site.initialized = rt.initialized.get(cached.method.owner)?.status === 'initialized'; }
                 // APKRuntime.recordMethod / record, inlined for the steady state (counters known, trace ring past its fixed head): per-method counters, evidence row, ring entry.
                 const calleeMethod = cached.method, info = calleeMethod.recordInfo, ring = rt.traceRing;
-                if (!fastCalls || info === undefined || rt.traceMuted || ring == null || ring.head.length < 128) rt.recordMethod(calleeMethod);
+                if (!fastCalls || info === undefined || info.exempt || rt.traceMuted || ring == null || ring.head.length < 128) rt.recordMethod(calleeMethod);
                 else {
                   info.stats.methods++; const evidence = info.evidence; if (evidence !== undefined && evidence.calls < Number.MAX_SAFE_INTEGER) evidence.calls++;
                   if (ring.length === 384) { ring.tail[ring.start] = info.entry; ring.start = ring.start === 383 ? 0 : ring.start + 1; rt.traceDropped = (rt.traceDropped ?? 0) + 1; }
@@ -665,7 +665,7 @@ function runLoop(rt, owner, base) {
       }
     } catch (error) {
       returning = false; input = null;
-      if (error?.vmFatal === true || f === null) throw error;
+      if (error?.vmFatal === true || error?.looperYield === true || f === null) throw error;   // looperYield: the main thread's MessageQueue.next() returns control to the host event loop (message-queue-native.js)
       // No frame is left to handle it (the failure happened after the last frame of this run returned, or in the host code that completes the run): the original error is the report, not a TypeError about a missing frame.
       if (frames.length === 0 || (thread === owner && frames.length <= base)) throw error;
       f = frames[frames.length - 1];                                // compiled code may have entered callees directly: the failing frame is the top one

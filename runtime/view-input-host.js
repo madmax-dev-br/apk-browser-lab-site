@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=b60e95a62870';
-import { gcRoot } from './heap-gc.js?v=b60e95a62870';
+import { APKError } from './apk-runtime.js?v=0a3a52e395d4';
+import { gcRoot } from './heap-gc.js?v=0a3a52e395d4';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;';
 const SUPER_ERROR = 'Landroid/util/SuperNotCalledException;';
@@ -23,9 +23,7 @@ export function createViewInputHost(platform) {
   const dispatch = (runtime, receiver, name, parameters = [], result = 'V', values = []) => runtime.dispatch(
     { owner: VIEW, name, parameters, result, signature: `(${parameters.join('')})${result}` },
     runtime.argumentWords(parameters, values, { receiver }), 'virtual');
-  const cancelQueued = (receiver, kinds) => {
-    platform.eventQueue = platform.eventQueue.filter(event => !same(event.viewInput?.receiver, receiver) || !kinds.includes(event.viewInput.kind));
-  };
+  const cancelQueued = (runtime, receiver, kinds) => platform.cancelEvents(runtime, event => same(event.viewInput?.receiver, receiver) && kinds.includes(event.viewInput.kind));
   const cancel = (runtime, receiver, seen = new Set()) => {
     if (seen.has(receiver.ref) || seen.size >= 4096 || cancellationStack.length >= 64) throw new APKError('Cyclic/excessive View input cancellation', { kind: 'view-input-unsupported' });
     seen.add(receiver.ref);
@@ -86,9 +84,9 @@ export function createViewInputHost(platform) {
         view.overScrollMode = args[1]; return;
       }
       if (name === 'cancelPendingInputEvents' || name === 'dispatchCancelPendingInputEvents') return cancel(runtime, receiver);
-      if (name === 'cancelLongPress') { cancelQueued(receiver, ['longPress', 'tap']); return; }
+      if (name === 'cancelLongPress') { cancelQueued(runtime, receiver, ['longPress', 'tap']); return; }
       if (name === 'onCancelPendingInputEvents') {
-        cancelQueued(receiver, ['click']);
+        cancelQueued(runtime, receiver, ['click']);
         dispatch(runtime, receiver, 'cancelLongPress');
         const current = cancellationStack.at(-1);
         if (current && same(current.receiver, receiver)) current.calledSuper = true;

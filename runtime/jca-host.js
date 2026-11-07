@@ -1,12 +1,12 @@
-import { createHostRegistry } from './host-contract.js?v=b60e95a62870';
-import { FRAMEWORK_RESOURCES } from './jca-resources.js?v=b60e95a62870';
+import { createHostRegistry } from './host-contract.js?v=0a3a52e395d4';
+import { FRAMEWORK_RESOURCES } from './jca-resources.js?v=0a3a52e395d4';
 
 // Platform boundary of the original java.security / javax.crypto / Conscrypt classes in the framework DEX (framework-aosp/jca-sources.txt):
 //   * java.lang.System.logE/logW/logI (libcore hidden logging helpers the Provider framework calls) go to the VM trace like logcat lines;
 //   * android.icu.text.Normalizer2, the ICU class behind the original java.text.Normalizer (X500Name canonical names, IDN, Conscrypt hostnames): the four standard forms
 //     (NFC, NFD, NFKC, NFKD) over the browser's own Unicode normalization, String.prototype.normalize -- the platform boundary for ICU4J's normalizer;
 //   * the platform side of the Keystore 2 client (frameworks/base android.security.keystore2 over the generated AIDL stubs, framework-aosp/generated-keystore2): ServiceManager serves
-//     the software Keystore 2 service of framework-aosp/lab-java-jca (dev.apkweb.keystore.LabKeystore, over the software KeyMint on Conscrypt), UserHandle.myUserId, the hidden
+//     the software Keystore 2 service of framework-aosp/lab-java-jca (dev.apkweb.keystore.LabKeystore, over the software KeyMint on Conscrypt), registered in the system_server registry (src/java-services-host.js), UserHandle.myUserId, the hidden
 //     BiometricManager.getAuthenticatorIds (the virtual device has no enrolled biometric: none), the Intent that resolves the RKP provisioner (the app is not installed), and the lab
 //     Host class the service uses (package name, a flush of the app-data store so keys survive a page reload);
 //   * the resource files of the framework's own classes (java/security/security.properties, the Android 13 provider list) are served from src/jca-resources.js.
@@ -32,14 +32,6 @@ export function createJcaHost(platform) {
   }
   def(NORMALIZER2, 'normalize', `(${CHAR_SEQUENCE})${STRING}`, (r, _m, [self, source]) => text(r, source).normalize(r.object(self).normalizationForm));
   def(NORMALIZER2, 'isNormalized', `(${CHAR_SEQUENCE})Z`, (r, _m, [self, source]) => { const t = text(r, source); return t === t.normalize(r.object(self).normalizationForm) ? 1 : 0; });
-  const SERVICE_MANAGER = 'Landroid/os/ServiceManager;', IBINDER = 'Landroid/os/IBinder;', KEYSTORE2 = 'android.system.keystore2.IKeystoreService/default';
-  const serviceNamed = (r, name) => {
-    if (name === null || r.stringCharacters(name) !== KEYSTORE2) return null;
-    return r.dispatch({ owner: 'Ldev/apkweb/keystore/LabKeystore;', name: 'service', parameters: [], result: IBINDER, signature: `()${IBINDER}` }, [], 'static');
-  };
-  registry.type(SERVICE_MANAGER);
-  for (const name of ['getService', 'checkService', 'waitForService']) def(SERVICE_MANAGER, name, `(${STRING})${IBINDER}`, (r, _m, [service]) => serviceNamed(r, service), { static: true });
-  def(SERVICE_MANAGER, 'isDeclared', `(${STRING})Z`, (r, _m, [service]) => serviceNamed(r, service) === null ? 0 : 1, { static: true });
   def('Landroid/os/UserHandle;', 'myUserId', '()I', () => 0, { static: true });
   def('Landroid/hardware/biometrics/BiometricManager;', 'getAuthenticatorIds', '()[J', r => { const a = r.newArray('[J', 0); return a; });
   def('Landroid/content/Intent;', 'resolveSystemService', '(Landroid/content/pm/PackageManager;I)Landroid/content/ComponentName;', () => null);

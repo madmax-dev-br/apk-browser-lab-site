@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=b60e95a62870';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=b60e95a62870';
-import { inspectELF } from './native-inspector.js?v=b60e95a62870';
-import { inflateRaw } from './inflate.js?v=b60e95a62870';
-import { resolveDevice } from './device-profile.js?v=b60e95a62870';
-import { resourceProfileFor } from './device-configuration.js?v=b60e95a62870';
-import { JniBridge } from './jni-host.js?v=b60e95a62870';
-import { providerForApk } from './native-provider-variants.js?v=b60e95a62870';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=b60e95a62870';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=b60e95a62870';
-import { AndroidResources } from './android-resources.js?v=b60e95a62870';
-import { AndroidPlatform } from './android-platform.js?v=b60e95a62870';
-import { FrameworkProvider } from './framework-provider.js?v=b60e95a62870';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=0a3a52e395d4';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=0a3a52e395d4';
+import { inspectELF } from './native-inspector.js?v=0a3a52e395d4';
+import { inflateRaw } from './inflate.js?v=0a3a52e395d4';
+import { resolveDevice } from './device-profile.js?v=0a3a52e395d4';
+import { resourceProfileFor } from './device-configuration.js?v=0a3a52e395d4';
+import { JniBridge } from './jni-host.js?v=0a3a52e395d4';
+import { providerForApk } from './native-provider-variants.js?v=0a3a52e395d4';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=0a3a52e395d4';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=0a3a52e395d4';
+import { AndroidResources } from './android-resources.js?v=0a3a52e395d4';
+import { AndroidPlatform } from './android-platform.js?v=0a3a52e395d4';
+import { FrameworkProvider } from './framework-provider.js?v=0a3a52e395d4';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -441,6 +441,9 @@ export function nameFrameworkAttributes(node, nameOf) {
   }
   for (const child of node.children ?? []) nameFrameworkAttributes(child, nameOf);
 }
+let defaultFrameworkProvider = null;
+/** Node tests: a factory of the framework provider loadAPK uses when the caller names none (the browser Worker always passes its own). */
+export function setDefaultFrameworkProvider(factory) { defaultFrameworkProvider = factory; }
 export async function loadAPK(arrayBuffer, options = {}) {
   if (!(arrayBuffer instanceof ArrayBuffer) && !(arrayBuffer instanceof Uint8Array)) fail('loadAPK requires an APK ArrayBuffer');
   const archive = new APKArchive(arrayBuffer), names = [...archive.entries.keys()];
@@ -505,7 +508,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   let framework = null;
   const provider = options.frameworkProvider ?? (options.frameworkDex ? new FrameworkProvider({ bytes: options.frameworkDex,
     properties: options.frameworkProperties, metadata: options.frameworkMetadata, expectedSha256: options.frameworkSha256,
-    nativeBindings: options.frameworkNativeBindings }) : null);
+    nativeBindings: options.frameworkNativeBindings }) : 'frameworkDex' in options ? null : defaultFrameworkProvider?.() ?? null);
   if (provider) {
     framework = typeof provider === 'function' ? await provider({ onProgress: options.onProgress }) : await provider.load({ onProgress: options.onProgress });
     if (!framework?.files || !(framework.nativeBindings instanceof Map)) fail('Invalid framework provider result');
