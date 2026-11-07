@@ -1,6 +1,6 @@
-import { createHostRegistry, floatBits, bitsFloat } from './host-contract.js?v=cfc12cc19192';
-import { gcRoot } from './heap-gc.js?v=cfc12cc19192';
-import { sfntStyle, tagToInt } from './sfnt.js?v=cfc12cc19192';
+import { createHostRegistry, floatBits, bitsFloat } from './host-contract.js?v=7cc05078518d';
+import { gcRoot } from './heap-gc.js?v=7cc05078518d';
+import { sfntStyle, tagToInt } from './sfnt.js?v=7cc05078518d';
 
 export { sfntStyle };
 

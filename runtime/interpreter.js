@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=cfc12cc19192';
-import { BUCKET } from './time-breakdown.js?v=cfc12cc19192';
-import { Blocked, QUANTUM } from './scheduler.js?v=cfc12cc19192';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=cfc12cc19192';
+import { APKError } from './apk-error.js?v=7cc05078518d';
+import { BUCKET } from './time-breakdown.js?v=7cc05078518d';
+import { Blocked, QUANTUM } from './scheduler.js?v=7cc05078518d';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=7cc05078518d';
 
 // Frame-based DEX interpreter.
 //
@@ -383,7 +383,7 @@ function runLoop(rt, owner, base) {
         // ---- thread switch: pick a runnable thread (waiting for events/timers while the owner is blocked), then resume it
         let picked = null;
         for (;;) {
-          if (owner !== null && owner.state === 'blocked') sched.serviceEvents();   // threads that never stop must not starve the host event queue while the owner waits
+          if (owner !== null && (owner.state === 'blocked' || sched.starved)) sched.serviceEvents();   // threads that never stop must not starve the host event queue while the owner waits
           const choice = sched.pick(thread, owner);
           if (choice.thread !== null) { picked = choice.thread; break; }
           if (owner === null) return undefined;                         // nothing runnable: this slice is over

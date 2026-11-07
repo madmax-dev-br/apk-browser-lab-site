@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=cfc12cc19192';
+import { APKError } from './apk-error.js?v=7cc05078518d';
 
 // Green-thread scheduler for the VM.
 //
@@ -27,9 +27,10 @@ export class VMThread {
 
 export const QUANTUM = 20000;   // instructions a thread runs before another runnable thread gets the processor
 
-const QUIET_IDLE_LIMIT = 50000;   // consecutive clock skips with no host event in between
+const EVENT_GRACE_MS = 50;   // host time a due host event may wait for a run that cannot return to the event pump before that run yields to it (hostEventsStarved)
+const QUIET_IDLE_LIMIT = 50000;  // consecutive clock skips with no host event in between
 export class Scheduler {
-  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; }
+  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; this.starved = false; this.dueSince = 0; }
   get clock() { return this.rt.platform.clock; }
 
   /** The thread that runs host events (Looper/main). */
@@ -117,8 +118,24 @@ export class Scheduler {
     // A slice with no owner (runThreads, called from a nested host wait or the event pump) is not a thread of its own: the thread whose host wait this slice serves is parked on the JavaScript stack
     // below it. When its wait is over (woken by its deadline, notify or unpark) the slice must end so that it can continue, however many other threads are runnable -- or whether `current` is the only one.
     if (owner === null && this.waitingNested.size && this.innermostNestedReady()) return true;
+    if (this.hostEventsStarved(owner)) return true;
     for (const thread of this.threads) if (thread !== current && thread.state === 'runnable' && (thread === owner || thread.nestedDepth === 0)) return true;
     return false;
+  }
+  /**
+   * Host events (main-Looper messages, posted tasks) that stay due while the running code cannot return to the event pump. The pump normally runs between scheduling slices, but two runs sit on the
+   * JavaScript stack above it and end only when their own work does: a slice that serves a nested host wait (`owner === null` with waiters on the stack), and a nested run owned by a background
+   * thread (host code called back into Java: toString() from String.valueOf, ...). Neither is preempted by an idle main thread, which is not a thread with frames to resume. Android's main thread
+   * runs a due message at once, so after EVENT_GRACE_MS of host time the run yields (sets `starved`) and the caller serves the events (serviceEvents). The grace keeps short callbacks from being
+   * interleaved with main-thread work that might contend for a monitor the buried thread holds. The main thread's own runs never yield (host events assume they are not interleaved mid-event).
+   */
+  hostEventsStarved(owner) {
+    if (owner === null ? this.waitingNested.size === 0 : (owner === this.main || owner.state === 'blocked')) return false;
+    const delay = this.rt.platform.nextEventDelay?.();
+    if (delay !== 0) { this.dueSince = 0; return false; }
+    const now = performance.now();
+    if (!this.dueSince) { this.dueSince = now; return false; }
+    return (this.starved = now - this.dueSince >= EVENT_GRACE_MS);
   }
   /** True when the innermost nested host wait (the only one whose JavaScript stack is on top) can continue. */
   innermostNestedReady() { let innermost = null; for (const thread of this.waitingNested) innermost = thread; return innermost !== null && innermost.state === 'runnable'; }
@@ -129,6 +146,7 @@ export class Scheduler {
    * are already due run, the same way the idle path runs them (a runnable thread is preempted for them: see hasOtherRunnable).
    */
   serviceEvents() {
+    this.starved = false; this.dueSince = 0;
     const platform = this.rt.platform, delay = platform.nextEventDelay?.();
     if (delay === null || delay === undefined || delay > 0) return;
     const previous = this.rt.thread; this.rt.thread = this.mainThread();
