@@ -177,10 +177,10 @@
           "dev.apkweb.fixtures.state.MainActivity"
         ]
       },
-      "executionValidated": false,
+      "executionValidated": true,
       "validation": {
         "evidence": "evidence/validation/compose-state.json",
-        "generatedAt": "2026-11-03T00:44:44.033Z",
+        "generatedAt": "2026-11-07T15:59:25.039Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -199,7 +199,7 @@
       "id": "compose-navigation",
       "file": "compose-navigation-debug.apk",
       "title": "Compose · navegação e Activities",
-      "description": "Fluxo lista → detalhe → editar com Navigation Compose, SettingsActivity e retorno de resultado via Activity Result. Executado e validado no navegador (fluxos completos, entrada real, comparação visual com capturas do Android).",
+      "description": "Fluxo lista → detalhe → editar com Navigation Compose, SettingsActivity e retorno de resultado via Activity Result. Tentativa experimental: a execução na web ainda não passou todos os critérios de validação.",
       "tags": [
         "Navigation Compose",
         "Activities",
@@ -217,15 +217,15 @@
       "executionValidated": false,
       "validation": {
         "evidence": "evidence/validation/compose-navigation.json",
-        "generatedAt": "2026-11-03T00:49:11.903Z",
-        "verdict": true,
+        "generatedAt": "2026-11-07T16:03:18.010Z",
+        "verdict": false,
         "criteria": {
           "flowsNode": true,
           "diagnostics": true,
           "layoutSanity": true,
           "parity": true,
           "flowsBrowser": true,
-          "realTaps": true,
+          "realTaps": false,
           "strict": true
         }
       },
@@ -274,10 +274,10 @@
           "dev.apkweb.hybrid.ReviewActivity"
         ]
       },
-      "executionValidated": false,
+      "executionValidated": true,
       "validation": {
         "evidence": "evidence/validation/hybrid-navigation.json",
-        "generatedAt": "2026-11-03T00:53:41.863Z",
+        "generatedAt": "2026-11-07T16:06:59.652Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -318,7 +318,7 @@
         "Review / Help Activities"
       ],
       "advanced": true,
-      "executionValidated": false,
+      "executionValidated": true,
       "expected": {
         "packageName": "dev.apkweb.projects",
         "launcherActivity": "dev.apkweb.projects.MainActivity",
@@ -330,7 +330,7 @@
       },
       "validation": {
         "evidence": "evidence/validation/xml-projects.json",
-        "generatedAt": "2026-11-03T01:01:52.953Z",
+        "generatedAt": "2026-11-07T16:14:36.606Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -356,7 +356,7 @@
         "BudgetActivity"
       ],
       "advanced": true,
-      "executionValidated": false,
+      "executionValidated": true,
       "expected": {
         "packageName": "dev.apkweb.approvals",
         "launcherActivity": "dev.apkweb.approvals.MainActivity",
@@ -367,7 +367,7 @@
       },
       "validation": {
         "evidence": "evidence/validation/compose-approvals.json",
-        "generatedAt": "2026-11-03T00:55:13.175Z",
+        "generatedAt": "2026-11-07T16:08:23.989Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
