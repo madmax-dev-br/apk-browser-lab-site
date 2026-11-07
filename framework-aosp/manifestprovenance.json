@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 8133640,
-  "sha256": "8954a88001c0718da9fea41c070b01de4f8025990439df3bda7ab2f9c04fee1b",
-  "classCount": 6226,
+  "bytes": 8133968,
+  "sha256": "780f22d143ebb4498bc14e28e5a10697c40d1bc908a956760969d10fa2ef9f6f",
+  "classCount": 6227,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -870,6 +870,7 @@
     "Landroid/graphics/RenderNode$NoImagePreloadHolder;",
     "Landroid/graphics/RenderNode$UsageHint;",
     "Landroid/graphics/RenderNode;",
+    "Landroid/graphics/TemporaryBuffer;",
     "Landroid/graphics/Xfermode;",
     "Landroid/graphics/animation/NativeInterpolator;",
     "Landroid/graphics/animation/FallbackLUTInterpolator;",
@@ -37986,6 +37987,16 @@
       "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/util/Printer.java?format=TEXT",
       "sha256": "9c0ee0efc19ecd352edf514e9216ee11c7203e01470bf964cb1db27f2f7c7bb3",
       "bytes": 1079,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/TemporaryBuffer.java",
+      "localPath": "framework-aosp/upstream/android/graphics/TemporaryBuffer.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/TemporaryBuffer.java?format=TEXT",
+      "sha256": "2bb4a1979e495da2a5abbfdca66a168b477e00aadc365ada640d34d262051354",
+      "bytes": 1380,
       "license": "Apache-2.0"
     }
   ],
