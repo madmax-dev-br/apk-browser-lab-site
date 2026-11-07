@@ -7,8 +7,8 @@
 // own origin or a srcdoc is an opaque origin that cannot touch the lab's DOM, Worker or storage. Scripts run only when the app enabled JavaScript. The frame gets no
 // permissions policy features (`allow=""`), no referrer, and no ambient credentials where the browser supports `credentialless`.
 
-import { bridgeMarkup, injectIntoHead } from './webview-bridge.js?v=0121b87c7254';
-import { rewriteDocument, RESOURCE_MAX_BYTES } from './webview-resources.js?v=0121b87c7254';
+import { bridgeMarkup, injectIntoHead } from './webview-bridge.js?v=d6386b812e54';
+import { rewriteDocument, RESOURCE_MAX_BYTES } from './webview-resources.js?v=d6386b812e54';
 
 export const FRAME_SANDBOX = Object.freeze({ scripts: 'allow-scripts', forms: 'allow-forms' });
 export const FRAME_ATTRIBUTES = Object.freeze({ allow: '', referrerpolicy: 'no-referrer', loading: 'eager', 'aria-label': 'WebView' });

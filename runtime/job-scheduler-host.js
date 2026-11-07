@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=0121b87c7254';
-import { createHostRegistry } from './host-contract.js?v=0121b87c7254';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=0121b87c7254';
+import { APKError } from './apk-error.js?v=d6386b812e54';
+import { createHostRegistry } from './host-contract.js?v=d6386b812e54';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=d6386b812e54';
 
 // android.app.job: JobScheduler, JobInfo (+ Builder), JobParameters and the JobService base class, with the scheduling rules of Android 13's JobSchedulerService for the
 // constraints a virtual device can answer. AOSP references: frameworks/base/apex/jobscheduler (JobSchedulerService.validateJob, JobStatus.isReady / wouldBeReadyWithConstraint,
@@ -16,10 +16,17 @@ import { gcRoot, GC_ROOTS } from './heap-gc.js?v=0121b87c7254';
 //    bumps its delivery count; completeWork removes it from there. When a run ends (jobFinished or onStopJob) the executing items go back to the FRONT of the pending queue, and a job
 //    that finished without reschedule but still has pending work stays scheduled and starts again (JobSchedulerService keeps a job with work). JobWorkItem is a host class (the AOSP
 //    class is a Parcelable around an Intent plus bookkeeping the host owns, so there is nothing for the app VM to execute that the host does not already hold).
+//  * How the service is run (JobServiceContext.executeRunnableJob / doServiceBoundLocked): the system binds the job's component with BIND_AUTO_CREATE and an Intent carrying the
+//    component, takes the IBinder from onBind as an IJobService and calls startJob / stopJob on it. A JobService's own engine answers that; any other Service (the API 26+
+//    JobIntentService shape) returns JobServiceEngine.getBinder() from onBind. Here a JobService subclass is called directly (same result: its engine just forwards to onStartJob /
+//    onStopJob); a plain Service is created (attach, onCreate), onBind(Intent[component]) is called, and the returned engine binder drives onStartJob / onStopJob / jobFinished. When the
+//    job ends the service is unbound (onUnbind, onDestroy) on the main thread, like the system does for a service with no other bindings. onBind returning null or any binder that is
+//    not a JobServiceEngine binder fails with a named error (kind job-service-bind-failed). The job host keeps its own instance; it does not share one with Context.bindService.
 //  * Not modelled: persistence across a lab restart (setPersisted is recorded; the permission is checked), content-URI triggers (setTriggerContentUri fails explicitly), URI grants carried
 //    by a work item's Intent (a persisted job rejects such an Intent like AOSP; for other jobs the grants are not applied), per-work network estimate accounting, expedited quotas,
 //    doze/standby buckets, the 10 minute execution cap.
 const SCHEDULER = 'Landroid/app/job/JobScheduler;', INFO = 'Landroid/app/job/JobInfo;', BUILDER = 'Landroid/app/job/JobInfo$Builder;', PARAMS = 'Landroid/app/job/JobParameters;', JOB_SERVICE = 'Landroid/app/job/JobService;', SERVICE = 'Landroid/app/Service;';
+const ENGINE = 'Landroid/app/job/JobServiceEngine;', ENGINE_BINDER = 'Landroid/app/job/JobServiceEngine$JobInterface;', IBINDER = 'Landroid/os/IBinder;';
 const WORK = 'Landroid/app/job/JobWorkItem;', WORK_CREATOR = 'Landroid/app/job/JobWorkItem$1;', PARCEL = 'Landroid/os/Parcel;', INTENT = 'Landroid/content/Intent;', CREATOR = 'Landroid/os/Parcelable$Creator;';
 const NETWORK_BYTES_UNKNOWN = -1n;
 const COMPONENT = 'Landroid/content/ComponentName;', PERSISTABLE = 'Landroid/os/PersistableBundle;', BUNDLE = 'Landroid/os/Bundle;', STRING = 'Ljava/lang/String;', NETWORK = 'Landroid/net/Network;', WRAPPER = 'Landroid/content/ContextWrapper;', LIST = 'Ljava/util/List;';
@@ -32,6 +39,7 @@ export function createJobSchedulerHost(platform) {
   const registry = createHostRegistry(), { def, type } = registry;
   type(SERVICE, WRAPPER, [], { allocatable: true }); type(JOB_SERVICE, SERVICE, [], { allocatable: true });
   type(SCHEDULER, 'Ljava/lang/Object;'); type(INFO, 'Ljava/lang/Object;', [], { allocatable: true }); type(BUILDER, 'Ljava/lang/Object;', [], { allocatable: true }); type(PARAMS, 'Ljava/lang/Object;', ['Landroid/os/Parcelable;'], { allocatable: true });
+  type(ENGINE, 'Ljava/lang/Object;', [], { allocatable: true }); type(ENGINE_BINDER, 'Landroid/os/Binder;', [IBINDER], { allocatable: true });
   type(WORK, 'Ljava/lang/Object;', ['Landroid/os/Parcelable;'], { allocatable: true }); type(WORK_CREATOR, 'Ljava/lang/Object;', [CREATOR], { allocatable: true });
   const constants = { NETWORK_TYPE_NONE: NETWORK_NONE, NETWORK_TYPE_ANY: NETWORK_ANY, NETWORK_TYPE_UNMETERED: NETWORK_UNMETERED, NETWORK_TYPE_NOT_ROAMING: NETWORK_NOT_ROAMING, NETWORK_TYPE_METERED: NETWORK_METERED,
     BACKOFF_POLICY_LINEAR: 0, BACKOFF_POLICY_EXPONENTIAL: 1, PRIORITY_DEFAULT: 300, PRIORITY_LOW: 200, PRIORITY_MIN: 100, PRIORITY_HIGH: 400, PRIORITY_MAX: 500 };
@@ -94,18 +102,47 @@ export function createJobSchedulerHost(platform) {
   }
   const kick = r => platform.queueTask(() => evaluate(r), 0, []);
 
+  /** The Intent JobServiceContext binds with: only the job's component. */
+  function bindIntent(r, job) {
+    const intent = r.allocate(INTENT); dispatch(r, INTENT, '<init>', [], 'V', [intent], 'direct');
+    dispatch(r, INTENT, 'setComponent', [COMPONENT], INTENT, [intent, job.spec.component]); return intent;
+  }
+  /** Creates (or reuses) the service of a job: { ref, descriptor, callee: { ref, descriptor } receiving onStartJob/onStopJob, engine, intent }. */
   function serviceFor(r, job) {
     const key = job.spec.className;
     let instance = services.get(key);
     if (!instance) {
       const descriptor = `L${key.replaceAll('.', '/')};`;
-      if (!r.classes.has(descriptor) || !r.isSubtype(descriptor, JOB_SERVICE)) throw new APKError(`JobService ${key} is not a JobService of this APK`, { kind: 'job-service-missing' });
+      if (!r.classes.has(descriptor) || !r.isSubtype(descriptor, SERVICE)) throw new APKError(`Service ${key} is not a Service of this APK`, { kind: 'job-service-missing' });
       const ref = r.allocate(descriptor); dispatch(r, descriptor, '<init>', [], 'V', [ref], 'direct');
       r.object(ref).baseContext = platform.application; r.object(ref).jobServiceType = descriptor;
       dispatch(r, descriptor, 'onCreate', [], 'V', [ref]);
-      instance = { ref, descriptor }; services.set(key, instance);
+      instance = { ref, descriptor, callee: { ref, descriptor }, engine: null, intent: null };
+      if (!r.isSubtype(descriptor, JOB_SERVICE)) {
+        // Not a JobService: bind it the way the system does and drive the job through the JobServiceEngine binder onBind returns.
+        const intent = bindIntent(r, job), binder = dispatch(r, descriptor, 'onBind', [INTENT], IBINDER, [ref, intent]);
+        const engine = binder === null || binder === 0 ? null : r.object(binder).jobEngine ?? null;
+        if (engine === null) {
+          dispatch(r, descriptor, 'onDestroy', [], 'V', [ref]);
+          throw new APKError(`Service ${key} was scheduled as a job but its onBind(Intent) returned ${binder === null || binder === 0 ? 'null' : `a ${r.typeOf(binder).slice(1, -1).replaceAll('/', '.')}`}, not a JobServiceEngine binder; JobSchedulerService can only run a JobService or a Service whose onBind returns JobServiceEngine.getBinder()`, { kind: 'job-service-bind-failed' });
+        }
+        Object.assign(instance, { engine, intent, callee: { ref: engine, descriptor: r.typeOf(engine) } });
+      }
+      services.set(key, instance);
     }
     return instance;
+  }
+  /** The job's run is over: a service that was bound for it is unbound (onUnbind, onDestroy) on the main thread, after the app code that ended the job returned. */
+  function releaseService(r, job) {
+    const service = job.service; job.service = null;
+    if (!service?.engine || service.released) return;
+    service.released = true;
+    platform.queueTask(() => {
+      if (services.get(job.spec.className) === service) services.delete(job.spec.className);
+      dispatch(r, service.descriptor, 'onUnbind', [INTENT], 'Z', [service.ref, service.intent]);
+      dispatch(r, service.descriptor, 'onDestroy', [], 'V', [service.ref]);
+      r.record(`JOB unbind+destroy ${describe(job.spec)}`);
+    }, 0, [service.ref, service.intent]);
   }
   function start(r, job, deadlineForced) {
     const spec = job.spec, service = serviceFor(r, job);
@@ -114,8 +151,8 @@ export function createJobSchedulerHost(platform) {
     job.params = params; job.service = service;
     r.record(`JOB start ${describe(spec)}${deadlineForced ? ' [deadline]' : ''}`);
     let more;
-    try { more = dispatch(r, service.descriptor, 'onStartJob', [PARAMS], 'Z', [service.ref, params]); }
-    catch (error) { job.running = false; throw error; }
+    try { more = dispatch(r, service.callee.descriptor, 'onStartJob', [PARAMS], 'Z', [service.callee.ref, params]); }
+    catch (error) { job.running = false; releaseService(r, job); throw error; }
     if (!more) finish(r, job, false, 'onStartJob returned false');
   }
   /** Periodic jobs run once per period, in the last `flex` ms of it; the period after a run starts where the previous one ended (JobStatus.createFromOldJob / getPeriodicJobRunTimes). */
@@ -127,7 +164,7 @@ export function createJobSchedulerHost(platform) {
   /** The job is over: remove it, re-queue it (back-off) or arm the next period. */
   function finish(r, job, reschedule, why) {
     if (!job.running) return;
-    job.running = false; job.params = null; stats.finished++; releaseWork(job);
+    job.running = false; job.params = null; stats.finished++; releaseWork(job); releaseService(r, job);
     r.record(`JOB finished ${describe(job.spec)} reschedule=${reschedule} (${why})`);
     if (!jobs.has(job.spec.id) || jobs.get(job.spec.id) !== job) return;           // cancelled or replaced meanwhile
     if (reschedule) { job.backoffAttempts++; job.earliest = clock() + backoffDelay(job); job.deadline = null; stats.rescheduled++; }
@@ -142,9 +179,9 @@ export function createJobSchedulerHost(platform) {
   function stop(r, job, reason, constraint) {
     if (!job.running) return;
     stats.stopped++; r.object(job.params).stopReason = reason;
-    const reschedule = dispatch(r, job.service.descriptor, 'onStopJob', [PARAMS], 'Z', [job.service.ref, job.params]);
+    const reschedule = dispatch(r, job.service.callee.descriptor, 'onStopJob', [PARAMS], 'Z', [job.service.callee.ref, job.params]);
     r.record(`JOB stopped ${describe(job.spec)} reason=${reason} reschedule=${!!reschedule}`);
-    job.running = false; job.params = null; releaseWork(job);
+    job.running = false; job.params = null; releaseWork(job); releaseService(r, job);
     if (constraint === false) return;                                                // cancelled: removed by the caller
     if (jobs.get(job.spec.id) !== job) return;
     if (reschedule || job.spec.periodic) { if (reschedule) { job.backoffAttempts++; job.earliest = clock() + backoffDelay(job); } else nextPeriod(job); stats.rescheduled++; }
@@ -179,6 +216,19 @@ export function createJobSchedulerHost(platform) {
   def(SERVICE, 'onStart', '(Landroid/content/Intent;I)V', () => {}); def(SERVICE, 'onLowMemory', '()V', () => {}); def(SERVICE, 'onTrimMemory', '(I)V', () => {});
   def(JOB_SERVICE, '<init>', '()V', () => {});
   def(JOB_SERVICE, 'jobFinished', `(${PARAMS}Z)V`, (r, _m, [, params, wantsReschedule]) => {
+    if (params === null || params === 0) r.throwJava('Ljava/lang/NullPointerException;', 'params');
+    const job = r.object(params).job; if (!job) return;
+    finish(r, job, !!wantsReschedule, 'jobFinished');
+  });
+  // JobServiceEngine (core/java/android/app/job/JobServiceEngine.java, API 26): the base of the engine a Service wraps; the app subclass implements onStartJob / onStopJob. getBinder() is
+  // the IJobService stub (here a Binder carrying the engine, which the job host recognises); jobFinished ends the run exactly as JobService.jobFinished does.
+  def(ENGINE, '<init>', `(${SERVICE})V`, (r, _m, [self, service]) => { r.object(self).engineService = service; });
+  def(ENGINE, 'getBinder', `()${IBINDER}`, (r, _m, [self]) => {
+    const object = r.object(self);
+    if (!object.engineBinder) { object.engineBinder = r.allocate(ENGINE_BINDER); dispatch(r, 'Landroid/os/Binder;', '<init>', [], 'V', [object.engineBinder], 'direct'); r.object(object.engineBinder).jobEngine = self; }
+    return object.engineBinder;
+  });
+  def(ENGINE, 'jobFinished', `(${PARAMS}Z)V`, (r, _m, [, params, wantsReschedule]) => {
     if (params === null || params === 0) r.throwJava('Ljava/lang/NullPointerException;', 'params');
     const job = r.object(params).job; if (!job) return;
     finish(r, job, !!wantsReschedule, 'jobFinished');
