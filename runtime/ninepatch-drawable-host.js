@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=4e8e9e43a248';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=4e8e9e43a248';
+import { APKError } from './apk-runtime.js?v=46eedf31a25e';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=46eedf31a25e';
 // android.graphics.drawable.NinePatchDrawable for compiled 9-patch PNGs (aapt2 npTc chunk).
 // Layout contract (intrinsic size, getPadding) comes from the real compiled chunk; pixels are stretched with the
 // official Skia rasterizer (CanvasKit) exactly along the chunk's stretch regions. No platform-drawable look-alikes.
