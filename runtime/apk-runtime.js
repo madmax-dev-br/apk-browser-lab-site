@@ -1,29 +1,29 @@
-import { VMClock } from './vm-clock.js?v=967d9272d044';
-import { OperationMonitor } from './operation-monitor.js?v=967d9272d044';
-import { ExecutionProfile } from './execution-profile.js?v=967d9272d044';
-import { SamplingProfiler } from './sampling-profiler.js?v=967d9272d044';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=967d9272d044';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=967d9272d044';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=967d9272d044';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=967d9272d044';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=967d9272d044';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=967d9272d044';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=967d9272d044';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=967d9272d044';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=967d9272d044';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=967d9272d044';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=967d9272d044';
-import { APKError } from './apk-error.js?v=967d9272d044';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=967d9272d044';
-import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=967d9272d044';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=967d9272d044';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=967d9272d044';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=967d9272d044';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=967d9272d044';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=967d9272d044';
-import { Scheduler, Blocked } from './scheduler.js?v=967d9272d044';
-import { bootClassLacksMember } from './boot-class-members.js?v=967d9272d044';
-export { APKError } from './apk-error.js?v=967d9272d044';
+import { VMClock } from './vm-clock.js?v=277134f86d82';
+import { OperationMonitor } from './operation-monitor.js?v=277134f86d82';
+import { ExecutionProfile } from './execution-profile.js?v=277134f86d82';
+import { SamplingProfiler } from './sampling-profiler.js?v=277134f86d82';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=277134f86d82';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=277134f86d82';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=277134f86d82';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=277134f86d82';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=277134f86d82';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=277134f86d82';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=277134f86d82';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=277134f86d82';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=277134f86d82';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=277134f86d82';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=277134f86d82';
+import { APKError } from './apk-error.js?v=277134f86d82';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=277134f86d82';
+import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=277134f86d82';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=277134f86d82';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=277134f86d82';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=277134f86d82';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=277134f86d82';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=277134f86d82';
+import { Scheduler, Blocked } from './scheduler.js?v=277134f86d82';
+import { bootClassLacksMember } from './boot-class-members.js?v=277134f86d82';
+export { APKError } from './apk-error.js?v=277134f86d82';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1289,7 +1289,7 @@ export class APKRuntime {
     const id = value !== null && typeof value === 'object' ? value.ref : value;
     const dead = typeof id === 'number' ? freedBy(this, id) : null, collected = typeof id === 'number' && id > 0 && id < this.nextId;
     const message = dead ? `Use of a collected object: #${id} of class ${String(dead.type).replace(/^L|;$/g, '').replaceAll('/', '.')} was freed by collection ${dead.collection} (the last collection is ${this.gcStats?.collections ?? 0}): a root the collector did not see`
-      : collected ? `Null or invalid object reference: #${id} was allocated (ids up to ${this.nextId - 1}) but is not on the heap now (freed by an older collection or released)` : `Null or invalid object reference: ${JSON.stringify(value)}`;
+      : collected ? `Null or invalid object reference: #${id} was allocated (ids up to ${this.nextId - 1}) but is not on the heap now (freed by a collection older than the ${this.gcFreedRing?.length ?? 0} whose freed ids are kept, of ${this.gcStats?.collections ?? 0}, or released)` : `Null or invalid object reference: ${JSON.stringify(value)}`;
     throw new APKError(message, { kind: 'invalid-object-reference', ref: id, collectedBy: dead?.collection ?? null, type: dead?.type ?? null, jsStack: `Error: ${message}\n` + String(new Error().stack ?? '').split('\n').slice(2, 12).join('\n'), vmContext: this.monitor?.context?.() ?? null });
   }
   /**

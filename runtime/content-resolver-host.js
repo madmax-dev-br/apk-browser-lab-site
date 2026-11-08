@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=967d9272d044';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=967d9272d044';
+import { APKError } from './apk-runtime.js?v=277134f86d82';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=277134f86d82';
 const RESOLVER = 'Landroid/content/ContentResolver;', URI = 'Landroid/net/Uri;', GLOBAL = 'Landroid/provider/Settings$Global;', OBSERVER = 'Landroid/database/ContentObserver;';
 const fail = message => { throw new APKError(message, { kind: 'virtual-content-provider-unsupported' }); };
 const keys = new Set();

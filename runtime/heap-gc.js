@@ -29,8 +29,8 @@
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=967d9272d044';
-import { cellBytes } from './java-arrays.js?v=967d9272d044';
+import { BUCKET } from './time-breakdown.js?v=277134f86d82';
+import { cellBytes } from './java-arrays.js?v=277134f86d82';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -107,6 +107,7 @@ const weakTypeCache = runtime => weakTypeCaches.get(runtime) ?? weakTypeCaches.s
 /** Instances of these classes are code and metadata (DEX files, programs, compiled functions, frames, threads): never Java references, never walked. */
 const SKIP_CONSTRUCTORS = new Set(['DexFile', 'DexProgram', 'DexClassTable', 'ClassTable', 'CompiledFunction', 'Frame', 'ClassDefinition']);   // not VMThread: the threads the scheduler runs are skipped by identity above (enumerateRoots covers them), but the host record of a Thread that was created and not started yet (a ThreadFactory's product before start()) holds its Runnable target, group and handler only there
 const FLAT_CONTAINER_MIN = 2048, FLAT_SAMPLE = 48;
+const TOMBSTONE_COLLECTIONS = 64, TOMBSTONE_IDS = 3000000;
 const noRefs = new WeakSet();
 export function markNoJavaRefs(object) { if (object !== null && typeof object === 'object') noRefs.add(object); return object; }
 function flatRecord(value, depth, limit) {
@@ -380,7 +381,10 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   {   // the ids freed by the last collections (sorted, with their class), so that a use of a collected object is diagnosed as such (see APKRuntime.object)
     const ring = runtime.gcFreedRing ??= [], kinds = [...new Set(freedTypes)], index = new Map(kinds.map((type, i) => [type, i]));
     const order = Array.from(freedIds.keys()).sort((a, b) => freedIds[a] - freedIds[b]);
-    ring.unshift({ collection: (runtime.gcStats?.collections ?? 0) + 1, ids: Int32Array.from(order, i => freedIds[i]), types: Uint16Array.from(order, i => index.get(freedTypes[i])), kinds }); ring.length = Math.min(ring.length, 3);
+    ring.unshift({ collection: (runtime.gcStats?.collections ?? 0) + 1, ids: Int32Array.from(order, i => freedIds[i]), types: Uint16Array.from(order, i => index.get(freedTypes[i])), kinds });
+    // Kept for the last TOMBSTONE_COLLECTIONS collections or TOMBSTONE_IDS freed ids, whichever is reached first (6 bytes per freed object): a Java value that host code held unseen by the collector is
+    // typically used many collections after it was freed, and the diagnosis needs the class of what was freed and the collection that freed it (APKRuntime.object).
+    let kept = 0, total = 0; for (const entry of ring) { total += entry.ids.length; if (kept > 0 && (kept >= TOMBSTONE_COLLECTIONS || total > TOMBSTONE_IDS)) break; kept++; } ring.length = kept;
   }
   phases.soft = { policy, cleared: softCleared, softReferences: softIds.length, weakCleared, phantomCleared };
   if (softMode) runtime.gcSoftLast = { collection: (runtime.gcStats?.collections ?? 0) + 1, policy, cleared: softCleared, softReferences: softIds.length, freed: before - heap.size };   // what the report's OOM line quotes
