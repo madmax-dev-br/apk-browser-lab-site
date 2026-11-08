@@ -1,42 +1,42 @@
-import { buildScreenState } from './screen-state.js?v=6de442fe2bc0';
-import { createLogcat } from './logcat.js?v=6de442fe2bc0';
-import { reportSummary } from './report-summary.js?v=6de442fe2bc0';
-import { TimeBreakdown } from './time-breakdown.js?v=6de442fe2bc0';
-import { createMessageSink } from './audio-native.js?v=6de442fe2bc0';
-import { loadAPK } from './apk-loader.js?v=6de442fe2bc0';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=6de442fe2bc0';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=6de442fe2bc0';
-import { createWebViewBackend } from './webview-backend.js?v=6de442fe2bc0';
-import { FrameworkProvider } from './framework-provider.js?v=6de442fe2bc0';
-import { createRasterSender } from './raster-cache.js?v=6de442fe2bc0';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=6de442fe2bc0';
-import { dispatchPointer } from './pointer-input-host.js?v=6de442fe2bc0';
-import { resolveDevice } from './device-profile.js?v=6de442fe2bc0';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=6de442fe2bc0';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=6de442fe2bc0';
-import { SkiaProvider } from './skia-provider.js?v=6de442fe2bc0';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=6de442fe2bc0';
-import { SemanticsPacer } from './semantics-pacing.js?v=6de442fe2bc0';
-import { disposeTextLayout } from './text-layout-native.js?v=6de442fe2bc0';
-import { IcuBreakProvider } from './icu-break-provider.js?v=6de442fe2bc0';
-import { SqliteProvider } from './sqlite-native.js?v=6de442fe2bc0';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=6de442fe2bc0';
-import { TzdataProvider } from './java-time-native.js?v=6de442fe2bc0';
-import { ZlibProvider } from './zip-native.js?v=6de442fe2bc0';
-import { IcuConverterProvider } from './icu-converter-native.js?v=6de442fe2bc0';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=6de442fe2bc0';
-import { JavacryptoProvider } from './javacrypto-native.js?v=6de442fe2bc0';
-import { disposeColorFilters } from './color-filter-native.js?v=6de442fe2bc0';
-import { disposeRegex } from './regex-native.js?v=6de442fe2bc0';
-import { disposeRenderNodes } from './rendernode-native.js?v=6de442fe2bc0';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=6de442fe2bc0';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=6de442fe2bc0';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=6de442fe2bc0';
+import { buildScreenState } from './screen-state.js?v=9510d53c1f46';
+import { createLogcat } from './logcat.js?v=9510d53c1f46';
+import { reportSummary } from './report-summary.js?v=9510d53c1f46';
+import { TimeBreakdown } from './time-breakdown.js?v=9510d53c1f46';
+import { createMessageSink } from './audio-native.js?v=9510d53c1f46';
+import { loadAPK } from './apk-loader.js?v=9510d53c1f46';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=9510d53c1f46';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=9510d53c1f46';
+import { createWebViewBackend } from './webview-backend.js?v=9510d53c1f46';
+import { FrameworkProvider } from './framework-provider.js?v=9510d53c1f46';
+import { createRasterSender } from './raster-cache.js?v=9510d53c1f46';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=9510d53c1f46';
+import { dispatchPointer } from './pointer-input-host.js?v=9510d53c1f46';
+import { resolveDevice } from './device-profile.js?v=9510d53c1f46';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=9510d53c1f46';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=9510d53c1f46';
+import { SkiaProvider } from './skia-provider.js?v=9510d53c1f46';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=9510d53c1f46';
+import { SemanticsPacer } from './semantics-pacing.js?v=9510d53c1f46';
+import { disposeTextLayout } from './text-layout-native.js?v=9510d53c1f46';
+import { IcuBreakProvider } from './icu-break-provider.js?v=9510d53c1f46';
+import { SqliteProvider } from './sqlite-native.js?v=9510d53c1f46';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=9510d53c1f46';
+import { TzdataProvider } from './java-time-native.js?v=9510d53c1f46';
+import { ZlibProvider } from './zip-native.js?v=9510d53c1f46';
+import { IcuConverterProvider } from './icu-converter-native.js?v=9510d53c1f46';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=9510d53c1f46';
+import { JavacryptoProvider } from './javacrypto-native.js?v=9510d53c1f46';
+import { disposeColorFilters } from './color-filter-native.js?v=9510d53c1f46';
+import { disposeRegex } from './regex-native.js?v=9510d53c1f46';
+import { disposeRenderNodes } from './rendernode-native.js?v=9510d53c1f46';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=9510d53c1f46';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=9510d53c1f46';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=9510d53c1f46';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=6de442fe2bc0';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=6de442fe2bc0';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=6de442fe2bc0';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '6de442fe2bc0';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=9510d53c1f46';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=9510d53c1f46';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=9510d53c1f46';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '9510d53c1f46';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -59,6 +59,7 @@ let lastComposeSemantics = null;   // the tree of the last walk, reused by sched
 /** `paced`: a scheduled VM event may reuse the last semantics tree while the pacer says a fresh one is not due yet; replies to page requests are never paced. */
 function currentSnapshot({ paced = false } = {}) {
   appData?.touch(); const snapshotStarted = performance.now();
+  if (!paced) snapshotOwed = false;   // a reply to a page request carries the newest state: nothing is owed to the page anymore
   runtime.steps = 0; // A bounded inspection event, separate from the APK callback that just finished.
   const snapshot = runtime.snapshot();
   if (!snapshot.closed && composeSemantics) {
@@ -69,7 +70,7 @@ function currentSnapshot({ paced = false } = {}) {
   Object.assign(snapshot, runtime.executionSnapshot());
   // VM health the page can show: live Java objects, collections, and any OutOfMemoryError the VM raised (even if the app caught it).
   snapshot.pendingEventDelay = runtime.platform.nextEventDelay?.() ?? null;   // ms until the VM's next scheduled event (frame, timer); null when nothing is scheduled
-  snapshot.vmHealth = { liveObjects: runtime.heap.size, limit: runtime.maxHeapObjects, bytesPerObject: BYTES_PER_OBJECT, lastEventMs, workerTiming: { ...workerTiming, snapshotMs: Math.round(workerTiming.snapshotMs), semanticsMs: Math.round(workerTiming.semanticsMs), scheduledMs: Math.round(workerTiming.scheduledMs) }, collections: runtime.gcStats?.collections ?? 0, freedObjects: runtime.gcStats?.freed ?? 0, gcMs: Math.round(runtime.gcStats?.totalMs ?? 0), oomCount: runtime.oomCount ?? 0, lastOom: runtime.lastOom ? { ...runtime.lastOom, census: undefined } : null, heapCensus: runtime.lastOom?.census && runtime.lastOom.count !== reportedCensus ? (reportedCensus = runtime.lastOom.count, runtime.lastOom.census) : undefined };
+  snapshot.vmHealth = { raster: runtime.rasterStats ? { ...runtime.rasterStats, keyMs: Math.round(runtime.rasterStats.keyMs), replayMs: Math.round(runtime.rasterStats.replayMs), encodeMs: Math.round(runtime.rasterStats.encodeMs) } : null, framesProduced: runtime.platform.viewWindowHost?.frameState?.().framesRun ?? 0, liveObjects: runtime.heap.size, limit: runtime.maxHeapObjects, bytesPerObject: BYTES_PER_OBJECT, lastEventMs, workerTiming: { ...workerTiming, snapshotMs: Math.round(workerTiming.snapshotMs), semanticsMs: Math.round(workerTiming.semanticsMs), scheduledMs: Math.round(workerTiming.scheduledMs) }, collections: runtime.gcStats?.collections ?? 0, freedObjects: runtime.gcStats?.freed ?? 0, gcMs: Math.round(runtime.gcStats?.totalMs ?? 0), oomCount: runtime.oomCount ?? 0, lastOom: runtime.lastOom ? { ...runtime.lastOom, census: undefined } : null, heapCensus: runtime.lastOom?.census && runtime.lastOom.count !== reportedCensus ? (reportedCensus = runtime.lastOom.count, runtime.lastOom.census) : undefined };
   workerTiming.snapshots++; workerTiming.snapshotMs += performance.now() - snapshotStarted;
   return rasterSender.intern(snapshot); // repeated PNGs travel once; the page resolves rasterId to a cached Blob URL
 }
@@ -98,6 +99,29 @@ function monitored(name, body) {
   monitor.begin(name);
   try { return body(); } finally { monitor.end(); }
 }
+// Page back-pressure (frame coalescing): every scheduled-event snapshot carries a sequence number and the page acknowledges the newest one it has drawn
+// (src/device-view.js flushRuntimeSnapshot). While the previous snapshot is still unacknowledged the Worker does not take the next one (that would replay and
+// encode a frame the page would only replace before drawing it); the screen is owed one and it is sent when the ack arrives, or after FRAME_ACK_WAIT_MS
+// (a hidden tab or a page that dropped it never blocks the screen). Replies to page requests are never held back.
+const FRAME_ACK_WAIT_MS = 250;
+let eventSeq = 0, ackedSeq = 0, lastEventPostAt = 0, snapshotOwed = false, owedTimer = null;
+const frameStats = { sent: 0, held: 0, acks: 0, ackSent: 0, ackBusy: 0 };
+const pageBehind = () => eventSeq > ackedSeq && performance.now() - lastEventPostAt < FRAME_ACK_WAIT_MS;
+function postRuntimeEvent() {
+  snapshotOwed = false; clearTimeout(owedTimer); owedTimer = null;
+  const snapshot = currentSnapshot({ paced: true }); snapshot.vmHealth.frames = { ...frameStats };
+  lastEventPostAt = performance.now(); frameStats.sent++;
+  self.postMessage({ type: 'runtime-event', snapshot, seq: ++eventSeq }, rasterSender.takeTransfers());
+}
+function holdSnapshot() {
+  snapshotOwed = true; frameStats.held++;
+  if (owedTimer === null) owedTimer = setTimeout(() => { owedTimer = null; if (snapshotOwed && !busy && runtime) { busy = true; try { postRuntimeEvent(); } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); } finally { busy = false; scheduleEvents(); } } }, FRAME_ACK_WAIT_MS);
+}
+function frameAcked(seq) {
+  frameStats.acks++; if (snapshotOwed && busy) frameStats.ackBusy++;
+  if (Number.isSafeInteger(seq) && seq > ackedSeq) ackedSeq = Math.min(seq, eventSeq);
+  if (snapshotOwed && !busy && runtime && ackedSeq >= eventSeq) { frameStats.ackSent++; busy = true; try { postRuntimeEvent(); } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); } finally { busy = false; scheduleEvents(); } }
+}
 function scheduleEvents() {
   clearTimeout(eventTimer); eventTimer = null;
   if (!runtime?.platform?.nextEventDelay) return;
@@ -113,7 +137,7 @@ function scheduleEvents() {
     try {
       const started = performance.now(), drained = monitored('evento agendado', () => drainReadyEvents()); lastEventMs = Math.round(performance.now() - started); if (drained.processed) { workerTiming.scheduledBatches++; workerTiming.scheduledMs += performance.now() - started; }
       logcat.flush();
-      if (drained.processed || (semanticsPacer.stale && semanticsPacer.wait() <= 0)) self.postMessage({ type: 'runtime-event', snapshot: currentSnapshot({ paced: true }) }); else self.postMessage({ type: 'runtime-idle' });
+      if (drained.processed || snapshotOwed || (semanticsPacer.stale && semanticsPacer.wait() <= 0)) { if (pageBehind()) holdSnapshot(); else postRuntimeEvent(); } else self.postMessage({ type: 'runtime-idle' });
       succeeded = true;
     } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); }
     finally { busy = false; if (succeeded) scheduleEvents(); }
@@ -140,9 +164,10 @@ function snapshotScreenDuringOperation(message) {
   try { self.postMessage({ type: 'screen-snapshot', text: buildScreenState(runtime, { semantics: null, heartbeat: null }).text, at: Date.now() }); } catch { /* best effort */ }
 }
 self.onmessage = async ({ data }) => {
+  if (data?.type === 'frame-ack') { frameAcked(data.seq); return; }
   if (!data || !Number.isSafeInteger(data.requestId)) return;
   const { requestId, type } = data;
-  const send = (message) => { logcat.flush(); self.postMessage({ requestId, ...message }); };   // log lines first, so the page has them when the reply arrives
+  const send = (message) => { logcat.flush(); self.postMessage({ requestId, ...message }, rasterSender.takeTransfers()); };   // log lines first, so the page has them when the reply arrives; raw pixel rasters first seen by the page travel as transferred buffers
   if (type === 'webview-event') { try { runtime?.platform?.webViewBackend?.handleEvent(runtime, data); } finally { scheduleEvents(); } return; }   // an iframe finished or failed: only queues VM tasks
   if (type === 'app-data-flush') { runtime?.fileMappings?.flushAll(); appData?.syncPoint('page-hide'); return; }   // shared native file mappings reach their files before the data is stored   // the page is being hidden/closed: store now, even while the VM is busy (no reply)
   if (type === 'screen-state') {   // read-only picture of the screen for "Copiar estado da tela"; answered even while the VM is between operations, always with whatever could be read
@@ -228,6 +253,7 @@ self.onmessage = async ({ data }) => {
       const javacryptoProvider = NATIVE_LIBS_URL ? (sharedJavacryptoProvider ??= await JavacryptoProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
       const result = await loadAPK(data.buffer, { maxEventWallMs: EVENT_WALL_LIMIT_MS, maxHeapObjects: heapLimitFor(data), nativeLibraryProvider, javacryptoProvider, device: resolveDevice(data.device || {}), tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', strictCrash: data.strictCrash === true, enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
       runtime = result.runtime; archive = result.archive; inventory = result.inventory; logcat.clear(); logcat.attach(runtime);
+      runtime.contentRasterOptions = { transport: 'rgba' };   // Compose/Canvas content reaches the page as raw RGBA8 (src/raster-cache.js), not as a PNG
       runtime.monitor.configure({ sink: message => { logcat.flush(); self.postMessage({ ...message, requestId: activeRequestId }); snapshotScreenDuringOperation(message); }, budgetMs: OPERATION_WALL_LIMIT_MS });   // heartbeats to the page + the operation wall budget
       runtime.platform.audioSink = createMessageSink((message, transfer) => self.postMessage(message, transfer));   // android.media.AudioTrack PCM goes to the page's Web Audio output
       // WebView content lives in iframes of the page: without a page that wants them (the embedded player's default) the WebView has no backend and fails explicitly

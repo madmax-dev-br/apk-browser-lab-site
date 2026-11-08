@@ -18,8 +18,9 @@ const rasterObjects = (root, visit) => {
   const stack = [root];
   while (stack.length) {
     const value = stack.pop(); if (!value || typeof value !== 'object') continue;
+    if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) continue;   // pixel buffers are leaves: never walk their elements
     if (Array.isArray(value)) { for (let i = value.length - 1; i >= 0; i--) stack.push(value[i]); continue; }
-    if (typeof value.dataURL === 'string' || typeof value.rasterId === 'string') visit(value);
+    if (typeof value.dataURL === 'string' || typeof value.rasterId === 'string' || value.kind === 'rgba-raster') visit(value);
     const keys = Object.keys(value); for (let i = keys.length - 1; i >= 0; i--) { const child = value[keys[i]]; if (child && typeof child === 'object') stack.push(child); }
   }
 };
@@ -37,9 +38,20 @@ class BoundedLRU {
 }
 /** Worker side. intern() mutates a fresh snapshot in place: every raster gets rasterId/rasterSize, repeats lose their dataURL. */
 export function createRasterSender() {
-  const lru = new BoundedLRU(); const stats = { sent: 0, deduped: 0, bytesSent: 0, bytesSaved: 0 };
-  return { stats, reset() { lru.clear(); }, intern(snapshot) {
+  const lru = new BoundedLRU(); const stats = { sent: 0, deduped: 0, bytesSent: 0, bytesSaved: 0, pixelsSent: 0, pixelsDeduped: 0 }; let transfers = [];
+  return { stats, reset() { lru.clear(); transfers = []; },
+  /** ArrayBuffers (raw pixel rasters first seen by the page) that the message carrying the last interned snapshot must transfer. */
+  takeTransfers() { const list = transfers; transfers = []; return list; },
+  intern(snapshot) {
     rasterObjects(snapshot, value => {
+      if (value.kind === 'rgba-raster') {   // raw RGBA8 pixels, named by the VM's rasterization id (a cache hit keeps the id): first sight travels as a transferred copy, repeats as the id only
+        const id = value.rasterId, bytes = value.pixels?.byteLength ?? value.rasterSize;
+        if (typeof id !== 'string' || !(bytes > 0)) throw new Error('Raster RGBA sem identificador ou pixels.');
+        value.rasterSize = bytes;
+        if (lru.has(id)) { lru.touch(id); delete value.pixels; stats.pixelsDeduped++; stats.bytesSaved += bytes; }
+        else { lru.touch(id, null, bytes); const copy = value.pixels.slice().buffer; value.pixels = copy; transfers.push(copy); stats.pixelsSent++; stats.bytesSent += bytes; }
+        return;
+      }
       if (typeof value.dataURL !== 'string') return;
       const text = value.dataURL, id = hashRaster(text); value.rasterId = id; value.rasterSize = text.length;
       if (lru.has(id)) { lru.touch(id); delete value.dataURL; stats.deduped++; stats.bytesSaved += text.length; } else { lru.touch(id, null, text.length); stats.sent++; stats.bytesSent += text.length; }
@@ -49,11 +61,23 @@ export function createRasterSender() {
 }
 const defaultToURL = base64 => { const binary = atob(base64), bytes = new Uint8Array(binary.length); for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i); return URL.createObjectURL(new Blob([bytes], { type: 'image/png' })); };
 /** Page side. resolve() replaces every raster's dataURL by a trusted Blob URL (decoded/validated once per distinct PNG). */
-export function createRasterReceiver({ toURL = defaultToURL } = {}) {
+const defaultToImage = (buffer, width, height) => new ImageData(new Uint8ClampedArray(buffer), width, height);
+export function createRasterReceiver({ toURL = defaultToURL, toImage = defaultToImage } = {}) {
   const lru = new BoundedLRU(url => { trusted.delete(url); try { URL.revokeObjectURL?.(url); } catch { /* ignore */ } }); const stats = { decoded: 0, reused: 0 };
   return { stats, reset() { lru.clear(); }, resolve(snapshot) {
     rasterObjects(snapshot, value => {
       const id = value.rasterId;
+      if (value.kind === 'rgba-raster') {   // `image` is an ImageData the page puts on a canvas; built once per distinct rasterization
+        const { width, height } = value;
+        if (!(Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width <= 4096 && height <= 4096 && width * height <= 4 * 1024 * 1024)) throw new Error('Raster RGBA com dimensões inválidas recebido da VM.');
+        if (typeof id !== 'string') throw new Error('Raster RGBA sem identificador recebido da VM.');
+        if (value.pixels !== undefined) {
+          if (!(value.pixels instanceof ArrayBuffer) || value.pixels.byteLength !== width * height * 4) throw new Error('Raster RGBA com pixels inválidos recebido da VM.');
+          if (!lru.has(id)) { lru.touch(id, toImage(value.pixels, width, height), value.pixels.byteLength); stats.decoded++; } else { lru.touch(id); stats.reused++; }
+        } else if (!lru.has(id)) throw new Error('Cache de rasters dessincronizado com a VM; reabra o APK.');
+        else { lru.touch(id); stats.reused++; }
+        delete value.pixels; value.image = lru.get(id).value; return;
+      }
       if (typeof value.dataURL === 'string') {
         const text = value.dataURL;
         if (text.startsWith('blob:') && trusted.has(text)) return;

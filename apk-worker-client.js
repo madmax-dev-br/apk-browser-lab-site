@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=6de442fe2bc0';
-import { createRasterReceiver } from './raster-cache.js?v=6de442fe2bc0';
+import { createWebAudioPlayer } from './web-audio-player.js?v=9510d53c1f46';
+import { createRasterReceiver } from './raster-cache.js?v=9510d53c1f46';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=6de442fe2bc0', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=9510d53c1f46', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -29,7 +29,7 @@ export class APKWorkerClient {
       if (data?.type === 'audio') { (this.audioPlayer ??= createWebAudioPlayer()).handle(data); return; }   // PCM from android.media.AudioTrack for the page's Web Audio output
       if (data?.type === 'runtime-busy') { this.onRuntimeBusy?.(true); return; }
       if (data?.type === 'runtime-idle') { this.onRuntimeBusy?.(false); return; }
-      if (data?.type === 'runtime-event') { this.onRuntimeSnapshot?.(data.snapshot); return; }
+      if (data?.type === 'runtime-event') { this.onRuntimeSnapshot?.(data.snapshot, data.seq); return; }
       if (data?.type === 'runtime-error') this.onRuntimeBusy?.(false);
       if (data?.type === 'runtime-error') { const error = new Error(data.error?.message || 'Falha em callback assíncrono da VM.'); Object.assign(error, data.error || {}); this.onRuntimeError?.(error); return; }
       const pending = this.pending;
@@ -99,6 +99,8 @@ export class APKWorkerClient {
     const last = this.lastScreenSnapshot; if (!last) return null;
     return { text: `${last.text}\n(captura feita há ${Math.round((Date.now() - last.receivedAt) / 100) / 10} s durante uma operação da VM: o Worker não responde enquanto executa código da VM; a semântica do Compose não está incluída)`, blank: false, reasons: [], stale: true };
   }
+  /** Tells the Worker that the page has drawn the scheduled-event snapshot `seq` (back-pressure: the Worker does not take the next one while one is undrawn, src/apk-worker.js). */
+  ackFrame(seq) { try { this.worker?.postMessage({ type: 'frame-ack', seq }); } catch { /* the Worker is gone */ } }
   /** Side channel: independent of the one-operation-at-a-time request slot, so it works while a click or launch is running (and then answers from the last snapshot). */
   screenState() {
     if (!this.worker) return Promise.resolve(this.cachedScreenState());

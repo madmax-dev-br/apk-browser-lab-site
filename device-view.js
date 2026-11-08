@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=6de442fe2bc0';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=6de442fe2bc0';
-import { isTrustedRasterURL } from './raster-cache.js?v=6de442fe2bc0';
+import { updateWebViewSlot } from './webview-slot.js?v=9510d53c1f46';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=9510d53c1f46';
+import { isTrustedRasterURL } from './raster-cache.js?v=9510d53c1f46';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -16,20 +16,25 @@ const { $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKErr
 // VM timer events (animations, handlers) can arrive faster than the display refreshes: only the newest is rendered, once per frame. An RPC result
 // (renderSnapshot called directly) is always newer than a queued event, so renderSnapshot clears the queue.
 let webviews = null;   // the page side of the WebViews of the bound VM (src/webview-frame.js); null when the host disables WebView
-const runtimeFrames = { pending: null, requested: false, vmBusy: false, coalesced: 0, rendered: 0 };
+const runtimeFrames = { pending: null, requested: false, vmBusy: false, coalesced: 0, rendered: 0, seq: 0, drawMs: 0, putMs: 0, log: [], drawn: [] };   // log: arrival of each runtime snapshot (page clock, frames the Worker had produced, snapshots drawn so far) for the produced-vs-displayed measurement
 const nextFrame = globalThis.requestAnimationFrame ? callback => globalThis.requestAnimationFrame(callback) : callback => setTimeout(callback, 16);
 function flushRuntimeSnapshot(vm) {
   runtimeFrames.requested = false; const snapshot = runtimeFrames.pending; runtimeFrames.pending = null;
   if (!snapshot || state.runtime !== vm) return;
+  const drawStarted = Date.now();
   try { renderSnapshot(snapshot); } catch (error) { reportAPKError(error, 'Falha ao renderizar callback da VM'); }
+  runtimeFrames.drawMs += Date.now() - drawStarted;
+  vm.ackFrame?.(runtimeFrames.seq);   // drawn (or failed): the Worker may take the next snapshot
 }
 /** Route the Worker client's asynchronous snapshots/errors (timers, animations) into this view. */
 function bindVM(vm) {
   vm.onRuntimeBusy = busy => { runtimeFrames.vmBusy = busy; };   // a scheduled VM event is being processed (frame, timer): the screen is not settled yet
-  vm.onRuntimeSnapshot = snapshot => {
+  vm.onRuntimeSnapshot = (snapshot, seq) => {
     runtimeFrames.vmBusy = false;
     if (state.runtime !== vm) return;
+    if (runtimeFrames.log.length < 50000) runtimeFrames.log.push([Date.now(), snapshot?.vmHealth?.framesProduced ?? null]);
     if (runtimeFrames.pending) runtimeFrames.coalesced++;
+    if (Number.isSafeInteger(seq)) runtimeFrames.seq = seq;
     runtimeFrames.pending = snapshot; if (!runtimeFrames.requested) { runtimeFrames.requested = true; nextFrame(() => flushRuntimeSnapshot(vm)); }
   };
   vm.onRuntimeError = error => { if (state.runtime === vm) reportAPKError(error, 'Callback assíncrono interrompido'); };
@@ -157,7 +162,7 @@ function shadowElement(child) {
   if (element._css !== shadowCSS) { element.style.cssText = shadowCSS; element._css = shadowCSS; }
   return element;
 }
-const SIGNATURE_SKIP = new Set(['children']);
+const SIGNATURE_SKIP = new Set(['children', 'image']);   // `image`: the ImageData of a raw-pixel raster (identified in the signature by its rasterId; walking its bytes costs ~200 ms)
 function viewSignature(view, parentKind, parentLaidOut, clipOwnBounds, renderChildren, focusBusy) {
   return `${parentKind}|${parentLaidOut}|${clipOwnBounds}|${renderChildren}|${focusBusy}|${state.viewSession}|${JSON.stringify(view, (key, value) => SIGNATURE_SKIP.has(key) ? undefined : value)}`;
 }
@@ -285,9 +290,21 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (view.canvasChildrenCaptured && !view.contentRaster) throw new Error('A captura Canvas não retornou uma imagem de conteúdo.');
   if (view.contentRaster) {
     if (kind === 'input' || kind === 'progress') throw new Error('Canvas sobre controle HTML exige um contêiner.');
-    const drawing = view.contentRaster, layer = element._contentLayer ||= document.createElement('img');
-    if (drawing.kind !== 'raster' || !pngURLOk(drawing.dataURL) || !(drawing.width > 0 && drawing.height > 0)) throw new Error('PNG de conteúdo Canvas inválido recebido da VM.');
-    if (layer._url !== drawing.dataURL) { layer.src = drawing.dataURL; layer._url = drawing.dataURL; layer.alt = ''; layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-canvas-content'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0'; }
+    const drawing = view.contentRaster;
+    if (drawing.kind === 'rgba-raster') {   // raw pixels from the VM (src/raster-cache.js): put on a canvas, no PNG decode
+      if (!(drawing.image?.width === drawing.width && drawing.image?.height === drawing.height && drawing.width > 0 && drawing.height > 0)) throw new Error('Pixels de conteúdo Canvas inválidos recebidos da VM.');
+      let layer = element._contentLayer; if (!layer || layer.tagName !== 'CANVAS') { layer = element._contentLayer = document.createElement('canvas'); layer._image = null; }
+      if (layer._image !== drawing.image) {
+        if (layer.width !== drawing.width || layer.height !== drawing.height) { layer.width = drawing.width; layer.height = drawing.height; }
+        const putStarted = Date.now(); layer.getContext('2d').putImageData(drawing.image, 0, 0); runtimeFrames.putMs += Date.now() - putStarted; layer._image = drawing.image; layer.dataset.rasterId = drawing.rasterId;
+        layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-canvas-content'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0';
+      }
+    } else {
+      let layer = element._contentLayer; if (!layer || layer.tagName !== 'IMG') layer = element._contentLayer = document.createElement('img');
+      if (drawing.kind !== 'raster' || !pngURLOk(drawing.dataURL) || !(drawing.width > 0 && drawing.height > 0)) throw new Error('PNG de conteúdo Canvas inválido recebido da VM.');
+      if (layer._url !== drawing.dataURL) { layer.src = drawing.dataURL; layer._url = drawing.dataURL; layer.alt = ''; layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-canvas-content'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0'; }
+    }
+    const layer = element._contentLayer;
     if (!element.style.position) element.style.position = 'relative';
     if (layer.parentNode !== element) element.append(layer);
   } else element._contentLayer?.remove();
@@ -525,7 +542,8 @@ function renderWindowSurfaces(surfaces) {
   reconcileChildren(layer, ordered);
 }
 function renderSnapshot(snapshot) {
-  runtimeFrames.pending = null; runtimeFrames.rendered++;
+  if (runtimeFrames.pending && state.runtime?.ackFrame) state.runtime.ackFrame(runtimeFrames.seq);   // an RPC reply replaces a queued scheduled-event snapshot: it counts as drawn
+  runtimeFrames.pending = null; runtimeFrames.rendered++; if (runtimeFrames.drawn.length < 50000) runtimeFrames.drawn.push(Date.now());
   if (snapshot?.droppedComposeAction) appendTrace(`Ação Compose descartada: nó ${snapshot.droppedComposeAction.ownerViewId}:${snapshot.droppedComposeAction.nodeId} não existe mais (${snapshot.droppedComposeAction.action}).`);
   state.lastAPKError = null; state.canGoBack = !!snapshot.canGoBack; hooks.navigationChanged?.(state.canGoBack);
   if (snapshot.closed) {
