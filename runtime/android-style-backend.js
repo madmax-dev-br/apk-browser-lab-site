@@ -1,7 +1,7 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=da865bfd70a5';
-import { APKError } from './apk-runtime.js?v=da865bfd70a5';
-import { ephemeronMap } from './heap-gc.js?v=da865bfd70a5';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=da865bfd70a5';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=6de442fe2bc0';
+import { APKError } from './apk-runtime.js?v=6de442fe2bc0';
+import { ephemeronMap } from './heap-gc.js?v=6de442fe2bc0';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=6de442fe2bc0';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -22,8 +22,9 @@ export class AndroidStyleBackend {
   constructor(platform) { this.platform = platform; this.poolStrings = new Map(); this.xmlCookieSequence = 0; }
   put(runtime, ref, owner, name, type, value) { const field = runtime.resolveField({ owner, name, type, key: `${owner}->${name}:${type}` }); runtime.storeField(runtime.object(ref).fields, field.key, value); }
   get(runtime, ref, owner, name, type) { const field = runtime.resolveField({ owner, name, type, key: `${owner}->${name}:${type}` }); return runtime.object(ref).fields.get(field.key); }
+  /** The Resources being served: the scoped configuration Resources (platform.withResources), else the app's default one. */
   resourceObject(runtime) {
-    const resources = this.platform.resourceObject ??= runtime.makeObject(RESOURCES);
+    const resources = this.platform.activeResources ?? (this.platform.resourceObject ??= runtime.makeObject(RESOURCES));
     if (!this.get(runtime, resources, RESOURCES, 'mTypedArrayPool', 'Landroid/util/Pools$SynchronizedPool;')) {
       const type = 'Landroid/util/Pools$SynchronizedPool;';
       if (!runtime.classes.has(type)) fail('Original AOSP Pools DEX is required for the resource TypedArray pool');
@@ -35,13 +36,14 @@ export class AndroidStyleBackend {
   assetObject(runtime) { return this.assets ??= runtime.makeObject(ASSETS); }
   reflectionDefinition(owner,kind,name,parameters){if(owner!==THEME||kind!=='method'||name!=='rebase'||parameters?.length)return null;return {method:{owner,name,parameters:[],result:'V',signature:'()V',key:owner+'->rebase()V'},flags:1};}
   rebaseTheme(runtime,theme){
+    const owner=runtime.object(theme).resources??null;if((this.platform.activeResources??null)!==owner)return this.platform.withResources(runtime,owner,()=>this.rebaseTheme(runtime,theme));   // replay against the configuration of the Resources the Theme belongs to
     const object=runtime.object(theme), values=new Map(), table=this.platform.resources?.table;if(!table)fail('Theme rebase requires actual resource bags');
     // Theme.rebase's public Android contract: replay the applied styles in
     // order against current resource configuration; retain identity and key.
     for(const {id,force} of object.appliedStyles)for(const [attribute,value]of table.resolveBag(id))if(force||!values.has(attribute))values.set(attribute,value);
     object.themeValues=values;runtime.record('RESOURCE Theme.rebase [real applied-style history and compiled resource bags]');
   }
-  createTheme(runtime) { const ref = runtime.makeObject(THEME); runtime.object(ref).themeValues = new Map(); runtime.object(ref).appliedStyles = []; (this.themeRefs ??= ephemeronMap(runtime, new Map())).set(ref.ref, ref); return ref; }   // weakly held: a Theme nothing else references is collected
+  createTheme(runtime) { const ref = runtime.makeObject(THEME); runtime.object(ref).resources = this.platform.activeResources ?? null; runtime.object(ref).themeValues = new Map(); runtime.object(ref).appliedStyles = []; (this.themeRefs ??= ephemeronMap(runtime, new Map())).set(ref.ref, ref); return ref; }   // weakly held: a Theme nothing else references is collected
   /** Resources.updateConfiguration: every live Theme replays its applied styles against the new configuration (identity and key retained). */
   refreshThemes(runtime) { for (const ref of this.themeRefs?.values() ?? []) this.rebaseTheme(runtime, ref); }
   originalThemeMethod(runtime, context, startType, name, parameters, result, values = []) {
@@ -60,7 +62,7 @@ export class AndroidStyleBackend {
     object.themeValues = new Map(original.themeValues); object.appliedStyles = original.appliedStyles.slice();
   }
   theme(runtime, context, startType = runtime.typeOf(context)) {
-    const resources=this.platform.resourcesForContext?.(runtime,context);if(resources&&runtime.object(resources).resourceConfigurationDifference)fail('Theme resource selection for changed Context configuration is not installed',{kind:'configuration-resources-unsupported'});
+    const scoped=this.platform.overrideResources(runtime,this.platform.resourcesForContext?.(runtime,context));if(scoped!==(this.platform.activeResources??null))return this.platform.withResources(runtime,scoped,()=>this.theme(runtime,context,startType));   // the Context's own Resources (a configuration Context wins over its Activity's) select every variant of its Theme
     const original = this.originalThemeMethod(runtime, context, startType, 'getTheme', [], THEME);
     if (original.handled) return original.value;
     const object = runtime.object(context); if (object.themeRef) return object.themeRef;
@@ -213,7 +215,11 @@ export class AndroidStyleBackend {
   }
   invoke(runtime, method, args) {
     const owner = method.owner, name = method.name, receiver = args[0];
-    if(owner===RESOURCES&&!['selectDefaultTheme','selectSystemTheme'].includes(name)&&runtime.object(receiver).resourceConfigurationDifference)fail('Resource selection for changed Context configuration is not installed',{kind:'configuration-resources-unsupported'});
+    if(owner!==ASSETS&&owner!==XML&&!(owner===RESOURCES&&['selectDefaultTheme','selectSystemTheme'].includes(name))){
+      // Resources: its own configuration; Theme: the Resources it was created from; a Context: the Resources of its chain.
+      const platform=this.platform,source=owner===RESOURCES?receiver:owner===THEME?runtime.object(receiver).resources:platform.resourcesForContext?.(runtime,receiver),scoped=platform.overrideResources(runtime,source);
+      if(scoped!==(platform.activeResources??null))return platform.withResources(runtime,scoped,()=>this.invoke(runtime,method,args));
+    }
     if(owner===RESOURCES&&['selectDefaultTheme','selectSystemTheme'].includes(name)){const algorithms='Landroid/content/res/ResourcesThemeAlgorithms;';if(!runtime.dex.bootClasses?.has(algorithms))fail('Original Resources theme-selection algorithms are required');return runtime.dispatch({...method,owner:algorithms},args,'static');}
     if (owner === ASSETS) { const text = this.poolStrings.get(args[1])?.get(args[2]); if (text === undefined) fail(`Missing original pooled string cookie=${args[1]} index=${args[2]}`); return text; }
     if (owner === XML) { const text = runtime.object(receiver).pooledStrings?.get(args[1]); if (text === undefined) fail('Missing compiled XML pooled string'); return text; }
@@ -243,7 +249,7 @@ export class AndroidStyleBackend {
       if (name === 'applyStyle') return this.applyStyle(runtime, receiver, args[1], !!args[2]);
       if (name === 'getKey')return this.themeKey(runtime,receiver);
       if (name === 'setTo') return this.copyTheme(runtime, receiver, args[1]);
-      if (name === 'getResources') return this.resourceObject(runtime);
+      if (name === 'getResources') return object.resources ?? this.resourceObject(runtime);
       if (name === 'resolveAttribute') {
         const found = this.platform.resources.table.getThemeAttribute(object.themeValues, args[1], !!args[3]);
         runtime.lastResourceCall = `Resources$Theme.resolveAttribute(0x${(args[1] >>> 0).toString(16)}${this.platform.resources.table.names ? ' ' + this.attributeName(args[1]) : ''}, resolveRefs=${!!args[3]}) -> ${found ? `type ${found.value.dataType}, data 0x${(found.value.rawData >>> 0).toString(16)}, resourceId 0x${found.ref.toString(16)}` : 'false'}`;

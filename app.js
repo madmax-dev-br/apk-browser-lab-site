@@ -1,9 +1,9 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=da865bfd70a5';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=da865bfd70a5';
-import { createDeviceView, createViewState } from './device-view.js?v=da865bfd70a5';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=da865bfd70a5';
-import { formatApiGapReport } from './api-gap-scan.js?v=da865bfd70a5';
-import { createLogcatPanel } from './logcat-panel.js?v=da865bfd70a5';
+import { APKWorkerClient } from './apk-worker-client.js?v=6de442fe2bc0';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=6de442fe2bc0';
+import { createDeviceView, createViewState } from './device-view.js?v=6de442fe2bc0';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=6de442fe2bc0';
+import { formatApiGapReport } from './api-gap-scan.js?v=6de442fe2bc0';
+import { createLogcatPanel } from './logcat-panel.js?v=6de442fe2bc0';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
