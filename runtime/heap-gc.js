@@ -23,7 +23,7 @@
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=46eedf31a25e';
+import { BUCKET } from './time-breakdown.js?v=314f9426f7b0';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -361,7 +361,8 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   // Minimum allocation between two collections: a collection scans the whole live set, so a live set that stays above the threshold (gcNextAt is capped at 85% of the limit) must not be
   // re-scanned at every safepoint. A collection that freed little (< 10% of the heap) quadruples the wait.
   const minAlloc = Math.max(1024, Math.floor(runtime.maxHeapObjects / 32));
-  runtime.gcMinAlloc = freed < before * 0.1 ? minAlloc * 4 : minAlloc;
+  // The x4 is bounded: never above a quarter of the limit nor a quarter of the room still left, so a heap that is filling up is never allowed to run to the limit between two collections.
+  runtime.gcMinAlloc = Math.min(freed < before * 0.1 ? minAlloc * 4 : minAlloc, Math.max(1024, Math.floor(Math.min(runtime.maxHeapObjects * 0.25, (runtime.maxHeapObjects - heap.size) / 4))));
   if (cleared.length && runtime.platform?.queueTask) {
     runtime.platform.queueTask(() => { for (const reference of cleared) { try { runtime.dispatch({ owner: 'Ljava/lang/ref/Reference;', name: 'enqueue', parameters: [], result: 'Z', signature: '()Z' }, [reference], 'virtual'); } catch { /* the queue is gone with its owner */ } } }, 0, cleared);
   }
@@ -374,8 +375,11 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
 /** The first collection waits until the live heap passes this share of the object limit (then the hysteresis below applies). With the memory-budget limit (hundreds of thousands of objects) half the limit is
  *  already ~500 MiB of host memory, so garbage must be collected earlier: a quarter of the limit. */
 export const GC_START_FRACTION = 0.25;
+export const NEAR_LIMIT = 0.9;
 export function collectionDue(runtime, threshold = Math.floor(runtime.maxHeapObjects * GC_START_FRACTION)) {
   const wait = Math.min(runtime.gcMinAlloc ?? 0, Math.max(64, (runtime.maxHeapObjects - runtime.heap.size) >> 1)), allocated = runtime.nextId - (runtime.gcLastNextId ?? 0);   // never wait past half the remaining headroom
+  // Near the limit (>= 90%, which includes the OOM headroom): pacing, gcMinAlloc and gcNextAt are ignored; the only guard against re-scanning a genuinely live heap at every safepoint is a small allocation floor.
+  if (runtime.heap.size >= runtime.maxHeapObjects * NEAR_LIMIT) return allocated >= Math.max(64, Math.min(256, (runtime.maxHeapObjects - runtime.heap.size) >> 2));
   if (runtime.gcCellPressure && runtime.arrayCells > runtime.maxArrayCells * 0.75) return true;   // three quarters of the array-cell budget: big arrays are few objects, so neither the object-count wait nor the pacing below may hold the collection back
   // Pacing: a collection that took T ms is followed by at least 8 T ms of mutator time (<= ~11% GC overhead), unless the heap is nearly full (above 85% of the limit: collect, the report warns).
   if (runtime.gcLastEnd && (runtime.gcLastMs ?? 0) >= 20 && runtime.heap.size < runtime.maxHeapObjects * 0.85 && performance.now() - runtime.gcLastEnd < 8 * runtime.gcLastMs) return false;   // collections under 20 ms are cheap enough to run whenever they are due

@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=46eedf31a25e';
+import { APKError } from './apk-error.js?v=314f9426f7b0';
 
 // Green-thread scheduler for the VM.
 //
@@ -63,6 +63,9 @@ export class Scheduler {
     this.threads = this.threads.filter(candidate => candidate !== thread);
     if (this.cursor >= this.threads.length) this.cursor = 0;
     if (this.rt.monitors) for (const [id, monitor] of this.rt.monitors) if (monitor.owner === thread) this.rt.monitors.delete(id);
+    // ART's Thread exit does notifyAll() on the Thread object: whoever waits on it (HandlerThread.getLooper's `while (isAlive() && mLooper == null) wait()`, an Object.wait-based join) re-checks isAlive().
+    const ref = thread.javaObject;
+    if (ref !== undefined && ref !== null) { const waiters = this.rt.heap.get(ref.ref ?? ref)?.waiters; if (waiters) for (const waiter of waiters) waiter.notified = true; }
   }
 
   /** Marks blocked threads whose condition holds (or whose deadline passed) runnable again; returns the earliest pending deadline. */
