@@ -1,6 +1,6 @@
-import {APKError} from './apk-runtime.js?v=314f9426f7b0';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=314f9426f7b0';
-import {getVectorGraphics} from './vector-native.js?v=314f9426f7b0';
+import {APKError} from './apk-runtime.js?v=cc91314626dd';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=cc91314626dd';
+import {getVectorGraphics} from './vector-native.js?v=cc91314626dd';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -25,12 +25,13 @@ export function setContentRaster(r,view,graphics,target,width,height){
  if(!Object.getOwnPropertyDescriptor(view,'contentRaster')?.get){
   const held=view.contentRaster??null;
   Object.defineProperty(view,'contentRaster',{configurable:true,enumerable:false,
-   get(){const make=this.contentRasterPending;if(make){this.contentRasterPending=null;this.contentRasterTarget=null;this.contentRasterValue=make();}return this.contentRasterValue??null;},
-   set(value){this.contentRasterPending=null;this.contentRasterTarget=null;this.contentRasterValue=value;}});
+   get(){const make=this.contentRasterPending;if(make){this.contentRasterPending=null;this.contentRasterValue=make();}return this.contentRasterValue??null;},
+   set(value){this.contentRasterPending=null;this.contentRasterValue=value;}});
   view.contentRasterValue=held;
  }
  if(view.contentRasterPending)stats.superseded=(stats.superseded??0)+1;stats.deferred=(stats.deferred??0)+1;
- view.contentRasterTarget=target;   // the deferred replay's canvas: a collector root while the replay is pending (the closure itself is invisible to a heap walk)
+ // The deferred replay reads `target`, which is the View's own `contentCanvas` (see the callers): that record property keeps it alive for the collector; no second
+ // root is kept here (a duplicate `{ref}` property on the View record broke the page's taps in the browser parity flows, cause not found: keep the record as it was).
  view.contentRasterPending=()=>graphics.snapshotCanvas(target,width,height,r.contentRasterOptions);
 }
 export function createComposeCanvasHost(platform){
