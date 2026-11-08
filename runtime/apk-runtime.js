@@ -1,28 +1,28 @@
-import { VMClock } from './vm-clock.js?v=935cae6f69f6';
-import { OperationMonitor } from './operation-monitor.js?v=935cae6f69f6';
-import { ExecutionProfile } from './execution-profile.js?v=935cae6f69f6';
-import { SamplingProfiler } from './sampling-profiler.js?v=935cae6f69f6';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=935cae6f69f6';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=935cae6f69f6';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=935cae6f69f6';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=935cae6f69f6';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=935cae6f69f6';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=935cae6f69f6';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=935cae6f69f6';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=935cae6f69f6';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=935cae6f69f6';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=935cae6f69f6';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=935cae6f69f6';
-import { APKError } from './apk-error.js?v=935cae6f69f6';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=935cae6f69f6';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=935cae6f69f6';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=935cae6f69f6';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=935cae6f69f6';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=935cae6f69f6';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=935cae6f69f6';
-import { Scheduler, Blocked } from './scheduler.js?v=935cae6f69f6';
-import { bootClassLacksMember } from './boot-class-members.js?v=935cae6f69f6';
-export { APKError } from './apk-error.js?v=935cae6f69f6';
+import { VMClock } from './vm-clock.js?v=57d10730b49f';
+import { OperationMonitor } from './operation-monitor.js?v=57d10730b49f';
+import { ExecutionProfile } from './execution-profile.js?v=57d10730b49f';
+import { SamplingProfiler } from './sampling-profiler.js?v=57d10730b49f';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=57d10730b49f';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=57d10730b49f';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=57d10730b49f';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=57d10730b49f';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=57d10730b49f';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=57d10730b49f';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=57d10730b49f';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=57d10730b49f';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=57d10730b49f';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=57d10730b49f';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=57d10730b49f';
+import { APKError } from './apk-error.js?v=57d10730b49f';
+import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf } from './heap-gc.js?v=57d10730b49f';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=57d10730b49f';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=57d10730b49f';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=57d10730b49f';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=57d10730b49f';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=57d10730b49f';
+import { Scheduler, Blocked } from './scheduler.js?v=57d10730b49f';
+import { bootClassLacksMember } from './boot-class-members.js?v=57d10730b49f';
+export { APKError } from './apk-error.js?v=57d10730b49f';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1476,8 +1476,9 @@ export class APKRuntime {
     length = int(length);
     if (length < 0) this.throwJava('Ljava/lang/NegativeArraySizeException;', `negative array length ${length}`);
     if (!type.startsWith('[')) fail('Invalid/excessive array allocation');
-    if (length > 16777216 || this.arrayCells + length > this.maxArrayCells) this.outOfMemory(length > 16777216 ? `Array of ${length} elements exceeds the array size limit` : `Array storage limit (${this.maxArrayCells} cells) exceeded: ${type} of ${length} cells requested with ${this.arrayCells} in use`);
-    const array = this.makeObject(type); this.arrayCells += length;   // after makeObject: an object-limit OutOfMemoryError there must not leave cells counted for an array that never existed
+    const cells = cellsOf(type, length);   // weighted by element width (heap-gc.js cellsOf): the one place that charges; the collector's recount uses it too
+    if (length > 16777216 || this.arrayCells + cells > this.maxArrayCells) this.outOfMemory(length > 16777216 ? `Array of ${length} elements exceeds the array size limit` : `Array storage limit (${this.maxArrayCells} cells) exceeded: ${type} of ${length} elements (${cells} cells) requested with ${this.arrayCells} in use`);
+    const array = this.makeObject(type); this.arrayCells += cells;   // after makeObject: an object-limit OutOfMemoryError there must not leave cells counted for an array that never existed
     // The collector is paced by the object count, so garbage arrays (a big buffer built and dropped again and again) hold their cells until a collection that nothing else would ask for:
     // past half of the cell budget, ask for one at the next safepoint / event boundary (heap-gc.js collectionDue honours cellPressure).
     if (this.arrayCells > this.maxArrayCells >> 1 && this.gcEnabled) { this.gcPressure = true; this.gcCellPressure = true; }
@@ -2565,7 +2566,7 @@ export class APKRuntime {
       if(method.parameters[1]==='[I'&&this.typeOf(args[1])!=='[I')this.throwJava('Ljava/lang/ClassCastException;','Array dimensions require int[]');
       if(!dimensions.length||component.match(/^\[*/)[0].length+dimensions.length>255)this.throwJava('Ljava/lang/IllegalArgumentException;','Array dimensions must total1..255');
       for(const length of dimensions)if(length<0)this.throwJava('Ljava/lang/NegativeArraySizeException;','negative reflected array dimension');
-      let nodes=1,totalArrays=0,totalCells=0;for(const length of dimensions){if(nodes===0)break;totalArrays+=nodes;totalCells+=nodes*length;if(length>1000000)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: dimension of ${length} elements exceeds the 1000000-element limit`);if(totalCells+this.arrayCells>this.maxArrayCells)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: array cell budget (${this.maxArrayCells}) needs ${totalCells} cells for ${component}${'[]'.repeat(dimensions.length)} (dimensions ${dimensions.join('x')}) with ${this.arrayCells} in use`);if(totalArrays+this.heap.size>this.maxHeapObjects)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: object budget (${this.maxHeapObjects}) needs ${totalArrays} arrays for ${component}${'[]'.repeat(dimensions.length)} (dimensions ${dimensions.join('x')}) with ${this.heap.size} live objects`);nodes*=length;}
+      let nodes=1,totalArrays=0,totalCells=0;for(let d=0;d<dimensions.length;d++){const length=dimensions[d];if(nodes===0)break;totalArrays+=nodes;totalCells+=nodes*cellsOf('['.repeat(dimensions.length-d)+component,length);if(length>1000000)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: dimension of ${length} elements exceeds the 1000000-element limit`);if(totalCells+this.arrayCells>this.maxArrayCells)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: array cell budget (${this.maxArrayCells}) needs ${totalCells} weighted cells for ${component}${'[]'.repeat(dimensions.length)} (dimensions ${dimensions.join('x')}) with ${this.arrayCells} in use`);if(totalArrays+this.heap.size>this.maxHeapObjects)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: object budget (${this.maxHeapObjects}) needs ${totalArrays} arrays for ${component}${'[]'.repeat(dimensions.length)} (dimensions ${dimensions.join('x')}) with ${this.heap.size} live objects`);nodes*=length;}
       const allocate=depth=>{const value=this.newArray('['.repeat(dimensions.length-depth)+component,dimensions[depth]);if(depth+1<dimensions.length){const values=this.array(value).elements;for(let i=0;i<values.length;i++)values[i]=allocate(depth+1);}return value;};return allocate(0);
     }
     if(staticCall&&['Ljava/lang/Integer;','Ljava/lang/Long;'].includes(method.owner)&&['toString','toHexString','toOctalString','toBinaryString','toUnsignedString'].includes(name)){

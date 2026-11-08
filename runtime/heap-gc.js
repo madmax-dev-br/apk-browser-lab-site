@@ -23,7 +23,7 @@
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=935cae6f69f6';
+import { BUCKET } from './time-breakdown.js?v=57d10730b49f';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -116,6 +116,14 @@ function flatSample(iterable, limit) {
   let seen = 0;
   for (const item of iterable) { if (!flatRecord(item, 0, limit)) return false; if (++seen >= FLAT_SAMPLE) break; }
   return seen > 0;
+}
+/** Array-cell weights per element type (the budget approximates the Java-visible heap, not the host cost of a JS array element): byte/boolean 1/8 cell, char/short 1/4, int/float 1/2, long/double and references 1. */
+const CELL_WEIGHT = { Z: 0.125, B: 0.125, C: 0.25, S: 0.25, I: 0.5, F: 0.5 };
+/** The one place that turns an array into budget cells: ceil(length * weight of the element type), at least 1 for a non-empty array, 0 for an empty one. `type` is the array descriptor ('[B', '[[I', '[Ljava/lang/String;'). */
+export function cellsOf(type, length) {
+  if (length <= 0) return 0;
+  const cells = Math.ceil(length * (type.length === 2 ? CELL_WEIGHT[type[1]] ?? 1 : 1));   // all weights are powers of two: exact in floating point
+  return cells < 1 ? 1 : cells;
 }
 const ELEMENT_WIDTH = { Z: 1, B: 1, C: 2, S: 2, I: 4, F: 4, J: 8, D: 8 };
 const refArrayTypes = new Map();
@@ -328,7 +336,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
     const records = heap.chunks[ci];
     for (let slot = 0; slot < 4096; slot++) {
       const record = records[slot]; if (record === undefined || record.freed === true) continue;
-      fieldSlots += record.fields?.size ?? 0; if (record.elements) arrayCells += record.elements.length;
+      fieldSlots += record.fields?.size ?? 0; if (record.elements) arrayCells += cellsOf(record.type, record.elements.length);
       { const type = record.type; let entry = survivors.get(type); if (entry === undefined) { const own = runtime.classes.get(type); survivors.set(type, entry = { n: 0, bytes: 0, cats: new Uint32Array(256), dex: own ? (runtime.dex.bootDexes?.has(own.dex) ? 'framework' : (own.dex?.filename ?? 'app')) : 'host' }); }
         entry.cats[markBytes[ci][slot]]++; entry.n++; entry.bytes += 48 + (record.fields?.size ?? 0) * 8 + (record.elements ? record.elements.length * (record.type.length === 2 ? ELEMENT_WIDTH[record.type[1]] ?? 8 : 8) : 0) + (typeof record.value === 'string' ? record.value.length * 2 : 0) + ((record.list?.length ?? 0) + (record.set?.length ?? 0)) * 8 + (record.map?.size ?? 0) * 48; }
       collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
@@ -424,9 +432,10 @@ function candidateArrays(heap) {
   const best = [];
   for (const ci of heap.usedChunks()) for (let slot = 0; slot < 4096; slot++) {
     const record = heap.chunks[ci][slot]; if (record === undefined || record.freed === true || !record.elements) continue;
-    const cells = record.elements.length; if (cells < 1000) continue;
+    const length = record.elements.length; if (length < 1000) continue;
+    const cells = cellsOf(record.type, length);
     if (best.length >= ARRAY_CANDIDATES && cells <= best[best.length - 1].cells) continue;
-    best.push({ id: (ci << 12) + slot, type: record.type, cells, root: undefined }); best.sort((a, b) => b.cells - a.cells); if (best.length > ARRAY_CANDIDATES) best.pop();
+    best.push({ id: (ci << 12) + slot, type: record.type, length, cells, root: undefined }); best.sort((a, b) => b.cells - a.cells); if (best.length > ARRAY_CANDIDATES) best.pop();
   }
   return best;
 }
@@ -435,14 +444,14 @@ function arrayCensus(runtime, heap, markedHas, candidates) {
   let liveCells = 0, garbageCells = 0, liveBig = 0, liveBigCells = 0, garbageBig = 0, garbageBigCells = 0;
   for (const ci of heap.usedChunks()) for (let slot = 0; slot < 4096; slot++) {
     const record = heap.chunks[ci][slot], id = (ci << 12) + slot; if (record === undefined || id === 0 || record.freed === true || !record.elements) continue;
-    const cells = record.elements.length, live = markedHas(id);
+    const cells = cellsOf(record.type, record.elements.length), live = markedHas(id);
     if (live) { liveCells += cells; if (cells > BIG_ARRAY_CELLS) { liveBig++; liveBigCells += cells; } } else { garbageCells += cells; if (cells > BIG_ARRAY_CELLS) { garbageBig++; garbageBigCells += cells; } }
   }
-  const row = c => ({ type: typeLabel(c.type), length: c.cells, cells: c.cells, root: c.root ?? null });
+  const row = c => ({ type: typeLabel(c.type), length: c.length, cells: c.cells, root: c.root ?? null });
   const liveTop = candidates.filter(c => c.root !== undefined).slice(0, 10).map(row), garbageTop = candidates.filter(c => c.root === undefined).slice(0, 5).map(c => ({ ...row(c), root: null }));
   const summary = { cellsInUse: runtime.arrayCells ?? 0, maxCells: runtime.maxArrayCells ?? 0, liveCells, garbageCells, liveOver1M: { arrays: liveBig, cells: liveBigCells }, garbageOver1M: { arrays: garbageBig, cells: garbageBigCells }, liveTop, garbageTop };
-  const fmt = c => `${c.type} length ${c.length} (${c.cells} cells) via ${c.root ?? 'nenhuma raiz (inalcançável)'}`;
-  const lines = [`Células de array: ${summary.cellsInUse} contadas de ${summary.maxCells}; vivas ${liveCells}, inalcançáveis ainda não coletadas ${garbageCells}; arrays acima de 1 M de células: ${liveBig} vivos com ${liveBigCells} células, ${garbageBig} inalcançáveis com ${garbageBigCells}.`];
+  const fmt = c => `${c.type} length ${c.length} elements (${c.cells} weighted cells) via ${c.root ?? 'nenhuma raiz (inalcançável)'}`;
+  const lines = [`Células de array (ponderadas pela largura do elemento: byte 1/8, char 1/4, int 1/2, long e referência 1): ${summary.cellsInUse} contadas de ${summary.maxCells}; vivas ${liveCells}, inalcançáveis ainda não coletadas ${garbageCells}; arrays acima de 1 M de células: ${liveBig} vivos com ${liveBigCells} células, ${garbageBig} inalcançáveis com ${garbageBigCells}.`];
   if (liveTop.length) lines.push('Maiores arrays vivos (por células; primeira raiz que alcança):', ...liveTop.map(c => `  ${fmt(c)}`));
   if (garbageTop.length) lines.push('Maiores arrays inalcançáveis ainda não coletados:', ...garbageTop.map(c => `  ${fmt(c)}`));
   return { summary, lines };
@@ -494,7 +503,7 @@ export function heapCensus(runtime, { topClasses = 20, topRoots = 10 } = {}) {
   const allocationSites = [...(runtime.allocationSamples ?? [])].map(([site, samples]) => ({ site, samples })).sort((a, b) => b.samples - a.samples).slice(0, 8);
   const gc = { enabled: !!runtime.gcEnabled, ...(runtime.gcStats ?? {}), skips: { ...(runtime.gcSkips ?? {}) } };
   const mib = bytes => (bytes / 1048576).toFixed(1);
-  const lines = [`Censo do heap da VM: ${live} objetos vivos (~${mib(estimatedBytes)} MiB estimados) de um limite de ${runtime.maxHeapObjects}; ${garbage} inalcançáveis ainda não coletados; ${runtime.fieldSlots ?? 0} campos, ${runtime.arrayCells ?? 0} células de array, ${runtime.collectionCells ?? 0} células de coleção.`,
+  const lines = [`Censo do heap da VM: ${live} objetos vivos (~${mib(estimatedBytes)} MiB estimados) de um limite de ${runtime.maxHeapObjects}; ${garbage} inalcançáveis ainda não coletados; ${runtime.fieldSlots ?? 0} campos, ${runtime.arrayCells ?? 0} células de array ponderadas, ${runtime.collectionCells ?? 0} células de coleção.`,
     `Coletor: ${gc.enabled ? 'ligado' : 'DESLIGADO'}; ${gc.collections ?? 0} coletas, ${gc.freed ?? 0} liberados no total, última coleta (${gc.lastReason ?? 'nenhuma'}) deixou ${gc.lastLive ?? '?'} vivos${Object.keys(gc.skips).length ? `; coletas recusadas: ${Object.entries(gc.skips).map(([why, n]) => `${why} x${n}`).join(', ')}` : ''}.`,
     'Classes com mais objetos vivos:', ...classes.map(c => `  ${c.count} x ${typeLabel(c.type)} (~${mib(c.bytes)} MiB)`),
     'Raízes que mantêm os objetos vivos (objetos exclusivos de cada grupo, do menor alcance ao maior):', ...roots.map(g => `  ${g.objects} objetos via ${g.name} (sozinha alcança ${g.reachAlone})`)];
