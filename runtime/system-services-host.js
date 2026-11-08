@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=99056e83c7d5';
-import { APKError } from './apk-error.js?v=99056e83c7d5';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=99056e83c7d5';
+import { gcRoot } from './heap-gc.js?v=da865bfd70a5';
+import { APKError } from './apk-error.js?v=da865bfd70a5';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=da865bfd70a5';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -182,6 +182,7 @@ export function createSystemServicesHost(platform) {
     }
     return lines;
   };
+  platform.throwableTraceLines = traceLines;   // used by src/concurrency-host.js to give logcat the full text of a fatal exception
   def(THROWABLE, 'printStackTrace', '()V', (r, _m, [self]) => { for (const line of traceLines(r, self)) r.record(`LOG W System.err: ${line}`); });
   for (const sink of ['Ljava/io/PrintStream;', 'Ljava/io/PrintWriter;'])
     def(THROWABLE, 'printStackTrace', `(${sink})V`, (r, _m, [self, out]) => { for (const line of traceLines(r, self)) r.dispatch({ owner: sink, name: 'println', parameters: ['Ljava/lang/String;'], result: 'V', signature: '(Ljava/lang/String;)V' }, [out, line], 'virtual'); });

@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=99056e83c7d5';
-import { createHostRegistry } from './host-contract.js?v=99056e83c7d5';
-import { Blocked, VMThread } from './scheduler.js?v=99056e83c7d5';
-import { Invoke } from './interpreter.js?v=99056e83c7d5';
-import { GC_ROOTS } from './heap-gc.js?v=99056e83c7d5';
+import { APKError } from './apk-error.js?v=da865bfd70a5';
+import { createHostRegistry } from './host-contract.js?v=da865bfd70a5';
+import { Blocked, VMThread } from './scheduler.js?v=da865bfd70a5';
+import { Invoke } from './interpreter.js?v=da865bfd70a5';
+import { GC_ROOTS } from './heap-gc.js?v=da865bfd70a5';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -116,10 +116,13 @@ export function createConcurrencyHost(platform) {
     r.record(`RUNTIME uncaught exception in thread "${st.name}": ${r.typeOf(throwable)}: ${r.object(throwable).message ?? ''}`);
     return new Invoke({ owner: UEH, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [handler, ref, throwable], 'virtual', null, error => { try { if (error?.value) r.noteHandlerFailure(st.name, error.value); } catch { /* diagnostics only */ } return undefined; });   // an exception the handler throws is ignored, as in Java -- but recorded
   }
+  // Logcat shows a fatal/uncaught exception as a header line plus the full stack trace (the trace ring keeps its one-line form); never fails the exception path.
+  const logThrowable = (r, level, tag, header, throwable) => { if (!r.logEntry) return; let lines; try { lines = r.platform.throwableTraceLines(r, throwable); } catch { lines = [`${r.typeOf(throwable)}: ${r.object(throwable).message ?? ''}`]; } r.logEntry(level, tag, `${header}\n${lines.join('\n')}`); };
   const uncaught = (r, ref, throwable) => r.finishHostStep(uncaughtInvoke(r, ref, throwable));
   function fatal(r, ref, throwable) {
     try { r.noteUncaught(state(r, ref).name, throwable); if (r.strictCrash) r.appCrash = { thread: state(r, ref).name, ...r.describeThrowable(throwable), phase: r.monitor?.op?.name ?? null, atMs: Math.round(platform.clock.now()) }; } catch { /* diagnostics only */ }
-    r.record(`LOG E AndroidRuntime: FATAL EXCEPTION: ${state(r, ref).name}: ${r.typeOf(throwable)}: ${r.object(throwable).message ?? ''}`);
+    r.record(`LOG E AndroidRuntime: FATAL EXCEPTION: ${state(r, ref).name}: ${r.typeOf(throwable)}: ${r.object(throwable).message ?? ''}`, true);
+    logThrowable(r, 'E', 'AndroidRuntime', `FATAL EXCEPTION: ${state(r, ref).name}\nProcess: ${r.platform?.packageName ?? ''}, PID: ${r.platform?.virtualProcess?.pid ?? 0}`, throwable);
     if (!r.strictCrash) { try { r.noteTolerated(state(r, ref).name, throwable); } catch { /* diagnostics only */ } return undefined; }   // tolerant mode: never silent (see the Resumo), but the app and the other threads keep running
     const crash = new APKError(`Uncaught exception in thread "${state(r, ref).name}": ${r.typeOf(throwable)}${r.object(throwable).message ? ': ' + r.object(throwable).message : ''}`, { kind: 'uncaught-thread-exception' }); crash.vmFatal = true; throw crash;
   }
@@ -241,7 +244,8 @@ export function createConcurrencyHost(platform) {
     if (g.parent) return new Invoke({ owner: GROUP, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [g.parent, thread, throwable], 'virtual');
     if (defaultOf(r)) return new Invoke({ owner: UEH, name: 'uncaughtException', parameters: [THREAD, THROWABLE], result: 'V', signature: `(${THREAD}${THROWABLE})V` }, [defaultOf(r), thread, throwable], 'virtual', null, error => { try { if (error?.value) r.noteHandlerFailure(state(r, thread).name, error.value); } catch { /* diagnostics only */ } throw error; });
     // ThreadGroup.uncaughtException with no default handler: Android prints `Exception in thread "name"` and the stack to System.err and carries on
-    r.record(`LOG E System.err: Exception in thread "${state(r, thread).name}" ${r.typeOf(throwable)}: ${r.object(throwable).message ?? ''}`);
+    r.record(`LOG E System.err: Exception in thread "${state(r, thread).name}" ${r.typeOf(throwable)}: ${r.object(throwable).message ?? ''}`, true);
+    logThrowable(r, 'W', 'System.err', `Exception in thread "${state(r, thread).name}"`, throwable);
   });
   type(KILL, OBJECT, [UEH], { allocatable: true });
   // RuntimeInit.KillApplicationHandler: logs `FATAL EXCEPTION: <thread>` with the stack, records the app crash for the reports and ends the app run (the process dies on Android).

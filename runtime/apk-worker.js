@@ -1,46 +1,48 @@
-import { buildScreenState } from './screen-state.js?v=99056e83c7d5';
-import { reportSummary } from './report-summary.js?v=99056e83c7d5';
-import { TimeBreakdown } from './time-breakdown.js?v=99056e83c7d5';
-import { createMessageSink } from './audio-native.js?v=99056e83c7d5';
-import { loadAPK } from './apk-loader.js?v=99056e83c7d5';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=99056e83c7d5';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=99056e83c7d5';
-import { createWebViewBackend } from './webview-backend.js?v=99056e83c7d5';
-import { FrameworkProvider } from './framework-provider.js?v=99056e83c7d5';
-import { createRasterSender } from './raster-cache.js?v=99056e83c7d5';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=99056e83c7d5';
-import { dispatchPointer } from './pointer-input-host.js?v=99056e83c7d5';
-import { resolveDevice } from './device-profile.js?v=99056e83c7d5';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=99056e83c7d5';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=99056e83c7d5';
-import { SkiaProvider } from './skia-provider.js?v=99056e83c7d5';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=99056e83c7d5';
-import { SemanticsPacer } from './semantics-pacing.js?v=99056e83c7d5';
-import { disposeTextLayout } from './text-layout-native.js?v=99056e83c7d5';
-import { IcuBreakProvider } from './icu-break-provider.js?v=99056e83c7d5';
-import { SqliteProvider } from './sqlite-native.js?v=99056e83c7d5';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=99056e83c7d5';
-import { TzdataProvider } from './java-time-native.js?v=99056e83c7d5';
-import { ZlibProvider } from './zip-native.js?v=99056e83c7d5';
-import { IcuConverterProvider } from './icu-converter-native.js?v=99056e83c7d5';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=99056e83c7d5';
-import { JavacryptoProvider } from './javacrypto-native.js?v=99056e83c7d5';
-import { disposeColorFilters } from './color-filter-native.js?v=99056e83c7d5';
-import { disposeRegex } from './regex-native.js?v=99056e83c7d5';
-import { disposeRenderNodes } from './rendernode-native.js?v=99056e83c7d5';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=99056e83c7d5';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=99056e83c7d5';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=99056e83c7d5';
+import { buildScreenState } from './screen-state.js?v=da865bfd70a5';
+import { createLogcat } from './logcat.js?v=da865bfd70a5';
+import { reportSummary } from './report-summary.js?v=da865bfd70a5';
+import { TimeBreakdown } from './time-breakdown.js?v=da865bfd70a5';
+import { createMessageSink } from './audio-native.js?v=da865bfd70a5';
+import { loadAPK } from './apk-loader.js?v=da865bfd70a5';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=da865bfd70a5';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=da865bfd70a5';
+import { createWebViewBackend } from './webview-backend.js?v=da865bfd70a5';
+import { FrameworkProvider } from './framework-provider.js?v=da865bfd70a5';
+import { createRasterSender } from './raster-cache.js?v=da865bfd70a5';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=da865bfd70a5';
+import { dispatchPointer } from './pointer-input-host.js?v=da865bfd70a5';
+import { resolveDevice } from './device-profile.js?v=da865bfd70a5';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=da865bfd70a5';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=da865bfd70a5';
+import { SkiaProvider } from './skia-provider.js?v=da865bfd70a5';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=da865bfd70a5';
+import { SemanticsPacer } from './semantics-pacing.js?v=da865bfd70a5';
+import { disposeTextLayout } from './text-layout-native.js?v=da865bfd70a5';
+import { IcuBreakProvider } from './icu-break-provider.js?v=da865bfd70a5';
+import { SqliteProvider } from './sqlite-native.js?v=da865bfd70a5';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=da865bfd70a5';
+import { TzdataProvider } from './java-time-native.js?v=da865bfd70a5';
+import { ZlibProvider } from './zip-native.js?v=da865bfd70a5';
+import { IcuConverterProvider } from './icu-converter-native.js?v=da865bfd70a5';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=da865bfd70a5';
+import { JavacryptoProvider } from './javacrypto-native.js?v=da865bfd70a5';
+import { disposeColorFilters } from './color-filter-native.js?v=da865bfd70a5';
+import { disposeRegex } from './regex-native.js?v=da865bfd70a5';
+import { disposeRenderNodes } from './rendernode-native.js?v=da865bfd70a5';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=da865bfd70a5';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=da865bfd70a5';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=da865bfd70a5';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=99056e83c7d5';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=99056e83c7d5';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=99056e83c7d5';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '99056e83c7d5';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=da865bfd70a5';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=da865bfd70a5';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=da865bfd70a5';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'da865bfd70a5';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
 let sharedLayoutProvider = null, sharedNativeLibraryProvider = null, sharedJavacryptoProvider = null;
 let sharedConfigurationProvider = null;
+const logcat = createLogcat({ post: message => self.postMessage(message) });   // the app's logcat (src/logcat.js): batches go to the page on a 100 ms timer and at the end of every event batch / request
 let runtime = null, reportedCensus = 0;   // reportedCensus: the OutOfMemoryError whose heap census already reached the page
 let appData = null, appDataInfo = null;   // per-app private data persistence (src/app-data-store.js): the live persistence object (null when disabled) and the last status
 let composeSemantics = null;
@@ -110,6 +112,7 @@ function scheduleEvents() {
     self.postMessage({ type: 'runtime-busy' });   // the page must not treat the screen as settled while a scheduled VM event is being processed
     try {
       const started = performance.now(), drained = monitored('evento agendado', () => drainReadyEvents()); lastEventMs = Math.round(performance.now() - started); if (drained.processed) { workerTiming.scheduledBatches++; workerTiming.scheduledMs += performance.now() - started; }
+      logcat.flush();
       if (drained.processed || (semanticsPacer.stale && semanticsPacer.wait() <= 0)) self.postMessage({ type: 'runtime-event', snapshot: currentSnapshot({ paced: true }) }); else self.postMessage({ type: 'runtime-idle' });
       succeeded = true;
     } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); }
@@ -139,7 +142,7 @@ function snapshotScreenDuringOperation(message) {
 self.onmessage = async ({ data }) => {
   if (!data || !Number.isSafeInteger(data.requestId)) return;
   const { requestId, type } = data;
-  const send = (message) => self.postMessage({ requestId, ...message });
+  const send = (message) => { logcat.flush(); self.postMessage({ requestId, ...message }); };   // log lines first, so the page has them when the reply arrives
   if (type === 'webview-event') { try { runtime?.platform?.webViewBackend?.handleEvent(runtime, data); } finally { scheduleEvents(); } return; }   // an iframe finished or failed: only queues VM tasks
   if (type === 'app-data-flush') { runtime?.fileMappings?.flushAll(); appData?.syncPoint('page-hide'); return; }   // shared native file mappings reach their files before the data is stored   // the page is being hidden/closed: store now, even while the VM is busy (no reply)
   if (type === 'screen-state') {   // read-only picture of the screen for "Copiar estado da tela"; answered even while the VM is between operations, always with whatever could be read
@@ -224,8 +227,8 @@ self.onmessage = async ({ data }) => {
       const nativeLibraryProvider = NATIVE_LIBS_URL ? (sharedNativeLibraryProvider ??= await LazyNativeLibraryProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
       const javacryptoProvider = NATIVE_LIBS_URL ? (sharedJavacryptoProvider ??= await JavacryptoProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
       const result = await loadAPK(data.buffer, { maxEventWallMs: EVENT_WALL_LIMIT_MS, maxHeapObjects: heapLimitFor(data), nativeLibraryProvider, javacryptoProvider, device: resolveDevice(data.device || {}), tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', strictCrash: data.strictCrash === true, enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
-      runtime = result.runtime; archive = result.archive; inventory = result.inventory;
-      runtime.monitor.configure({ sink: message => { self.postMessage({ ...message, requestId: activeRequestId }); snapshotScreenDuringOperation(message); }, budgetMs: OPERATION_WALL_LIMIT_MS });   // heartbeats to the page + the operation wall budget
+      runtime = result.runtime; archive = result.archive; inventory = result.inventory; logcat.clear(); logcat.attach(runtime);
+      runtime.monitor.configure({ sink: message => { logcat.flush(); self.postMessage({ ...message, requestId: activeRequestId }); snapshotScreenDuringOperation(message); }, budgetMs: OPERATION_WALL_LIMIT_MS });   // heartbeats to the page + the operation wall budget
       runtime.platform.audioSink = createMessageSink((message, transfer) => self.postMessage(message, transfer));   // android.media.AudioTrack PCM goes to the page's Web Audio output
       // WebView content lives in iframes of the page: without a page that wants them (the embedded player's default) the WebView has no backend and fails explicitly
       if (data.webview !== false) runtime.platform.webViewBackend = createWebViewBackend({ platform: runtime.platform, post: message => self.postMessage(message), labOrigin: self.location?.origin ?? '' }); inspectNativeLibraries = result.inspectNativeLibraries;

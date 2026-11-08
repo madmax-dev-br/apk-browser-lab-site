@@ -23,7 +23,7 @@
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=99056e83c7d5';
+import { BUCKET } from './time-breakdown.js?v=da865bfd70a5';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -152,7 +152,7 @@ export function createMarker(runtime, { full = false } = {}) {
     if (record.freed === true) { if (strict && violations.length < 20) violations.push(id); return; }   // a real {ref} to an object collected earlier: a root the collector did not see
     setMarked(id); worklist.push(id); count++;
   };
-  const idLike = (key, value) => typeof value === 'number' && Number.isSafeInteger(value) && value > 0 && value < limit && ID_KEY.test(key);
+  const idLike = (key, value) => typeof value === 'number' && Number.isSafeInteger(value) && value > 0 && value < limit && key !== 'gcLastNextId' && ID_KEY.test(key);   // gcLastNextId is the collector's own counter (the id the first object after the last collection got), not a reference: matching /Id$/ kept that one object, possibly a huge array, alive through every collection
   /** Iterative scan of plain JavaScript data; pointers are `{ ref }` objects and id-named integers. */
   const scan = start => {
     if (start !== undefined) stack.push(start);
@@ -365,7 +365,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   if (cleared.length && runtime.platform?.queueTask) {
     runtime.platform.queueTask(() => { for (const reference of cleared) { try { runtime.dispatch({ owner: 'Ljava/lang/ref/Reference;', name: 'enqueue', parameters: [], result: 'Z', signature: '()Z' }, [reference], 'virtual'); } catch { /* the queue is gone with its owner */ } } }, 0, cleared);
   }
-  runtime.allocationSamples = null; runtime.gcPressure = false; runtime.gcLastNextId = runtime.nextId; runtime.fieldSlots = fieldSlots; runtime.arrayCells = arrayCells; runtime.collectionCells = collectionCells;
+  runtime.allocationSamples = null; runtime.gcPressure = false; runtime.gcCellPressure = false; runtime.gcLastNextId = runtime.nextId; runtime.fieldSlots = fieldSlots; runtime.arrayCells = arrayCells; runtime.collectionCells = collectionCells;
   runtime.gcStats = { collections: (runtime.gcStats?.collections ?? 0) + 1, freed: (runtime.gcStats?.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(runtime.gcStats?.peakLiveAfterGc ?? 0, heap.size), lastReason: reason, totalMs: (runtime.gcStats?.totalMs ?? 0) + (performance.now() - started), recent: [...(runtime.gcStats?.recent ?? []).slice(-15), { at: Math.round(started), ms: Math.round(performance.now() - started), markMs: Math.round(markMs), before, after: heap.size, nextId: runtime.nextId, reason }] };
   return { collected: true, reason, before, after: heap.size, freed, ms: Math.round(performance.now() - started), markMs: Math.round(markMs) };
 }
@@ -376,8 +376,10 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
 export const GC_START_FRACTION = 0.25;
 export function collectionDue(runtime, threshold = Math.floor(runtime.maxHeapObjects * GC_START_FRACTION)) {
   const wait = Math.min(runtime.gcMinAlloc ?? 0, Math.max(64, (runtime.maxHeapObjects - runtime.heap.size) >> 1)), allocated = runtime.nextId - (runtime.gcLastNextId ?? 0);   // never wait past half the remaining headroom
+  if (runtime.gcCellPressure && runtime.arrayCells > runtime.maxArrayCells * 0.75) return true;   // three quarters of the array-cell budget: big arrays are few objects, so neither the object-count wait nor the pacing below may hold the collection back
   // Pacing: a collection that took T ms is followed by at least 8 T ms of mutator time (<= ~11% GC overhead), unless the heap is nearly full (above 85% of the limit: collect, the report warns).
   if (runtime.gcLastEnd && (runtime.gcLastMs ?? 0) >= 20 && runtime.heap.size < runtime.maxHeapObjects * 0.85 && performance.now() - runtime.gcLastEnd < 8 * runtime.gcLastMs) return false;   // collections under 20 ms are cheap enough to run whenever they are due
+  if (runtime.gcCellPressure) return true;   // half of the array-cell budget is in use (newArray)
   if (runtime.gcPressure) return allocated >= Math.min(wait, Math.max(1024, wait >> 2));   // a native resource count asked for it (regex handles are capped at 16384): wait less, but not for every quantum
   return allocated >= wait && runtime.heap.size >= Math.max(threshold, runtime.gcNextAt ?? 0);
 }
@@ -411,6 +413,36 @@ export function estimateRecordBytes(record) {
   return bytes;
 }
 const typeLabel = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
+
+const BIG_ARRAY_CELLS = 1000000, ARRAY_CANDIDATES = 40;
+/** The largest arrays of the heap (live or not yet collected), by cells: the candidates the census classifies. Cheap: one pass over the records, a bounded sorted list. */
+function candidateArrays(heap) {
+  const best = [];
+  for (const ci of heap.usedChunks()) for (let slot = 0; slot < 4096; slot++) {
+    const record = heap.chunks[ci][slot]; if (record === undefined || record.freed === true || !record.elements) continue;
+    const cells = record.elements.length; if (cells < 1000) continue;
+    if (best.length >= ARRAY_CANDIDATES && cells <= best[best.length - 1].cells) continue;
+    best.push({ id: (ci << 12) + slot, type: record.type, cells, root: undefined }); best.sort((a, b) => b.cells - a.cells); if (best.length > ARRAY_CANDIDATES) best.pop();
+  }
+  return best;
+}
+/** Which arrays hold the array-cell budget: the 10 largest live arrays (element type, length, cells, first root group that reaches each), the cells held by live and by unreachable-not-yet-collected arrays over 1 M cells. */
+function arrayCensus(runtime, heap, markedHas, candidates) {
+  let liveCells = 0, garbageCells = 0, liveBig = 0, liveBigCells = 0, garbageBig = 0, garbageBigCells = 0;
+  for (const ci of heap.usedChunks()) for (let slot = 0; slot < 4096; slot++) {
+    const record = heap.chunks[ci][slot], id = (ci << 12) + slot; if (record === undefined || id === 0 || record.freed === true || !record.elements) continue;
+    const cells = record.elements.length, live = markedHas(id);
+    if (live) { liveCells += cells; if (cells > BIG_ARRAY_CELLS) { liveBig++; liveBigCells += cells; } } else { garbageCells += cells; if (cells > BIG_ARRAY_CELLS) { garbageBig++; garbageBigCells += cells; } }
+  }
+  const row = c => ({ type: typeLabel(c.type), length: c.cells, cells: c.cells, root: c.root ?? null });
+  const liveTop = candidates.filter(c => c.root !== undefined).slice(0, 10).map(row), garbageTop = candidates.filter(c => c.root === undefined).slice(0, 5).map(c => ({ ...row(c), root: null }));
+  const summary = { cellsInUse: runtime.arrayCells ?? 0, maxCells: runtime.maxArrayCells ?? 0, liveCells, garbageCells, liveOver1M: { arrays: liveBig, cells: liveBigCells }, garbageOver1M: { arrays: garbageBig, cells: garbageBigCells }, liveTop, garbageTop };
+  const fmt = c => `${c.type} length ${c.length} (${c.cells} cells) via ${c.root ?? 'nenhuma raiz (inalcançável)'}`;
+  const lines = [`Células de array: ${summary.cellsInUse} contadas de ${summary.maxCells}; vivas ${liveCells}, inalcançáveis ainda não coletadas ${garbageCells}; arrays acima de 1 M de células: ${liveBig} vivos com ${liveBigCells} células, ${garbageBig} inalcançáveis com ${garbageBigCells}.`];
+  if (liveTop.length) lines.push('Maiores arrays vivos (por células; primeira raiz que alcança):', ...liveTop.map(c => `  ${fmt(c)}`));
+  if (garbageTop.length) lines.push('Maiores arrays inalcançáveis ainda não coletados:', ...garbageTop.map(c => `  ${fmt(c)}`));
+  return { summary, lines };
+}
 const familyOf = key => { const text = String(key), owner = text.slice(1, text.indexOf('->')), parts = owner.split('/'); return parts.length > 3 ? parts.slice(0, 3).join('.') : parts.join('.').replace(/;$/, ''); };
 
 /**
@@ -439,9 +471,13 @@ export function heapCensus(runtime, { topClasses = 20, topRoots = 10 } = {}) {
   // Pass 1: how far each group reaches on its own (capped), so that structures shared by many groups are attributed to the group that reaches the most, not to whichever came first.
   for (const def of defs) { const own = createMarker(runtime); def.visit(own.scan); own.drain(REACH_CAP); def.reach = own.count(); }
   for (const id of ids) markId(id);
+  const bigArrays = candidateArrays(heap); const attribute = name => { for (const c of bigArrays) if (c.root === undefined && markedHas(c.id)) c.root = name; };
+  attribute('ids de objetos do runtime/plataforma');
   // Pass 2: exclusive attribution, smallest reach first.
-  for (const def of [...defs].sort((x, y) => x.reach - y.reach)) { const before = marker.count(); def.visit(scan); drain(); const gained = marker.count() - before; if (gained > 0) groups.push({ name: def.name, objects: gained, reachAlone: def.reach >= REACH_CAP ? `${REACH_CAP}+` : def.reach }); }
+  for (const def of [...defs].sort((x, y) => x.reach - y.reach)) { const before = marker.count(); def.visit(scan); drain(); attribute(def.name); const gained = marker.count() - before; if (gained > 0) groups.push({ name: def.name, objects: gained, reachAlone: def.reach >= REACH_CAP ? `${REACH_CAP}+` : def.reach }); }
   drain(); marker.ephemerons();
+  drain(); attribute('(demais raízes)');
+  const arrays = arrayCensus(runtime, heap, markedHas, bigArrays);
   const counts = new Map(), garbageCounts = new Map(); let live = 0, garbage = 0, estimatedBytes = 0;
   for (const ci of heap.usedChunks()) for (let slot = 0; slot < 4096; slot++) {
     const record = heap.chunks[ci][slot]; const id = (ci << 12) + slot; if (record === undefined || id === 0 || record.freed === true) continue;
@@ -458,9 +494,10 @@ export function heapCensus(runtime, { topClasses = 20, topRoots = 10 } = {}) {
     `Coletor: ${gc.enabled ? 'ligado' : 'DESLIGADO'}; ${gc.collections ?? 0} coletas, ${gc.freed ?? 0} liberados no total, última coleta (${gc.lastReason ?? 'nenhuma'}) deixou ${gc.lastLive ?? '?'} vivos${Object.keys(gc.skips).length ? `; coletas recusadas: ${Object.entries(gc.skips).map(([why, n]) => `${why} x${n}`).join(', ')}` : ''}.`,
     'Classes com mais objetos vivos:', ...classes.map(c => `  ${c.count} x ${typeLabel(c.type)} (~${mib(c.bytes)} MiB)`),
     'Raízes que mantêm os objetos vivos (objetos exclusivos de cada grupo, do menor alcance ao maior):', ...roots.map(g => `  ${g.objects} objetos via ${g.name} (sozinha alcança ${g.reachAlone})`)];
+  lines.push(...arrays.lines);
   if (garbageClasses.length) lines.push('Inalcançáveis ainda não coletados:', ...garbageClasses.map(c => `  ${c.count} x ${typeLabel(c.type)}`));
   if (allocationSites.length) lines.push('Métodos que mais alocaram desde a última coleta (amostra):', ...allocationSites.map(s => `  ${s.samples} amostras em ${s.site}`));
-  return { live, garbage, estimatedBytes, limit: runtime.maxHeapObjects, topClasses: classes, roots, garbageClasses, allocationSites, gc, trackedContainers: trackedCount, text: lines.join('\n') };
+  return { live, garbage, estimatedBytes, arrays: arrays.summary, limit: runtime.maxHeapObjects, topClasses: classes, roots, garbageClasses, allocationSites, gc, trackedContainers: trackedCount, text: lines.join('\n') };
 }
 
 /** Which of the last collections freed object `id`: { collection, type } or null (binary search in the sorted ring). */

@@ -1,28 +1,28 @@
-import { VMClock } from './vm-clock.js?v=99056e83c7d5';
-import { OperationMonitor } from './operation-monitor.js?v=99056e83c7d5';
-import { ExecutionProfile } from './execution-profile.js?v=99056e83c7d5';
-import { SamplingProfiler } from './sampling-profiler.js?v=99056e83c7d5';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=99056e83c7d5';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=99056e83c7d5';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=99056e83c7d5';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=99056e83c7d5';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=99056e83c7d5';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=99056e83c7d5';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=99056e83c7d5';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=99056e83c7d5';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=99056e83c7d5';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=99056e83c7d5';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=99056e83c7d5';
-import { APKError } from './apk-error.js?v=99056e83c7d5';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=99056e83c7d5';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=99056e83c7d5';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=99056e83c7d5';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=99056e83c7d5';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=99056e83c7d5';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=99056e83c7d5';
-import { Scheduler, Blocked } from './scheduler.js?v=99056e83c7d5';
-import { bootClassLacksMember } from './boot-class-members.js?v=99056e83c7d5';
-export { APKError } from './apk-error.js?v=99056e83c7d5';
+import { VMClock } from './vm-clock.js?v=da865bfd70a5';
+import { OperationMonitor } from './operation-monitor.js?v=da865bfd70a5';
+import { ExecutionProfile } from './execution-profile.js?v=da865bfd70a5';
+import { SamplingProfiler } from './sampling-profiler.js?v=da865bfd70a5';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=da865bfd70a5';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=da865bfd70a5';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=da865bfd70a5';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=da865bfd70a5';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=da865bfd70a5';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=da865bfd70a5';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=da865bfd70a5';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=da865bfd70a5';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=da865bfd70a5';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=da865bfd70a5';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=da865bfd70a5';
+import { APKError } from './apk-error.js?v=da865bfd70a5';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=da865bfd70a5';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=da865bfd70a5';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=da865bfd70a5';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=da865bfd70a5';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=da865bfd70a5';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=da865bfd70a5';
+import { Scheduler, Blocked } from './scheduler.js?v=da865bfd70a5';
+import { bootClassLacksMember } from './boot-class-members.js?v=da865bfd70a5';
+export { APKError } from './apk-error.js?v=da865bfd70a5';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1031,8 +1031,9 @@ export class APKRuntime {
   activities() { return [...this.dex.classes.keys()].filter(t => this.isSubtype(t, 'Landroid/app/Activity;')); }
   // Execution trace: the first 128 entries are kept forever and the most recent 384 in a ring (the former splice(128,1)-per-call kept exactly this
   // content but moved ~380 elements on every VM call). Entries may be strings or {method, origin} pairs, rendered to text only when `trace` is read.
-  record(line) {
+  record(line, quiet = false) {
     if (this.traceMuted) return; // host plumbing
+    if (this.logSink !== undefined && quiet !== true && typeof line === 'string' && line.charCodeAt(0) === 76 && line.startsWith('LOG ')) this.logSink(line);   // src/logcat.js: every log line is also a logcat entry
     if (typeof line === 'object') { if (line.exempt === true) return; }
     else { const frames = this.thread?.frames, method = frames?.length ? frames[frames.length - 1].method : null; if (method && (method.plumbing ??= LOOPER_PLUMBING.test(method.owner))) return; }   // a host call made by the pump's own Looper/MessageQueue/Handler code that must not evict APK-visible trace entries (e.g. building WindowInsets for the virtual system bars)
     const ring = this.traceRing ??= { head: [], tail: new Array(384), start: 0, length: 0 };
@@ -1046,7 +1047,7 @@ export class APKRuntime {
     for (let i = 0; i < ring.length; i++) out.push(text(ring.tail[(ring.start + i) % 384]));
     return out;
   }
-  set trace(entries) { this.traceRing = null; for (const entry of entries) this.record(entry); }
+  set trace(entries) { this.traceRing = null; for (const entry of entries) this.record(entry, true); }
   methodOrigin(method) { return this.dex.bootDexes?.has(method.dex) ? 'framework' : 'apk'; }
   recordMethod(method) {
     // Per-method cache of the origin, its counter object, the evidence row and the (immutable) trace entry: this runs once per Java call.
@@ -1413,9 +1414,12 @@ export class APKRuntime {
     length = int(length);
     if (length < 0) this.throwJava('Ljava/lang/NegativeArraySizeException;', `negative array length ${length}`);
     if (!type.startsWith('[')) fail('Invalid/excessive array allocation');
-    if (length > 16777216 || this.arrayCells + length > this.maxArrayCells) this.outOfMemory(length > 16777216 ? `Array of ${length} elements exceeds the array size limit` : `Array storage limit (${this.maxArrayCells} cells) exceeded`);
-    this.arrayCells += length;
-    const array = this.makeObject(type); this.object(array).elements = new Array(length).fill(defaultValue(type.slice(1))); return array;
+    if (length > 16777216 || this.arrayCells + length > this.maxArrayCells) this.outOfMemory(length > 16777216 ? `Array of ${length} elements exceeds the array size limit` : `Array storage limit (${this.maxArrayCells} cells) exceeded: ${type} of ${length} cells requested with ${this.arrayCells} in use`);
+    const array = this.makeObject(type); this.arrayCells += length;   // after makeObject: an object-limit OutOfMemoryError there must not leave cells counted for an array that never existed
+    // The collector is paced by the object count, so garbage arrays (a big buffer built and dropped again and again) hold their cells until a collection that nothing else would ask for:
+    // past half of the cell budget, ask for one at the next safepoint / event boundary (heap-gc.js collectionDue honours cellPressure).
+    if (this.arrayCells > this.maxArrayCells >> 1 && this.gcEnabled) { this.gcPressure = true; this.gcCellPressure = true; }
+    this.object(array).elements = new Array(length).fill(defaultValue(type.slice(1))); return array;
   }
   array(value, index) {
     const obj = this.object(value);
@@ -1956,8 +1960,8 @@ export class APKRuntime {
   noteOom(reason) {
     const log = this.oomLog ??= []; const frames = this.thread?.frames ?? [], top = []; 
     for (let i = frames.length - 1; i >= 0 && top.length < 3; i--) { const m = frames[i].method; if (m) top.push(`${String(m.owner).replace(/^L|;$/g, '').replaceAll('/', '.')}.${m.name}`); }
-    const kind = /^Object limit/.test(reason) ? 'limite de objetos' : /field storage/.test(reason) ? 'limite de campos' : /^Array of/.test(reason) ? 'tamanho de um array' : /^Array storage/.test(reason) ? 'orçamento de células de arrays' : /^Collection storage/.test(reason) ? 'orçamento de coleções' : 'outro';
-    log.push({ kind, reason: String(reason).slice(0, 140), thread: this.thread?.name ?? null, frames: top, hostCall: this.hostCall ? String(this.hostCall).replace(/^L|;->/g, m => m === ';->' ? '.' : '').slice(0, 80) : null, objects: this.heap.size, maxObjects: this.maxHeapObjects, fieldSlots: this.fieldSlots, maxFieldSlots: this.maxFieldSlots, arrayCells: this.arrayCells, maxArrayCells: this.maxArrayCells, collectionCells: this.collectionCells, maxCollectionCells: this.maxCollectionCells, gcTries: { ...(this.gcSafepointTries ?? {}) }, gcSkips: { ...(this.gcSkips ?? {}) }, sinceGc: Math.max(0, this.nextId - (this.gcLastNextId ?? 0)) });
+    const kind = /^Object limit|^Reflected multi-array allocation exceeds VM heap limits: object/.test(reason) ? 'limite de objetos' : /field storage/.test(reason) ? 'limite de campos' : /^Array of|^Reflected multi-array allocation exceeds VM heap limits: dimension/.test(reason) ? 'tamanho de um array' : /^Array storage|^Reflected multi-array allocation exceeds VM heap limits: array cell/.test(reason) ? 'orçamento de células de arrays' : /^Collection storage/.test(reason) ? 'orçamento de coleções' : 'outro';
+    log.push({ kind, reason: String(reason).slice(0, 220), thread: this.thread?.name ?? null, frames: top, hostCall: this.hostCall ? String(this.hostCall).replace(/^L|;->/g, m => m === ';->' ? '.' : '').slice(0, 80) : null, objects: this.heap.size, maxObjects: this.maxHeapObjects, fieldSlots: this.fieldSlots, maxFieldSlots: this.maxFieldSlots, arrayCells: this.arrayCells, maxArrayCells: this.maxArrayCells, collectionCells: this.collectionCells, maxCollectionCells: this.maxCollectionCells, gcTries: { ...(this.gcSafepointTries ?? {}) }, gcSkips: { ...(this.gcSkips ?? {}) }, sinceGc: Math.max(0, this.nextId - (this.gcLastNextId ?? 0)) });
     if (log.length > 12) log.shift();
   }
   /**
@@ -1979,9 +1983,10 @@ export class APKRuntime {
     this.record(`OOM java.lang.OutOfMemoryError: ${reason}; ${this.heap.size} live objects`);
     if (this.inOutOfMemory) fail(reason);
     // The first few exhaustions get a heap census (src/heap-gc.js heapCensus): what is alive, who keeps it alive, who allocated it. Later ones reuse it (a census is a full mark).
-    if ((this.oomCount ?? 0) <= 3 || !this.lastOom.census) { try { const census = heapCensus(this); this.lastOom.census = { text: census.text, live: census.live, garbage: census.garbage, estimatedBytes: census.estimatedBytes, limit: census.limit }; } catch (error) { this.lastOom.census = { text: `Censo do heap indisponível: ${error.message}` }; } }
+    if ((this.oomCount ?? 0) <= 3 || !this.lastOom.census) { try { const census = heapCensus(this); this.lastOom.census = { text: census.text, live: census.live, garbage: census.garbage, estimatedBytes: census.estimatedBytes, limit: census.limit, arrays: census.arrays }; const entry = this.oomLog?.[this.oomLog.length - 1]; if (entry) entry.arrays = census.arrays; } catch (error) { this.lastOom.census = { text: `Censo do heap indisponível: ${error.message}` }; } }
     else this.lastOom.census = this.prevCensus;
     this.prevCensus = this.lastOom.census;
+    { const entry = this.oomLog?.[this.oomLog.length - 1]; if (entry && !entry.arrays && this.lastOom.census?.arrays) entry.arrays = this.lastOom.census.arrays; }
     this.inOutOfMemory = true; this.maxHeapObjects += 64;   // headroom for the throwable itself
     try { this.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate: ${reason} (${this.heap.size} live objects)${this.gcPhases?.[0] ? `; coleta antes do OOM: ${this.gcPhases[0].before} → ${this.gcPhases[0].after}` : '; nenhuma coleta antes do OOM'}`, { kind: 'java-heap-exhausted', limit: this.maxHeapObjects - 64, liveObjects: this.heap.size, heap: this.lastOom.census }); }
     finally { this.maxHeapObjects -= 64; this.inOutOfMemory = false; }
@@ -2476,7 +2481,7 @@ export class APKRuntime {
       if(method.parameters[1]==='[I'&&this.typeOf(args[1])!=='[I')this.throwJava('Ljava/lang/ClassCastException;','Array dimensions require int[]');
       if(!dimensions.length||component.match(/^\[*/)[0].length+dimensions.length>255)this.throwJava('Ljava/lang/IllegalArgumentException;','Array dimensions must total1..255');
       for(const length of dimensions)if(length<0)this.throwJava('Ljava/lang/NegativeArraySizeException;','negative reflected array dimension');
-      let nodes=1,totalArrays=0,totalCells=0;for(const length of dimensions){if(nodes===0)break;totalArrays+=nodes;totalCells+=nodes*length;if(length>1000000||totalCells+this.arrayCells>this.maxArrayCells||totalArrays+this.heap.size>this.maxHeapObjects)fail('Reflected multi-array allocation exceeds VM heap limits');nodes*=length;}
+      let nodes=1,totalArrays=0,totalCells=0;for(const length of dimensions){if(nodes===0)break;totalArrays+=nodes;totalCells+=nodes*length;if(length>1000000)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: dimension of ${length} elements exceeds the 1000000-element limit`);if(totalCells+this.arrayCells>this.maxArrayCells)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: array cell budget (${this.maxArrayCells}) needs ${totalCells} cells for ${component}${'[]'.repeat(dimensions.length)} (dimensions ${dimensions.join('x')}) with ${this.arrayCells} in use`);if(totalArrays+this.heap.size>this.maxHeapObjects)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: object budget (${this.maxHeapObjects}) needs ${totalArrays} arrays for ${component}${'[]'.repeat(dimensions.length)} (dimensions ${dimensions.join('x')}) with ${this.heap.size} live objects`);nodes*=length;}
       const allocate=depth=>{const value=this.newArray('['.repeat(dimensions.length-depth)+component,dimensions[depth]);if(depth+1<dimensions.length){const values=this.array(value).elements;for(let i=0;i<values.length;i++)values[i]=allocate(depth+1);}return value;};return allocate(0);
     }
     if(staticCall&&['Ljava/lang/Integer;','Ljava/lang/Long;'].includes(method.owner)&&['toString','toHexString','toOctalString','toBinaryString','toUnsignedString'].includes(name)){

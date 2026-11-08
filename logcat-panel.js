@@ -1,0 +1,92 @@
+// The "Logcat" panel of the lab page: the app's log lines (src/logcat.js batches from the Worker) in `logcat -v threadtime` format, coloured by level, with a text filter,
+// a minimum level, autoscroll, "Limpar" and "Salvar". The formatting and filter functions are pure (tested without a DOM); createLogcatPanel() wires them to the page.
+import { LEVELS, MAX_LINES, formatThreadtime, rowToEntry } from './logcat.js?v=da865bfd70a5';
+
+export const RENDER_MAX = 2000;   // rows kept in the DOM; the whole buffer is still saved by "Salvar"
+export const LEVEL_NAMES = { V: 'Verbose', D: 'Debug', I: 'Info', W: 'Warning', E: 'Error', A: 'Assert' };
+
+/** The entry passes when its level is at or above `minLevel` and `text` (case-insensitive) is part of its tag or message. */
+export function matchesFilter(entry, { text = '', minLevel = 'V' } = {}) {
+  if (LEVELS.indexOf(entry.level) < LEVELS.indexOf(minLevel)) return false;
+  const needle = String(text).trim().toLowerCase(); if (!needle) return true;
+  return entry.tag.toLowerCase().includes(needle) || entry.message.toLowerCase().includes(needle);
+}
+
+export const formatEntry = entry => formatThreadtime(entry);
+
+const stamp = date => { const p = (v, n = 2) => String(v).padStart(n, '0'); return `${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}-${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}`; };
+/** logcat-<package>-<timestamp>.txt */
+export const exportFileName = (packageName, date = new Date()) => `logcat-${String(packageName || 'app').replace(/[^A-Za-z0-9._-]+/g, '_')}-${stamp(date)}.txt`;
+
+/** The text "Salvar" writes: one threadtime line per entry, preceded by a note when older lines were discarded. */
+export function buildExport(entries, { dropped = 0 } = {}) {
+  const lines = []; if (dropped > 0) lines.push(`--------- ${dropped} linhas anteriores descartadas (buffer cheio) ---------`);
+  for (const entry of entries) lines.push(formatEntry(entry));
+  return lines.join('\n') + (lines.length ? '\n' : '');
+}
+
+/** Page-side store: applies the Worker's batches (reset, rows, dropped), bounded like the Worker's buffer. */
+export function createLogcatStore({ maxLines = MAX_LINES } = {}) {
+  let entries = [], lost = 0, trimmed = 0, lastTotal = 0;
+  return {
+    /** A Worker batch. `dropped` on the page = lines the Worker could not deliver + lines trimmed from this store. */
+    apply(message) {
+      if (message.reset) { entries = []; lost = 0; trimmed = 0; lastTotal = 0; }
+      const rows = (message.rows ?? []).map(rowToEntry); entries.push(...rows);
+      if (entries.length > maxLines) { trimmed += entries.length - maxLines; entries = entries.slice(entries.length - maxLines); }
+      if (message.total !== undefined) { lost += Math.max(0, message.total - lastTotal - rows.length); lastTotal = message.total; }
+      return rows;
+    },
+    clear() { entries = []; lost = 0; trimmed = 0; },
+    get entries() { return entries; },
+    get dropped() { return lost + trimmed; },
+  };
+}
+
+function download(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' })), link = document.createElement('a');
+  link.href = url; link.download = name; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** root: the <details id="logcat"> element (see index.html). Returns { push(message), reset(), store }. */
+export function createLogcatPanel({ root, getPackage = () => 'app', save = download } = {}) {
+  const q = selector => root.querySelector(selector), out = q('.logcat-lines'), count = q('.logcat-count'), filterInput = q('.logcat-filter'), levelSelect = q('.logcat-level'), scopeSelect = q('.logcat-scope'), auto = q('.logcat-autoscroll');
+  const store = createLogcatStore(); let lastSeq = -1, timer = null, visibleCount = 0;
+  const filter = () => ({ text: filterInput.value, minLevel: levelSelect.value });
+  const row = entry => { const div = document.createElement('div'); div.className = `logcat-row level-${entry.level}`; div.textContent = formatEntry(entry); return div; };
+  const updateCount = () => {
+    const text = `${store.entries.length} linhas${visibleCount !== store.entries.length ? ` · ${visibleCount} exibidas` : ''}${store.dropped ? ` · ${store.dropped} descartadas` : ''}`;
+    count.textContent = text;
+  };
+  const scroll = () => { if (auto.checked) out.scrollTop = out.scrollHeight; };
+  const renderAll = () => {
+    const f = filter(), visible = store.entries.filter(entry => matchesFilter(entry, f)); visibleCount = visible.length;
+    out.replaceChildren(...visible.slice(-RENDER_MAX).map(row)); lastSeq = store.entries.at(-1)?.seq ?? -1; updateCount(); scroll();
+    if (!visible.length) { const empty = document.createElement('div'); empty.className = 'logcat-empty'; empty.textContent = store.entries.length ? 'Nenhuma linha passa pelo filtro.' : 'O logcat do app aparecerá aqui (Log.*, System.out/err, exceções).'; out.append(empty); }
+  };
+  const renderNew = () => {
+    timer = null;
+    let from = store.entries.length; while (from > 0 && store.entries[from - 1].seq > lastSeq) from--;   // entries are in seq order: the new ones are the tail
+    const f = filter(), fresh = store.entries.slice(from).filter(entry => matchesFilter(entry, f)); lastSeq = store.entries.at(-1)?.seq ?? lastSeq;
+    if (out.querySelector('.logcat-empty')) { renderAll(); return; }
+    visibleCount += fresh.length; if (fresh.length) out.append(...fresh.map(row));
+    while (out.childElementCount > RENDER_MAX) out.firstElementChild.remove();
+    updateCount(); scroll();
+  };
+  const schedule = () => { if (timer === null) timer = setTimeout(renderNew, 60); };
+  filterInput.addEventListener('input', renderAll); levelSelect.addEventListener('change', renderAll);
+  out.addEventListener('scroll', () => { auto.checked = out.scrollHeight - out.scrollTop - out.clientHeight < 24; });   // scrolling up pauses, reaching the bottom resumes
+  auto.addEventListener('change', scroll);
+  q('.logcat-clear').addEventListener('click', () => { store.clear(); renderAll(); });
+  q('.logcat-save').addEventListener('click', () => {
+    const f = filter(), entries = scopeSelect.value === 'filtered' ? store.entries.filter(entry => matchesFilter(entry, f)) : store.entries;
+    save(exportFileName(getPackage()), buildExport(entries, { dropped: store.dropped }));
+  });
+  renderAll();
+  return {
+    store,
+    push(message) { store.apply(message); if (message.reset) renderAll(); else schedule(); },
+    reset() { store.apply({ reset: true, rows: [], dropped: 0, total: 0 }); renderAll(); },
+    flushNow() { if (timer !== null) { clearTimeout(timer); renderNew(); } },
+  };
+}

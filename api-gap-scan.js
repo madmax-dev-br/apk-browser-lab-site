@@ -10,8 +10,8 @@
 // The report holds ONLY framework/JDK names and counts (and the native library file names the user asked for): app class names, method names and strings never
 // enter it, so it can be pasted into a chat. DOM-free and process-free: it runs in the Worker and in Node.
 
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=99056e83c7d5';
-import { describeNativeLibrary } from './native-library-hints.js?v=99056e83c7d5';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=da865bfd70a5';
+import { describeNativeLibrary } from './native-library-hints.js?v=da865bfd70a5';
 
 export const FRAMEWORK = /^L(android|java|javax|dalvik|libcore|sun|org\/(json|xml|w3c))\//;
 const SDK_INT_FIELD = 'Landroid/os/Build$VERSION;->SDK_INT:I';

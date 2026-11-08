@@ -8,6 +8,19 @@
 // Path rules follow java.io.UnixFileSystem.normalize: collapse duplicate '/', drop a trailing '/'. Canonicalization resolves
 // '.', '..' and the /data/data -> /data/user/0 and /sdcard -> /storage/emulated/0 aliases.
 
+/**
+ * The standard public directories of the primary external volume (android.os.Environment.DIRECTORY_*, AOSP android-13.0.0_r1): vold/MediaProvider create them for user 0 on a real device, so they exist
+ * before any app runs and Environment.getExternalStoragePublicDirectory(type) returns a directory that is already there.
+ *
+ * Modelled: Android 11+ scoped storage over FUSE, seen through the File API by an app without any storage permission. The app may create directories and files in these directories (and below them) and
+ * read, overwrite, rename and delete what it created: the virtual device runs one app, so every file in the tree was created by it, and it "owns" all of them (mode 0660 files, 0775 directories as FUSE
+ * reports them). Writes under Android/data/<pkg> (the app-specific external dir, persisted by src/app-data-store.js) behave the same.
+ * Not modelled: files owned by other apps (there are none: the volume starts with only these empty directories, so the "cannot read another app's files in Download/Documents without READ_MEDIA_*"
+ * rule never has a file to hide), MediaStore indexing and the media-collection permission checks (a file written here is not visible through MediaStore queries), per-file owner UIDs, quotas and case
+ * folding. The shared volume is never persisted across page reloads (only the app-specific dirs are), as before.
+ */
+export const PUBLIC_DIRECTORIES = Object.freeze(['Alarms', 'Audiobooks', 'DCIM', 'Documents', 'Download', 'Movies', 'Music', 'Notifications', 'Pictures', 'Podcasts', 'Recordings', 'Ringtones', 'Screenshots']);
+
 const ALIASES = (pkg) => [['/data/data/', '/data/user/0/'], ['/sdcard', '/storage/emulated/0'], ['/storage/self/primary', '/storage/emulated/0'], ['/mnt/sdcard', '/storage/emulated/0']];
 
 export function normalizePath(path) {
@@ -23,6 +36,7 @@ export class VirtualFileSystem {
     for (const dir of ['/', '/data', '/data/user', '/data/user/0', `/data/user/0/${packageName}`, `/data/user/0/${packageName}/cache`, `/data/user/0/${packageName}/code_cache`, '/data/app', this.codePath, '/data/local', '/data/local/tmp',
       '/storage', '/storage/emulated', '/storage/emulated/0', '/storage/emulated/0/Android', '/storage/emulated/0/Android/data', `/storage/emulated/0/Android/data/${packageName}`,
       '/system', '/system/bin', '/system/lib64', '/system/etc', '/system/fonts', '/proc']) this.put(dir, this.directory());
+    for (const name of PUBLIC_DIRECTORIES) { const dir = this.directory(); dir.mode = 0o775; this.put(`/storage/emulated/0/${name}`, dir); }   // see PUBLIC_DIRECTORIES: the app owns what it creates here
     // /proc and its entries are deliberately empty: nothing in the browser VM backs them.
   }
   /** Mounts immutable bytes (zero-copy) at path, e.g. the installed APK at <codePath>/base.apk. */
