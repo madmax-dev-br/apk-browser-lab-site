@@ -120,8 +120,13 @@ export function compileMethod(rt, method, code, prog, tries, support) {
       if (intrinsic) emit(`{ const a0 = r[${registers[0]}]${registers.length > 1 ? `, a1 = r[${registers[1]}]` : ''}; if (typeof a0 === 'string') { ${intrinsic.replaceAll('${PC_NEXT}', String(pc + 3))} } }`);
       const index = sites.length; sites.push(site);
       const hit = site.virtual ? `H.receiverType(rt, a0) === s.type` : 'true';
+      // The callee's register file is allocated and filled here (its arguments are the last k registers), so the call builds no argument array.
+      // A callee of up to two words may be a trivial getter, an identity, a parameter null check or a static getter: then its result is produced in place, as the interpreter's cached-call
+      // path does (H.getterCall), and no frame is made.
+      const getter = k <= 2 ? `{ const gv = H.getterCall(rt, s, ${k === 0 ? 'undefined' : 'a0'}, n); if (gv !== H.NO_GETTER) { f.result = gv; pc = ${pc + 3}; continue; } }` : '';
       emit(`{ const s = Z[${index}]; if (s.callee !== null) { ${registers.map((x, j) => `const a${j} = r[${x}];`).join(' ')} if (${hit}) {
-  n++; cur = ${pc}; const fb = H.prepareCall(rt, f, s, [${registers.map((x, j) => `a${j}`).join(', ')}], ${pc + 3}, ${pc}); const cf = fb.prog.fn;
+  n++; cur = ${pc}; ${getter}const cc = s.callee.code, nr = new Array(cc.registers), at = cc.registers - ${k}; ${registers.map((x, j) => `nr[at + ${j}] = a${j};`).join(' ')}
+  const fb = H.prepareCall(rt, f, s, nr, ${pc + 3}, ${pc}); const cf = fb.prog.fn;
   if (cf !== null && rt.jitDepth < 80) {
     rt.jitDepth++; let st; try { st = cf(fb); } finally { rt.jitDepth--; }
     if (st === ${RET}) { rt.thread.frames.pop(); f.result = fb.rv; pc = ${pc + 3}; continue; }
@@ -154,8 +159,8 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         case 0x19: return putWide(a, `${BigInt.asIntN(64, BigInt(u[pc + 1]) << 48n)}n`);
         case 0x1a: case 0x1b: { const i = op === 0x1a ? u[pc + 1] : u[pc + 1] + u[pc + 2] * 65536; return `r[${a}] = S[${i}];`; }
         case 0x1c: return `{ const t = T[${u[pc + 1]}]; if (!rt.classes.has(t)) rt.assertResolvable(t); r[${a}] = rt.classObject(t); }`;
-        case 0x1f: return `{ const v = r[${a}]; if (v !== null && v !== 0 && !rt.isSubtype(rt.typeOf(v), T[${u[pc + 1]}])) { rt.assertResolvable(T[${u[pc + 1]}]); H.castFail(rt, v, T[${u[pc + 1]}]); } }`;
-        case 0x20: return `{ const v = r[${hi}]; r[${lo}] = v !== null && v !== 0 && rt.isSubtype(rt.typeOf(v), T[${u[pc + 1]}]) ? 1 : (rt.assertResolvable(T[${u[pc + 1]}]), 0); }`;
+        case 0x1f: { const s = site({ type: null, epoch: -1, answer: false }); return `{ const v = r[${a}]; if (v !== null && v !== 0 && !H.subtype(rt, Z[${s}], rt.typeOf(v), T[${u[pc + 1]}])) { rt.assertResolvable(T[${u[pc + 1]}]); H.castFail(rt, v, T[${u[pc + 1]}]); } }`; }
+        case 0x20: { const s = site({ type: null, epoch: -1, answer: false }); return `{ const v = r[${hi}]; r[${lo}] = v !== null && v !== 0 && H.subtype(rt, Z[${s}], rt.typeOf(v), T[${u[pc + 1]}]) ? 1 : (rt.assertResolvable(T[${u[pc + 1]}]), 0); }`; }
         case 0x21: return `r[${lo}] = rt.array(r[${hi}]).elements.length;`;
         case 0x22: return `rt.bytecodeAlloc = true; try { r[${a}] = rt.allocate(T[${u[pc + 1]}]); } finally { rt.bytecodeAlloc = false; }`;
         case 0x23: return `rt.bytecodeAlloc = true; try { r[${lo}] = rt.newArray(T[${u[pc + 1]}], r[${hi}] | 0); } finally { rt.bytecodeAlloc = false; }`;
@@ -175,7 +180,7 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         }
         case 0x32: case 0x33: case 0x34: case 0x35: case 0x36: case 0x37: {
           const x = R(lo), y = R(hi), t = pc + signed16(u[pc + 1]);
-          const cond = op === 0x32 ? `H.same(${x}, ${y})` : op === 0x33 ? `!H.same(${x}, ${y})` : op === 0x34 ? `${x} < ${y}` : op === 0x35 ? `${x} >= ${y}` : op === 0x36 ? `${x} > ${y}` : `${x} <= ${y}`;
+          const cond = op === 0x32 ? `(${x} === ${y} || H.same(${x}, ${y}))` : op === 0x33 ? `(${x} !== ${y} && !H.same(${x}, ${y}))` : op === 0x34 ? `${x} < ${y}` : op === 0x35 ? `${x} >= ${y}` : op === 0x36 ? `${x} > ${y}` : `${x} <= ${y}`;
           return `if (${cond}) { ${jump(pc, t)} }`;
         }
         case 0x38: case 0x39: case 0x3a: case 0x3b: case 0x3c: case 0x3d: {
@@ -194,7 +199,7 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         }
         case 0x52: case 0x53: case 0x54: case 0x55: case 0x56: case 0x57: case 0x58:
         case 0x59: case 0x5a: case 0x5b: case 0x5c: case 0x5d: case 0x5e: case 0x5f: {
-          const s = site({ field: null, key: null, type: null, def: undefined }), store = op >= 0x59, variant = op - (store ? 0x59 : 0x52), ref = u[pc + 1];
+          const s = site({ field: null, key: null, type: null, def: undefined, more: null }), store = op >= 0x59, variant = op - (store ? 0x59 : 0x52), ref = u[pc + 1];
           const prelude = `const o = rt.object(r[${hi}]); const s = Z[${s}]; if (o.type !== s.type) H.fieldSite(rt, s, FR[${ref}], o);`;
           if (!store) {
             const narrowed = variant === 3 ? 'v & 1' : variant === 4 ? '(v << 24) >> 24' : variant === 5 ? 'v & 65535' : variant === 6 ? '(v << 16) >> 16' : 'v';

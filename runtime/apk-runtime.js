@@ -1,28 +1,28 @@
-import { VMClock } from './vm-clock.js?v=9510d53c1f46';
-import { OperationMonitor } from './operation-monitor.js?v=9510d53c1f46';
-import { ExecutionProfile } from './execution-profile.js?v=9510d53c1f46';
-import { SamplingProfiler } from './sampling-profiler.js?v=9510d53c1f46';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=9510d53c1f46';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=9510d53c1f46';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=9510d53c1f46';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=9510d53c1f46';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=9510d53c1f46';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=9510d53c1f46';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=9510d53c1f46';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=9510d53c1f46';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=9510d53c1f46';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=9510d53c1f46';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=9510d53c1f46';
-import { APKError } from './apk-error.js?v=9510d53c1f46';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=9510d53c1f46';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=9510d53c1f46';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=9510d53c1f46';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=9510d53c1f46';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=9510d53c1f46';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=9510d53c1f46';
-import { Scheduler, Blocked } from './scheduler.js?v=9510d53c1f46';
-import { bootClassLacksMember } from './boot-class-members.js?v=9510d53c1f46';
-export { APKError } from './apk-error.js?v=9510d53c1f46';
+import { VMClock } from './vm-clock.js?v=fb41a105df84';
+import { OperationMonitor } from './operation-monitor.js?v=fb41a105df84';
+import { ExecutionProfile } from './execution-profile.js?v=fb41a105df84';
+import { SamplingProfiler } from './sampling-profiler.js?v=fb41a105df84';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=fb41a105df84';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=fb41a105df84';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=fb41a105df84';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=fb41a105df84';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=fb41a105df84';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=fb41a105df84';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=fb41a105df84';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=fb41a105df84';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=fb41a105df84';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=fb41a105df84';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=fb41a105df84';
+import { APKError } from './apk-error.js?v=fb41a105df84';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=fb41a105df84';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=fb41a105df84';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=fb41a105df84';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=fb41a105df84';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=fb41a105df84';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=fb41a105df84';
+import { Scheduler, Blocked } from './scheduler.js?v=fb41a105df84';
+import { bootClassLacksMember } from './boot-class-members.js?v=fb41a105df84';
+export { APKError } from './apk-error.js?v=fb41a105df84';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -916,6 +916,67 @@ class Heap {
 /** Returned by a chunk of APKRuntime.bridge() when none of its branches applies to the call. */
 const BRIDGE_NEXT = Symbol('bridge-next');
 const OBJECT_INIT_KEY = 'Ljava/lang/Object;-><init>()V';
+const BOOLEAN_TRUE_FIELD = { owner: 'Ljava/lang/Boolean;', name: 'TRUE', type: 'Ljava/lang/Boolean;', key: 'Ljava/lang/Boolean;->TRUE:Ljava/lang/Boolean;' }, BOOLEAN_FALSE_FIELD = { owner: 'Ljava/lang/Boolean;', name: 'FALSE', type: 'Ljava/lang/Boolean;', key: 'Ljava/lang/Boolean;->FALSE:Ljava/lang/Boolean;' };
+/** Primitive type letter by box class (the inverse of BOX_TYPES), looked up once per bridged call instead of searching the table. */
+const BOX_TYPE_OF = new Map(Object.entries(BOX_TYPES).map(([type, owner]) => [owner, type]));
+const popCount32 = n => { n = n - ((n >>> 1) & 0x55555555); n = (n & 0x33333333) + ((n >>> 2) & 0x33333333); return Math.imul((n + (n >>> 4)) & 0x0f0f0f0f, 0x01010101) >>> 24; };
+const trailingZeros32 = n => n === 0 ? 32 : 31 - Math.clz32(n & -n);
+/** The two 32-bit halves of a long's two's-complement image, as unsigned numbers. */
+const longLow = n => Number(n & 0xffffffffn), longHigh = n => Number((n >> 32n) & 0xffffffffn);
+const minMaxAbs = (name, decode, encode, x, y) => { const a = decode(x), b = y === undefined ? 0 : decode(y); if (Number.isNaN(a)) return x; if (Number.isNaN(b)) return y; return encode(name === 'min' ? Math.min(a, b) : name === 'max' ? Math.max(a, b) : Math.abs(a)); };
+// The receiver checks of the stateful bridges below are those of the chunks that serve them (bridgeC0: the receiver is an instance of the owner; the field-updater block of bridgeC1).
+const ARFU = 'Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;', ARFU_GET = `${ARFU}->get(Ljava/lang/Object;)Ljava/lang/Object;`, ARFU_CAS = `${ARFU}->compareAndSet(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Z`;
+const ATOMIC_INTEGER = 'Ljava/util/concurrent/atomic/AtomicInteger;', ATOMIC_INTEGER_GET = `${ATOMIC_INTEGER}->get()I`, ATOMIC_INTEGER_CAS = `${ATOMIC_INTEGER}->compareAndSet(II)Z`;
+const bridgeReceiver = (rt, word, owner, key) => { const obj = rt.object(word); if (!rt.isSubtype(obj.type, owner)) fail(`Receiver does not match ${key}`); return obj; };
+const updaterTarget = (rt, updater, word) => { const field = updater.updaterField, target = rt.object(word); if (!field || !rt.isSubtype(target.type, field.owner)) rt.throwJava('Ljava/lang/ClassCastException;', 'Atomic field updater receiver mismatch'); return target; };
+const updaterValue = (field, target) => target.fields.has(field.key) ? target.fields.get(field.key) : defaultValue(field.type);
+/**
+ * Direct bodies of the pure java.lang bridges that UI toolkits call tens of thousands of times per frame (identity hash and equality, bit twiddling, float/int bit casts, Math.min/max/abs).
+ * Each is the branch of the bridge chunks below for that key, written over the raw argument words (a long is its BigInt word, a reference is the value or 0) with the same checks, results and
+ * exceptions, so a call reaches it without walking the chunks: APKRuntime.directBridge binds one to a resolution the first time that resolution is bridged, only when no Skia, platform or ICU
+ * host claims the key (those are consulted before the chunks). Everything around the body -- the call-site cache, trace entry, host time, profile counters -- is unchanged.
+ */
+const DIRECT_BRIDGES = new Map([
+  ['Ljava/lang/Object;->hashCode()I', (rt, w) => typeof w[0] === 'string' ? stringHash(w[0]) : rt.object(w[0]).id],
+  ['Ljava/lang/Object;->equals(Ljava/lang/Object;)Z', (rt, w) => equal(w[0], w[1]) ? 1 : 0],
+  ['Ljava/lang/Integer;->bitCount(I)I', (rt, w) => popCount32(int(w[0]) >>> 0)],
+  ['Ljava/lang/Integer;->numberOfLeadingZeros(I)I', (rt, w) => Math.clz32(int(w[0]))],
+  ['Ljava/lang/Integer;->numberOfTrailingZeros(I)I', (rt, w) => trailingZeros32(int(w[0]))],
+  ['Ljava/lang/Integer;->rotateLeft(II)I', (rt, w) => { const n = int(w[0]), d = int(w[1]) & 31; return (n << d) | (n >>> (32 - d)); }],
+  ['Ljava/lang/Integer;->rotateRight(II)I', (rt, w) => { const n = int(w[0]), d = int(w[1]) & 31; return (n >>> d) | (n << (32 - d)); }],
+  ['Ljava/lang/Long;->bitCount(J)I', (rt, w) => { const n = BigInt.asUintN(64, wide(w[0])); return popCount32(longLow(n)) + popCount32(longHigh(n)); }],
+  ['Ljava/lang/Long;->numberOfLeadingZeros(J)I', (rt, w) => { const n = BigInt.asUintN(64, wide(w[0])); if (n === 0n) return 64; const high = longHigh(n); return high !== 0 ? Math.clz32(high) : 32 + Math.clz32(longLow(n)); }],
+  ['Ljava/lang/Long;->numberOfTrailingZeros(J)I', (rt, w) => { const n = BigInt.asUintN(64, wide(w[0])); if (n === 0n) return 64; const low = longLow(n); return low !== 0 ? trailingZeros32(low) : 32 + trailingZeros32(longHigh(n)); }],
+  ['Ljava/lang/Long;->rotateLeft(JI)J', (rt, w) => { const n = BigInt.asUintN(64, wide(w[0])), d = BigInt(int(w[2]) & 63); return BigInt.asIntN(64, (n << d) | (n >> (64n - d))); }],
+  ['Ljava/lang/Long;->rotateRight(JI)J', (rt, w) => { const n = BigInt.asUintN(64, wide(w[0])), d = BigInt(int(w[2]) & 63); return BigInt.asIntN(64, (n >> d) | (n << (64n - d))); }],
+  ['Ljava/lang/Float;->intBitsToFloat(I)F', (rt, w) => int(w[0])],
+  ['Ljava/lang/Float;->floatToRawIntBits(F)I', (rt, w) => int(w[0])],
+  ['Ljava/lang/Float;->floatToIntBits(F)I', (rt, w) => { const bits = int(w[0]); return (bits & 0x7f800000) === 0x7f800000 && (bits & 0x7fffff) !== 0 ? 0x7fc00000 : bits; }],
+  ['Ljava/lang/Double;->doubleToRawLongBits(D)J', (rt, w) => wide(w[0])],
+  ['Ljava/lang/Double;->longBitsToDouble(J)D', (rt, w) => wide(w[0])],
+  ['Ljava/lang/Double;->doubleToLongBits(D)J', (rt, w) => { const bits = wide(w[0]); return Number.isNaN(doubleNumber(bits)) ? 0x7ff8000000000000n : bits; }],
+  ['Ljava/lang/Math;->min(II)I', (rt, w) => Math.min(int(w[0]), int(w[1]))],
+  ['Ljava/lang/Math;->max(II)I', (rt, w) => Math.max(int(w[0]), int(w[1]))],
+  ['Ljava/lang/Math;->abs(I)I', (rt, w) => Math.abs(int(w[0])) | 0],
+  ['Ljava/lang/Math;->min(JJ)J', (rt, w) => { const a = wide(w[0]), b = wide(w[2]); return a < b ? a : b; }],
+  ['Ljava/lang/Math;->max(JJ)J', (rt, w) => { const a = wide(w[0]), b = wide(w[2]); return a > b ? a : b; }],
+  ['Ljava/lang/Math;->abs(J)J', (rt, w) => { const a = wide(w[0]); return a < 0n ? wide(-a) : a; }],
+  ['Ljava/lang/Math;->min(FF)F', (rt, w) => minMaxAbs('min', floatNumber, floatBits, w[0], w[1])],
+  ['Ljava/lang/Math;->max(FF)F', (rt, w) => minMaxAbs('max', floatNumber, floatBits, w[0], w[1])],
+  ['Ljava/lang/Math;->abs(F)F', (rt, w) => minMaxAbs('abs', floatNumber, floatBits, w[0], undefined)],
+  ['Ljava/lang/Math;->min(DD)D', (rt, w) => minMaxAbs('min', doubleNumber, doubleBits, w[0], w[2])],
+  ['Ljava/lang/Math;->max(DD)D', (rt, w) => minMaxAbs('max', doubleNumber, doubleBits, w[0], w[2])],
+  ['Ljava/lang/Math;->abs(D)D', (rt, w) => minMaxAbs('abs', doubleNumber, doubleBits, w[0], undefined)],
+  // Field updaters and atomics (lock-free state of coroutine and snapshot machinery): the value lives on the heap record, read and written as the chunks do.
+  [ARFU_GET, (rt, w) => { const updater = bridgeReceiver(rt, w[0], ARFU, ARFU_GET), target = updaterTarget(rt, updater, w[1]); return updaterValue(updater.updaterField, target); }],
+  [ARFU_CAS, (rt, w) => {
+    const updater = bridgeReceiver(rt, w[0], ARFU, ARFU_CAS), target = updaterTarget(rt, updater, w[1]), field = updater.updaterField, same = equal(updaterValue(field, target), w[2]);
+    if (same) rt.storeField(target.fields, field.key, w[3] === 0 ? null : w[3]);
+    return same ? 1 : 0;
+  }],
+  [ATOMIC_INTEGER_GET, (rt, w) => bridgeReceiver(rt, w[0], ATOMIC_INTEGER, ATOMIC_INTEGER_GET).atomicValue ?? 0],
+  [ATOMIC_INTEGER_CAS, (rt, w) => { const atomic = bridgeReceiver(rt, w[0], ATOMIC_INTEGER, ATOMIC_INTEGER_CAS), same = equal(atomic.atomicValue ?? 0, w[1]); if (same) atomic.atomicValue = w[2]; return same ? 1 : 0; }],
+]);
 
 /**
  * JDK methods that the bridged host classes (SHIMS: collections, atomics, String, Math, Random...) do not implement natively are written in Java (framework-aosp/lab-java/dev/apkweb/util)
@@ -1072,7 +1133,8 @@ export class APKRuntime {
   }
   compactArguments(method, words, mode) {
     const staticCall = mode === 'static';
-    if (words.length !== wordCount(method.parameters) + (staticCall ? 0 : 1)) fail(`Invalid argument count: ${methodKey(method)}`);
+    const parameters = method.parameters; let count = parameters.wordCount; if (count === undefined) { count = wordCount(parameters); if (Object.isExtensible(parameters)) parameters.wordCount = count; }   // cached on the parameter list (shared by the copies of a reference): one reduce per list, not per call
+    if (words.length !== count + (staticCall ? 0 : 1)) fail(`Invalid argument count: ${methodKey(method)}`);
     const args = []; let position = 0;
     if (!staticCall) args.push(words[position++]);
     // A null reference is the register value 0 in bytecode; host code receives it as null (the same value Java's own `== null` sees), never as a number it must remember to test.
@@ -2184,7 +2246,7 @@ export class APKRuntime {
   boxPrimitive(type, value) {
     if (type === 'V') return null;
     if (type.length !== 1) return value;
-    if (type === 'Z') return this.readStatic({ owner: 'Ljava/lang/Boolean;', name: value ? 'TRUE' : 'FALSE', type: 'Ljava/lang/Boolean;', key: `Ljava/lang/Boolean;->${value ? 'TRUE' : 'FALSE'}:Ljava/lang/Boolean;` });
+    if (type === 'Z') return this.readStatic(value ? BOOLEAN_TRUE_FIELD : BOOLEAN_FALSE_FIELD);   // one reference object per constant, so its resolution is cached across calls (resolveField)
     const owner = BOX_TYPES[type]; if (!owner) fail(`Cannot box primitive ${type}`);
     const cacheable = ['B', 'S', 'I', 'J'].includes(type) ? value >= -128 && value <= 127 : type === 'C' && value >= 0 && value <= 127;
     let key = null;
@@ -2339,7 +2401,19 @@ export class APKRuntime {
   bridge(method, words, mode, knownKey, resolution) {
     const tb = this.tb, previous = tb.enter(BUCKET.HOST);
     const startedAt = tb.last;
-    try { return this.bridgeCore(method, words, mode, knownKey, resolution); } finally { tb.leave(previous); if (knownKey !== undefined && knownKey !== null) tb.hostCall(knownKey, tb.last - startedAt); }
+    try {
+      if (resolution !== undefined && knownKey != null && this.fastCallPaths !== false) {   // a pure java.lang bridge (DIRECT_BRIDGES): its body runs over the words, without the argument compaction and the chunk walk
+        let direct = resolution.direct; if (direct === undefined) direct = resolution.direct = this.directBridge(knownKey);
+        if (direct !== null && words.length === (resolution.wordCount ??= wordCount(method.parameters) + (mode === 'static' ? 0 : 1))) return direct(this, words);
+      }
+      return this.bridgeCore(method, words, mode, knownKey, resolution);
+    } finally { tb.leave(previous); if (knownKey !== undefined && knownKey !== null) tb.hostCall(knownKey, tb.last - startedAt); }
+  }
+  /** The direct body (DIRECT_BRIDGES) for a bridge key that no Skia, platform or ICU host claims, or null: those hosts are consulted before the bridge chunks and must keep winning. */
+  directBridge(key) {
+    const direct = DIRECT_BRIDGES.get(key);
+    if (direct === undefined || this.skiaHost?.supports?.(key) || this.platform?.supports?.(key) || ICU_BREAK_KEYS.has(key)) return null;
+    return direct;
   }
   bridgeCore(method, words, mode, knownKey, resolution) {
     // Object.<init>() on a live object does nothing: no registry, Skia or platform bridge claims it and the generic tail only validates the receiver.
@@ -2359,8 +2433,16 @@ export class APKRuntime {
       const colorRegistry=colorFilterRegistryBridge(this,method,args);if(colorRegistry)return colorRegistry.value;
       const textRegistry=textLayoutRegistryBridge(this,method,args);if(textRegistry)return textRegistry.value;
     }
-    if(this.skiaHost?.supports?.(key))return this.skiaHost.invoke(this,method,args,mode);
-    if ((resolution === undefined ? this.platform?.supports?.(key) : (resolution.platformSupports ??= !!this.platform?.supports?.(key)))) return this.platform.invoke(this, method, args, mode);
+    if (resolution === undefined ? this.skiaHost?.supports?.(key) : (resolution.skiaSupports ??= !!this.skiaHost?.supports?.(key))) return this.skiaHost.invoke(this, method, args, mode);   // memoized per resolution like the platform's answer below: the Skia host's key set is fixed
+    if ((resolution === undefined ? this.platform?.supports?.(key) : (resolution.platformSupports ??= !!this.platform?.supports?.(key)))) {
+      if (resolution !== undefined) {
+        // The contract host that serves the key is the first step of AndroidPlatform.invoke (a host that serves a key keeps serving it); remembered on the resolution with the body itself, so the
+        // repeated call neither rebuilds the key text nor searches the hosts.
+        let host = resolution.contractHost; if (host === undefined) host = resolution.contractHost = this.platform.contractHosts?.find(candidate => candidate.supports(key)) ?? null;
+        if (host !== null && host.callWith !== undefined) return host.callWith(this, method, args, resolution.contractFn ??= host.fnFor(key));
+      }
+      return this.platform.invoke(this, method, args, mode);
+    }
     // The former single if-chain is split into consecutive chunks (each returns BRIDGE_NEXT when none of its branches applies): V8 refuses to optimize a function this large,
     // which left every bridged call in the bytecode interpreter.
     let result;
@@ -3093,7 +3175,7 @@ export class APKRuntime {
     return BRIDGE_NEXT;
   }
   bridgeB0(method, args, staticCall, key, name) {
-    const primitiveBoxType = Object.keys(BOX_TYPES).find(type => BOX_TYPES[type] === method.owner);
+    const primitiveBoxType = BOX_TYPE_OF.get(method.owner);
     if(primitiveBoxType&&!staticCall&&name==='<init>'){
       const object=this.object(args[0]);if(object.boxed!==undefined)fail('Primitive wrapper constructor cannot run twice');
       if(method.parameters[0]==='Ljava/lang/String;'){   // Integer(String) etc: parse exactly as the matching parseXxx(String) would
@@ -3288,7 +3370,7 @@ export class APKRuntime {
     return BRIDGE_NEXT;
   }
   bridgeC0(method, args, staticCall, key, name) {
-    const primitiveBoxType = Object.keys(BOX_TYPES).find(type => BOX_TYPES[type] === method.owner);
+    const primitiveBoxType = BOX_TYPE_OF.get(method.owner);
     const obj = this.object(args[0]);
     if (!this.isSubtype(obj.type, method.owner)) fail(`Receiver does not match ${methodKey(method)}`);
     if (method.owner === 'Ljava/util/concurrent/TimeUnit;') {

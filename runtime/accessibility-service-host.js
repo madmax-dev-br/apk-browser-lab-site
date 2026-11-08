@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=9510d53c1f46';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=9510d53c1f46';
+import { APKError } from './apk-runtime.js?v=fb41a105df84';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=fb41a105df84';
 const MANAGER = 'Landroid/view/accessibility/AccessibilityManager;';
 const VIEW = 'Landroid/view/View;', DELEGATE = 'Landroid/view/View$AccessibilityDelegate;', PROVIDER = 'Landroid/view/accessibility/AccessibilityNodeProvider;';
 const DELEGATE_FIELD = `${VIEW}->mAccessibilityDelegate:${DELEGATE}`;

@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=9510d53c1f46';
-import { createHostRegistry } from './host-contract.js?v=9510d53c1f46';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=9510d53c1f46';
+import { APKError } from './apk-error.js?v=fb41a105df84';
+import { createHostRegistry } from './host-contract.js?v=fb41a105df84';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=fb41a105df84';
 
 // android.app.PendingIntent (android-13.0.0_r1 PendingIntent.java + ActivityManagerService.getIntentSenderLocked): tokens are identified by (kind, package, requestCode, Intent.filterEquals),
 // FLAG_NO_CREATE / FLAG_CANCEL_CURRENT / FLAG_UPDATE_CURRENT / FLAG_ONE_SHOT behave as documented, and apps targeting API 31+ must say FLAG_IMMUTABLE or FLAG_MUTABLE.

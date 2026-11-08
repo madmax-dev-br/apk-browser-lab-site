@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=9510d53c1f46';
-import { BUCKET } from './time-breakdown.js?v=9510d53c1f46';
-import { Blocked, QUANTUM } from './scheduler.js?v=9510d53c1f46';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=9510d53c1f46';
+import { APKError } from './apk-error.js?v=fb41a105df84';
+import { BUCKET } from './time-breakdown.js?v=fb41a105df84';
+import { Blocked, QUANTUM } from './scheduler.js?v=fb41a105df84';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=fb41a105df84';
 
 // Frame-based DEX interpreter.
 //
@@ -31,7 +31,7 @@ export class PendingCall { constructor(method, code, args, definition = null) { 
 export class Invoke { constructor(method, args, mode = 'virtual', then = null, onError = null) { this.method = method; this.args = args; this.mode = mode; this.then = then; this.onError = onError; } }
 /** Marker frame under the callee of an Invoke; holds the continuation. It has no registers or code. */
 class ContFrame { constructor(invoke) { this.cont = invoke; this.method = null; this.code = null; } }
-const OUT_FRAME = 1, OUT_BLOCKED = 2, DRIVE = { kind: 'drive' };
+const OUT_FRAME = 1, OUT_BLOCKED = 2, DRIVE = { kind: 'drive' }, NO_GETTER = Symbol('no getter');
 
 export class Frame {
   constructor(method, code, regs, prog) {
@@ -56,8 +56,40 @@ function prepareCore(rt, method, code) {
   // Code units are little-endian 16-bit words; a view avoids copying when the code item is 2-byte aligned (always, in a well-formed DEX, unless the input buffer is offset oddly).
   const units = (byteStart & 1) === 0 && LITTLE_ENDIAN ? new Uint16Array(reader.bytes.buffer, byteStart, code.units) : Uint16Array.from({ length: code.units }, (_, i) => reader.view.getUint16(code.offset + i * 2, true));
   const origin = rt.methodOrigin(method);
-  const prog = { dex, units, refs: new Array(code.units), tries: null, stats: rt.executionByOrigin[origin], key: method.key, filename: dex.filename ?? 'DEX', calls: 0, loops: 0, fn: null, method, code, getter: detectGetter(code, units) };
+  const prog = { dex, units, refs: new Array(code.units), tries: null, stats: rt.executionByOrigin[origin], key: method.key, filename: dex.filename ?? 'DEX', calls: 0, loops: 0, fn: null, method, code, getter: detectGetter(code, units), shape: detectShape(code, units) };
   progs.set(rt, prog); return prog;
+}
+
+/**
+ * Other bodies the invoke instruction can run without a frame (see the cached-call path in runLoop and getterCall), each with the instruction count it stands for, or null:
+ *   IDENTITY     `return p0` / `return-object p0` of a method taking one word (an inline-class constructor, an unboxing accessor): the argument, 1 instruction.
+ *   NULL_GUARD   `if-eqz p0, +n; return-void; ...` or `if-nez p0, L; ...; L: return-void`, p0 the first argument (a parameter null check): nothing, 2 instructions, when p0 is not null;
+ *                a null argument takes the ordinary call, which runs the branch that throws.
+ *   STATIC_GET   `sget* vA, field; return* vA` of a method taking nothing (a constant or singleton accessor): the static's value, 2 instructions, once the field site is warm.
+ */
+const IDENTITY = 1, NULL_GUARD = 2, STATIC_GET = 3;
+function detectShape(code, units) {
+  if (code.tries) return null;
+  const w0 = units[0], op0 = w0 & 255, a0 = w0 >> 8, first = code.registers - code.incoming;
+  if (code.units === 1 && code.incoming === 1 && (op0 === 0x0f || op0 === 0x11) && a0 === first) return { kind: IDENTITY, op: op0, count: 1 };
+  if ((op0 === 0x38 || op0 === 0x39) && code.incoming >= 1 && a0 === first && code.units >= 3) {
+    const target = ((units[1] << 16) >> 16);
+    if (op0 === 0x38 && (units[2] & 255) === 0x0e) return { kind: NULL_GUARD, op: op0, count: 2 };
+    if (op0 === 0x39 && target > 0 && target < code.units && (units[target] & 255) === 0x0e) return { kind: NULL_GUARD, op: op0, count: 2 };
+    return null;
+  }
+  if (code.units === 3 && code.incoming === 0 && op0 >= 0x60 && op0 <= 0x66) {
+    const w2 = units[2], op2 = w2 & 255, expected = op0 === 0x61 ? 0x10 : op0 === 0x62 ? 0x11 : 0x0f;
+    if (op2 === expected && (w2 >> 8) === a0) return { kind: STATIC_GET, op: op0, count: 2 };
+  }
+  return null;
+}
+/** The value of a STATIC_GET body whose field site is warm (the class initialized, the static present), or NO_GETTER. */
+function staticGetValue(rt, prog) {
+  const site = prog.refs[0]; if (site === undefined || !site.ready) return NO_GETTER;
+  const v = rt.staticFields.get(site.key); if (v === undefined) return NO_GETTER;
+  const variant = prog.shape.op - 0x60;
+  return variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
 }
 
 /**
@@ -89,7 +121,7 @@ function makeInvokeSite(dex, u, pc, op, a, hi) {
   const argc = range ? a : hi;
   if (!range && hi > 5) fail('Invalid invoke register count');
   if (argc !== wordCount(target.parameters) + (mode === 'static' ? 0 : 1)) fail('Invalid invoke argument shape');
-  return { target, mode, virtual: mode === 'virtual', isStatic: mode === 'static', argc, first: range ? u[pc + 2] : -1, definition: null, type: null, callee: null, calleeProg: null, poly: null, initialized: false, bridge: null, bridgeEpoch: -1, bridgeType: null };
+  return { target, mode, virtual: mode === 'virtual', isStatic: mode === 'static', argc, first: range ? u[pc + 2] : -1, definition: null, type: null, callee: null, calleeProg: null, poly: null, initialized: false, bridge: null, bridgeEpoch: -1, bridgeType: null, bridgePoly: null };
 }
 /** What kind of value a receiver is, for the "Invalid field/receiver" report: a DEX class instance, a host-modelled object, an array, a class object, a boxed primitive. */
 function receiverKind(rt, type, object) {
@@ -103,12 +135,34 @@ function invalidField(rt, reference, type, object) {
   const field = reference ? `${reference.owner}->${reference.name}:${reference.type}` : '(no field reference)';
   fail(`Invalid field/receiver: the field ${field} (declared by ${reference?.owner ?? '?'}) was accessed on a ${receiverKind(rt, type, object)} of class ${type}, which is not a ${reference?.owner ?? 'subclass'}; thread ${rt.thread?.name ?? '?'}`);
 }
-function fieldSiteFor(rt, reference, type) {
+/**
+ * The field site at `pc` for a receiver of class `type`. What the reference resolves to depends on the reference alone, so a site that already resolved it (for the class in site.type, the fast
+ * check of the access) only validates another receiver class -- a subclass of the field's declaring class, as before -- and remembers it in site.more; the key and default stay.
+ */
+function fieldSiteAt(rt, prog, pc, reference, type) {
+  const site = prog.refs[pc];
+  if (site !== undefined) { const more = site.more; if (more !== null && more.has(type)) return site; }
   if (!reference || !rt.isSubtype(type, reference.owner)) invalidField(rt, reference, type, null);
+  if (site !== undefined) { (site.more ??= new Set()).add(type); return site; }
   const field = rt.resolveField(reference);
-  return { type, key: field.key, def: defaultValue(field.type) };
+  return prog.refs[pc] = { type, key: field.key, def: defaultValue(field.type), more: null };
+}
+/** rt.isSubtype(valueType, type) for the checkcast/instanceof at `pc`, through a memo of the class that site saw last (most see one); like the runtime's memo it follows the class-graph epoch. */
+function subtypeAt(rt, prog, pc, valueType, type) {
+  let site = prog.refs[pc]; if (site === undefined) site = prog.refs[pc] = { type: null, epoch: -1, answer: false };
+  const epoch = rt.dex.dynamicFiles?.length ?? 0;
+  if (site.type !== valueType || site.epoch !== epoch) { site.answer = rt.isSubtype(valueType, type); site.type = valueType; site.epoch = epoch; }
+  return site.answer;
 }
 
+/** APKRuntime.recordMethod / record for a DEX callee, inlined for the steady state (counters known, trace ring past its fixed head): per-method counters, evidence row, ring entry. */
+function noteCall(rt, calleeMethod) {
+  const info = calleeMethod.recordInfo, ring = rt.traceRing;
+  if (rt.fastCallPaths === false || info === undefined || info.exempt || rt.traceMuted || ring == null || ring.head.length < 128) { rt.recordMethod(calleeMethod); return; }
+  info.stats.methods++; const evidence = info.evidence; if (evidence !== undefined && evidence.calls < Number.MAX_SAFE_INTEGER) evidence.calls++;
+  if (ring.length === 384) { ring.tail[ring.start] = info.entry; ring.start = ring.start === 383 ? 0 : ring.start + 1; rt.traceDropped = (rt.traceDropped ?? 0) + 1; }
+  else ring.tail[(ring.start + ring.length++) % 384] = info.entry;
+}
 /** Compiles the method of `frame` now (a loop in it has run long enough in the interpreter). Always returns false. */
 function compileHot(rt, prog, frame = null) {
   const code = prog.code, method = prog.method;
@@ -128,27 +182,68 @@ function jitSupport(rt) {
     const a = kind === 'float' ? floatNumber(x) : doubleNumber(x), b = kind === 'float' ? floatNumber(y) : doubleNumber(y);
     return Number.isNaN(a) || Number.isNaN(b) ? gt : a < b ? -1 : a > b ? 1 : 0;
   };
-  /** A compiled caller enters a cached callee: the callee frame is created and pushed; the caller then runs the callee's compiled body directly or returns to the loop. */
-  const prepareCall = (rt, f, site, args, returnPc, pcOfCall) => {
-    const callee = site.callee; rt.callStats.cached++;
+  /** A compiled caller enters a cached callee: the callee frame is created over the register file the caller filled (`regs`, see the invoke emission) and pushed; the caller then runs the callee's compiled body directly or returns to the loop. */
+  const prepareCall = (rt, f, site, regs, returnPc, pcOfCall) => {
+    const callee = site.callee, prog = site.calleeProg; rt.callStats.cached++;
     if (site.isStatic && rt.initialized.get(callee.method.owner)?.status !== 'initialized') rt.initialize(callee.method.owner);
-    rt.recordMethod(callee.method);
+    noteCall(rt, callee.method);
     const frames = rt.thread.frames;
     if (frames.length + rt.depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
     f.pc = returnPc; f.callPc = pcOfCall;
     if (frames.length + rt.depth + 1 > rt.peakCallDepth) rt.peakCallDepth = frames.length + rt.depth + 1;
-    const frame = makeFrame(rt, callee.method, callee.code, args, site.calleeProg); frames.push(frame);
+    if (++prog.calls === rt.jitThreshold) compileHot(rt, prog);
+    const frame = new Frame(callee.method, callee.code, regs, prog); frames.push(frame);
     return frame;
   };
+  /**
+   * The frameless callees of the interpreter's cached-call path (a trivial getter, detectGetter; an identity, a parameter null check or a static getter, detectShape), for a compiled caller
+   * whose cached callee is one: the call's result, with the bookkeeping of the call it replaces (counters, trace entry, depth, JIT counter, the callee's instructions). `receiver` is the
+   * first argument word. NO_GETTER when the callee has no such body, its field site is not warm for the receiver's class, the owner of a static one is not initialized, a null check fails,
+   * or the budget is short: the caller then makes the ordinary call. `pending` is the caller's instruction count not yet added to rt.steps.
+   */
+  const getterCall = (rt, site, receiver, pending) => {
+    const prog = site.calleeProg, getter = prog.getter, shape = prog.shape;
+    if ((getter === null && shape === null) || rt.fastCallPaths === false || rt.steps + pending + 2 > rt.maxInstructionsPerEvent) return NO_GETTER;
+    let value, count = 2;
+    if (getter !== null) {
+      let target; if (receiver !== null && typeof receiver === 'object') target = rt.heap.get(receiver.ref);
+      if (target === undefined) return NO_GETTER;
+      const fieldSite = prog.refs[0]; if (fieldSite === undefined || fieldSite.type !== target.type) return NO_GETTER;
+      let v = target.fields.get(fieldSite.key); if (v === undefined) v = fieldSite.def;
+      if (getter === 0x55) v &= 1; else if (getter === 0x56) v = (v << 24) >> 24; else if (getter === 0x57) v &= 65535; else if (getter === 0x58) v = (v << 16) >> 16;
+      value = getter === 0x54 && (v === 0 || v === null) ? null : v;
+    } else {   // detectShape
+      count = shape.count;
+      if (shape.kind === STATIC_GET) { const v = staticGetValue(rt, prog); if (v === NO_GETTER) return NO_GETTER; value = shape.op === 0x62 && v === 0 ? null : v; }
+      else if (shape.kind === IDENTITY) value = shape.op === 0x11 && (receiver === 0 || receiver === null) ? null : receiver;
+      else if (receiver !== null && receiver !== 0) value = undefined; else return NO_GETTER;
+    }
+    const callee = site.callee;
+    if (site.isStatic && rt.initialized.get(callee.method.owner)?.status !== 'initialized') return NO_GETTER;
+    rt.callStats.cached++; noteCall(rt, callee.method);
+    const frames = rt.thread.frames;
+    if (frames.length + rt.depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
+    if (frames.length + rt.depth + 1 > rt.peakCallDepth) rt.peakCallDepth = frames.length + rt.depth + 1;
+    if (++prog.calls === rt.jitThreshold) compileHot(rt, prog);
+    rt.steps += count; prog.stats.instructions += count;
+    return value;
+  };
   return support = { QUANTUM, WIDE_HIGH, makeInvokeSite, helpers: {
-    prepareCall, receiverType: (rt, receiver) => receiver !== null && typeof receiver === 'object' ? (rt.heap.get(receiver.ref)?.type ?? rt.typeOf(receiver)) : rt.typeOf(receiver),
+    prepareCall, getterCall, NO_GETTER, receiverType: (rt, receiver) => receiver !== null && typeof receiver === 'object' ? (rt.heap.get(receiver.ref)?.type ?? rt.typeOf(receiver)) : rt.typeOf(receiver),
     arith: arithmetic, long: (op, x, y) => longArithmetic(op, x, y), num: (kind, op, x, y) => numericBinary(kind === 'float' ? 2 : 3, op, x, y), cmp, same: equal,
     floatBits, floatNumber, doubleBits, doubleNumber, javaInt, javaLong,
     fuse(max, rt) { rt.budgetExceeded(`Instruction budget (${max}/event) exceeded`); },
     castFail(rt, value, type) { rt.throwJava('Ljava/lang/ClassCastException;', `Cannot cast ${rt.typeOf(value)} to ${type}`); },
-    fieldSite(rt, site, reference, object) {
-      if (!reference || !rt.isSubtype(object.type, reference.owner)) invalidField(rt, reference, object.type, object);
-      const field = rt.resolveField(reference); site.key = field.key; site.def = defaultValue(field.type); site.type = object.type;
+    fieldSite(rt, site, reference, object) {   // the compiled form of fieldSiteAt: the first receiver class stays in site.type, the others go to site.more
+      const type = object.type, more = site.more; if (more !== null && more.has(type)) return;
+      if (!reference || !rt.isSubtype(type, reference.owner)) invalidField(rt, reference, type, object);
+      if (site.key !== null) { (site.more ??= new Set()).add(type); return; }
+      const field = rt.resolveField(reference); site.key = field.key; site.def = defaultValue(field.type); site.type = type;
+    },
+    subtype(rt, site, valueType, type) {   // the compiled form of subtypeAt
+      const epoch = rt.dex.dynamicFiles?.length ?? 0;
+      if (site.type !== valueType || site.epoch !== epoch) { site.answer = rt.isSubtype(valueType, type); site.type = valueType; site.epoch = epoch; }
+      return site.answer;
     },
     staticSite(rt, site, reference, afterWrite = false) {
       let value;
@@ -457,10 +552,10 @@ function runLoop(rt, owner, base) {
           }
           case 0x1f: {
             const type = dex.types[u[pc + 1]], value = regs[a]; if (!type) fail('Invalid type index');
-            if (!isNull(value) && !rt.isSubtype(rt.typeOf(value), type)) { rt.assertResolvable(type); rt.throwJava('Ljava/lang/ClassCastException;', `Cannot cast ${rt.typeOf(value)} to ${type}`); }
+            if (!isNull(value) && !subtypeAt(rt, prog, pc, rt.typeOf(value), type)) { rt.assertResolvable(type); rt.throwJava('Ljava/lang/ClassCastException;', `Cannot cast ${rt.typeOf(value)} to ${type}`); }
             pc += 2; break;
           }
-          case 0x20: { const type = dex.types[u[pc + 1]], value = regs[hi]; if (!type) fail('Invalid instanceof type'); regs[lo] = !isNull(value) && rt.isSubtype(rt.typeOf(value), type) ? 1 : (rt.assertResolvable(type), 0); pc += 2; break; }
+          case 0x20: { const type = dex.types[u[pc + 1]], value = regs[hi]; if (!type) fail('Invalid instanceof type'); regs[lo] = !isNull(value) && subtypeAt(rt, prog, pc, rt.typeOf(value), type) ? 1 : (rt.assertResolvable(type), 0); pc += 2; break; }
           case 0x21: regs[lo] = rt.array(regs[hi]).elements.length; pc++; break;
           case 0x22: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid allocation type'); if (rt.initialized.get(type)?.status !== 'initialized') { const gate = rt.initStep(type); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.bytecodeAlloc = true; try { regs[a] = rt.allocate(type); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
           case 0x23: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid array type'); rt.bytecodeAlloc = true; try { regs[lo] = rt.newArray(type, int(regs[hi])); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
@@ -498,7 +593,7 @@ function runLoop(rt, owner, base) {
           }
           case 0x52: case 0x53: case 0x54: case 0x55: case 0x56: case 0x57: case 0x58: {
             const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.object(objectRef);
-            let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = prog.refs[pc] = fieldSiteFor(rt, dex.fields[u[pc + 1]], obj.type);
+            let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = fieldSiteAt(rt, prog, pc, dex.fields[u[pc + 1]], obj.type);
             let v = obj.fields.get(site.key); if (v === undefined) v = site.def;
             const variant = op - 0x52;
             if (variant === 0 || variant === 2) regs[lo] = v;
@@ -507,7 +602,7 @@ function runLoop(rt, owner, base) {
           }
           case 0x59: case 0x5a: case 0x5b: case 0x5c: case 0x5d: case 0x5e: case 0x5f: {
             const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.object(objectRef);
-            let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = prog.refs[pc] = fieldSiteFor(rt, dex.fields[u[pc + 1]], obj.type);
+            let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = fieldSiteAt(rt, prog, pc, dex.fields[u[pc + 1]], obj.type);
             const variant = op - 0x59, v = regs[lo], value = variant <= 2 ? v : variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : (v << 16) >> 16;
             const fields = obj.fields; if (fields.has(site.key)) fields.set(site.key, value); else rt.storeField(fields, site.key, value);
             pc += 2; break;
@@ -558,9 +653,7 @@ function runLoop(rt, owner, base) {
                   else ring.tail[(ring.start + ring.length++) % 384] = info.entry;
                 }
                 if (frames.length + rt.depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
-                const calleeCode = cached.code, argc = site.argc, nregs = calleeCode.registers, nr = new Array(nregs), at = nregs - argc;
-                if (site.first >= 0) { const first = site.first; for (let j = 0; j < argc; j++) nr[at + j] = regs[first + j]; }
-                else { const packed = u[pc + 2]; switch (argc) { case 5: nr[at + 4] = regs[lo]; case 4: nr[at + 3] = regs[(packed >> 12) & 15]; case 3: nr[at + 2] = regs[(packed >> 8) & 15]; case 2: nr[at + 1] = regs[(packed >> 4) & 15]; case 1: nr[at] = regs[packed & 15]; } }
+                const calleeCode = cached.code, argc = site.argc, nregs = calleeCode.registers, at = nregs - argc;
                 f.pc = pc + 3; f.callPc = start; if (frames.length + rt.depth + 1 > rt.peakCallDepth) rt.peakCallDepth = frames.length + rt.depth + 1;
                 if (++calleeProg.calls === rt.jitThreshold) compileHot(rt, calleeProg);
                 const getter = calleeProg.getter;
@@ -577,6 +670,17 @@ function runLoop(rt, owner, base) {
                     }
                   }
                 }
+                const shape = calleeProg.shape;
+                if (shape !== null && fastCalls && quantum > 1 && rt.steps + 2 <= max && !probe) {
+                  // Frameless identity / parameter null check / static getter (detectShape): the callee's instructions are accounted for here, as for the getter above.
+                  let value = NO_GETTER;
+                  if (shape.kind === STATIC_GET) { const v = staticGetValue(rt, calleeProg); if (v !== NO_GETTER) value = shape.op === 0x62 && v === 0 ? null : v; }
+                  else { const p0 = regs[site.first >= 0 ? site.first : u[pc + 2] & 15]; if (shape.kind === IDENTITY) value = shape.op === 0x11 && (p0 === 0 || p0 === null) ? null : p0; else if (p0 !== null && p0 !== 0) value = undefined; }
+                  if (value !== NO_GETTER) { rt.steps += shape.count; calleeProg.stats.instructions += shape.count; quantum--; f.result = value; pc += 3; break; }
+                }
+                const nr = new Array(nregs);
+                if (site.first >= 0) { const first = site.first; for (let j = 0; j < argc; j++) nr[at + j] = regs[first + j]; }
+                else { const packed = u[pc + 2]; switch (argc) { case 5: nr[at + 4] = regs[lo]; case 4: nr[at + 3] = regs[(packed >> 12) & 15]; case 3: nr[at + 2] = regs[(packed >> 8) & 15]; case 2: nr[at + 1] = regs[(packed >> 4) & 15]; case 1: nr[at] = regs[packed & 15]; } }
                 f = new Frame(cached.method, calleeCode, nr, calleeProg); frames.push(f);
                 regs = nr; prog = calleeProg; u = prog.units; dex = prog.dex; stats = prog.stats; pc = 0;
                 if (--quantum <= 0 || rt.q <= 0) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) { f.pc = 0; need = true; break inner; } }
@@ -587,11 +691,33 @@ function runLoop(rt, owner, base) {
             const argc = site.argc, args = new Array(argc);
             if (site.first >= 0) { const first = site.first; for (let j = 0; j < argc; j++) args[j] = regs[first + j]; }
             else { const packed = u[pc + 2]; switch (argc) { case 5: args[4] = regs[lo]; case 4: args[3] = regs[(packed >> 12) & 15]; case 3: args[2] = regs[(packed >> 8) & 15]; case 2: args[1] = regs[(packed >> 4) & 15]; case 1: args[0] = regs[packed & 15]; } }
-            // Calls that resolve to a SHIM/platform bridge are cached too: the resolution is reused for the same call site (and receiver class) without re-walking dispatch().
-            let outcome;
-            const bridge = site.bridge;
-            if (bridge !== null && site.bridgeEpoch === rt.resolveEpoch && (!site.virtual || (typeof args[0] !== 'string' && args[0] !== null && args[0] !== 0 && rt.typeOf(args[0]) === site.bridgeType && rt.heap.get(args[0].ref).annotationValues === undefined))) {
-              rt.callStats.bridged++; if (rt.profile.active) rt.profile.host(bridge.key); rt.monitor.hostEnter(bridge.key, bridge); rt.record(bridge.text);
+            // Calls that resolve to a SHIM/platform bridge are cached too: the resolution is reused for the same call site without re-walking dispatch(). A virtual site remembers the resolution per
+            // receiver class (the first in site.bridge/bridgeType, the others in site.bridgePoly; a String receiver is the class String); annotation and reflection proxies always dispatch.
+            let outcome, bridge = site.bridge, bridged = false;
+            if (bridge !== null && site.bridgeEpoch === rt.resolveEpoch) {
+              if (!site.virtual) bridged = true;
+              else {
+                const receiver = args[0];
+                if (typeof receiver === 'string') bridged = site.bridgeType === 'Ljava/lang/String;';
+                else if (receiver !== null && receiver !== 0) {
+                  const record = rt.heap.get(receiver.ref);
+                  if (record !== undefined && record.annotationValues === undefined && record.proxyHandler === undefined) {
+                    if (record.type === site.bridgeType) bridged = true;
+                    else { const poly = site.bridgePoly; if (poly !== null) { const entry = poly.get(record.type); if (entry !== undefined) { bridge = entry; bridged = true; } } }
+                  }
+                }
+              }
+            }
+            if (bridged) {
+              rt.callStats.bridged++; if (rt.profile.active) rt.profile.host(bridge.key); rt.monitor.hostEnter(bridge.key, bridge);
+              { // APKRuntime.record(bridge.text), inlined for the steady state (the calling method's plumbing flag known, ring past its fixed head)
+                const plumbing = f.method.plumbing, ring = rt.traceRing;
+                if (!fastCalls || plumbing === undefined || rt.traceMuted || ring == null || ring.head.length < 128) rt.record(bridge.text);
+                else if (plumbing === false) {
+                  if (ring.length === 384) { ring.tail[ring.start] = bridge.text; ring.start = ring.start === 383 ? 0 : ring.start + 1; rt.traceDropped = (rt.traceDropped ?? 0) + 1; }
+                  else ring.tail[(ring.start + ring.length++) % 384] = bridge.text;
+                }
+              }
               const hostMark = rt.hostAllocs.length;   // see APKRuntime.dispatch: host allocations are scoped to the call
               outcome = rt.bridge(bridge.selected, args, site.mode, bridge.key, bridge); rt.hostCall = null;
               if (rt.hostAllocs.length > hostMark && !(outcome instanceof Blocked || outcome instanceof Invoke)) rt.releaseHostAllocs(hostMark);
@@ -599,8 +725,12 @@ function runLoop(rt, owner, base) {
               rt.callStats.dispatched++; rt.lastBridge = null; const depthBefore = rt.depth;
               outcome = rt.dispatch(site.target, args, site.mode, f.method.owner, true);
               if (rt.lastBridge !== null && rt.lastBridgeDepth === depthBefore + 1) {
-                const annotationProxy = site.virtual && typeof args[0] !== 'string' && rt.object(args[0]).annotationValues !== undefined;
-                if (!annotationProxy) { site.bridge = rt.lastBridge; site.bridgeEpoch = rt.resolveEpoch; site.bridgeType = site.virtual ? rt.typeOf(args[0]) : null; }
+                const receiver = args[0], record = site.virtual && typeof receiver !== 'string' ? rt.object(receiver) : null;
+                if (record === null || (record.annotationValues === undefined && record.proxyHandler === undefined)) {
+                  const type = site.virtual ? (record === null ? 'Ljava/lang/String;' : record.type) : null;
+                  if (site.bridge === null || site.bridgeEpoch !== rt.resolveEpoch) { site.bridge = rt.lastBridge; site.bridgeEpoch = rt.resolveEpoch; site.bridgeType = type; site.bridgePoly = null; }
+                  else if (fastCalls && site.virtual && type !== site.bridgeType) { const poly = site.bridgePoly ??= new Map(); if (poly.size < 64) poly.set(type, rt.lastBridge); }
+                }
               }
               rt.lastBridge = null;
             }
@@ -608,7 +738,7 @@ function runLoop(rt, owner, base) {
               if (outcome.definition !== null && !(site.virtual && typeof args[0] !== 'string' && rt.object(args[0]).annotationValues)) {
                 if (fastCalls && site.callee !== null && site.virtual) {
                   const type = rt.typeOf(args[0]), poly = site.poly ??= new Map();
-                  if (type !== site.type && poly.size < 16) poly.set(type, { callee: outcome.definition, prog: prepare(rt, outcome.method, outcome.code) });
+                  if (type !== site.type && poly.size < 128) poly.set(type, { callee: outcome.definition, prog: prepare(rt, outcome.method, outcome.code) });
                 } else { site.callee = outcome.definition; site.type = site.virtual ? rt.typeOf(args[0]) : null; site.calleeProg = prepare(rt, outcome.method, outcome.code); }
               }
               if (frames.length + rt.depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
