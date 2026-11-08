@@ -174,3 +174,4 @@
 .memory-meter{flex-wrap:wrap;white-space:normal!important;line-height:1.35}.memory-meter>span{display:flex;flex-direction:column}
 .screen-state-bar{display:none}
 .status-bar{flex-wrap:wrap}.memory-meter{order:5;flex:1 0 100%;margin:4px 0 0}
+.vm-memory-hint{font-style:normal;font-weight:600;color:var(--accent);margin-left:6px}.vm-memory-hint[hidden]{display:none}.vm-memory-row .support-note{display:block;margin:-6px 1px 8px}

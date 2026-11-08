@@ -23,7 +23,7 @@
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=e6f7c307465c';
+import { BUCKET } from './time-breakdown.js?v=2e29585a666b';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -243,7 +243,7 @@ function collectGarbageTimed(runtime, options) {
     }
   }
 }
-function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC_AUDIT === '1', extraRoots = null, reason = 'manual', safepoint = false } = {}) {
+function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC_AUDIT === '1', extraRoots = null, reason = 'manual', safepoint = false, emergency = false } = {}) {
   const started = performance.now(), heap = runtime.heap, before = heap.size;
   const blocked = quiescent(runtime, safepoint) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null);
   if (blocked) { const skips = (runtime.gcSkips ??= {}); skips[blocked] = (skips[blocked] ?? 0) + 1; return { collected: false, reason: blocked, before, after: before, freed: 0, ms: 0 }; }
@@ -275,7 +275,8 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   // handed back to it since the last fully quiescent collection stay alive. Outside a safepoint nothing is in flight and the set is dropped.
   setCategory(3);
   const stackQuiet = runtime.depth === 0 && runtime.nestedRuns <= 1 && !runtime.initDepth && !runtime.scheduler?.waitingNested?.size && !runtime.scheduler?.threads.some(thread => thread.nestedDepth > 0 || thread.nestedBlock);
-  if (!safepoint || stackQuiet) runtime.hostAllocs.length = 0; else for (const id of runtime.hostAllocs) markId(id);
+  // An emergency collection (APKRuntime.emergencyCollect) runs inside an allocation: host code of the allocating thread may be mid-way through a native holding what it allocated, so hostAllocs is never dropped there.
+  if (!safepoint || (stackQuiet && !emergency)) runtime.hostAllocs.length = 0; else for (const id of runtime.hostAllocs) markId(id);
   graceRoots(runtime, markId);   // the last host allocations of finished calls (see APKRuntime.releaseHostAllocs)
   for (const weak of tracked) { const container = weak.deref(); if (container === undefined) tracked.delete(weak); else scan(container); }
   if (extraRoots) { const values = typeof extraRoots === 'function' ? extraRoots() : extraRoots; for (const item of values ?? []) scan(item); }

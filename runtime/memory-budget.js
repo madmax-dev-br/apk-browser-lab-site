@@ -16,8 +16,14 @@ export function memoryBudget({ deviceMemory = null, override = null } = {}) {
   return { maxHeapObjects, budgetMiB, source, bytesPerObject: BYTES_PER_OBJECT };
 }
 
-/** The limit the Worker passes to the VM: an explicit page option wins, then the device-memory budget. */
+/** The "Memória da VM" choices of the page, in MiB of Java heap budget; 0 = automatic (the device-memory rule above). The object limit of a step is memoryBudget({ override }), so the
+ *  field-slot / array-cell / collection-cell budgets of the VM scale with it as for any other limit; steps above the VM's ceiling (MAX_OBJECTS) are clamped to it. */
+export const MEMORY_STEPS_MIB = Object.freeze([512, 1024, 2048, 3072, 4096]);
+export const isMemoryStep = value => value === 0 || MEMORY_STEPS_MIB.includes(value);
+
+/** The limit the Worker passes to the VM: an explicit page option wins, then a chosen `memoryMiB` step (anything outside the list is ignored), then the device-memory budget. */
 export function heapLimitFor(options = {}, scope = globalThis) {
   if (Number.isInteger(options.maxHeapObjects)) return options.maxHeapObjects;
+  if (MEMORY_STEPS_MIB.includes(options.memoryMiB)) return memoryBudget({ override: options.memoryMiB }).maxHeapObjects;
   return memoryBudget({ deviceMemory: scope.navigator?.deviceMemory ?? null }).maxHeapObjects;
 }

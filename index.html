@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=e6f7c307465c">
-  <meta name="apk-browser-build" content="e6f7c307465c">
+  <link rel="stylesheet" href="./styles.css?v=2e29585a666b">
+  <meta name="apk-browser-build" content="2e29585a666b">
 </head>
 <body>
   <header class="topbar">
@@ -84,6 +84,9 @@
             </section>
             <section class="cp-group" aria-labelledby="cp-run-title">
               <h3 id="cp-run-title">Execução</h3>
+              <label class="cp-field" for="vm-memory"><span>Memória da VM <em id="vm-memory-hint" class="vm-memory-hint" role="status" hidden>reabra o APK para aplicar</em><small>Orçamento do heap Java; vale quando o APK é aberto de novo</small></span><select id="vm-memory" aria-describedby="vm-memory-note"></select></label>
+              <p id="vm-memory-note" class="cp-note">Este número é o orçamento do heap Java (objetos e arrays da VM; os demais orçamentos crescem junto). O navegador gasta mais que isso: tabelas do DEX, CanvasKit, rasters e um objeto JavaScript por objeto Java. Uma aba acima de ~2–4 GiB pode ser encerrada pelo navegador. O limite do motor é 2 097 152 objetos (4 GiB é limitado a ele).</p>
+              <p id="vm-memory-device" class="cp-note"></p>
               <label class="cp-field" for="tolerate-missing"><span>Modo tolerante<small>APIs do Android que faltam viram <code>STUB-VOID</code>/<code>STUB-RETURN</code> no log em vez de parar o app</small></span><select id="tolerate-missing"><option value="off">Desligado (estrito)</option><option value="void">Só métodos void</option><option value="primitives" selected>void e primitivos (0, false)</option><option value="all">Todos os tipos (0, false, null)</option></select></label>
               <label class="cp-check" for="strict-crash"><input id="strict-crash" type="checkbox"><span>Modo estrito de falhas<small>Uma exceção fatal em qualquer thread encerra o app (como o Android). Desligado, ela é registrada como <code>FATAL (tolerada)</code> no resumo e só a thread que falhou termina</small></span></label>
               <div id="app-data-row" class="app-data-row">
@@ -137,7 +140,7 @@
     </details>
     <footer><span><span class="footer-dot"></span> Sem instalação. Sem emulador. Sem upload.</span><a href="./hermes-proof/">Experimento Hermes no navegador ↗</a><span>APK Browser Lab <span class="footer-slash">/</span> protótipo técnico</span></footer>
   </main>
-  <script type="module" src="./app.js?v=e6f7c307465c"></script>
+  <script type="module" src="./app.js?v=2e29585a666b"></script>
 <div id="summary-overlay" class="summary-overlay" role="dialog" aria-label="Resumo" hidden><button id="summary-close" type="button">Fechar</button><pre id="summary-text"></pre></div>
 </body>
 </html>
