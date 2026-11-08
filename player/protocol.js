@@ -1,6 +1,6 @@
 // Versioned host <-> frame message schema and the <apk-player> configuration model. No DOM: shared by the host script, the frame and the tests.
-import { sanitizeSettings } from '../device-settings.js?v=b53ec96fe6dd';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=b53ec96fe6dd';
+import { sanitizeSettings } from '../device-settings.js?v=d330fc66b304';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=d330fc66b304';
 export const PROTOCOL = 'apk-player';
 export const VERSION = 1;
 export const MAX_APK_BYTES = 1024 * 1024 * 1024;
