@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=63564e17bcf5';
-import { createHostRegistry } from './host-contract.js?v=63564e17bcf5';
-import { Blocked, VMThread } from './scheduler.js?v=63564e17bcf5';
-import { Invoke } from './interpreter.js?v=63564e17bcf5';
-import { GC_ROOTS } from './heap-gc.js?v=63564e17bcf5';
+import { APKError } from './apk-error.js?v=e4970e1ed8a9';
+import { createHostRegistry } from './host-contract.js?v=e4970e1ed8a9';
+import { Blocked, VMThread } from './scheduler.js?v=e4970e1ed8a9';
+import { Invoke } from './interpreter.js?v=e4970e1ed8a9';
+import { GC_ROOTS } from './heap-gc.js?v=e4970e1ed8a9';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -93,6 +93,7 @@ export function createConcurrencyHost(platform) {
   const init = (r, self, target, name, group = null) => {
     const st = state(r, self); st.target = target ?? null; if (name !== undefined && name !== null) st.name = r.stringCharacters(name);
     st.group = group ?? (current ? state(r, current).group : null) ?? mainGroup(r); inheritLocals(r, self);
+    st.contextLoader = contextLoaderOf(r, r.thread ?? r.scheduler.mainThread());   // Thread.init: contextClassLoader = parent.getContextClassLoader() (the creating thread's)
   };
   def(THREAD, '<init>', '()V', (r, _m, [self]) => init(r, self, null));
   def(THREAD, '<init>', `(${RUNNABLE})V`, (r, _m, [self, t]) => init(r, self, t));
@@ -218,7 +219,11 @@ export function createConcurrencyHost(platform) {
 
   // Thread.getContextClassLoader/setContextClassLoader: a thread starts with its creator's context loader, which for the VM's first thread is the system (app) class loader.
   const CLASS_LOADER = 'Ljava/lang/ClassLoader;';
-  def(THREAD, 'getContextClassLoader', `()${CLASS_LOADER}`, (r, _m, [self]) => { const st = state(r, self); if (!('contextLoader' in st)) st.contextLoader = r.dispatch({ owner: CLASS_LOADER, name: 'getSystemClassLoader', parameters: [], result: CLASS_LOADER, signature: `()${CLASS_LOADER}` }, [], 'static'); return st.contextLoader; });
+  // A thread whose context loader was never set: the app's class loader (LoadedApk.makeApplication -> initializeJavaContextClassLoader sets it on the main thread before Application.onCreate,
+  // and every thread created afterwards inherits its creator's, see init above). `undefined` is "not set" (VMThread starts with it); a loader set to null stays null, as on Android.
+  const appContextLoader = r => r.dispatch({ owner: CLASS_LOADER, name: 'getSystemClassLoader', parameters: [], result: CLASS_LOADER, signature: `()${CLASS_LOADER}` }, [], 'static');
+  const contextLoaderOf = (r, thread) => { if (!thread) return appContextLoader(r); if (thread.contextLoader === undefined) thread.contextLoader = appContextLoader(r); return thread.contextLoader; };
+  def(THREAD, 'getContextClassLoader', `()${CLASS_LOADER}`, (r, _m, [self]) => contextLoaderOf(r, state(r, self) ?? r.scheduler.mainThread()));
   def(THREAD, 'setContextClassLoader', `(${CLASS_LOADER})V`, (r, _m, [self, loader]) => { state(r, self).contextLoader = loader; });
   def(THREAD, 'holdsLock', `(${OBJECT})Z`, (r, _m, [object]) => { if (object === null) throwNew(r, 'Ljava/lang/NullPointerException;'); return r.ownsMonitor(object) ? 1 : 0; }, { static: true });
   def(THREAD, 'yield', '()V', r => { if (r.multiThreaded) return new Blocked({ ready: () => true, reason: 'Thread.yield' }); platform.drainEvents(r, { maxEvents: 1 }); }, { static: true });
