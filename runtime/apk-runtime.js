@@ -1,29 +1,29 @@
-import { VMClock } from './vm-clock.js?v=277134f86d82';
-import { OperationMonitor } from './operation-monitor.js?v=277134f86d82';
-import { ExecutionProfile } from './execution-profile.js?v=277134f86d82';
-import { SamplingProfiler } from './sampling-profiler.js?v=277134f86d82';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=277134f86d82';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=277134f86d82';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=277134f86d82';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=277134f86d82';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=277134f86d82';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=277134f86d82';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=277134f86d82';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=277134f86d82';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=277134f86d82';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=277134f86d82';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=277134f86d82';
-import { APKError } from './apk-error.js?v=277134f86d82';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=277134f86d82';
-import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=277134f86d82';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=277134f86d82';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=277134f86d82';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=277134f86d82';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=277134f86d82';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=277134f86d82';
-import { Scheduler, Blocked } from './scheduler.js?v=277134f86d82';
-import { bootClassLacksMember } from './boot-class-members.js?v=277134f86d82';
-export { APKError } from './apk-error.js?v=277134f86d82';
+import { VMClock } from './vm-clock.js?v=220db593ef5c';
+import { OperationMonitor } from './operation-monitor.js?v=220db593ef5c';
+import { ExecutionProfile } from './execution-profile.js?v=220db593ef5c';
+import { SamplingProfiler } from './sampling-profiler.js?v=220db593ef5c';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=220db593ef5c';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=220db593ef5c';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=220db593ef5c';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=220db593ef5c';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=220db593ef5c';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=220db593ef5c';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=220db593ef5c';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=220db593ef5c';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=220db593ef5c';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=220db593ef5c';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=220db593ef5c';
+import { APKError } from './apk-error.js?v=220db593ef5c';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=220db593ef5c';
+import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=220db593ef5c';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=220db593ef5c';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=220db593ef5c';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=220db593ef5c';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=220db593ef5c';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=220db593ef5c';
+import { Scheduler, Blocked } from './scheduler.js?v=220db593ef5c';
+import { bootClassLacksMember } from './boot-class-members.js?v=220db593ef5c';
+export { APKError } from './apk-error.js?v=220db593ef5c';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -730,6 +730,8 @@ const ABSTRACT_GUARD = globalThis.process?.env?.APKWEB_GUARD_ABSTRACT === '1', A
 const FINAL_BOX_TYPES = new Set(['Ljava/lang/Long;', 'Ljava/lang/Integer;', 'Ljava/lang/Short;', 'Ljava/lang/Byte;', 'Ljava/lang/Character;', 'Ljava/lang/Boolean;', 'Ljava/lang/Double;', 'Ljava/lang/Float;']);
 /** APKWEB_GC_STRESS=1: collect at every safepoint and before every queued platform task, so a Java reference held only by host code (a closure, a table the collector cannot see) fails at once instead of weeks later. */
 const GC_STRESS = globalThis.process?.env?.APKWEB_GC_STRESS === '1';
+/** Consecutive IllegalMonitorStateExceptions from monitor-exit on one thread before the lab treats it as a loop (APKRuntime.monitorExit). */
+const MONITOR_EXIT_FAILURE_LIMIT = 2000;
 const MAP_TYPES = ['HashMap', 'WeakHashMap', 'LinkedHashMap', 'concurrent/ConcurrentHashMap'];
 EXTERNAL_PARENTS.set('Ljava/util/concurrent/atomic/AtomicReferenceArray;', 'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set('Ljava/util/concurrent/atomic/AtomicReferenceArray;', ['Ljava/io/Serializable;']);
@@ -2655,7 +2657,7 @@ export class APKRuntime {
     }
     if(method.owner==='Ljava/lang/Object;'&&['notify','notifyAll','wait'].includes(name)){
       const object=this.object(args[0]),thread=this.thread??this.scheduler.mainThread(),monitor=this.monitors.get(object.id);
-      if(!monitor||monitor.owner!==thread)this.throwJava('Ljava/lang/IllegalMonitorStateException;','object not locked by thread before '+name+'()');
+      if(!monitor||monitor.owner!==thread)this.throwJava('Ljava/lang/IllegalMonitorStateException;','object not locked by thread before '+name+'()'+this.monitorDiagnostic(monitor,thread));
       if(name==='wait'){
         const millis=args[1]??0n,nanos=args[2]??0;
         if(millis<0n||nanos<0||nanos>999999)this.throwJava('Ljava/lang/IllegalArgumentException;',millis<0n?'timeout value is negative':'nanosecond timeout value out of range');
@@ -4239,8 +4241,22 @@ export class APKRuntime {
   }
   monitorExit(value, thread = this.thread ?? this.scheduler.mainThread()) {
     const id = this.monitorId(value), monitor = this.monitors.get(id);
-    if (monitor === undefined || monitor.owner !== thread) this.throwJava('Ljava/lang/IllegalMonitorStateException;', 'monitor not owned');
+    if (monitor === undefined || monitor.owner !== thread) {
+      // A synchronized block's catch-all handler runs monitor-exit and rethrows; when the thread does not own the monitor, that monitor-exit throws IllegalMonitorStateException into the same handler,
+      // forever (ART would loop the same way; the lab never reaches that state unless its own monitor bookkeeping is wrong). After MONITOR_EXIT_FAILURE_LIMIT failures in a row on one thread the loop
+      // ends in a named internal error that carries the bookkeeping, instead of allocating exceptions until the object limit.
+      const streak = thread.monitorExitFailures = (thread.monitorExitFailures ?? 0) + 1, detail = this.monitorDiagnostic(monitor, thread);
+      if (streak >= MONITOR_EXIT_FAILURE_LIMIT) { thread.monitorExitFailures = 0; throw new APKError(`monitor-exit threw IllegalMonitorStateException ${streak} times in a row on thread ${thread.name}: a synchronized block's handler keeps releasing a monitor the thread does not own${detail}`, { kind: 'monitor-exit-loop' }); }
+      this.throwJava('Ljava/lang/IllegalMonitorStateException;', 'monitor not owned' + detail);
+    }
+    thread.monitorExitFailures = 0;
     if (monitor.count > 1) monitor.count--; else this.monitors.delete(id);
+  }
+  /** What the lab knows about a monitor whose ownership check failed: its owner, the thread that asked, the nesting of host calls and waits (appended to the IllegalMonitorStateException message). */
+  monitorDiagnostic(monitor, thread) {
+    const owner = monitor ? `owned by thread ${monitor.owner?.name ?? '?'} (count ${monitor.count})` : 'held by no thread';
+    const frame = thread?.frames?.at(-1)?.method?.key ?? '-';
+    return ` [lab: monitor ${owner}; asking thread ${thread?.name ?? '?'} (${thread?.state ?? '?'}, ${thread?.frames?.length ?? 0} frames, top ${frame}); current thread ${this.thread?.name ?? 'none'}; nested runs ${this.nestedRuns}; nested host waits ${this.scheduler?.waitingNested?.size ?? 0}]`;
   }
   ownsMonitor(value, thread = this.thread ?? this.scheduler.mainThread()) { return this.monitors.get(this.monitorId(value))?.owner === thread; }
   /** An exception left a thread's run(): the thread's UncaughtExceptionHandler runs, otherwise the fatal exception ends the process like Android's default handler. */

@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=277134f86d82';
+import { APKError } from './apk-error.js?v=220db593ef5c';
 
 // Green-thread scheduler for the VM.
 //
@@ -91,11 +91,16 @@ export class Scheduler {
    */
   pick(current, owner) {
     const earliest = this.wake(), n = this.threads.length;
+    // A scheduling slice without an owner (runThreads from a nested host wait or the event pump) runs one thread and ends, and the next slice picks again: starting the round robin at the
+    // head of the list every time let the first runnable threads monopolize the processor while a thread created later (a HandlerThread whose getLooper() the main thread waits for) never
+    // ran. The cursor remembers where the last pick left off, so consecutive slices go around the whole list.
+    const from = current !== null && current !== undefined ? this.threads.indexOf(current) : this.cursor;
     for (let i = 1; i <= n; i++) {
-      const thread = this.threads[(this.threads.indexOf(current) + i + n) % n];
+      const at = (from + i + n) % n, thread = this.threads[at];
       if (!thread || thread.state !== 'runnable') continue;
       if (thread !== owner && thread.nestedDepth > 0) continue;   // suspended under the JavaScript stack of an outer run: only that run can resume it
       if (thread === this.main && thread !== owner && thread.frames.length === 0) continue;   // the main thread between events has no frames and no driver: it is the host event loop, not a guest to resume (running it ends it)
+      this.cursor = at;
       return { thread, earliest };
     }
     return { thread: null, earliest };
