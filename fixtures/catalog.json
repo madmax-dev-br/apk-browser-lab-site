@@ -177,10 +177,10 @@
           "dev.apkweb.fixtures.state.MainActivity"
         ]
       },
-      "executionValidated": false,
+      "executionValidated": true,
       "validation": {
         "evidence": "evidence/validation/compose-state.json",
-        "generatedAt": "2026-11-08T18:15:37.394Z",
+        "generatedAt": "2026-11-08T21:48:27.937Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -214,10 +214,10 @@
           "dev.apkweb.fixtures.navigation.SettingsActivity"
         ]
       },
-      "executionValidated": false,
+      "executionValidated": true,
       "validation": {
         "evidence": "evidence/validation/compose-navigation.json",
-        "generatedAt": "2026-11-08T18:19:04.998Z",
+        "generatedAt": "2026-11-08T21:52:14.219Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -274,10 +274,10 @@
           "dev.apkweb.hybrid.ReviewActivity"
         ]
       },
-      "executionValidated": false,
+      "executionValidated": true,
       "validation": {
         "evidence": "evidence/validation/hybrid-navigation.json",
-        "generatedAt": "2026-11-08T18:22:41.396Z",
+        "generatedAt": "2026-11-08T21:55:56.409Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -318,7 +318,7 @@
         "Review / Help Activities"
       ],
       "advanced": true,
-      "executionValidated": false,
+      "executionValidated": true,
       "expected": {
         "packageName": "dev.apkweb.projects",
         "launcherActivity": "dev.apkweb.projects.MainActivity",
@@ -330,7 +330,7 @@
       },
       "validation": {
         "evidence": "evidence/validation/xml-projects.json",
-        "generatedAt": "2026-11-08T18:29:21.334Z",
+        "generatedAt": "2026-11-08T22:02:36.876Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -356,7 +356,7 @@
         "BudgetActivity"
       ],
       "advanced": true,
-      "executionValidated": false,
+      "executionValidated": true,
       "expected": {
         "packageName": "dev.apkweb.approvals",
         "launcherActivity": "dev.apkweb.approvals.MainActivity",
@@ -367,7 +367,7 @@
       },
       "validation": {
         "evidence": "evidence/validation/compose-approvals.json",
-        "generatedAt": "2026-11-08T18:24:02.976Z",
+        "generatedAt": "2026-11-08T21:57:19.356Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
