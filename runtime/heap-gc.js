@@ -23,7 +23,7 @@
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=cc91314626dd';
+import { BUCKET } from './time-breakdown.js?v=118dad9f8a40';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -96,7 +96,7 @@ const weakTypeCache = runtime => weakTypeCaches.get(runtime) ?? weakTypeCaches.s
  * nested objects in its sample is walked in full. `markNoJavaRefs(object)` declares an object (and everything under it) reference-free explicitly.
  */
 /** Instances of these classes are code and metadata (DEX files, programs, compiled functions, frames, threads): never Java references, never walked. */
-const SKIP_CONSTRUCTORS = new Set(['DexFile', 'DexProgram', 'CompiledFunction', 'Frame', 'VMThread', 'ClassDefinition']);
+const SKIP_CONSTRUCTORS = new Set(['DexFile', 'DexProgram', 'CompiledFunction', 'Frame', 'ClassDefinition']);   // not VMThread: the threads the scheduler runs are skipped by identity above (enumerateRoots covers them), but the host record of a Thread that was created and not started yet (a ThreadFactory's product before start()) holds its Runnable target, group and handler only there
 const FLAT_CONTAINER_MIN = 2048, FLAT_SAMPLE = 48;
 const noRefs = new WeakSet();
 export function markNoJavaRefs(object) { if (object !== null && typeof object === 'object') noRefs.add(object); return object; }
@@ -599,12 +599,13 @@ function auditAgainstFullWalk(runtime, { markedHas, extraRoots }) {
     for (let head = 0; head < queue.length && !found && head < 3_000_000; head++) {
       const node = queue[head]; if (ArrayBuffer.isView(node) || node instanceof WeakMap || node instanceof WeakSet || node.freed === true) continue;
       if (typeof node.ref === 'number' && node.ref === target && Object.keys(node).length === 1) { found = node; break; }
+      if (!(node instanceof Map) && !(node instanceof Set) && !Array.isArray(node) && Object.keys(node).some(key => node[key] === target && typeof node[key] === 'number')) { found = node; break; }   // an id-named number field
       if (node instanceof Map) { for (const [k, v] of node) { push(v, node, `[${String(k).slice(0, 40)}]`); push(k, node, 'key'); } }
       else if (node instanceof Set || Array.isArray(node)) { let i = 0; for (const v of node) push(v, node, `[${i++}]`); }
       else for (const key of Object.keys(node)) push(node[key], node, key);
     }
     let path = ''; for (let at = found, guard = 0; at && parent.get(at) && guard < 400; guard++) { const [from, label] = parent.get(at); path = label + (path ? ' → ' + path : ''); at = from; }
-    throw new Error(`GC audit: the pruned root scan lost ${missed.length} object(s) a full conservative walk reaches: #${missed.slice(0, 12).join(', #')}; first reached through ${path || '?'}`);
+    throw new Error(`GC audit: the pruned root scan lost ${missed.length} object(s) a full conservative walk reaches: #${missed.slice(0, 12).join(', #')}; first reached through ${path || '?'}; ${missed.length ? `ids ${missed.slice(0, 12).map(m => { const id = Number(m.split(' ')[0]); return `${id}${id >= full.limit ? '>' : '<'}limit ${full.limit}`; }).join(' ')}` : ''}`);
   }
   if (missed.length) throw new Error(`GC audit: the pruned root scan lost ${missed.length} object(s) a full conservative walk reaches: #${missed.slice(0, 12).join(', #')}`);
 }
