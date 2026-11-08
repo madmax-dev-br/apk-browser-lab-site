@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=57d10730b49f';
-import { buildElfDescriptor } from './native-descriptor.js?v=57d10730b49f';
-import { sha256Hex } from './sha256-sync.js?v=57d10730b49f';
-import { withVariants } from './native-provider-variants.js?v=57d10730b49f';
+import { APKError } from './apk-error.js?v=0ad8b82325c7';
+import { buildElfDescriptor } from './native-descriptor.js?v=0ad8b82325c7';
+import { sha256Hex } from './sha256-sync.js?v=0ad8b82325c7';
+import { withVariants } from './native-provider-variants.js?v=0ad8b82325c7';
 
 // Browser-side provider of the lab's wasm32 native libraries (vendor/native-libs/wasm32, published next to the page by scripts/build-web.mjs).
 //

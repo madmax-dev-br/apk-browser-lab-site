@@ -1,11 +1,12 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=57d10730b49f';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=57d10730b49f';
-import { createDeviceView, createViewState } from './device-view.js?v=57d10730b49f';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=57d10730b49f';
-import { formatApiGapReport } from './api-gap-scan.js?v=57d10730b49f';
-import { createLogcatPanel } from './logcat-panel.js?v=57d10730b49f';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=57d10730b49f';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=57d10730b49f';
+import { APKWorkerClient } from './apk-worker-client.js?v=0ad8b82325c7';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=0ad8b82325c7';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice } from './device-settings.js?v=0ad8b82325c7';
+import { createDeviceView, createViewState } from './device-view.js?v=0ad8b82325c7';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=0ad8b82325c7';
+import { formatApiGapReport } from './api-gap-scan.js?v=0ad8b82325c7';
+import { createLogcatPanel } from './logcat-panel.js?v=0ad8b82325c7';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=0ad8b82325c7';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=0ad8b82325c7';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -128,6 +129,21 @@ function reportAPKError(error, title) {
   if (state.mode === 'apk') showError(error, title);
   else appendTrace(`ERRO APK: ${error.message || error}`);
 }
+// Boot screen: the phone frame appears in the click's own frame (before the Worker answers), shows the phase text, and fades out when the first real frame is drawn (or the operation ends without one).
+function sizeBootOverlay() {
+  const stage = $('preview-stage'), overlay = $('boot-overlay'); if (!stage || !overlay) return;
+  const d = resolveDevice(deviceState.settings), w = d.widthDp, h = d.heightDp, scale = Math.min(0.7, Math.max(120, stage.clientWidth - 24) / (w + 10), Math.max(160, stage.clientHeight - 16) / (h + 10));
+  overlay.style.setProperty('--boot-w', String(w)); overlay.style.setProperty('--boot-h', String(h)); overlay.style.setProperty('--boot-scale', scale.toFixed(4));
+}
+function showBoot(caption) {
+  const overlay = $('boot-overlay'); if (!overlay) return;
+  clearTimeout(state.bootTimer); sizeBootOverlay(); $('boot-caption').textContent = caption; overlay.classList.remove('fading'); overlay.hidden = false; $('empty-preview').hidden = true; state.bootVisible = true;
+}
+function hideBoot() {
+  const overlay = $('boot-overlay'); if (!overlay || !state.bootVisible) return;
+  state.bootVisible = false; overlay.classList.add('fading'); clearTimeout(state.bootTimer);
+  state.bootTimer = setTimeout(() => { overlay.hidden = true; overlay.classList.remove('fading'); if (!state.apkRunning && state.mode === 'apk') $('empty-preview').hidden = false; }, 380);
+}
 function beginOperation(message) {
   const token = ++state.operation;
   setBusy(true); $('operation-panel').hidden = false;
@@ -139,12 +155,12 @@ function beginOperation(message) {
 }
 function finishOperation(token) {
   if (token !== state.operation) return;
-  clearInterval(state.operationTimer); $('operation-panel').hidden = true; state.abortController = null; setBusy(false); if (state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length || state.pendingScrollBys.size) flushPendingInputs();
+  clearInterval(state.operationTimer); hideBoot(); $('operation-panel').hidden = true; state.abortController = null; setBusy(false); if (state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length || state.pendingScrollBys.size) flushPendingInputs();
 }
 function onWorkerProgress(progress = {}) {
   const phases = { 'framework-resources': 'Carregando dados originais de estilos Android', framework: 'Carregando código AOSP compilado', manifest: 'Lendo o manifesto', dex: 'Inspecionando DEX', native: 'Inventariando bibliotecas nativas', complete: 'Inspeção concluída', launch: 'Tentando iniciar a Activity', intent: 'Abrindo o link', click: 'Executando callback DEX', back: 'Retornando à Activity anterior', resources: 'Lendo recursos e layouts XML' };
   const message = `${phases[progress.phase] || 'Processando no Worker'}${progress.filename ? ` · ${progress.filename}` : ''}`;
-  $('operation-message').textContent = message;
+  $('operation-message').textContent = message; if (state.bootVisible) $('boot-caption').textContent = message;
   const bar = $('operation-progress');
   if (progress.total > 0) { bar.max = progress.total; bar.value = progress.completed || 0; }
   else bar.removeAttribute('value');
@@ -171,7 +187,7 @@ apkVM.onApiGaps = report => { state.apiGaps = report; };
 const logcatPanel = createLogcatPanel({ root: $('logcat'), getPackage: () => state.inventory?.packageName ?? state.fileName ?? 'app' });   // src/logcat-panel.js
 apkVM.onLogcat = message => logcatPanel.push(message);
 const netlogPanel = createNetlogPanel({ root: $('netlog'), getPackage: () => state.inventory?.packageName ?? state.fileName ?? 'app', getAllowedHosts: () => deviceState.settings.network.allowedHosts,
-  allowHost: host => { $('dev-hosts').value = addAllowedHost($('dev-hosts').value, host); $('dev-hosts').dispatchEvent(new Event('input')); } });   // src/netlog-panel.js; "Permitir" types the host into the Dispositivo field, the same path as typing it
+  allowHost: host => { if ($('dev-hosts-all').checked) return; $('dev-hosts').value = addAllowedHost($('dev-hosts').value, host); $('dev-hosts').dispatchEvent(new Event('input')); } });   // src/netlog-panel.js; "Permitir" types the host into the Dispositivo field, the same path as typing it
 apkVM.onNetlog = message => netlogPanel.push(message);
 window.apkLabNetlog = netlogPanel;   // test and console access: .store.entries
 window.apkLabLogcat = logcatPanel;   // test and console access: .store.entries
@@ -311,7 +327,7 @@ async function importSource(source, autoRun = false) {
   state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
   switchMode('apk'); hideError(); state.runtime = null; state.inventory = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true;
   $('empty-preview').querySelector('h2').textContent = 'Seu aplicativo começa aqui.'; $('empty-preview').querySelector('p').innerHTML = 'Selecione um APK e clique em Executar.<br>Ou rode a demonstração para testar.';
-  const token = beginOperation('Lendo o arquivo APK…');
+  showBoot('Abrindo o APK…'); const token = beginOperation('Lendo o arquivo APK…');
   $('native-inspection').hidden = true; $('native-result').hidden = true; $('unsupported-notice').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('inspection-badge').textContent = 'ANALISANDO';
   $('file-info').hidden = false; $('file-name').textContent = source.name; $('file-size').textContent = source.file ? `${formatSize(source.file.size)} · arquivo local` : 'APK de teste hospedado localmente';
   $('reopen-file').hidden = false; $('preview-name').textContent = source.name;
@@ -360,9 +376,18 @@ function updateMemoryMeter(health) {
   const meter = $('memory-meter'); if (!meter || !health || !Number.isFinite(health.liveObjects) || !health.limit) return;
   const ratio = Math.min(1, health.liveObjects / health.limit), page = globalThis.performance?.memory?.usedJSHeapSize, bytesPerObject = health.bytesPerObject || 1600, estimate = health.liveObjects * bytesPerObject;
   meter.hidden = false; meter.dataset.level = ratio >= 0.9 ? 'high' : ratio >= 0.7 ? 'warn' : 'ok'; meter.style.setProperty('--fill', `${Math.round(ratio * 100)}%`);
-  meter.lastElementChild.textContent = `Memória da VM ${count(health.liveObjects)} / ${count(health.limit)} objetos (${ratio < 0.1 ? (ratio * 100).toFixed(1) : Math.round(ratio * 100)}%) · ≈ ${mib(estimate)}${page ? ` · heap da página ${mib(page)}` : ''}`;
-  meter.title = [`Objetos vivos da VM: ${health.liveObjects} de ${health.limit} (acima disso a VM lança java.lang.OutOfMemoryError).`, `Custo estimado: ${bytesPerObject} bytes por objeto (medido em exemplos reais), ≈ ${mib(estimate)}.`,
+  const pct = ratio < 0.1 ? (ratio * 100).toFixed(1) : String(Math.round(ratio * 100)), workerBytes = health.workerHeapBytes, browser = `Memória do browser: Worker ${Number.isFinite(workerBytes) ? mib(workerBytes) : 'indisponível'} · página ${page ? mib(page) : 'indisponível'}`;
+  const lines = meter.lastElementChild.children; if (lines.length !== 2) meter.lastElementChild.replaceChildren(document.createElement('span'), document.createElement('span'));
+  meter.lastElementChild.children[0].textContent = `Heap Java: ${count(health.liveObjects)} objetos (${pct} % do limite) · ~${mib(estimate)} estimados`; meter.lastElementChild.children[1].textContent = browser;
+  meter.title = ['O heap Java conta só os objetos da VM; o browser gasta além disso com as tabelas DEX, o CanvasKit, os rasters e cada objeto Java como objeto JavaScript.', `Objetos vivos da VM: ${health.liveObjects} de ${health.limit} (acima disso a VM lança java.lang.OutOfMemoryError).`, `Custo estimado: ${bytesPerObject} bytes por objeto (medido em exemplos reais), ≈ ${mib(estimate)}.`,
     page ? `Heap JS da página (sem o Web Worker): ${mib(page)}.` : 'Heap JS da página: indisponível neste navegador.', `Coletas de lixo: ${health.collections ?? 0} (${health.freedObjects ?? 0} objetos liberados, ${health.gcMs ?? 0} ms); último evento ${health.lastEventMs ?? 0} ms.`, health.oomCount ? `OutOfMemoryError já lançado ${health.oomCount} vez(es).` : ''].filter(Boolean).join('\n');
+}
+// "Mostrar limites de layout": page overlay over the device screen, redrawn only when a snapshot is drawn or the option changes.
+function redrawLayoutBounds() {
+  const canvas = $('layout-bounds-canvas'); if (!canvas) return;
+  const on = !!deviceState.settings.layoutBounds && !!state.lastSnapshot; canvas.hidden = !on; if (!on) return;
+  const screen = $('android-screen'), frame = deviceState.bars?.contentFrame, width = screen.clientWidth || deviceState.bars?.widthDp || 411, height = screen.clientHeight || deviceState.bars?.heightDp || 914;
+  drawLayoutBounds(canvas, layoutBoundsRects(state.lastSnapshot, { origin: { x: frame?.left ?? 0, y: frame?.top ?? 0 } }), width, height);
 }
 const deviceState = { settings: loadDeviceSettings(), clockTimer: null };
 const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, notifyParent, clickView: id => clickView(id), hooks: {
@@ -373,7 +398,7 @@ const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTr
     if (state.mode === 'apk') { setStatus('Aplicativo encerrado · nenhuma Activity ativa'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENCERRADO'; }
   },
   rendered(snapshot, composeReady) {
-    $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth); if (snapshot.vmHealth) state.lastVmHealth = snapshot.vmHealth;
+    hideBoot(); $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth); state.lastSnapshot = snapshot; redrawLayoutBounds(); if (snapshot.vmHealth) state.lastVmHealth = snapshot.vmHealth;
     if (snapshot.droppedEvent) appendTrace(`Evento descartado: a View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) já não existe na VM.`);
     // The VM raised java.lang.OutOfMemoryError (even if the app caught it): never silent.
     if ((snapshot.vmHealth?.oomCount ?? 0) > (state.oomSeen ?? 0)) { state.oomSeen = snapshot.vmHealth.oomCount; appendTrace(`OutOfMemoryError: ${snapshot.vmHealth.lastOom?.reason} (${snapshot.vmHealth.liveObjects} objetos vivos)`); setStatus(`java.lang.OutOfMemoryError na VM (${snapshot.vmHealth.liveObjects} objetos vivos, limite ${snapshot.vmHealth.limit})`, 'error'); }
@@ -389,16 +414,16 @@ const fillSelect = (select, entries) => { select.replaceChildren(...entries.map(
 function writeDevicePanel(settings) {
   $('dev-screen').value = settings.screen; $('dev-orientation').value = settings.orientation; $('dev-font').value = String(settings.fontScale); $('dev-font-out').textContent = `${settings.fontScale.toFixed(2).replace('.', ',')}×`;
   $('dev-locale').value = settings.locale; $('dev-dark').checked = settings.darkTheme; $('dev-animator').value = String(settings.animatorScale); $('dev-hour24').checked = settings.hour24; $('dev-tz').value = settings.timeZone;
-  $('dev-battery').value = String(settings.battery.level); $('dev-battery-out').textContent = `${settings.battery.level}%`; $('dev-charging').checked = settings.battery.charging; $('dev-network').value = settings.connectivity; $('dev-nav').value = settings.navigation; $('dev-hosts').value = settings.network.allowedHosts.join(', '); $('dev-proxy').value = settings.network.proxyUrl;
+  $('dev-battery').value = String(settings.battery.level); $('dev-battery-out').textContent = `${settings.battery.level}%`; $('dev-charging').checked = settings.battery.charging; $('dev-network').value = settings.connectivity; $('dev-nav').value = settings.navigation; { const all = settings.network.allowedHosts.includes('*'); $('dev-hosts-all').checked = all; $('dev-hosts').disabled = all; $('dev-hosts').value = all ? '*' : settings.network.allowedHosts.join(', '); } $('dev-layout-bounds').checked = !!settings.layoutBounds; $('dev-proxy').value = settings.network.proxyUrl;
   const device = resolveDevice(settings); $('device-summary').textContent = `${device.widthDp} × ${device.heightDp} · ${settings.orientation === 'landscape' ? 'paisagem' : 'retrato'}`;
 }
 function readDevicePanel() {
   return sanitizeSettings({ screen: $('dev-screen').value, orientation: $('dev-orientation').value, fontScale: Number($('dev-font').value), locale: $('dev-locale').value, darkTheme: $('dev-dark').checked, animatorScale: Number($('dev-animator').value),
-    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, network: { allowedHosts: $('dev-hosts').value, proxyUrl: $('dev-proxy').value } });
+    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value } });
 }
 let deviceApplying = Promise.resolve();
 function applyDeviceSettings(settings) {
-  deviceState.settings = settings; saveDeviceSettings(settings); writeDevicePanel(settings); updateSystemBarIcons();
+  deviceState.settings = settings; saveDeviceSettings(settings); writeDevicePanel(settings); updateSystemBarIcons(); redrawLayoutBounds();
   const note = $('device-status');
   if (state.runtime !== apkVM || !state.apkRunning) { note.textContent = 'Nenhum app em execução: as configurações valem desde o próximo lançamento.'; return deviceApplying; }
   // One RPC at a time: wait for a VM operation in flight, then deliver the newest settings through ActivityThread semantics.
@@ -415,8 +440,9 @@ function applyDeviceSettings(settings) {
 }
 function initDevicePanel() {
   fillSelect($('dev-screen'), DEVICE_SCREENS); fillSelect($('dev-locale'), DEVICE_LOCALES); fillSelect($('dev-tz'), DEVICE_ZONES); writeDevicePanel(deviceState.settings);
-  for (const id of ['dev-screen', 'dev-orientation', 'dev-font', 'dev-locale', 'dev-dark', 'dev-animator', 'dev-hour24', 'dev-tz', 'dev-battery', 'dev-charging', 'dev-network', 'dev-nav', 'dev-hosts', 'dev-proxy']) $(id).addEventListener('input', () => { applyDeviceSettings(readDevicePanel()); });
-  $('device-reset').addEventListener('click', () => { applyDeviceSettings(sanitizeSettings({})); });
+  for (const id of ['dev-screen', 'dev-orientation', 'dev-font', 'dev-locale', 'dev-dark', 'dev-animator', 'dev-hour24', 'dev-tz', 'dev-battery', 'dev-charging', 'dev-network', 'dev-nav', 'dev-hosts-all', 'dev-layout-bounds', 'dev-hosts', 'dev-proxy']) $(id).addEventListener('input', () => { applyDeviceSettings(readDevicePanel()); });
+  document.querySelector('#trace .trace-actions')?.addEventListener('click', event => event.preventDefault());   // buttons in the <summary> must not toggle the panel
+  $('device-reset').addEventListener('click', () => { applyDeviceSettings(defaultDeviceSettings()); });
 }
 // ---- "Abrir": a deep link / Intent resolved against the manifest's intent filters (src/deep-link-host.js) ----
 const deepLinkPanel = { history: [], busy: false };
@@ -464,7 +490,7 @@ function initDeepLinkPanel() {
 }
 async function runAPK() {
   if (!state.runtime || state.busy || state.runStarting) return;
-  state.runStarting = true;
+  state.runStarting = true; showBoot('Iniciando o aplicativo…');
   try { await runAPKOnce(); } finally { state.runStarting = false; }
 }
 async function runAPKOnce() {
@@ -491,8 +517,16 @@ async function backAPK() {
   finally { finishOperation(token); }
 }
 async function clickView(id) {
-  if (!state.runtime || state.busy) return;
-  await flushPendingInputs(); const token = beginOperation('Executando callback DEX…');
+  if (!state.runtime) return;
+  // A tap during a running operation is queued, not dropped (Android delivers it when the main thread is free); bounded so a wedged VM cannot hold it forever.
+  state.pendingClicks = (state.pendingClicks ?? 0) + 1;
+  try {
+    for (let waited = 0; state.busy && waited < 15000; waited += 10) { await new Promise(resolve => setTimeout(resolve, 10)); if (!state.runtime) return; }
+    if (state.busy) return;
+    await flushPendingInputs();
+    if (state.busy) { for (let waited = 0; state.busy && waited < 15000; waited += 10) await new Promise(resolve => setTimeout(resolve, 10)); if (state.busy || !state.runtime) return; }
+  } finally { state.pendingClicks--; }
+  const token = beginOperation('Executando callback DEX…');
   try { const snapshot = await state.runtime.click(id, { onProgress: onWorkerProgress }); if (token === state.operation) renderSnapshot(snapshot); }
   catch (error) { if (token === state.operation) reportAPKError(error, 'Callback interrompido'); }
   finally { finishOperation(token); }

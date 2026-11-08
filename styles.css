@@ -150,3 +150,26 @@
 .control-panel input[type=text]{font:9px ui-monospace,monospace;color:#5d6072;border:1px solid #e7e9f0;border-radius:4px;background:#fbfcfe;padding:7px}
 .control-panel input[type=text]::placeholder{color:#b3b7c3}.control-panel input[type=text]:focus-visible{outline:3px solid #b1adff;outline-offset:1px}
 :root[data-theme=dark] .control-panel input[type=text]{color:#acacb5;border-color:#363944;background:#101520}:root[data-theme=dark] .control-panel input[type=text]::placeholder{color:#5f6270}
+/* boot overlay: the phone frame shown from the click on "Executar APK" until the first real frame */
+.boot-overlay{position:absolute;left:50%;top:50%;z-index:6;width:calc(var(--boot-w,411)*1px + 10px);height:calc(var(--boot-h,914)*1px + 10px);transform:translate(-50%,-50%) scale(var(--boot-scale,.7));transform-origin:center center;background:#262934;border-radius:34px;padding:5px;opacity:1;transition:opacity .35s ease;pointer-events:none}
+.boot-overlay.fading{opacity:0}
+.boot-screen{width:100%;height:100%;border-radius:28px;background:radial-gradient(circle at 50% 42%,#1c2030 0,#0b0d14 70%);color:#a4c639;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px}
+.boot-logo{width:104px;height:104px;animation:boot-pulse 1.6s ease-in-out infinite}
+.boot-eye{fill:#0b0d14}
+.boot-bar{width:140px;height:4px;border-radius:2px;background:#2a2f40;overflow:hidden;position:relative}
+.boot-bar i{position:absolute;top:0;bottom:0;width:40%;border-radius:2px;background:currentColor;animation:boot-slide 1.3s ease-in-out infinite}
+.boot-caption{margin:0;max-width:78%;text-align:center;font-size:15px;line-height:1.4;color:#aab0c4}
+@keyframes boot-pulse{0%,100%{opacity:.55;transform:scale(.96)}50%{opacity:1;transform:scale(1.03)}}
+@keyframes boot-slide{0%{left:-40%}100%{left:100%}}
+@media (prefers-reduced-motion:reduce){.boot-logo,.boot-bar i{animation:none}.boot-bar i{left:30%}}
+/* log header actions */
+.trace-actions{margin-left:auto;display:flex;gap:6px}
+.trace-actions+.trace-chevron{margin-left:0}
+.trace-actions button{font:11px ui-monospace,monospace;padding:4px 7px;border:1px solid #dfe2ea;border-radius:5px;background:#fff;color:#4a5060}
+:root[data-theme=dark] .trace-actions button{background:#1b1d22;border-color:#333740;color:#b6b9c2}
+/* layout bounds overlay, over the device screen */
+.layout-bounds-canvas{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:50}
+/* memory line */
+.memory-meter{flex-wrap:wrap;white-space:normal!important;line-height:1.35}.memory-meter>span{display:flex;flex-direction:column}
+.screen-state-bar{display:none}
+.status-bar{flex-wrap:wrap}.memory-meter{order:5;flex:1 0 100%;margin:4px 0 0}

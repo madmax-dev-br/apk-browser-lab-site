@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=57d10730b49f">
-  <meta name="apk-browser-build" content="57d10730b49f">
+  <link rel="stylesheet" href="./styles.css?v=0ad8b82325c7">
+  <meta name="apk-browser-build" content="0ad8b82325c7">
 </head>
 <body>
   <header class="topbar">
@@ -59,6 +59,7 @@
               <h3 id="cp-look-title">Aparência</h3>
               <div class="cp-grid">
                 <label for="dev-dark">Tema escuro</label><input id="dev-dark" type="checkbox">
+                <label for="dev-layout-bounds" title="Opção de desenvolvedor do Android: contorna os limites de cada View e nó do Compose (azul), margens (magenta) e padding (verde)">Mostrar limites de layout</label><input id="dev-layout-bounds" type="checkbox">
                 <label for="dev-font">Escala da fonte <output id="dev-font-out">1,00×</output></label><input id="dev-font" type="range" min="0.85" max="2" step="0.05">
                 <label for="dev-locale">Idioma e região</label><select id="dev-locale"></select>
                 <label for="dev-orientation">Orientação</label><select id="dev-orientation"><option value="portrait">Retrato</option><option value="landscape">Paisagem</option></select>
@@ -75,10 +76,11 @@
                 <label for="dev-battery">Bateria <output id="dev-battery-out">80%</output></label><input id="dev-battery" type="range" min="0" max="100" step="1">
                 <label for="dev-charging">Carregando</label><input id="dev-charging" type="checkbox">
                 <label for="dev-network">Conectividade</label><select id="dev-network"><option value="online">Wi‑Fi (sem tarifação)</option><option value="metered">Dados móveis (tarifado)</option><option value="offline">Sem conexão</option></select>
-                <label for="dev-hosts">Hosts permitidos</label><input id="dev-hosts" type="text" spellcheck="false" autocomplete="off" placeholder="api.exemplo.com, *.cdn.exemplo.com" aria-describedby="dev-hosts-note">
+                <label for="dev-hosts-all">Permitir todos os hosts</label><input id="dev-hosts-all" type="checkbox" aria-describedby="dev-hosts-note">
+                <label for="dev-hosts">Hosts permitidos na rede</label><input id="dev-hosts" type="text" spellcheck="false" autocomplete="off" placeholder="api.exemplo.com, *.cdn.exemplo.com" aria-describedby="dev-hosts-note">
                 <label for="dev-proxy">Proxy (opcional)</label><input id="dev-proxy" type="text" spellcheck="false" autocomplete="off" placeholder="https://relay.exemplo.com/?url={url}">
               </div>
-              <p id="dev-hosts-note" class="cp-note">Sem hosts na lista, todo nome falha como em um telefone offline. Um host listado ainda depende de CORS no servidor (ou de um proxy seu).</p>
+              <p id="dev-hosts-note" class="cp-note">Com "Permitir todos os hosts" ligado (padrão) qualquer nome pode ser acessado, ainda sujeito a CORS no servidor (ou a um proxy seu). Desligado, só os hosts da lista são acessíveis e, sem hosts na lista, todo nome falha como em um telefone offline.</p>
             </section>
             <section class="cp-group" aria-labelledby="cp-run-title">
               <h3 id="cp-run-title">Execução</h3>
@@ -101,10 +103,12 @@
         <div class="preview-bar"><div class="preview-title"><span class="window-dots"><i></i><i></i><i></i></span><span id="preview-name">Prévia do aplicativo</span></div><button id="back-button" class="back-button" hidden>← Voltar</button><span class="runtime-badge" id="runtime-badge"><span></span> INATIVO</span></div>
         <div class="preview-stage" id="preview-stage">
           <div id="empty-preview" class="empty-preview"><div class="empty-device"><span></span><div>▶</div><i></i></div><h2>Seu aplicativo começa aqui.</h2><p>Selecione um APK e clique em Executar.<br>Ou rode a demonstração para testar.</p><span class="browser-chip"><span>◉</span> Tudo acontece neste navegador</span></div>
+          <div id="boot-overlay" class="boot-overlay" hidden role="status" aria-live="polite"><div class="boot-screen"><svg class="boot-logo" viewBox="0 0 64 64" width="84" height="84" aria-hidden="true"><path class="boot-antenna" d="M20 8l6 9M44 8l-6 9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M10 40a22 22 0 0 1 44 0z" fill="currentColor"/><circle cx="24" cy="32" r="2.6" class="boot-eye"/><circle cx="40" cy="32" r="2.6" class="boot-eye"/><rect x="10" y="44" width="44" height="12" rx="6" fill="currentColor" opacity=".35"/></svg><div class="boot-bar"><i></i></div><p id="boot-caption" class="boot-caption">Iniciando…</p></div></div>
           <div id="android-device" class="android-device" hidden>
             <div id="android-screen" class="android-screen">
               <div id="android-content" class="android-content"></div>
               <div id="android-window-layer" class="android-window-layer"></div>
+              <canvas id="layout-bounds-canvas" class="layout-bounds-canvas" aria-hidden="true" hidden></canvas>
               <div class="system-bars" aria-hidden="true">
                 <div id="sysbar-status" class="sysbar-status"><span id="sysbar-clock" class="sysbar-clock">9:41</span><span class="sysbar-cutout"></span><span class="sysbar-icons"><svg id="sysbar-wifi" viewBox="0 0 24 24" width="14" height="14"><path d="M12 18.5a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM2.4 9.2l1.9 1.9a10.8 10.8 0 0 1 15.4 0l1.9-1.9a13.5 13.5 0 0 0-19.2 0zM6.2 13l1.9 1.9a5.4 5.4 0 0 1 7.8 0l1.9-1.9a8.1 8.1 0 0 0-11.6 0z" fill="currentColor"/></svg><svg id="sysbar-cell" viewBox="0 0 24 24" width="14" height="14"><path d="M2 22h20V2z" fill="currentColor"/></svg><span class="sysbar-battery"><span id="sysbar-battery-level" class="sysbar-battery-level"></span><b id="sysbar-bolt" hidden>⚡</b></span></span></div>
                 <div id="sysbar-nav" class="sysbar-nav"><span class="sysbar-handle"></span><span class="sysbar-buttons"><i class="sysbar-back"></i><i class="sysbar-home"></i><i class="sysbar-recents"></i></span></div>
@@ -114,8 +118,7 @@
           <div id="error-panel" class="error-panel" role="alert" hidden><span class="error-icon">!</span><h2 id="error-title">Não foi possível executar</h2><p id="error-message"></p><details id="error-diagnostics" hidden><summary>Detalhes técnicos da execução</summary><pre id="error-detail" hidden></pre></details><button id="error-copy" type="button">Copiar diagnóstico</button> <button id="error-summary" type="button" title="Mostra só o resumo (memória, quem retém, exceções, thread principal) em letras grandes: uma foto basta">Mostrar resumo</button></div>
         </div>
         <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Aguardando um aplicativo</span></span><span id="memory-meter" class="memory-meter" role="status" hidden><i></i><span></span></span><span id="execution-engine">411 × 914 dp · DENSIDADE 1</span></div>
-        <div class="screen-state-bar"><button id="screen-state-summary" type="button" title="Mostra só o resumo (memória, quem retém, exceções, thread principal) em letras grandes: uma foto basta">Mostrar resumo</button> <button id="screen-state-copy" type="button" title="Copia um resumo do que a VM mostra (Activities, árvore de views, Compose, quadros, fila, threads, memória) mesmo sem erro">Copiar estado da tela</button></div>
-        <details id="trace" class="trace"><summary><span>Log de execução</span><span id="trace-count">0 eventos</span><span class="trace-chevron">⌄</span></summary><pre id="trace-output">O log aparecerá após a execução.</pre></details>
+        <details id="trace" class="trace"><summary><span>Log de execução</span><span id="trace-count">0 eventos</span><span class="trace-actions"><button id="screen-state-summary" type="button" title="Mostra só o resumo (memória, quem retém, exceções, thread principal) em letras grandes: uma foto basta">Resumo</button><button id="screen-state-copy" type="button" title="Copia um resumo do que a VM mostra (Activities, árvore de views, Compose, quadros, fila, threads, memória) mesmo sem erro">Estado</button></span><span class="trace-chevron">⌄</span></summary><pre id="trace-output">O log aparecerá após a execução.</pre></details>
         <details id="logcat" class="trace logcat"><summary><span>Logcat</span><span class="logcat-count">0 linhas</span><span class="trace-chevron">⌄</span></summary>
           <div class="logcat-bar"><input class="logcat-filter" type="search" placeholder="Filtrar por tag ou texto" aria-label="Filtrar logcat por tag ou texto"><select class="logcat-level" aria-label="Nível mínimo"><option value="V">V Verbose</option><option value="D">D Debug</option><option value="I">I Info</option><option value="W">W Warning</option><option value="E">E Error</option></select><label class="logcat-auto"><input class="logcat-autoscroll" type="checkbox" checked> Rolar</label><button class="logcat-clear" type="button">Limpar</button><select class="logcat-scope" aria-label="O que salvar"><option value="all">Salvar tudo</option><option value="filtered">Salvar o filtrado</option></select><button class="logcat-save" type="button">Salvar</button></div>
           <div class="logcat-lines" role="log" aria-live="off"></div></details>
@@ -134,7 +137,7 @@
     </details>
     <footer><span><span class="footer-dot"></span> Sem instalação. Sem emulador. Sem upload.</span><a href="./hermes-proof/">Experimento Hermes no navegador ↗</a><span>APK Browser Lab <span class="footer-slash">/</span> protótipo técnico</span></footer>
   </main>
-  <script type="module" src="./app.js?v=57d10730b49f"></script>
+  <script type="module" src="./app.js?v=0ad8b82325c7"></script>
 <div id="summary-overlay" class="summary-overlay" role="dialog" aria-label="Resumo" hidden><button id="summary-close" type="button">Fechar</button><pre id="summary-text"></pre></div>
 </body>
 </html>

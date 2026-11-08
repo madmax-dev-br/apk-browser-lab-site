@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=57d10730b49f';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=57d10730b49f';
-import { installNetworkCallbacks } from './network-callbacks.js?v=57d10730b49f';
-import { createHostRegistry } from './host-contract.js?v=57d10730b49f';
-import { resolveDevice } from './device-profile.js?v=57d10730b49f';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=57d10730b49f';
-import { gcRoot } from './heap-gc.js?v=57d10730b49f';
+import { APKError } from './apk-error.js?v=0ad8b82325c7';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=0ad8b82325c7';
+import { installNetworkCallbacks } from './network-callbacks.js?v=0ad8b82325c7';
+import { createHostRegistry } from './host-contract.js?v=0ad8b82325c7';
+import { resolveDevice } from './device-profile.js?v=0ad8b82325c7';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=0ad8b82325c7';
+import { gcRoot } from './heap-gc.js?v=0ad8b82325c7';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -12,6 +12,11 @@ import { gcRoot } from './heap-gc.js?v=57d10730b49f';
 const CONFIGURATION = 'Landroid/content/res/Configuration;', ACTIVITY = 'Landroid/app/Activity;', VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;';
 const CONFIG_FLAGS = { mcc: 1, mnc: 2, locale: 4, touchscreen: 8, keyboard: 0x10, keyboardHidden: 0x20, navigation: 0x40, orientation: 0x80, screenLayout: 0x100, uiMode: 0x200, screenSize: 0x400, smallestScreenSize: 0x800, density: 0x1000, layoutDirection: 0x2000, colorMode: 0x4000, fontScale: 0x40000000 };
 const fail = (message, details = {}) => { throw new APKError(message, { kind: 'device-state-unsupported', ...details }); };
+/** Configuration.diff over the fields the device model sets, for a VM whose framework has no Configuration class. */
+const bareConfigurationDiff = (a, b) => { let diff = 0; const differs = (...names) => names.some(name => a[name] !== b[name]);
+  if (differs('orientation')) diff |= CONFIG_FLAGS.orientation; if (differs('screenLayout')) diff |= CONFIG_FLAGS.screenLayout; if (differs('uiMode')) diff |= CONFIG_FLAGS.uiMode;
+  if (differs('screenWidthDp', 'screenHeightDp')) diff |= CONFIG_FLAGS.screenSize; if (differs('smallestScreenWidthDp')) diff |= CONFIG_FLAGS.smallestScreenSize; if (differs('densityDpi')) diff |= CONFIG_FLAGS.density;
+  if (differs('fontScale')) diff |= CONFIG_FLAGS.fontScale; if (differs('locale')) diff |= CONFIG_FLAGS.locale; return diff; };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export function createDeviceStateHost(platform) {
   const registry = createHostRegistry(), { def, type } = registry;
@@ -166,6 +171,10 @@ export function createDeviceStateHost(platform) {
   const apply = (r, userNext, { except = null } = {}) => {
     platform.userDevice = userNext; const next = platform.effectiveDevice(userNext, except ?? platform.frames.at(-1));
     const previous = platform.device; if (same(previous, next)) return { changed: 0, relaunched: 0, delivered: 0 };
+    // The global Configuration always exists on a device (ActivityThread keeps it); here it is built lazily, so an app that never asked for its Resources has none yet: build it from the *previous* device, or the change has nothing to diff against and no Activity would be recreated.
+    if (!platform.configuration && r.classes.has(CONFIGURATION)) platform.resourceConfiguration(r, null);
+    // No Configuration class in the loaded framework (the app never names it, so the configuration profile is not loaded): the diff is taken between the two device models' configuration fields.
+    const bare = !platform.configuration && !r.classes.has(CONFIGURATION), configurationBefore = bare ? platform.deviceConfiguration(r) : null;
     platform.device = next;
     const seen = platform.frames.at(-1), bars = seen && (seen.root || seen.window) ? platform.systemBarsHost.describe(r, seen) : null;
     // 1. Resource selection: the original matcher now sees the new qualifiers; Themes replay their applied styles against it.
@@ -177,6 +186,7 @@ export function createDeviceStateHost(platform) {
       diff = call(r, current, CONFIGURATION, 'diff', [CONFIGURATION], 'I', [fresh]); call(r, current, CONFIGURATION, 'setTo', [CONFIGURATION], 'V', [fresh]);
       // The page-level system settings that are not Configuration fields (animator scale, time zone, battery, connectivity) are applied below.
     }
+    else if (bare) diff = bareConfigurationDiff(configurationBefore, platform.deviceConfiguration(r));
     platform.updateMetrics(r);
     if (previous.animatorScale !== next.animatorScale) { applyAnimatorScale(r, next.animatorScale); platform.contentHost.notifySetting(r, 'animator_duration_scale'); }
     let delivered = 0, relaunched = 0;
@@ -190,11 +200,12 @@ export function createDeviceStateHost(platform) {
         if (frame !== top) { frame.pendingDiff = (frame.pendingDiff | 0) | diff; continue; }
         const total = diff | (frame.pendingDiff | 0); frame.pendingDiff = 0; platform.lastConfigurationDiff = total;
         if (!needsRelaunch(frame, total)) {
+          if (!current) continue;   // nothing in the app can name a Configuration: there is no onConfigurationChanged to deliver
           call(r, frame.activity, frame.type, 'onConfigurationChanged', [CONFIGURATION], 'V', [current]); delivered++;
           views(r, frame.root, view => { if (r.objectOverride?.(r.object(view).type, 'onConfigurationChanged(Landroid/content/res/Configuration;)V')) call(r, view, VIEW, 'onConfigurationChanged', [CONFIGURATION], 'V', [current]); });
         } else { platform.recreateActivity(r, frame); relaunched++; }
       }
-      platform.componentCallbacksHost.dispatchConfiguration(r, current);
+      if (current) platform.componentCallbacksHost.dispatchConfiguration(r, current);
     }
     // 4. Window: the system bars/insets and the content frame follow the new size, orientation and navigation mode.
     platform.systemBarsHost.notifyChanged(r);

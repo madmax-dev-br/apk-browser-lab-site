@@ -1,4 +1,4 @@
-import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=57d10730b49f';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=0ad8b82325c7';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: SCREEN_PRESETS.map(p => p.id), orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -24,11 +24,14 @@ export function sanitizeSettings(input = {}) {
   if (Number.isFinite(Number(input.statusBarHeightDp)) && input.statusBarHeightDp !== null && input.statusBarHeightDp !== '') out.statusBarHeightDp = Math.min(64, Math.max(16, Number(input.statusBarHeightDp)));   // dp; null = the framework's status_bar_height
   if (typeof input.darkTheme === 'boolean') out.darkTheme = input.darkTheme;
   if (typeof input.hour24 === 'boolean') out.hour24 = input.hour24;
+  out.layoutBounds = input.layoutBounds === true;   // page-only developer option ("Mostrar limites de layout"); the VM never sees it
   if (typeof input.locale === 'string' && /^[a-z]{2}-[A-Z]{2}$/.test(input.locale)) out.locale = input.locale;
   if (typeof input.timeZone === 'string' && input.timeZone.length < 64) { try { if (input.timeZone) new Intl.DateTimeFormat('en-US', { timeZone: input.timeZone }); out.timeZone = input.timeZone; } catch { /* unknown zone: keep default */ } }
   if (input.battery && typeof input.battery === 'object') { out.battery.level = Math.min(100, Math.max(0, Math.round(Number(input.battery.level) || 0))); out.battery.charging = !!input.battery.charging; }
   return out;
 }
-export function loadDeviceSettings() { try { const text = globalThis.localStorage?.getItem(KEY); return sanitizeSettings(text ? JSON.parse(text) : {}); } catch { return sanitizeSettings({}); } }
+/** A new user's device reaches every host (allowedHosts = ['*']); sanitizeSettings({}) alone stays the closed policy so embedders that pass no network config keep it. */
+export function defaultDeviceSettings() { return sanitizeSettings({ network: { allowedHosts: ['*'] } }); }
+export function loadDeviceSettings() { try { const text = globalThis.localStorage?.getItem(KEY); return text ? sanitizeSettings(JSON.parse(text)) : defaultDeviceSettings(); } catch { return defaultDeviceSettings(); } }
 export function saveDeviceSettings(settings) { try { globalThis.localStorage?.setItem(KEY, JSON.stringify(settings)); return true; } catch { return false; } }
 export { resolveDevice };

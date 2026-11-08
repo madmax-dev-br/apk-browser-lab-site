@@ -1,4 +1,4 @@
-import {APKError} from './apk-error.js?v=57d10730b49f';
+import {APKError} from './apk-error.js?v=0ad8b82325c7';
 
 const PATTERN='Lcom/android/icu/util/regex/PatternNative;',MATCHER='Lcom/android/icu/util/regex/MatcherNative;',REGISTRY='Llibcore/util/NativeAllocationRegistry;';
 const FINALIZERS=new Map([[0x5245475001n,'pattern'],[0x5245474d01n,'matcher']]);
