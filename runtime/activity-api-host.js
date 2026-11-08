@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=fb41a105df84';
-import { APKError } from './apk-error.js?v=fb41a105df84';
-import { gcRoot } from './heap-gc.js?v=fb41a105df84';
+import { createHostRegistry } from './host-contract.js?v=fa94ded129ca';
+import { APKError } from './apk-error.js?v=fa94ded129ca';
+import { gcRoot } from './heap-gc.js?v=fa94ded129ca';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
