@@ -2,7 +2,7 @@
 // original java.net.DatagramSocket / MulticastSocket / PlainDatagramSocketImpl. Datagrams are delivered between sockets inside the VM: loopback, the Wi-Fi address while the panel is online,
 // broadcast and multicast groups joined by sockets of this process. There is no route out of the browser, so a datagram for any other address fails like on a device that has no route to it
 // (ENETUNREACH), and a connected socket whose loopback peer is not there gets ECONNREFUSED (the ICMP port unreachable the kernel reports) on its next send or receive.
-import { Blocked } from './scheduler.js?v=514b56884167';
+import { Blocked } from './scheduler.js?v=c8a9f970d5b5';
 
 const MAX_DATAGRAM = 65507, RECEIVE_QUEUE_BYTES = 212992, EPHEMERAL_FIRST = 32768, EPHEMERAL_LAST = 60999, OWN_V4 = [10, 0, 2, 15], BROADCAST_V4 = [10, 0, 2, 255];
 

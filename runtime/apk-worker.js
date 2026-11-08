@@ -1,40 +1,41 @@
-import { buildScreenState } from './screen-state.js?v=514b56884167';
-import { reportSummary } from './report-summary.js?v=514b56884167';
-import { TimeBreakdown } from './time-breakdown.js?v=514b56884167';
-import { createMessageSink } from './audio-native.js?v=514b56884167';
-import { loadAPK } from './apk-loader.js?v=514b56884167';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=514b56884167';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=514b56884167';
-import { createWebViewBackend } from './webview-backend.js?v=514b56884167';
-import { FrameworkProvider } from './framework-provider.js?v=514b56884167';
-import { createRasterSender } from './raster-cache.js?v=514b56884167';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=514b56884167';
-import { dispatchPointer } from './pointer-input-host.js?v=514b56884167';
-import { resolveDevice } from './device-profile.js?v=514b56884167';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=514b56884167';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=514b56884167';
-import { SkiaProvider } from './skia-provider.js?v=514b56884167';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=514b56884167';
-import { disposeTextLayout } from './text-layout-native.js?v=514b56884167';
-import { IcuBreakProvider } from './icu-break-provider.js?v=514b56884167';
-import { SqliteProvider } from './sqlite-native.js?v=514b56884167';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=514b56884167';
-import { TzdataProvider } from './java-time-native.js?v=514b56884167';
-import { ZlibProvider } from './zip-native.js?v=514b56884167';
-import { IcuConverterProvider } from './icu-converter-native.js?v=514b56884167';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=514b56884167';
-import { JavacryptoProvider } from './javacrypto-native.js?v=514b56884167';
-import { disposeColorFilters } from './color-filter-native.js?v=514b56884167';
-import { disposeRegex } from './regex-native.js?v=514b56884167';
-import { disposeRenderNodes } from './rendernode-native.js?v=514b56884167';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=514b56884167';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=514b56884167';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=514b56884167';
+import { buildScreenState } from './screen-state.js?v=c8a9f970d5b5';
+import { reportSummary } from './report-summary.js?v=c8a9f970d5b5';
+import { TimeBreakdown } from './time-breakdown.js?v=c8a9f970d5b5';
+import { createMessageSink } from './audio-native.js?v=c8a9f970d5b5';
+import { loadAPK } from './apk-loader.js?v=c8a9f970d5b5';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=c8a9f970d5b5';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=c8a9f970d5b5';
+import { createWebViewBackend } from './webview-backend.js?v=c8a9f970d5b5';
+import { FrameworkProvider } from './framework-provider.js?v=c8a9f970d5b5';
+import { createRasterSender } from './raster-cache.js?v=c8a9f970d5b5';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=c8a9f970d5b5';
+import { dispatchPointer } from './pointer-input-host.js?v=c8a9f970d5b5';
+import { resolveDevice } from './device-profile.js?v=c8a9f970d5b5';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=c8a9f970d5b5';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=c8a9f970d5b5';
+import { SkiaProvider } from './skia-provider.js?v=c8a9f970d5b5';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=c8a9f970d5b5';
+import { SemanticsPacer } from './semantics-pacing.js?v=c8a9f970d5b5';
+import { disposeTextLayout } from './text-layout-native.js?v=c8a9f970d5b5';
+import { IcuBreakProvider } from './icu-break-provider.js?v=c8a9f970d5b5';
+import { SqliteProvider } from './sqlite-native.js?v=c8a9f970d5b5';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=c8a9f970d5b5';
+import { TzdataProvider } from './java-time-native.js?v=c8a9f970d5b5';
+import { ZlibProvider } from './zip-native.js?v=c8a9f970d5b5';
+import { IcuConverterProvider } from './icu-converter-native.js?v=c8a9f970d5b5';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=c8a9f970d5b5';
+import { JavacryptoProvider } from './javacrypto-native.js?v=c8a9f970d5b5';
+import { disposeColorFilters } from './color-filter-native.js?v=c8a9f970d5b5';
+import { disposeRegex } from './regex-native.js?v=c8a9f970d5b5';
+import { disposeRenderNodes } from './rendernode-native.js?v=c8a9f970d5b5';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=c8a9f970d5b5';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=c8a9f970d5b5';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=c8a9f970d5b5';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=514b56884167';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=514b56884167';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=514b56884167';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '514b56884167';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=c8a9f970d5b5';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=c8a9f970d5b5';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=c8a9f970d5b5';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'c8a9f970d5b5';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -50,15 +51,24 @@ let busy = false;
 let eventTimer = null, lastEventMs = 0;
 function errorData(error) { const summary = (() => { try { return runtime ? reportSummary(runtime, { tela: (() => { try { return runtime.runDiagnostic(() => buildScreenState(runtime, { semantics: null }).tela, null); } catch { return null; } })(), error: { message: error.message, details: { jsStack: error.details?.jsStack ?? (!error.details && /^(TypeError|RangeError|ReferenceError|SyntaxError|EvalError)$/.test(error.name ?? '') ? String(error.stack ?? '') : null) } } }).join('\n') : null; } catch { return null; } })(); const uncaught = (() => { try { return runtime?.uncaughtText?.() || null; } catch { return null; } })(); const internal = !error.details && /^(TypeError|RangeError|ReferenceError|SyntaxError|EvalError)$/.test(error.name ?? ''); return { summary, uncaught, name: error.name || 'Error', message: error.message || String(error), stack: error.stack, details: internal ? { kind: 'internal-js-error', jsStack: String(error.stack ?? '').split('\n').slice(0, 13).join('\n'), vmContext: runtime?.monitor?.context?.() ?? null } : error.details, navigation: runtime?.platform?.navigationState?.(runtime), trace: Array.isArray(runtime?.trace) ? runtime.trace.slice(-512) : [], stubs: runtime ? [...[...(runtime.missingLibraries ?? [])].map(([key, count]) => [`lib${key}.so`, count]), ...(runtime.missingClasses ?? []), ...(runtime.missingReturns ?? []), ...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`) : [], stubLists: runtime ? { void: [...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`), returns: [...(runtime.missingReturns ?? [])].map(([key, count]) => `${key} x${count}`), classes: [...(runtime.missingClasses ?? [])].map(([key, count]) => `${key} x${count}`) } : null }; }
 const rasterSender = createRasterSender();
-function currentSnapshot() {
-  appData?.touch();
+const semanticsPacer = new SemanticsPacer();
+const workerTiming = { snapshots: 0, snapshotMs: 0, semanticsWalks: 0, semanticsReused: 0, semanticsMs: 0, scheduledBatches: 0, scheduledMs: 0 };   // cumulative host time of the Worker's own work per snapshot, reported in vmHealth for the page and the benchmarks
+let lastComposeSemantics = null;   // the tree of the last walk, reused by scheduled events inside the pacing gap (src/semantics-pacing.js)
+/** `paced`: a scheduled VM event may reuse the last semantics tree while the pacer says a fresh one is not due yet; replies to page requests are never paced. */
+function currentSnapshot({ paced = false } = {}) {
+  appData?.touch(); const snapshotStarted = performance.now();
   runtime.steps = 0; // A bounded inspection event, separate from the APK callback that just finished.
   const snapshot = runtime.snapshot();
-  if (!snapshot.closed && composeSemantics) snapshot.composeSemantics = composeSemantics.snapshot();
+  if (!snapshot.closed && composeSemantics) {
+    const reuse = paced && lastComposeSemantics && !semanticsPacer.take();
+    if (!reuse) { const startedAt = performance.now(); try { lastComposeSemantics = composeSemantics.snapshot(); } finally { semanticsPacer.taken(startedAt); workerTiming.semanticsWalks++; workerTiming.semanticsMs += performance.now() - startedAt; } } else workerTiming.semanticsReused++;
+    snapshot.composeSemantics = lastComposeSemantics;
+  }
   Object.assign(snapshot, runtime.executionSnapshot());
   // VM health the page can show: live Java objects, collections, and any OutOfMemoryError the VM raised (even if the app caught it).
   snapshot.pendingEventDelay = runtime.platform.nextEventDelay?.() ?? null;   // ms until the VM's next scheduled event (frame, timer); null when nothing is scheduled
-  snapshot.vmHealth = { liveObjects: runtime.heap.size, limit: runtime.maxHeapObjects, bytesPerObject: BYTES_PER_OBJECT, lastEventMs, collections: runtime.gcStats?.collections ?? 0, freedObjects: runtime.gcStats?.freed ?? 0, gcMs: Math.round(runtime.gcStats?.totalMs ?? 0), oomCount: runtime.oomCount ?? 0, lastOom: runtime.lastOom ? { ...runtime.lastOom, census: undefined } : null, heapCensus: runtime.lastOom?.census && runtime.lastOom.count !== reportedCensus ? (reportedCensus = runtime.lastOom.count, runtime.lastOom.census) : undefined };
+  snapshot.vmHealth = { liveObjects: runtime.heap.size, limit: runtime.maxHeapObjects, bytesPerObject: BYTES_PER_OBJECT, lastEventMs, workerTiming: { ...workerTiming, snapshotMs: Math.round(workerTiming.snapshotMs), semanticsMs: Math.round(workerTiming.semanticsMs), scheduledMs: Math.round(workerTiming.scheduledMs) }, collections: runtime.gcStats?.collections ?? 0, freedObjects: runtime.gcStats?.freed ?? 0, gcMs: Math.round(runtime.gcStats?.totalMs ?? 0), oomCount: runtime.oomCount ?? 0, lastOom: runtime.lastOom ? { ...runtime.lastOom, census: undefined } : null, heapCensus: runtime.lastOom?.census && runtime.lastOom.count !== reportedCensus ? (reportedCensus = runtime.lastOom.count, runtime.lastOom.census) : undefined };
+  workerTiming.snapshots++; workerTiming.snapshotMs += performance.now() - snapshotStarted;
   return rasterSender.intern(snapshot); // repeated PNGs travel once; the page resolves rasterId to a cached Blob URL
 }
 // Host-time limit of one VM event in the Worker. The instruction fuse (100M per thread: a React Native startup needs ~3.4M-85M in one dispatch, see the comment at
@@ -90,15 +100,17 @@ function scheduleEvents() {
   clearTimeout(eventTimer); eventTimer = null;
   if (!runtime?.platform?.nextEventDelay) return;
   const eventDelay = runtime.platform.nextEventDelay(), threadDelay = runtime.multiThreaded ? runtime.scheduler.threadDelay() : null;   // parked and sleeping threads wake by timer too: an idle pool costs nothing between deadlines
-  const delay = eventDelay === null ? threadDelay : threadDelay === null ? eventDelay : Math.min(eventDelay, threadDelay);
+  let delay = eventDelay === null ? threadDelay : threadDelay === null ? eventDelay : Math.min(eventDelay, threadDelay);
+  const owed = semanticsPacer.refreshDelay();   // a scheduled event reused the last semantics tree: a fresh one is owed even if no VM event is due (src/semantics-pacing.js)
+  if (owed !== null) delay = delay == null ? owed : Math.min(delay, owed);
   if (delay == null) return;
   eventTimer = setTimeout(() => {
     if (busy) { scheduleEvents(); return; }
     busy = true; let succeeded = false;
     self.postMessage({ type: 'runtime-busy' });   // the page must not treat the screen as settled while a scheduled VM event is being processed
     try {
-      const started = performance.now(), drained = monitored('evento agendado', () => drainReadyEvents()); lastEventMs = Math.round(performance.now() - started);
-      if (drained.processed) self.postMessage({ type: 'runtime-event', snapshot: currentSnapshot() }); else self.postMessage({ type: 'runtime-idle' });
+      const started = performance.now(), drained = monitored('evento agendado', () => drainReadyEvents()); lastEventMs = Math.round(performance.now() - started); if (drained.processed) { workerTiming.scheduledBatches++; workerTiming.scheduledMs += performance.now() - started; }
+      if (drained.processed || (semanticsPacer.stale && semanticsPacer.wait() <= 0)) self.postMessage({ type: 'runtime-event', snapshot: currentSnapshot({ paced: true }) }); else self.postMessage({ type: 'runtime-idle' });
       succeeded = true;
     } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); }
     finally { busy = false; if (succeeded) scheduleEvents(); }
@@ -196,7 +208,7 @@ self.onmessage = async ({ data }) => {
       rasterSender.reset();
       runtime?.fileMappings?.flushAll();   // the VM stops: nothing else writes a mapping back
       if (appData) { await appData.close().catch(() => {}); } appData = null; appDataInfo = null;
-      if (runtime) { disposeRegex(runtime); disposeRenderNodes(runtime); disposeTextLayout(runtime); disposeColorFilters(runtime); } runtime?.skiaHost?.dispose?.(); runtime = null; reportedCensus = 0; composeSemantics = null;
+      if (runtime) { disposeRegex(runtime); disposeRenderNodes(runtime); disposeTextLayout(runtime); disposeColorFilters(runtime); } runtime?.skiaHost?.dispose?.(); runtime = null; reportedCensus = 0; composeSemantics = null; lastComposeSemantics = null; semanticsPacer.stale = false;
       if (!(data.buffer instanceof ArrayBuffer)) throw new TypeError('O Worker precisa receber um ArrayBuffer de APK.');
       const frameworkProvider = data.frameworkDex ? new FrameworkProvider({ bytes: data.frameworkDex }) : FRAMEWORK_ASSET_URL ? new FrameworkProvider({ url: new URL(FRAMEWORK_ASSET_URL, import.meta.url), provenanceURL: new URL(FRAMEWORK_ASSET_URL.replace('framework.dex', 'manifestprovenance.json'), import.meta.url) }) : null;
       const frameworkResourceProvider = data.frameworkResources ? new FrameworkResourceProvider({ data: data.frameworkResources }) : FRAMEWORK_RESOURCE_URL ? new FrameworkResourceProvider({ url: new URL(FRAMEWORK_RESOURCE_URL, import.meta.url), provenanceURL: new URL(FRAMEWORK_RESOURCE_URL.replace('framework-resources.json.gz', 'provenance.json'), import.meta.url), xmlIndexURL: new URL(FRAMEWORK_RESOURCE_URL.replace('framework-resources.json.gz', 'framework-xml-index.json'), import.meta.url), xmlDataURL: new URL(FRAMEWORK_RESOURCE_URL.replace('framework-resources.json.gz', 'framework-xml.bin.gz'), import.meta.url) }) : null;
@@ -219,7 +231,7 @@ self.onmessage = async ({ data }) => {
       if (data.webview !== false) runtime.platform.webViewBackend = createWebViewBackend({ platform: runtime.platform, post: message => self.postMessage(message), labOrigin: self.location?.origin ?? '' }); inspectNativeLibraries = result.inspectNativeLibraries;
       if (self.location?.origin) runtime.javaProperties.set('apkweb.origin', self.location.origin);   // the page origin (same as this worker's): lets sample apps address documents the lab serves itself
       runtime.platform.onExternalActivity = () => { if (!busy) scheduleEvents(); };   // network exchanges finishing wake the event pump
-      composeSemantics = createComposeSemanticsDriver(runtime);
+      composeSemantics = createComposeSemanticsDriver(runtime); lastComposeSemantics = null; semanticsPacer.stale = false;
       runtime.gcEnabled = data.gc !== false;   // unreachable Java objects are reclaimed between events (src/heap-gc.js)
       // Stored app data goes back into the virtual filesystem before any app code runs (Application.onCreate happens at launch).
       const attached = await attachAppData(runtime, { keep: data.keepData !== false, clear: data.clearData === true, onStatus: status => self.postMessage({ type: 'app-data', status }) });
