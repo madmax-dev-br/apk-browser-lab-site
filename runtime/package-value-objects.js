@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=ca7b5e864afd';
-import { PACKAGE_VALUE_FIELDS, PACKAGE_VALUE_PARENTS } from './package-value-fields.js?v=ca7b5e864afd';
+import { createHostRegistry } from './host-contract.js?v=c2b02b689b7f';
+import { PACKAGE_VALUE_FIELDS, PACKAGE_VALUE_PARENTS } from './package-value-fields.js?v=c2b02b689b7f';
 
 // Construction, copy and Parcel behaviour of the android.content.pm value classes (PackageItemInfo, ComponentInfo, ApplicationInfo, ServiceInfo, ProviderInfo, InstrumentationInfo, PermissionInfo,
 // PermissionGroupInfo, PackageInfo, ResolveInfo, FeatureInfo, ConfigurationInfo, Signature). They are host objects whose fields are declared by the AOSP class that owns them
