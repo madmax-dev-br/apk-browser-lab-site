@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=fa94ded129ca';
-import { createRasterReceiver } from './raster-cache.js?v=fa94ded129ca';
+import { createWebAudioPlayer } from './web-audio-player.js?v=9796aad5420d';
+import { createRasterReceiver } from './raster-cache.js?v=9796aad5420d';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=fa94ded129ca', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=9796aad5420d', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -24,6 +24,7 @@ export class APKWorkerClient {
       if (side && (data.type === 'result' || data.type === 'error')) { clearTimeout(side.timer); this.sideRequests.delete(data.requestId); side.resolve(data.type === 'result' ? data.screenState : this.cachedScreenState()); return; }
       if (data?.type === 'app-data') { this.appData = data.status; this.onAppData?.(data.status); return; }
       if (data?.type === 'logcat') { this.onLogcat?.(data); return; }   // a batch of the app's logcat lines (src/logcat.js), never part of a request
+      if (data?.type === 'netlog') { this.onNetlog?.(data); return; }   // a batch of the app's network requests (src/netlog.js), never part of a request
       if (data?.type === 'webview') { this.onWebView?.(data); return; }   // a WebView command for the page's iframes (src/webview-frame.js)
       if (data?.type === 'api-gaps') { this.apiGaps = data.report ?? null; this.onApiGaps?.(this.apiGaps); return; }   // static estimate, posted once after a launch; never part of a request
       if (data?.type === 'audio') { (this.audioPlayer ??= createWebAudioPlayer()).handle(data); return; }   // PCM from android.media.AudioTrack for the page's Web Audio output

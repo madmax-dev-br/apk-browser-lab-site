@@ -101,3 +101,27 @@
 :root[data-theme=dark] .logcat-bar input[type=search],:root[data-theme=dark] .logcat-bar select,:root[data-theme=dark] .logcat-bar button{background:#1b1d22;border-color:#333740;color:#b6b9c2}
 :root[data-theme=dark] .logcat-lines{background:#15181e;border-top:1px solid #333740}
 :root[data-theme=dark] .logcat-row.level-V{color:#8d93a3}:root[data-theme=dark] .logcat-row.level-D{color:#6fa8e0}:root[data-theme=dark] .logcat-row.level-I{color:#5fc283}:root[data-theme=dark] .logcat-row.level-W{color:#e0b04a}:root[data-theme=dark] .logcat-row.level-E{color:#ff7b75}
+
+.netlog-rows{background:#f9fafc;border-top:1px solid #eceef3;font:10px/1.5 ui-monospace,monospace;padding:4px 0;height:260px;overflow:auto}
+.netlog-line{display:grid;grid-template-columns:78px 52px minmax(0,1fr) minmax(90px,170px) 62px 62px;gap:8px;padding:2px 12px;cursor:pointer;border-left:3px solid transparent;color:#5d6473}
+.netlog-line:hover,.netlog-line:focus-visible{background:#eef1f7;outline:none}
+.netlog-line span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.netlog-size,.netlog-duration{text-align:right}
+.netlog-entry.cat-ok .netlog-line{border-left-color:#2d8a4b}.netlog-entry.cat-ok .netlog-status{color:#2d8a4b}
+.netlog-entry.cat-redirect .netlog-line{border-left-color:#2f6fb0}.netlog-entry.cat-redirect .netlog-status{color:#2f6fb0}
+.netlog-entry.cat-fail .netlog-line{border-left-color:#a8740c}.netlog-entry.cat-fail .netlog-status{color:#a8740c}
+.netlog-entry.cat-refused .netlog-line{border-left-color:#7a3fb0;background:#f4eefa}.netlog-entry.cat-refused .netlog-status{color:#7a3fb0}
+.netlog-entry.cat-error .netlog-line{border-left-color:#c9342f}.netlog-entry.cat-error .netlog-status{color:#c9342f}
+.netlog-entry.cat-pending .netlog-status{color:#8d93a3}
+.netlog-detail{padding:6px 14px 8px 28px;border-left:3px solid #dfe2ea;margin-left:0;white-space:pre-wrap;word-break:break-word;color:#4a5060}
+.netlog-url{font-weight:600;margin-bottom:4px}.netlog-note{margin:4px 0}.netlog-timing{color:#7a8191;margin:4px 0}
+.netlog-block{margin-top:4px}.netlog-block-title{color:#7a8191}.netlog-header{padding-left:10px}
+.netlog-allow{font:11px ui-monospace,monospace;padding:4px 9px;border:1px solid #7a3fb0;border-radius:5px;background:#fff;color:#7a3fb0;cursor:pointer;margin:2px 0}
+.netlog-empty{color:#8d93a3;padding:4px 12px}
+:root[data-theme=dark] .netlog-rows{background:#15181e;border-top:1px solid #333740}
+:root[data-theme=dark] .netlog-line{color:#b6b9c2}:root[data-theme=dark] .netlog-line:hover,:root[data-theme=dark] .netlog-line:focus-visible{background:#1f232b}
+:root[data-theme=dark] .netlog-entry.cat-refused .netlog-line{background:#251c30}:root[data-theme=dark] .netlog-entry.cat-refused .netlog-status{color:#c79af0}
+:root[data-theme=dark] .netlog-entry.cat-ok .netlog-status{color:#5fc283}:root[data-theme=dark] .netlog-entry.cat-redirect .netlog-status{color:#6fa8e0}:root[data-theme=dark] .netlog-entry.cat-fail .netlog-status{color:#e0b04a}:root[data-theme=dark] .netlog-entry.cat-error .netlog-status{color:#ff7b75}
+:root[data-theme=dark] .netlog-detail{color:#b6b9c2;border-left-color:#333740}
+:root[data-theme=dark] .netlog-allow{background:#1b1d22;color:#c79af0;border-color:#c79af0}
+@media (max-width:640px){.netlog-line{grid-template-columns:70px 44px minmax(0,1fr) 90px}.netlog-size,.netlog-duration{display:none}}

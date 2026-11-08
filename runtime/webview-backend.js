@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=fa94ded129ca';
-import { networkOf } from './network-native.js?v=fa94ded129ca';
-import { WEBVIEW_ERRORS } from './webview-host.js?v=fa94ded129ca';
-import { buildCsp } from './webview-bridge.js?v=fa94ded129ca';
-import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=fa94ded129ca';
+import { APKError } from './apk-error.js?v=9796aad5420d';
+import { networkOf } from './network-native.js?v=9796aad5420d';
+import { WEBVIEW_ERRORS } from './webview-host.js?v=9796aad5420d';
+import { buildCsp } from './webview-bridge.js?v=9796aad5420d';
+import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=9796aad5420d';
 
 // The Worker's side of the WebView backend (design: docs/APK-REAL-TASKS.md, task 33). The page owns the iframes (src/webview-frame.js); this module decides what may be loaded,
 // tells the page what to load (`post`), and turns the page's events (`handleEvent`) into the callbacks Android would deliver, on the VM main thread, in Android's order.
@@ -34,9 +34,9 @@ export function decideNavigation(text, { labOrigin = '', online = true, allowed 
       : { ok: false, code: WEBVIEW_ERRORS.UNSAFE_RESOURCE, description: `net::ERR_BLOCKED_BY_CLIENT (a WebView may load only ${LAB_WEBVIEW_PATH} documents from the lab itself)` };
   }
   if (blockNetworkLoads) return { ok: false, code: WEBVIEW_ERRORS.UNKNOWN, description: 'net::ERR_ACCESS_DENIED (WebSettings.setBlockNetworkLoads)' };
-  if (!online) return { ok: false, code: WEBVIEW_ERRORS.CONNECT, description: 'net::ERR_INTERNET_DISCONNECTED' };
+  if (!online) return { ok: false, code: WEBVIEW_ERRORS.CONNECT, description: 'net::ERR_INTERNET_DISCONNECTED', refusal: 'offline' };
   if (!allowed(url.hostname, url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80)) {
-    return { ok: false, code: WEBVIEW_ERRORS.HOST_LOOKUP, description: `net::ERR_NAME_NOT_RESOLVED (${url.hostname} is not in the allowed hosts of the virtual device)` };
+    return { ok: false, code: WEBVIEW_ERRORS.HOST_LOOKUP, description: `net::ERR_NAME_NOT_RESOLVED (${url.hostname} is not in the allowed hosts of the virtual device)`, refusal: 'allowlist' };
   }
   return { ok: true, url: url.href };
 }
@@ -91,7 +91,7 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
       if (/^javascript:/i.test(request.url ?? '')) { let code = request.url.slice(11); try { code = decodeURIComponent(code); } catch { /* not escaped */ } backend.evaluate(r, self, state, code, null); return; }
       if (request.kind === 'url' || request.kind === 'post') {
         const decision = decideNavigation(request.url, policyFor(r, state));
-        if (!decision.ok) { h.failLoad(r, self, state, display, decision.code, decision.description); return; }
+        if (!decision.ok) { if (decision.refusal) networkOf(r).logRefusal({ api: 'WebView', method: request.kind === 'post' ? 'POST' : 'GET', url: request.url, host: new URL(request.url, labOrigin || undefined).hostname }); h.failLoad(r, self, state, display, decision.code, decision.description); return; }
         request = { ...request, url: decision.url }; if (request.displayUrl === undefined) request.displayUrl = decision.url;
       } else if (request.kind === 'dataBase' && request.baseUrl !== 'about:blank') {
         try { new URL(request.baseUrl); }   // the base only has to be an absolute URL: nothing is fetched from it

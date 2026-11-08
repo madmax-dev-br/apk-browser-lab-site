@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=fa94ded129ca';
-import { throwNew } from './java-throw.js?v=fa94ded129ca';
-import { Blocked } from './scheduler.js?v=fa94ded129ca';
-import { OS_CONSTANTS } from './os-constants-data.js?v=fa94ded129ca';
-import { openExchange, describeFailure } from './network-transport.js?v=fa94ded129ca';
-import { WorkerExecutor } from './network-worker-executor.js?v=fa94ded129ca';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=fa94ded129ca';
+import { APKError } from './apk-error.js?v=9796aad5420d';
+import { throwNew } from './java-throw.js?v=9796aad5420d';
+import { Blocked } from './scheduler.js?v=9796aad5420d';
+import { OS_CONSTANTS } from './os-constants-data.js?v=9796aad5420d';
+import { openExchange, describeFailure } from './network-transport.js?v=9796aad5420d';
+import { WorkerExecutor } from './network-worker-executor.js?v=9796aad5420d';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=9796aad5420d';
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
 //
@@ -26,7 +26,7 @@ const loopbackHost = host => host === 'localhost' || /^127\.\d+\.\d+\.\d+$/.test
 class Operation {
   constructor(handle, request) {
     this.handle = handle; this.request = request; this.head = null; this.queue = []; this.queued = 0; this.ended = false; this.error = null; this.closed = false;
-    this.abortController = typeof AbortController === 'function' ? new AbortController() : null; this.reader = null; this.resume = null; this.consumed = 0; this.executor = 'main'; this.shared = null;
+    this.abortController = typeof AbortController === 'function' ? new AbortController() : null; this.reader = null; this.resume = null; this.consumed = 0; this.executor = 'main'; this.shared = null; this.received = 0; this.log = null;
   }
   abort() { try { this.abortController?.abort(); } catch { /* already finished */ } try { this.reader?.cancel()?.catch?.(() => {}); } catch { /* ignored */ } this.onAbort?.(); }
 }
@@ -46,6 +46,12 @@ export class NetworkBridge {
     if (this.derived?.source !== network) this.derived = { source: network, value: { allowedHosts: network?.allowedHosts ?? [], proxyUrl: network?.proxyUrl ?? '', fetch: null, redirect: 'auto' } };
     return this.derived.value;
   }
+  /** The Worker's network log (src/netlog.js), or null (tests, hosts that attach none). */
+  get log() { return this.runtime.netLog ?? null; }
+  /** Reports a request the policy refused (allowlist, or the device being offline) to the network log; the caller still counts and fails it. */
+  logRefusal(info) { this.log?.refuse({ ...info, offline: !this.online }); }
+  /** Syncs the operation's log entry with what the exchange has produced so far. */
+  observe(op) { if (op.log) this.log?.observe(op.log, op); }
   get online() { return (this.platform.device?.connectivity ?? 'online') !== 'offline'; }
   get pending() { let n = 0; for (const op of this.ops.values()) if (!op.ended && op.error === null && !op.closed) n++; return n; }
 
@@ -66,7 +72,7 @@ export class NetworkBridge {
   /** Called when the page changes the device connectivity: exchanges in flight fail like a dropped link. */
   connectivityChanged() {
     if (this.online) return;
-    for (const op of this.ops.values()) if (!op.ended && op.error === null) { op.error = { type: 'Ljava/net/SocketException;', message: 'Software caused connection abort' }; op.abort(); }
+    for (const op of this.ops.values()) if (!op.ended && op.error === null) { op.error = { type: 'Ljava/net/SocketException;', message: 'Software caused connection abort' }; op.abort(); this.observe(op); }
     this.signal();
   }
   signal() { this.activity = true; this.platform.onExternalActivity?.(); for (const resolve of [...this.waiters]) resolve(); }
@@ -94,13 +100,13 @@ export class NetworkBridge {
   start(request, reserved = null) {
     const op = reserved ?? new Operation(this.nextHandle++, request); op.request = request; this.ops.set(op.handle, op);
     this.stats.requests++; this.noteHost(new URL(request.url).hostname); this.stats.bytesOut += request.body?.length ?? 0;
-    op.executor = this.executorFor();
-    if (op.executor === 'worker') { try { (this.worker ??= new WorkerExecutor(this)).start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto' }); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.signal(); } }
-    else this.run(op).catch(error => { op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => this.signal());
+    op.executor = this.executorFor(); op.log = this.log?.begin(request, { api: request.api }) ?? null;
+    if (op.executor === 'worker') { try { (this.worker ??= new WorkerExecutor(this)).start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto' }); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
+    else this.run(op).catch(error => { op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => { this.observe(op); this.signal(); });
     return op;
   }
   /** Moves what a worker exchange has produced into the operation (head, body bytes, end, failure); true if anything changed. */
-  refresh(op) { return op.executor === 'worker' && !op.closed ? this.worker.poll(op) : false; }
+  refresh(op) { if (op.executor !== 'worker' || op.closed) return false; const changed = this.worker.poll(op); this.observe(op); return changed; }
 
   /**
    * Called when a run loop sits on the JavaScript stack of host code and has nothing runnable: block for real until a worker exchange makes progress (Atomics.wait on the
@@ -123,7 +129,7 @@ export class NetworkBridge {
     const { head, reader } = await openExchange(request, { fetch: this.fetchFunction(), proxyUrl: policy.proxyUrl, redirect: policy.redirect ?? 'auto', signal: op.abortController?.signal, dropped: this.droppedRequestHeaders });
     if (op.closed || op.error !== null) { try { await reader?.cancel(); } catch { /* ignored */ } return; }
     if (head.status >= 300 && head.status < 400) this.stats.redirectsObserved++;
-    op.head = head; this.signal();
+    op.head = head; this.observe(op); this.signal();
     if (!reader) { op.ended = true; return; }
     op.reader = reader;
     for (;;) {
@@ -134,7 +140,7 @@ export class NetworkBridge {
       if (step.done) { op.ended = true; return; }
       const bytes = step.value instanceof Uint8Array ? step.value : new Uint8Array(step.value);
       for (let at = 0; at < bytes.length; at += CHUNK) { const piece = bytes.subarray(at, at + CHUNK); op.queue.push(piece); op.queued += piece.length; }
-      this.stats.bytesIn += bytes.length;
+      this.stats.bytesIn += bytes.length; op.received += bytes.length; this.observe(op);
       this.signal();
     }
   }
@@ -150,7 +156,7 @@ export class NetworkBridge {
     if (copied && op.resume) { const resume = op.resume; op.resume = null; resume(); }
     return copied;
   }
-  discard(op) { op.closed = true; op.abort(); this.ops.delete(op.handle); op.resume?.(); }
+  discard(op) { op.closed = true; this.observe(op); op.abort(); this.ops.delete(op.handle); op.resume?.(); }
 }
 
 /** The parsed res/xml network security config of the app (cached per manifest), or null when the manifest names none. A config that cannot be read fails explicitly. */
@@ -235,7 +241,7 @@ export function createNetworkNativeBindings() {
       if (!bytes) gai('android_getaddrinfo', C.EAI_NONAME);
       return refArray(runtime, '[' + INET, [inetAddress(runtime, null, bytes)]);   // libcore leaves the host name unset here; Inet6AddressImpl names the results of a name lookup itself
     }
-    if (!net.allowed(host)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; gai('android_getaddrinfo', C.EAI_NODATA); }
+    if (!net.allowed(host)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal({ api: 'DNS', kind: 'dns', method: 'LOOKUP', url: `dns://${host}`, host }); gai('android_getaddrinfo', C.EAI_NODATA); }
     const addresses = loopbackHost(host) ? [inetAddress(runtime, null, [127, 0, 0, 1])] : [inetAddress(runtime, null, syntheticAddress(host))];
     return refArray(runtime, '[' + INET, addresses);
   });
@@ -243,10 +249,11 @@ export function createNetworkNativeBindings() {
   // ---- NetBridge
   add(NET, 'reserve()I', runtime => { const net = networkOf(runtime), op = new Operation(net.nextHandle++, null); net.ops.set(op.handle, op); return op.handle; });
   add(NET, `open(I${STRING}${STRING}[${STRING}[BIII)I`, (runtime, [ticket, method, urlText, headerArray, bodyArray, redirect, connectTimeout, readTimeout]) => {
+    const namedHeaders = () => { const list = runtime.object(headerArray).elements, out = []; for (let i = 0; i + 1 < list.length; i += 2) out.push([text(runtime, list[i]), text(runtime, list[i + 1])]); return out; };
     const net = networkOf(runtime), url = text(runtime, urlText), parsed = new URL(url), port = Number(parsed.port || (parsed.protocol === 'https:' ? 443 : 80));
     net.noteHost(parsed.hostname);
     const shown = isIpLiteral(parsed.hostname) ? `/${parsed.hostname.replace(/^\[|\]$/g, '')}` : `${parsed.hostname}/${syntheticAddress(parsed.hostname).join('.')}`;
-    const refuse = () => { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; throwNew(runtime, 'Ljava/net/ConnectException;', `failed to connect to ${shown} (port ${port}) from /:: (port 0)${connectTimeout > 0 ? ` after ${connectTimeout}ms` : ''}: connect failed: ENETUNREACH (Network is unreachable)`); };
+    const refuse = () => { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal({ method: text(runtime, method), url, host: parsed.hostname, port, headers: namedHeaders(), bytes: bodyArray ? runtime.object(bodyArray).elements.length : 0 }); throwNew(runtime, 'Ljava/net/ConnectException;', `failed to connect to ${shown} (port ${port}) from /:: (port 0)${connectTimeout > 0 ? ` after ${connectTimeout}ms` : ''}: connect failed: ENETUNREACH (Network is unreachable)`); };
     if (!net.online || !(net.allowed(parsed.hostname, port))) refuse();
     const names = runtime.object(headerArray).elements, headers = [];
     for (let i = 0; i + 1 < names.length; i += 2) headers.push([text(runtime, names[i]), text(runtime, names[i + 1])]);

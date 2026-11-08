@@ -259,7 +259,7 @@
       "id": "hybrid-navigation",
       "file": "hybrid-navigation-debug.apk",
       "title": "Híbrido · Views e Compose",
-      "description": "NavHostFragment com navegação XML, ComposeView e AndroidView, combinando interfaces e várias Activities. Executado e validado no navegador (fluxos completos, entrada real, comparação visual com capturas do Android).",
+      "description": "NavHostFragment com navegação XML, ComposeView e AndroidView, combinando interfaces e várias Activities. Tentativa experimental: a execução na web ainda não passou todos os critérios de validação.",
       "tags": [
         "ComposeView",
         "AndroidView",
@@ -274,11 +274,11 @@
           "dev.apkweb.hybrid.ReviewActivity"
         ]
       },
-      "executionValidated": true,
+      "executionValidated": false,
       "validation": {
         "evidence": "evidence/validation/hybrid-navigation.json",
-        "generatedAt": "2026-11-07T22:51:59.730Z",
-        "verdict": true,
+        "generatedAt": "2026-11-08T02:01:59.492Z",
+        "verdict": false,
         "criteria": {
           "flowsNode": true,
           "diagnostics": true,
@@ -286,7 +286,7 @@
           "parity": true,
           "flowsBrowser": true,
           "realTaps": true,
-          "strict": true
+          "strict": false
         }
       },
       "sizeBytes": 10385581,
@@ -330,7 +330,7 @@
       },
       "validation": {
         "evidence": "evidence/validation/xml-projects.json",
-        "generatedAt": "2026-11-07T22:59:33.803Z",
+        "generatedAt": "2026-11-08T02:04:11.149Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,

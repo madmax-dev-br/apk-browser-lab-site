@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=fa94ded129ca';
-import { throwNew } from './java-throw.js?v=fa94ded129ca';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=fa94ded129ca';
-import { networkOf, isIpLiteral } from './network-native.js?v=fa94ded129ca';
-import { Blocked } from './scheduler.js?v=fa94ded129ca';
-import { installUdp } from './udp-native.js?v=fa94ded129ca';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=fa94ded129ca';
+import { APKError } from './apk-error.js?v=9796aad5420d';
+import { throwNew } from './java-throw.js?v=9796aad5420d';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=9796aad5420d';
+import { networkOf, isIpLiteral } from './network-native.js?v=9796aad5420d';
+import { Blocked } from './scheduler.js?v=9796aad5420d';
+import { installUdp } from './udp-native.js?v=9796aad5420d';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=9796aad5420d';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -277,8 +277,11 @@ export function createLibcoreIoNativeBindings() {
     if (udp.isDatagram(entry.desc)) return udp.connectDatagram(runtime, fdRef, udp.bytesOf(runtime, address), port);
     host ??= hostOf(runtime, address);
     const net = networkOf(runtime); net.noteHost(host);
-    if (!net.online || !net.allowed(host, port)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; err(runtime, 'connect', 'ENETUNREACH'); }
-    throw new APKError(`Raw TCP connect to ${host}:${port} is not available in the browser; only HTTP(S) through java.net.HttpURLConnection reaches the network (src/network-native.js)`, { kind: 'raw-socket-unsupported' });
+    const target = { api: 'Socket', kind: 'socket', method: 'CONNECT', url: `tcp://${host.includes(':') ? `[${host}]` : host}:${port}`, host, port };
+    if (!net.online || !net.allowed(host, port)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal(target); err(runtime, 'connect', 'ENETUNREACH'); }
+    const message = `Raw TCP connect to ${host}:${port} is not available in the browser; only HTTP(S) through java.net.HttpURLConnection reaches the network (src/network-native.js)`;
+    net.log?.unsupported({ ...target, message });
+    throw new APKError(message, { kind: 'raw-socket-unsupported' });
   };
   const hostOf = (runtime, address) => runtime.stringCharacters(runtime.dispatch({ owner: INET, name: 'getHostAddress', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [address], 'virtual'));
   L(`connect(Ljava/io/FileDescriptor;${INET}I)V`, (runtime, [, fdRef, address, port]) => connectSocket(runtime, fdRef, null, port, address));

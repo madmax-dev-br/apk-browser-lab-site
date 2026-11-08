@@ -1,9 +1,10 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=fa94ded129ca';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=fa94ded129ca';
-import { createDeviceView, createViewState } from './device-view.js?v=fa94ded129ca';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=fa94ded129ca';
-import { formatApiGapReport } from './api-gap-scan.js?v=fa94ded129ca';
-import { createLogcatPanel } from './logcat-panel.js?v=fa94ded129ca';
+import { APKWorkerClient } from './apk-worker-client.js?v=9796aad5420d';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=9796aad5420d';
+import { createDeviceView, createViewState } from './device-view.js?v=9796aad5420d';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=9796aad5420d';
+import { formatApiGapReport } from './api-gap-scan.js?v=9796aad5420d';
+import { createLogcatPanel } from './logcat-panel.js?v=9796aad5420d';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=9796aad5420d';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -168,6 +169,10 @@ apkVM.onAppData = showAppData;
 apkVM.onApiGaps = report => { state.apiGaps = report; };
 const logcatPanel = createLogcatPanel({ root: $('logcat'), getPackage: () => state.inventory?.packageName ?? state.fileName ?? 'app' });   // src/logcat-panel.js
 apkVM.onLogcat = message => logcatPanel.push(message);
+const netlogPanel = createNetlogPanel({ root: $('netlog'), getPackage: () => state.inventory?.packageName ?? state.fileName ?? 'app', getAllowedHosts: () => deviceState.settings.network.allowedHosts,
+  allowHost: host => { $('dev-hosts').value = addAllowedHost($('dev-hosts').value, host); $('dev-hosts').dispatchEvent(new Event('input')); } });   // src/netlog-panel.js; "Permitir" types the host into the Dispositivo field, the same path as typing it
+apkVM.onNetlog = message => netlogPanel.push(message);
+window.apkLabNetlog = netlogPanel;   // test and console access: .store.entries
 window.apkLabLogcat = logcatPanel;   // test and console access: .store.entries
 try { if (localStorage.getItem('apkweb.keepAppData') === '0') $('keep-app-data').checked = false; } catch { /* storage may be blocked */ }
 $('keep-app-data')?.addEventListener('change', () => { try { localStorage.setItem('apkweb.keepAppData', $('keep-app-data').checked ? '1' : '0'); } catch { /* ignore */ } setStatus($('keep-app-data').checked ? 'Os dados do app serão mantidos a partir da próxima abertura do APK.' : 'Os dados do app não serão lidos nem gravados a partir da próxima abertura do APK.'); });
