@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=59cb4c442af6';
-import { createRasterReceiver } from './raster-cache.js?v=59cb4c442af6';
+import { createWebAudioPlayer } from './web-audio-player.js?v=63564e17bcf5';
+import { createRasterReceiver } from './raster-cache.js?v=63564e17bcf5';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=59cb4c442af6', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=63564e17bcf5', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -86,9 +86,9 @@ export class APKWorkerClient {
       catch (error) { this.cancel(error); }
     });
   }
-  async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], permissions = null } = {}) {
+  async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], eventSeconds = 0, permissions = null } = {}) {
     this.cancel(); this.rasters.reset(); this.apiGaps = null;
-    const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, permissions }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
+    const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, eventSeconds, permissions }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
     this.appData = response.appData ?? null;
     return { inventory: response.inventory, appData: this.appData };
   }
@@ -118,6 +118,8 @@ export class APKWorkerClient {
   }
   /** Debugging tool: installs the return-value overrides ([{ method, value, enabled }]) in the running VM; resolves with one status per entry. */
   async setMethodOverrides(overrides) { return (await this.sideCall('method-overrides', { overrides })).statuses; }
+  async setTimeLimits(seconds) { return (await this.sideCall('time-limits', { seconds })).limits; }
+  async setIgnoredActivities(entries) { return (await this.sideCall('ignored-activities', { entries })).statuses; }
   /** The permission states and the simulated location ({ config, location }), applied between two VM events; either part may be left out. */
   async setPermissions(payload) { return this.sideCall('permissions-config', payload); }
   /** The answer to a `permission-request` (onPermissionRequest): the config after the user's dialog, or null when it was dismissed. */

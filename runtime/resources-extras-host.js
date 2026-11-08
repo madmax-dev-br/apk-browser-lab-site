@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=59cb4c442af6';
+import { createHostRegistry } from './host-contract.js?v=63564e17bcf5';
 
 // More of android.content.res.Resources over the app's resource table (frameworks/base/core/java/android/content/res/Resources.java + ResourcesImpl.java, android-13.0.0_r1):
 //  getQuantityText / getQuantityString (plurals: the CLDR rule for the configuration's locale picks the item, "other" is the fallback, NotFoundException when neither exists),

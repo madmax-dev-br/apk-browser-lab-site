@@ -1,8 +1,9 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=59cb4c442af6';
-import { staticRetentionLines } from './heap-gc.js?v=59cb4c442af6';
-import { overrideSummaryLines } from './method-overrides.js?v=59cb4c442af6';
+import { TimeBreakdown } from './time-breakdown.js?v=63564e17bcf5';
+import { staticRetentionLines } from './heap-gc.js?v=63564e17bcf5';
+import { overrideSummaryLines } from './method-overrides.js?v=63564e17bcf5';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=63564e17bcf5';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -42,6 +43,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     out.push(`Memória: ${live} de ${limit} objetos vivos (${Math.round(100 * live / limit)}%), ~${Math.round(live * BYTES_PER_OBJECT / MiB)} MiB estimados; ${last ? `última coleta liberou ${last.before - last.after} (${last.before} → ${last.after}); ${runtime.gcStats?.collections ?? 0} coletas` : 'nenhuma coleta ainda'}${runtime.oomCount ? `; OutOfMemoryError ${runtime.oomCount}×` : ''}`);
   });
   part(() => { const lines = overrideSummaryLines(runtime); if (lines) out.push(...lines); });   // debugging tool in use: never silent (src/method-overrides.js)
+  part(() => { const line = ignoredActivitiesLine(runtime); if (line) out.push(line); });   // debugging tool in use: never silent (src/ignored-activities.js)
   if (tela?.length) out.push(...tela);   // "Tela:" lines computed by the screen-state report (activity, first frame verdict, Compose, layout)
   part(() => {   // fatal exceptions the tolerant mode let pass: never silent
     const table = runtime.toleratedFatals; if (!table?.size) return;

@@ -221,3 +221,12 @@
 .perm-button{border:1px solid #c4c7c5;background:#fff;color:#0b57d0;border-radius:100px;min-height:44px;padding:8px 14px;font-size:14px;font-weight:500;cursor:pointer}
 .perm-button:hover,.perm-button:focus-visible{background:#e8f0fe}.perm-button:focus-visible{outline:3px solid #0b57d0;outline-offset:1px}
 .perm-scrim.dark .perm-card{background:#2b2d30;color:#e3e3e3}.perm-scrim.dark .perm-detail{color:#c4c7c5}.perm-scrim.dark .perm-button{background:#2b2d30;border-color:#5e5e5e;color:#a8c7fa}.perm-scrim.dark .perm-button:hover,.perm-scrim.dark .perm-button:focus-visible{background:#3a3d42}.perm-scrim.dark .perm-icon{color:#a8c7fa}
+/* Activities ignoradas: same layout as the Retornos de métodos rows (name and Remover on one line, the count below) */
+.ia-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:6px}
+.ia-row input[type=checkbox]{accent-color:var(--accent)}
+.ia-row .ia-name{width:100%;min-width:0;box-sizing:border-box;font:9px ui-monospace,monospace}
+.ia-row .ia-meta{grid-column:1/-1;font-size:9px;color:#9aa0ae;overflow-wrap:anywhere}.ia-row .ia-meta[data-state=error]{color:#d4504a}.ia-row .ia-meta[data-state=ok]{color:#3c9a64}
+:root[data-theme=dark] .ia-row .ia-meta[data-state=error]{color:#f08a84}:root[data-theme=dark] .ia-row .ia-meta[data-state=ok]{color:#7bd19b}
+.ia-available{display:block;max-height:180px}
+.ia-available li button:disabled{opacity:.55;cursor:default}
+.ia-available .ia-empty{padding:6px 8px;font-size:9px;color:#9aa0ae}
