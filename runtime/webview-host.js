@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=c8a9f970d5b5';
-import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=c8a9f970d5b5';
-import { isInterfaceName } from './webview-bridge.js?v=c8a9f970d5b5';
-import { APKError } from './apk-error.js?v=c8a9f970d5b5';
+import { gcRoot } from './heap-gc.js?v=99056e83c7d5';
+import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=99056e83c7d5';
+import { isInterfaceName } from './webview-bridge.js?v=99056e83c7d5';
+import { APKError } from './apk-error.js?v=99056e83c7d5';
 
 // android.webkit.WebView and its public companions for the browser VM (design: docs/APK-REAL-TASKS.md, task 33).
 //

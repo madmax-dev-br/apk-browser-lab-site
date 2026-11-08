@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=c8a9f970d5b5';
-import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=c8a9f970d5b5';
+import { APKError } from './apk-error.js?v=99056e83c7d5';
+import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=99056e83c7d5';
 // SystemUI of the virtual device: status bar, navigation bar (gesture handle or 3 buttons) and the window policy PhoneWindow/DecorView apply to the app:
 // edge-to-edge (targetSdk >= 35 unless windowOptOutEdgeToEdgeEnforcement, Window.setDecorFitsSystemWindows(false), SYSTEM_UI_FLAG_LAYOUT_*),
 // bar colors/appearance (theme + Window setters + WindowInsetsController + SYSTEM_UI_FLAG_LIGHT_*), hiding (FLAG_FULLSCREEN, SYSTEM_UI_FLAG_FULLSCREEN/HIDE_NAVIGATION,
@@ -95,6 +95,37 @@ export function createSystemBarsHost(platform) {
     return call(r, builder, BUILDER, 'build', [], INSETS);
   };
   const controllerFor = (r, frame) => { if (!frame.controller) { frame.controller = r.makeObject(CONTROLLER); r.object(frame.controller).barsFrame = frame; } return frame.controller; };
+  // WindowInsetsController of windows that are not Activity frames (Dialog and popup windows). PhoneWindow.getInsetsController hands out a PendingInsetsController
+  // until the decor is attached to a ViewRoot: appearance, show/hide, behavior and listener calls are recorded and replayed in order when the window is added
+  // (PendingInsetsController.replayAndAttach). The state is the window's own (lightStatus/lightNav, hidden bar types, behavior, listeners). The page draws one set of
+  // system bars for the Activity, so a dialog window's bar state is kept and readable but does not repaint those bars.
+  const freshWindowBars = () => ({ lightStatus: false, lightNav: false, hideStatus: false, hideNav: false, behavior: 1, listeners: [] });
+  const cloneWindowBars = bars => ({ ...bars, listeners: [...bars.listeners] });
+  const holderOf = (r, owner) => { const object = r.object(owner); if (!object.insetsHolder) { const controller = r.makeObject(CONTROLLER); object.insetsHolder = { owner, controller, attached: false, bars: freshWindowBars(), shadow: null, queue: [] }; r.object(controller).barsHolder = object.insetsHolder; } return object.insetsHolder; };
+  const notifyControllable = (r, holder, listener) => r.dispatch({ owner: r.object(listener).type, name: 'onControllableInsetsChanged', signature: `(${CONTROLLER}I)V`, parameters: [CONTROLLER, 'I'], result: 'V' }, [listener, holder.controller, TYPES.statusBars | TYPES.navigationBars], 'virtual');
+  const applyWindowOp = (bars, op) => {
+    if (op.kind === 'appearance') { if (op.mask & APPEARANCE.LIGHT_STATUS_BARS) bars.lightStatus = !!(op.appearance & APPEARANCE.LIGHT_STATUS_BARS); if (op.mask & APPEARANCE.LIGHT_NAVIGATION_BARS) bars.lightNav = !!(op.appearance & APPEARANCE.LIGHT_NAVIGATION_BARS); }
+    else if (op.kind === 'hide' || op.kind === 'show') { const hide = op.kind === 'hide'; if (op.types & TYPES.statusBars) bars.hideStatus = hide; if (op.types & TYPES.navigationBars) bars.hideNav = hide; }
+    else if (op.kind === 'behavior') bars.behavior = op.behavior;
+    else if (op.kind === 'addListener') bars.listeners.push(op.listener);
+    else if (op.kind === 'removeListener') { const index = bars.listeners.findIndex(x => x?.ref === op.listener?.ref); if (index >= 0) bars.listeners.splice(index, 1); }
+  };
+  const windowControllerCall = (r, holder, name, args) => {
+    const readBars = () => holder.attached ? holder.bars : holder.shadow ?? holder.bars;
+    if (name === 'getSystemBarsAppearance') { const bars = readBars(); return (bars.lightStatus ? APPEARANCE.LIGHT_STATUS_BARS : 0) | (bars.lightNav ? APPEARANCE.LIGHT_NAVIGATION_BARS : 0); }
+    if (name === 'getSystemBarsBehavior') return readBars().behavior;
+    let op;
+    if (name === 'setSystemBarsAppearance') op = { kind: 'appearance', appearance: args[1], mask: args[2] };
+    else if (name === 'hide' || name === 'show') op = { kind: name, types: args[1] };
+    else if (name === 'setSystemBarsBehavior') op = { kind: 'behavior', behavior: args[1] };
+    else if (name === 'addOnControllableInsetsChangedListener' || name === 'removeOnControllableInsetsChangedListener') {
+      if (args[1] === null) r.throwJava('Ljava/lang/NullPointerException;', 'Attempt to invoke interface method on a null object reference');
+      op = { kind: name.startsWith('add') ? 'addListener' : 'removeListener', listener: args[1] };
+    } else fail('Unsupported WindowInsetsController operation ' + name);
+    if (holder.attached) { applyWindowOp(holder.bars, op); if (op.kind === 'addListener') notifyControllable(r, holder, op.listener); }
+    else { holder.queue.push(op); applyWindowOp(holder.shadow ??= cloneWindowBars(holder.bars), op); }   // PendingInsetsController: recorded, answered from the pending values
+  };
+  const viewRootOf = (r, view) => { let root = view, steps = 0; while (r.object(root).parent && steps++ < 4096) root = r.object(root).parent; return root; };
   return {
     supports: key => keys.has(key), parent: type => type === CONTROLLER ? 'Ljava/lang/Object;' : null,
     /** Policy snapshot for the page, the layout and WindowInsets (null while no Activity is running). */
@@ -115,11 +146,31 @@ export function createSystemBarsHost(platform) {
       const metrics = r.allocate(METRICS); call(r, metrics, METRICS, '<init>', [RECT, INSETS], 'V', [bounds, insets], 'direct');
       return metrics;
     },
+    /** Window.getInsetsController for a Dialog/popup window: the same controller object for the window across calls (pending until the window is added). */
+    windowController(r, owner) { return holderOf(r, owner).controller; },
+    /** View.getWindowInsetsController: the controller of the window the view's tree belongs to (null for a view with no window). */
+    viewController(r, view) {
+      const root = viewRootOf(r, view), object = r.object(root);
+      if (object.surfaceWindow) return holderOf(r, object.surfaceWindow).controller;
+      if (object.surfaceRecord) return holderOf(r, root).controller;
+      const frame = this.frameForRoot(r, root) ?? (r.object(view).attached ? activeFrame(r) : null);
+      return frame ? controllerFor(r, frame) : null;
+    },
+    /** The window was added to the WindowManager: PendingInsetsController.replayAndAttach, recorded calls replay in order on the window's own state. */
+    windowAttached(r, owner) {
+      const holder = holderOf(r, owner); if (holder.attached) return; holder.attached = true; holder.shadow = null;
+      const queue = holder.queue.splice(0);
+      for (const op of queue) { applyWindowOp(holder.bars, op); if (op.kind === 'addListener') notifyControllable(r, holder, op.listener); }
+      if (queue.length) r.record(`WINDOW insets controller replayed ${queue.length} pending call(s)`);
+    },
+    /** Window removed: the decor has no ViewRoot any more, calls go back to being pending. */
+    windowDetached(r, owner) { const holder = r.object(owner).insetsHolder; if (holder?.attached) { holder.attached = false; holder.shadow = cloneWindowBars(holder.bars); } },
     contentFrame(r, root) { const frame = this.frameForRoot(r, root); return frame ? compute(r, frame).contentFrame : null; },
     notifyChanged(r) { for (const frame of platform.allFrames()) changed(r, frame); },
     invoke(r, method, args) {
       const name = method.name, owner = method.owner, receiver = args[0];
       if (owner === CONTROLLER) {
+        const holder = r.object(receiver).barsHolder; if (holder) return windowControllerCall(r, holder, name, args);
         const frame = r.object(receiver).barsFrame, bars = stateOf(r, frame);
         if (name === 'setSystemBarsAppearance') { const [, appearance, mask] = args; if (mask & APPEARANCE.LIGHT_STATUS_BARS) bars.lightStatus = !!(appearance & APPEARANCE.LIGHT_STATUS_BARS); if (mask & APPEARANCE.LIGHT_NAVIGATION_BARS) bars.lightNav = !!(appearance & APPEARANCE.LIGHT_NAVIGATION_BARS); changed(r, frame, false); return; }
         if (name === 'getSystemBarsAppearance') return (bars.lightStatus ? APPEARANCE.LIGHT_STATUS_BARS : 0) | (bars.lightNav ? APPEARANCE.LIGHT_NAVIGATION_BARS : 0);
@@ -138,7 +189,7 @@ export function createSystemBarsHost(platform) {
         if (name === 'setSystemUiVisibility') { r.object(receiver).systemUiVisibility = args[1]; const frame = platform.frames.at(-1); if (frame) changed(r, frame); return; }
         if (name === 'getSystemUiVisibility') return r.object(receiver).systemUiVisibility | 0;
         if (name === 'getWindowSystemUiVisibility') { const frame = platform.frames.at(-1); return frame ? uiFlags(r, frame) : 0; }
-        if (name === 'getWindowInsetsController') { const frame = platform.frames.at(-1); return frame ? controllerFor(r, frame) : null; }
+        if (name === 'getWindowInsetsController') return this.viewController(r, receiver);
       }
       const frame = frameOfWindow(r, receiver), bars = stateOf(r, frame);
       // Frame metrics need GPU/RenderThread timing the lab does not produce: listeners are kept (and removable) but, truthfully, never receive a FrameMetrics.
