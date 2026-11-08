@@ -26,16 +26,6 @@
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/android/content/res/Configuration.java",
-      "localPath": "framework-aosp/upstream/android/content/res/Configuration.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/res/Configuration.java?format=TEXT",
-      "sha256": "9108ff13d9fa19692ecc9f3af9dfec58d3ecb281d803b31d06e97807acb7e9d4",
-      "bytes": 125863,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
       "path": "core/java/android/app/WindowConfiguration.java",
       "localPath": "framework-aosp/upstream/android/app/WindowConfiguration.java",
       "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/WindowConfiguration.java?format=TEXT",
@@ -43,6 +33,16 @@
       "bytes": 34464,
       "license": "Apache-2.0",
       "role": "candidate-configuration-profile"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/content/res/Configuration.java",
+      "localPath": "framework-aosp/upstream/android/content/res/Configuration.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/res/Configuration.java?format=TEXT",
+      "sha256": "9108ff13d9fa19692ecc9f3af9dfec58d3ecb281d803b31d06e97807acb7e9d4",
+      "bytes": 125863,
+      "license": "Apache-2.0"
     },
     {
       "project": "platform/frameworks/base",
@@ -56,7 +56,7 @@
       "role": "candidate-configuration-profile"
     }
   ],
-  "requiresDefaultFrameworkSha256": "780f22d143ebb4498bc14e28e5a10697c40d1bc908a956760969d10fa2ef9f6f",
+  "requiresDefaultFrameworkSha256": "2a992149bb6e214a5b9f9e60f4a8d10d4c216ecc13a00df255527116575a59f8",
   "compileOnlyDeclarationsPackaged": false,
   "sourceExtractions": [],
   "integrationStatus": "Validated source configuration and locale-direction profile; loaded by actual APK Configuration references",

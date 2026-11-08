@@ -363,13 +363,422 @@
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/FrameLayout.java",
-      "localPath": "framework-aosp/upstream/android/widget/FrameLayout.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/FrameLayout.java?format=TEXT",
-      "sha256": "6a04023a4daba7d8f1959a34b433460afa8ba9cc2d0ef031def9eb4e30f7a6c2",
-      "bytes": 19813,
-      "license": "Apache-2.0",
-      "role": "candidate-frame-layout-profile"
+      "path": "core/java/android/app/AlertDialog.java",
+      "localPath": "framework-aosp/upstream/android/app/AlertDialog.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/AlertDialog.java?format=TEXT",
+      "sha256": "490a54f1718df9f914b7feb22bdb95b27c89bbf425551730d44c598dd5eabe52",
+      "bytes": 47715,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/content/CursorEntityIterator.java",
+      "localPath": "framework-aosp/upstream/android/content/CursorEntityIterator.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/CursorEntityIterator.java?format=TEXT",
+      "sha256": "1e4a37cb218ac259d356bb84b90c068d20f885cdf9ab2c14f231e89a111a07e2",
+      "bytes": 3995,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/content/res/ResourceId.java",
+      "localPath": "framework-aosp/upstream/android/content/res/ResourceId.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/res/ResourceId.java?format=TEXT",
+      "sha256": "d6e196e12801693cea88862f3a0082922ac0c8925683fe85868c4796d2798686",
+      "bytes": 1570,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/ClipDrawable.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/ClipDrawable.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/ClipDrawable.java?format=TEXT",
+      "sha256": "daa09691616a81f74a189576eb0738c6296c642df02989ef2455bbdc1fca01ba",
+      "bytes": 8014,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/PaintDrawable.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/PaintDrawable.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/PaintDrawable.java?format=TEXT",
+      "sha256": "5d853592c54eb435d2b651cd5e0d7b00f7dfde210b6c354b263b1d76809d3519",
+      "bytes": 4003,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/ShapeDrawable.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/ShapeDrawable.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/ShapeDrawable.java?format=TEXT",
+      "sha256": "ac43cec79a2321b52c0982ab71840c4058a1b5e69e7239a95c7fe81dac947a0c",
+      "bytes": 21007,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/shapes/ArcShape.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/ArcShape.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/ArcShape.java?format=TEXT",
+      "sha256": "068841a792d73b064876a7a21fb2a606af4473d8bd1c2c8df47c4fd552b08008",
+      "bytes": 2991,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/shapes/OvalShape.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/OvalShape.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/OvalShape.java?format=TEXT",
+      "sha256": "f1c499f337298dd28c9067d094b01bfa50b96bcc1e9860c08dc7ef2adbcd9c37",
+      "bytes": 1604,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/shapes/PathShape.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/PathShape.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/PathShape.java?format=TEXT",
+      "sha256": "c08dd2655711c120fcafcbc733a004f2f73a6503a3355aabdf57ba3e1c149965",
+      "bytes": 3525,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/shapes/RectShape.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/RectShape.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/RectShape.java?format=TEXT",
+      "sha256": "36fb2b851188d544abd761d0fb9e378a9a1f5cd1aa9503a6bd08716c81918578",
+      "bytes": 2498,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/shapes/RoundRectShape.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/RoundRectShape.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/RoundRectShape.java?format=TEXT",
+      "sha256": "a289d8091bd468f3c587c77939970b9f33f3dc3361cafad851c05864e14c8bbf",
+      "bytes": 6251,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "graphics/java/android/graphics/drawable/shapes/Shape.java",
+      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/Shape.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/Shape.java?format=TEXT",
+      "sha256": "f56c30f30b4add6e9723ee3a336efffcce4c35160b05d4495e8328f3e1c17f56",
+      "bytes": 4017,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/provider/ContactsContract.java",
+      "localPath": "framework-aosp/upstream/android/provider/ContactsContract.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/provider/ContactsContract.java?format=TEXT",
+      "sha256": "a30516d22b85b26dc8ef6ebda59ef2ebf7e35b4b0a61aa9ad63b3d3ab907151b",
+      "bytes": 420167,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/provider/ContactsInternal.java",
+      "localPath": "framework-aosp/upstream/android/provider/ContactsInternal.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/provider/ContactsInternal.java?format=TEXT",
+      "sha256": "ab7c8c84e26d90c5aa9c0a5a2de7f40e54f8f2becc023b51b1e4478cf4048379",
+      "bytes": 5438,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/ArcMotion.java",
+      "localPath": "framework-aosp/upstream/android/transition/ArcMotion.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/ArcMotion.java?format=TEXT",
+      "sha256": "84227db6365ec0e0d87acb605f84073a674eda28b6bbd8c0684d7ef2b57b231f",
+      "bytes": 11922,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/AutoTransition.java",
+      "localPath": "framework-aosp/upstream/android/transition/AutoTransition.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/AutoTransition.java?format=TEXT",
+      "sha256": "6f53d8e8728bd37dcedb050f93e61125c432d0fb114c1639195d6c45b41030c7",
+      "bytes": 1732,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/ChangeBounds.java",
+      "localPath": "framework-aosp/upstream/android/transition/ChangeBounds.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/ChangeBounds.java?format=TEXT",
+      "sha256": "6224fefdb4a25ec96fbb192081f7518197d76153e5068925981e6925e031f8c7",
+      "bytes": 22338,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/ChangeClipBounds.java",
+      "localPath": "framework-aosp/upstream/android/transition/ChangeClipBounds.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/ChangeClipBounds.java?format=TEXT",
+      "sha256": "0eedc72ffcd6fd06a70c4f12ecb0de3b9934951334b624793058feada3c29008",
+      "bytes": 3987,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/ChangeImageTransform.java",
+      "localPath": "framework-aosp/upstream/android/transition/ChangeImageTransform.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/ChangeImageTransform.java?format=TEXT",
+      "sha256": "51afa0c1d2c611929e3ca1803dd3143209c06ac066f528180acdd03d7d29026d",
+      "bytes": 6801,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/ChangeScroll.java",
+      "localPath": "framework-aosp/upstream/android/transition/ChangeScroll.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/ChangeScroll.java?format=TEXT",
+      "sha256": "851a2b60c451f02cf36e7ad51f0b9350e035ed8def3084ffffa0cc81106f07b4",
+      "bytes": 3112,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/CircularPropagation.java",
+      "localPath": "framework-aosp/upstream/android/transition/CircularPropagation.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/CircularPropagation.java?format=TEXT",
+      "sha256": "e51be0922f57aea6b59ea263c063ae003db5baaa333084b044d5853b6f602e3f",
+      "bytes": 4449,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/Explode.java",
+      "localPath": "framework-aosp/upstream/android/transition/Explode.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Explode.java?format=TEXT",
+      "sha256": "9d8d77a3080c079fc2622b6d5f3a03d8c39e0919e1fa6d1a1e14d8bed1970957",
+      "bytes": 6695,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/Fade.java",
+      "localPath": "framework-aosp/upstream/android/transition/Fade.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Fade.java?format=TEXT",
+      "sha256": "6d648d0fcc0a162834bd85223b4582a035c03a9a09a37a19f9a4772a2132cf00",
+      "bytes": 7595,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/PathMotion.java",
+      "localPath": "framework-aosp/upstream/android/transition/PathMotion.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/PathMotion.java?format=TEXT",
+      "sha256": "7ea7ba3b36d9ab8dbc1bf07b1d845886694a32a547cfd38c0f1dc9ff6c1cf8ae",
+      "bytes": 2323,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/PatternPathMotion.java",
+      "localPath": "framework-aosp/upstream/android/transition/PatternPathMotion.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/PatternPathMotion.java?format=TEXT",
+      "sha256": "73c9cd215701114194e4f1b39676c02853ac08b93035d1e6503e76cd2d73fea6",
+      "bytes": 5419,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/Recolor.java",
+      "localPath": "framework-aosp/upstream/android/transition/Recolor.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Recolor.java?format=TEXT",
+      "sha256": "5966260db2b0be81c05d25901353a12ca793f77022b84951311462f16ab2c2e1",
+      "bytes": 3914,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/Rotate.java",
+      "localPath": "framework-aosp/upstream/android/transition/Rotate.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Rotate.java?format=TEXT",
+      "sha256": "1a13d81d9c2dc41dc5d3a829c7930b2d5282cb64ba207c3b809baec8e9f553d9",
+      "bytes": 2093,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/Scene.java",
+      "localPath": "framework-aosp/upstream/android/transition/Scene.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Scene.java?format=TEXT",
+      "sha256": "1316df877567a86e65870cf620e5c0fcd731ee30cf9168ec9211ffb8c60f131d",
+      "bytes": 11135,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/SidePropagation.java",
+      "localPath": "framework-aosp/upstream/android/transition/SidePropagation.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/SidePropagation.java?format=TEXT",
+      "sha256": "8deea0cb6e7de1b87d7a84fa3e74a3f3ca272f2447106e641f8c4c630d3a13db",
+      "bytes": 6802,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/Slide.java",
+      "localPath": "framework-aosp/upstream/android/transition/Slide.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Slide.java?format=TEXT",
+      "sha256": "8fe3270defd0d14cbb334d91a18ecee093410c3c9299556c28c1e14fbf788751",
+      "bytes": 10479,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/Transition.java",
+      "localPath": "framework-aosp/upstream/android/transition/Transition.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Transition.java?format=TEXT",
+      "sha256": "61d4506504e9f88a3425eeef25ecb63696bce927535ff0f1ffbb2b978d1b14ce",
+      "bytes": 106918,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/TransitionListenerAdapter.java",
+      "localPath": "framework-aosp/upstream/android/transition/TransitionListenerAdapter.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionListenerAdapter.java?format=TEXT",
+      "sha256": "0f2391dab48cf39054a5d9b8a6ab368bfa1339927eac7515d8c5e402d01c7069",
+      "bytes": 1646,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/TransitionManager.java",
+      "localPath": "framework-aosp/upstream/android/transition/TransitionManager.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionManager.java?format=TEXT",
+      "sha256": "3f3ca757aae08200e7c820a33199aee995d39aa90ad2463c2dbcb853ee174bc8",
+      "bytes": 19708,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/TransitionPropagation.java",
+      "localPath": "framework-aosp/upstream/android/transition/TransitionPropagation.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionPropagation.java?format=TEXT",
+      "sha256": "447bbfa1cf5f449360f7a21a55fc16ec23059e3a09c0efdcadc2a67e430e9133",
+      "bytes": 4454,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/TransitionSet.java",
+      "localPath": "framework-aosp/upstream/android/transition/TransitionSet.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionSet.java?format=TEXT",
+      "sha256": "e83c8c80002a732edf8312b1ce13aaaf57d41beb5dcb0fd55563a94a86a2cb62",
+      "bytes": 21848,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/TransitionUtils.java",
+      "localPath": "framework-aosp/upstream/android/transition/TransitionUtils.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionUtils.java?format=TEXT",
+      "sha256": "f2dcae50f823d4f227669492066327f381d6c328d935393a6d5653b8ffb3b625",
+      "bytes": 8470,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/TransitionValues.java",
+      "localPath": "framework-aosp/upstream/android/transition/TransitionValues.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionValues.java?format=TEXT",
+      "sha256": "6ea6fd683dd62a2546a8d323e9bd43519513b8cac867978c8e0725db51c24efc",
+      "bytes": 3377,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/TransitionValuesMaps.java",
+      "localPath": "framework-aosp/upstream/android/transition/TransitionValuesMaps.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionValuesMaps.java?format=TEXT",
+      "sha256": "d33245513d2cc706e46caf98bff9c854646932fcc915c87705abcac1797c8000",
+      "bytes": 1108,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/TranslationAnimationCreator.java",
+      "localPath": "framework-aosp/upstream/android/transition/TranslationAnimationCreator.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TranslationAnimationCreator.java?format=TEXT",
+      "sha256": "9d44875073e2f21e260ff682673c2130ed65b534c91ef7fe4a31ee362a2070a4",
+      "bytes": 6605,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/Visibility.java",
+      "localPath": "framework-aosp/upstream/android/transition/Visibility.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Visibility.java?format=TEXT",
+      "sha256": "abbc77b6f0d4f079cd290347a402a2caec52ced030c8024f9b26963ba76b3909",
+      "bytes": 27137,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/transition/VisibilityPropagation.java",
+      "localPath": "framework-aosp/upstream/android/transition/VisibilityPropagation.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/VisibilityPropagation.java?format=TEXT",
+      "sha256": "b2419cf9d61f692653db969f299bd886371e7cd1ace003599e304d8a060c6430",
+      "bytes": 4182,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/GestureDetector.java",
+      "localPath": "framework-aosp/upstream/android/view/GestureDetector.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/GestureDetector.java?format=TEXT",
+      "sha256": "10a89c320c9350135380620f09123f3ad5d9ea6f27c3b47a9c032ea834040915",
+      "bytes": 39720,
+      "license": "Apache-2.0"
     },
     {
       "project": "platform/frameworks/base",
@@ -385,92 +794,121 @@
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/LinearLayout.java",
-      "localPath": "framework-aosp/upstream/android/widget/LinearLayout.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/LinearLayout.java?format=TEXT",
-      "sha256": "ab889453a73dba31034478e8c5e5c5bc149f42ae0c6c1b3632c53defd7d1ce0e",
-      "bytes": 84076,
-      "license": "Apache-2.0",
-      "role": "candidate-layout-profile"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/ScrollView.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ScrollView.java?format=TEXT",
-      "sha256": "9bbb1ecb2dc0e0111657098d0a4afed087743af4af09f0bf26e8ad3b8ade708d",
-      "bytes": 75415,
-      "localPath": "framework-aosp/upstream/android/widget/ScrollView.java",
+      "path": "core/java/android/view/inputmethod/BaseInputConnection.java",
+      "localPath": "framework-aosp/upstream/android/view/inputmethod/BaseInputConnection.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/BaseInputConnection.java?format=TEXT",
+      "sha256": "7f7efc37ef37dcb4a35cb6135ff7a307fd9e2128bfc57dd265ba99bea279be26",
+      "bytes": 35614,
       "license": "Apache-2.0"
     },
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/HorizontalScrollView.java",
-      "localPath": "framework-aosp/upstream/android/widget/HorizontalScrollView.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/HorizontalScrollView.java?format=TEXT",
-      "sha256": "afcb6a2dd15bbe2fa7795d03fee9c2e0763068b87ad675961864f91706d99273",
-      "bytes": 70917,
+      "path": "core/java/android/view/inputmethod/CompletionInfo.java",
+      "localPath": "framework-aosp/upstream/android/view/inputmethod/CompletionInfo.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/CompletionInfo.java?format=TEXT",
+      "sha256": "c2370c52e26f6ff3c70e85dcf741f2e5c0ca8a98cf672f77a6ae5d4a11c6e7a8",
+      "bytes": 6162,
       "license": "Apache-2.0"
     },
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/android/app/AlertDialog.java",
-      "localPath": "framework-aosp/upstream/android/app/AlertDialog.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/AlertDialog.java?format=TEXT",
-      "sha256": "490a54f1718df9f914b7feb22bdb95b27c89bbf425551730d44c598dd5eabe52",
-      "bytes": 47715,
+      "path": "core/java/android/view/inputmethod/CorrectionInfo.java",
+      "localPath": "framework-aosp/upstream/android/view/inputmethod/CorrectionInfo.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/CorrectionInfo.java?format=TEXT",
+      "sha256": "4737ea5b787a198b1511d6cfa7960546d426b598481a4ebb575402dfed07f280",
+      "bytes": 3310,
       "license": "Apache-2.0"
     },
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/com/android/internal/app/AlertController.java",
-      "localPath": "framework-aosp/upstream/com/android/internal/app/AlertController.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/app/AlertController.java?format=TEXT",
-      "sha256": "c0c751946736a43233723ee490f9c7ac23cd6b16dfc01b383472b972bf8f575b",
-      "bytes": 48383,
+      "path": "core/java/android/view/inputmethod/EditorInfo.java",
+      "localPath": "framework-aosp/upstream/android/view/inputmethod/EditorInfo.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/EditorInfo.java?format=TEXT",
+      "sha256": "65b8e5557d8dd158fa8a48b62151ea5ec7caa1e72e873d2dfaebc82fc71960a8",
+      "bytes": 51671,
       "license": "Apache-2.0"
     },
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/com/android/internal/widget/AlertDialogLayout.java",
-      "localPath": "framework-aosp/upstream/com/android/internal/widget/AlertDialogLayout.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/widget/AlertDialogLayout.java?format=TEXT",
-      "sha256": "c180db6d8998964b9e486761a0ac517fcab052c454556a6fb48989c83075f710",
-      "bytes": 13591,
+      "path": "core/java/android/view/inputmethod/ExtractedText.java",
+      "localPath": "framework-aosp/upstream/android/view/inputmethod/ExtractedText.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/ExtractedText.java?format=TEXT",
+      "sha256": "0ad87986c006b6f4b381b2553e9b7a98b3820b4f8c8106b0f11f937aa598f5bd",
+      "bytes": 4759,
       "license": "Apache-2.0"
     },
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/com/android/internal/widget/ButtonBarLayout.java",
-      "localPath": "framework-aosp/upstream/com/android/internal/widget/ButtonBarLayout.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/widget/ButtonBarLayout.java?format=TEXT",
-      "sha256": "57e74d1bba925261e0ebecc179ce6740c62c0df8972d8cec43d1a00a9f7ddbb0",
-      "bytes": 6010,
+      "path": "core/java/android/view/inputmethod/ExtractedTextRequest.java",
+      "localPath": "framework-aosp/upstream/android/view/inputmethod/ExtractedTextRequest.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/ExtractedTextRequest.java?format=TEXT",
+      "sha256": "b176b91569dd864b73ab96a9599b11d4b9840696b0c44fe2aa0bc773ba9b25e0",
+      "bytes": 2658,
       "license": "Apache-2.0"
     },
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/com/android/internal/widget/DialogTitle.java",
-      "localPath": "framework-aosp/upstream/com/android/internal/widget/DialogTitle.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/widget/DialogTitle.java?format=TEXT",
-      "sha256": "5046b5a36013a77334c2dfa8223db0540f10e4ffc28db26bb9691ad9797af00a",
-      "bytes": 2832,
+      "path": "core/java/android/view/inputmethod/InputConnection.java",
+      "localPath": "framework-aosp/upstream/android/view/inputmethod/InputConnection.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/InputConnection.java?format=TEXT",
+      "sha256": "667dd6a70e24030927d17bc5dc234a974a9e25b6c5c39037f75d4e7eaf649009",
+      "bytes": 64253,
       "license": "Apache-2.0"
     },
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/ListView.java",
-      "localPath": "framework-aosp/upstream/android/widget/ListView.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ListView.java?format=TEXT",
-      "sha256": "57908d535677df092674a1ac2b5e30518575eafadf37821e4cba0fe418c8ea7a",
-      "bytes": 165557,
+      "path": "core/java/android/view/inputmethod/InputConnectionWrapper.java",
+      "localPath": "framework-aosp/upstream/android/view/inputmethod/InputConnectionWrapper.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/InputConnectionWrapper.java?format=TEXT",
+      "sha256": "30e871ddf37e2fab922d26e81560065ccccebf75965a024976d110a90bdf971a",
+      "bytes": 10986,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/inputmethod/InputContentInfo.java",
+      "localPath": "framework-aosp/upstream/android/view/inputmethod/InputContentInfo.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/InputContentInfo.java?format=TEXT",
+      "sha256": "c5ab7fb7ccaa7b2287f909d4a419c3d97004b1a9e782108b748fa19402044afc",
+      "bytes": 11158,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/inputmethod/SurroundingText.java",
+      "localPath": "framework-aosp/upstream/android/view/inputmethod/SurroundingText.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/SurroundingText.java?format=TEXT",
+      "sha256": "7de344bd0973dcbf476b3755f8239047c13bad5d90c85ace2fc3e53cf4ffa155",
+      "bytes": 6299,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/inputmethod/TextAttribute.java",
+      "localPath": "framework-aosp/upstream/android/view/inputmethod/TextAttribute.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/TextAttribute.java?format=TEXT",
+      "sha256": "830c18c7b3cbc000586afe1303a620c2c9e61ad1cf3f5c4b5b340607c627015f",
+      "bytes": 4922,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/inputmethod/TextSnapshot.java",
+      "localPath": "framework-aosp/upstream/android/view/inputmethod/TextSnapshot.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/TextSnapshot.java?format=TEXT",
+      "sha256": "ecdf0fffee910b8766514b176fe1d3093a0357d165254c62338426e2e7fca370",
+      "bytes": 5431,
       "license": "Apache-2.0"
     },
     {
@@ -481,6 +919,16 @@
       "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/AbsListView.java?format=TEXT",
       "sha256": "87fd4de11fe2a11ae31737840c672ceada386661d71fd2617aed3ca90af5f097",
       "bytes": 294243,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/Adapter.java",
+      "localPath": "framework-aosp/upstream/android/widget/Adapter.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/Adapter.java?format=TEXT",
+      "sha256": "ba364169e25b69c155a2d2a008bc9e99f1bc31a632883588278360cbaf75e848",
+      "bytes": 6947,
       "license": "Apache-2.0"
     },
     {
@@ -516,6 +964,16 @@
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/Checkable.java",
+      "localPath": "framework-aosp/upstream/android/widget/Checkable.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/Checkable.java?format=TEXT",
+      "sha256": "ed4efb0276f125e47f6f79b107e1791e05e5cc5fcca438fe93a0f67fde653fdb",
+      "bytes": 1133,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
       "path": "core/java/android/widget/CheckedTextView.java",
       "localPath": "framework-aosp/upstream/android/widget/CheckedTextView.java",
       "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/CheckedTextView.java?format=TEXT",
@@ -526,11 +984,31 @@
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/HeaderViewListAdapter.java",
-      "localPath": "framework-aosp/upstream/android/widget/HeaderViewListAdapter.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/HeaderViewListAdapter.java?format=TEXT",
-      "sha256": "ce5fa2b247d89c2064698641721f8a8d1fc6c5ffea139f0bb30db7a34226d984",
-      "bytes": 8798,
+      "path": "core/java/android/widget/CursorAdapter.java",
+      "localPath": "framework-aosp/upstream/android/widget/CursorAdapter.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/CursorAdapter.java?format=TEXT",
+      "sha256": "db3cf5a8c86f0b5da0d3e3224572dd9ca2dc648981743edd14ff6bf930cf514f",
+      "bytes": 18200,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/CursorFilter.java",
+      "localPath": "framework-aosp/upstream/android/widget/CursorFilter.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/CursorFilter.java?format=TEXT",
+      "sha256": "afde2f5b1a979330aa03e20e831998baf6d79373419eafd83d1f7c22a27468f9",
+      "bytes": 2218,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/FastScroller.java",
+      "localPath": "framework-aosp/upstream/android/widget/FastScroller.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/FastScroller.java?format=TEXT",
+      "sha256": "664f51a6a467112d13845ef047f6e85ed6bbf4a83e56e33ac4db40285f7aab45",
+      "bytes": 61179,
       "license": "Apache-2.0"
     },
     {
@@ -556,6 +1034,48 @@
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/FrameLayout.java",
+      "localPath": "framework-aosp/upstream/android/widget/FrameLayout.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/FrameLayout.java?format=TEXT",
+      "sha256": "6a04023a4daba7d8f1959a34b433460afa8ba9cc2d0ef031def9eb4e30f7a6c2",
+      "bytes": 19813,
+      "license": "Apache-2.0",
+      "role": "candidate-frame-layout-profile"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/HeaderViewListAdapter.java",
+      "localPath": "framework-aosp/upstream/android/widget/HeaderViewListAdapter.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/HeaderViewListAdapter.java?format=TEXT",
+      "sha256": "ce5fa2b247d89c2064698641721f8a8d1fc6c5ffea139f0bb30db7a34226d984",
+      "bytes": 8798,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/HorizontalScrollView.java",
+      "localPath": "framework-aosp/upstream/android/widget/HorizontalScrollView.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/HorizontalScrollView.java?format=TEXT",
+      "sha256": "afcb6a2dd15bbe2fa7795d03fee9c2e0763068b87ad675961864f91706d99273",
+      "bytes": 70917,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/LinearLayout.java",
+      "localPath": "framework-aosp/upstream/android/widget/LinearLayout.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/LinearLayout.java?format=TEXT",
+      "sha256": "ab889453a73dba31034478e8c5e5c5bc149f42ae0c6c1b3632c53defd7d1ce0e",
+      "bytes": 84076,
+      "license": "Apache-2.0",
+      "role": "candidate-layout-profile"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
       "path": "core/java/android/widget/ListAdapter.java",
       "localPath": "framework-aosp/upstream/android/widget/ListAdapter.java",
       "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ListAdapter.java?format=TEXT",
@@ -566,21 +1086,41 @@
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/Adapter.java",
-      "localPath": "framework-aosp/upstream/android/widget/Adapter.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/Adapter.java?format=TEXT",
-      "sha256": "ba364169e25b69c155a2d2a008bc9e99f1bc31a632883588278360cbaf75e848",
-      "bytes": 6947,
+      "path": "core/java/android/widget/ListView.java",
+      "localPath": "framework-aosp/upstream/android/widget/ListView.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ListView.java?format=TEXT",
+      "sha256": "57908d535677df092674a1ac2b5e30518575eafadf37821e4cba0fe418c8ea7a",
+      "bytes": 165557,
       "license": "Apache-2.0"
     },
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/WrapperListAdapter.java",
-      "localPath": "framework-aosp/upstream/android/widget/WrapperListAdapter.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/WrapperListAdapter.java?format=TEXT",
-      "sha256": "97507ad182c090f8cd485b4958a306befc67bf138ac1b870d9be55dddf4b7ff6",
-      "bytes": 1067,
+      "path": "core/java/android/widget/RelativeLayout.java",
+      "localPath": "framework-aosp/upstream/android/widget/RelativeLayout.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/RelativeLayout.java?format=TEXT",
+      "sha256": "cbc320b3b8d60dc259f9d8ddbd66ff9ee12b65736b15cddf88106dd804c8a30b",
+      "bytes": 88608,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/ResourceCursorAdapter.java",
+      "localPath": "framework-aosp/upstream/android/widget/ResourceCursorAdapter.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ResourceCursorAdapter.java?format=TEXT",
+      "sha256": "3e6527a8520b87fa88b0fd820216e7c983641ad15f50de3bc04792a38b0396ef",
+      "bytes": 6442,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/ScrollView.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ScrollView.java?format=TEXT",
+      "sha256": "9bbb1ecb2dc0e0111657098d0a4afed087743af4af09f0bf26e8ad3b8ade708d",
+      "bytes": 75415,
+      "localPath": "framework-aosp/upstream/android/widget/ScrollView.java",
       "license": "Apache-2.0"
     },
     {
@@ -591,76 +1131,6 @@
       "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/SectionIndexer.java?format=TEXT",
       "sha256": "cac8ba42be7e413e5a20dde3fca32fe321a3677b68f665ab943cf3b355097a8b",
       "bytes": 3257,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/Space.java",
-      "localPath": "framework-aosp/upstream/android/widget/Space.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/Space.java?format=TEXT",
-      "sha256": "74af269ff3834bfafc97517383bc90781d00ad78e891f269445e5dd9491b0d1e",
-      "bytes": 2867,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/FastScroller.java",
-      "localPath": "framework-aosp/upstream/android/widget/FastScroller.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/FastScroller.java?format=TEXT",
-      "sha256": "664f51a6a467112d13845ef047f6e85ed6bbf4a83e56e33ac4db40285f7aab45",
-      "bytes": 61179,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/CursorAdapter.java",
-      "localPath": "framework-aosp/upstream/android/widget/CursorAdapter.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/CursorAdapter.java?format=TEXT",
-      "sha256": "db3cf5a8c86f0b5da0d3e3224572dd9ca2dc648981743edd14ff6bf930cf514f",
-      "bytes": 18200,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/SpinnerAdapter.java",
-      "localPath": "framework-aosp/upstream/android/widget/SpinnerAdapter.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/SpinnerAdapter.java?format=TEXT",
-      "sha256": "41d8a82165ae23b3059e6c31b4da2da64e6a7846ec743fa606960a733bbd88f2",
-      "bytes": 1853,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/Checkable.java",
-      "localPath": "framework-aosp/upstream/android/widget/Checkable.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/Checkable.java?format=TEXT",
-      "sha256": "ed4efb0276f125e47f6f79b107e1791e05e5cc5fcca438fe93a0f67fde653fdb",
-      "bytes": 1133,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/com/android/internal/app/MicroAlertController.java",
-      "localPath": "framework-aosp/upstream/com/android/internal/app/MicroAlertController.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/app/MicroAlertController.java?format=TEXT",
-      "sha256": "97139d1fc7b3be7ffb43ce3bba65732b38b31b3756843db727c10658fa203397",
-      "bytes": 4283,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/content/res/ResourceId.java",
-      "localPath": "framework-aosp/upstream/android/content/res/ResourceId.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/res/ResourceId.java?format=TEXT",
-      "sha256": "d6e196e12801693cea88862f3a0082922ac0c8925683fe85868c4796d2798686",
-      "bytes": 1570,
       "license": "Apache-2.0"
     },
     {
@@ -686,11 +1156,21 @@
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/ResourceCursorAdapter.java",
-      "localPath": "framework-aosp/upstream/android/widget/ResourceCursorAdapter.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ResourceCursorAdapter.java?format=TEXT",
-      "sha256": "3e6527a8520b87fa88b0fd820216e7c983641ad15f50de3bc04792a38b0396ef",
-      "bytes": 6442,
+      "path": "core/java/android/widget/Space.java",
+      "localPath": "framework-aosp/upstream/android/widget/Space.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/Space.java?format=TEXT",
+      "sha256": "74af269ff3834bfafc97517383bc90781d00ad78e891f269445e5dd9491b0d1e",
+      "bytes": 2867,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/SpinnerAdapter.java",
+      "localPath": "framework-aosp/upstream/android/widget/SpinnerAdapter.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/SpinnerAdapter.java?format=TEXT",
+      "sha256": "41d8a82165ae23b3059e6c31b4da2da64e6a7846ec743fa606960a733bbd88f2",
+      "bytes": 1853,
       "license": "Apache-2.0"
     },
     {
@@ -706,11 +1186,61 @@
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/CursorFilter.java",
-      "localPath": "framework-aosp/upstream/android/widget/CursorFilter.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/CursorFilter.java?format=TEXT",
-      "sha256": "afde2f5b1a979330aa03e20e831998baf6d79373419eafd83d1f7c22a27468f9",
-      "bytes": 2218,
+      "path": "core/java/android/widget/WrapperListAdapter.java",
+      "localPath": "framework-aosp/upstream/android/widget/WrapperListAdapter.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/WrapperListAdapter.java?format=TEXT",
+      "sha256": "97507ad182c090f8cd485b4958a306befc67bf138ac1b870d9be55dddf4b7ff6",
+      "bytes": 1067,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/com/android/internal/app/AlertController.java",
+      "localPath": "framework-aosp/upstream/com/android/internal/app/AlertController.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/app/AlertController.java?format=TEXT",
+      "sha256": "c0c751946736a43233723ee490f9c7ac23cd6b16dfc01b383472b972bf8f575b",
+      "bytes": 48383,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/com/android/internal/app/MicroAlertController.java",
+      "localPath": "framework-aosp/upstream/com/android/internal/app/MicroAlertController.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/app/MicroAlertController.java?format=TEXT",
+      "sha256": "97139d1fc7b3be7ffb43ce3bba65732b38b31b3756843db727c10658fa203397",
+      "bytes": 4283,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/com/android/internal/widget/AlertDialogLayout.java",
+      "localPath": "framework-aosp/upstream/com/android/internal/widget/AlertDialogLayout.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/widget/AlertDialogLayout.java?format=TEXT",
+      "sha256": "c180db6d8998964b9e486761a0ac517fcab052c454556a6fb48989c83075f710",
+      "bytes": 13591,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/com/android/internal/widget/ButtonBarLayout.java",
+      "localPath": "framework-aosp/upstream/com/android/internal/widget/ButtonBarLayout.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/widget/ButtonBarLayout.java?format=TEXT",
+      "sha256": "57e74d1bba925261e0ebecc179ce6740c62c0df8972d8cec43d1a00a9f7ddbb0",
+      "bytes": 6010,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/com/android/internal/widget/DialogTitle.java",
+      "localPath": "framework-aosp/upstream/com/android/internal/widget/DialogTitle.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/widget/DialogTitle.java?format=TEXT",
+      "sha256": "5046b5a36013a77334c2dfa8223db0540f10e4ffc28db26bb9691ad9797af00a",
+      "bytes": 2832,
       "license": "Apache-2.0"
     },
     {
@@ -726,555 +1256,15 @@
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
-      "path": "core/java/android/provider/ContactsContract.java",
-      "localPath": "framework-aosp/upstream/android/provider/ContactsContract.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/provider/ContactsContract.java?format=TEXT",
-      "sha256": "a30516d22b85b26dc8ef6ebda59ef2ebf7e35b4b0a61aa9ad63b3d3ab907151b",
-      "bytes": 420167,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/content/CursorEntityIterator.java",
-      "localPath": "framework-aosp/upstream/android/content/CursorEntityIterator.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/CursorEntityIterator.java?format=TEXT",
-      "sha256": "1e4a37cb218ac259d356bb84b90c068d20f885cdf9ab2c14f231e89a111a07e2",
-      "bytes": 3995,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
       "path": "core/java/com/google/android/collect/Sets.java",
       "localPath": "framework-aosp/upstream/com/google/android/collect/Sets.java",
       "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/google/android/collect/Sets.java?format=TEXT",
       "sha256": "f22c260a0c16d0b57d353c04b110fe3438d1f334fc26285df3ae3c5fc38d8513",
       "bytes": 3793,
       "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/provider/ContactsInternal.java",
-      "localPath": "framework-aosp/upstream/android/provider/ContactsInternal.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/provider/ContactsInternal.java?format=TEXT",
-      "sha256": "ab7c8c84e26d90c5aa9c0a5a2de7f40e54f8f2becc023b51b1e4478cf4048379",
-      "bytes": 5438,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "graphics/java/android/graphics/drawable/ShapeDrawable.java",
-      "localPath": "framework-aosp/upstream/android/graphics/drawable/ShapeDrawable.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/ShapeDrawable.java?format=TEXT",
-      "sha256": "ac43cec79a2321b52c0982ab71840c4058a1b5e69e7239a95c7fe81dac947a0c",
-      "bytes": 21007,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "graphics/java/android/graphics/drawable/ClipDrawable.java",
-      "localPath": "framework-aosp/upstream/android/graphics/drawable/ClipDrawable.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/ClipDrawable.java?format=TEXT",
-      "sha256": "daa09691616a81f74a189576eb0738c6296c642df02989ef2455bbdc1fca01ba",
-      "bytes": 8014,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "graphics/java/android/graphics/drawable/shapes/Shape.java",
-      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/Shape.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/Shape.java?format=TEXT",
-      "sha256": "f56c30f30b4add6e9723ee3a336efffcce4c35160b05d4495e8328f3e1c17f56",
-      "bytes": 4017,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "graphics/java/android/graphics/drawable/shapes/RectShape.java",
-      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/RectShape.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/RectShape.java?format=TEXT",
-      "sha256": "36fb2b851188d544abd761d0fb9e378a9a1f5cd1aa9503a6bd08716c81918578",
-      "bytes": 2498,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "graphics/java/android/graphics/drawable/shapes/RoundRectShape.java",
-      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/RoundRectShape.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/RoundRectShape.java?format=TEXT",
-      "sha256": "a289d8091bd468f3c587c77939970b9f33f3dc3361cafad851c05864e14c8bbf",
-      "bytes": 6251,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "graphics/java/android/graphics/drawable/shapes/OvalShape.java",
-      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/OvalShape.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/OvalShape.java?format=TEXT",
-      "sha256": "f1c499f337298dd28c9067d094b01bfa50b96bcc1e9860c08dc7ef2adbcd9c37",
-      "bytes": 1604,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "graphics/java/android/graphics/drawable/shapes/ArcShape.java",
-      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/ArcShape.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/ArcShape.java?format=TEXT",
-      "sha256": "068841a792d73b064876a7a21fb2a606af4473d8bd1c2c8df47c4fd552b08008",
-      "bytes": 2991,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "graphics/java/android/graphics/drawable/shapes/PathShape.java",
-      "localPath": "framework-aosp/upstream/android/graphics/drawable/shapes/PathShape.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/shapes/PathShape.java?format=TEXT",
-      "sha256": "c08dd2655711c120fcafcbc733a004f2f73a6503a3355aabdf57ba3e1c149965",
-      "bytes": 3525,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/view/inputmethod/EditorInfo.java",
-      "localPath": "framework-aosp/upstream/android/view/inputmethod/EditorInfo.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/EditorInfo.java?format=TEXT",
-      "sha256": "65b8e5557d8dd158fa8a48b62151ea5ec7caa1e72e873d2dfaebc82fc71960a8",
-      "bytes": 51671,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/view/inputmethod/InputConnection.java",
-      "localPath": "framework-aosp/upstream/android/view/inputmethod/InputConnection.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/InputConnection.java?format=TEXT",
-      "sha256": "667dd6a70e24030927d17bc5dc234a974a9e25b6c5c39037f75d4e7eaf649009",
-      "bytes": 64253,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/view/inputmethod/InputConnectionWrapper.java",
-      "localPath": "framework-aosp/upstream/android/view/inputmethod/InputConnectionWrapper.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/InputConnectionWrapper.java?format=TEXT",
-      "sha256": "30e871ddf37e2fab922d26e81560065ccccebf75965a024976d110a90bdf971a",
-      "bytes": 10986,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/view/inputmethod/BaseInputConnection.java",
-      "localPath": "framework-aosp/upstream/android/view/inputmethod/BaseInputConnection.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/BaseInputConnection.java?format=TEXT",
-      "sha256": "7f7efc37ef37dcb4a35cb6135ff7a307fd9e2128bfc57dd265ba99bea279be26",
-      "bytes": 35614,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/view/inputmethod/CompletionInfo.java",
-      "localPath": "framework-aosp/upstream/android/view/inputmethod/CompletionInfo.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/CompletionInfo.java?format=TEXT",
-      "sha256": "c2370c52e26f6ff3c70e85dcf741f2e5c0ca8a98cf672f77a6ae5d4a11c6e7a8",
-      "bytes": 6162,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/view/inputmethod/CorrectionInfo.java",
-      "localPath": "framework-aosp/upstream/android/view/inputmethod/CorrectionInfo.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/CorrectionInfo.java?format=TEXT",
-      "sha256": "4737ea5b787a198b1511d6cfa7960546d426b598481a4ebb575402dfed07f280",
-      "bytes": 3310,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/view/inputmethod/ExtractedText.java",
-      "localPath": "framework-aosp/upstream/android/view/inputmethod/ExtractedText.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/ExtractedText.java?format=TEXT",
-      "sha256": "0ad87986c006b6f4b381b2553e9b7a98b3820b4f8c8106b0f11f937aa598f5bd",
-      "bytes": 4759,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/view/inputmethod/ExtractedTextRequest.java",
-      "localPath": "framework-aosp/upstream/android/view/inputmethod/ExtractedTextRequest.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/ExtractedTextRequest.java?format=TEXT",
-      "sha256": "b176b91569dd864b73ab96a9599b11d4b9840696b0c44fe2aa0bc773ba9b25e0",
-      "bytes": 2658,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/view/inputmethod/SurroundingText.java",
-      "localPath": "framework-aosp/upstream/android/view/inputmethod/SurroundingText.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/SurroundingText.java?format=TEXT",
-      "sha256": "7de344bd0973dcbf476b3755f8239047c13bad5d90c85ace2fc3e53cf4ffa155",
-      "bytes": 6299,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/view/inputmethod/TextAttribute.java",
-      "localPath": "framework-aosp/upstream/android/view/inputmethod/TextAttribute.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/TextAttribute.java?format=TEXT",
-      "sha256": "830c18c7b3cbc000586afe1303a620c2c9e61ad1cf3f5c4b5b340607c627015f",
-      "bytes": 4922,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/view/inputmethod/InputContentInfo.java",
-      "localPath": "framework-aosp/upstream/android/view/inputmethod/InputContentInfo.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/InputContentInfo.java?format=TEXT",
-      "sha256": "c5ab7fb7ccaa7b2287f909d4a419c3d97004b1a9e782108b748fa19402044afc",
-      "bytes": 11158,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/view/inputmethod/TextSnapshot.java",
-      "localPath": "framework-aosp/upstream/android/view/inputmethod/TextSnapshot.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/inputmethod/TextSnapshot.java?format=TEXT",
-      "sha256": "ecdf0fffee910b8766514b176fe1d3093a0357d165254c62338426e2e7fca370",
-      "bytes": 5431,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/view/GestureDetector.java",
-      "localPath": "framework-aosp/upstream/android/view/GestureDetector.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/GestureDetector.java?format=TEXT",
-      "sha256": "10a89c320c9350135380620f09123f3ad5d9ea6f27c3b47a9c032ea834040915",
-      "bytes": 39720,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/Transition.java",
-      "localPath": "framework-aosp/upstream/android/transition/Transition.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Transition.java?format=TEXT",
-      "sha256": "61d4506504e9f88a3425eeef25ecb63696bce927535ff0f1ffbb2b978d1b14ce",
-      "bytes": 106918,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/TransitionSet.java",
-      "localPath": "framework-aosp/upstream/android/transition/TransitionSet.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionSet.java?format=TEXT",
-      "sha256": "e83c8c80002a732edf8312b1ce13aaaf57d41beb5dcb0fd55563a94a86a2cb62",
-      "bytes": 21848,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/TransitionValues.java",
-      "localPath": "framework-aosp/upstream/android/transition/TransitionValues.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionValues.java?format=TEXT",
-      "sha256": "6ea6fd683dd62a2546a8d323e9bd43519513b8cac867978c8e0725db51c24efc",
-      "bytes": 3377,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/TransitionListenerAdapter.java",
-      "localPath": "framework-aosp/upstream/android/transition/TransitionListenerAdapter.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionListenerAdapter.java?format=TEXT",
-      "sha256": "0f2391dab48cf39054a5d9b8a6ab368bfa1339927eac7515d8c5e402d01c7069",
-      "bytes": 1646,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/TransitionPropagation.java",
-      "localPath": "framework-aosp/upstream/android/transition/TransitionPropagation.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionPropagation.java?format=TEXT",
-      "sha256": "447bbfa1cf5f449360f7a21a55fc16ec23059e3a09c0efdcadc2a67e430e9133",
-      "bytes": 4454,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/PathMotion.java",
-      "localPath": "framework-aosp/upstream/android/transition/PathMotion.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/PathMotion.java?format=TEXT",
-      "sha256": "7ea7ba3b36d9ab8dbc1bf07b1d845886694a32a547cfd38c0f1dc9ff6c1cf8ae",
-      "bytes": 2323,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/ArcMotion.java",
-      "localPath": "framework-aosp/upstream/android/transition/ArcMotion.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/ArcMotion.java?format=TEXT",
-      "sha256": "84227db6365ec0e0d87acb605f84073a674eda28b6bbd8c0684d7ef2b57b231f",
-      "bytes": 11922,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/PatternPathMotion.java",
-      "localPath": "framework-aosp/upstream/android/transition/PatternPathMotion.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/PatternPathMotion.java?format=TEXT",
-      "sha256": "73c9cd215701114194e4f1b39676c02853ac08b93035d1e6503e76cd2d73fea6",
-      "bytes": 5419,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/Scene.java",
-      "localPath": "framework-aosp/upstream/android/transition/Scene.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Scene.java?format=TEXT",
-      "sha256": "1316df877567a86e65870cf620e5c0fcd731ee30cf9168ec9211ffb8c60f131d",
-      "bytes": 11135,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/TransitionManager.java",
-      "localPath": "framework-aosp/upstream/android/transition/TransitionManager.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionManager.java?format=TEXT",
-      "sha256": "3f3ca757aae08200e7c820a33199aee995d39aa90ad2463c2dbcb853ee174bc8",
-      "bytes": 19708,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/Visibility.java",
-      "localPath": "framework-aosp/upstream/android/transition/Visibility.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Visibility.java?format=TEXT",
-      "sha256": "abbc77b6f0d4f079cd290347a402a2caec52ced030c8024f9b26963ba76b3909",
-      "bytes": 27137,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/Fade.java",
-      "localPath": "framework-aosp/upstream/android/transition/Fade.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Fade.java?format=TEXT",
-      "sha256": "6d648d0fcc0a162834bd85223b4582a035c03a9a09a37a19f9a4772a2132cf00",
-      "bytes": 7595,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/Slide.java",
-      "localPath": "framework-aosp/upstream/android/transition/Slide.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Slide.java?format=TEXT",
-      "sha256": "8fe3270defd0d14cbb334d91a18ecee093410c3c9299556c28c1e14fbf788751",
-      "bytes": 10479,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/Explode.java",
-      "localPath": "framework-aosp/upstream/android/transition/Explode.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Explode.java?format=TEXT",
-      "sha256": "9d8d77a3080c079fc2622b6d5f3a03d8c39e0919e1fa6d1a1e14d8bed1970957",
-      "bytes": 6695,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/AutoTransition.java",
-      "localPath": "framework-aosp/upstream/android/transition/AutoTransition.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/AutoTransition.java?format=TEXT",
-      "sha256": "6f53d8e8728bd37dcedb050f93e61125c432d0fb114c1639195d6c45b41030c7",
-      "bytes": 1732,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/ChangeBounds.java",
-      "localPath": "framework-aosp/upstream/android/transition/ChangeBounds.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/ChangeBounds.java?format=TEXT",
-      "sha256": "6224fefdb4a25ec96fbb192081f7518197d76153e5068925981e6925e031f8c7",
-      "bytes": 22338,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/ChangeImageTransform.java",
-      "localPath": "framework-aosp/upstream/android/transition/ChangeImageTransform.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/ChangeImageTransform.java?format=TEXT",
-      "sha256": "51afa0c1d2c611929e3ca1803dd3143209c06ac066f528180acdd03d7d29026d",
-      "bytes": 6801,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/ChangeClipBounds.java",
-      "localPath": "framework-aosp/upstream/android/transition/ChangeClipBounds.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/ChangeClipBounds.java?format=TEXT",
-      "sha256": "0eedc72ffcd6fd06a70c4f12ecb0de3b9934951334b624793058feada3c29008",
-      "bytes": 3987,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/ChangeScroll.java",
-      "localPath": "framework-aosp/upstream/android/transition/ChangeScroll.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/ChangeScroll.java?format=TEXT",
-      "sha256": "851a2b60c451f02cf36e7ad51f0b9350e035ed8def3084ffffa0cc81106f07b4",
-      "bytes": 3112,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/TransitionUtils.java",
-      "localPath": "framework-aosp/upstream/android/transition/TransitionUtils.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionUtils.java?format=TEXT",
-      "sha256": "f2dcae50f823d4f227669492066327f381d6c328d935393a6d5653b8ffb3b625",
-      "bytes": 8470,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/SidePropagation.java",
-      "localPath": "framework-aosp/upstream/android/transition/SidePropagation.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/SidePropagation.java?format=TEXT",
-      "sha256": "8deea0cb6e7de1b87d7a84fa3e74a3f3ca272f2447106e641f8c4c630d3a13db",
-      "bytes": 6802,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/CircularPropagation.java",
-      "localPath": "framework-aosp/upstream/android/transition/CircularPropagation.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/CircularPropagation.java?format=TEXT",
-      "sha256": "e51be0922f57aea6b59ea263c063ae003db5baaa333084b044d5853b6f602e3f",
-      "bytes": 4449,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/VisibilityPropagation.java",
-      "localPath": "framework-aosp/upstream/android/transition/VisibilityPropagation.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/VisibilityPropagation.java?format=TEXT",
-      "sha256": "b2419cf9d61f692653db969f299bd886371e7cd1ace003599e304d8a060c6430",
-      "bytes": 4182,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/Recolor.java",
-      "localPath": "framework-aosp/upstream/android/transition/Recolor.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Recolor.java?format=TEXT",
-      "sha256": "5966260db2b0be81c05d25901353a12ca793f77022b84951311462f16ab2c2e1",
-      "bytes": 3914,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/Rotate.java",
-      "localPath": "framework-aosp/upstream/android/transition/Rotate.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/Rotate.java?format=TEXT",
-      "sha256": "1a13d81d9c2dc41dc5d3a829c7930b2d5282cb64ba207c3b809baec8e9f553d9",
-      "bytes": 2093,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/TransitionPropagation.java",
-      "localPath": "framework-aosp/upstream/android/transition/TransitionPropagation.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionPropagation.java?format=TEXT",
-      "sha256": "447bbfa1cf5f449360f7a21a55fc16ec23059e3a09c0efdcadc2a67e430e9133",
-      "bytes": 4454,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/TransitionValuesMaps.java",
-      "localPath": "framework-aosp/upstream/android/transition/TransitionValuesMaps.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TransitionValuesMaps.java?format=TEXT",
-      "sha256": "d33245513d2cc706e46caf98bff9c854646932fcc915c87705abcac1797c8000",
-      "bytes": 1108,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/transition/TranslationAnimationCreator.java",
-      "localPath": "framework-aosp/upstream/android/transition/TranslationAnimationCreator.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/transition/TranslationAnimationCreator.java?format=TEXT",
-      "sha256": "9d44875073e2f21e260ff682673c2130ed65b534c91ef7fe4a31ee362a2070a4",
-      "bytes": 6605,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "graphics/java/android/graphics/drawable/PaintDrawable.java",
-      "localPath": "framework-aosp/upstream/android/graphics/drawable/PaintDrawable.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/PaintDrawable.java?format=TEXT",
-      "sha256": "5d853592c54eb435d2b651cd5e0d7b00f7dfde210b6c354b263b1d76809d3519",
-      "bytes": 4003,
-      "license": "Apache-2.0"
-    },
-    {
-      "project": "platform/frameworks/base",
-      "tag": "android-13.0.0_r1",
-      "path": "core/java/android/widget/RelativeLayout.java",
-      "localPath": "framework-aosp/upstream/android/widget/RelativeLayout.java",
-      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/RelativeLayout.java?format=TEXT",
-      "sha256": "cbc320b3b8d60dc259f9d8ddbd66ff9ee12b65736b15cddf88106dd804c8a30b",
-      "bytes": 88608,
-      "license": "Apache-2.0"
     }
   ],
-  "requiresDefaultFrameworkSha256": "780f22d143ebb4498bc14e28e5a10697c40d1bc908a956760969d10fa2ef9f6f",
+  "requiresDefaultFrameworkSha256": "2a992149bb6e214a5b9f9e60f4a8d10d4c216ecc13a00df255527116575a59f8",
   "sourceTransforms": [
     {
       "path": "com/android/internal/app/AlertController.java",

@@ -5,7 +5,7 @@
 //   toString : @pkg.Type(member=value, ...), "value=" omitted for a lone `value` member; strings quoted, chars quoted, longs L, floats f, classes X.class
 // Value representations are the VM's: int-like members are numbers, long members BigInt, float/double members raw bit patterns, strings JS strings.
 
-import { bitsDouble, bitsFloat } from './host-contract.js?v=9796aad5420d';
+import { bitsDouble, bitsFloat } from './host-contract.js?v=4e8e9e43a248';
 
 const stringHash = text => { let n = 0; for (let i = 0; i < text.length; i++) n = (Math.imul(n, 31) + text.charCodeAt(i)) | 0; return n; };
 const isArrayType = type => type.startsWith('[');

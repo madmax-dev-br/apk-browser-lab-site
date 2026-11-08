@@ -1,43 +1,44 @@
-import { buildScreenState } from './screen-state.js?v=9796aad5420d';
-import { createLogcat } from './logcat.js?v=9796aad5420d';
-import { createNetlog } from './netlog.js?v=9796aad5420d';
-import { reportSummary } from './report-summary.js?v=9796aad5420d';
-import { TimeBreakdown } from './time-breakdown.js?v=9796aad5420d';
-import { createMessageSink } from './audio-native.js?v=9796aad5420d';
-import { loadAPK } from './apk-loader.js?v=9796aad5420d';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=9796aad5420d';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=9796aad5420d';
-import { createWebViewBackend } from './webview-backend.js?v=9796aad5420d';
-import { FrameworkProvider } from './framework-provider.js?v=9796aad5420d';
-import { createRasterSender } from './raster-cache.js?v=9796aad5420d';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=9796aad5420d';
-import { dispatchPointer } from './pointer-input-host.js?v=9796aad5420d';
-import { resolveDevice } from './device-profile.js?v=9796aad5420d';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=9796aad5420d';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=9796aad5420d';
-import { SkiaProvider } from './skia-provider.js?v=9796aad5420d';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=9796aad5420d';
-import { SemanticsPacer } from './semantics-pacing.js?v=9796aad5420d';
-import { disposeTextLayout } from './text-layout-native.js?v=9796aad5420d';
-import { IcuBreakProvider } from './icu-break-provider.js?v=9796aad5420d';
-import { SqliteProvider } from './sqlite-native.js?v=9796aad5420d';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=9796aad5420d';
-import { TzdataProvider } from './java-time-native.js?v=9796aad5420d';
-import { ZlibProvider } from './zip-native.js?v=9796aad5420d';
-import { IcuConverterProvider } from './icu-converter-native.js?v=9796aad5420d';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=9796aad5420d';
-import { JavacryptoProvider } from './javacrypto-native.js?v=9796aad5420d';
-import { disposeColorFilters } from './color-filter-native.js?v=9796aad5420d';
-import { disposeRegex } from './regex-native.js?v=9796aad5420d';
-import { disposeRenderNodes } from './rendernode-native.js?v=9796aad5420d';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=9796aad5420d';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=9796aad5420d';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=9796aad5420d';
+import { buildScreenState } from './screen-state.js?v=4e8e9e43a248';
+import { createLogcat } from './logcat.js?v=4e8e9e43a248';
+import { createNetlog } from './netlog.js?v=4e8e9e43a248';
+import { reportSummary } from './report-summary.js?v=4e8e9e43a248';
+import { TimeBreakdown } from './time-breakdown.js?v=4e8e9e43a248';
+import { createMessageSink } from './audio-native.js?v=4e8e9e43a248';
+import { loadAPK } from './apk-loader.js?v=4e8e9e43a248';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=4e8e9e43a248';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=4e8e9e43a248';
+import { createWebViewBackend } from './webview-backend.js?v=4e8e9e43a248';
+import { FrameworkProvider } from './framework-provider.js?v=4e8e9e43a248';
+import { createRasterSender } from './raster-cache.js?v=4e8e9e43a248';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=4e8e9e43a248';
+import { dispatchPointer } from './pointer-input-host.js?v=4e8e9e43a248';
+import { resolveDevice } from './device-profile.js?v=4e8e9e43a248';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=4e8e9e43a248';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=4e8e9e43a248';
+import { SkiaProvider } from './skia-provider.js?v=4e8e9e43a248';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=4e8e9e43a248';
+import { SemanticsPacer } from './semantics-pacing.js?v=4e8e9e43a248';
+import { disposeTextLayout } from './text-layout-native.js?v=4e8e9e43a248';
+import { IcuBreakProvider } from './icu-break-provider.js?v=4e8e9e43a248';
+import { SqliteProvider } from './sqlite-native.js?v=4e8e9e43a248';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=4e8e9e43a248';
+import { TzdataProvider } from './java-time-native.js?v=4e8e9e43a248';
+import { ZlibProvider } from './zip-native.js?v=4e8e9e43a248';
+import { IcuConverterProvider } from './icu-converter-native.js?v=4e8e9e43a248';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=4e8e9e43a248';
+import { JavacryptoProvider } from './javacrypto-native.js?v=4e8e9e43a248';
+import { disposeColorFilters } from './color-filter-native.js?v=4e8e9e43a248';
+import { disposeRegex } from './regex-native.js?v=4e8e9e43a248';
+import { disposeRenderNodes } from './rendernode-native.js?v=4e8e9e43a248';
+import { startDeepLink } from './deep-link-host.js?v=4e8e9e43a248';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=4e8e9e43a248';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=4e8e9e43a248';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=4e8e9e43a248';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=9796aad5420d';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=9796aad5420d';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=9796aad5420d';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '9796aad5420d';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=4e8e9e43a248';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=4e8e9e43a248';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=4e8e9e43a248';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '4e8e9e43a248';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -282,11 +283,11 @@ self.onmessage = async ({ data }) => {
       if (!runtime || typeof inspectNativeLibraries !== 'function') throw new Error('Reabra o APK para disponibilizar a inspeção ELF.');
       const libraries = await inspectNativeLibraries(data.paths, data.limits);
       send({ type: 'result', libraries, nativeInspection: inventory.nativeInspection });
-    } else if (type === 'launch' || type === 'click' || type === 'back' || type === 'input' || type === 'check' || type === 'focus' || type === 'press' || type === 'scroll' || type === 'compose-action' || type === 'pointer' || type === 'scrollby') {
+    } else if (type === 'launch' || type === 'intent' || type === 'click' || type === 'back' || type === 'input' || type === 'check' || type === 'focus' || type === 'press' || type === 'scroll' || type === 'compose-action' || type === 'pointer' || type === 'scrollby') {
       if (!runtime) throw new Error('Reabra um APK antes de executar a VM.');
       send({ type: 'progress', progress: { phase: type, completed: 0, total: 1 } });
       runtime.monitor.begin(type);
-      runtime.steps = 0; let droppedComposeAction = null, droppedEvent = null;
+      runtime.steps = 0; let droppedComposeAction = null, droppedEvent = null, deepLink = null;
       // An id the page took from an older snapshot can name a View that has since been collected (it was removed from the hierarchy): Android would not deliver the event either.
       const staleId = ['click', 'input', 'check', 'focus', 'press', 'scroll', 'scrollby'].includes(type) ? data.id : type === 'compose-action' || type === 'pointer' ? data.ownerViewId : null;
       if (staleId !== null && isFreedId(runtime, staleId)) {
@@ -325,13 +326,18 @@ self.onmessage = async ({ data }) => {
       else if (type === 'press') runtime.dispatch({ owner: 'Landroid/view/View;', name: 'setPressed', signature: '(Z)V', parameters: ['Z'], result: 'V' }, [{ ref: data.id }, data.pressed ? 1 : 0], 'virtual');
       else if (type === 'input') runtime.platform.setInput(runtime, data.id, data.text);
       else if (type === 'check') runtime.platform.checkInput(runtime, data.id, data.checked);
+      else if (type === 'intent') {
+        // A deep link / Intent the page describes: resolved against the manifest's intent filters and started like `am start` (see src/deep-link-host.js).
+        deepLink = startDeepLink(runtime, data.intent || {});
+      }
       else await (type === 'launch' ? runtime.launch(data.activity) : type === 'back' ? runtime.back() : runtime.click(data.id));
       drainReadyEvents();
-      const resultSnapshot = currentSnapshot(); if (droppedComposeAction) resultSnapshot.droppedComposeAction = droppedComposeAction; if (droppedEvent) resultSnapshot.droppedEvent = droppedEvent;
+      if (deepLink && !deepLink.ok && !runtime.activity) { send({ type: 'result', deepLink }); succeeded = true; return; }   // nothing matched and no Activity runs yet: there is no screen to snapshot
+      const resultSnapshot = currentSnapshot(); if (deepLink) resultSnapshot.deepLink = deepLink; if (droppedComposeAction) resultSnapshot.droppedComposeAction = droppedComposeAction; if (droppedEvent) resultSnapshot.droppedEvent = droppedEvent;
       send({ type: 'result', snapshot: resultSnapshot });
     } else throw new Error(`Operação de Worker desconhecida: ${type}`);
     succeeded = true;
   } catch (error) {
     send({ type: 'error', error: errorData(error) });
-  } finally { runtime?.monitor?.end(); busy = false; if (succeeded) scheduleEvents(); if (type === 'launch') startApiGapScan(); }
+  } finally { runtime?.monitor?.end(); busy = false; if (succeeded) scheduleEvents(); if (type === 'launch' || type === 'intent') startApiGapScan(); }
 };

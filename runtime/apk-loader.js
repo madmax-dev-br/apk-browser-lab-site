@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=9796aad5420d';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=9796aad5420d';
-import { inspectELF } from './native-inspector.js?v=9796aad5420d';
-import { inflateRaw } from './inflate.js?v=9796aad5420d';
-import { resolveDevice } from './device-profile.js?v=9796aad5420d';
-import { resourceProfileFor } from './device-configuration.js?v=9796aad5420d';
-import { JniBridge } from './jni-host.js?v=9796aad5420d';
-import { providerForApk } from './native-provider-variants.js?v=9796aad5420d';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=9796aad5420d';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=9796aad5420d';
-import { AndroidResources } from './android-resources.js?v=9796aad5420d';
-import { AndroidPlatform } from './android-platform.js?v=9796aad5420d';
-import { FrameworkProvider } from './framework-provider.js?v=9796aad5420d';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=4e8e9e43a248';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=4e8e9e43a248';
+import { inspectELF } from './native-inspector.js?v=4e8e9e43a248';
+import { inflateRaw } from './inflate.js?v=4e8e9e43a248';
+import { resolveDevice } from './device-profile.js?v=4e8e9e43a248';
+import { resourceProfileFor } from './device-configuration.js?v=4e8e9e43a248';
+import { JniBridge } from './jni-host.js?v=4e8e9e43a248';
+import { providerForApk } from './native-provider-variants.js?v=4e8e9e43a248';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=4e8e9e43a248';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=4e8e9e43a248';
+import { AndroidResources } from './android-resources.js?v=4e8e9e43a248';
+import { AndroidPlatform } from './android-platform.js?v=4e8e9e43a248';
+import { FrameworkProvider } from './framework-provider.js?v=4e8e9e43a248';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -240,8 +240,15 @@ export function parseManifest(data) {
         activities.push(node.activity);
       }
       const owner = [...stack].reverse().find(n => n.activity)?.activity;
-      if (name === 'intent-filter' && owner) node.filter = { activity: owner, main: false, launcher: false, view: false, browsable: false, autoVerify: typeof attrs.autoVerify === 'number' ? attrs.autoVerify !== 0 : attrs.autoVerify === 'true', schemes: [], hosts: [] };
+      if (name === 'intent-filter' && owner) {
+        node.filter = { activity: owner, main: false, launcher: false, view: false, browsable: false, autoVerify: typeof attrs.autoVerify === 'number' ? attrs.autoVerify !== 0 : attrs.autoVerify === 'true', schemes: [], hosts: [] };
+        // The whole filter as IntentFilter sees it (actions, categories, <data> entries), kept on the Activity for Intent resolution (src/intent-resolver.js).
+        node.filter.record = { actions: [], categories: [], data: [], priority: Number(attrs.priority) | 0 }; (owner.filters ??= []).push(node.filter.record);
+      }
       const filter = [...stack].reverse().find(n => n.filter)?.filter;
+      if (name === 'action' && filter && typeof attrs.name === 'string') filter.record.actions.push(attrs.name);
+      if (name === 'category' && filter && typeof attrs.name === 'string') filter.record.categories.push(attrs.name);
+      if (name === 'data' && filter) { const entry = {}; for (const key of ['scheme', 'host', 'port', 'path', 'pathPrefix', 'pathPattern', 'pathAdvancedPattern', 'pathSuffix', 'mimeType']) if (attrs[key] !== undefined && attrs[key] !== null && attrs[key] !== '') entry[key] = typeof attrs[key] === 'string' ? attrs[key] : String(attrs[key]); filter.record.data.push(entry); }
       if (name === 'action' && filter && attrs.name === 'android.intent.action.MAIN') filter.main = true;
       if (name === 'action' && filter && attrs.name === 'android.intent.action.VIEW') filter.view = true;
       if (name === 'category' && filter && attrs.name === 'android.intent.category.BROWSABLE') filter.browsable = true;
@@ -260,7 +267,7 @@ export function parseManifest(data) {
   if (!strings || stack.length || typeof packageName !== 'string') fail('Incomplete AndroidManifest.xml');
   const deduplicated = new Map();
   for (const a of activities) {
-    if (deduplicated.has(a.name)) deduplicated.get(a.name).launcher ||= a.launcher;
+    if (deduplicated.has(a.name)) { const kept = deduplicated.get(a.name); kept.launcher ||= a.launcher; if (a.filters?.length) (kept.filters ??= []).push(...a.filters); }
     else deduplicated.set(a.name, { ...a, descriptor: `L${a.name.replaceAll('.', '/')};` });
   }
   const launchers = [...deduplicated.values()].filter(a => a.launcher);

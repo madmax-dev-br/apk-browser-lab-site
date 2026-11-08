@@ -1,10 +1,11 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=9796aad5420d';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=9796aad5420d';
-import { createDeviceView, createViewState } from './device-view.js?v=9796aad5420d';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=9796aad5420d';
-import { formatApiGapReport } from './api-gap-scan.js?v=9796aad5420d';
-import { createLogcatPanel } from './logcat-panel.js?v=9796aad5420d';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=9796aad5420d';
+import { APKWorkerClient } from './apk-worker-client.js?v=4e8e9e43a248';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, resolveDevice } from './device-settings.js?v=4e8e9e43a248';
+import { createDeviceView, createViewState } from './device-view.js?v=4e8e9e43a248';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=4e8e9e43a248';
+import { formatApiGapReport } from './api-gap-scan.js?v=4e8e9e43a248';
+import { createLogcatPanel } from './logcat-panel.js?v=4e8e9e43a248';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=4e8e9e43a248';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=4e8e9e43a248';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -141,7 +142,7 @@ function finishOperation(token) {
   clearInterval(state.operationTimer); $('operation-panel').hidden = true; state.abortController = null; setBusy(false); if (state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length || state.pendingScrollBys.size) flushPendingInputs();
 }
 function onWorkerProgress(progress = {}) {
-  const phases = { 'framework-resources': 'Carregando dados originais de estilos Android', framework: 'Carregando código AOSP compilado', manifest: 'Lendo o manifesto', dex: 'Inspecionando DEX', native: 'Inventariando bibliotecas nativas', complete: 'Inspeção concluída', launch: 'Tentando iniciar a Activity', click: 'Executando callback DEX', back: 'Retornando à Activity anterior', resources: 'Lendo recursos e layouts XML' };
+  const phases = { 'framework-resources': 'Carregando dados originais de estilos Android', framework: 'Carregando código AOSP compilado', manifest: 'Lendo o manifesto', dex: 'Inspecionando DEX', native: 'Inventariando bibliotecas nativas', complete: 'Inspeção concluída', launch: 'Tentando iniciar a Activity', intent: 'Abrindo o link', click: 'Executando callback DEX', back: 'Retornando à Activity anterior', resources: 'Lendo recursos e layouts XML' };
   const message = `${phases[progress.phase] || 'Processando no Worker'}${progress.filename ? ` · ${progress.filename}` : ''}`;
   $('operation-message').textContent = message;
   const bar = $('operation-progress');
@@ -417,6 +418,50 @@ function initDevicePanel() {
   for (const id of ['dev-screen', 'dev-orientation', 'dev-font', 'dev-locale', 'dev-dark', 'dev-animator', 'dev-hour24', 'dev-tz', 'dev-battery', 'dev-charging', 'dev-network', 'dev-nav', 'dev-hosts', 'dev-proxy']) $(id).addEventListener('input', () => { applyDeviceSettings(readDevicePanel()); });
   $('device-reset').addEventListener('click', () => { applyDeviceSettings(sanitizeSettings({})); });
 }
+// ---- "Abrir": a deep link / Intent resolved against the manifest's intent filters (src/deep-link-host.js) ----
+const deepLinkPanel = { history: [], busy: false };
+function showDeepLinkResult(state, message, detail = '') {
+  const note = $('deeplink-result'); note.dataset.state = state; note.textContent = message;
+  if (detail) { const small = document.createElement('small'); small.textContent = detail; note.append(small); }
+}
+function renderDeepLinkHistory() {
+  const list = $('deeplink-history-list'), items = deepLinkPanel.history;
+  $('deeplink-history').hidden = !items.length;
+  list.replaceChildren(...items.map((entry) => {
+    const item = document.createElement('li'), button = document.createElement('button');
+    button.type = 'button'; button.textContent = historyLabel(entry); button.title = historyLabel(entry);
+    button.addEventListener('click', () => { $('deeplink-input').value = entry.link; $('deeplink-component').value = entry.component; $('deeplink-action').value = entry.action; $('deeplink-input').focus(); });
+    item.append(button); return item;
+  }));
+}
+async function openDeepLink() {
+  if (deepLinkPanel.busy) return;
+  let request;
+  try { request = buildDeepLinkRequest({ link: $('deeplink-input').value, action: $('deeplink-action').value, component: $('deeplink-component').value }); }
+  catch (error) { showDeepLinkResult('error', error.message); return; }
+  if (!state.runtime || state.busy) { showDeepLinkResult('error', state.runtime ? 'A VM está ocupada; tente de novo em instantes.' : 'Abra um APK primeiro: o link é resolvido pelos filtros do manifesto dele.'); return; }
+  deepLinkPanel.busy = true; $('deeplink-open').disabled = true;
+  try {
+    await flushPendingInputs(); switchMode('apk'); hideError(); state.lastAPKError = null;
+    const token = beginOperation('Abrindo link…'); state.runStartedAt = Date.now();
+    try {
+      const { deepLink, snapshot } = await state.runtime.startIntent(request, { onProgress: onWorkerProgress });
+      if (token === state.operation) {
+        if (deepLink?.ok && deepLink.launched) state.launchAttempted = true;
+        if (snapshot) renderSnapshot(snapshot);
+        const result = describeDeepLink(deepLink); showDeepLinkResult(result.state, result.message, result.detail);
+        deepLinkPanel.history = addToHistory(deepLinkPanel.history, { link: $('deeplink-input').value, action: $('deeplink-action').value, component: $('deeplink-component').value });
+        saveHistory(deepLinkPanel.history); renderDeepLinkHistory();
+      }
+    } catch (error) { if (token === state.operation) { showDeepLinkResult('error', 'A Activity encontrada não pôde ser iniciada: ' + (error?.message || error)); reportAPKError(error, 'Não foi possível abrir o link'); } }
+    finally { finishOperation(token); }
+  } finally { deepLinkPanel.busy = false; $('deeplink-open').disabled = false; }
+}
+function initDeepLinkPanel() {
+  deepLinkPanel.history = loadHistory(); renderDeepLinkHistory();
+  $('deeplink-form').addEventListener('submit', (event) => { event.preventDefault(); openDeepLink(); });
+  $('deeplink-history-clear').addEventListener('click', () => { deepLinkPanel.history = []; saveHistory([]); renderDeepLinkHistory(); });
+}
 async function runAPK() {
   if (!state.runtime || state.busy || state.runStarting) return;
   state.runStarting = true;
@@ -540,3 +585,4 @@ loadScenarioCatalog();
 notifyParent('apk-lab-ready');
 if (params.get('demo') === '1') runDemo();
 initDevicePanel();
+initDeepLinkPanel();

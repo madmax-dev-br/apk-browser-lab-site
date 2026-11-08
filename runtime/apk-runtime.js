@@ -1,28 +1,28 @@
-import { VMClock } from './vm-clock.js?v=9796aad5420d';
-import { OperationMonitor } from './operation-monitor.js?v=9796aad5420d';
-import { ExecutionProfile } from './execution-profile.js?v=9796aad5420d';
-import { SamplingProfiler } from './sampling-profiler.js?v=9796aad5420d';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=9796aad5420d';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=9796aad5420d';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=9796aad5420d';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=9796aad5420d';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=9796aad5420d';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=9796aad5420d';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=9796aad5420d';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=9796aad5420d';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=9796aad5420d';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=9796aad5420d';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=9796aad5420d';
-import { APKError } from './apk-error.js?v=9796aad5420d';
-import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=9796aad5420d';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=9796aad5420d';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=9796aad5420d';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=9796aad5420d';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=9796aad5420d';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=9796aad5420d';
-import { Scheduler, Blocked } from './scheduler.js?v=9796aad5420d';
-import { bootClassLacksMember } from './boot-class-members.js?v=9796aad5420d';
-export { APKError } from './apk-error.js?v=9796aad5420d';
+import { VMClock } from './vm-clock.js?v=4e8e9e43a248';
+import { OperationMonitor } from './operation-monitor.js?v=4e8e9e43a248';
+import { ExecutionProfile } from './execution-profile.js?v=4e8e9e43a248';
+import { SamplingProfiler } from './sampling-profiler.js?v=4e8e9e43a248';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=4e8e9e43a248';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=4e8e9e43a248';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=4e8e9e43a248';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=4e8e9e43a248';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=4e8e9e43a248';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=4e8e9e43a248';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=4e8e9e43a248';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=4e8e9e43a248';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=4e8e9e43a248';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=4e8e9e43a248';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=4e8e9e43a248';
+import { APKError } from './apk-error.js?v=4e8e9e43a248';
+import { collectGarbage, collectionDue, heapCensus, freedBy } from './heap-gc.js?v=4e8e9e43a248';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=4e8e9e43a248';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=4e8e9e43a248';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=4e8e9e43a248';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=4e8e9e43a248';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=4e8e9e43a248';
+import { Scheduler, Blocked } from './scheduler.js?v=4e8e9e43a248';
+import { bootClassLacksMember } from './boot-class-members.js?v=4e8e9e43a248';
+export { APKError } from './apk-error.js?v=4e8e9e43a248';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1547,12 +1547,12 @@ export class APKRuntime {
     if(this.dex.bootClasses?.has(graphics))this.dispatch({owner:graphics,name:'setTargetSdkVersion',parameters:['I'],result:'V',signature:'(I)V'},[target],'static');
     this.frameworkRuntimeConfigured=true;
   }
-  launch(activity) {
+  launch(activity, options = {}) {
     this.platform?.looperHost?.hostEventRan(this);   // a launch is a message of the main Looper in Android: the thread is back in MessageQueue.next() afterwards (IdleHandlers)
     const savedSafeDepth = this.gcSafeDepth; this.gcSafeDepth = 1;   // onCreate/onStart/onResume run as one long event: collect at its safepoints (the JavaScript callers hold only the Activity and rooted frames)
-    try { return this.launchActivity(activity); } finally { this.gcSafeDepth = savedSafeDepth; }
+    try { return this.launchActivity(activity, options); } finally { this.gcSafeDepth = savedSafeDepth; }
   }
-  launchActivity(activity) {
+  launchActivity(activity, { intent = null } = {}) {   // `intent`: the Intent the launcher Activity receives (a deep link) instead of the default one
     if (this.activity) fail('Activity already launched; load the APK again to restart');
     if (this.unsupportedFeatures.length) fail(`Unsupported APK: ${this.unsupportedFeatures.join('; ')}`);
     const candidates = this.activities();
@@ -1564,6 +1564,7 @@ export class APKRuntime {
     this.configureFrameworkRuntime();
     if(this.dex.bootClasses?.has('Lsun/misc/VM;'))this.dispatch({owner:'Lsun/misc/VM;',name:'booted',parameters:[],result:'V',signature:'()V'},[],'static');
     this.platform?.beforeLaunch?.(this);
+    if (this.platform) this.platform.launchIntent = intent;
     this.activityType = type; this.activity = this.allocate(type);
     const launchedActivity = this.activity;
     this.dispatch({ owner: type, name: '<init>', signature: '()V', parameters: [], result: 'V' }, [launchedActivity], 'direct');

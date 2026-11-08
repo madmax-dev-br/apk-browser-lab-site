@@ -126,3 +126,11 @@ session. Original Java isTagEnabled/beginSection/endSection/counter methods
 therefore perform their actual short-circuit behavior. Emission and tracing
 activation natives remain unbound; an explicitly enabled test mask reaches the
 original validation or a specific unavailable-JNI error, never a fake emission.
+
+android.view.textclassifier (data classes): TextClassifier (NO_OP, Utils, EntityConfig...), TextClassificationContext, TextClassificationSession(+Factory, Id), TextSelection, TextClassification,
+TextLinks(+TextLinksParams), TextLanguage, ConversationAction(s), SelectionEvent, TextClassifierEvent, EntityConfidence, ExtrasUtils, Log, SelectionSessionLogger and SystemTextClassifierMetadata are pinned
+originals in the java.time compilation group (next to Linkify), plus android.util / com.android.internal.util IndentingPrintWriter for TextClassifier.dump. The support/ TextClassifier.java declaration only serves
+the runtime group (ClipDescription reads TextClassifier.EntityType). TextClassificationManager stays host code (src/system-managers-host.js): its original needs the ITextClassifierService binder and
+Settings.Global/DeviceConfig flags; SystemTextClassifier and TextClassificationConstants are not packaged. Recorded source transforms (build/javatime-transforms.json): TextLinks.TextLinkSpan.onClick takes the
+AOSP default of the smart-linkify flag and its two hidden TextView hooks refuse explicitly; TextClassification.maybeLoadDrawable (documented best effort) skips the hidden Icon accessors; TextClassificationSession
+drops the SystemTextClassifier remote-session initialization (the lab has no such service).

@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=9796aad5420d';
-import { gcRoot } from './heap-gc.js?v=9796aad5420d';
-import { APKError } from './apk-error.js?v=9796aad5420d';
+import { createHostRegistry } from './host-contract.js?v=4e8e9e43a248';
+import { gcRoot } from './heap-gc.js?v=4e8e9e43a248';
+import { APKError } from './apk-error.js?v=4e8e9e43a248';
 
 // Public android.widget.TextView API (API 33) beyond what the platform's native text model carries, with the semantics of android-13.0.0_r1 TextView.java.
 // The lab renders TextView / Button / EditText text through its native SkParagraph path (view-layout-host measure, compose-canvas-host draw), which honours the text, size, colour, typeface,
@@ -75,7 +75,12 @@ export function createTextViewApiHost(platform) {
   def(TEXT, 'getDefaultMovementMethod', '()Landroid/text/method/MovementMethod;', () => null);
   def(TEXT, 'getTextSizeUnit', '()I', (r, _m, [self]) => tv(r, self).textSizeUnit);
   def(TEXT, 'isInputMethodTarget', '()Z', () => 0);
-  def(TEXT, 'getTextClassifier', '()Landroid/view/textclassifier/TextClassifier;', (r, _m, [self]) => r.object(self).textClassifier ?? null);
+  def(TEXT, 'getTextClassifier', '()Landroid/view/textclassifier/TextClassifier;', (r, _m, [self]) => {   // TextView.getTextClassifier: the one set on the view, else the manager's, else NO_OP
+    const own = r.object(self).textClassifier; if (!nullish(own)) return own;
+    const context = call(r, self, VIEW, 'getContext', [], CONTEXT), TCM = 'Landroid/view/textclassifier/TextClassificationManager;', CLASSIFIER = 'Landroid/view/textclassifier/TextClassifier;';
+    const manager = nullish(context) ? null : call(r, context, CONTEXT, 'getSystemService', [STRING], OBJECT, ['textclassification']);
+    return !nullish(manager) ? call(r, manager, TCM, 'getTextClassifier', [], CLASSIFIER) : r.readStatic({ owner: CLASSIFIER, name: 'NO_OP', type: CLASSIFIER });
+  });
   def(TEXT, 'setTextClassifier', '(Landroid/view/textclassifier/TextClassifier;)V', (r, _m, [self, classifier]) => { r.object(self).textClassifier = nullish(classifier) ? null : classifier; });
   def(TEXT, 'setInputExtras', '(I)V', (r, _m, [self]) => { throw new APKError('TextView.setInputExtras parses an XML resource into the IME extras Bundle; the virtual device has no input method service to consume it', { kind: 'input-extras-unsupported' }); void self; });
   def(TEXT, 'getInputExtras', '(Z)Landroid/os/Bundle;', (r, _m, [self, create]) => {

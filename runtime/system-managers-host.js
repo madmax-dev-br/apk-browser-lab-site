@@ -1,6 +1,6 @@
-import { floatBits } from './host-contract.js?v=9796aad5420d';
-import { gcRoot } from './heap-gc.js?v=9796aad5420d';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=9796aad5420d';
+import { floatBits } from './host-contract.js?v=4e8e9e43a248';
+import { gcRoot } from './heap-gc.js?v=4e8e9e43a248';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=4e8e9e43a248';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,
@@ -141,20 +141,30 @@ export function createSystemManagersHost(platform) {
   def(CAPTIONING, 'addCaptioningChangeListener', `(${CAPTION_LISTENER})V`, (r, _m, [, listener]) => { if (nullish(listener)) npe(r); });
   def(CAPTIONING, 'removeCaptioningChangeListener', `(${CAPTION_LISTENER})V`, (r, _m, [, listener]) => { if (nullish(listener)) npe(r); });
 
-  // ---- TextClassificationManager: the manager and the classifier's lifecycle; the request/result classes are not part of the lab framework
+  // ---- TextClassificationManager (android-13.0.0_r1): the manager is a host object; TextClassifier and every request/result/session class are the pinned originals. The lab device has no
+  // text-classifier provider (SystemTextClassifier would find no service) and no local classifier ("Local text-classifier not supported"), so the classifier it hands out is TextClassifier.NO_OP.
+  // A session is the original TextClassificationSession over the manager's classifier at creation time: independent lifecycle (destroy/isDestroyed), calls on a destroyed session are IllegalStateException.
   const TEXT_CLASSIFICATION = service('textclassification', 'Landroid/view/textclassifier/TextClassificationManager;'), CLASSIFIER = 'Landroid/view/textclassifier/TextClassifier;';
-  const CLASSIFIER_IMPL = 'Landroid/view/textclassifier/TextClassifierImpl;';
-  type(CLASSIFIER_IMPL, OBJECT, [CLASSIFIER], { allocatable: true }); type(CLASSIFIER, OBJECT, [], { allocatable: false });
-  consts(CLASSIFIER, { WIDGET_TYPE_TEXTVIEW_BASE: 0 });
-  strings(CLASSIFIER, { TYPE_UNKNOWN: '', TYPE_OTHER: 'other', TYPE_EMAIL: 'email', TYPE_PHONE: 'phone', TYPE_ADDRESS: 'address', TYPE_URL: 'url', TYPE_DATE: 'date', TYPE_DATE_TIME: 'datetime', TYPE_FLIGHT_NUMBER: 'flight' });
+  const TC_CONTEXT = 'Landroid/view/textclassifier/TextClassificationContext;', TC_SESSION = 'Landroid/view/textclassifier/TextClassificationSession;', TC_FACTORY = 'Landroid/view/textclassifier/TextClassificationSessionFactory;';
   const classifierState = new WeakMap();
-  const classifierOf = r => { if (!classifierState.has(r)) classifierState.set(r, { object: null, destroyed: false, custom: null }); return classifierState.get(r); };
-  def(TEXT_CLASSIFICATION, 'getTextClassifier', `()${CLASSIFIER}`, r => { const s = classifierOf(r); return s.custom ?? (s.object ??= r.allocate(CLASSIFIER_IMPL)); });
-  def(TEXT_CLASSIFICATION, 'getTextClassifier', `(I)${CLASSIFIER}`, (r, _m, [, kind]) => { if (kind !== 0 && kind !== 1 && kind !== 2) iae(r, `Invalid TextClassifier type: ${kind}`); const s = classifierOf(r); return s.custom ?? (s.object ??= r.allocate(CLASSIFIER_IMPL)); });
-  def(TEXT_CLASSIFICATION, 'setTextClassifier', `(${CLASSIFIER})V`, (r, _m, [, classifier]) => { classifierOf(r).custom = nullish(classifier) ? null : classifier; });
-  def(CLASSIFIER_IMPL, 'isDestroyed', '()Z', (r) => (classifierOf(r).destroyed ? 1 : 0));
-  def(CLASSIFIER_IMPL, 'destroy', '()V', (r) => { classifierOf(r).destroyed = true; });
-  def(CLASSIFIER_IMPL, 'getMaxGenerateLinksTextLength', '()I', () => 0);
+  const classifierOf = r => { if (!classifierState.has(r)) classifierState.set(r, gcRoot(new Map([['custom', null], ['factory', null]]))); return classifierState.get(r); };
+  const noOp = r => r.readStatic({ owner: CLASSIFIER, name: 'NO_OP', type: CLASSIFIER });
+  const currentClassifier = r => classifierOf(r).get('custom') ?? noOp(r);
+  def(TEXT_CLASSIFICATION, 'getTextClassifier', `()${CLASSIFIER}`, r => currentClassifier(r));
+  def(TEXT_CLASSIFICATION, 'getTextClassifier', `(I)${CLASSIFIER}`, r => noOp(r));   // the typed lookup ignores the custom classifier: LOCAL is unsupported and SYSTEM has no service, both answer NO_OP
+  def(TEXT_CLASSIFICATION, 'setTextClassifier', `(${CLASSIFIER})V`, (r, _m, [, classifier]) => { classifierOf(r).set('custom', nullish(classifier) ? null : classifier); });
+  def(TEXT_CLASSIFICATION, 'setTextClassificationSessionFactory', `(${TC_FACTORY})V`, (r, _m, [, factory]) => { classifierOf(r).set('factory', nullish(factory) ? null : factory); });
+  def(TEXT_CLASSIFICATION, 'createTextClassificationSession', `(${TC_CONTEXT})${CLASSIFIER}`, (r, _m, [, context]) => {
+    if (nullish(context)) npe(r);
+    const factory = classifierOf(r).get('factory');
+    const session = factory ? call(r, factory, TC_FACTORY, 'createTextClassificationSession', [TC_CONTEXT], CLASSIFIER, [context]) : construct(r, TC_SESSION, [TC_CONTEXT, CLASSIFIER], [context, currentClassifier(r)]);
+    if (nullish(session)) npe(r, 'Session Factory should never return null');
+    return session;
+  });
+  def(TEXT_CLASSIFICATION, 'createTextClassificationSession', `(${TC_CONTEXT}${CLASSIFIER})${CLASSIFIER}`, (r, _m, [, context, classifier]) => {
+    if (nullish(context)) npe(r); if (nullish(classifier)) npe(r);
+    return construct(r, TC_SESSION, [TC_CONTEXT, CLASSIFIER], [context, classifier]);
+  });
 
   // ---- RoleManager: the lab device has no telephony, so only the roles that need none are available and nobody the app is not holds any role
   const ROLE = service('role', 'Landroid/app/role/RoleManager;');
