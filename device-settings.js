@@ -1,5 +1,6 @@
-import { isMemoryStep } from './memory-budget.js?v=c2b02b689b7f';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=c2b02b689b7f';
+import { isMemoryStep } from './memory-budget.js?v=7a404aba383f';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=7a404aba383f';
+import { sanitizeLocation } from './runtime-permissions.js?v=7a404aba383f';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: SCREEN_PRESETS.map(p => p.id), orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -17,7 +18,7 @@ export function sanitizeProxyUrl(value) {
   return '';
 }
 export function sanitizeSettings(input = {}) {
-  const out = { ...DEFAULT_DEVICE, battery: { ...DEFAULT_DEVICE.battery }, network: { allowedHosts: [], proxyUrl: '' }, memoryMiB: 0 };   // memoryMiB: Java heap budget of the VM in MiB, 0 = automatic; applies at the next load
+  const out = { ...DEFAULT_DEVICE, battery: { ...DEFAULT_DEVICE.battery }, network: { allowedHosts: [], proxyUrl: '' }, memoryMiB: 0, location: sanitizeLocation(null) };   // memoryMiB: Java heap budget of the VM in MiB, 0 = automatic; applies at the next load
   if (input.network && typeof input.network === 'object') { out.network.allowedHosts = sanitizeHosts(input.network.allowedHosts); out.network.proxyUrl = sanitizeProxyUrl(input.network.proxyUrl); }
   for (const [name, values] of Object.entries(ALLOWED)) if (values.includes(input[name])) out[name] = input[name];
   if (Number.isFinite(Number(input.fontScale))) out.fontScale = Math.min(2, Math.max(0.85, Number(input.fontScale)));
@@ -26,6 +27,7 @@ export function sanitizeSettings(input = {}) {
   if (isMemoryStep(Number(input.memoryMiB)) && input.memoryMiB !== null && input.memoryMiB !== '' && input.memoryMiB !== true) out.memoryMiB = Number(input.memoryMiB);
   if (typeof input.darkTheme === 'boolean') out.darkTheme = input.darkTheme;
   if (typeof input.hour24 === 'boolean') out.hour24 = input.hour24;
+  out.location = sanitizeLocation(input.location);   // simulated device location ("Permissões" section): page-only, sent to the VM through the permission channel, never as part of the device model
   out.layoutBounds = input.layoutBounds === true;   // page-only developer option ("Mostrar limites de layout"); the VM never sees it
   if (typeof input.locale === 'string' && /^[a-z]{2}-[A-Z]{2}$/.test(input.locale)) out.locale = input.locale;
   if (typeof input.timeZone === 'string' && input.timeZone.length < 64) { try { if (input.timeZone) new Intl.DateTimeFormat('en-US', { timeZone: input.timeZone }); out.timeZone = input.timeZone; } catch { /* unknown zone: keep default */ } }
@@ -48,3 +50,6 @@ export function loadDeviceSettings() {
 }
 export function saveDeviceSettings(settings) { try { globalThis.localStorage?.setItem(KEY, JSON.stringify({ ...settings, version: SETTINGS_VERSION })); return true; } catch { return false; } }
 export { resolveDevice };
+
+/** The device model the VM gets: the page-only blocks (simulated location) are left out so they never count as a device change. */
+export function deviceForVM(settings) { const { location, ...device } = settings; return device; }

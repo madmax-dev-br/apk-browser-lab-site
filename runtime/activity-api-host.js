@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=c2b02b689b7f';
-import { APKError } from './apk-error.js?v=c2b02b689b7f';
-import { gcRoot } from './heap-gc.js?v=c2b02b689b7f';
+import { createHostRegistry } from './host-contract.js?v=7a404aba383f';
+import { APKError } from './apk-error.js?v=7a404aba383f';
+import { gcRoot } from './heap-gc.js?v=7a404aba383f';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -428,24 +428,25 @@ export function createActivityApiHost(platform) {
     return callStatic(r, URI, 'parse', [STRING], URI, [`android-app://${caller}`]);
   });
 
-  // ---- Permission requests: the virtual device has no permission dialog; the request is answered with the current grant state, the way a user who dismissed the dialog would -----------------------------
-  const denials = new Map();
+  // ---- Permission requests (src/permission-host.js, src/runtime-permissions.js): the answer comes from the "Permissões" state; a request that needs the user's decision waits for the page's dialog and the
+  // result is delivered later through onRequestPermissionsResult, like the asynchronous PermissionController round trip on Android -----------------------------------------------------------------
   def(ACTIVITY, 'requestPermissions', '([Ljava/lang/String;I)V', (r, _m, [self, permissions, requestCode]) => {
     if (requestCode < 0) iae(r, 'requestCode should be >= 0');
     if (nullish(permissions)) iae(r, 'permissions cannot be null or empty');
     const names = r.array(permissions).elements;
     if (names.length === 0) iae(r, 'permission cannot be null or empty');
-    const strings = names.map(n => text(r, n)), results = strings.map(permission => platform.holdsPermission(r, permission) ? 0 : -1);
-    strings.forEach((permission, i) => { if (results[i] !== 0) denials.set(permission, (denials.get(permission) ?? 0) + 1); });
-    r.record(`PERMISSIONS request ${requestCode} ${strings.map((p, i) => `${p}=${results[i] === 0 ? 'granted' : 'denied'}`).join(' ')}`);
-    platform.queueTask(() => {
-      const outNames = intArray(r, '[Ljava/lang/String;', strings), outResults = intArray(r, '[I', results);
-      call(r, self, ACTIVITY, 'onRequestPermissionsResult', ['I', '[Ljava/lang/String;', '[I'], 'V', [requestCode, outNames, outResults]);
-    }, 0, [self, permissions]);
+    const strings = names.map(n => text(r, n));
+    platform.runtimePermissions.request(r, strings, requestCode, [self, permissions], results => {
+      platform.queueTask(() => {
+        const empty = results.length === 0, outNames = intArray(r, '[Ljava/lang/String;', empty ? [] : strings), outResults = intArray(r, '[I', results);
+        call(r, self, ACTIVITY, 'onRequestPermissionsResult', ['I', '[Ljava/lang/String;', '[I'], 'V', [requestCode, outNames, outResults]);
+      }, 0, [self, permissions]);
+      platform.onExternalActivity?.();
+    });
   });
   def(ACTIVITY, 'shouldShowRequestPermissionRationale', `(${STRING})Z`, (r, _m, [, permission]) => {
     if (nullish(permission)) npe(r);
-    const name = text(r, permission); return !platform.holdsPermission(r, name) && denials.get(name) === 1 ? 1 : 0;   // shown once after the first denial; "don't ask again" after the second
+    return platform.runtimePermissions.shouldShowRationale(text(r, permission)) ? 1 : 0;   // true after one denial; false once it is "don't ask again" (two denials, or denied in Settings)
   });
 
   // ---- Activity starts ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------

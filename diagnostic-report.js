@@ -9,7 +9,7 @@ export const stubsOf = error => (error?.stubs?.length ? error.stubs : [...new Se
  * buildDiagnosticReport({ error, product, packageName, tolerateMissing, build }) -> { cause, text }
  * `apiGaps` is the already formatted static API-gap section (src/api-gap-scan.js formatApiGapReport), appended last. `error` is the Worker error (message, trace, stubs) or any Error. `stubs` overrides the error's own list (the player passes the live snapshot lists).
  */
-export function buildDiagnosticReport({ error, product = 'APK Browser Lab', packageName = 'APK', tolerateMissing = 'off', build = '', stubs = null, apiGaps = null }) {
+export function buildDiagnosticReport({ error, product = 'APK Browser Lab', packageName = 'APK', tolerateMissing = 'off', build = '', stubs = null, apiGaps = null, methodOverrides = 0 }) {
   const raw = error?.message || String(error), cause = causeOf(raw);
   const frames = [...raw.matchAll(/(L[^\s:]+?;->[^\s]+?) \[([^\]]+)\] at PC (0x[\da-f]+)/gi)].map(([, frame, dex, pc]) => `  ${frame} [${dex}] @${pc}`);
   const trace = error?.trace ?? [], list = stubs ?? stubsOf(error);
@@ -17,7 +17,7 @@ export function buildDiagnosticReport({ error, product = 'APK Browser Lab', pack
   const consequence = libStubs && !/UnsatisfiedLink|native|JNI|\.so\b/i.test(cause)
     ? `Atenção: o modo tolerante substituiu ${libStubs} biblioteca${libStubs > 1 ? 's' : ''} nativa${libStubs > 1 ? 's' : ''} (STUB-LIB) e este erro não menciona nativos: a falha pode ser consequência das bibliotecas substituídas listadas abaixo (os resultados delas são vazios).` : '';
   const text = [
-    `${product}${build ? ' ' + build : ''} · ${packageName} · modo tolerante: ${tolerateMissing}`,
+    `${product}${build ? ' ' + build : ''} · ${packageName} · modo tolerante: ${tolerateMissing}${methodOverrides > 0 ? ` · RETORNOS SUBSTITUÍDOS ATIVOS (${methodOverrides} métodos: o código original deles não executou)` : ''}`,
     error?.details?.jsStack ? `Erro interno: ${String(error.details.jsStack).split('\n')[0]}` : '',
     `Erro: ${cause}`,
     error?.summary ? error.summary : '',

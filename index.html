@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=c2b02b689b7f">
-  <meta name="apk-browser-build" content="c2b02b689b7f">
+  <link rel="stylesheet" href="./styles.css?v=7a404aba383f">
+  <meta name="apk-browser-build" content="7a404aba383f">
 </head>
 <body>
   <header class="topbar">
@@ -42,8 +42,8 @@
           <div id="unsupported-notice" class="unsupported-notice" role="status" hidden><strong>Este APK ainda não pode ser executado</strong><p>O relatório indica limites de arquivo que impedem a tentativa. Veja os detalhes abaixo; uma inspeção parcial não comprova compatibilidade.</p><ul id="unsupported-list"></ul></div>
           <details id="control-panel" class="device-panel control-panel">
             <summary><span>Controles</span><span id="device-summary" class="quiet-badge" title="Tela e orientação do dispositivo virtual">411 × 914 · retrato</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
-            <section class="cp-group" aria-labelledby="cp-open-title">
-              <h3 id="cp-open-title">Abrir</h3>
+            <details class="cp-group" id="cp-sec-open" data-section="open">
+              <summary><h3 id="cp-open-title">Abrir</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
               <form id="deeplink-form" class="deeplink-form" autocomplete="off">
                 <label for="deeplink-input">Link ou URI</label>
                 <div class="deeplink-row"><input id="deeplink-input" type="text" spellcheck="false" autocapitalize="off" placeholder="meuapp://caminho?id=1 ou https://exemplo.com/p/1"><button id="deeplink-open" class="cp-button primary" type="submit">Abrir</button></div>
@@ -54,9 +54,9 @@
               </form>
               <p id="deeplink-result" class="cp-note deeplink-result" role="status" aria-live="polite">Resolvido pelos intent-filters do manifesto, como <code>am start -a VIEW -d</code>. Sem app em execução, a Activity encontrada é iniciada com esse Intent.</p>
               <div id="deeplink-history" class="deeplink-history" hidden><span class="cp-subtitle">Recentes</span><ul id="deeplink-history-list"></ul><button id="deeplink-history-clear" class="cp-link" type="button">Limpar histórico</button></div>
-            </section>
-            <section class="cp-group" aria-labelledby="cp-look-title">
-              <h3 id="cp-look-title">Aparência</h3>
+            </div></details>
+            <details class="cp-group" id="cp-sec-look" data-section="look">
+              <summary><h3 id="cp-look-title">Aparência</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
               <div class="cp-grid">
                 <label for="dev-dark">Tema escuro</label><input id="dev-dark" type="checkbox">
                 <label for="dev-layout-bounds" title="Opção de desenvolvedor do Android: contorna os limites de cada View e nó do Compose (azul), margens (magenta) e padding (verde)">Mostrar limites de layout</label><input id="dev-layout-bounds" type="checkbox">
@@ -67,9 +67,9 @@
                 <label for="dev-nav">Navegação</label><select id="dev-nav"><option value="gesture">Gestos</option><option value="buttons">3 botões</option></select>
                 <label for="dev-animator">Escala de animação</label><select id="dev-animator"><option value="0">Desligada</option><option value="0.5">0,5×</option><option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select>
               </div>
-            </section>
-            <section class="cp-group" aria-labelledby="cp-device-title">
-              <h3 id="cp-device-title">Dispositivo</h3>
+            </div></details>
+            <details class="cp-group" id="cp-sec-device" data-section="device">
+              <summary><h3 id="cp-device-title">Dispositivo</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
               <div class="cp-grid">
                 <label for="dev-hour24">Relógio de 24 horas</label><input id="dev-hour24" type="checkbox">
                 <label for="dev-tz">Fuso horário</label><select id="dev-tz"></select>
@@ -81,9 +81,24 @@
                 <label for="dev-proxy">Proxy (opcional)</label><input id="dev-proxy" type="text" spellcheck="false" autocomplete="off" placeholder="https://relay.exemplo.com/?url={url}">
               </div>
               <p id="dev-hosts-note" class="cp-note">Com "Permitir todos os hosts" ligado (padrão) qualquer nome pode ser acessado, ainda sujeito a CORS no servidor (ou a um proxy seu). Desligado, só os hosts da lista são acessíveis e, sem hosts na lista, todo nome falha como em um telefone offline.</p>
-            </section>
-            <section class="cp-group" aria-labelledby="cp-run-title">
-              <h3 id="cp-run-title">Execução</h3>
+            </div></details>
+            <details class="cp-group" id="cp-sec-perms" data-section="perms">
+              <summary><h3 id="cp-perms-title">Permissões</h3><span id="perms-summary" class="cp-badge">sem app</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p id="perms-empty" class="cp-note">Abra um APK para ver as permissões de execução (perigosas) que o app pede no manifesto.</p>
+              <div id="perms-list" class="perms-list"></div>
+              <p id="perms-note" class="cp-note" role="status" aria-live="polite">"Perguntar" é o padrão do Android: a permissão não é concedida e requestPermissions mostra o diálogo sobre o telefone. No Android, revogar uma permissão com o app aberto encerra o processo do app; aqui a revogação vale na hora e o app continua rodando (reabra o APK para vê-lo recomeçar sem a permissão).</p>
+              <span class="cp-subtitle perms-loc-title">Localização simulada</span>
+              <div class="cp-grid">
+                <label for="loc-enabled">Localização do dispositivo ligada</label><input id="loc-enabled" type="checkbox">
+                <label for="loc-lat">Latitude</label><input id="loc-lat" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="-23.5505">
+                <label for="loc-lon">Longitude</label><input id="loc-lon" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="-46.6333">
+                <label for="loc-acc">Precisão (m)</label><input id="loc-acc" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="10">
+              </div>
+              <p id="loc-note" class="cp-note" role="status" aria-live="polite">Com a permissão concedida e a localização ligada, LocationManager entrega esta posição (getLastKnownLocation e requestLocationUpdates). O cliente de localização do Google Play services não existe neste dispositivo virtual e continua falhando de forma explícita.</p>
+              <button id="perms-reset" class="cp-button" type="button" disabled>Restaurar permissões deste app</button>
+            </div></details>
+            <details class="cp-group" id="cp-sec-run" data-section="run">
+              <summary><h3 id="cp-run-title">Execução</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
               <label class="cp-field" for="vm-memory"><span>Memória da VM <em id="vm-memory-hint" class="vm-memory-hint" role="status" hidden>reabra o APK para aplicar</em><small>Orçamento do heap Java; vale quando o APK é aberto de novo</small></span><select id="vm-memory" aria-describedby="vm-memory-note"></select></label>
               <p id="vm-memory-note" class="cp-note">Este número é o orçamento do heap Java (objetos e arrays da VM; os demais orçamentos crescem junto). O navegador gasta mais que isso: tabelas do DEX, CanvasKit, rasters e um objeto JavaScript por objeto Java. Uma aba acima de ~2–4 GiB pode ser encerrada pelo navegador. O limite do motor é 2 097 152 objetos (4 GiB é limitado a ele).</p>
               <p id="vm-memory-device" class="cp-note"></p>
@@ -96,7 +111,15 @@
               </div>
               <p id="device-status" class="cp-note" role="status" aria-live="polite">As mudanças chegam ao app como no Android: Configuration, recursos reselecionados e Activity recriada ou onConfigurationChanged.</p>
               <button id="device-reset" class="cp-button" type="button">Restaurar padrão</button>
-            </section>
+            </div></details>
+          <details class="cp-group" id="cp-sec-overrides" data-section="overrides">
+              <summary><h3 id="cp-overrides-title">Retornos de métodos</h3><span id="ov-summary" class="cp-badge">0 ativos</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p class="cp-note ov-warning">Ferramenta de depuração: enquanto ativo, o corpo do método escolhido <b>não executa</b> e a chamada devolve o valor digitado. Vale nas próximas chamadas, sem recarregar. Cada chamada substituída é contada, registrada no Logcat (aviso, tag <code>APKWebLab</code>) e listada no Resumo.</p>
+              <div class="ov-search"><label for="ov-search">Buscar método nas classes do APK</label><input id="ov-search" type="search" spellcheck="false" autocomplete="off" placeholder="parte da classe ou do método" aria-controls="ov-results"><ul id="ov-results" class="ov-results" hidden></ul></div>
+              <ul id="ov-list" class="ov-list"></ul>
+              <p id="ov-status" class="cp-note" role="status" aria-live="polite">Nenhum retorno substituído.</p>
+              <button id="ov-add" class="cp-button" type="button">+ Adicionar</button>
+            </div></details>
           </details>
           <button id="run-button" class="run-button" disabled><span aria-hidden="true">▶</span> Executar APK <kbd>RUN</kbd></button>
           <p class="support-note"><span aria-hidden="true">ⓘ</span><span>VM experimental para Android Views e bytecode DEX. Multidex é inspecionado no Worker; Android, Compose e JNI ainda podem exigir APIs não implementadas. </span></p>
@@ -112,6 +135,7 @@
               <div id="android-content" class="android-content"></div>
               <div id="android-window-layer" class="android-window-layer"></div>
               <canvas id="layout-bounds-canvas" class="layout-bounds-canvas" aria-hidden="true" hidden></canvas>
+              <div id="permission-dialog" class="perm-scrim" hidden><div class="perm-card" role="alertdialog" aria-modal="true" aria-labelledby="perm-question" aria-describedby="perm-detail" tabindex="-1"><div class="perm-icon" id="perm-icon" aria-hidden="true"></div><p id="perm-question" class="perm-question"></p><p id="perm-detail" class="perm-detail"></p><div class="perm-actions"><button id="perm-allow" type="button" class="perm-button"></button><button id="perm-once" type="button" class="perm-button" hidden>Só desta vez</button><button id="perm-deny" type="button" class="perm-button">Não permitir</button></div></div></div>
               <div class="system-bars" aria-hidden="true">
                 <div id="sysbar-status" class="sysbar-status"><span id="sysbar-clock" class="sysbar-clock">9:41</span><span class="sysbar-cutout"></span><span class="sysbar-icons"><svg id="sysbar-wifi" viewBox="0 0 24 24" width="14" height="14"><path d="M12 18.5a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM2.4 9.2l1.9 1.9a10.8 10.8 0 0 1 15.4 0l1.9-1.9a13.5 13.5 0 0 0-19.2 0zM6.2 13l1.9 1.9a5.4 5.4 0 0 1 7.8 0l1.9-1.9a8.1 8.1 0 0 0-11.6 0z" fill="currentColor"/></svg><svg id="sysbar-cell" viewBox="0 0 24 24" width="14" height="14"><path d="M2 22h20V2z" fill="currentColor"/></svg><span class="sysbar-battery"><span id="sysbar-battery-level" class="sysbar-battery-level"></span><b id="sysbar-bolt" hidden>⚡</b></span></span></div>
                 <div id="sysbar-nav" class="sysbar-nav"><span class="sysbar-handle"></span><span class="sysbar-buttons"><i class="sysbar-back"></i><i class="sysbar-home"></i><i class="sysbar-recents"></i></span></div>
@@ -140,7 +164,7 @@
     </details>
     <footer><span><span class="footer-dot"></span> Sem instalação. Sem emulador. Sem upload.</span><a href="./hermes-proof/">Experimento Hermes no navegador ↗</a><span>APK Browser Lab <span class="footer-slash">/</span> protótipo técnico</span></footer>
   </main>
-  <script type="module" src="./app.js?v=c2b02b689b7f"></script>
+  <script type="module" src="./app.js?v=7a404aba383f"></script>
 <div id="summary-overlay" class="summary-overlay" role="dialog" aria-label="Resumo" hidden><button id="summary-close" type="button">Fechar</button><pre id="summary-text"></pre></div>
 </body>
 </html>

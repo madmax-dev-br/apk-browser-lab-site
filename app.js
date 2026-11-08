@@ -1,13 +1,16 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=c2b02b689b7f';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=c2b02b689b7f';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice } from './device-settings.js?v=c2b02b689b7f';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=c2b02b689b7f';
-import { createDeviceView, createViewState } from './device-view.js?v=c2b02b689b7f';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=c2b02b689b7f';
-import { formatApiGapReport } from './api-gap-scan.js?v=c2b02b689b7f';
-import { createLogcatPanel } from './logcat-panel.js?v=c2b02b689b7f';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=c2b02b689b7f';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=c2b02b689b7f';
+import { APKWorkerClient } from './apk-worker-client.js?v=7a404aba383f';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=7a404aba383f';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=7a404aba383f';
+import { initCollapsibleSections } from './panel-sections.js?v=7a404aba383f';
+import { createPermissionsPanel } from './permissions-panel.js?v=7a404aba383f';
+import { createOverridesPanel } from './overrides-panel.js?v=7a404aba383f';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=7a404aba383f';
+import { createDeviceView, createViewState } from './device-view.js?v=7a404aba383f';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=7a404aba383f';
+import { formatApiGapReport } from './api-gap-scan.js?v=7a404aba383f';
+import { createLogcatPanel } from './logcat-panel.js?v=7a404aba383f';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=7a404aba383f';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=7a404aba383f';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -109,7 +112,7 @@ function showError(error, title = 'Tentativa de execução interrompida') {
   if (error.details) details.push(typeof error.details === 'string' ? error.details : JSON.stringify(error.details, null, 2));
   if (error.trace?.length) details.push('Últimas instruções da VM:\n' + error.trace.slice(-40).join('\n'));
   $('error-detail').textContent = [...new Set(details)].join('\n');
-  state.errorReport = buildDiagnosticReport({ error, packageName: inventory?.packageName ?? state.fileName ?? 'APK', tolerateMissing: $('tolerate-missing')?.value ?? 'off', build: document.querySelector?.('script[src*="app.js"]')?.src?.split('v=')[1] ?? '' }).text;
+  state.errorReport = buildDiagnosticReport({ error, packageName: inventory?.packageName ?? state.fileName ?? 'APK', tolerateMissing: $('tolerate-missing')?.value ?? 'off', methodOverrides: overridesPanel.activeCount(), build: document.querySelector?.('script[src*="app.js"]')?.src?.split('v=')[1] ?? '' }).text;
   $('error-detail').hidden = !details.length;
   $('error-diagnostics').hidden = !details.length;
   $('error-diagnostics').open = false;
@@ -329,6 +332,7 @@ async function inspectSelectedNative() {
 async function importSource(source, autoRun = false) {
   if (state.busy) return;
   state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
+  permissionsPanel?.detach(); overridesPanel?.detach();
   switchMode('apk'); hideError(); state.runtime = null; state.inventory = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true;
   $('empty-preview').querySelector('h2').textContent = 'Seu aplicativo começa aqui.'; $('empty-preview').querySelector('p').innerHTML = 'Selecione um APK e clique em Executar.<br>Ou rode a demonstração para testar.';
   showBoot('Abrindo o APK…'); const token = beginOperation('Lendo o arquivo APK…');
@@ -352,9 +356,10 @@ async function importSource(source, autoRun = false) {
     if (buffer.byteLength > 1024 * 1024 * 1024) throw new Error('O APK excede o limite de 1 GiB.');
     $('file-size').textContent = `${formatSize(buffer.byteLength)} · processado no navegador`;
     state.apiGaps = null;
-    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceState.settings, tolerateMissing: $('tolerate-missing')?.value ?? 'off', strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB }); state.loadedMemoryMiB = deviceState.settings.memoryMiB; updateVmMemoryHint(); // Ownership transfers to the Worker.
+    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceForVM(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB }); state.loadedMemoryMiB = deviceState.settings.memoryMiB; updateVmMemoryHint(); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
     state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);
+    await permissionsPanel.attach(result.inventory); await overridesPanel.attach(result.inventory);   // before any app code runs: permission state, simulated location, method return overrides
     showInventory(result.inventory);
     appendTrace(`Pacote: ${result.inventory.packageName || '(não identificado)'}`);
     if (state.mode === 'apk') {
@@ -394,6 +399,8 @@ function redrawLayoutBounds() {
   drawLayoutBounds(canvas, layoutBoundsRects(state.lastSnapshot, { origin: { x: frame?.left ?? 0, y: frame?.top ?? 0 } }), width, height);
 }
 const deviceState = { settings: loadDeviceSettings(), clockTimer: null };
+const permissionsPanel = createPermissionsPanel({ $, vm: apkVM, location: { get: () => deviceState.settings.location, set: block => { deviceState.settings = { ...deviceState.settings, location: block }; saveDeviceSettings(deviceState.settings); } } });
+const overridesPanel = createOverridesPanel({ $, vm: apkVM });
 const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, notifyParent, clickView: id => clickView(id), hooks: {
   navigationChanged(canGoBack) { $('back-button').disabled = state.busy || !canGoBack; $('back-button').hidden = state.mode !== 'apk' || !canGoBack; },
   closed() {
@@ -402,6 +409,7 @@ const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTr
     if (state.mode === 'apk') { setStatus('Aplicativo encerrado · nenhuma Activity ativa'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENCERRADO'; }
   },
   rendered(snapshot, composeReady) {
+    overridesPanel.hits(snapshot.methodOverrides);
     hideBoot({ force: true }); $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth); state.lastSnapshot = snapshot; redrawLayoutBounds(); if (snapshot.vmHealth) state.lastVmHealth = snapshot.vmHealth;
     if (snapshot.droppedEvent) appendTrace(`Evento descartado: a View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) já não existe na VM.`);
     // The VM raised java.lang.OutOfMemoryError (even if the app caught it): never silent.
@@ -423,7 +431,7 @@ function writeDevicePanel(settings) {
 }
 function readDevicePanel() {
   return sanitizeSettings({ screen: $('dev-screen').value, orientation: $('dev-orientation').value, fontScale: Number($('dev-font').value), locale: $('dev-locale').value, darkTheme: $('dev-dark').checked, animatorScale: Number($('dev-animator').value),
-    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value }, memoryMiB: Number($('vm-memory')?.value ?? 0) });
+    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value }, memoryMiB: Number($('vm-memory')?.value ?? 0), location: deviceState.settings.location });
 }
 // "Memória da VM": the Java heap budget (object limit) used at the next load; the VM limit of each step is memoryBudget({ override }).maxHeapObjects, the same rule the Worker applies (heapLimitFor).
 const vmMemoryLabel = mibValue => { const { maxHeapObjects } = memoryBudget({ override: mibValue }); return `${mibValue >= 1024 ? `${mibValue / 1024} GiB` : `${mibValue} MiB`} · ${maxHeapObjects.toLocaleString('pt-BR')} objetos`; };
@@ -445,7 +453,7 @@ function applyDeviceSettings(settings) {
     for (let attempt = 0; attempt < 100 && apkVM.pending; attempt++) await new Promise(resolve => setTimeout(resolve, 50));
     const latest = deviceState.settings;
     try {
-      const { outcome, snapshot } = await apkVM.setDevice(latest);
+      const { outcome, snapshot } = await apkVM.setDevice(deviceForVM(latest));
       if (snapshot) renderSnapshot(snapshot);
       note.textContent = outcome?.changed ? `Aplicado ao vivo: ${outcome.relaunched ? `${outcome.relaunched} Activity recriada(s) com estado salvo` : ''}${outcome.relaunched && outcome.delivered ? ' · ' : ''}${outcome.delivered ? `${outcome.delivered} onConfigurationChanged` : ''}${!outcome.relaunched && !outcome.delivered ? 'sem mudança de Configuration (barra de status, rede/bateria/fuso)' : ''}.` : 'Sem alteração para o app.';
     } catch (error) { note.textContent = 'O app não aceitou a mudança: ' + (error?.message || error); reportAPKError(error, 'Mudança de configuração do dispositivo interrompida'); }
@@ -456,7 +464,7 @@ function initDevicePanel() {
   fillSelect($('dev-screen'), DEVICE_SCREENS); fillSelect($('dev-locale'), DEVICE_LOCALES); fillSelect($('dev-tz'), DEVICE_ZONES); initVmMemory(); writeDevicePanel(deviceState.settings);
   for (const id of ['dev-screen', 'dev-orientation', 'dev-font', 'dev-locale', 'dev-dark', 'dev-animator', 'dev-hour24', 'dev-tz', 'dev-battery', 'dev-charging', 'dev-network', 'dev-nav', 'dev-hosts-all', 'dev-layout-bounds', 'dev-hosts', 'dev-proxy', 'vm-memory']) $(id).addEventListener('input', () => { applyDeviceSettings(readDevicePanel()); });
   document.querySelector('#trace .trace-actions')?.addEventListener('click', event => event.preventDefault());   // buttons in the <summary> must not toggle the panel
-  $('device-reset').addEventListener('click', () => { applyDeviceSettings(defaultDeviceSettings()); });
+  $('device-reset').addEventListener('click', () => { applyDeviceSettings(defaultDeviceSettings()); permissionsPanel.refreshLocation(); if (apkVM.worker) apkVM.setPermissions({ location: deviceState.settings.location }).catch(() => {}); });
 }
 // ---- "Abrir": a deep link / Intent resolved against the manifest's intent filters (src/deep-link-host.js) ----
 const deepLinkPanel = { history: [], busy: false };
@@ -633,4 +641,5 @@ loadScenarioCatalog();
 notifyParent('apk-lab-ready');
 if (params.get('demo') === '1') runDemo();
 initDevicePanel();
+initCollapsibleSections($('control-panel'));
 initDeepLinkPanel();

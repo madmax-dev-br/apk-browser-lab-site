@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=c2b02b689b7f';
-import { createRasterReceiver } from './raster-cache.js?v=c2b02b689b7f';
+import { createWebAudioPlayer } from './web-audio-player.js?v=7a404aba383f';
+import { createRasterReceiver } from './raster-cache.js?v=7a404aba383f';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=c2b02b689b7f', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=7a404aba383f', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -20,6 +20,10 @@ export class APKWorkerClient {
       if (data?.snapshot) { try { this.rasters.resolve(data.snapshot); } catch (error) { this.cancel(error); return; } }
       if (data?.type === 'heartbeat') { this.lastHeartbeat = { ...data, receivedAt: Date.now() }; this.onHeartbeat?.(data); this.rearm?.(); return; }   // a Worker that keeps heartbeating is alive: the request timeout measures silence   // posted by the VM from inside its loops: the last one explains a timeout
       if (data?.type === 'screen-snapshot') { this.lastScreenSnapshot = { text: data.text, receivedAt: Date.now() }; return; }
+      if (data?.type === 'permission-request') { this.onPermissionRequest?.(data.request); return; }   // Activity.requestPermissions that needs the user's answer
+      if (data?.type === 'permission-config') { this.onPermissionConfig?.(data.config); return; }
+      const call = this.sideCalls?.get(data?.requestId);
+      if (call && (data.type === 'result' || data.type === 'error')) { clearTimeout(call.timer); this.sideCalls.delete(data.requestId); if (data.type === 'result') call.resolve(data); else call.reject(Object.assign(new Error(data.error?.message || 'Falha na VM.'), data.error || {})); return; }
       const side = this.sideRequests?.get(data?.requestId);
       if (side && (data.type === 'result' || data.type === 'error')) { clearTimeout(side.timer); this.sideRequests.delete(data.requestId); side.resolve(data.type === 'result' ? data.screenState : this.cachedScreenState()); return; }
       if (data?.type === 'app-data') { this.appData = data.status; this.onAppData?.(data.status); return; }
@@ -82,9 +86,9 @@ export class APKWorkerClient {
       catch (error) { this.cancel(error); }
     });
   }
-  async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0 } = {}) {
+  async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], permissions = null } = {}) {
     this.cancel(); this.rasters.reset(); this.apiGaps = null;
-    const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
+    const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, permissions }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
     this.appData = response.appData ?? null;
     return { inventory: response.inventory, appData: this.appData };
   }
@@ -102,6 +106,24 @@ export class APKWorkerClient {
   }
   /** Tells the Worker that the page has drawn the scheduled-event snapshot `seq` (back-pressure: the Worker does not take the next one while one is undrawn, src/apk-worker.js). */
   ackFrame(seq) { try { this.worker?.postMessage({ type: 'frame-ack', seq }); } catch { /* the Worker is gone */ } }
+  /** A request answered from the Worker's message loop between two VM events, outside the one-operation slot (method overrides, permission state): resolves with the reply, rejects when there is no Worker or it stays silent. */
+  sideCall(type, payload = {}, timeoutMs = 8000) {
+    if (!this.worker) return Promise.reject(new Error('Nenhum APK está carregado na VM.'));
+    return new Promise((resolve, reject) => {
+      const requestId = ++this.sequence, calls = this.sideCalls ??= new Map();
+      const timer = setTimeout(() => { calls.delete(requestId); reject(new Error(`A VM não respondeu a "${type}" em ${Math.round(timeoutMs / 1000)} s (ocupada com uma operação).`)); }, timeoutMs);
+      calls.set(requestId, { resolve, reject, timer });
+      try { this.worker.postMessage({ ...payload, type, requestId }); } catch (error) { clearTimeout(timer); calls.delete(requestId); reject(error); }
+    });
+  }
+  /** Debugging tool: installs the return-value overrides ([{ method, value, enabled }]) in the running VM; resolves with one status per entry. */
+  async setMethodOverrides(overrides) { return (await this.sideCall('method-overrides', { overrides })).statuses; }
+  /** The permission states and the simulated location ({ config, location }), applied between two VM events; either part may be left out. */
+  async setPermissions(payload) { return this.sideCall('permissions-config', payload); }
+  /** The answer to a `permission-request` (onPermissionRequest): the config after the user's dialog, or null when it was dismissed. */
+  permissionResponse(id, config) { try { this.worker?.postMessage({ type: 'permission-response', requestId: ++this.sequence, id, config }); } catch { /* the Worker is gone */ } }
+  /** Methods of the loaded APK matching `query`, and the return types of owner->name(parameters) for a Java-form text. */
+  async searchMethods({ query = '', owner = null, name = null, parameters = [] } = {}) { const reply = await this.sideCall('method-search', { query, owner, name, parameters }); return { methods: reply.methods, returnTypes: reply.returnTypes }; }
   /** Side channel: independent of the one-operation-at-a-time request slot, so it works while a click or launch is running (and then answers from the last snapshot). */
   screenState() {
     if (!this.worker) return Promise.resolve(this.cachedScreenState());
@@ -145,6 +167,8 @@ export class APKWorkerClient {
     this.worker = null;
     for (const side of this.sideRequests?.values() ?? []) { clearTimeout(side.timer); side.resolve(this.cachedScreenState()); }
     this.sideRequests?.clear();
+    for (const call of this.sideCalls?.values() ?? []) { clearTimeout(call.timer); call.reject(new Error('A VM foi encerrada.')); }
+    this.sideCalls?.clear();
     if (this.pending) {
       clearTimeout(this.pending.timer);
       const reject = this.pending.reject; this.pending = null;

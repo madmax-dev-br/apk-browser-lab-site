@@ -58,13 +58,13 @@
 
 /* Virtual device settings panel */
 .device-panel{border:1px solid var(--line);border-radius:8px;margin:14px 0 12px;background:#fbfcfe}
-.device-panel summary{display:flex;align-items:center;gap:9px;padding:11px 12px;cursor:pointer;list-style:none;font-size:10px;font-weight:600;color:#6e7384}
-.device-panel summary::-webkit-details-marker{display:none}
-.device-panel summary .quiet-badge{margin-left:auto;font:7px ui-monospace,monospace;background:#f4f5f7;color:#a4a8b2;padding:4px 5px;border-radius:3px}
-.device-panel[open] .trace-chevron{transform:rotate(180deg)}
+.device-panel>summary{display:flex;align-items:center;gap:9px;padding:11px 12px;cursor:pointer;list-style:none;font-size:10px;font-weight:600;color:#6e7384}
+.device-panel>summary::-webkit-details-marker{display:none}
+.device-panel>summary .quiet-badge{margin-left:auto;font:7px ui-monospace,monospace;background:#f4f5f7;color:#a4a8b2;padding:4px 5px;border-radius:3px}
+.device-panel[open]>summary .trace-chevron{transform:rotate(180deg)}
 :root[data-theme=dark] .device-panel{background:#17171d;border-color:#2c2b36}
-:root[data-theme=dark] .device-panel summary{color:#b6b3c3}
-:root[data-theme=dark] .device-panel summary .quiet-badge{background:#23222c;color:#8f8c9d}
+:root[data-theme=dark] .device-panel>summary{color:#b6b3c3}
+:root[data-theme=dark] .device-panel>summary .quiet-badge{background:#23222c;color:#8f8c9d}
 .memory-meter{display:inline-flex;align-items:center;gap:6px;margin-left:auto;margin-right:12px;font-size:11px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
 .memory-meter[hidden]{display:none}
 .memory-meter i{display:inline-block;width:44px;height:6px;border-radius:3px;background:var(--line);overflow:hidden;position:relative}
@@ -114,9 +114,9 @@
 @media (max-width:640px){.netlog-line{grid-template-columns:70px 44px minmax(0,1fr) 90px}.netlog-size,.netlog-duration{display:none}}
 /* Controles: one panel (deep link, appearance, device, execution), compact label/value rows grouped under small headings. */
 .control-panel{margin-bottom:14px}
-.control-panel[open] summary{border-bottom:1px solid var(--line)}
-.cp-group{padding:11px 12px 12px;border-top:1px solid var(--line)}.cp-group:first-of-type{border-top:0}
-.cp-group h3{margin:0 0 9px;font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
+.control-panel[open]>summary{border-bottom:1px solid var(--line)}
+.cp-group{padding:0;border-top:1px solid var(--line)}.cp-group:first-of-type{border-top:0}
+.cp-group h3{margin:0;font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
 .cp-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:8px 10px;align-items:center}
 .cp-grid label,.deeplink-form>label{font-size:10px;color:#6e7384;display:flex;justify-content:space-between;gap:6px}
 .cp-grid output{font:9px ui-monospace,monospace;color:#8d94a4}
@@ -146,10 +146,10 @@
 :root[data-theme=dark] .cp-button{background:#1d1c25;border-color:#2c2b36;color:#a9a6b8}:root[data-theme=dark] .cp-button.primary{background:var(--accent);border-color:var(--accent);color:#14131b}
 :root[data-theme=dark] .deeplink-result[data-state=ok]{color:#7bd19b}:root[data-theme=dark] .deeplink-result[data-state=error]{color:#f08a84}
 :root[data-theme=dark] .deeplink-history li button{color:#a9a6b8}:root[data-theme=dark] .deeplink-history li button:hover,:root[data-theme=dark] .deeplink-history li button:focus-visible{background:#23222c}
-:root[data-theme=dark] .cp-group,:root[data-theme=dark] .control-panel[open] summary{border-color:#2c2b36}
-.control-panel input[type=text]{font:9px ui-monospace,monospace;color:#5d6072;border:1px solid #e7e9f0;border-radius:4px;background:#fbfcfe;padding:7px}
-.control-panel input[type=text]::placeholder{color:#b3b7c3}.control-panel input[type=text]:focus-visible{outline:3px solid #b1adff;outline-offset:1px}
-:root[data-theme=dark] .control-panel input[type=text]{color:#acacb5;border-color:#363944;background:#101520}:root[data-theme=dark] .control-panel input[type=text]::placeholder{color:#5f6270}
+:root[data-theme=dark] .cp-group,:root[data-theme=dark] .control-panel[open]>summary{border-color:#2c2b36}
+.control-panel input[type=text],.control-panel input[type=search]{font:9px ui-monospace,monospace;color:#5d6072;border:1px solid #e7e9f0;border-radius:4px;background:#fbfcfe;padding:7px}
+.control-panel input[type=text]::placeholder,.control-panel input[type=search]::placeholder{color:#b3b7c3}.control-panel input[type=text]:focus-visible,.control-panel input[type=search]:focus-visible{outline:3px solid #b1adff;outline-offset:1px}
+:root[data-theme=dark] .control-panel input[type=text],.control-panel input[type=search]{color:#acacb5;border-color:#363944;background:#101520}:root[data-theme=dark] .control-panel input[type=text]::placeholder{color:#5f6270}
 /* boot overlay: the phone frame shown from the click on "Executar APK" until the first real frame */
 .boot-overlay{position:absolute;left:50%;top:50%;z-index:6;width:calc(var(--boot-w,411)*1px + 10px);height:calc(var(--boot-h,914)*1px + 10px);transform:translate(-50%,-50%) scale(var(--boot-scale,.7));transform-origin:center center;background:#262934;border-radius:34px;padding:5px;opacity:1;transition:opacity .35s ease;pointer-events:none}
 .boot-overlay.fading{opacity:0}
@@ -175,3 +175,49 @@
 .screen-state-bar{display:none}
 .status-bar{flex-wrap:wrap}.memory-meter{order:5;flex:1 0 100%;margin:4px 0 0}
 .vm-memory-hint{font-style:normal;font-weight:600;color:var(--accent);margin-left:6px}.vm-memory-hint[hidden]{display:none}.vm-memory-row .support-note{display:block;margin:-6px 1px 8px}
+
+/* collapsible sections of the "Controles" panel */
+.cp-group>summary{display:flex;align-items:center;gap:8px;min-height:38px;padding:9px 12px;cursor:pointer;list-style:none;color:inherit}
+.cp-group>summary::-webkit-details-marker{display:none}
+.cp-group>summary:hover{background:rgba(110,115,132,.06)}
+.cp-group>summary:focus-visible{outline:3px solid #b1adff;outline-offset:-3px;border-radius:6px}
+.cp-group>summary .trace-chevron{margin-left:auto;flex:none;transition:transform .15s}
+.cp-group[open]>summary .trace-chevron{transform:rotate(180deg)}
+.cp-body{padding:0 12px 12px}
+.cp-badge{font:8px ui-monospace,monospace;background:#f4f5f7;color:#a4a8b2;padding:3px 5px;border-radius:3px;white-space:nowrap;margin-left:auto}.cp-badge+.trace-chevron{margin-left:0}
+:root[data-theme=dark] .cp-badge{background:#23222c;color:#8f8c9d}
+@media (prefers-reduced-motion:reduce){.cp-group>summary .trace-chevron{transition:none}}
+/* Permissões */
+.perms-list{display:flex;flex-direction:column;gap:10px}.perms-list[hidden]{display:none}
+.perm-group-title{margin:0 0 4px;font-size:10px;font-weight:700;color:#6e7384}
+.perm-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr);gap:6px 10px;align-items:center;padding:3px 0}
+.perm-name{font:9px ui-monospace,monospace;color:#6e7384;overflow-wrap:anywhere}.perm-name small{display:block;font:9px system-ui,sans-serif;color:#9aa0ae}
+.perm-row select{width:100%;min-width:0}
+.perm-state{grid-column:1/-1;font-size:9px;color:#9aa0ae;margin:-2px 0 2px}
+.perms-loc-title{margin-top:14px}
+:root[data-theme=dark] .perm-group-title,:root[data-theme=dark] .perm-name{color:#a9a6b8}
+/* Retornos de métodos */
+.ov-warning b{color:var(--accent)}
+.ov-search{position:relative;margin-bottom:8px}.ov-search label{display:block;font-size:10px;color:#6e7384;margin-bottom:4px}.ov-search input{width:100%;box-sizing:border-box}
+.ov-results{list-style:none;margin:4px 0 0;padding:0;max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:6px;background:#fff}.ov-results[hidden]{display:none}
+.ov-results li button{display:block;width:100%;text-align:left;border:0;background:none;padding:6px 8px;font:9px ui-monospace,monospace;color:#5d6072;cursor:pointer;overflow-wrap:anywhere}
+.ov-results li button:hover,.ov-results li button:focus-visible{background:#f0f1f6}
+.ov-results .ov-empty{padding:6px 8px;font-size:9px;color:#9aa0ae}
+.ov-list{list-style:none;margin:0 0 6px;padding:0;display:flex;flex-direction:column;gap:10px}
+.ov-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:6px}
+.ov-row input[type=checkbox]{accent-color:var(--accent)}
+.ov-row .ov-method{grid-column:2/4;width:100%;min-width:0;box-sizing:border-box}
+.ov-row .ov-value{grid-column:1/3;width:100%;min-width:0;box-sizing:border-box}
+.ov-row .ov-remove{grid-column:3}
+.ov-row .ov-meta{grid-column:1/-1;font-size:9px;color:#9aa0ae;overflow-wrap:anywhere}.ov-row .ov-meta[data-state=error]{color:#d4504a}.ov-row .ov-meta[data-state=ok]{color:#3c9a64}
+:root[data-theme=dark] .ov-results{background:#101520}:root[data-theme=dark] .ov-results li button{color:#acacb5}:root[data-theme=dark] .ov-results li button:hover,:root[data-theme=dark] .ov-results li button:focus-visible{background:#23222c}
+:root[data-theme=dark] .ov-search label{color:#a9a6b8}:root[data-theme=dark] .ov-row .ov-meta[data-state=error]{color:#f08a84}:root[data-theme=dark] .ov-row .ov-meta[data-state=ok]{color:#7bd19b}
+/* permission dialog, over the phone screen (Android 13 look) */
+.perm-scrim{position:absolute;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);padding:24px}.perm-scrim[hidden]{display:none}
+.perm-card{width:100%;max-width:310px;box-sizing:border-box;background:#fff;color:#1f1f1f;border-radius:28px;padding:24px 20px 16px;text-align:center;font-family:system-ui,sans-serif;outline:none}
+.perm-icon{width:24px;height:24px;margin:0 auto 14px;color:#0b57d0}.perm-icon svg{width:24px;height:24px;fill:currentColor}
+.perm-question{margin:0 0 6px;font-size:16px;line-height:22px;font-weight:500}.perm-detail{margin:0 0 14px;font-size:12px;line-height:16px;color:#5f6368}
+.perm-actions{display:flex;flex-direction:column;gap:8px}
+.perm-button{border:1px solid #c4c7c5;background:#fff;color:#0b57d0;border-radius:100px;min-height:44px;padding:8px 14px;font-size:14px;font-weight:500;cursor:pointer}
+.perm-button:hover,.perm-button:focus-visible{background:#e8f0fe}.perm-button:focus-visible{outline:3px solid #0b57d0;outline-offset:1px}
+.perm-scrim.dark .perm-card{background:#2b2d30;color:#e3e3e3}.perm-scrim.dark .perm-detail{color:#c4c7c5}.perm-scrim.dark .perm-button{background:#2b2d30;border-color:#5e5e5e;color:#a8c7fa}.perm-scrim.dark .perm-button:hover,.perm-scrim.dark .perm-button:focus-visible{background:#3a3d42}.perm-scrim.dark .perm-icon{color:#a8c7fa}

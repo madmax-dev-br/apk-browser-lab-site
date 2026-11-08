@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=c2b02b689b7f';
-import { BUCKET } from './time-breakdown.js?v=c2b02b689b7f';
-import { Blocked, QUANTUM } from './scheduler.js?v=c2b02b689b7f';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=c2b02b689b7f';
+import { APKError } from './apk-error.js?v=7a404aba383f';
+import { BUCKET } from './time-breakdown.js?v=7a404aba383f';
+import { Blocked, QUANTUM } from './scheduler.js?v=7a404aba383f';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=7a404aba383f';
 
 // Frame-based DEX interpreter.
 //
@@ -57,7 +57,7 @@ function prepareCore(rt, method, code) {
   const units = (byteStart & 1) === 0 && LITTLE_ENDIAN ? new Uint16Array(reader.bytes.buffer, byteStart, code.units) : Uint16Array.from({ length: code.units }, (_, i) => reader.view.getUint16(code.offset + i * 2, true));
   const origin = rt.methodOrigin(method);
   const prog = { dex, units, refs: new Array(code.units), tries: null, stats: rt.executionByOrigin[origin], key: method.key, filename: dex.filename ?? 'DEX', calls: 0, loops: 0, fn: null, method, code, getter: detectGetter(code, units), shape: detectShape(code, units) };
-  progs.set(rt, prog); return prog;
+  progs.set(rt, prog); (rt.allProgs ??= []).push(prog); return prog;   // allProgs: applyMethodOverrides resets the call-site caches of every decoded method (src/method-overrides.js)
 }
 
 /**

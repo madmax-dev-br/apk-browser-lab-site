@@ -1,6 +1,6 @@
 // "Estado da tela": a plain-text picture of what the VM shows and why it may be blank, for "Copiar diagnóstico" and for a button that works without any error. Read-only on the VM.
 // Pure data: no app or library names are written here; class names come from the running app and only reach the user's clipboard.
-import { reportSummary, collapseThreads } from './report-summary.js?v=c2b02b689b7f';
+import { reportSummary, collapseThreads } from './report-summary.js?v=7a404aba383f';
 const MiB = 1024 * 1024, BYTES_PER_OBJECT = 1600;
 const STAGES = { 0: 'destruída', 1: 'criada', 2: 'parada', 3: 'iniciada/pausada', 4: 'retomada (em primeiro plano)' };
 const dotted = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');
@@ -50,6 +50,7 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
   const tasks = platform.tasks ?? [], frames = platform.allFrames?.() ?? [];
   const top = frames.length ? frames[frames.length - 1] : null;
   out.push('Estado da tela');
+  if (runtime.methodOverrides) out.push(`ATENÇÃO: retornos de métodos substituídos ATIVOS (${runtime.methodOverrides.size} métodos): o código original deles não executou; ferramenta de depuração.`);
   const summaryAt = out.length;
   // ---- activity stack
   out.push('Pilha de Activities (tarefa: Activity, estágio):');

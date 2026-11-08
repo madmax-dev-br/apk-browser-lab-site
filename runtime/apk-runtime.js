@@ -1,29 +1,30 @@
-import { VMClock } from './vm-clock.js?v=c2b02b689b7f';
-import { OperationMonitor } from './operation-monitor.js?v=c2b02b689b7f';
-import { ExecutionProfile } from './execution-profile.js?v=c2b02b689b7f';
-import { SamplingProfiler } from './sampling-profiler.js?v=c2b02b689b7f';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=c2b02b689b7f';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=c2b02b689b7f';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=c2b02b689b7f';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=c2b02b689b7f';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=c2b02b689b7f';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=c2b02b689b7f';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=c2b02b689b7f';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=c2b02b689b7f';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=c2b02b689b7f';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=c2b02b689b7f';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=c2b02b689b7f';
-import { APKError } from './apk-error.js?v=c2b02b689b7f';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=c2b02b689b7f';
-import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=c2b02b689b7f';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=c2b02b689b7f';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=c2b02b689b7f';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=c2b02b689b7f';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=c2b02b689b7f';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=c2b02b689b7f';
-import { Scheduler, Blocked } from './scheduler.js?v=c2b02b689b7f';
-import { bootClassLacksMember } from './boot-class-members.js?v=c2b02b689b7f';
-export { APKError } from './apk-error.js?v=c2b02b689b7f';
+import { VMClock } from './vm-clock.js?v=7a404aba383f';
+import { overrideHit } from './method-overrides.js?v=7a404aba383f';
+import { OperationMonitor } from './operation-monitor.js?v=7a404aba383f';
+import { ExecutionProfile } from './execution-profile.js?v=7a404aba383f';
+import { SamplingProfiler } from './sampling-profiler.js?v=7a404aba383f';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=7a404aba383f';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=7a404aba383f';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=7a404aba383f';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=7a404aba383f';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=7a404aba383f';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=7a404aba383f';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=7a404aba383f';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=7a404aba383f';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=7a404aba383f';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=7a404aba383f';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=7a404aba383f';
+import { APKError } from './apk-error.js?v=7a404aba383f';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=7a404aba383f';
+import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=7a404aba383f';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=7a404aba383f';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=7a404aba383f';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=7a404aba383f';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=7a404aba383f';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=7a404aba383f';
+import { Scheduler, Blocked } from './scheduler.js?v=7a404aba383f';
+import { bootClassLacksMember } from './boot-class-members.js?v=7a404aba383f';
+export { APKError } from './apk-error.js?v=7a404aba383f';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1152,7 +1153,7 @@ export class APKRuntime {
     // boolean/byte/short/char/int/long/float/double methods with 0/false; 'all' also answers object methods with null. Every stubbed call is counted and traced (STUB-VOID / STUB-RETURN), so the run
     // doubles as the to-do list of missing bridges; a run that stubbed anything is never treated as validated. The default stays strict.
     if (!['off', 'void', 'primitives', 'all'].includes(tolerateMissing)) fail('VM tolerateMissing must be off, void, primitives or all');
-    this.tolerateMissing = tolerateMissing; this.missingVoid = new Map(); this.missingReturns = new Map(); this.missingClasses = new Map(); this.missingLibraries = new Map(); this.refusedProtectedLibrary = null;
+    this.methodOverrides = null; this.tolerateMissing = tolerateMissing; this.missingVoid = new Map(); this.missingReturns = new Map(); this.missingClasses = new Map(); this.missingLibraries = new Map(); this.refusedProtectedLibrary = null;
     this.maxCallDepth = maxCallDepth; this.peakCallDepth = 0;
     if (!Number.isInteger(maxInstructionsPerEvent) || maxInstructionsPerEvent < 1000 || maxInstructionsPerEvent > 200000000) fail('VM maxInstructionsPerEvent must be an integer from 1000 to 200000000');
     // Default fuse: 100M instructions per thread between blocking points, x8 across the threads of one host event. Measured on React Native 0.79 startup (Wellhub 10.22): one
@@ -2013,11 +2014,13 @@ export class APKRuntime {
       if (resolution.kind === 'bridge') { this.lastBridge = resolution; this.lastBridgeDepth = this.depth; if (this.profile.active) this.profile.host(resolution.key); this.monitor.hostEnter(resolution.key, resolution); this.record(resolution.text ??= `${resolution.skia ? 'SKIA' : 'SHIM'} ${resolution.key}`); this.lastHostCall = resolution.key; return hostReturn(resolution.selected, this.bridge(resolution.selected, args, mode, resolution.key, resolution)); }
       if (resolution.kind === 'default') {
         const defaultMethod = resolution.defaultMethod;
+        if (this.methodOverrides !== null) { const overridden = this.methodOverrides.get(defaultMethod.method.key); if (overridden !== undefined) return overrideHit(this, overridden, defaultMethod, mode); }   // src/method-overrides.js
         this.recordMethod(defaultMethod.method);
         if (wantFrame) return new PendingCall(defaultMethod.method, defaultMethod.code, args);
         return this.execute(defaultMethod.method, defaultMethod.code, args);
       }
       const definition = resolution.definition;
+      if (this.methodOverrides !== null) { const overridden = this.methodOverrides.get(definition.method.key); if (overridden !== undefined) return overrideHit(this, overridden, definition, mode); }   // src/method-overrides.js: the body does not run
       if (resolution.fast !== undefined) { const fast = resolution.fast(this, args); if (fast !== FALLTHROUGH) return fast; }   // host fast path of a framework method (src/io-fast-paths.js); FALLTHROUGH runs the DEX body
       if (!!(definition.flags & 8) !== (mode === 'static')) fail(`Invalid static/instance invoke: ${definition.method.key}`);
       if (mode === 'static') this.initialize(definition.method.owner);

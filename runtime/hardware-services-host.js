@@ -1,13 +1,13 @@
-import { APKError } from './apk-error.js?v=c2b02b689b7f';
-import { gcRoot } from './heap-gc.js?v=c2b02b689b7f';
-import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=c2b02b689b7f';
-import { createHostRegistry } from './host-contract.js?v=c2b02b689b7f';
-import { GC_ROOTS } from './heap-gc.js?v=c2b02b689b7f';
+import { APKError } from './apk-error.js?v=7a404aba383f';
+import { gcRoot } from './heap-gc.js?v=7a404aba383f';
+import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=7a404aba383f';
+import { createHostRegistry, doubleBits, floatBits } from './host-contract.js?v=7a404aba383f';
+import { GC_ROOTS } from './heap-gc.js?v=7a404aba383f';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
 // contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes
 // (AlarmManager is Java now: src/java-services-host.js, docs/SERVICES.md). Each service exists only through this contract; Context.getSystemService returns it for the service name or its class.
-const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', PENDING = 'Landroid/app/PendingIntent;', CONTEXT = 'Landroid/content/Context;';
+const RUNNABLE = 'Ljava/lang/Runnable;', DELIVERY = 'Lapkweb/bridge/LocationDelivery;', OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', PENDING = 'Landroid/app/PendingIntent;', CONTEXT = 'Landroid/content/Context;';
 
 export function createHardwareServicesHost(platform) {
   const registry = createHostRegistry(), { def, type } = registry;
@@ -48,10 +48,12 @@ export function createHardwareServicesHost(platform) {
   // ---- AudioManager: src/audio-manager-host.js (volumes, ringer/DND rule, focus stack, devices, session ids) ---------------------------------------------------
   const audioManager = installAudioManager({ platform, def, service, call, holds, emptyList }), ringtones = installRingtoneManager({ platform, def, type, holds });
 
-  // ---- LocationManager: an emulator with location services off (android-13.0.0_r1 LocationManager / LocationManagerService) ----------------------------------------------------------------
-  // The providers exist (passive, gps, network, fused) but the user setting is off, so none is enabled and none ever produces a fix: isLocationEnabled/isProviderEnabled are false, there is no last
-  // location, getCurrentLocation answers null, GNSS callbacks register but never fire, and a listener registered on a disabled provider hears onProviderDisabled right away (documented in
-  // LocationListener). Permission checks throw SecurityException like LocationPermissions.enforceLocationPermission. Callbacks run on the main event queue (the Looper/Executor given is not honoured).
+  // ---- LocationManager (android-13.0.0_r1 LocationManager / LocationManagerService) ----------------------------------------------------------------------------------------------------------
+  // The providers exist (passive, gps, network, fused). Location is off by default, like an emulator with the setting off: isLocationEnabled/isProviderEnabled are false, there is no last location,
+  // getCurrentLocation answers null and a listener registered on a disabled provider hears onProviderDisabled right away (documented in LocationListener). The "Permissões" section of the page can
+  // turn location on and give the device a position (platform.locationSimulation): then the providers are enabled, getLastKnownLocation / getCurrentLocation return that fix and registered
+  // listeners hear it, on their Looper or Executor, when it is registered and each time it changes. Permission checks throw SecurityException like LocationPermissions.enforceLocationPermission.
+  // minTime / minDistance are not applied (every change is delivered). GNSS callbacks register but never fire. Google Play services' fused client does not exist on this device.
   const LOCATION = service('location', 'Landroid/location/LocationManager;');
   const LISTENER = 'Landroid/location/LocationListener;', LOC = 'Landroid/location/Location;', LOOPER = 'Landroid/os/Looper;', EXECUTOR = 'Ljava/util/concurrent/Executor;', CONSUMER = 'Ljava/util/function/Consumer;', SIGNAL = 'Landroid/os/CancellationSignal;', CRITERIA = 'Landroid/location/Criteria;', LREQUEST = 'Landroid/location/LocationRequest;', GNSS_CB = 'Landroid/location/GnssStatus$Callback;', HANDLER = 'Landroid/os/Handler;', INTENT = 'Landroid/content/Intent;';
   const PROVIDERS = ['passive', 'gps', 'network', 'fused'], FINE_ONLY = new Set(['gps', 'passive']);
@@ -64,52 +66,109 @@ export function createHardwareServicesHost(platform) {
     else if (!fine && !coarse) r.throwJava('Ljava/lang/SecurityException;', `uid ${uid} does not have android.permission.ACCESS_COARSE_LOCATION or android.permission.ACCESS_FINE_LOCATION.`);
   };
   const providerOfRequest = (r, request) => { const name = call(r, request, LREQUEST, 'getProvider', [], STRING); return text(r, name); };
-  def(LOCATION, 'isLocationEnabled', '()Z', () => 0);
-  def(LOCATION, 'isProviderEnabled', `(${STRING})Z`, (r, _m, [, provider]) => { provider_(r, provider); return 0; });
+  // The simulated location (the "Permissões" section of the page: platform.locationSimulation = { enabled, latitude, longitude, accuracy, time, elapsedNanos, version }, null until the page sends it).
+  const sim = () => platform.locationSimulation ?? null;
+  const enabled = () => !!sim()?.enabled;
+  const hasFix = () => { const s = sim(); return !!s && s.enabled && s.hasFix !== false; };
+  def(LOCATION, 'isLocationEnabled', '()Z', () => (enabled() ? 1 : 0));
+  def(LOCATION, 'isLocationEnabledForUser', '(Landroid/os/UserHandle;)Z', () => (enabled() ? 1 : 0));
+  def(LOCATION, 'isProviderEnabled', `(${STRING})Z`, (r, _m, [, provider]) => (enabled() && PROVIDERS.includes(provider_(r, provider)) ? 1 : 0));
+  def(LOCATION, 'isProviderEnabledForUser', `(${STRING}Landroid/os/UserHandle;)Z`, (r, _m, [, provider]) => (enabled() && PROVIDERS.includes(provider_(r, provider)) ? 1 : 0));
   def(LOCATION, 'hasProvider', `(${STRING})Z`, (r, _m, [, provider]) => PROVIDERS.includes(provider_(r, provider)) ? 1 : 0);
   const providerList = (r, names) => { const list = emptyList(r); for (const name of names) call(r, list, 'Ljava/util/ArrayList;', 'add', [OBJECT], 'Z', [name]); return list; };
   def(LOCATION, 'getAllProviders', '()Ljava/util/List;', r => providerList(r, PROVIDERS));
-  def(LOCATION, 'getProviders', '(Z)Ljava/util/List;', (r, _m, [, enabledOnly]) => providerList(r, enabledOnly ? [] : PROVIDERS));
+  def(LOCATION, 'getProviders', '(Z)Ljava/util/List;', (r, _m, [, enabledOnly]) => providerList(r, enabledOnly && !enabled() ? [] : PROVIDERS));
   def(LOCATION, 'getBestProvider', `(${CRITERIA}Z)${STRING}`, (r, _m, [, criteria, enabledOnly]) => {
     if (criteria === null) iae(r, 'criteria must not be null');
-    if (enabledOnly) return null;   // no provider is enabled
-    throw new APKError('LocationManager.getBestProvider(criteria, false): matching Criteria against provider properties is not modelled', { kind: 'unsupported-location' });
+    if (enabledOnly && !enabled()) return null;   // no provider is enabled
+    throw new APKError('LocationManager.getBestProvider(criteria, ...): matching Criteria against provider properties is not modelled', { kind: 'unsupported-location' });
   });
-  def(LOCATION, 'getLastKnownLocation', `(${STRING})${LOC}`, (r, _m, [, provider]) => { enforce(r, provider_(r, provider)); return null; });
-  // updates: validation order of LocationManager.requestLocationUpdates, then the registration; a disabled provider reports onProviderDisabled at once
-  const registerListener = (r, key, provider, notify) => {
+  // The Location a provider reports: the simulated values, stamped with the virtual clock at the moment they last changed. With only ACCESS_COARSE_LOCATION the fix is coarsened to a grid of the
+  // 2000 m coarse accuracy (LocationFudger in AOSP also adds a stable random offset, which is not modelled).
+  const COARSE_METERS = 2000;
+  const coarsen = (value, meters, latitude) => { const step = meters / (latitude ? 111320 : 111320 * Math.max(0.01, Math.cos(sim().latitude * Math.PI / 180))); return Math.round(value / step) * step; };
+  const makeLocation = (r, provider) => {
+    const s = sim(), fine = holds(r, 'android.permission.ACCESS_FINE_LOCATION');
+    const latitude = fine ? s.latitude : coarsen(s.latitude, COARSE_METERS, true), longitude = fine ? s.longitude : coarsen(s.longitude, COARSE_METERS, false), accuracy = fine ? s.accuracy : Math.max(s.accuracy, COARSE_METERS);
+    const location = r.allocate(LOC); r.dispatch({ owner: LOC, name: '<init>', parameters: [STRING], result: 'V', signature: `(${STRING})V` }, [location, provider], 'direct');
+    const wide = (name, parameters, values) => r.dispatch({ owner: LOC, name, parameters, result: 'V', signature: `(${parameters.join('')})V` }, r.argumentWords(parameters, values, { receiver: location }), 'virtual');   // D and J take two argument words
+    wide('setLatitude', ['D'], [doubleBits(latitude)]); wide('setLongitude', ['D'], [doubleBits(longitude)]); wide('setAccuracy', ['F'], [floatBits(accuracy)]);
+    wide('setTime', ['J'], [BigInt(s.time)]); wide('setElapsedRealtimeNanos', ['J'], [BigInt(s.elapsedNanos)]);
+    return location;
+  };
+  def(LOCATION, 'getLastKnownLocation', `(${STRING})${LOC}`, (r, _m, [, provider]) => {
+    const name = provider_(r, provider); enforce(r, name);
+    return hasFix() && PROVIDERS.includes(name) ? makeLocation(r, name) : null;
+  });
+  // Deliveries run on the Looper (or Executor) the app registered with; without one, on the main queue.
+  type(DELIVERY, OBJECT, [RUNNABLE], { allocatable: true });
+  def(DELIVERY, 'run', '()V', (r, _m, [self]) => r.object(self).task());
+  const deliverOn = (r, target, task, roots) => {
+    if (target?.executor) { const runnable = r.allocate(DELIVERY); r.object(runnable).task = task; r.object(runnable).held = roots; call(r, target.executor, EXECUTOR, 'execute', [RUNNABLE], 'V', [runnable]); return; }
+    if (target?.looper) {
+      const handler = r.allocate(HANDLER); r.dispatch({ owner: HANDLER, name: '<init>', parameters: [LOOPER], result: 'V', signature: `(${LOOPER})V` }, [handler, target.looper], 'direct');
+      const runnable = r.allocate(DELIVERY); r.object(runnable).task = task; r.object(runnable).held = [...roots, handler]; call(r, handler, HANDLER, 'post', [RUNNABLE], 'Z', [runnable]); return;
+    }
+    platform.queueTask(task, 0, roots);
+  };
+  // updates: validation order of LocationManager.requestLocationUpdates, then the registration. With location on and a fix, the first fix is delivered at once (a registered listener of a provider
+  // with a last location hears it); a disabled provider reports onProviderDisabled; later changes of the simulated values (and the switch) are delivered by platform.locationChanged below.
+  const registerListener = (r, key, provider, hooks, target = null, single = false) => {
     if (key === null || key === 0) iae(r, 'invalid listener: null');
     enforce(r, provider);
     if (!PROVIDERS.includes(provider)) iae(r, `provider "${provider}" does not exist`);
-    const record = { provider, key, cancelled: false }; registrations.set(key.ref ?? key, record);
-    platform.queueTask(() => { if (!record.cancelled) notify(); }, 0, [key]);
+    const record = { provider, key, cancelled: false, hooks, target, single, looper: target?.looper ?? null, executor: target?.executor ?? null }; registrations.set(key.ref ?? key, record);
+    deliverOn(r, target, () => { if (record.cancelled) return; if (hasFix()) { hooks.location(makeLocation(r, provider)); if (single) { record.cancelled = true; registrations.delete(key.ref ?? key); } } else if (!enabled()) hooks.disabled(); }, [key, ...(target ? [target.looper, target.executor].filter(Boolean) : [])]);
   };
-  const disabledToListener = (r, listener, provider) => () => call(r, listener, LISTENER, 'onProviderDisabled', [STRING], 'V', [provider]);
-  const disabledToIntent = (r, pending, provider) => () => {
-    const intent = r.allocate(INTENT); r.dispatch({ owner: INTENT, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [intent], 'direct');
-    call(r, intent, INTENT, 'putExtra', [STRING, 'Z'], INTENT, ['providerEnabled', 0]);
-    r.dispatch({ owner: PENDING, name: 'send', parameters: [CONTEXT, 'I', INTENT], result: 'V', signature: `(${CONTEXT}I${INTENT})V` }, [pending, platform.application, 0, intent], 'virtual');
+  const toListener = (r, listener, provider) => ({
+    disabled: () => call(r, listener, LISTENER, 'onProviderDisabled', [STRING], 'V', [provider]),
+    enabled: () => call(r, listener, LISTENER, 'onProviderEnabled', [STRING], 'V', [provider]),
+    location: location => call(r, listener, LISTENER, 'onLocationChanged', [LOC], 'V', [location]),
+  });
+  const toIntent = (r, pending, provider) => {
+    const send = (extras) => {
+      const intent = r.allocate(INTENT); r.dispatch({ owner: INTENT, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [intent], 'direct');
+      for (const [name, type, value] of extras) call(r, intent, INTENT, 'putExtra', [STRING, type], INTENT, [name, value]);
+      r.dispatch({ owner: PENDING, name: 'send', parameters: [CONTEXT, 'I', INTENT], result: 'V', signature: `(${CONTEXT}I${INTENT})V` }, [pending, platform.application, 0, intent], 'virtual');
+    };
+    return { disabled: () => send([['providerEnabled', 'Z', 0]]), enabled: () => send([['providerEnabled', 'Z', 1]]), location: location => send([['location', 'Landroid/os/Parcelable;', location]]) };
   };
   const requestArgs = (r, provider, listener) => { const name = provider_(r, provider); return [name, listener]; };
-  def(LOCATION, 'requestLocationUpdates', `(${STRING}JF${LISTENER}${LOOPER})V`, (r, _m, [, provider, , , listener]) => { const [name] = requestArgs(r, provider, listener); registerListener(r, listener, name, disabledToListener(r, listener, name)); });
-  def(LOCATION, 'requestLocationUpdates', `(${STRING}JF${LISTENER})V`, (r, _m, [, provider, , , listener]) => { const [name] = requestArgs(r, provider, listener); registerListener(r, listener, name, disabledToListener(r, listener, name)); });
-  def(LOCATION, 'requestLocationUpdates', `(${STRING}JF${EXECUTOR}${LISTENER})V`, (r, _m, [, provider, , , , listener]) => { const [name] = requestArgs(r, provider, listener); registerListener(r, listener, name, disabledToListener(r, listener, name)); });
-  def(LOCATION, 'requestLocationUpdates', `(${STRING}JF${PENDING})V`, (r, _m, [, provider, , , pending]) => { const name = provider_(r, provider); registerListener(r, pending, name, disabledToIntent(r, pending, name)); });
-  def(LOCATION, 'requestLocationUpdates', `(${STRING}${LREQUEST}${EXECUTOR}${LISTENER})V`, (r, _m, [, provider, , , listener]) => { const name = provider_(r, provider); registerListener(r, listener, name, disabledToListener(r, listener, name)); });
-  def(LOCATION, 'requestLocationUpdates', `(${STRING}${LREQUEST}${PENDING})V`, (r, _m, [, provider, , pending]) => { const name = provider_(r, provider); registerListener(r, pending, name, disabledToIntent(r, pending, name)); });
-  def(LOCATION, 'requestLocationUpdates', `(${LREQUEST}${EXECUTOR}${LISTENER})V`, (r, _m, [, request, , listener]) => { if (request === null) iae(r, 'invalid null request'); const name = providerOfRequest(r, request); registerListener(r, listener, name, disabledToListener(r, listener, name)); });
-  def(LOCATION, 'requestSingleUpdate', `(${STRING}${LISTENER}${LOOPER})V`, (r, _m, [, provider, listener]) => { const name = provider_(r, provider); registerListener(r, listener, name, disabledToListener(r, listener, name)); });
-  def(LOCATION, 'requestSingleUpdate', `(${STRING}${PENDING})V`, (r, _m, [, provider, pending]) => { const name = provider_(r, provider); registerListener(r, pending, name, disabledToIntent(r, pending, name)); });
+  const listen = (r, provider, listener, target, single) => { const [name] = requestArgs(r, provider, listener); registerListener(r, listener, name, toListener(r, listener, name), target, single); };
+  const pend = (r, provider, pending, single) => { const name = provider_(r, provider); registerListener(r, pending, name, toIntent(r, pending, name), null, single); };
+  def(LOCATION, 'requestLocationUpdates', `(${STRING}JF${LISTENER}${LOOPER})V`, (r, _m, [, provider, , , listener, looper]) => listen(r, provider, listener, looper === null || looper === 0 ? null : { looper }, false));
+  def(LOCATION, 'requestLocationUpdates', `(${STRING}JF${LISTENER})V`, (r, _m, [, provider, , , listener]) => listen(r, provider, listener, null, false));
+  def(LOCATION, 'requestLocationUpdates', `(${STRING}JF${EXECUTOR}${LISTENER})V`, (r, _m, [, provider, , , executor, listener]) => listen(r, provider, listener, executor === null || executor === 0 ? null : { executor }, false));
+  def(LOCATION, 'requestLocationUpdates', `(${STRING}JF${PENDING})V`, (r, _m, [, provider, , , pending]) => pend(r, provider, pending, false));
+  def(LOCATION, 'requestLocationUpdates', `(${STRING}${LREQUEST}${EXECUTOR}${LISTENER})V`, (r, _m, [, provider, , executor, listener]) => listen(r, provider, listener, executor === null || executor === 0 ? null : { executor }, false));
+  def(LOCATION, 'requestLocationUpdates', `(${STRING}${LREQUEST}${PENDING})V`, (r, _m, [, provider, , pending]) => pend(r, provider, pending, false));
+  def(LOCATION, 'requestLocationUpdates', `(${LREQUEST}${EXECUTOR}${LISTENER})V`, (r, _m, [, request, executor, listener]) => { if (request === null) iae(r, 'invalid null request'); const name = providerOfRequest(r, request); registerListener(r, listener, name, toListener(r, listener, name), executor === null || executor === 0 ? null : { executor }, false); });
+  def(LOCATION, 'requestSingleUpdate', `(${STRING}${LISTENER}${LOOPER})V`, (r, _m, [, provider, listener, looper]) => listen(r, provider, listener, looper === null || looper === 0 ? null : { looper }, true));
+  def(LOCATION, 'requestSingleUpdate', `(${STRING}${PENDING})V`, (r, _m, [, provider, pending]) => pend(r, provider, pending, true));
   const remove = (r, _m, [, key]) => { if (key === null || key === 0) iae(r, 'invalid listener: null'); const record = registrations.get(key.ref ?? key); if (record) { record.cancelled = true; registrations.delete(key.ref ?? key); } };
   def(LOCATION, 'removeUpdates', `(${LISTENER})V`, remove); def(LOCATION, 'removeUpdates', `(${PENDING})V`, remove);
-  // getCurrentLocation: the consumer gets null (no provider can produce a fix); a cancelled signal suppresses the answer
-  const currentLocation = (r, provider, signal, consumer) => {
+  // The simulated values or the "location on" switch changed in the page: every registration of a provider that is on hears the new fix (onLocationChanged on its Looper / Executor); the switch itself is
+  // onProviderEnabled / onProviderDisabled.
+  const deliverChange = (r, previous, now) => {
+    const wasEnabled = !!previous?.enabled;
+    for (const record of [...registrations.values()]) {
+      if (!record.hooks || record.cancelled) continue;
+      const target = record.target, roots = [record.key, ...(target ? [target.looper, target.executor].filter(Boolean) : [])];
+      if (!!now?.enabled !== wasEnabled) { const hook = now?.enabled ? record.hooks.enabled : record.hooks.disabled; deliverOn(r, target, () => { if (!record.cancelled) hook(); }, roots); }
+      if (now?.enabled && (now.version !== previous?.version || !wasEnabled) && hasFix()) {
+        deliverOn(r, target, () => { if (record.cancelled) return; record.hooks.location(makeLocation(r, record.provider)); if (record.single) { record.cancelled = true; registrations.delete(record.key.ref ?? record.key); } }, roots);
+      }
+    }
+  };
+  platform.locationChanged = (r, previous) => { const now = sim(); if (![...registrations.values()].some(record => record.hooks)) return; platform.queueTask(() => deliverChange(r, previous, now), 0); };   // never runs Java inside the page's message handler: the pump delivers
+  // getCurrentLocation: a fresh fix when location is on and one exists, otherwise null (no provider can produce a fix); a cancelled signal suppresses the answer
+  const currentLocation = (r, provider, signal, consumer, executor = null) => {
     if (consumer === null || consumer === 0) r.throwJava('Ljava/lang/NullPointerException;', null);
     enforce(r, provider);
-    platform.queueTask(() => { if (signal !== null && signal !== 0 && call(r, signal, SIGNAL, 'isCanceled', [], 'Z')) return; call(r, consumer, CONSUMER, 'accept', [OBJECT], 'V', [null]); }, 0, [consumer, signal]);
+    deliverOn(r, executor === null || executor === 0 ? null : { executor }, () => { if (signal !== null && signal !== 0 && call(r, signal, SIGNAL, 'isCanceled', [], 'Z')) return; call(r, consumer, CONSUMER, 'accept', [OBJECT], 'V', [hasFix() && PROVIDERS.includes(provider) ? makeLocation(r, provider) : null]); }, [consumer, signal]);
   };
-  def(LOCATION, 'getCurrentLocation', `(${STRING}${SIGNAL}${EXECUTOR}${CONSUMER})V`, (r, _m, [, provider, signal, , consumer]) => currentLocation(r, provider_(r, provider), signal, consumer));
-  def(LOCATION, 'getCurrentLocation', `(${STRING}${LREQUEST}${SIGNAL}${EXECUTOR}${CONSUMER})V`, (r, _m, [, provider, , signal, , consumer]) => currentLocation(r, provider_(r, provider), signal, consumer));
+  def(LOCATION, 'getCurrentLocation', `(${STRING}${SIGNAL}${EXECUTOR}${CONSUMER})V`, (r, _m, [, provider, signal, executor, consumer]) => currentLocation(r, provider_(r, provider), signal, consumer, executor));
+  def(LOCATION, 'getCurrentLocation', `(${STRING}${LREQUEST}${SIGNAL}${EXECUTOR}${CONSUMER})V`, (r, _m, [, provider, , signal, executor, consumer]) => currentLocation(r, provider_(r, provider), signal, consumer, executor));
   // GNSS: callbacks register (the status needs ACCESS_FINE_LOCATION) and are never invoked while location is off
   const gnssRegister = (r, callback) => { if (callback === null || callback === 0) r.throwJava('Ljava/lang/NullPointerException;', null); enforce(r, 'gps'); registrations.set(callback.ref ?? callback, { provider: 'gps', key: callback, cancelled: false }); return 1; };
   def(LOCATION, 'registerGnssStatusCallback', `(${GNSS_CB})Z`, (r, _m, [, cb]) => gnssRegister(r, cb)); def(LOCATION, 'registerGnssStatusCallback', `(${GNSS_CB}${HANDLER})Z`, (r, _m, [, cb]) => gnssRegister(r, cb)); def(LOCATION, 'registerGnssStatusCallback', `(${EXECUTOR}${GNSS_CB})Z`, (r, _m, [, , cb]) => gnssRegister(r, cb));
