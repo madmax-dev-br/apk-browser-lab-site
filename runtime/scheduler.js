@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=220db593ef5c';
+import { APKError } from './apk-error.js?v=b53ec96fe6dd';
 
 // Green-thread scheduler for the VM.
 //
@@ -99,6 +99,7 @@ export class Scheduler {
       const at = (from + i + n) % n, thread = this.threads[at];
       if (!thread || thread.state !== 'runnable') continue;
       if (thread !== owner && thread.nestedDepth > 0) continue;   // suspended under the JavaScript stack of an outer run: only that run can resume it
+      if (thread !== owner && this.waitingNested.has(thread)) continue;   // parked in a nested host wait (resolveNested) on the JavaScript stack: its own wait loop resumes it when wake() made it runnable, never a slice as a guest (that ran its frames twice and ended in a false deadlock)
       if (thread === this.main && thread !== owner && thread.frames.length === 0) continue;   // the main thread between events has no frames and no driver: it is the host event loop, not a guest to resume (running it ends it)
       this.cursor = at;
       return { thread, earliest };
