@@ -1,12 +1,12 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=0ad8b82325c7';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=0ad8b82325c7';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice } from './device-settings.js?v=0ad8b82325c7';
-import { createDeviceView, createViewState } from './device-view.js?v=0ad8b82325c7';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=0ad8b82325c7';
-import { formatApiGapReport } from './api-gap-scan.js?v=0ad8b82325c7';
-import { createLogcatPanel } from './logcat-panel.js?v=0ad8b82325c7';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=0ad8b82325c7';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=0ad8b82325c7';
+import { APKWorkerClient } from './apk-worker-client.js?v=e6f7c307465c';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=e6f7c307465c';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice } from './device-settings.js?v=e6f7c307465c';
+import { createDeviceView, createViewState } from './device-view.js?v=e6f7c307465c';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=e6f7c307465c';
+import { formatApiGapReport } from './api-gap-scan.js?v=e6f7c307465c';
+import { createLogcatPanel } from './logcat-panel.js?v=e6f7c307465c';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=e6f7c307465c';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=e6f7c307465c';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -137,11 +137,14 @@ function sizeBootOverlay() {
 }
 function showBoot(caption) {
   const overlay = $('boot-overlay'); if (!overlay) return;
-  clearTimeout(state.bootTimer); sizeBootOverlay(); $('boot-caption').textContent = caption; overlay.classList.remove('fading'); overlay.hidden = false; $('empty-preview').hidden = true; state.bootVisible = true;
+  clearTimeout(state.bootTimer); sizeBootOverlay(); $('boot-caption').textContent = caption; overlay.classList.remove('fading', 'idle'); overlay.hidden = false; $('empty-preview').hidden = true; state.bootVisible = true;
 }
-function hideBoot() {
+function hideBoot({ force = false } = {}) {
   const overlay = $('boot-overlay'); if (!overlay || !state.bootVisible) return;
-  state.bootVisible = false; overlay.classList.add('fading'); clearTimeout(state.bootTimer);
+  // An APK that is loaded but not running keeps the phone frame on screen, idle, with the one thing the user can do next; the frame only goes away when the app
+  // draws its first frame (force) or when there is no APK (an error, a closed file).
+  if (!force && state.currentSource && !state.apkRunning && !state.lastAPKError && state.mode === 'apk') { overlay.classList.add('idle'); overlay.classList.remove('fading'); $('boot-caption').textContent = 'APK pronto. Clique em Executar APK para iniciar.'; $('empty-preview').hidden = true; return; }
+  state.bootVisible = false; overlay.classList.add('fading'); overlay.classList.remove('idle'); clearTimeout(state.bootTimer);
   state.bootTimer = setTimeout(() => { overlay.hidden = true; overlay.classList.remove('fading'); if (!state.apkRunning && state.mode === 'apk') $('empty-preview').hidden = false; }, 380);
 }
 function beginOperation(message) {
@@ -398,7 +401,7 @@ const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTr
     if (state.mode === 'apk') { setStatus('Aplicativo encerrado · nenhuma Activity ativa'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENCERRADO'; }
   },
   rendered(snapshot, composeReady) {
-    hideBoot(); $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth); state.lastSnapshot = snapshot; redrawLayoutBounds(); if (snapshot.vmHealth) state.lastVmHealth = snapshot.vmHealth;
+    hideBoot({ force: true }); $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth); state.lastSnapshot = snapshot; redrawLayoutBounds(); if (snapshot.vmHealth) state.lastVmHealth = snapshot.vmHealth;
     if (snapshot.droppedEvent) appendTrace(`Evento descartado: a View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) já não existe na VM.`);
     // The VM raised java.lang.OutOfMemoryError (even if the app caught it): never silent.
     if ((snapshot.vmHealth?.oomCount ?? 0) > (state.oomSeen ?? 0)) { state.oomSeen = snapshot.vmHealth.oomCount; appendTrace(`OutOfMemoryError: ${snapshot.vmHealth.lastOom?.reason} (${snapshot.vmHealth.liveObjects} objetos vivos)`); setStatus(`java.lang.OutOfMemoryError na VM (${snapshot.vmHealth.liveObjects} objetos vivos, limite ${snapshot.vmHealth.limit})`, 'error'); }

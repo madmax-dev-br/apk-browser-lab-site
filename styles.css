@@ -158,7 +158,8 @@
 .boot-eye{fill:#0b0d14}
 .boot-bar{width:140px;height:4px;border-radius:2px;background:#2a2f40;overflow:hidden;position:relative}
 .boot-bar i{position:absolute;top:0;bottom:0;width:40%;border-radius:2px;background:currentColor;animation:boot-slide 1.3s ease-in-out infinite}
-.boot-caption{margin:0;max-width:78%;text-align:center;font-size:15px;line-height:1.4;color:#aab0c4}
+.boot-caption{margin:0;max-width:84%;padding:0 10px;box-sizing:border-box;text-align:center;font-size:14px;line-height:1.45;color:#aab0c4;overflow-wrap:anywhere;word-break:break-word}
+.boot-overlay.idle .boot-bar{visibility:hidden}.boot-overlay.idle .boot-logo{animation:none;opacity:.9}.boot-overlay.idle .boot-caption{color:#d5d9e6;font-size:15px}
 @keyframes boot-pulse{0%,100%{opacity:.55;transform:scale(.96)}50%{opacity:1;transform:scale(1.03)}}
 @keyframes boot-slide{0%{left:-40%}100%{left:100%}}
 @media (prefers-reduced-motion:reduce){.boot-logo,.boot-bar i{animation:none}.boot-bar i{left:30%}}

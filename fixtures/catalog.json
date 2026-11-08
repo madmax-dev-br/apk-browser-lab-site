@@ -180,7 +180,7 @@
       "executionValidated": true,
       "validation": {
         "evidence": "evidence/validation/compose-state.json",
-        "generatedAt": "2026-11-08T04:07:05.974Z",
+        "generatedAt": "2026-11-08T10:07:15.493Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -217,7 +217,7 @@
       "executionValidated": true,
       "validation": {
         "evidence": "evidence/validation/compose-navigation.json",
-        "generatedAt": "2026-11-08T04:32:27.470Z",
+        "generatedAt": "2026-11-08T10:10:50.479Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -277,7 +277,7 @@
       "executionValidated": true,
       "validation": {
         "evidence": "evidence/validation/hybrid-navigation.json",
-        "generatedAt": "2026-11-08T04:14:07.981Z",
+        "generatedAt": "2026-11-08T10:14:26.153Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -311,14 +311,14 @@
       "id": "xml-projects",
       "file": "xml-projects-debug.apk",
       "title": "Projetos · XML, Fragments e três Activities",
-      "description": "Lista RecyclerView com busca e filtros, formulário condicional com validação, rascunho após recriar, confirmação e revisão via Activity Result. Executado e validado no navegador (fluxos completos, entrada real, comparação visual com capturas do Android).",
+      "description": "Lista RecyclerView com busca e filtros, formulário condicional com validação, rascunho após recriar, confirmação e revisão via Activity Result. Tentativa experimental: a execução na web ainda não passou todos os critérios de validação.",
       "tags": [
         "Navigation XML",
         "SavedStateHandle + recriação",
         "Review / Help Activities"
       ],
       "advanced": true,
-      "executionValidated": true,
+      "executionValidated": false,
       "expected": {
         "packageName": "dev.apkweb.projects",
         "launcherActivity": "dev.apkweb.projects.MainActivity",
@@ -330,13 +330,13 @@
       },
       "validation": {
         "evidence": "evidence/validation/xml-projects.json",
-        "generatedAt": "2026-11-08T04:36:25.369Z",
-        "verdict": true,
+        "generatedAt": "2026-11-08T10:21:15.134Z",
+        "verdict": false,
         "criteria": {
           "flowsNode": true,
           "diagnostics": true,
           "layoutSanity": true,
-          "parity": true,
+          "parity": false,
           "flowsBrowser": true,
           "realTaps": true,
           "strict": true
@@ -367,7 +367,7 @@
       },
       "validation": {
         "evidence": "evidence/validation/compose-approvals.json",
-        "generatedAt": "2026-11-08T04:15:43.297Z",
+        "generatedAt": "2026-11-08T10:15:51.102Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
