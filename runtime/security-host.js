@@ -1,8 +1,8 @@
-import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=5568051d2763';
-import { APKError } from './apk-error.js?v=5568051d2763';
-import { Blocked } from './scheduler.js?v=5568051d2763';
-import { networkOf } from './network-native.js?v=5568051d2763';
-import { installTlsSockets, TRUST_KEY } from './tls-socket-host.js?v=5568051d2763';
+import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=8d232ffea982';
+import { APKError } from './apk-error.js?v=8d232ffea982';
+import { Blocked } from './scheduler.js?v=8d232ffea982';
+import { networkOf } from './network-native.js?v=8d232ffea982';
+import { installTlsSockets, TRUST_KEY } from './tls-socket-host.js?v=8d232ffea982';
 
 // java.net.IDN and the javax.net.ssl surface (TrustManagerFactory, KeyManagerFactory, SSLContext) for libraries that probe the platform at launch (OkHttp's Platform.get(),
 // host name normalisation). java.security.Security / Provider / KeyStore and the providers (Conscrypt, the Android Keystore) are the original libcore and Conscrypt
@@ -143,6 +143,24 @@ export function createSecurityHost(platform) {
   // SSLContext: the socket factory is Conscrypt's OpenSSLSocketFactoryImpl.
   const PROTOCOLS = ['TLS', 'TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3', 'SSL', 'SSLv3', 'Default'];
   def(SSL_CONTEXT, 'getInstance', `(${STRING})${SSL_CONTEXT}`, (r, _m, [name]) => { const ref = r.allocate(SSL_CONTEXT); r.object(ref).protocol = algorithm(r, name, PROTOCOLS, 'SSLContext'); return ref; }, { static: true });
+  // getInstance(protocol, provider): on the device only Conscrypt (AndroidOpenSSL, or the Play Services copy GmsCore_OpenSSL when an app installs it) registers SSLContext services; any other
+  // provider answers NoSuchAlgorithmException like the JCA's GetInstance, and an unknown provider name NoSuchProviderException. gRPC's OkHttp channel builder asks this way with the provider
+  // it found through Security.getProviders().
+  const SSL_PROVIDERS = ['AndroidOpenSSL', 'GmsCore_OpenSSL'];
+  const providerName = (r, provider) => r.stringCharacters(r.dispatch({ owner: 'Ljava/security/Provider;', name: 'getName', parameters: [], result: STRING, signature: `()${STRING}` }, [provider], 'virtual'));
+  const contextFromProvider = (r, name, provider) => {
+    if (provider === null || provider === 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'missing provider');
+    const protocol = algorithm(r, name, PROTOCOLS, 'SSLContext'), pname = providerName(r, provider);
+    if (!SSL_PROVIDERS.includes(pname)) r.throwJava('Ljava/security/NoSuchAlgorithmException;', `no such algorithm: ${r.stringCharacters(name)} for provider ${pname}`);
+    const ref = r.allocate(SSL_CONTEXT); r.object(ref).protocol = protocol; return ref;
+  };
+  def(SSL_CONTEXT, 'getInstance', `(${STRING}Ljava/security/Provider;)${SSL_CONTEXT}`, (r, _m, [name, provider]) => contextFromProvider(r, name, provider), { static: true });
+  def(SSL_CONTEXT, 'getInstance', `(${STRING}${STRING})${SSL_CONTEXT}`, (r, _m, [name, pname]) => {
+    if (pname === null || pname === 0 || r.stringCharacters(pname).length === 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'missing provider');
+    const provider = r.dispatch({ owner: 'Ljava/security/Security;', name: 'getProvider', parameters: [STRING], result: 'Ljava/security/Provider;', signature: `(${STRING})Ljava/security/Provider;` }, [pname], 'static');
+    if (provider === null) r.throwJava('Ljava/security/NoSuchProviderException;', `no such provider: ${r.stringCharacters(pname)}`);
+    return contextFromProvider(r, name, provider);
+  }, { static: true });
   def(SSL_CONTEXT, 'getDefault', `()${SSL_CONTEXT}`, r => { const ref = r.allocate(SSL_CONTEXT); Object.assign(r.object(ref), { protocol: 'Default', factory: r.allocate(OSFI) }); return ref; }, { static: true });
   def(SSL_CONTEXT, 'getProtocol', `()${STRING}`, (r, _m, [self]) => r.object(self).protocol);
   def(SSL_CONTEXT, 'init', `([${KM}[${TM}${SECURE_RANDOM})V`, (r, _m, [self, , trust]) => { const o = r.object(self); o.trustManagers = (trust === null || trust === 0 || trust === undefined) ? null : [...r.array(trust).elements]; o.factory = r.allocate(OSFI); r.storeField(r.object(o.factory).fields, TRUST_KEY, o.trustManagers ? trust : null); });
