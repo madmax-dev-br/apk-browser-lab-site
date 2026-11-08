@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=fc06dc17d6d8';
-import { BUCKET } from './time-breakdown.js?v=fc06dc17d6d8';
-import { Blocked, QUANTUM } from './scheduler.js?v=fc06dc17d6d8';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=fc06dc17d6d8';
+import { APKError } from './apk-error.js?v=ca7b5e864afd';
+import { BUCKET } from './time-breakdown.js?v=ca7b5e864afd';
+import { Blocked, QUANTUM } from './scheduler.js?v=ca7b5e864afd';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=ca7b5e864afd';
 
 // Frame-based DEX interpreter.
 //
@@ -413,6 +413,19 @@ function wakeInput(thread) {
   return { kind: 'result', R, fresh: kind === 'site' };
 }
 
+/** Which call left no value for the move-result at `pc` (diagnostics only): the invoke-* instruction just before it (formats 35c/3rc and invoke-polymorphic are 3 or 4 code units). */
+export function missingResultCall(dex, u, pc) {
+  for (const width of [3, 4]) {
+    const at = pc - width; if (at < 0) continue;
+    const op = u[at] & 0xff;
+    if ((op >= 0x6e && op <= 0x78) || op === 0xfa || op === 0xfb) {
+      let method = null; try { method = dex.method(u[at + 1]); } catch { /* an index the decoder rejects: name the opcode only */ }
+      return `: the call at PC 0x${at.toString(16).padStart(4, '0')}${method ? ` to ${method.owner}->${method.name}${method.signature}` : ` (opcode 0x${op.toString(16)})`} returned no value (a host method that answered undefined for a non-void signature, or a result lost on the way)`;
+    }
+  }
+  return '';
+}
+
 /** The thread the interpreter is currently running (the scheduler switches it at safepoints). */
 export function currentThread(rt) { return rt.thread ?? rt.scheduler.mainThread(); }
 
@@ -534,8 +547,8 @@ function runLoop(rt, owner, base) {
           case 0x01: case 0x07: regs[lo] = regs[hi]; pc++; break;
           case 0x02: case 0x08: regs[a] = regs[u[pc + 1]]; pc += 2; break;
           case 0x03: case 0x09: regs[u[pc + 1]] = regs[u[pc + 2]]; pc += 3; break;
-          case 0x0a: case 0x0c: if (f.result === undefined) fail('move-result without result'); regs[a] = f.result; f.result = undefined; pc++; break;
-          case 0x0b: if (typeof f.result !== 'bigint') fail('move-result-wide without wide result'); regs[a] = BigInt.asIntN(64, f.result); regs[a + 1] = WIDE_HIGH; f.result = undefined; pc++; break;
+          case 0x0a: case 0x0c: if (f.result === undefined) fail(`move-result without result${missingResultCall(dex, u, pc)}`); regs[a] = f.result; f.result = undefined; pc++; break;
+          case 0x0b: if (typeof f.result !== 'bigint') fail(`move-result-wide without wide result${missingResultCall(dex, u, pc)}`); regs[a] = BigInt.asIntN(64, f.result); regs[a + 1] = WIDE_HIGH; f.result = undefined; pc++; break;
           case 0x0d: if (!f.pendingException) fail('move-exception without caught exception'); regs[a] = f.pendingException; f.pendingException = null; pc++; break;
           case 0x0e: returnValue = undefined; returning = true; break;
           case 0x0f: { const v = regs[a]; if (v === undefined) fail(`Invalid/uninitialized register v${a}`); returnValue = v; returning = true; break; }

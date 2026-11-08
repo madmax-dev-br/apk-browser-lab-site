@@ -27,16 +27,27 @@ export async function openExchange(request, { fetch: fetchFunction = globalThis.
   if (request.body && request.method !== 'GET' && request.method !== 'HEAD') init.body = request.body;
   const response = await fetchFunction(target, init);
   if (response.type === 'opaqueredirect') { try { await response.body?.cancel(); } catch { /* ignored */ } throw Object.assign(new Error('The browser does not expose redirect responses; enable redirect following for this connection'), { code: 'APKWEB_OPAQUE_REDIRECT' }); }
+  // A relay that could not reach the target answers 502 with the Node error code (scripts/cors-relay.mjs): it is the same failure as a direct connect, so it becomes the same exception.
+  const relayCode = proxyUrl ? response.headers.get('x-apkweb-relay-error-code') : null;
+  if (relayCode) { try { await response.body?.cancel(); } catch { /* ignored */ } throw Object.assign(new Error(response.headers.get('x-apkweb-relay-error') ?? relayCode), { code: relayCode, relayed: true }); }
   const out = []; let encoded = false;
   response.headers.forEach((value, name) => {
     const lower = name.toLowerCase();
     if (lower === 'content-encoding' && ENCODED.test(value.trim())) { encoded = true; return; }
-    if (lower === 'x-apkweb-set-cookie') { for (const cookie of value.split('\n')) out.push(['Set-Cookie', cookie]); return; }
+    if (lower === 'x-apkweb-set-cookie') { for (const cookie of relayCookies(value)) out.push(['Set-Cookie', cookie]); return; }
+    if (lower.startsWith('x-apkweb-relay-')) return;
     out.push([name, value]);
   });
   const kept = encoded ? out.filter(([name]) => name.toLowerCase() !== 'content-length') : out;   // the transport already decoded the body (OkHttp's transparent gzip drops both too)
   const url = !proxyUrl && response.redirected && response.url ? response.url : request.url;       // only a followed redirect changes the URL
   return { head: { version: 'HTTP/1.1', status: response.status, reason: response.statusText ?? '', url, headers: kept }, reader: response.body ? response.body.getReader() : null };
+}
+
+/** The Set-Cookie values a relay returned in x-apkweb-set-cookie: a JSON array (a header value cannot hold line breaks), or the older newline-separated form. */
+export function relayCookies(value) {
+  const text = String(value).trim();
+  if (text.startsWith('[')) { try { const list = JSON.parse(text); if (Array.isArray(list)) return list.filter(item => typeof item === 'string'); } catch { /* not JSON: fall through */ } }
+  return text.split('\n').filter(Boolean);
 }
 
 /** A fetch failure (or a worker-serialised copy of one) as the Java exception an Android device would throw: { type, message }. */
