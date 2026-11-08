@@ -1,11 +1,11 @@
-import { APKError } from './apk-error.js?v=8d232ffea982';
-import { throwNew } from './java-throw.js?v=8d232ffea982';
-import { Blocked } from './scheduler.js?v=8d232ffea982';
-import { OS_CONSTANTS } from './os-constants-data.js?v=8d232ffea982';
-import { openExchange, describeFailure } from './network-transport.js?v=8d232ffea982';
-import { WorkerExecutor } from './network-worker-executor.js?v=8d232ffea982';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=8d232ffea982';
-import { TransportAuthority } from './transport-ca.js?v=8d232ffea982';
+import { APKError } from './apk-error.js?v=cde218cfa9f2';
+import { throwNew } from './java-throw.js?v=cde218cfa9f2';
+import { Blocked } from './scheduler.js?v=cde218cfa9f2';
+import { OS_CONSTANTS } from './os-constants-data.js?v=cde218cfa9f2';
+import { openExchange, describeFailure } from './network-transport.js?v=cde218cfa9f2';
+import { WorkerExecutor } from './network-worker-executor.js?v=cde218cfa9f2';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=cde218cfa9f2';
+import { TransportAuthority } from './transport-ca.js?v=cde218cfa9f2';
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
 //

@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=8d232ffea982';
+import { APKError } from './apk-error.js?v=cde218cfa9f2';
 
 // Green-thread scheduler for the VM.
 //
@@ -30,7 +30,7 @@ export const QUANTUM = 20000;   // instructions a thread runs before another run
 const EVENT_GRACE_MS = 50;   // host time a due host event may wait for a run that cannot return to the event pump before that run yields to it (hostEventsStarved)
 const QUIET_IDLE_LIMIT = 50000;  // consecutive clock skips with no host event in between
 export class Scheduler {
-  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; this.starved = false; this.dueSince = 0; }
+  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.parkedServing = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; this.starved = false; this.dueSince = 0; }
   get clock() { return this.rt.platform.clock; }
 
   /** The thread that runs host events (Looper/main). */
@@ -158,8 +158,21 @@ export class Scheduler {
     this.starved = false; this.dueSince = 0;
     const platform = this.rt.platform, delay = platform.nextEventDelay?.();
     if (delay === null || delay === undefined || delay > 0) return;
+    if (!this.mayServeEvents()) return;
     const previous = this.rt.thread; this.rt.thread = this.mainThread();
-    try { const processed = platform.drainEvents?.(this.rt)?.processed ?? 0; if (processed) { this.stats.events += processed; this.quietIdles = 0; } } finally { this.rt.thread = previous; }
+    try { const processed = this.serveEvents(platform); if (processed) { this.stats.events += processed; this.quietIdles = 0; } } finally { this.rt.thread = previous; }
+  }
+  /**
+   * Main-Looper messages are served on the main thread's stack while it is parked in a Java wait (a lab allowance: host tasks such as network results and posted work keep flowing; a device
+   * would run none of them until main returned to its Looper). One level only: a served message that blocks parks main again, and serving the next message on top of it, and the next, nested
+   * one JavaScript run per queued message until the stack overflowed (a real app: "RangeError: Maximum call stack size exceeded" in the event pump). While a message served that way is on
+   * the stack and main is parked again, the queue waits; it runs when main is back in its Looper.
+   */
+  mainParked() { const main = this.main; return main !== null && (main.state === 'blocked' || this.waitingNested.has(main)); }
+  mayServeEvents() { return !(this.parkedServing > 0 && this.mainParked()); }
+  serveEvents(platform) {
+    const parked = this.mainParked(); if (parked) this.parkedServing = (this.parkedServing ?? 0) + 1;
+    try { return platform.drainEvents?.(this.rt)?.processed ?? 0; } finally { if (parked) this.parkedServing--; }
   }
   /** What to do when nothing is runnable: run due platform events, skip the clock to the earliest deadline, or report the deadlock. `owner` is the blocked loop owner. */
   idle(earliest, why) {
@@ -167,7 +180,8 @@ export class Scheduler {
     if (this.rt.monitor?.active) this.rt.monitor.tick();   // a nested wait that keeps skipping the virtual clock and running events still ends with the operation budget
     // Readiness can change asynchronously now (a network worker thread writes shared memory while this run loop is deciding): look once more before concluding that nothing can run.
     this.wake(); if (this.threads.some(thread => thread.state === 'runnable' && !this.idleMain(thread) && (thread.nestedDepth === 0 || this.waitingNested.has(thread)))) return;
-    const processed = platform.drainEvents?.(this.rt)?.processed ?? 0;
+    const serve = this.mayServeEvents();
+    const processed = serve ? this.serveEvents(platform) : 0;
     if (processed) { this.stats.events += processed; this.quietIdles = 0; return; }
     const network = this.rt.network;
     if (network && network.pending > 0) {
@@ -177,9 +191,9 @@ export class Scheduler {
       throw new APKError(`Network wait in a frame that cannot suspend: ${why}. ${network.pending} exchange(s) are in flight and the VM is inside a nested host call, so it cannot yield to the browser event loop (threads: ${this.describe()})`, { kind: 'network-would-block' });
     }
     this.wake(); if (this.threads.some(thread => thread.state === 'runnable' && thread.nestedDepth === 0 && !this.idleMain(thread))) return;   // same race, after the platform events ran
-    const delay = platform.nextEventDelay?.() ?? null, now = this.clock.now();
+    const delay = serve ? (platform.nextEventDelay?.() ?? null) : null, now = this.clock.now();   // queued messages that may not run now (see mayServeEvents) are no wake-up for this wait
     const next = Math.min(earliest === Infinity ? Infinity : Math.max(0, earliest - now), delay === null ? Infinity : delay);
-    if (next === Infinity) throw new APKError(`Deadlock: ${why}; no thread is runnable and no timer or event is pending (threads: ${this.describe()})`, { kind: 'cooperative-deadlock' });
+    if (next === Infinity) throw new APKError(`Deadlock: ${why}; no thread is runnable and no timer or event is pending${serve ? '' : ' (main-Looper messages are queued, but the main thread is blocked inside a message that ran during its own wait: they run only when main is back in its Looper)'} (threads: ${this.describe()})`, { kind: 'cooperative-deadlock' });
     // Time may only be skipped to a wake-up that can lead somewhere. Threads that merely re-park on a timer (an idle pool worker's keep-alive) wake, find nothing and sleep again
     // forever; when that is all that happens, virtual time advances without end while the waiter never gets what it needs. That is a deadlock, reported as one.
     if (++this.quietIdles > QUIET_IDLE_LIMIT) throw new APKError(`Deadlock: ${why}; ${this.quietIdles} consecutive idle rounds advanced the clock by ${Math.round(this.stats.skippedMs - (this.quietSkipStart ?? 0))} ms without an event, a network response or a thread completing a wait (threads: ${this.describe()})`, { kind: 'cooperative-deadlock' });
