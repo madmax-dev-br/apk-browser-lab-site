@@ -1,6 +1,7 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=2e29585a666b';
+import { TimeBreakdown } from './time-breakdown.js?v=beba259db142';
+import { staticRetentionLines } from './heap-gc.js?v=beba259db142';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -52,13 +53,18 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
   part(() => {   // every OutOfMemoryError: which limit, where
     const log = runtime.oomLog; if (!log?.length) return;
     for (const entry of log.slice(-3)) {
-      out.push(`OOM (${entry.kind}) em ${entry.thread ?? '?'}: ${entry.frames.join(' ← ') || entry.hostCall || 'código do host'}; objetos ${entry.objects}/${entry.maxObjects}, campos ${entry.fieldSlots}/${entry.maxFieldSlots}, células de arrays ${entry.arrayCells}/${entry.maxArrayCells} (ponderadas pela largura do elemento), de coleções ${entry.collectionCells}/${entry.maxCollectionCells}${entry.reason ? `; motivo: ${entry.reason}` : ''}${entry.gcTries ? `; coletor: ${entry.gcTries.calls ?? 0} safepoints pediram coleta (${entry.gcTries.notDue ?? 0} não devidas), puladas ${JSON.stringify(entry.gcSkips ?? {})}, ${entry.sinceGc} alocados desde a última coleta` : ''}${entry.gcEmergency?.attempts ? `; coleta de emergência na alocação: ${entry.gcEmergency.attempts} tentativas, ${entry.gcEmergency.ran} executadas (${entry.gcEmergency.freed} objetos liberados), bloqueios ${JSON.stringify(entry.gcEmergency.blocked)}` : ''}`);
+      out.push(`OOM (${entry.kind}) em ${entry.thread ?? '?'}: ${entry.frames.join(' ← ') || entry.hostCall || 'código do host'}; objetos ${entry.objects}/${entry.maxObjects}, campos ${entry.fieldSlots}/${entry.maxFieldSlots}, células de arrays ${entry.arrayCells}/${entry.maxArrayCells} (ponderadas pela largura do elemento), de coleções ${entry.collectionCells}/${entry.maxCollectionCells}${entry.reason ? `; motivo: ${entry.reason}` : ''}${entry.gcTries ? `; coletor: ${entry.gcTries.calls ?? 0} safepoints pediram coleta (${entry.gcTries.notDue ?? 0} não devidas), puladas ${JSON.stringify(entry.gcSkips ?? {})}, ${entry.sinceGc} alocados desde a última coleta` : ''}${entry.gcEmergency?.attempts ? `; coleta de emergência na alocação: ${entry.gcEmergency.attempts} tentativas, ${entry.gcEmergency.ran} executadas (${entry.gcEmergency.freed} objetos liberados), bloqueios ${JSON.stringify(entry.gcEmergency.blocked)}` : ''}; ${entry.soft ? `referências suaves: a coleta sob pressão (política ${entry.soft.policy}) limpou ${entry.soft.cleared} de ${entry.soft.softReferences}, ${entry.soft.totalCleared} no total` : 'nenhuma referência suave foi limpa'}`);
       const a = entry.arrays; if (a) {
         out.push(`  arrays no OOM: ${a.liveCells} células ponderadas vivas e ${a.garbageCells} inalcançáveis ainda não coletadas (contador ${a.cellsInUse}); acima de 1 M de células: ${a.liveOver1M.arrays} vivos (${a.liveOver1M.cells} células) e ${a.garbageOver1M.arrays} inalcançáveis (${a.garbageOver1M.cells} células)`);
         for (const c of a.liveTop) out.push(`    vivo: ${c.type} comprimento ${c.length} elementos (${c.cells} células ponderadas), mantido por ${c.root}`);
         for (const c of a.garbageTop.slice(0, 3)) out.push(`    inalcançável: ${c.type} comprimento ${c.length} elementos (${c.cells} células ponderadas)`);
       }
     }
+  });
+  part(() => {   // soft references cleared under pressure (heap-gc.js softPolicy) and which static fields hold the heap (computed on OutOfMemoryError and by the heap census)
+    const stats = runtime.gcStats, soft = runtime.gcSoftLast;
+    if (soft || stats?.softCleared) out.push(`referências suaves: ${stats?.softCleared ?? 0} referentes limpos em ${stats?.softCollections ?? 0} coletas sob pressão${soft ? `; a última (política ${soft.policy}) limpou ${soft.cleared} de ${soft.softReferences} e liberou ${soft.freed} objetos` : ''}`);
+    out.push(...staticRetentionLines(runtime.gcStaticRetention));
   });
   part(() => {   // (b) survivors, (c) who keeps them, retention paths
     const last = runtime.gcPhases?.[0]; if (!last) return;

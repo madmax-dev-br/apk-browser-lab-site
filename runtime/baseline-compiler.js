@@ -161,7 +161,7 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         case 0x1c: return `{ const t = T[${u[pc + 1]}]; if (!rt.classes.has(t)) rt.assertResolvable(t); r[${a}] = rt.classObject(t); }`;
         case 0x1f: { const s = site({ type: null, epoch: -1, answer: false }); return `{ const v = r[${a}]; if (v !== null && v !== 0 && !H.subtype(rt, Z[${s}], rt.typeOf(v), T[${u[pc + 1]}])) { rt.assertResolvable(T[${u[pc + 1]}]); H.castFail(rt, v, T[${u[pc + 1]}]); } }`; }
         case 0x20: { const s = site({ type: null, epoch: -1, answer: false }); return `{ const v = r[${hi}]; r[${lo}] = v !== null && v !== 0 && H.subtype(rt, Z[${s}], rt.typeOf(v), T[${u[pc + 1]}]) ? 1 : (rt.assertResolvable(T[${u[pc + 1]}]), 0); }`; }
-        case 0x21: return `r[${lo}] = rt.array(r[${hi}]).elements.length;`;
+        case 0x21: return `r[${lo}] = rt.array(r[${hi}]).cells.length;`;
         case 0x22: return `rt.bytecodeAlloc = true; try { r[${a}] = rt.allocate(T[${u[pc + 1]}]); } finally { rt.bytecodeAlloc = false; }`;
         case 0x23: return `rt.bytecodeAlloc = true; try { r[${lo}] = rt.newArray(T[${u[pc + 1]}], r[${hi}] | 0); } finally { rt.bytecodeAlloc = false; }`;
         case 0x28: return jump(pc, pc + signed8(a));
@@ -190,12 +190,12 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         }
         case 0x44: case 0x45: case 0x46: case 0x47: case 0x48: case 0x49: case 0x4a: {
           const packed = u[pc + 1], variant = op - 0x44, array = R(packed & 255), index = R(packed >> 8);
-          return variant === 1 ? `{ const e = rt.array(${array}, ${index}).elements[${index}]; r[${a}] = e; r[${a + 1}] = W; }` : `r[${a}] = rt.array(${array}, ${index}).elements[${index}];`;
+          return variant === 1 ? `{ const e = rt.array(${array}, ${index}).cells[${index}]; r[${a}] = e; r[${a + 1}] = W; }` : `r[${a}] = rt.array(${array}, ${index}).cells[${index}];`;
         }
         case 0x4b: case 0x4c: case 0x4d: case 0x4e: case 0x4f: case 0x50: case 0x51: {
           const packed = u[pc + 1], variant = op - 0x4b, array = R(packed & 255), index = R(packed >> 8), v = R(a);
           const value = variant === 1 ? v : variant === 3 ? `${v} & 1` : variant === 4 ? `(${v} << 24) >> 24` : variant === 5 ? `${v} & 65535` : variant === 6 ? `(${v} << 16) >> 16` : v;
-          return `{ const arr = rt.array(${array}, ${index}); const val = ${value}; ${op === 0x4d ? 'rt.checkArrayValue(arr, val); ' : ''}arr.elements[${index}] = val; }`;
+          return `{ const arr = rt.array(${array}, ${index}); const val = ${value}; ${op === 0x4d ? 'rt.checkArrayValue(arr, val); ' : ''}arr.cells[${index}] = val; }`;
         }
         case 0x52: case 0x53: case 0x54: case 0x55: case 0x56: case 0x57: case 0x58:
         case 0x59: case 0x5a: case 0x5b: case 0x5c: case 0x5d: case 0x5e: case 0x5f: {

@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=2e29585a666b';
+import { APKError } from './apk-error.js?v=beba259db142';
 
 // Framework natives behind the original libcore java.time sources compiled into the framework DEX.
 //   jdk.internal.misc.VM.getNanoTimeAdjustment(long)  -- Clock.systemUTC(): nanoseconds to add to offsetInSeconds to reach the current wall clock, -1 when the
@@ -35,7 +35,7 @@ export function createJavaTimeNativeBindings() {
   });
   bindings.set(`${PROVIDER}->nativeTzdb()[B`, runtime => {
     const data = runtime.tzdata?.bytes; if (!data) throw new APKError('java.time zone rules need the verified tz database (options.tzdataProvider)', { kind: 'tzdata-missing' });
-    runtime.tzdbArray ??= (() => { const array = runtime.newArray('[B', data.length); runtime.array(array).elements = Array.from(data, v => (v << 24) >> 24); return array; })();
+    runtime.tzdbArray ??= runtime.arrayOf('[B', data);
     return runtime.tzdbArray;
   });
   return bindings;

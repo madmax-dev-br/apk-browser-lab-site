@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { getSolidPaint } from './paint-host.js?v=2e29585a666b';
-import { getMatrixValues } from './matrix-native.js?v=2e29585a666b';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=2e29585a666b';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { getSolidPaint } from './paint-host.js?v=beba259db142';
+import { getMatrixValues } from './matrix-native.js?v=beba259db142';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=beba259db142';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -112,10 +112,10 @@ export function createVectorNativeBindings(){
  vector('nGetRootAlpha',['J'],'F',(g,[h])=>g.get(h,'tree').alpha);
  for(const [name,field]of [['nSetAntiAlias','antiAlias'],['nSetAllowCaching','allowCaching']])vector(name,['J','Z'],'V',(g,[h,v])=>{g.get(h,'tree')[field]=!!v;});
  vector('nUpdateGroupProperties',['J',...Array(7).fill('F')],'V',(g,[h,...values])=>{const p=g.get(h,'group').props;groupKeys.forEach((key,i)=>p[key]=finite(values[i]));});
- vector('nGetGroupProperties',['J','[F','I'],'Z',(g,[h,array,length],vm)=>{if(length!==7||vm.array(array).elements.length<length)return 0;vm.array(array).elements.splice(0,7,...groupKeys.map(k=>rawFloat(g.get(h,'group').props[k])));return 1;});
+ vector('nGetGroupProperties',['J','[F','I'],'Z',(g,[h,array,length],vm)=>{if(length!==7||vm.array(array).elements.length<length)return 0;vm.array(array).cells.set(groupKeys.map(k=>rawFloat(g.get(h,'group').props[k])));return 1;});
  vector('nUpdateFullPathProperties',['J','F','I','F','I','F','F','F','F','F','I','I','I'],'V',(g,[h,...values])=>{
   const order=['strokeWidth','strokeColor','strokeAlpha','fillColor','fillAlpha','trimPathStart','trimPathEnd','trimPathOffset','strokeMiterLimit','strokeLineCap','strokeLineJoin','fillType'];const p=g.get(h,'full').props;order.forEach((key,i)=>p[key]=finite(values[i]));});
- vector('nGetFullPathProperties',['J','[B','I'],'Z',(g,[h,array,length],vm)=>{if(length!==48||vm.array(array).elements.length<length)return 0;const buf=new DataView(new ArrayBuffer(48)),p=g.get(h,'full').props;propertyKeys.forEach((key,i)=>{if(['strokeColor','fillColor','strokeLineCap','strokeLineJoin','fillType'].includes(key))buf.setInt32(i*4,p[key],true);else buf.setFloat32(i*4,p[key],true);});vm.array(array).elements.splice(0,48,...new Int8Array(buf.buffer));return 1;});
+ vector('nGetFullPathProperties',['J','[B','I'],'Z',(g,[h,array,length],vm)=>{if(length!==48||vm.array(array).elements.length<length)return 0;const buf=new DataView(new ArrayBuffer(48)),p=g.get(h,'full').props;propertyKeys.forEach((key,i)=>{if(['strokeColor','fillColor','strokeLineCap','strokeLineJoin','fillType'].includes(key))buf.setInt32(i*4,p[key],true);else buf.setFloat32(i*4,p[key],true);});vm.array(array).cells.set(new Int8Array(buf.buffer));return 1;});
  for(const [kind,keys]of [['group',groupKeys],['full',propertyKeys]])for(const property of keys){const suffix=property[0].toUpperCase()+property.slice(1),integer=['strokeColor','fillColor','strokeLineCap','strokeLineJoin','fillType'].includes(property),type=integer?'I':'F';
   if(kind==='full'&&!['strokeWidth','strokeColor','strokeAlpha','fillColor','fillAlpha','trimPathStart','trimPathEnd','trimPathOffset'].includes(property))continue;
   vector('nGet'+suffix,['J'],type,(g,[h])=>g.get(h,kind).props[property]);vector('nSet'+suffix,['J',type],'V',(g,[h,v])=>{g.get(h,kind).props[property]=finite(v);});}
@@ -148,6 +148,7 @@ export function createVectorCanvasHost(){
   invoke(runtime,method,args){
    const object=runtime.object(args[0]),graphics=getVectorGraphics(runtime),name=method.name;
    if(name==='<init>'){if(object.nativeCanvasHandle)problem('Canvas is already initialized');object.nativeCanvasHandle=graphics.createCanvas();object.canvasDensity=160;return;}
+   runtime.skiaHost?.bitmaps?.flattenFullCanvas(object.nativeCanvasHandle);   // a Bitmap's command list is folded into one pixel command before it reaches the command limit
    const canvas=graphics.get(object.nativeCanvasHandle,'canvas');
    if(name==='getNativeCanvasWrapper')return object.nativeCanvasHandle;
    if(name==='isHardwareAccelerated')return 0;

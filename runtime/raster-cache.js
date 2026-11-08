@@ -17,8 +17,7 @@ export function hashRaster(text) {
 const rasterObjects = (root, visit) => {
   const stack = [root];
   while (stack.length) {
-    const value = stack.pop(); if (!value || typeof value !== 'object') continue;
-    if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) continue;   // pixel buffers are leaves: never walk their elements
+    const value = stack.pop(); if (!value || typeof value !== 'object' || ArrayBuffer.isView(value) || value instanceof ArrayBuffer) continue;   // typed data (pixel buffers, Java array storage) holds no rasters
     if (Array.isArray(value)) { for (let i = value.length - 1; i >= 0; i--) stack.push(value[i]); continue; }
     if (typeof value.dataURL === 'string' || typeof value.rasterId === 'string' || value.kind === 'rgba-raster') visit(value);
     const keys = Object.keys(value); for (let i = keys.length - 1; i >= 0; i--) { const child = value[keys[i]]; if (child && typeof child === 'object') stack.push(child); }

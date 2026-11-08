@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=2e29585a666b';
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { createHostRegistry, floatBits } from './host-contract.js?v=2e29585a666b';
-import { DIGESTS } from './crypto-host.js?v=2e29585a666b';
+import { gcRoot } from './heap-gc.js?v=beba259db142';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { createHostRegistry, floatBits } from './host-contract.js?v=beba259db142';
+import { DIGESTS } from './crypto-host.js?v=beba259db142';
 
 // java.io.ObjectOutputStream / ObjectInputStream: the Java Object Serialization Stream Protocol (JDK 8 ObjectStreamConstants, protocol version 5) for the types a VM app
 // serializes through Parcel.writeSerializable, Bundle/Intent extras, WorkManager's Data, caches and Externalizable models: String, boxed primitives, primitive and reference
@@ -75,7 +75,7 @@ export function createSerializationHost(platform) {
 
   const vcall = (r, receiver, owner, name, parameters, result, args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...args], 'virtual');
   const isSerializable = (r, t) => r.isSubtype(t, SERIALIZABLE);
-  const byteArray = (r, bytes) => { const a = r.newArray('[B', bytes.length); r.array(a).elements = Array.from(bytes, byteOf); return a; };
+  const byteArray = (r, bytes) => r.arrayOf('[B', bytes);
   const unsupported = (t, why) => new APKError(`Serialization of ${t.startsWith('[') ? t : dotted(t)} is not implemented${why ? ` (${why})` : ''}`, { kind: 'unsupported-serialization', type: t });
 
   // ---- ObjectStreamClass: what the stream says about a class ---------------------------------------------------------------------------------------
@@ -326,7 +326,7 @@ export function createSerializationHost(platform) {
   def(OIS, 'readUnsignedByte', '()I', (r, _m, [self]) => dataBytes(r, inState(r, self), 1)[0]);
   def(OIS, 'readUnsignedShort', '()I', (r, _m, [self]) => primitiveValue('C', dataBytes(r, inState(r, self), 2)));
   def(OIS, 'readUTF', `()${STRING}`, (r, _m, [self]) => { const s = inState(r, self), n = primitiveValue('C', dataBytes(r, s, 2)); return decodeUTF(dataBytes(r, s, n)); });
-  def(OIS, 'readFully', '([B)V', (r, _m, [self, a]) => { const e = r.array(a).elements; e.splice(0, e.length, ...dataBytes(r, inState(r, self), e.length).map(byteOf)); });
+  def(OIS, 'readFully', '([B)V', (r, _m, [self, a]) => { const e = r.array(a).cells; e.set(dataBytes(r, inState(r, self), e.length)); });
   def(OIS, 'readFully', '([BII)V', (r, _m, [self, a, o, l]) => { const e = r.array(a).elements; if (o < 0 || l < 0 || o + l > e.length) r.throwJava('Ljava/lang/IndexOutOfBoundsException;', null); dataBytes(r, inState(r, self), l).forEach((b, i) => { e[o + i] = byteOf(b); }); });
   const readSome = (r, self, a, o, l) => {
     const s = inState(r, self), e = r.array(a).elements; if (l === 0) return 0;
@@ -334,7 +334,7 @@ export function createSerializationHost(platform) {
     if (s.blockMode) { if (!refill(r, s)) return -1; const n = Math.min(l, s.blockLeft); sourceBytes(r, s, n).forEach((b, i) => { e[o + i] = byteOf(b); }); s.blockLeft -= n; return n; }
     if (s.peeked !== -1) { e[o] = byteOf(s.peeked); s.peeked = -1; return 1; }
     const buffer = r.newArray('[B', l), got = vcall(r, s.source, INPUT, 'read', ['[B', 'I', 'I'], 'I', [buffer, 0, l]);
-    if (got > 0) r.array(buffer).elements.slice(0, got).forEach((b, i) => { e[o + i] = b; });
+    if (got > 0) { const read = r.array(buffer).cells; if (ArrayBuffer.isView(e)) e.set(read.subarray(0, got), o); else for (let i = 0; i < got; i++) e[o + i] = read[i]; }
     return got;
   };
   def(OIS, 'read', '()I', (r, _m, [self]) => { const s = inState(r, self); if (s.blockMode) { if (!refill(r, s)) return -1; s.blockLeft--; return rawByte(r, s); } const v = peekByte(r, s); s.peeked = -1; return v; });

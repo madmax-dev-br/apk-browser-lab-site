@@ -1,6 +1,6 @@
-import { createHostRegistry, floatBits, bitsFloat } from './host-contract.js?v=2e29585a666b';
-import { gcRoot } from './heap-gc.js?v=2e29585a666b';
-import { sfntStyle, tagToInt } from './sfnt.js?v=2e29585a666b';
+import { createHostRegistry, floatBits, bitsFloat } from './host-contract.js?v=beba259db142';
+import { gcRoot } from './heap-gc.js?v=beba259db142';
+import { sfntStyle, tagToInt } from './sfnt.js?v=beba259db142';
 
 export { sfntStyle };
 
@@ -142,7 +142,7 @@ export function createTypefaceBuilderHost(platform) {
     if (pfd === null) npe(r, null);
     const stream = construct(r, 'Ljava/io/FileInputStream;', [FD], [call(r, pfd, PFD, 'getFileDescriptor', [], FD)]), chunks = [], block = r.newArray('[B', 65536);
     try {
-      for (;;) { const n = call(r, stream, 'Ljava/io/FileInputStream;', 'read', ['[B', 'I', 'I'], 'I', [block, 0, 65536]); if (n < 0) break; chunks.push(Uint8Array.from(r.array(block).elements.slice(0, n), v => v & 255)); }
+      for (;;) { const n = call(r, stream, 'Ljava/io/FileInputStream;', 'read', ['[B', 'I', 'I'], 'I', [block, 0, 65536]); if (n < 0) break; chunks.push(r.bytesOf(block, 0, n).slice()); }
     } catch (error) { if (isJava(error, r, IOEXCEPTION)) return failure(r.typeOf(error.value), r.object(error.value).message ?? ''); throw error; }
     const all = new Uint8Array(chunks.reduce((sum, c) => sum + c.length, 0)); let at = 0; for (const c of chunks) { all.set(c, at); at += c.length; }
     const start = Number(offset), count = Number(size) === -1 ? all.length - start : Number(size);

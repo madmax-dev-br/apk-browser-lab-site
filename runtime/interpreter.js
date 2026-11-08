@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { BUCKET } from './time-breakdown.js?v=2e29585a666b';
-import { Blocked, QUANTUM } from './scheduler.js?v=2e29585a666b';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=2e29585a666b';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { BUCKET } from './time-breakdown.js?v=beba259db142';
+import { Blocked, QUANTUM } from './scheduler.js?v=beba259db142';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=beba259db142';
 
 // Frame-based DEX interpreter.
 //
@@ -556,7 +556,7 @@ function runLoop(rt, owner, base) {
             pc += 2; break;
           }
           case 0x20: { const type = dex.types[u[pc + 1]], value = regs[hi]; if (!type) fail('Invalid instanceof type'); regs[lo] = !isNull(value) && subtypeAt(rt, prog, pc, rt.typeOf(value), type) ? 1 : (rt.assertResolvable(type), 0); pc += 2; break; }
-          case 0x21: regs[lo] = rt.array(regs[hi]).elements.length; pc++; break;
+          case 0x21: regs[lo] = rt.array(regs[hi]).cells.length; pc++; break;
           case 0x22: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid allocation type'); if (rt.initialized.get(type)?.status !== 'initialized') { const gate = rt.initStep(type); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.bytecodeAlloc = true; try { regs[a] = rt.allocate(type); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
           case 0x23: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid array type'); rt.bytecodeAlloc = true; try { regs[lo] = rt.newArray(type, int(regs[hi])); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
           case 0x27: { const value = regs[a]; if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'throw with null exception'); throw new JavaException(value, rt.object(value).message ?? rt.typeOf(value), rt.object(value).exceptionDetails); }
@@ -577,18 +577,18 @@ function runLoop(rt, owner, base) {
           }
           case 0x44: case 0x45: case 0x46: case 0x47: case 0x48: case 0x49: case 0x4a: {
             const packed = u[pc + 1], index = regs[packed >> 8], arrayRef = regs[packed & 255]; let array; if (arrayRef !== null && typeof arrayRef === 'object') array = heapList.get(arrayRef.ref);
-            if (array === undefined || array.elements === undefined || !(index >= 0 && index < array.elements.length)) array = rt.array(arrayRef, index);
-            const variant = op - 0x44, e = array.elements[index];
+            if (array === undefined || array.cells === undefined || !(index >= 0 && index < array.cells.length)) array = rt.array(arrayRef, index);
+            const variant = op - 0x44, e = array.cells[index];
             if (variant === 1) { regs[a] = e; regs[a + 1] = WIDE_HIGH; } else regs[a] = variant === 3 ? e & 1 : variant === 4 ? (e << 24) >> 24 : variant === 5 ? e & 65535 : variant === 6 ? (e << 16) >> 16 : e;
             pc += 2; break;
           }
           case 0x4b: case 0x4c: case 0x4d: case 0x4e: case 0x4f: case 0x50: case 0x51: {
             const packed = u[pc + 1], index = regs[packed >> 8], arrayRef = regs[packed & 255]; let array; if (arrayRef !== null && typeof arrayRef === 'object') array = heapList.get(arrayRef.ref);
-            if (array === undefined || array.elements === undefined || !(index >= 0 && index < array.elements.length)) array = rt.array(arrayRef, index);
+            if (array === undefined || array.cells === undefined || !(index >= 0 && index < array.cells.length)) array = rt.array(arrayRef, index);
             const variant = op - 0x4b, v = regs[a];
             const value = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
             if (variant === 2) rt.checkArrayValue(array, value);
-            array.elements[index] = value;
+            array.cells[index] = value;
             pc += 2; break;
           }
           case 0x52: case 0x53: case 0x54: case 0x55: case 0x56: case 0x57: case 0x58: {
@@ -850,24 +850,18 @@ function stepRare(rt, f, regs, u, dex, pc, op, a, lo, hi) {
       case 0x24: case 0x25: {
         const type = dex.types[u[pc + 1]]; if (!type?.startsWith('[') || ['J', 'D'].includes(type.slice(1))) fail('Invalid filled-new-array type');
         const registers = invokeRegisters(u, pc, regs, op, a, lo, hi); rt.bytecodeAlloc = true; let value; try { value = rt.newArray(type, registers.length); } finally { rt.bytecodeAlloc = false; } const array = rt.object(value);
-        for (let i = 0; i < registers.length; i++) { const entry = regs[registers[i]]; rt.checkArrayValue(array, entry); array.elements[i] = narrow(entry, type.slice(1)); }
+        for (let i = 0; i < registers.length; i++) { const entry = regs[registers[i]]; rt.checkArrayValue(array, entry); array.cells[i] = narrow(entry, type.slice(1)); }
         f.result = value; pc += 3; break;
       }
       case 0x26: {
         const array = rt.array(regs[a]), payload = pc + (u[pc + 1] | (u[pc + 2] << 16)), tag = u[payload], width = u[payload + 1];
         const size = u[payload + 2] + u[payload + 3] * 65536;
         const expected = { Z: 1, B: 1, C: 2, S: 2, I: 4, F: 4, J: 8, D: 8 }[array.type.slice(1)];
-        if (tag !== 0x0300 || !expected || width !== expected || size > array.elements.length || payload + 4 + Math.ceil(size * width / 2) > f.code.units) fail('Malformed fill-array-data payload');
-        const type = array.type.slice(1);
-        for (let i = 0; i < size; i++) {
-          const p = payload + 4 + (i * width >> 1);
-          let value;
-          if (width === 1) value = (i & 1) ? u[p] >> 8 : u[p] & 255;
-          else if (width === 2) value = u[p];
-          else if (width === 4) value = (u[p] | (u[p + 1] << 16)) | 0;
-          else value = BigInt.asIntN(64, BigInt(u[p] | (u[p + 1] << 16)) & 0xffffffffn | BigInt(u[p + 2] | (u[p + 3] << 16)) << 32n);
-          array.elements[i] = narrow(value, type);
-        }
+        if (tag !== 0x0300 || !expected || size > array.cells.length || width !== expected || payload + 4 + Math.ceil(size * width / 2) > f.code.units) fail('Malformed fill-array-data payload');
+        // The payload is the little-endian byte image of the elements, exactly the array's storage: copy it through a byte view of the code units (u is a Uint16Array over the DEX bytes, or a copy of them).
+        const cells = array.cells, bytes = new Uint8Array(u.buffer, u.byteOffset + (payload + 4) * 2, size * width);
+        if (ArrayBuffer.isView(cells)) new Uint8Array(cells.buffer, cells.byteOffset, cells.byteLength).set(bytes);   // same byte image: a byte[] is its bytes, a char[] its UTF-16 units, an int[]/float[] its 32-bit words, a long[]/double[] its 64-bit words
+        else { const type = array.type.slice(1), view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength); for (let i = 0; i < size; i++) cells[i] = narrow(width === 1 ? view.getInt8(i) : width === 2 ? view.getUint16(i * 2, true) : width === 4 ? view.getInt32(i * 4, true) : view.getBigInt64(i * 8, true), type); }
         pc += 3; break;
       }
       case 0x2b: case 0x2c: {

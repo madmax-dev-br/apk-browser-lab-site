@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { throwNew } from './java-throw.js?v=2e29585a666b';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { throwNew } from './java-throw.js?v=beba259db142';
 
 // com.android.icu.charset.NativeConverter converter natives (open/close/decode/encode/reset/callbacks) over the unmodified ICU4C 70.1 ucnv implementation compiled to
 // WebAssembly (vendor/icu/70.1/icu-converter.wasm, scripts/build-icu-converter.sh). The wrapper code follows external/icu android-13.0.0_r1
@@ -80,7 +80,7 @@ export function createIcuConverterNativeBindings() {
   add('getSubstitutionBytes(J)[B', (runtime, [handle]) => {
     const pointer = Number(handle); if (!pointer) return null;
     const c = converters(runtime), out = c.alloc(32), length = c.x.icu_cnv_subst_chars(pointer, out), bytes = length < 0 ? new Uint8Array(0) : c.bytes().slice(out, out + length); c.x.free(out);
-    const array = runtime.newArray('[B', bytes.length); runtime.array(array).elements = Array.from(bytes, v => (v << 24) >> 24); return array;
+    return runtime.arrayOf('[B', bytes);
   });
   // decode: NativeConverter_decode; data[0..2] = input offset / output offset / invalid byte count
   add('decode(J[BI[CI[IZ)I', (runtime, [handle, input, inEnd, output, outEnd, data, flush]) => {

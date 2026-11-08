@@ -2,7 +2,7 @@
 // original java.net.DatagramSocket / MulticastSocket / PlainDatagramSocketImpl. Datagrams are delivered between sockets inside the VM: loopback, the Wi-Fi address while the panel is online,
 // broadcast and multicast groups joined by sockets of this process. There is no route out of the browser, so a datagram for any other address fails like on a device that has no route to it
 // (ENETUNREACH), and a connected socket whose loopback peer is not there gets ECONNREFUSED (the ICMP port unreachable the kernel reports) on its next send or receive.
-import { Blocked } from './scheduler.js?v=2e29585a666b';
+import { Blocked } from './scheduler.js?v=beba259db142';
 
 const MAX_DATAGRAM = 65507, RECEIVE_QUEUE_BYTES = 212992, EPHEMERAL_FIRST = 32768, EPHEMERAL_LAST = 60999, OWN_V4 = [10, 0, 2, 15], BROADCAST_V4 = [10, 0, 2, 255];
 
@@ -142,7 +142,7 @@ export function installUdp({ L, C, err, entryOf, state, construct, byteArray, in
       for (const row of rows) {
         let revents = 0;
         if (row.desc?.kind === 'socket') {
-          if (row.events & C.POLLIN && (row.desc.queue?.length ?? 0) > 0) revents |= C.POLLIN;
+          if (row.events & C.POLLIN && ((row.desc.queue?.length ?? 0) > 0 || row.desc.http?.readable())) revents |= C.POLLIN;
           if (row.desc.pendingError) revents |= C.POLLERR;
           if (row.events & C.POLLOUT) revents |= C.POLLOUT;
         }
@@ -160,7 +160,7 @@ export function installUdp({ L, C, err, entryOf, state, construct, byteArray, in
   const FIONREAD = 0x541b;
   L('ioctlInt(Ljava/io/FileDescriptor;I)I', (runtime, [, fdRef, command]) => {
     const desc = entryOf(runtime, 'ioctl', fdRef).desc;
-    if (desc.kind === 'socket' && command === FIONREAD) return desc.queue?.[0]?.data.length ?? 0;
+    if (desc.kind === 'socket' && command === FIONREAD) return desc.http ? (desc.http.pump(), Math.min(desc.http.available, 0x7fffffff)) : desc.queue?.[0]?.data.length ?? 0;
     return err(runtime, 'ioctl', 'ENOTTY');
   });
 
@@ -189,7 +189,20 @@ export function installUdp({ L, C, err, entryOf, state, construct, byteArray, in
     else if (option === C.MCAST_LEAVE_GROUP) { if (!groups.delete(key(bytes))) err(runtime, 'setsockopt', 'EADDRNOTAVAIL'); }
     else err(runtime, 'setsockopt', 'ENOPROTOOPT');
   });
-  for (const name of ['setsockoptLinger', 'setsockoptTimeval']) L(`${name}(Ljava/io/FileDescriptor;IILandroid/system/${name === 'setsockoptLinger' ? 'StructLinger' : 'StructTimeval'};)V`, (runtime, [, fdRef]) => { socketOf(runtime, 'setsockopt', fdRef); });
+  // SO_LINGER and SO_RCVTIMEO are kept per socket (java.net reads SO_TIMEOUT from the PlainSocketImpl field, but Os.getsockopt* answers what was set).
+  const STRUCT_LINGER = 'Landroid/system/StructLinger;', STRUCT_TIMEVAL = 'Landroid/system/StructTimeval;';
+  L(`setsockoptLinger(Ljava/io/FileDescriptor;II${STRUCT_LINGER})V`, (runtime, [, fdRef, level, option, value]) => {
+    const desc = socketOf(runtime, 'setsockopt', fdRef), fields = runtime.object(value).fields;
+    (desc.options ??= new Map()).set(`${level}:${option}`, { on: fields.get(`${STRUCT_LINGER}->l_onoff:I`) ?? 0, seconds: fields.get(`${STRUCT_LINGER}->l_linger:I`) ?? 0 });
+  });
+  L(`setsockoptTimeval(Ljava/io/FileDescriptor;II${STRUCT_TIMEVAL})V`, (runtime, [, fdRef, level, option, value]) => {
+    const desc = socketOf(runtime, 'setsockopt', fdRef), fields = runtime.object(value).fields;
+    (desc.options ??= new Map()).set(`${level}:${option}`, { sec: BigInt(fields.get(`${STRUCT_TIMEVAL}->tv_sec:J`) ?? 0n), usec: BigInt(fields.get(`${STRUCT_TIMEVAL}->tv_usec:J`) ?? 0n) });
+  });
+  L(`getsockoptLinger(Ljava/io/FileDescriptor;II)${STRUCT_LINGER}`, (runtime, [, fdRef, level, option]) => { const v = opt(socketOf(runtime, 'getsockopt', fdRef), level, option) ?? { on: 0, seconds: 0 }; return construct(runtime, STRUCT_LINGER, ['I', 'I'], [v.on, v.seconds]); });
+  L(`getsockoptTimeval(Ljava/io/FileDescriptor;II)${STRUCT_TIMEVAL}`, (runtime, [, fdRef, level, option]) => { const v = opt(socketOf(runtime, 'getsockopt', fdRef), level, option) ?? { sec: 0n, usec: 0n }; return construct(runtime, STRUCT_TIMEVAL, ['J', 'J'], [v.sec, v.usec]); });
 
-  return { bytesOf, connectDatagram, boundAddress, isDatagram: desc => desc.kind === 'socket' && desc.type === C.SOCK_DGRAM };
+  /** A connected stream socket reports a source address and an ephemeral port like the kernel's autobind does. */
+  const bindEphemeral = (runtime, fn, desc, bytes) => bindTo(runtime, fn, desc, bytes, 0);
+  return { bytesOf, connectDatagram, boundAddress, bindEphemeral, isDatagram: desc => desc.kind === 'socket' && desc.type === C.SOCK_DGRAM };
 }

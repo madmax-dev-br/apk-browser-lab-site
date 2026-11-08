@@ -1,5 +1,8 @@
-import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=2e29585a666b';
-import { APKError } from './apk-error.js?v=2e29585a666b';
+import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=beba259db142';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { Blocked } from './scheduler.js?v=beba259db142';
+import { networkOf } from './network-native.js?v=beba259db142';
+import { installTlsSockets, TRUST_KEY } from './tls-socket-host.js?v=beba259db142';
 
 // java.net.IDN and the javax.net.ssl surface (TrustManagerFactory, KeyManagerFactory, SSLContext) for libraries that probe the platform at launch (OkHttp's Platform.get(),
 // host name normalisation). java.security.Security / Provider / KeyStore and the providers (Conscrypt, the Android Keystore) are the original libcore and Conscrypt
@@ -65,8 +68,9 @@ export function createSecurityHost(platform) {
 
   // ---- TLS surface: javax.net.ssl / java.security.KeyStore / Conscrypt (com.android.org.conscrypt) as an Android 9+ app sees them ------------------------
   // OkHttp's Platform.get() reflects on Conscrypt's OpenSSLSocketImpl and builds a TrustManagerFactory/SSLContext when the client is created. The device trust
-  // store (AndroidCAStore) is not available here, so the default TrustManager has no trust anchors and, like Conscrypt's TrustManagerImpl, rejects every chain
-  // with "Trust anchor for certification path not found." (fail closed). TLS itself is never done in the VM: network access goes through the lab's fetch bridge.
+  // store (AndroidCAStore) is not available here: the default TrustManager trusts exactly one authority, the lab transport CA (src/transport-ca.js) -- the chains an SSLSocket over a
+  // virtual HTTP socket presents -- and, like Conscrypt's TrustManagerImpl, rejects every other chain with "Trust anchor for certification path not found." (fail closed).
+  // TLS itself is never done in the VM: network access goes through the lab's fetch bridge (src/tls-socket-host.js explains the SSLSocket model).
   const TM = 'Ljavax/net/ssl/TrustManager;', KM = 'Ljavax/net/ssl/KeyManager;', X509TM = 'Ljavax/net/ssl/X509TrustManager;', TMF = 'Ljavax/net/ssl/TrustManagerFactory;', KMF = 'Ljavax/net/ssl/KeyManagerFactory;';
   const SSL_CONTEXT = 'Ljavax/net/ssl/SSLContext;', SSL_SOCKET_FACTORY = 'Ljavax/net/ssl/SSLSocketFactory;', SSL_SOCKET = 'Ljavax/net/ssl/SSLSocket;', KEYSTORE = 'Ljava/security/KeyStore;', SECURE_RANDOM = 'Ljava/security/SecureRandom;';
   const X509 = 'Ljava/security/cert/X509Certificate;', CERT = 'Ljava/security/cert/Certificate;', LIST = 'Ljava/util/List;', INPUT_STREAM = 'Ljava/io/InputStream;', CHARS = '[C', BYTES = '[B';
@@ -78,26 +82,44 @@ export function createSecurityHost(platform) {
   const array = (r, element, items) => { const a = r.newArray(`[${element}`, items.length); r.array(a).elements = items; return a; };
   const algorithm = (r, name, accepted, what) => { if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'algorithm == null'); const wanted = r.stringCharacters(name); if (!accepted.some(a => a.toLowerCase() === wanted.toLowerCase())) r.throwJava('Ljava/security/NoSuchAlgorithmException;', `${wanted} ${what} not available`); return wanted; };
 
-  // Conscrypt's TrustManagerImpl: X509TrustManager with no anchors.
-  def(TMI, 'getAcceptedIssuers', `()[${X509}`, r => array(r, X509, []));
-  const checkChain = (r, chain) => { if (chain === null || r.array(chain).elements.length === 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'null or zero-length certificate chain'); r.throwJava('Ljava/security/cert/CertificateException;', NO_ANCHOR); };
+  // Conscrypt's TrustManagerImpl: an X509TrustManager whose only anchor is the lab transport CA.
+  const checkChain = (r, chain, client = false) => {
+    if (chain === null || r.array(chain).elements.length === 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'null or zero-length certificate chain');
+    if (!client && sockets.isLabChain(r, chain)) return;
+    r.throwJava('Ljava/security/cert/CertificateException;', NO_ANCHOR);
+  };
+  const asList = (r, chain) => r.dispatch({ owner: 'Ljava/util/Arrays;', name: 'asList', parameters: ['[Ljava/lang/Object;'], result: LIST, signature: `([Ljava/lang/Object;)${LIST}` }, r.argumentWords(['[Ljava/lang/Object;'], [chain], {}), 'static');
+  def(TMI, 'getAcceptedIssuers', `()[${X509}`, r => { const ca = sockets.authorityCertificate(r); if (ca instanceof Blocked) return ca; return array(r, X509, ca === null ? [] : [ca]); });
   def(TMI, 'checkServerTrusted', `([${X509}${STRING})V`, (r, _m, [, chain]) => checkChain(r, chain));
-  def(TMI, 'checkClientTrusted', `([${X509}${STRING})V`, (r, _m, [, chain]) => checkChain(r, chain));
-  def(TMI, 'checkServerTrusted', `([${X509}${STRING}${STRING})${LIST}`, (r, _m, [, chain]) => checkChain(r, chain));
-  def(EXT, '<init>', `(${X509TM})V`, (r, _m, [self, manager]) => { if (manager === null) r.throwJava('Ljava/lang/NullPointerException;', null); r.object(self).delegate = manager; });
-  def(EXT, 'checkServerTrusted', `([${X509}${STRING}${STRING})${LIST}`, (r, _m, [, chain]) => checkChain(r, chain));
+  def(TMI, 'checkClientTrusted', `([${X509}${STRING})V`, (r, _m, [, chain]) => checkChain(r, chain, true));
+  def(TMI, 'checkServerTrusted', `([${X509}${STRING}${STRING})${LIST}`, (r, _m, [, chain]) => { checkChain(r, chain); return asList(r, chain); });
+  // X509TrustManagerExtensions wraps the platform's TrustManagerImpl; for any other TrustManager Android reflects on checkServerTrusted(chain, authType, host) and, finding none, throws -- clients (OkHttp) then build their own chain cleaner
+  def(EXT, '<init>', `(${X509TM})V`, (r, _m, [self, manager]) => {
+    if (manager === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    if (!r.isSubtype(r.object(manager).type, TMI)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Required method checkServerTrusted(X509Certificate[], String, String) missing');
+    r.object(self).delegate = manager;
+  });
+  def(EXT, 'checkServerTrusted', `([${X509}${STRING}${STRING})${LIST}`, (r, _m, [, chain]) => { checkChain(r, chain); return asList(r, chain); });
   def(EXT, 'isUserAddedCertificate', `(${X509})Z`, () => 0);
   def(EXT, 'isSameTrustConfiguration', `(${STRING}${STRING})Z`, () => 1);
 
   // Conscrypt socket classes: only the reflective surface OkHttp inspects at start-up; sockets cannot be created (see the header comment).
-  const noSockets = r => r.throwJava('Ljava/net/SocketException;', 'TLS sockets are not available in the browser lab (HTTP goes through the fetch bridge)');
-  for (const parameters of ['', 'Ljava/net/Socket;Ljava/lang/String;IZ', 'Ljava/lang/String;I', 'Ljava/net/InetAddress;I']) def(OSFI, 'createSocket', `(${parameters})${'Ljava/net/Socket;'}`, noSockets);
+  // Conscrypt's OpenSSLSocketFactoryImpl: createSocket returns an SSLSocket over a virtual HTTP socket (src/tls-socket-host.js) -- the browser's fetch does the TLS.
   // Conscrypt (android-13): the cipher suites a client socket enables by default, and the extra legacy ones it can be asked to enable.
   const DEFAULT_SUITES = ['TLS_AES_128_GCM_SHA256', 'TLS_AES_256_GCM_SHA384', 'TLS_CHACHA20_POLY1305_SHA256', 'TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256', 'TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384', 'TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256',
     'TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256', 'TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384', 'TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256', 'TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA', 'TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA',
     'TLS_RSA_WITH_AES_128_GCM_SHA256', 'TLS_RSA_WITH_AES_256_GCM_SHA384', 'TLS_RSA_WITH_AES_128_CBC_SHA', 'TLS_RSA_WITH_AES_256_CBC_SHA'];
   const SUPPORTED_SUITES = [...DEFAULT_SUITES, 'TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA', 'TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA', 'TLS_RSA_WITH_3DES_EDE_CBC_SHA', 'TLS_EMPTY_RENEGOTIATION_INFO_SCSV'];
   const DEFAULT_PROTOCOLS = ['TLSv1.3', 'TLSv1.2'], SUPPORTED_PROTOCOLS = ['TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3'];
+  const sockets = installTlsSockets({ def, type, registry }, { defaults: { DEFAULT_SUITES, SUPPORTED_SUITES, DEFAULT_PROTOCOLS, SUPPORTED_PROTOCOLS }, array });
+  const SOCKET = 'Ljava/net/Socket;', INET = 'Ljava/net/InetAddress;';
+  const nameOf = (r, address) => { const literal = r.stringCharacters(r.dispatch({ owner: INET, name: 'getHostAddress', parameters: [], result: STRING, signature: `()${STRING}` }, [address], 'virtual')); return networkOf(r).resolvedName(literal) ?? literal; };
+  def(OSFI, 'createSocket', `()${SOCKET}`, (r, _m, [self]) => sockets.unconnected(r, self));
+  def(OSFI, 'createSocket', `(${SOCKET}${STRING}IZ)${SOCKET}`, (r, _m, [self, socket, host, port, autoClose]) => sockets.wrap(r, self, socket, host, port, !!autoClose));
+  def(OSFI, 'createSocket', `(${STRING}I)${SOCKET}`, (r, _m, [self, host, port]) => sockets.connected(r, self, [STRING, 'I'], [host, port], r.stringCharacters(host)));
+  def(OSFI, 'createSocket', `(${INET}I)${SOCKET}`, (r, _m, [self, address, port]) => sockets.connected(r, self, [INET, 'I'], [address, port], nameOf(r, address)));
+  def(OSFI, 'createSocket', `(${STRING}I${INET}I)${SOCKET}`, (r, _m, [self, host, port, local, localPort]) => sockets.connected(r, self, [STRING, 'I', INET, 'I'], [host, port, local, localPort], r.stringCharacters(host)));
+  def(OSFI, 'createSocket', `(${INET}I${INET}I)${SOCKET}`, (r, _m, [self, address, port, local, localPort]) => sockets.connected(r, self, [INET, 'I', INET, 'I'], [address, port, local, localPort], nameOf(r, address)));
   def(OSFI, 'getDefaultCipherSuites', '()[Ljava/lang/String;', r => array(r, STRING, DEFAULT_SUITES));
   def(OSFI, 'getSupportedCipherSuites', '()[Ljava/lang/String;', r => array(r, STRING, SUPPORTED_SUITES));
   // SSLContext.getDefaultSSLParameters / getSupportedSSLParameters (SSLContextSpi -> the socket factory's defaults): a real javax.net.ssl.SSLParameters of the cipher suites and protocols.
@@ -123,7 +145,7 @@ export function createSecurityHost(platform) {
   def(SSL_CONTEXT, 'getInstance', `(${STRING})${SSL_CONTEXT}`, (r, _m, [name]) => { const ref = r.allocate(SSL_CONTEXT); r.object(ref).protocol = algorithm(r, name, PROTOCOLS, 'SSLContext'); return ref; }, { static: true });
   def(SSL_CONTEXT, 'getDefault', `()${SSL_CONTEXT}`, r => { const ref = r.allocate(SSL_CONTEXT); Object.assign(r.object(ref), { protocol: 'Default', factory: r.allocate(OSFI) }); return ref; }, { static: true });
   def(SSL_CONTEXT, 'getProtocol', `()${STRING}`, (r, _m, [self]) => r.object(self).protocol);
-  def(SSL_CONTEXT, 'init', `([${KM}[${TM}${SECURE_RANDOM})V`, (r, _m, [self, , trust]) => { const o = r.object(self); o.trustManagers = (trust === null || trust === 0 || trust === undefined) ? null : [...r.array(trust).elements]; o.factory = r.allocate(OSFI); });
+  def(SSL_CONTEXT, 'init', `([${KM}[${TM}${SECURE_RANDOM})V`, (r, _m, [self, , trust]) => { const o = r.object(self); o.trustManagers = (trust === null || trust === 0 || trust === undefined) ? null : [...r.array(trust).elements]; o.factory = r.allocate(OSFI); r.storeField(r.object(o.factory).fields, TRUST_KEY, o.trustManagers ? trust : null); });
   def(SSL_CONTEXT, 'getSocketFactory', `()${SSL_SOCKET_FACTORY}`, (r, _m, [self]) => r.object(self).factory ?? r.throwJava('Ljava/lang/IllegalStateException;', 'SSLContext is not initialized'));
 
   return { ...registry, interfaces: registry.interfacesOf };

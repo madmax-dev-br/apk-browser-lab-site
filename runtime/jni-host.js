@@ -1,17 +1,17 @@
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { JavaException } from './apk-runtime.js?v=2e29585a666b';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=2e29585a666b';
-import { buildElfDescriptor } from './native-descriptor.js?v=2e29585a666b';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=2e29585a666b';
-import { NativeLinker, LinkError } from './native-linker.js?v=2e29585a666b';
-import { hostFunction } from './wasm-host-function.js?v=2e29585a666b';
-import { parseWasm } from './wasm-dylink.js?v=2e29585a666b';
-import { formatVersion } from './rn-version.js?v=2e29585a666b';
-import { registerWasmMemory } from './unsafe-native.js?v=2e29585a666b';
-import { writeSkPath } from './skia-path-layout.js?v=2e29585a666b';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=2e29585a666b';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=2e29585a666b';
-import { withVariants } from './native-provider-variants.js?v=2e29585a666b';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { JavaException } from './apk-runtime.js?v=beba259db142';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=beba259db142';
+import { buildElfDescriptor } from './native-descriptor.js?v=beba259db142';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=beba259db142';
+import { NativeLinker, LinkError } from './native-linker.js?v=beba259db142';
+import { hostFunction } from './wasm-host-function.js?v=beba259db142';
+import { parseWasm } from './wasm-dylink.js?v=beba259db142';
+import { formatVersion } from './rn-version.js?v=beba259db142';
+import { registerWasmMemory } from './unsafe-native.js?v=beba259db142';
+import { writeSkPath } from './skia-path-layout.js?v=beba259db142';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=beba259db142';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=beba259db142';
+import { withVariants } from './native-provider-variants.js?v=beba259db142';
 
 // JNI -> WebAssembly bridge.
 //
@@ -599,23 +599,26 @@ export class JniBridge {
     for (const [name, code, size] of PRIMITIVES) {
       const write = (v, at, value) => { switch (code) { case 'Z': v.setUint8(at, value & 1); break; case 'B': v.setInt8(at, value); break; case 'C': v.setUint16(at, value, true); break; case 'S': v.setInt16(at, value, true); break; case 'I': case 'F': v.setInt32(at, value, true); break; default: v.setBigInt64(at, BigInt.asIntN(64, BigInt(value)), true); } };
       const read = (v, at) => { switch (code) { case 'Z': return v.getUint8(at) ? 1 : 0; case 'B': return v.getInt8(at); case 'C': return v.getUint16(at, true); case 'S': return v.getInt16(at, true); case 'I': case 'F': return v.getInt32(at, true); default: return v.getBigInt64(at, true); } };
+      // The Java storage (java-arrays.js) has the native byte image of the elements (little-endian, jboolean = 0/1): typed storage copies as bytes, anything else element by element.
+      const copyOut = (v, at, cells, start, length) => { if (ArrayBuffer.isView(cells)) new Uint8Array(v.buffer, at, length * size).set(new Uint8Array(cells.buffer, cells.byteOffset + start * size, length * size)); else for (let i = 0; i < length; i++) write(v, at + i * size, cells[start + i]); };
+      const copyIn = (v, at, cells, start, length) => { if (ArrayBuffer.isView(cells)) new Uint8Array(cells.buffer, cells.byteOffset + start * size, length * size).set(new Uint8Array(v.buffer, at, length * size)); else for (let i = 0; i < length; i++) cells[start + i] = read(v, at + i * size); };
       h[`New${name}Array`] = (_env, length) => { if (length < 0) { self.#throwNew('Ljava/lang/NegativeArraySizeException;', String(length)); return 0; } return self.#local(r.newArray(`[${code}`, length)); };
       h[`Get${name}ArrayElements`] = (_env, a, isCopy) => {
-        const array = arrayOf(a), ptr = lib.malloc(Math.max(1, array.elements.length * size)), v = view(); if (isCopy) v.setUint8(isCopy, 1);
-        array.elements.forEach((e, i) => write(v, ptr + i * size, e)); lib.allocations.set(ptr, { array: self.#value(a), code, size }); return ptr;
+        const array = arrayOf(a), ptr = lib.malloc(Math.max(1, array.cells.length * size)), v = view(); if (isCopy) v.setUint8(isCopy, 1);
+        copyOut(v, ptr, array.cells, 0, array.cells.length); lib.allocations.set(ptr, { array: self.#value(a), code, size }); return ptr;
       };
       h[`Release${name}ArrayElements`] = (_env, a, ptr, mode) => {
         const array = arrayOf(a), v = view();
-        if (mode === 0 || mode === 1) array.elements.forEach((_, i) => { array.elements[i] = read(v, ptr + i * size); });
+        if (mode === 0 || mode === 1) copyIn(v, ptr, array.cells, 0, array.cells.length);
         if (mode === 0 || mode === 2) { lib.allocations.delete(ptr); lib.free(ptr); }
       };
       h[`Get${name}ArrayRegion`] = (_env, a, start, length, out) => {
         const array = arrayOf(a); if (start < 0 || length < 0 || start + length > array.elements.length) return outOfBounds(`length=${array.elements.length}; regionStart=${start}; regionLength=${length}`);
-        const v = view(); for (let i = 0; i < length; i++) write(v, out + i * size, array.elements[start + i]);
+        copyOut(view(), out, array.cells, start, length);
       };
       h[`Set${name}ArrayRegion`] = (_env, a, start, length, src) => {
         const array = arrayOf(a); if (start < 0 || length < 0 || start + length > array.elements.length) return outOfBounds(`length=${array.elements.length}; regionStart=${start}; regionLength=${length}`);
-        const v = view(); for (let i = 0; i < length; i++) array.elements[start + i] = read(v, src + i * size);
+        copyIn(view(), src, array.cells, start, length);
       };
     }
     h.GetPrimitiveArrayCritical = (_env, a, isCopy) => {

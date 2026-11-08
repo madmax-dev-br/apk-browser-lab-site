@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { throwNew } from './java-throw.js?v=2e29585a666b';
-import { readNativeBytes } from './unsafe-native.js?v=2e29585a666b';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { throwNew } from './java-throw.js?v=beba259db142';
+import { readNativeBytes } from './unsafe-native.js?v=beba259db142';
 
 // Natives of java.util.zip behind the original libcore classes (android-13.0.0_r1):
 //   Inflater / Deflater / CRC32 / Adler32  -- Android's external/zlib compiled to WebAssembly (vendor/zlib); the wrappers follow ojluni Inflater.c, Deflater.c, CRC32.c, Adler32.c
@@ -57,10 +57,11 @@ class ZlibEngine {
   cstr(pointer) { if (!pointer) return null; const bytes = this.bytes(); let end = pointer; while (bytes[end]) end++; return decoder.decode(bytes.subarray(pointer, end)); }
   /** Copies elements [offset, offset+count) of a Java byte[] into Wasm memory (returns the pointer; caller frees). */
   upload(array, offset, count) {
-    const elements = array.elements, pointer = this.alloc(count), view = this.bytes();
-    for (let i = 0; i < count; i++) view[pointer + i] = elements[offset + i] & 0xff; return pointer;
+    const cells = array.cells, pointer = this.alloc(count), view = this.bytes();
+    if (ArrayBuffer.isView(cells)) view.set(new Uint8Array(cells.buffer, cells.byteOffset + offset, count), pointer); else for (let i = 0; i < count; i++) view[pointer + i] = cells[offset + i] & 0xff;
+    return pointer;
   }
-  download(pointer, array, offset, count) { const view = this.bytes(), elements = array.elements; for (let i = 0; i < count; i++) elements[offset + i] = (view[pointer + i] << 24) >> 24; }
+  download(pointer, array, offset, count) { const view = this.bytes(), cells = array.cells; if (ArrayBuffer.isView(cells)) cells.set(view.subarray(pointer, pointer + count), offset); else for (let i = 0; i < count; i++) cells[offset + i] = (view[pointer + i] << 24) >> 24; }
 }
 
 const engines = new WeakMap();
@@ -189,8 +190,8 @@ export function createZipNativeBindings() {
   add(ZIPFILE, 'close(J)V', (runtime, [zip]) => { engineFor(runtime).x.zp_close(Number(zip)); });
   add(ZIPFILE, 'getFileDescriptor(J)I', (runtime, [zip]) => engineFor(runtime).x.zp_zfd(Number(zip)));
   add(ZIPFILE, 'getEntry(J[BZ)J', (runtime, [zip, name, addSlash]) => {
-    const e = engineFor(runtime), source = runtime.array(name).elements, length = source.length, p = e.alloc(length + 2);
-    for (let i = 0; i < length; i++) e.bytes()[p + i] = source[i] & 0xff; e.bytes()[p + length] = 0;
+    const e = engineFor(runtime), source = runtime.bytesOf(name), length = source.length, p = e.alloc(length + 2);
+    e.bytes().set(source, p); e.bytes()[p + length] = 0;
     try { return BigInt(e.x.zp_get_entry(Number(zip), p, length, addSlash ? 1 : 0)); } finally { e.x.free(p); }
   });
   add(ZIPFILE, 'freeEntry(JJ)V', (runtime, [zip, entry]) => { engineFor(runtime).x.zp_free_entry(Number(zip), Number(entry)); });
@@ -201,7 +202,7 @@ export function createZipNativeBindings() {
   add(ZIPFILE, 'getEntrySize(J)J', (runtime, [entry]) => engineFor(runtime).x.zp_entry_size(Number(entry)));
   add(ZIPFILE, 'getEntryTime(J)J', (runtime, [entry]) => BigInt.asUintN(32, engineFor(runtime).x.zp_entry_time(Number(entry))));
   add(ZIPFILE, 'getEntryCrc(J)J', (runtime, [entry]) => BigInt(engineFor(runtime).x.zp_entry_crc(Number(entry)) >>> 0));
-  const byteArray = (runtime, bytes) => { const array = runtime.newArray('[B', bytes.length); runtime.array(array).elements = Array.from(bytes, v => (v << 24) >> 24); return array; };
+  const byteArray = (runtime, bytes) => runtime.arrayOf('[B', bytes);
   add(ZIPFILE, 'getCommentBytes(J)[B', (runtime, [zip]) => {
     const e = engineFor(runtime), comment = e.x.zp_comment(Number(zip)); if (!comment) return null;
     return byteArray(runtime, e.bytes().slice(comment, comment + e.x.zp_comment_length(Number(zip))));

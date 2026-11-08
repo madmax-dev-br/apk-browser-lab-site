@@ -18,12 +18,19 @@
 // Invoke.then) must declare it: `queueTask(fn, delay, roots)`, `Blocked({ roots })`, Invoke args. A queued platform task *without* a roots declaration makes the collector skip
 // (reason "unannotated-task") rather than risk freeing a captured object; audit mode reports it so the call site can be annotated.
 //
-// java.lang.ref.WeakReference/SoftReference referents are held strongly, finalizers are never run (documented limit: nothing is cleared before the object becomes
-// unreachable from everything else, which is what ART guarantees for soft references anyway; WeakHashMap and Compose's weak sets therefore never lose an entry early).
+// java.lang.ref references, as ART treats them (finalizers are never run):
+//  - WeakReference (and subclasses): the referent never keeps its object alive; once a collection finds it otherwise unreachable the referent is cleared and the reference is enqueued on its ReferenceQueue.
+//  - SoftReference (and subclasses): strongly reachable in a normal collection (a cache is only emptied when the heap needs it). A collection run under pressure (`clearSoft`: the emergency collection at an
+//    allocation site, a heap at or above NEAR_LIMIT of the object limit, a collection that follows one which freed less than 5% of a half-full heap, see softPolicy) does not trace through soft
+//    references: objects reachable only softly die, their references are cleared and enqueued. ART does the same (it clears softly reachable objects before throwing OutOfMemoryError and when the
+//    heap nears its target); libraries bound their caches with it.
+//  - PhantomReference (and subclasses): get() never returns the referent and the marker never traces through it. When the referent is otherwise unreachable the reference is cleared and enqueued.
+//    ART enqueues phantom references after finalization; the lab runs no finalizers, so a phantom is enqueued in the same collection that finds its referent unreachable.
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=2e29585a666b';
+import { BUCKET } from './time-breakdown.js?v=beba259db142';
+import { cellBytes } from './java-arrays.js?v=beba259db142';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -87,7 +94,9 @@ export function ephemeronMap(runtime, map) { (runtime.ephemeronMaps ??= new Set(
 
 /** The marking machinery shared by the collector and the heap census: `scan` follows plain JavaScript data, `drain` closes over the heap records reached so far. */
 const REFERENT_KEY = 'Ljava/lang/ref/Reference;->referent:Ljava/lang/Object;', QUEUE_KEY = 'Ljava/lang/ref/Reference;->queue:Ljava/lang/ref/ReferenceQueue;';
-const weakTypeCaches = new WeakMap();   // per runtime: type -> is a WeakReference subclass (class hierarchies do not change after load)
+const REF_NONE = 0, REF_WEAK = 1, REF_SOFT = 2, REF_PHANTOM = 3;
+const REF_SUPERS = new Map([['Ljava/lang/ref/WeakReference;', REF_WEAK], ['Ljava/lang/ref/SoftReference;', REF_SOFT], ['Ljava/lang/ref/PhantomReference;', REF_PHANTOM]]);
+const weakTypeCaches = new WeakMap();   // per runtime: type -> kind of java.lang.ref.Reference it is (class hierarchies do not change after load)
 const weakTypeCache = runtime => weakTypeCaches.get(runtime) ?? weakTypeCaches.set(runtime, new Map()).get(runtime);
 /**
  * Big host tables of pure data (resource entries, string tables, per-class indexes) are most of the JS nodes of a large app and hold no Java reference. A container of more than
@@ -125,7 +134,6 @@ export function cellsOf(type, length) {
   const cells = Math.ceil(length * (type.length === 2 ? CELL_WEIGHT[type[1]] ?? 1 : 1));   // all weights are powers of two: exact in floating point
   return cells < 1 ? 1 : cells;
 }
-const ELEMENT_WIDTH = { Z: 1, B: 1, C: 2, S: 2, I: 4, F: 4, J: 8, D: 8 };
 const refArrayTypes = new Map();
 const refArrayType = type => { let v = refArrayTypes.get(type); if (v === undefined) { v = type.charCodeAt(0) === 91 && (type.charCodeAt(1) === 76 || type.charCodeAt(1) === 91); refArrayTypes.set(type, v); } return v; };
 /** The big immutable tables and back-references that are never walked as roots (see SKIP_PROPS). */
@@ -134,20 +142,26 @@ function buildSkip(runtime) {
   for (const name of SKIP_PROPS) { const table = runtime[name]; if (table !== null && typeof table === 'object') skip.add(table); }
   return skip;
 }
-export function createMarker(runtime, { full = false } = {}) {
-  const heap = runtime.heap, weakIds = [], weakTypes = weakTypeCache(runtime), weakMaps = [], traced = new WeakSet();
-  /** java.lang.ref.WeakReference and its subclasses (WeakHashMap entries, ThreadLocal map entries ...): the referent does not keep its object alive. SoftReference and PhantomReference stay strong. */
-  const isWeak = type => { let weak = weakTypes.get(type); if (weak === undefined) { weak = false; if (type.charCodeAt(0) === 76) try { for (let at = type, depth = 0; at && depth < 64; at = runtime.parent(at), depth++) if (at === 'Ljava/lang/ref/WeakReference;') { weak = true; break; } } catch { weak = false; } /* walks the superclass chain: runtime.isSubtype would memoize every type the collector meets */ weakTypes.set(type, weak); } return weak; };
+/**
+ * options: `full` (audit: no pruning, private marks), `clearSoft` (a pressured collection: SoftReference referents are not traced, see the header), `privateMarks` (marks that survive another
+ * marker being created: the shared per-runtime chunks are zeroed by every marker), `epoch` (private 32-bit marks, `reset()` starts a new empty mark set without touching the chunks: used to measure
+ * the reach of many roots one after the other), `order` (record the ids in the order they are marked: `marker.order`).
+ */
+export function createMarker(runtime, { full = false, clearSoft = false, privateMarks = false, epoch = false, order = false } = {}) {
+  const heap = runtime.heap, weakIds = [], softIds = [], phantomIds = [], weakTypes = weakTypeCache(runtime), weakMaps = [], traced = new WeakSet(), markOrder = order ? [] : null;
+  /** The kind of java.lang.ref.Reference a heap type is: WeakReference (WeakHashMap entries, ThreadLocal map entries ...) and PhantomReference never keep the referent alive; SoftReference does unless `clearSoft`. */
+  const refKind = type => { let kind = weakTypes.get(type); if (kind === undefined) { kind = REF_NONE; if (type.charCodeAt(0) === 76) try { for (let at = type, depth = 0; at && depth < 64; at = runtime.parent(at), depth++) { const found = REF_SUPERS.get(at); if (found !== undefined) { kind = found; break; } } } catch { kind = REF_NONE; } /* walks the superclass chain: runtime.isSubtype would memoize every type the collector meets */ weakTypes.set(type, kind); } return kind; };
   const limit = runtime.nextId, worklist = []; let nodes = 0, pruned = 0;
   // Mark bits per 4096-id chunk, allocated only for the chunks that hold records and reused across collections.
-  const markChunks = full ? [] : (runtime.gcMarkChunks ??= []);
+  const markChunks = full || privateMarks || epoch ? [] : (runtime.gcMarkChunks ??= []);
   for (let ci = 0; ci < markChunks.length; ci++) if (markChunks[ci] !== undefined && heap.chunks[ci] === undefined) markChunks[ci] = undefined;
-  for (let ci = 0; ci < heap.chunks.length; ci++) if (heap.chunks[ci] !== undefined) { if (markChunks[ci] === undefined) markChunks[ci] = new Uint8Array(4096); else markChunks[ci].fill(0); }
-  const isMarked = id => { const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] !== 0; };
+  for (let ci = 0; ci < heap.chunks.length; ci++) if (heap.chunks[ci] !== undefined) { if (markChunks[ci] === undefined) markChunks[ci] = epoch ? new Uint32Array(4096) : new Uint8Array(4096); else markChunks[ci].fill(0); }
+  let epochValue = 1;
+  const isMarked = epoch ? (id => { const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] === epochValue; }) : (id => { const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] !== 0; });
   let category = 4; const setCategory = value => { category = value; };
-  const setMarked = id => { markChunks[id >>> 12][id & 4095] = category; };
+  const setMarked = epoch ? (id => { markChunks[id >>> 12][id & 4095] = epochValue; }) : (id => { markChunks[id >>> 12][id & 4095] = category; });
   const marked = { has: isMarked };
-  const visited = new WeakSet(), stack = [];
+  let visited = new WeakSet(); const stack = [];
   // The big tables are skipped by identity, not only by property name: a back-reference (jni.runtime, platform.runtime) reaches the runtime object from another root and would otherwise walk
   // its resolveCache (millions of entries) and the other skipped tables on every collection.
   const skip = buildSkip(runtime);
@@ -158,7 +172,7 @@ export function createMarker(runtime, { full = false } = {}) {
   const markId = (id, strict = false) => {
     if (!(id > 0 && id < limit) || isMarked(id)) return; const record = heap.get(id); if (record === undefined) return;
     if (record.freed === true) { if (strict && violations.length < 20) violations.push(id); return; }   // a real {ref} to an object collected earlier: a root the collector did not see
-    setMarked(id); worklist.push(id); count++;
+    setMarked(id); worklist.push(id); count++; if (markOrder !== null) markOrder.push(id);
   };
   const idLike = (key, value) => typeof value === 'number' && Number.isSafeInteger(value) && value > 0 && value < limit && key !== 'gcLastNextId' && ID_KEY.test(key);   // gcLastNextId is the collector's own counter (the id the first object after the last collection got), not a reference: matching /Id$/ kept that one object, possibly a huge array, alive through every collection
   /** Iterative scan of plain JavaScript data; pointers are `{ ref }` objects and id-named integers. */
@@ -196,13 +210,14 @@ export function createMarker(runtime, { full = false } = {}) {
   const drain = (cap = Infinity) => {
   while (worklist.length && count < cap) {
     if (++sincePulse >= 2048) { sincePulse = 0; runtime.monitor?.pulse(`coleta de lixo (marcando ${count} objetos)`); }
-    const record = heap.get(worklist.pop()), weak = isWeak(record.type);
-    if (weak) weakIds.push(record.id);
+    const record = heap.get(worklist.pop()), kind = refKind(record.type), weak = kind !== REF_NONE && (kind !== REF_SOFT || clearSoft);   // `weak`: this reference does not keep its referent alive in this mark
+    if (kind === REF_WEAK) weakIds.push(record.id); else if (kind === REF_SOFT) { if (clearSoft) softIds.push(record.id); } else if (kind === REF_PHANTOM) phantomIds.push(record.id);
     for (const key in record) {
       const item = record[key];
+      if (weak && key === 'referent') continue;   // a host-side referent kept outside the field table
       if (weak && key === 'fields' && item instanceof Map) { for (const [fieldKey, fieldValue] of item) { if (fieldKey === REFERENT_KEY) continue; if (fieldValue !== null && typeof fieldValue === 'object') stack.push(fieldValue); } continue; }
       if (key === 'map' && item instanceof Map && record.type === 'Ljava/util/WeakHashMap;') { weakMaps.push(record); continue; }   // WeakHashMap: keys are weak, a value is live only while its key is (see ephemerons)
-      if (key === 'elements') { if (Array.isArray(item) && refArrayType(record.type)) for (let i = 0; i < item.length; i++) { const element = item[i]; if (element !== null && typeof element === 'object') stack.push(element); } else if (Array.isArray(item) && typeof item[0] === 'object') scan(item); }
+      if (key === 'cells') { if (refArrayType(record.type)) { if (Array.isArray(item)) for (let i = 0; i < item.length; i++) { const element = item[i]; if (element !== null && typeof element === 'object') stack.push(element); } else scan(item); } }   // a primitive array's typed storage holds no references
       else if (item !== null && typeof item === 'object') stack.push(item);
       else if (typeof item === 'number' && idLike(key, item)) markId(item);
     }
@@ -220,7 +235,9 @@ export function createMarker(runtime, { full = false } = {}) {
       }
     }
   };
-  return { limit, marked, markedHas: isMarked, setCategory, markId, scan, drain, ephemerons, violations, stack, idLike, weakIds, weakMaps, traced, count: () => count, nodes: () => nodes, pruned: () => pruned, visited };
+  /** Epoch markers only: forget every mark, the worklist and the visited JavaScript objects (the next root starts from an empty mark set). */
+  const reset = () => { epochValue++; worklist.length = 0; stack.length = 0; count = 0; visited = new WeakSet(); };
+  return { limit, marked, markedHas: isMarked, setCategory, markId, scan, drain, ephemerons, violations, stack, idLike, weakIds, softIds, phantomIds, weakMaps, traced, reset, order: markOrder, count: () => count, nodes: () => nodes, pruned: () => pruned, get visited() { return visited; } };
 }
 
 /**
@@ -243,11 +260,12 @@ function collectGarbageTimed(runtime, options) {
     }
   }
 }
-function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC_AUDIT === '1', extraRoots = null, reason = 'manual', safepoint = false, emergency = false } = {}) {
+function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC_AUDIT === '1', extraRoots = null, reason = 'manual', safepoint = false, emergency = false, clearSoft = undefined } = {}) {
   const started = performance.now(), heap = runtime.heap, before = heap.size;
   const blocked = quiescent(runtime, safepoint) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null);
   if (blocked) { const skips = (runtime.gcSkips ??= {}); skips[blocked] = (skips[blocked] ?? 0) + 1; return { collected: false, reason: blocked, before, after: before, freed: 0, ms: 0 }; }
-  const { limit, markedHas, setCategory, markId, scan, drain, ephemerons, violations, idLike, weakIds, weakMaps, traced, nodes, count, pruned, visited } = createMarker(runtime);
+  const policy = clearSoft === false ? null : clearSoft === true ? 'forced' : softPolicy(runtime, { reason, emergency }), softMode = policy !== null;   // pressured collection: soft references are cleared (see the header)
+  const { limit, markedHas, setCategory, markId, scan, drain, ephemerons, violations, idLike, weakIds, softIds, phantomIds, weakMaps, traced, nodes, count, pruned, visited } = createMarker(runtime, { clearSoft: softMode });
   const t0 = performance.now(); let worstRoot = { key: '-', ms: 0, nodes: 0 };
   // Runtime and platform: everything but the heap itself and the large immutable tables. Each root is timed and counted on its own; a root that turned out heavy (>50k JS nodes) is split into
   // its properties on the following collections (iterative deepening), so the report names the structure by path (platform.x.y).
@@ -307,13 +325,19 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   }
   const markMs = performance.now() - t0;
   if (violations.length && audit) throw new Error(`GC audit: live structures reference already-collected objects #${[...new Set(violations)].map(id => `${id} ${heap.get(id)?.type}`).join(', #')} (a Java value held outside the collector's roots, e.g. captured by a host closure)`);
-  if (audit && heap.size <= 250000) auditAgainstFullWalk(runtime, { markedHas, extraRoots });
-  // Weak references: a referent nothing else keeps alive is cleared (Reference.get() answers null from now on) and its reference is queued on its ReferenceQueue after the collection.
+  if (audit && heap.size <= 250000) auditAgainstFullWalk(runtime, { markedHas, extraRoots, clearSoft: softMode });
+  // Weak references, phantom references and (in a pressured collection) soft references: a referent nothing else keeps alive is cleared (Reference.get() answers null from now on) and its reference
+  // is queued on its ReferenceQueue after the collection. Soft references whose referent something else keeps alive are left alone.
   const cleared = [];
-  for (const id of weakIds) {
-    const record = heap.get(id), referent = record.fields.get(REFERENT_KEY);
-    if (referent && typeof referent.ref === 'number' && !markedHas(referent.ref)) { record.fields.set(REFERENT_KEY, null); if (record.fields.get(QUEUE_KEY)) cleared.push({ ref: id }); }
-  }
+  const clearUnmarked = ids => {
+    let n = 0;
+    for (const id of ids) {
+      const record = heap.get(id), referent = record.fields.get(REFERENT_KEY);
+      if (referent && typeof referent.ref === 'number' && !markedHas(referent.ref)) { record.fields.set(REFERENT_KEY, null); n++; if (record.fields.get(QUEUE_KEY)) cleared.push({ ref: id }); }
+    }
+    return n;
+  };
+  const weakCleared = clearUnmarked(weakIds), phantomCleared = clearUnmarked(phantomIds), softCleared = softMode ? clearUnmarked(softIds) : 0;
   // Sweep (only the blocks of ids that hold records).
   const tSweep = performance.now(); let freed = 0; const freedIds = [], freedTypes = [];
   for (const ci of heap.usedChunks()) {
@@ -332,14 +356,14 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   }
   // Budgets count live storage only.
   const survivors = new Map(), markBytes = runtime.gcMarkChunks;
-  const tRebuild = performance.now(); let fieldSlots = runtime.staticFields?.size ?? 0, arrayCells = 0, collectionCells = 0;
+  const tRebuild = performance.now(); let fieldSlots = runtime.staticFields?.size ?? 0, arrayCells = 0, arrayBytes = 0, collectionCells = 0;
   for (const ci of heap.usedChunks()) {
     const records = heap.chunks[ci];
     for (let slot = 0; slot < 4096; slot++) {
       const record = records[slot]; if (record === undefined || record.freed === true) continue;
-      fieldSlots += record.fields?.size ?? 0; if (record.elements) arrayCells += cellsOf(record.type, record.elements.length);
+      fieldSlots += record.fields?.size ?? 0; if (record.cells !== undefined) { arrayCells += cellsOf(record.type, record.cells.length); arrayBytes += cellBytes(record.cells); }
       { const type = record.type; let entry = survivors.get(type); if (entry === undefined) { const own = runtime.classes.get(type); survivors.set(type, entry = { n: 0, bytes: 0, cats: new Uint32Array(256), dex: own ? (runtime.dex.bootDexes?.has(own.dex) ? 'framework' : (own.dex?.filename ?? 'app')) : 'host' }); }
-        entry.cats[markBytes[ci][slot]]++; entry.n++; entry.bytes += 48 + (record.fields?.size ?? 0) * 8 + (record.elements ? record.elements.length * (record.type.length === 2 ? ELEMENT_WIDTH[record.type[1]] ?? 8 : 8) : 0) + (typeof record.value === 'string' ? record.value.length * 2 : 0) + ((record.list?.length ?? 0) + (record.set?.length ?? 0)) * 8 + (record.map?.size ?? 0) * 48; }
+        entry.cats[markBytes[ci][slot]]++; entry.n++; entry.bytes += 48 + (record.fields?.size ?? 0) * 8 + (record.cells !== undefined ? cellBytes(record.cells) : 0) + (typeof record.value === 'string' ? record.value.length * 2 : 0) + ((record.list?.length ?? 0) + (record.set?.length ?? 0)) * 8 + (record.map?.size ?? 0) * 48; }
       collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
     }
   }
@@ -358,6 +382,8 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
     const order = Array.from(freedIds.keys()).sort((a, b) => freedIds[a] - freedIds[b]);
     ring.unshift({ collection: (runtime.gcStats?.collections ?? 0) + 1, ids: Int32Array.from(order, i => freedIds[i]), types: Uint16Array.from(order, i => index.get(freedTypes[i])), kinds }); ring.length = Math.min(ring.length, 3);
   }
+  phases.soft = { policy, cleared: softCleared, softReferences: softIds.length, weakCleared, phantomCleared };
+  if (softMode) runtime.gcSoftLast = { collection: (runtime.gcStats?.collections ?? 0) + 1, policy, cleared: softCleared, softReferences: softIds.length, freed: before - heap.size };   // what the report's OOM line quotes
   runtime.gcPhases = [phases, ...(runtime.gcPhases ?? [])].slice(0, 3);
   if (runtime.headroomBase) { runtime.maxHeapObjects = runtime.headroomBase; runtime.headroomBase = 0; }   // the OOM headroom (APKRuntime.oomHeadroom) lasts until this collection
   // A collection that frees little of a nearly full heap: the live set is a leak, not garbage. Find out who keeps the most numerous class alive (bounded; at most once per 20 s).
@@ -375,9 +401,25 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   if (cleared.length && runtime.platform?.queueTask) {
     runtime.platform.queueTask(() => { for (const reference of cleared) { try { runtime.dispatch({ owner: 'Ljava/lang/ref/Reference;', name: 'enqueue', parameters: [], result: 'Z', signature: '()Z' }, [reference], 'virtual'); } catch { /* the queue is gone with its owner */ } } }, 0, cleared);
   }
-  runtime.allocationSamples = null; runtime.gcPressure = false; runtime.gcCellPressure = false; runtime.gcLastNextId = runtime.nextId; runtime.fieldSlots = fieldSlots; runtime.arrayCells = arrayCells; runtime.collectionCells = collectionCells;
-  runtime.gcStats = { collections: (runtime.gcStats?.collections ?? 0) + 1, freed: (runtime.gcStats?.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(runtime.gcStats?.peakLiveAfterGc ?? 0, heap.size), lastReason: reason, totalMs: (runtime.gcStats?.totalMs ?? 0) + (performance.now() - started), recent: [...(runtime.gcStats?.recent ?? []).slice(-15), { at: Math.round(started), ms: Math.round(performance.now() - started), markMs: Math.round(markMs), before, after: heap.size, nextId: runtime.nextId, reason }] };
-  return { collected: true, reason, before, after: heap.size, freed, ms: Math.round(performance.now() - started), markMs: Math.round(markMs) };
+  runtime.allocationSamples = null; runtime.gcPressure = false; runtime.gcCellPressure = false; runtime.gcLastNextId = runtime.nextId; runtime.fieldSlots = fieldSlots; runtime.arrayCells = arrayCells; runtime.arrayBytes = arrayBytes; runtime.collectionCells = collectionCells;
+  runtime.gcStats = { collections: (runtime.gcStats?.collections ?? 0) + 1, freed: (runtime.gcStats?.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(runtime.gcStats?.peakLiveAfterGc ?? 0, heap.size), lastReason: reason, softCleared: (runtime.gcStats?.softCleared ?? 0) + softCleared, softCollections: (runtime.gcStats?.softCollections ?? 0) + (softMode ? 1 : 0), weakCleared: (runtime.gcStats?.weakCleared ?? 0) + weakCleared, phantomCleared: (runtime.gcStats?.phantomCleared ?? 0) + phantomCleared, totalMs: (runtime.gcStats?.totalMs ?? 0) + (performance.now() - started), recent: [...(runtime.gcStats?.recent ?? []).slice(-15), { at: Math.round(started), ms: Math.round(performance.now() - started), markMs: Math.round(markMs), before, after: heap.size, nextId: runtime.nextId, reason, ...(softMode ? { soft: policy, softCleared } : {}) }] };
+  return { collected: true, reason, before, after: heap.size, freed, ms: Math.round(performance.now() - started), markMs: Math.round(markMs), softPolicy: policy, softCleared };
+}
+
+/** A collection that follows one which freed less than this share of the heap clears soft references (when the heap is at least SOFT_LOW_YIELD_FILL full: a small app that is simply all live keeps its caches). */
+export const SOFT_LOW_YIELD = 0.05, SOFT_LOW_YIELD_FILL = 0.5;
+/**
+ * Why this collection clears soft references (null: it does not), the way ART's heap policy does under pressure. In order: 'emergency' (the collection at an allocation site that is about to fail, or
+ * the last one before an OutOfMemoryError: APKRuntime.emergencyCollect), 'near-limit' (the live heap is at or above NEAR_LIMIT of the object limit), 'low-yield' (the previous collection freed less
+ * than SOFT_LOW_YIELD of its heap and the heap is at least SOFT_LOW_YIELD_FILL of the limit: the live set keeps growing, so caches must give way).
+ */
+export function softPolicy(runtime, { reason = 'manual', emergency = false } = {}) {
+  if (emergency || reason === 'emergency') return 'emergency';
+  const size = runtime.heap.size, limit = runtime.headroomBase || runtime.maxHeapObjects;   // the OOM headroom is not capacity
+  if (size >= limit * NEAR_LIMIT) return 'near-limit';
+  const last = runtime.gcPhases?.[0];
+  if (last && last.before > 0 && (last.before - last.after) < last.before * SOFT_LOW_YIELD && size >= limit * SOFT_LOW_YIELD_FILL) return 'low-yield';
+  return null;
 }
 
 /** True when a pressure-driven collection (thread-switch safepoint, event boundary) may run now: enough was allocated since the last one, and the heap passed the threshold or a native resource asked for it. */
@@ -420,7 +462,7 @@ export function maybeCollect(runtime, options = {}) {
 /** Rough host-memory cost of one heap record (JavaScript object + its field Map / element array / collection storage). Calibrated against measured heap growth (docs/MEMORY.md). */
 export function estimateRecordBytes(record) {
   let bytes = 150 + (record.fields?.size ?? 0) * 56;
-  if (record.elements) bytes += 16 + record.elements.length * 8;
+  if (record.cells !== undefined) bytes += 16 + cellBytes(record.cells);   // exact for a primitive array's typed storage
   bytes += ((record.list?.length ?? 0) + (record.set?.length ?? 0)) * 24 + (record.map?.size ?? 0) * 72;
   if (typeof record.text === 'string') bytes += record.text.length * 2;
   return bytes;
@@ -432,8 +474,8 @@ const BIG_ARRAY_CELLS = 1000000, ARRAY_CANDIDATES = 40;
 function candidateArrays(heap) {
   const best = [];
   for (const ci of heap.usedChunks()) for (let slot = 0; slot < 4096; slot++) {
-    const record = heap.chunks[ci][slot]; if (record === undefined || record.freed === true || !record.elements) continue;
-    const length = record.elements.length; if (length < 1000) continue;
+    const record = heap.chunks[ci][slot]; if (record === undefined || record.freed === true || record.cells === undefined) continue;
+    const length = record.cells.length; if (length < 1000) continue;
     const cells = cellsOf(record.type, length);
     if (best.length >= ARRAY_CANDIDATES && cells <= best[best.length - 1].cells) continue;
     best.push({ id: (ci << 12) + slot, type: record.type, length, cells, root: undefined }); best.sort((a, b) => b.cells - a.cells); if (best.length > ARRAY_CANDIDATES) best.pop();
@@ -444,8 +486,8 @@ function candidateArrays(heap) {
 function arrayCensus(runtime, heap, markedHas, candidates) {
   let liveCells = 0, garbageCells = 0, liveBig = 0, liveBigCells = 0, garbageBig = 0, garbageBigCells = 0;
   for (const ci of heap.usedChunks()) for (let slot = 0; slot < 4096; slot++) {
-    const record = heap.chunks[ci][slot], id = (ci << 12) + slot; if (record === undefined || id === 0 || record.freed === true || !record.elements) continue;
-    const cells = cellsOf(record.type, record.elements.length), live = markedHas(id);
+    const record = heap.chunks[ci][slot], id = (ci << 12) + slot; if (record === undefined || id === 0 || record.freed === true || record.cells === undefined) continue;
+    const cells = cellsOf(record.type, record.cells.length), live = markedHas(id);
     if (live) { liveCells += cells; if (cells > BIG_ARRAY_CELLS) { liveBig++; liveBigCells += cells; } } else { garbageCells += cells; if (cells > BIG_ARRAY_CELLS) { garbageBig++; garbageBigCells += cells; } }
   }
   const row = c => ({ type: typeLabel(c.type), length: c.length, cells: c.cells, root: c.root ?? null });
@@ -459,12 +501,64 @@ function arrayCensus(runtime, heap, markedHas, candidates) {
 }
 const familyOf = key => { const text = String(key), owner = text.slice(1, text.indexOf('->')), parts = owner.split('/'); return parts.length > 3 ? parts.slice(0, 3).join('.') : parts.join('.').replace(/;$/, ''); };
 
+const fieldLabel = key => { const text = String(key), at = text.indexOf('->'), colon = text.indexOf(':', at); return at < 0 ? { owner: text, field: '' } : { owner: typeLabel(text.slice(0, at)), field: text.slice(at + 2, colon > 0 ? colon : undefined) }; };
+/**
+ * Which static fields keep the heap alive. Static fields are the first root group of a collection (category 1 of the report's "quem mantém vivo"); this splits that group by field: the fields that hold
+ * an object are ordered by how much they reach on their own (smallest first, measured with caps of 48, 2048 and 131072 objects so that the many tiny fields cost almost nothing) and marked in that
+ * order, so that every object is attributed to the smallest field that reaches it and structure shared with a big singleton does not turn that singleton into the culprit. Read-only, bounded by `budgetMs`
+ * for the reach estimate (fields not measured in time count as "at least the last cap"). Returns { total, bytes, fields: [{ owner, field, objects, bytes, classes }], classes: [{ type, n, bytes }], ms, truncated }:
+ * the TOP `topFields` fields by retained objects with their three most numerous classes, and the TOP `topClasses` classes among everything the static fields retain. Computed on OutOfMemoryError and by heapCensus.
+ */
+export function staticRetention(runtime, { topFields = 12, topClasses = 12, budgetMs = 1500, reachCaps = [48, 2048, 131072] } = {}) {
+  const started = performance.now(), heap = runtime.heap, entries = [];
+  for (const [key, value] of runtime.staticFields ?? []) if (value !== null && typeof value === 'object') entries.push({ key, value, reach: 0 });
+  let truncated = false;
+  if (entries.length > 1) {
+    const probe = createMarker(runtime, { epoch: true });
+    let pending = entries, measured = 0;
+    tiers: for (const cap of reachCaps) {
+      const next = [];
+      for (const entry of pending) {
+        if ((++measured & 63) === 0 && performance.now() - started > budgetMs) { truncated = true; for (const rest of pending) if (rest.reach < cap) rest.reach = cap; break tiers; }
+        probe.reset(); probe.scan(entry.value); probe.drain(cap); entry.reach = probe.count();
+        if (entry.reach >= cap) next.push(entry);
+      }
+      pending = next; if (!pending.length) break;
+    }
+    entries.sort((a, b) => a.reach - b.reach);
+  }
+  const own = createMarker(runtime, { privateMarks: true, order: true }), rows = [];
+  for (const entry of entries) {
+    const before = own.count(), from = own.order.length;
+    own.scan(entry.value); own.drain();
+    const gained = own.count() - before; if (gained > 0) rows.push({ key: entry.key, objects: gained, from, to: own.order.length });
+  }
+  const classCounts = new Map(); let bytes = 0;
+  const countRange = (from, to, into) => { for (let i = from; i < to; i++) { const record = heap.get(own.order[i]); if (record === undefined) continue; const b = estimateRecordBytes(record), entry = into.get(record.type) ?? into.set(record.type, { n: 0, bytes: 0 }).get(record.type); entry.n++; entry.bytes += b; } };
+  countRange(0, own.order.length, classCounts); for (const entry of classCounts.values()) bytes += entry.bytes;
+  const top = rows.sort((a, b) => b.objects - a.objects).slice(0, topFields).map(row => {
+    const classes = new Map(); countRange(row.from, row.to, classes);
+    let rowBytes = 0; for (const entry of classes.values()) rowBytes += entry.bytes;
+    return { ...fieldLabel(row.key), objects: row.objects, bytes: rowBytes, classes: [...classes].sort((a, b) => b[1].n - a[1].n).slice(0, 3).map(([type, v]) => ({ type: typeLabel(type), n: v.n })) };
+  });
+  const classes = [...classCounts].sort((a, b) => b[1].n - a[1].n).slice(0, topClasses).map(([type, v]) => ({ type: typeLabel(type), n: v.n, bytes: v.bytes }));
+  return { total: own.order.length, bytes, staticFields: entries.length, fields: top, classes, ms: Math.round(performance.now() - started), truncated };
+}
+/** The report lines of a staticRetention result (Portuguese, like the rest of the report): fields first, then classes. */
+export function staticRetentionLines(retention, { indent = '' } = {}) {
+  if (!retention?.fields?.length) return [];
+  const mib = bytes => (bytes / 1048576).toFixed(1), kib = bytes => bytes >= 1048576 ? `${mib(bytes)} MiB` : `${Math.round(bytes / 1024)} KiB`;
+  return [`${indent}retidos por campo estático (${retention.total} objetos, ~${kib(retention.bytes)}, ${retention.staticFields} campos com objeto${retention.truncated ? '; alcance medido parcialmente' : ''}):`,
+    ...retention.fields.map(f => `${indent}  ${f.objects} objetos (~${kib(f.bytes)}) via ${f.owner}${f.field ? '.' + f.field : ''}: ${f.classes.map(c => `${c.n} ${c.type}`).join(', ')}`),
+    `${indent}classes mais numerosas entre os retidos por campos estáticos: ${retention.classes.map(c => `${c.n} ${c.type}`).join(', ')}`];
+}
+
 /**
  * Read-only mark of the whole VM that attributes every live object to the first root group that reaches it, plus a class census and the allocation sites sampled since the last
  * collection. Nothing is freed. Returns { live, garbage, estimatedBytes, topClasses, roots, garbageClasses, allocationSites, gc, text }; `text` is the section of the diagnostic report.
  */
 export function heapCensus(runtime, { topClasses = 20, topRoots = 10 } = {}) {
-  const heap = runtime.heap, marker = createMarker(runtime), { markedHas, scan, drain, markId, idLike } = marker, groups = [], REACH_CAP = 25000;
+  const heap = runtime.heap, marker = createMarker(runtime, { privateMarks: true }), { markedHas, scan, drain, markId, idLike } = marker, groups = [], REACH_CAP = 25000;   // private marks: the per-group markers below zero the shared ones
   // Root groups: thread stacks, static fields by class family, the runtime's own tables, every host of the platform, registered host containers.
   const defs = [], scheduler = runtime.scheduler;
   if (scheduler?.threads) scheduler.threads.forEach((thread, index) => defs.push({ name: `pilha da thread ${index}${thread.name ? ` (${thread.name})` : ''}`, visit: sc => { const view = Object.create(scheduler); view.threads = [thread]; scheduler.enumerateRoots.call(view, item => sc(item)); } }));
@@ -492,10 +586,10 @@ export function heapCensus(runtime, { topClasses = 20, topRoots = 10 } = {}) {
   drain(); marker.ephemerons();
   drain(); attribute('(demais raízes)');
   const arrays = arrayCensus(runtime, heap, markedHas, bigArrays);
-  const counts = new Map(), garbageCounts = new Map(); let live = 0, garbage = 0, estimatedBytes = 0;
+  const counts = new Map(), garbageCounts = new Map(); let live = 0, garbage = 0, estimatedBytes = 0, arrayBytes = 0;
   for (const ci of heap.usedChunks()) for (let slot = 0; slot < 4096; slot++) {
     const record = heap.chunks[ci][slot]; const id = (ci << 12) + slot; if (record === undefined || id === 0 || record.freed === true) continue;
-    if (markedHas(id)) { live++; const entry = counts.get(record.type) ?? counts.set(record.type, { count: 0, bytes: 0 }).get(record.type), bytes = estimateRecordBytes(record); entry.count++; entry.bytes += bytes; estimatedBytes += bytes; }
+    if (markedHas(id)) { live++; const entry = counts.get(record.type) ?? counts.set(record.type, { count: 0, bytes: 0 }).get(record.type), bytes = estimateRecordBytes(record); entry.count++; entry.bytes += bytes; estimatedBytes += bytes; if (record.cells !== undefined) arrayBytes += cellBytes(record.cells); }
     else { garbage++; garbageCounts.set(record.type, (garbageCounts.get(record.type) ?? 0) + 1); }
   }
   const classes = [...counts].map(([type, { count, bytes }]) => ({ type, count, bytes })).sort((a, b) => b.count - a.count).slice(0, topClasses);
@@ -503,15 +597,19 @@ export function heapCensus(runtime, { topClasses = 20, topRoots = 10 } = {}) {
   const garbageClasses = [...garbageCounts].map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count).slice(0, 5);
   const allocationSites = [...(runtime.allocationSamples ?? [])].map(([site, samples]) => ({ site, samples })).sort((a, b) => b.samples - a.samples).slice(0, 8);
   const gc = { enabled: !!runtime.gcEnabled, ...(runtime.gcStats ?? {}), skips: { ...(runtime.gcSkips ?? {}) } };
+  let retention = null; try { retention = staticRetention(runtime); } catch (error) { retention = { error: String(error?.message ?? error), fields: [], classes: [] }; }
+  runtime.gcStaticRetention = retention;   // the report prints it (report-summary.js)
   const mib = bytes => (bytes / 1048576).toFixed(1);
-  const lines = [`Censo do heap da VM: ${live} objetos vivos (~${mib(estimatedBytes)} MiB estimados) de um limite de ${runtime.maxHeapObjects}; ${garbage} inalcançáveis ainda não coletados; ${runtime.fieldSlots ?? 0} campos, ${runtime.arrayCells ?? 0} células de array ponderadas, ${runtime.collectionCells ?? 0} células de coleção.`,
+  const lines = [`Censo do heap da VM: ${live} objetos vivos (~${mib(estimatedBytes)} MiB estimados) de um limite de ${runtime.maxHeapObjects}; ${garbage} inalcançáveis ainda não coletados; ${runtime.fieldSlots ?? 0} campos, ${runtime.arrayCells ?? 0} células de array ponderadas (${mib(arrayBytes)} MiB de armazenamento exato: tipado para arrays primitivos), ${runtime.collectionCells ?? 0} células de coleção.`,
     `Coletor: ${gc.enabled ? 'ligado' : 'DESLIGADO'}; ${gc.collections ?? 0} coletas, ${gc.freed ?? 0} liberados no total, última coleta (${gc.lastReason ?? 'nenhuma'}) deixou ${gc.lastLive ?? '?'} vivos${Object.keys(gc.skips).length ? `; coletas recusadas: ${Object.entries(gc.skips).map(([why, n]) => `${why} x${n}`).join(', ')}` : ''}.`,
     'Classes com mais objetos vivos:', ...classes.map(c => `  ${c.count} x ${typeLabel(c.type)} (~${mib(c.bytes)} MiB)`),
     'Raízes que mantêm os objetos vivos (objetos exclusivos de cada grupo, do menor alcance ao maior):', ...roots.map(g => `  ${g.objects} objetos via ${g.name} (sozinha alcança ${g.reachAlone})`)];
   lines.push(...arrays.lines);
+  lines.push(...staticRetentionLines(retention));
+  if (gc.softCleared || runtime.gcSoftLast) lines.push(`Referências suaves: ${gc.softCleared ?? 0} limpas em ${gc.softCollections ?? 0} coletas sob pressão${runtime.gcSoftLast ? `; a última (política ${runtime.gcSoftLast.policy}) limpou ${runtime.gcSoftLast.cleared} de ${runtime.gcSoftLast.softReferences} e liberou ${runtime.gcSoftLast.freed} objetos` : ''}.`);
   if (garbageClasses.length) lines.push('Inalcançáveis ainda não coletados:', ...garbageClasses.map(c => `  ${c.count} x ${typeLabel(c.type)}`));
   if (allocationSites.length) lines.push('Métodos que mais alocaram desde a última coleta (amostra):', ...allocationSites.map(s => `  ${s.samples} amostras em ${s.site}`));
-  return { live, garbage, estimatedBytes, arrays: arrays.summary, limit: runtime.maxHeapObjects, topClasses: classes, roots, garbageClasses, allocationSites, gc, trackedContainers: trackedCount, text: lines.join('\n') };
+  return { live, garbage, estimatedBytes, arrays: arrays.summary, limit: runtime.maxHeapObjects, topClasses: classes, roots, staticRetention: retention, garbageClasses, allocationSites, gc, trackedContainers: trackedCount, text: lines.join('\n') };
 }
 
 /** Which of the last collections freed object `id`: { collection, type } or null (binary search in the sorted ring). */
@@ -566,7 +664,7 @@ export function retentionPaths(runtime, { type = null, samples = 3, budgetMs = 1
       for (const key of Object.keys(record)) {
         const item = record[key];
         if (key === 'fields' && item instanceof Map) { for (const [k, v] of item) edge(node, v, fieldName(k)); continue; }
-        if (key === 'elements' && Array.isArray(item) && refArrayType(record.type)) { for (let i = 0; i < item.length; i++) edge(node, item[i], `[${i}]`); continue; }
+        if (key === 'cells') { if (Array.isArray(item) && refArrayType(record.type)) for (let i = 0; i < item.length; i++) edge(node, item[i], `[${i}]`); continue; }
         if ((key === 'list' || key === 'set') && Array.isArray(item)) { for (let i = 0; i < item.length; i++) edge(node, item[i], `${key}[${i}]`); continue; }
         if (key === 'map' && item instanceof Map) { for (const v of item.values()) edge(node, v?.value ?? v, 'map'); for (const v of item.values()) edge(node, v?.key, 'map-key'); continue; }
         if (item !== null && typeof item === 'object') edge(node, item, key);
@@ -589,8 +687,8 @@ export function retentionPaths(runtime, { type = null, samples = 3, budgetMs = 1
  * Audit mode: the collector's root pruning (structural frames, flat-table skipping, class skips) must not change what is alive. A second, fully conservative mark (no pruning of any kind,
  * every thread and frame walked generically) runs on small heaps and every object it reaches must also be marked by the real collection.
  */
-function auditAgainstFullWalk(runtime, { markedHas, extraRoots }) {
-  const full = createMarker(runtime, { full: true }), { scan, drain, ephemerons, markId } = full;
+function auditAgainstFullWalk(runtime, { markedHas, extraRoots, clearSoft = false }) {
+  const full = createMarker(runtime, { full: true, clearSoft }), { scan, drain, ephemerons, markId } = full;
   for (const key of Object.keys(runtime)) { if (SKIP_PROPS.has(key)) continue; const item = runtime[key]; if (item !== null && typeof item === 'object') scan(item); }
   runtime.scheduler?.enumerateRoots?.(item => scan(item));
   if (runtime.thread) scan(runtime.thread);

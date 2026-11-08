@@ -156,7 +156,7 @@
       ],
       "advanced": false,
       "executionValidated": true,
-      "sizeBytes": 16787,
+      "sizeBytes": 24979,
       "available": true
     },
     {
@@ -180,7 +180,7 @@
       "executionValidated": true,
       "validation": {
         "evidence": "evidence/validation/compose-state.json",
-        "generatedAt": "2026-11-08T04:07:05.974Z",
+        "generatedAt": "2026-11-08T10:53:44.360Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -217,7 +217,7 @@
       "executionValidated": true,
       "validation": {
         "evidence": "evidence/validation/compose-navigation.json",
-        "generatedAt": "2026-11-08T04:32:27.470Z",
+        "generatedAt": "2026-11-08T10:58:32.137Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -277,7 +277,7 @@
       "executionValidated": true,
       "validation": {
         "evidence": "evidence/validation/hybrid-navigation.json",
-        "generatedAt": "2026-11-08T04:14:07.981Z",
+        "generatedAt": "2026-11-08T11:04:23.217Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -330,7 +330,7 @@
       },
       "validation": {
         "evidence": "evidence/validation/xml-projects.json",
-        "generatedAt": "2026-11-08T10:31:13.639Z",
+        "generatedAt": "2026-11-08T11:11:49.688Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,
@@ -367,7 +367,7 @@
       },
       "validation": {
         "evidence": "evidence/validation/compose-approvals.json",
-        "generatedAt": "2026-11-08T04:15:43.297Z",
+        "generatedAt": "2026-11-08T11:05:50.121Z",
         "verdict": true,
         "criteria": {
           "flowsNode": true,

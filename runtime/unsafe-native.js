@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=2e29585a666b';
+import { APKError } from './apk-error.js?v=beba259db142';
 
 // The VM's raw-memory model and the natives that expose it to the original libcore classes:
 //   sun.misc.Unsafe / jdk.internal.misc.Unsafe     (get/put/compareAndSwap on (Object, offset) and on native addresses)
@@ -57,13 +57,13 @@ function arrayInfo(runtime, array) {
 }
 function readArray(info, offset, count) {
   const out = new Uint8Array(count);
-  if (info.component === 'B') { for (let i = 0; i < count; i++) out[i] = info.object.elements[offset - info.base + i] & 0xff; return out; }
+  if (info.component === 'B') { const cells = info.object.cells, at = offset - info.base; if (ArrayBuffer.isView(cells)) out.set(new Uint8Array(cells.buffer, cells.byteOffset + at, count)); else for (let i = 0; i < count; i++) out[i] = cells[at + i] & 0xff; return out; }
   const first = Math.floor((offset - info.base) / info.size), last = Math.floor((offset - info.base + count - 1) / info.size), image = new Uint8Array((last - first + 1) * info.size);
   for (let i = first; i <= last; i++) encode(info.component, info.object.elements[i], image, (i - first) * info.size);
   out.set(image.subarray(offset - info.base - first * info.size, offset - info.base - first * info.size + count)); return out;
 }
 function writeArray(info, offset, bytes) {
-  if (info.component === 'B') { for (let i = 0; i < bytes.length; i++) info.object.elements[offset - info.base + i] = (bytes[i] << 24) >> 24; return; }
+  if (info.component === 'B') { const cells = info.object.cells, at = offset - info.base; if (ArrayBuffer.isView(cells)) cells.set(bytes, at); else for (let i = 0; i < bytes.length; i++) cells[at + i] = (bytes[i] << 24) >> 24; return; }
   const first = Math.floor((offset - info.base) / info.size), last = Math.floor((offset - info.base + bytes.length - 1) / info.size), image = new Uint8Array((last - first + 1) * info.size);
   for (let i = first; i <= last; i++) encode(info.component, info.object.elements[i], image, (i - first) * info.size);
   image.set(bytes, offset - info.base - first * info.size);

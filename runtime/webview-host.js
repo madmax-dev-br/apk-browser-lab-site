@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=2e29585a666b';
-import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=2e29585a666b';
-import { isInterfaceName } from './webview-bridge.js?v=2e29585a666b';
-import { APKError } from './apk-error.js?v=2e29585a666b';
+import { gcRoot } from './heap-gc.js?v=beba259db142';
+import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=beba259db142';
+import { isInterfaceName } from './webview-bridge.js?v=beba259db142';
+import { APKError } from './apk-error.js?v=beba259db142';
 
 // android.webkit.WebView and its public companions for the browser VM (design: docs/APK-REAL-TASKS.md, task 33).
 //
@@ -152,7 +152,7 @@ export function createWebViewHost(platform) {
         const buffer = r.newArray('[B', 16384), got = call(r, stream, INPUT_STREAM, 'read', ['[B', 'I', 'I'], 'I', [buffer, 0, 16384]);
         if (got < 0) break;
         total += got; if (total > MAX_RESPONSE_BYTES) return { tooLarge: true };
-        chunks.push(Uint8Array.from(r.array(buffer).elements.slice(0, got), v => v & 255));
+        chunks.push(r.bytesOf(buffer, 0, got).slice());
       }
     } finally { try { call(r, stream, INPUT_STREAM, 'close', [], 'V', []); } catch { /* a stream that cannot close */ } }
     const bytes = new Uint8Array(total); let at = 0; for (const c of chunks) { bytes.set(c, at); at += c.length; }

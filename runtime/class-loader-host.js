@@ -1,8 +1,9 @@
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { APKArchive } from './apk-loader.js?v=2e29585a666b';
-import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=2e29585a666b';
-import { createHostRegistry } from './host-contract.js?v=2e29585a666b';
-import { normalizePath } from './virtual-fs.js?v=2e29585a666b';
+import { unsignedBytes } from './java-arrays.js?v=beba259db142';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { APKArchive } from './apk-loader.js?v=beba259db142';
+import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=beba259db142';
+import { createHostRegistry } from './host-contract.js?v=beba259db142';
+import { normalizePath } from './virtual-fs.js?v=beba259db142';
 
 // dalvik.system.{BaseDexClassLoader, InMemoryDexClassLoader, DexClassLoader, PathClassLoader, DexFile}: code that is only available at run time
 // (decrypted payloads, downloaded plugins). The DEX bytes are parsed by the same DexFile reader as APK classes and joined to the single VM class
@@ -129,10 +130,10 @@ export function createClassLoaderHost(platform) {
     if (ref === null) runtime.throwJava('Ljava/lang/NullPointerException;', 'dexBuffer == null');
     // The original java.nio.ByteBuffer (libcore): heap and direct buffers both expose their bytes as hb[offset + position, offset + limit) on Android.
     const object = runtime.object(ref);
-    if (object.byteArray) return Uint8Array.from(runtime.array(object.byteArray).elements.slice(object.bufferPosition, object.bufferLimit), v => v & 255);   // runtimes without the framework DEX use the host ByteBuffer
+    if (object.byteArray) return runtime.bytesOf(object.byteArray, object.bufferPosition, object.bufferLimit).slice();   // runtimes without the framework DEX use the host ByteBuffer
     const fields = object.fields, array = runtime.array(fields.get('Ljava/nio/ByteBuffer;->hb:[B')), offset = fields.get('Ljava/nio/ByteBuffer;->offset:I') | 0;
     const position = fields.get('Ljava/nio/Buffer;->position:I') | 0, limit = fields.get('Ljava/nio/Buffer;->limit:I') | 0;
-    return Uint8Array.from(array.elements.slice(offset + position, offset + limit), v => v & 255);
+    return unsignedBytes(array.cells, offset + position, offset + limit).slice();
   };
   /** Builds the loader state first (so its id names alias descriptors), defines the units, then publishes pathList. */
   const construct = (runtime, self, parent, label, define) => {
@@ -168,7 +169,7 @@ export function createClassLoaderHost(platform) {
     if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'name == null');
     const entry = r.stringCharacters(name).replace(/^\/+/, '');
     if (!r.apkEntries?.has(entry)) return null;
-    const bytes = r.apkReader(entry), array = r.newArray('[B', bytes.length); r.array(array).elements = Array.from(bytes, v => (v << 24) >> 24);
+    const array = r.arrayOf('[B', r.apkReader(entry));
     const stream = r.allocate('Ljava/io/ByteArrayInputStream;'); r.dispatch({ owner: 'Ljava/io/ByteArrayInputStream;', name: '<init>', parameters: ['[B'], result: 'V', signature: '([B)V' }, [stream, array], 'direct'); return stream;
   });
   def(LOADER, 'getResource', `(${STRING})Ljava/net/URL;`, (r, _m, [_self, name]) => {   // the first APK entry with that name as a jar: URL, else null

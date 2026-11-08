@@ -1,10 +1,11 @@
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { throwNew } from './java-throw.js?v=2e29585a666b';
-import { Blocked } from './scheduler.js?v=2e29585a666b';
-import { OS_CONSTANTS } from './os-constants-data.js?v=2e29585a666b';
-import { openExchange, describeFailure } from './network-transport.js?v=2e29585a666b';
-import { WorkerExecutor } from './network-worker-executor.js?v=2e29585a666b';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=2e29585a666b';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { throwNew } from './java-throw.js?v=beba259db142';
+import { Blocked } from './scheduler.js?v=beba259db142';
+import { OS_CONSTANTS } from './os-constants-data.js?v=beba259db142';
+import { openExchange, describeFailure } from './network-transport.js?v=beba259db142';
+import { WorkerExecutor } from './network-worker-executor.js?v=beba259db142';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=beba259db142';
+import { TransportAuthority } from './transport-ca.js?v=beba259db142';
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
 //
@@ -13,7 +14,8 @@ import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-sec
 //  * HTTP exchanges are dev.apkweb.net.NetBridge natives. A call that has to wait parks the calling Java thread in the scheduler (Blocked) while an asynchronous fetch
 //    runs; no SharedArrayBuffer and no cross-origin isolation are needed. A frame that cannot suspend (a nested host run) is reported explicitly by the scheduler.
 //  * Policy: offline device => every lookup fails and every connect is ENETUNREACH; otherwise only hosts in the allowlist (platform.networkPolicy.allowedHosts) are
-//    reachable. The default allowlist is empty, i.e. the device is effectively offline. Raw sockets are never opened.
+//    reachable. The default allowlist is empty, i.e. the device is effectively offline. TCP is never opened: a java.net.Socket connected to a permitted host is a virtual HTTP socket
+//    (src/virtual-http-socket.js) whose requests are exchanges of this bridge, and an SSLSocket over it presents the lab transport CA's chain (src/tls-socket-host.js, docs/NETWORK.md).
 const NET = 'Ldev/apkweb/net/NetBridge;', LINUX = 'Llibcore/io/Linux;', STRING = 'Ljava/lang/String;', INET = 'Ljava/net/InetAddress;', GAI = 'Landroid/system/GaiException;', ERRNO = 'Landroid/system/ErrnoException;';
 const C = OS_CONSTANTS, BOUNDARY = 'network-boundary';
 const HIGH_WATER = 256 * 1024, CHUNK = 64 * 1024;
@@ -53,7 +55,11 @@ export class NetworkBridge {
   /** Syncs the operation's log entry with what the exchange has produced so far. */
   observe(op) { if (op.log) this.log?.observe(op.log, op); }
   get online() { return (this.platform.device?.connectivity ?? 'online') !== 'offline'; }
-  get pending() { let n = 0; for (const op of this.ops.values()) if (!op.ended && op.error === null && !op.closed) n++; return n; }
+  get pending() { let n = this.jobs ?? 0; for (const op of this.ops.values()) if (!op.ended && op.error === null && !op.closed) n++; return n; }
+  /** Asynchronous host work the VM may have to wait for (WebCrypto certificate signing): counted as pending so the scheduler waits for the event loop instead of reporting a deadlock. */
+  track(promise) { this.jobs = (this.jobs ?? 0) + 1; const done = () => { this.jobs--; this.signal(); }; promise.then(done, done); return promise; }
+  /** The session's lab transport CA (src/transport-ca.js): the certificates SSLSockets over virtual HTTP sockets present. */
+  get authority() { return this.transportAuthority ??= new TransportAuthority({ now: () => this.platform.clock.wall(), track: promise => this.track(promise) }); }
 
   /** Is `host`(:port) reachable under the allowlist? Entries: "host", "*.suffix", "host:port", "*". Loopback needs an explicit entry too. */
   allowed(host, port = null) {
@@ -68,6 +74,9 @@ export class NetworkBridge {
     return false;
   }
   noteHost(host) { this.stats.hosts.add(String(host).toLowerCase()); }
+  /** The resolver's table: the address text a lookup returned -> the name that was looked up (a Socket connects to the address; the policy and the HTTP Host live in the name). Bounded. */
+  rememberResolved(address, host) { const table = this.resolved ??= new Map(); table.delete(address); table.set(address, host); if (table.size > 256) table.delete(table.keys().next().value); }
+  resolvedName(address) { return this.resolved?.get(address) ?? null; }
 
   /** Called when the page changes the device connectivity: exchanges in flight fail like a dropped link. */
   connectivityChanged() {
@@ -156,6 +165,13 @@ export class NetworkBridge {
     if (copied && op.resume) { const resume = op.resume; op.resume = null; resume(); }
     return copied;
   }
+  /** Hands out up to `limit` bytes of the received response body as pieces (the virtual HTTP socket serializes them itself), and wakes a reader paused by the high-water mark. */
+  drain(op, limit) {
+    const pieces = []; let taken = 0;
+    while (op.queue.length && taken < limit) { const piece = op.queue.shift(); pieces.push(piece); taken += piece.length; op.queued -= piece.length; }
+    if (pieces.length && op.resume) { const resume = op.resume; op.resume = null; resume(); }
+    return pieces;
+  }
   discard(op) { op.closed = true; this.observe(op); op.abort(); this.ops.delete(op.handle); op.resume?.(); }
 }
 
@@ -201,7 +217,7 @@ function parseV6(text) {
   return groups.flatMap(g => [parseInt(g, 16) >> 8, parseInt(g, 16) & 255]);
 }
 /** Documented stand-in for DNS: an allowed host name resolves to a stable address in 198.18.0.0/15 (RFC 2544 benchmarking space, never routable). The browser resolves
- * the real name when it fetches; raw sockets are never opened, so the address is only an identity. */
+ * the real name when it fetches; TCP is never opened, so the address is only an identity (a Socket that connects to it is mapped back to the name: NetworkBridge.resolvedName). */
 export function syntheticAddress(host) {
   let hash = 0x811c9dc5; for (const ch of String(host).toLowerCase()) hash = Math.imul(hash ^ ch.charCodeAt(0), 0x01000193) >>> 0;
   return [198, 18 + ((hash >>> 16) & 1), (hash >>> 8) & 255, (hash & 255) || 1];
@@ -242,7 +258,8 @@ export function createNetworkNativeBindings() {
       return refArray(runtime, '[' + INET, [inetAddress(runtime, null, bytes)]);   // libcore leaves the host name unset here; Inet6AddressImpl names the results of a name lookup itself
     }
     if (!net.allowed(host)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal({ api: 'DNS', kind: 'dns', method: 'LOOKUP', url: `dns://${host}`, host }); gai('android_getaddrinfo', C.EAI_NODATA); }
-    const addresses = loopbackHost(host) ? [inetAddress(runtime, null, [127, 0, 0, 1])] : [inetAddress(runtime, null, syntheticAddress(host))];
+    const bytes = loopbackHost(host) ? [127, 0, 0, 1] : syntheticAddress(host); net.rememberResolved(bytes.join('.'), host);
+    const addresses = [inetAddress(runtime, null, bytes)];
     return refArray(runtime, '[' + INET, addresses);
   });
 

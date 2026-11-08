@@ -1,28 +1,29 @@
-import { VMClock } from './vm-clock.js?v=2e29585a666b';
-import { OperationMonitor } from './operation-monitor.js?v=2e29585a666b';
-import { ExecutionProfile } from './execution-profile.js?v=2e29585a666b';
-import { SamplingProfiler } from './sampling-profiler.js?v=2e29585a666b';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=2e29585a666b';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=2e29585a666b';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=2e29585a666b';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=2e29585a666b';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=2e29585a666b';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=2e29585a666b';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=2e29585a666b';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=2e29585a666b';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=2e29585a666b';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=2e29585a666b';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=2e29585a666b';
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=2e29585a666b';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=2e29585a666b';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=2e29585a666b';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=2e29585a666b';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=2e29585a666b';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=2e29585a666b';
-import { Scheduler, Blocked } from './scheduler.js?v=2e29585a666b';
-import { bootClassLacksMember } from './boot-class-members.js?v=2e29585a666b';
-export { APKError } from './apk-error.js?v=2e29585a666b';
+import { VMClock } from './vm-clock.js?v=beba259db142';
+import { OperationMonitor } from './operation-monitor.js?v=beba259db142';
+import { ExecutionProfile } from './execution-profile.js?v=beba259db142';
+import { SamplingProfiler } from './sampling-profiler.js?v=beba259db142';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=beba259db142';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=beba259db142';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=beba259db142';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=beba259db142';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=beba259db142';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=beba259db142';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=beba259db142';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=beba259db142';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=beba259db142';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=beba259db142';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=beba259db142';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=beba259db142';
+import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=beba259db142';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=beba259db142';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=beba259db142';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=beba259db142';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=beba259db142';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=beba259db142';
+import { Scheduler, Blocked } from './scheduler.js?v=beba259db142';
+import { bootClassLacksMember } from './boot-class-members.js?v=beba259db142';
+export { APKError } from './apk-error.js?v=beba259db142';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -69,10 +70,12 @@ export class BinaryReader {
 }
 
 function utf16String(units) {
-  let result = '';
-  for (let i = 0; i < units.length; i += 8192) result += String.fromCharCode(...units.slice(i, i + 8192));
+  let result = ''; const typed = ArrayBuffer.isView(units);
+  for (let i = 0; i < units.length; i += 8192) result += String.fromCharCode(...(typed ? units.subarray(i, i + 8192) : units.slice(i, i + 8192)));
   return result;
 }
+/** A range of an array's storage: a view when the storage is typed (no copy), a copy otherwise (a reference array or a Proxy-backed view). */
+const cellRange = (cells, from, to) => ArrayBuffer.isView(cells) ? cells.subarray(from, to) : cells.slice(from, to);
 const methodKey = m => `${m.owner}->${m.name}${m.signature}`;
 const fieldKey = f => `${f.owner}->${f.name}:${f.type}`;
 
@@ -794,6 +797,13 @@ export const LOADER_ALIAS = /\$\$ldr\d+;$/;
 const PRIMITIVE_NAMES = { Z: 'boolean', B: 'byte', S: 'short', C: 'char', I: 'int', J: 'long', F: 'float', D: 'double', V: 'void' };
 export const dottedName = name => name.replace(LOADER_ALIAS, ';').slice(1, -1).replaceAll('/', '.');
 const ref = id => ({ ref: id });
+/** A Java array in the heap. `cells` is its storage (java-arrays.js: a typed array for a primitive array, an Array of references otherwise); the interpreter and the compiled code read it directly.
+ *  `elements` is the same storage for host code: reading it answers the storage, assigning a plain or typed array converts it to the array's representation (ownership passes to the record). */
+class ArrayRecord {
+  constructor(id, type, cells) { this.id = id; this.type = type; this.fields = NO_FIELDS; this.cells = cells; }
+  get elements() { return this.cells; }
+  set elements(values) { this.cells = cellsFrom(this.type, values); }
+}
 const isNull = value => value === null || value === 0;
 const describeRegister = value => value === undefined ? 'an uninitialized register' : value === null ? 'null' : typeof value === 'bigint' ? `a long (${value})` : typeof value === 'object' ? (value.ref !== undefined ? 'an object reference' : 'a host object') : `${typeof value} ${String(value).slice(0, 40)}`;
 const int = value => { if (typeof value !== 'number' || !Number.isInteger(value)) fail(`Expected int register, got ${describeRegister(value)}`); return value | 0; };
@@ -1439,11 +1449,17 @@ export class APKRuntime {
     return dottedName(type);
   }
   typeOf(value) { return typeof value === 'string' ? 'Ljava/lang/String;' : this.object(value).type; }
-  makeObject(type) {
+  /** The object-limit check (after an emergency collection when the limit is reached), the next id and the allocation-driven collection trigger shared by every heap allocation. */
+  allocateId(type) {
     if (this.heap.size >= this.maxHeapObjects && !(this.emergencyCollect('objetos') && this.heap.size < this.maxHeapObjects) && !this.oomHeadroom()) this.outOfMemory(`Object limit (${this.maxHeapObjects}) exceeded`);
     if (ABSTRACT_GUARD && !this.bytecodeAlloc) this.assertConcreteHostType(type);
     const id = this.nextId++;
     if ((id & 511) === 0) { this.sampleAllocation(); if (this.gcEnabled && this.heap.size > this.gcSafepointFloor && collectionDue(this)) this.q = 0; }   // allocation-driven: the next back-edge or call reaches the safepoint instead of waiting out the quantum (a loop that allocates 5 objects per iteration filled the heap inside one)
+    return id;
+  }
+  makeObject(type) {
+    if (type.charCodeAt(0) === 91) return this.newArray(type, 0);   // an array made as a bare object (host code then assigns its elements) is still an array record
+    const id = this.allocateId(type);
     this.heap.set(id, { id, type, fields: new Map(), text: '', orientation: 0, textSize: 20, children: [], listener: null });
     if (!this.bytecodeAlloc) this.hostAllocs.push(id);   // allocated by host code (a native, the platform): its JavaScript locals may hold it where no Java frame does -- see hostAllocs in heap-gc.js
     return ref(id);
@@ -1472,30 +1488,41 @@ export class APKRuntime {
     const site = top ? (caller ? `${top} <- ${caller}` : top) : 'código do host (sem método Java em execução)';
     if (samples.size < 2000 || samples.has(site)) samples.set(site, (samples.get(site) ?? 0) + 1);
   }
-  newArray(type, length) {
+  newArray(type, length, cells = null) {
     length = int(length);
     if (length < 0) this.throwJava('Ljava/lang/NegativeArraySizeException;', `negative array length ${length}`);
     if (!type.startsWith('[')) fail('Invalid/excessive array allocation');
-    const cells = cellsOf(type, length);   // weighted by element width (heap-gc.js cellsOf): the one place that charges; the collector's recount uses it too
-    if (length <= 16777216 && this.arrayCells + cells > this.maxArrayCells) this.emergencyCollect('células de arrays');   // the collection recounts the cell counters
-    if (length > 16777216 || this.arrayCells + cells > this.maxArrayCells) this.outOfMemory(length > 16777216 ? `Array of ${length} elements exceeds the array size limit` : `Array storage limit (${this.maxArrayCells} cells) exceeded: ${type} of ${length} elements (${cells} cells) requested with ${this.arrayCells} in use`);
-    const array = this.makeObject(type); this.arrayCells += cells;   // after makeObject: an object-limit OutOfMemoryError there must not leave cells counted for an array that never existed
+    const weighted = cellsOf(type, length);   // weighted by element width (heap-gc.js cellsOf): the one place that charges; the collector's recount uses it too
+    if (length <= 16777216 && this.arrayCells + weighted > this.maxArrayCells) this.emergencyCollect('células de arrays');   // the collection recounts the cell counters
+    if (length > 16777216 || this.arrayCells + weighted > this.maxArrayCells) this.outOfMemory(length > 16777216 ? `Array of ${length} elements exceeds the array size limit` : `Array storage limit (${this.maxArrayCells} cells) exceeded: ${type} of ${length} elements (${weighted} cells) requested with ${this.arrayCells} in use`);
+    const id = this.allocateId(type); this.arrayCells += weighted;   // after allocateId: an object-limit OutOfMemoryError there must not leave cells counted for an array that never existed
+    this.heap.set(id, new ArrayRecord(id, type, cells ?? newCells(type, length)));
+    if (!this.bytecodeAlloc) this.hostAllocs.push(id);
     // The collector is paced by the object count, so garbage arrays (a big buffer built and dropped again and again) hold their cells until a collection that nothing else would ask for:
     // past half of the cell budget, ask for one at the next safepoint / event boundary (heap-gc.js collectionDue honours cellPressure).
     if (this.arrayCells > this.maxArrayCells >> 1 && this.gcEnabled) { this.gcPressure = true; this.gcCellPressure = true; }
-    this.object(array).elements = new Array(length).fill(defaultValue(type.slice(1))); return array;
+    return ref(id);
   }
+  /** A new Java array of `type` holding a copy of `values` (a typed array, bit-exact when of the same element width, or a plain array; a reference array adopts a plain array). */
+  arrayOf(type, values) {
+    if (type.length === 2) { const cells = newCells(type, values.length); copyCells(cells, values); return this.newArray(type, values.length, cells); }
+    return this.newArray(type, values.length, Array.isArray(values) ? values : Array.from(values));
+  }
+  /** The storage of a Java array: a typed array for a primitive array (java-arrays.js), an Array of references otherwise. Fails like array() on null or a non-array. */
+  elementsOf(value) { return this.array(value).cells; }
+  /** The bytes of a byte[] (or boolean[]) as an unsigned view over its storage, no copy; `from`/`to` bound the range (unchecked: the caller validated them as the Java API requires). */
+  bytesOf(value, from, to) { const array = this.array(value); if (array.type !== '[B' && array.type !== '[Z') fail(`Expected a byte[] (got ${array.type})`); return unsignedBytes(array.cells, from, to); }
   array(value, index) {
     const obj = this.object(value);
-    if (!obj.elements) fail('Expected array reference');
-    if (index !== undefined && (index < 0 || index >= obj.elements.length)) this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `array index ${index} outside length ${obj.elements.length}`);
+    if (obj.cells === undefined) fail('Expected array reference');
+    if (index !== undefined && (index < 0 || index >= obj.cells.length)) this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `array index ${index} outside length ${obj.cells.length}`);
     return obj;
   }
   nativeArrayHandle(value) {
     const array = this.array(value);
     if (array.opaqueNativeHandle === undefined) {
       // The handle is the address of array[0]; the range covers the array's whole byte image so address arithmetic (Memory.peek*, Unsafe) stays inside it.
-      const bytes = array.elements.length * ({ '[Z': 1, '[B': 1, '[C': 2, '[S': 2, '[I': 4, '[F': 4, '[J': 8, '[D': 8 }[array.type] ?? 4);
+      const bytes = array.cells.length * (ELEMENT_BYTES[array.type[1]] ?? 4);
       array.opaqueNativeHandle = this.nextNativeArrayHandle; this.nextNativeArrayHandle += BigInt(((bytes + 15) & ~15) + 16);
       this.nativeArrays.set(array.opaqueNativeHandle, value); this.nativeRanges.push({ base: array.opaqueNativeHandle, end: array.opaqueNativeHandle + BigInt(bytes), value });
     }
@@ -1784,7 +1811,8 @@ export class APKRuntime {
    * (registers live in frame.regs, interpreted and compiled code alike), and host code up the JavaScript stack holds only values it allocated or received, which `hostAllocs` protects -- an
    * emergency collection never drops that list, because the allocating native may be mid-way through its work. Returns true when a collection ran and freed something. Bounded: not re-entrant, not
    * while the OutOfMemoryError itself is being built, and after an emergency collection that freed little (< 1% of the limit) not again until a normal collection ran or 2% of the limit was
-   * allocated, so a genuinely full heap costs one collection, not one per allocation. The counters (gcEmergency) go into the OOM report.
+   * allocated, so a genuinely full heap costs one collection, not one per allocation. The counters (gcEmergency) go into the OOM report. An emergency collection is a pressured one: SoftReference referents
+   * are cleared in it (heap-gc.js softPolicy 'emergency'), so every OutOfMemoryError raised from a budget stands only after one collection that also emptied the soft caches and freed nothing more.
    */
   emergencyCollect(budget) {
     if (!this.gcEnabled || this.inOutOfMemory || this.inEmergency) return false;
@@ -2053,7 +2081,7 @@ export class APKRuntime {
     const log = this.oomLog ??= []; const frames = this.thread?.frames ?? [], top = []; 
     for (let i = frames.length - 1; i >= 0 && top.length < 3; i--) { const m = frames[i].method; if (m) top.push(`${String(m.owner).replace(/^L|;$/g, '').replaceAll('/', '.')}.${m.name}`); }
     const kind = /^Object limit|^Reflected multi-array allocation exceeds VM heap limits: object/.test(reason) ? 'limite de objetos' : /field storage/.test(reason) ? 'limite de campos' : /^Array of|^Reflected multi-array allocation exceeds VM heap limits: dimension/.test(reason) ? 'tamanho de um array' : /^Array storage|^Reflected multi-array allocation exceeds VM heap limits: array cell/.test(reason) ? 'orçamento de células de arrays' : /^Collection storage/.test(reason) ? 'orçamento de coleções' : 'outro';
-    log.push({ kind, reason: String(reason).slice(0, 220), thread: this.thread?.name ?? null, frames: top, hostCall: this.hostCall ? String(this.hostCall).replace(/^L|;->/g, m => m === ';->' ? '.' : '').slice(0, 80) : null, objects: this.heap.size, maxObjects: this.maxHeapObjects, fieldSlots: this.fieldSlots, maxFieldSlots: this.maxFieldSlots, arrayCells: this.arrayCells, maxArrayCells: this.maxArrayCells, collectionCells: this.collectionCells, maxCollectionCells: this.maxCollectionCells, gcTries: { ...(this.gcSafepointTries ?? {}) }, gcSkips: { ...(this.gcSkips ?? {}) }, sinceGc: Math.max(0, this.nextId - (this.gcLastNextId ?? 0)), gcEmergency: this.gcEmergency ? { ...this.gcEmergency, blocked: { ...this.gcEmergency.blocked }, budgets: { ...this.gcEmergency.budgets } } : null });
+    log.push({ kind, reason: String(reason).slice(0, 220), thread: this.thread?.name ?? null, frames: top, hostCall: this.hostCall ? String(this.hostCall).replace(/^L|;->/g, m => m === ';->' ? '.' : '').slice(0, 80) : null, objects: this.heap.size, maxObjects: this.maxHeapObjects, fieldSlots: this.fieldSlots, maxFieldSlots: this.maxFieldSlots, arrayCells: this.arrayCells, maxArrayCells: this.maxArrayCells, collectionCells: this.collectionCells, maxCollectionCells: this.maxCollectionCells, gcTries: { ...(this.gcSafepointTries ?? {}) }, gcSkips: { ...(this.gcSkips ?? {}) }, sinceGc: Math.max(0, this.nextId - (this.gcLastNextId ?? 0)), gcEmergency: this.gcEmergency ? { ...this.gcEmergency, blocked: { ...this.gcEmergency.blocked }, budgets: { ...this.gcEmergency.budgets } } : null, soft: this.gcSoftLast ? { ...this.gcSoftLast, collections: this.gcStats?.softCollections ?? 0, totalCleared: this.gcStats?.softCleared ?? 0 } : null });   // soft: the last collection that cleared SoftReferences (heap-gc.js softPolicy): policy and how many referents it cleared
     if (log.length > 12) log.shift();
   }
   /**
@@ -2071,7 +2099,7 @@ export class APKRuntime {
   }
   outOfMemory(reason) {
     this.noteOom(reason);
-    this.oomCount = (this.oomCount ?? 0) + 1; this.lastOom = { reason, liveObjects: this.heap.size, limit: this.maxHeapObjects, fieldSlots: this.fieldSlots, count: this.oomCount };
+    this.oomCount = (this.oomCount ?? 0) + 1; this.lastOom = { reason, liveObjects: this.heap.size, limit: this.maxHeapObjects, fieldSlots: this.fieldSlots, count: this.oomCount, softCleared: this.gcSoftLast?.cleared ?? 0, softClearedTotal: this.gcStats?.softCleared ?? 0, softPolicy: this.gcSoftLast?.policy ?? null };
     this.record(`OOM java.lang.OutOfMemoryError: ${reason}; ${this.heap.size} live objects`);
     if (this.inOutOfMemory) fail(reason);
     // The first few exhaustions get a heap census (src/heap-gc.js heapCensus): what is alive, who keeps it alive, who allocated it. Later ones reuse it (a census is a full mark).
@@ -2081,7 +2109,8 @@ export class APKRuntime {
     { const entry = this.oomLog?.[this.oomLog.length - 1]; if (entry && !entry.arrays && this.lastOom.census?.arrays) entry.arrays = this.lastOom.census.arrays; }
     this.inOutOfMemory = true; this.maxHeapObjects += 64;   // headroom for the throwable itself
     const em = this.gcEmergency, emergencyNote = !em?.attempts ? '' : em.lastFreed === null ? `; coleta de emergência tentada ${em.attempts}x e bloqueada (${Object.entries(em.blocked).map(([k, n]) => `${k} ${n}x`).join(', ') || '?'})` : em.lastFreed === 0 ? '; a coleta de emergência não liberou nada (heap cheio de objetos vivos)' : `; a coleta de emergência liberou ${em.lastFreed} objetos, insuficiente`;
-    try { this.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate: ${reason} (${this.heap.size} live objects)${this.gcPhases?.[0] ? `; coleta antes do OOM: ${this.gcPhases[0].before} → ${this.gcPhases[0].after}` : '; nenhuma coleta antes do OOM'}${emergencyNote}`, { kind: 'java-heap-exhausted', limit: this.maxHeapObjects - 64, liveObjects: this.heap.size, heap: this.lastOom.census }); }
+    const sl = this.gcSoftLast, softNote = sl ? `; referências suaves: a última coleta sob pressão (política ${sl.policy}) limpou ${sl.cleared} de ${sl.softReferences}, ${this.gcStats?.softCleared ?? 0} no total` : '; nenhuma referência suave foi limpa';
+    try { this.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate: ${reason} (${this.heap.size} live objects)${this.gcPhases?.[0] ? `; coleta antes do OOM: ${this.gcPhases[0].before} → ${this.gcPhases[0].after}` : '; nenhuma coleta antes do OOM'}${emergencyNote}${softNote}`, { kind: 'java-heap-exhausted', softCleared: sl?.cleared ?? 0, softPolicy: sl?.policy ?? null, limit: this.maxHeapObjects - 64, liveObjects: this.heap.size, heap: this.lastOom.census }); }
     finally { this.maxHeapObjects -= 64; this.inOutOfMemory = false; }
   }
   throwJava(type, message, details = null) {
@@ -2870,7 +2899,7 @@ export class APKRuntime {
       if (name === 'arrayOffset' || name === 'isReadOnly') return 0;
       if (name === 'hasArray') return 1;
       if (name === 'charAt') { const at = int(args[1]); if (at < 0 || at >= limit - position) this.throwJava('Ljava/lang/IndexOutOfBoundsException;', 'CharBuffer.charAt bounds'); return array.elements[position + at] & 65535; }
-      if (name === 'toString') return utf16String(array.elements.slice(position, limit));
+      if (name === 'toString') return utf16String(cellRange(array.cells, position, limit));
       if (name === 'subSequence') { const start = int(args[1]), end = int(args[2]); if (start < 0 || end < start || end > limit - position) this.throwJava('Ljava/lang/IndexOutOfBoundsException;', 'CharBuffer.subSequence bounds'); const value = this.makeObject('Ljava/nio/CharBuffer;'); Object.assign(this.object(value), {charArray: buffer.charArray, bufferPosition: position + start, bufferLimit: position + end, bufferCapacity: buffer.bufferCapacity}); return value; }
       if (name === 'position' || name === 'limit') { if (args.length === 1) return name === 'position' ? position : limit; const n = int(args[1]), max = name === 'position' ? limit : buffer.bufferCapacity; if (n < 0 || n > max) this.throwJava('Ljava/lang/IllegalArgumentException;', 'CharBuffer position/limit bounds'); if (name === 'position') buffer.bufferPosition = n; else { buffer.bufferLimit = n; buffer.bufferPosition = Math.min(position, n); } return args[0]; }
       if (['clear', 'flip', 'rewind'].includes(name)) { buffer.bufferPosition = 0; if (name === 'clear') buffer.bufferLimit = buffer.bufferCapacity; else if (name === 'flip') buffer.bufferLimit = position; return args[0]; }
@@ -2907,7 +2936,7 @@ export class APKRuntime {
         // ByteBuffer.asCharBuffer(): a live view of the remaining bytes (position..limit) as UTF-16 units in the buffer's current byte order.
         const count = (limit - pos) >> 1, little = buffer.littleEndian, base = pos, storage = bytes.elements, view = this.newArray('[C', 0);
         const unit = index => little ? ((storage[base + index * 2 + 1] & 255) << 8) | (storage[base + index * 2] & 255) : ((storage[base + index * 2] & 255) << 8) | (storage[base + index * 2 + 1] & 255);
-        this.object(view).elements = new Proxy(new Array(count).fill(0), {
+        this.object(view).cells = new Proxy(new Array(count).fill(0), {   // a live view, not storage of its own: set directly (the elements setter would convert it)
           get: (target, property, receiver) => typeof property === 'string' && /^\d+$/.test(property) ? (Number(property) < count ? unit(Number(property)) : undefined) : Reflect.get(target, property, receiver),
           set: (target, property, value) => {
             if (typeof property === 'string' && /^\d+$/.test(property)) { const index = Number(property); if (index >= count) return false; const c = value & 65535, hi = (c >> 8 << 24) >> 24, lo = ((c & 255) << 24) >> 24; storage[base + index * 2] = little ? lo : hi; storage[base + index * 2 + 1] = little ? hi : lo; return true; }
@@ -2924,7 +2953,7 @@ export class APKRuntime {
         const array = this.array(args[1]), from = method.parameters.length === 3 ? int(args[2]) : 0, count = method.parameters.length === 3 ? int(args[3]) : array.elements.length;
         if (from < 0 || count < 0 || from > array.elements.length - count) this.throwJava('Ljava/lang/IndexOutOfBoundsException;', 'ByteBuffer bulk range');
         if (count > limit - pos) this.throwJava(name === 'get' ? 'Ljava/nio/BufferUnderflowException;' : 'Ljava/nio/BufferOverflowException;', null);
-        for (let i = 0; i < count; i++) { if (name === 'get') array.elements[from + i] = bytes.elements[pos + i]; else bytes.elements[pos + i] = array.elements[from + i]; }
+        if (name === 'get') array.cells.set(bytes.cells.subarray(pos, pos + count), from); else bytes.cells.set(array.cells.subarray(from, from + count), pos);
         buffer.bufferPosition += count; return args[0];
       }
       if (name === 'isReadOnly') return 0;
@@ -2940,9 +2969,8 @@ export class APKRuntime {
       if (['clear','flip','rewind'].includes(name)) {buffer.bufferPosition=0;if(name==='clear')buffer.bufferLimit=buffer.bufferCapacity;else if(name==='flip')buffer.bufferLimit=pos;return args[0];}
       const writing=name.startsWith('put'),suffix=name.slice(3),width=['Long','Double'].includes(suffix)?8:['Short','Char'].includes(suffix)?2:suffix?4:1,indexed=method.parameters[0]==='I' && (writing?method.parameters.length===2:method.parameters.length===1),at=indexed?int(args[1]):pos;
       if(at<0||at>limit-width)this.throwJava(indexed?'Ljava/lang/IndexOutOfBoundsException;':writing?'Ljava/nio/BufferOverflowException;':'Ljava/nio/BufferUnderflowException;', 'ByteBuffer access outside limit');
-      const data=new DataView(new ArrayBuffer(width)),little=buffer.littleEndian;
-      for(let i=0;i<width;i++)data.setInt8(i,bytes.elements[at+i]);
-      if(writing){const value=args[indexed?2:1];if(suffix==='Long'||suffix==='Double')data.setBigInt64(0,wide(value),little);else if(width===4)data.setInt32(0,int(value),little);else if(width===2)data.setInt16(0,int(value),little);else data.setInt8(0,int(value));for(let i=0;i<width;i++)bytes.elements[at+i]=data.getInt8(i);}
+      const cells=bytes.cells,data=new DataView(cells.buffer,cells.byteOffset+at,width),little=buffer.littleEndian;   // a view straight over the byte[]'s storage
+      if(writing){const value=args[indexed?2:1];if(suffix==='Long'||suffix==='Double')data.setBigInt64(0,wide(value),little);else if(width===4)data.setInt32(0,int(value),little);else if(width===2)data.setInt16(0,int(value),little);else data.setInt8(0,int(value));}
       if(!indexed)buffer.bufferPosition+=width;
       if(writing)return args[0];return width===8?data.getBigInt64(0,little):width===4?data.getInt32(0,little):width===2?(suffix==='Char'?data.getUint16(0,little):data.getInt16(0,little)):data.getInt8(0);
     }
@@ -3000,8 +3028,11 @@ export class APKRuntime {
         if(!source.type.startsWith('[')||!target.type.startsWith('['))this.throwJava('Ljava/lang/ArrayStoreException;','System.arraycopy requires arrays');
         if((source.type.slice(1).length===1||target.type.slice(1).length===1)&&source.type!==target.type)this.throwJava('Ljava/lang/ArrayStoreException;','System.arraycopy primitive array type mismatch');
         if(from<0||to<0||length<0||from+length>source.elements.length||to+length>target.elements.length)this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','System.arraycopy bounds error');
-        const values = source.elements.slice(from, from + length);
-        for (let i = 0; i < length; i++) { this.checkArrayValue(target, values[i]); target.elements[to + i] = values[i]; }
+        const src = source.cells, dst = target.cells;
+        if (ArrayBuffer.isView(dst)) { if (ArrayBuffer.isView(src)) dst.set(src.subarray(from, from + length), to); else for (let i = 0; i < length; i++) dst[to + i] = src[from + i]; return undefined; }   // typed storage: one copy (overlap-safe when source and target share the buffer)
+        if (source.type === target.type || target.type === '[Ljava/lang/Object;') { if (src === dst) dst.copyWithin(to, from, from + length); else for (let i = 0; i < length; i++) dst[to + i] = src[from + i]; return undefined; }   // every element of the source is assignable
+        const values = src.slice(from, from + length);
+        for (let i = 0; i < length; i++) { this.checkArrayValue(target, values[i]); dst[to + i] = values[i]; }
         return undefined;
       }
     }
@@ -3074,6 +3105,7 @@ export class APKRuntime {
         if (name === 'sort' && method.parameters.length <= 3 && source.type.length === 2 && component !== 'Z' && (method.parameters.length === 1 || method.parameters[1] === 'I')) {
           const ranged = method.parameters.length === 3, from = ranged ? int(args[1]) : 0, to = ranged ? int(args[2]) : source.elements.length;
           if (from > to) this.throwJava('Ljava/lang/IllegalArgumentException;', `fromIndex(${from}) > toIndex(${to})`); if (from < 0 || to > source.elements.length) this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `Array index out of range: ${from < 0 ? from : to}`);
+          if (ArrayBuffer.isView(source.cells)) { source.cells.subarray(from, to).sort((a, b) => order(numeric(a), numeric(b))); return; }
           const part = source.elements.slice(from, to).sort((a, b) => order(numeric(a), numeric(b))); for (let i = 0; i < part.length; i++) source.elements[from + i] = part[i]; return;
         }
         if (name === 'toString' && source.type.length === 2) {
@@ -3116,8 +3148,10 @@ export class APKRuntime {
       const classArgument=method.parameters.at(-1)==='Ljava/lang/Class;'?this.object(args.at(-1)).classType:null;
       if(classArgument&&!classArgument.startsWith('['))this.throwJava('Ljava/lang/NullPointerException;','Array class has no component type');
       if(classArgument&&!classArgument.startsWith('[L')&&!classArgument.startsWith('[['))this.throwJava('Ljava/lang/ClassCastException;','Typed copy requires a reference array class');
-      const result = this.newArray(classArgument??source.type, length), target = this.object(result);
-      for (let i = 0; i < Math.min(length, source.elements.length - from); i++){const value=source.elements[from+i];this.checkArrayValue(target,value);target.elements[i]=value;}
+      const result = this.newArray(classArgument??source.type, length), target = this.object(result), count = Math.min(length, source.cells.length - from);
+      if (ArrayBuffer.isView(target.cells)) target.cells.set(cellRange(source.cells, from, from + count));
+      else if (!classArgument || classArgument === source.type || classArgument === '[Ljava/lang/Object;') for (let i = 0; i < count; i++) target.cells[i] = source.cells[from + i];
+      else for (let i = 0; i < count; i++){const value=source.cells[from+i];this.checkArrayValue(target,value);target.cells[i]=value;}
       return result;
     }
     return BRIDGE_NEXT;
@@ -3260,26 +3294,26 @@ export class APKRuntime {
           else{if(offset>length-count)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','offset '+offset+', count '+count+', length '+length);
             for(let i=offset;i<offset+count;i++){const cp=source.elements[i]|0;if(cp<0||cp>0x10ffff)this.throwJava('Ljava/lang/IllegalArgumentException;',String(cp));text+=String.fromCodePoint(cp);}}
         }
-        else if(method.parameters[0]==='[C'){const source=this.array(args[1]);if(source.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','String constructor requires char[]');const from=method.parameters.length===3?int(args[2]):0,count=method.parameters.length===3?int(args[3]):source.elements.length;if(from<0||count<0||from>source.elements.length-count)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String char array range');text=utf16String(source.elements.slice(from,from+count));}
+        else if(method.parameters[0]==='[C'){const source=this.array(args[1]);if(source.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','String constructor requires char[]');const from=method.parameters.length===3?int(args[2]):0,count=method.parameters.length===3?int(args[3]):source.elements.length;if(from<0||count<0||from>source.elements.length-count)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String char array range');text=utf16String(cellRange(source.cells,from,from+count));}
         else if(method.parameters[0]==='[B'&&method.parameters[method.parameters.length-1]==='I'&&(method.parameters.length===2||method.parameters.length===4)){
           // Deprecated String(byte[] ascii, int hibyte[, offset, count]): each char is (hibyte << 8) | (byte & 0xff).
           const source=this.array(args[1]);if(source.type!=='[B')this.throwJava('Ljava/lang/ClassCastException;','String constructor requires byte[]');
           const quad=method.parameters.length===4,hibyte=(int(args[quad?2:2])&255)<<8,from=quad?int(args[3]):0,count=quad?int(args[4]):source.elements.length;
           if(quad&&method.parameters[1]!=='I')fail('Unexpected String(byte[],...) signature');
           if(from<0||count<0||from>source.elements.length-count)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String byte array range');
-          text=String.fromCharCode(...source.elements.slice(from,from+count).map(byte=>hibyte|(byte&255)));
+          {const cells=source.cells,units=new Uint16Array(count);for(let i=0;i<count;i++)units[i]=hibyte|(cells[from+i]&255);text=utf16String(units);}
         }
         else if(method.parameters[0]==='[B'){
           const source=this.array(args[1]);if(source.type!=='[B')this.throwJava('Ljava/lang/ClassCastException;','String constructor requires byte[]');
           const ranged=method.parameters[1]==='I',from=ranged?int(args[2]):0,count=ranged?int(args[3]):source.elements.length,selector=method.parameters.length>(ranged?3:1)?args[ranged?4:2]:null;
           if(from<0||count<0||from>source.elements.length-count)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String byte array range');
-          text=decodeBytes(Uint8Array.from(source.elements.slice(from,from+count),byte=>byte&255),this.stringCodec(selector,true));
+          text=decodeBytes(unsignedBytes(source.cells,from,from+count),this.stringCodec(selector,true));
         }
         const units=(this.constructedStringUnits??0)+text.length;if(text.length>4000000||units>16*1024*1024)fail('Constructed String UTF-16 storage limit exceeded');this.constructedStringUnits=units;object.stringValue=text;return;
       }
-      if(name==='copyValueOf'){const source=this.array(args[0]);if(source.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','copyValueOf requires char[]');return utf16String(source.elements.slice());}
+      if(name==='copyValueOf'){const source=this.array(args[0]);if(source.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','copyValueOf requires char[]');return utf16String(source.cells);}
       const value = this.stringCharacters(args[0]);
-      if(name==='getBytes'){const bytes=encodeString(value,this.stringCodec(method.parameters.length?args[1]:null,false)),result=this.newArray('[B',bytes.length);this.array(result).elements=Array.from(bytes);return result;}
+      if(name==='getBytes')return this.arrayOf('[B',encodeString(value,this.stringCodec(method.parameters.length?args[1]:null,false)));
       if(['codePointBefore','codePointCount','offsetByCodePoints'].includes(name)&&!isNull(args[0])&&this.isStringValue(args[0]))return this.codePointOps(this.stringCharacters(args[0]),name,args);
       if(['contains','equalsIgnoreCase','compareToIgnoreCase','codePointAt','intern','repeat','isBlank','contentEquals'].includes(name)||(['toLowerCase','toUpperCase'].includes(name)&&method.parameters.length===0)){
         const sequence=x=>{if(isNull(x))this.throwJava('Ljava/lang/NullPointerException;',null);return this.isStringValue(x)?this.stringCharacters(x):this.javaString(x);};
@@ -3307,9 +3341,9 @@ export class APKRuntime {
         return changed===value?args[0]:changed;
       }
       if(name==='getChars'){
-        const begin=int(args[1]),end=int(args[2]);if(begin<0||end<begin||end>value.length)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String source range');const target=this.array(args[3]),offset=int(args[4]);if(target.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','String.getChars requires char[]');if(offset<0||offset>target.elements.length-(end-begin))this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','String.getChars target range');for(let i=begin;i<end;i++)target.elements[offset+i-begin]=value.charCodeAt(i);return;
+        const begin=int(args[1]),end=int(args[2]);if(begin<0||end<begin||end>value.length)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String source range');const target=this.array(args[3]),offset=int(args[4]);if(target.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','String.getChars requires char[]');if(offset<0||offset>target.elements.length-(end-begin))this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','String.getChars target range');const cells=target.cells;for(let i=begin;i<end;i++)cells[offset+i-begin]=value.charCodeAt(i);return;
       }
-      if(name==='toCharArray'){const result=this.newArray('[C',value.length);this.array(result).elements=Array.from({length:value.length},(_,i)=>value.charCodeAt(i));return result;} if (typeof value !== 'string') fail('Expected String receiver');
+      if(name==='toCharArray'){const result=this.newArray('[C',value.length),cells=this.object(result).cells;for(let i=0;i<value.length;i++)cells[i]=value.charCodeAt(i);return result;} if (typeof value !== 'string') fail('Expected String receiver');
       if(name==='regionMatches'){
         const conditional=method.parameters[0]==='Z',shift=conditional?1:0,ignoreCase=conditional&&!!args[1],offset=int(args[1+shift]),other=args[2+shift],from=int(args[3+shift]),length=int(args[4+shift]);
         // Preserve Java's short-circuit bounds checks, including negative length.
@@ -3940,7 +3974,7 @@ export class APKRuntime {
         const start=method.parameters.length===1?0:int(args[2]),count=method.parameters.length===1?array.elements.length:int(args[3]);
         if(start<0||count<0||start>array.elements.length-count)this.throwJava('Ljava/lang/IndexOutOfBoundsException;','Invalid char-array append range');
         if((obj.builder??'').length+count>4000000)fail('StringBuilder length limit exceeded');
-        obj.builder=(obj.builder??'')+utf16String(array.elements.slice(start,start+count));return args[0];
+        obj.builder=(obj.builder??'')+utf16String(cellRange(array.cells,start,start+count));return args[0];
       }
       if(name==='append'&&method.parameters.length===3){
         const sequence=isNull(args[1])?'null':args[1],start=int(args[2]),end=int(args[3]);

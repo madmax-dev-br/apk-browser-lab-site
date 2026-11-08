@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=2e29585a666b';
+import { createHostRegistry } from './host-contract.js?v=beba259db142';
 
 // android.util.StatsLog (packages/modules/StatsD framework/java/android/util/StatsLog.java, android-13.0.0_r1) over an in-memory sink. The device writes events to the statsd socket from
 // libstats_jni; the browser VM has no statsd, so every accepted event is kept in platform.statsEvents ({ atomId, bytes }) and nothing is sent anywhere. StatsEvent itself is the original
@@ -24,9 +24,9 @@ export function createStatsHost(platform) {
   statics('write', `(${STATS_EVENT})V`, (r, _m, [event]) => {   // writeImpl(event.getBytes(), event.getNumBytes(), event.getAtomId()); event.release();
     const call = (name, result) => r.dispatch({ owner: STATS_EVENT, name, parameters: [], result, signature: `()${result}` }, [event], 'virtual');
     const bytes = call('getBytes', '[B'), size = call('getNumBytes', 'I'), atomId = call('getAtomId', 'I');
-    record(atomId, Uint8Array.from(r.array(bytes).elements.slice(0, size), value => value & 0xff));
+    record(atomId, r.bytesOf(bytes, 0, size).slice());
     r.dispatch({ owner: STATS_EVENT, name: 'release', parameters: [], result: 'V', signature: '()V' }, [event], 'virtual');
   });
-  statics('writeRaw', '([BI)V', (r, _m, [buffer, size]) => record(0, Uint8Array.from(r.array(buffer).elements.slice(0, size), value => value & 0xff)));
+  statics('writeRaw', '([BI)V', (r, _m, [buffer, size]) => record(0, r.bytesOf(buffer, 0, size).slice()));
   return { ...registry };
 }

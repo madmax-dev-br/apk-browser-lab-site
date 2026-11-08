@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { JavaException } from './apk-runtime.js?v=2e29585a666b';
-import { bitsDouble, doubleBits } from './host-contract.js?v=2e29585a666b';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { JavaException } from './apk-runtime.js?v=beba259db142';
+import { bitsDouble, doubleBits } from './host-contract.js?v=beba259db142';
 
 // Host bindings for the framework's SQLite natives.
 //
@@ -411,7 +411,7 @@ export function createSqliteNativeBindings() {
     const text = r.stringCharacters(args[3]), pointer = e.allocUtf16(text); try { return e.x.sqlite3_bind_text16(s, args[2], pointer, text.length * 2, SQLITE_TRANSIENT); } finally { e.x.free(pointer); }
   }));
   add(CONNECTION, `nativeBindBlob(JJI${BYTES})V`, (r, args) => bind(r, args, (e, s) => {
-    const elements = r.array(args[3]).elements, data = Uint8Array.from(elements, v => v & 0xff), pointer = e.allocBytes(data);
+    const data = r.bytesOf(args[3]), pointer = e.allocBytes(data);
     try { return e.x.sqlite3_bind_blob(s, args[2], pointer, data.length, SQLITE_TRANSIENT); } finally { e.x.free(pointer); }
   }));
   add(CONNECTION, 'nativeResetStatementAndClearBindings(JJ)V', (r, args) => {
@@ -527,7 +527,7 @@ export function createSqliteNativeBindings() {
     const type = w.type(slot);
     if (type === FIELD_BLOB || type === FIELD_STRING) {
       const payload = w.payload(slot); if (!payload) throwPlain(r, 'Native could not read blob slot');
-      const array = r.newArray(BYTES, payload.length); r.array(array).elements = Array.from(payload, v => (v << 24) >> 24); return array;
+      return r.arrayOf(BYTES, payload);
     }
     if (type === FIELD_INTEGER) throwPlain(r, 'INTEGER data in nativeGetBlob ');
     if (type === FIELD_FLOAT) throwPlain(r, 'FLOAT data in nativeGetBlob ');

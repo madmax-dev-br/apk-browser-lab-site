@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=2e29585a666b';
-import {getPaintStateByHandle} from './paint-host.js?v=2e29585a666b';
-import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=2e29585a666b';
-import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=2e29585a666b';
+import {APKError} from './apk-error.js?v=beba259db142';
+import {getPaintStateByHandle} from './paint-host.js?v=beba259db142';
+import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=beba259db142';
+import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=beba259db142';
 
 const MT='Landroid/graphics/text/MeasuredText;',BUILDER=MT.slice(0,-1)+'$Builder;',LB='Landroid/graphics/text/LineBreaker;';
 const REG='Llibcore/util/NativeAllocationRegistry;';
@@ -16,7 +16,7 @@ const backend=r=>{const b=r.skia;if(!b?.CanvasKit?.ParagraphBuilder||!b.fontMana
 const allocate=(r,kind,value)=>{const s=stateFor(r);if(s.handles.size>=8192)fail('Text layout exceeds8192 live handles');const h=s.next++;s.handles.set(h,{kind,...value});return h;};
 const get=(r,h,kind)=>{const v=stateFor(r).handles.get(h);if(!v||v.kind!==kind)fail(`Invalid or released ${kind} text-layout token`);return v;};
 const release=(r,h)=>{const s=stateFor(r),v=s.handles.get(h);if(v){v.paragraph?.delete();s.handles.delete(h);}};
-const chars=(r,ref)=>{const a=r.array(ref);if(a.type!=='[C'||a.elements.length>65536)fail('Text layout requires at most65536 UTF16 code units');let text='';for(let i=0;i<a.elements.length;i+=8192)text+=String.fromCharCode(...a.elements.slice(i,i+8192));return text;};
+const chars=(r,ref)=>{const a=r.array(ref);if(a.type!=='[C'||a.elements.length>65536)fail('Text layout requires at most65536 UTF16 code units');const cells=a.cells;let text='';for(let i=0;i<cells.length;i+=8192)text+=String.fromCharCode(...(ArrayBuffer.isView(cells)?cells.subarray(i,i+8192):cells.slice(i,i+8192)));return text;};
 const validateText=text=>{
  const rejected=[];
  for(const char of text){const cp=char.codePointAt(0),dir=androidCharacterDirectionality(cp);

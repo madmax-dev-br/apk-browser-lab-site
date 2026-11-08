@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=2e29585a666b';
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=2e29585a666b';
+import { gcRoot } from './heap-gc.js?v=beba259db142';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=beba259db142';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -341,7 +341,7 @@ export function createSystemServicesHost(platform) {
   // maxMemory/totalMemory describe the VM's declared heap (256 MiB limit, 128 MiB committed); freeMemory = committed - an estimate of live VM data
   // (object slots + field slots + array cells + collection cells at 16/8/8/16 bytes). The VM has no garbage collector, so used memory only grows.
   const RUNTIME = 'Ljava/lang/Runtime;', MAX_MEMORY = 256n * 1024n * 1024n, TOTAL_MEMORY = 128n * 1024n * 1024n;
-  const used = runtime => BigInt(runtime.heap.size * 16 + runtime.fieldSlots * 8 + runtime.arrayCells * 8 + runtime.collectionCells * 16);
+  const used = runtime => BigInt(runtime.heap.size * 16 + runtime.fieldSlots * 8 + (runtime.arrayBytes ?? runtime.arrayCells * 8) + runtime.collectionCells * 16);   // arrayBytes: the exact storage of the arrays (typed for primitive arrays) counted by the last collection
   def(RUNTIME, 'maxMemory', '()J', () => MAX_MEMORY); def(RUNTIME, 'totalMemory', '()J', () => TOTAL_MEMORY);
   def(RUNTIME, 'freeMemory', '()J', (runtime) => { const free = TOTAL_MEMORY - used(runtime); return free > 0n ? free : 0n; });
   // Runtime.exec (libcore Runtime.java): tokenize a command line with StringTokenizer's default delimiters, then `new ProcessBuilder(cmdarray).environment(envp).directory(dir).start()`. The

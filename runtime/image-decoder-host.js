@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=2e29585a666b';
-import { APKError } from './apk-error.js?v=2e29585a666b';
+import { createHostRegistry } from './host-contract.js?v=beba259db142';
+import { APKError } from './apk-error.js?v=beba259db142';
 
 // android.graphics.ImageDecoder (API 28+, android-13.0.0_r1 ImageDecoder.java) over the lab's bitmap codec: a Source is the encoded bytes (byte[], ByteBuffer, File, raw resource, asset, content Uri,
 // Callable<AssetFileDescriptor> is not modelled); decodeBitmap / decodeDrawable decode with BitmapFactory, call the OnHeaderDecodedListener with the decoder and the ImageInfo (size, mime type,
@@ -25,18 +25,18 @@ export function createImageDecoderHost(platform) {
   const iae = (r, m) => r.throwJava('Ljava/lang/IllegalArgumentException;', m);
   const ise = (r, m) => r.throwJava('Ljava/lang/IllegalStateException;', m);
   const unsupported = (message, kind) => { throw new APKError(message, { kind }); };
-  const bytesArray = (r, bytes) => { const array = r.newArray('[B', bytes.length); r.array(array).elements = Array.from(bytes, v => (v << 24) >> 24); return array; };
+  const bytesArray = (r, bytes) => r.arrayOf('[B', bytes);
   const readAll = (r, stream) => {
     const chunks = [], buffer = r.newArray('[B', 8192);
-    try { for (;;) { const n = call(r, stream, INPUT, 'read', ['[B', 'I', 'I'], 'I', [buffer, 0, 8192]); if (n < 0) break; chunks.push(Uint8Array.from(r.array(buffer).elements.slice(0, n), v => v & 255)); } } finally { call(r, stream, INPUT, 'close', [], 'V'); }
+    try { for (;;) { const n = call(r, stream, INPUT, 'read', ['[B', 'I', 'I'], 'I', [buffer, 0, 8192]); if (n < 0) break; chunks.push(r.bytesOf(buffer, 0, n).slice()); } } finally { call(r, stream, INPUT, 'close', [], 'V'); }
     const out = new Uint8Array(chunks.reduce((s, c) => s + c.length, 0)); let at = 0; for (const c of chunks) { out.set(c, at); at += c.length; } return out;
   };
   const source = (r, load, description) => { const o = r.makeObject(SOURCE); r.object(o).source = { load, description }; return o; };
-  def(ID, 'createSource', '([B)' + SOURCE, (r, _m, [data]) => { if (nullish(data)) npe(r, 'data is null'); return source(r, () => Uint8Array.from(r.array(data).elements, v => v & 255), 'ByteArraySource'); }, { static: true });
+  def(ID, 'createSource', '([B)' + SOURCE, (r, _m, [data]) => { if (nullish(data)) npe(r, 'data is null'); return source(r, () => r.bytesOf(data).slice(), 'ByteArraySource'); }, { static: true });
   def(ID, 'createSource', '([BII)' + SOURCE, (r, _m, [data, offset, length]) => {
     if (nullish(data)) npe(r, 'data is null'); const size = r.array(data).elements.length;
     if (offset < 0 || length < 0 || offset > size || offset + length > size) r.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `invalid offset/length: offset ${offset} length ${length} size ${size}`);
-    return source(r, () => Uint8Array.from(r.array(data).elements.slice(offset, offset + length), v => v & 255), 'ByteArraySource');
+    return source(r, () => r.bytesOf(data, offset, offset + length).slice(), 'ByteArraySource');
   }, { static: true });
   def(ID, 'createSource', `(Ljava/nio/ByteBuffer;)${SOURCE}`, (r, _m, [buffer]) => { if (nullish(buffer)) npe(r, 'buffer is null'); return source(r, () => { const dup = call(r, buffer, 'Ljava/nio/ByteBuffer;', 'duplicate', [], 'Ljava/nio/ByteBuffer;'), n = call(r, dup, 'Ljava/nio/Buffer;', 'remaining', [], 'I'), a = r.newArray('[B', n); call(r, dup, 'Ljava/nio/ByteBuffer;', 'get', ['[B'], 'Ljava/nio/ByteBuffer;', [a]); return Uint8Array.from(r.array(a).elements, v => v & 255); }, 'ByteBufferSource'); }, { static: true });
   def(ID, 'createSource', `(Ljava/io/File;)${SOURCE}`, (r, _m, [file]) => { if (nullish(file)) npe(r, 'file is null'); return source(r, () => readAll(r, construct(r, 'Ljava/io/FileInputStream;', ['Ljava/io/File;'], [file])), 'FileSource'); }, { static: true });
@@ -69,7 +69,7 @@ export function createImageDecoderHost(platform) {
     if (s.alpha) unsupported('ImageDecoder.setDecodeAsAlphaMaskEnabled: A8 alpha-mask decoding is not modelled', 'image-alpha-mask-unsupported');
     if (asDrawable && animated) unsupported('ImageDecoder.decodeDrawable of an animated image (AnimatedImageDrawable) is not modelled; decodeBitmap returns the first frame', 'animated-image-unsupported');
     let out = bitmap; const tw = s.target ? s.target[0] : Math.max(1, Math.floor(width / s.sample)), th = s.target ? s.target[1] : Math.max(1, Math.floor(height / s.sample));
-    if (tw !== width || th !== height) out = callStatic(r, BITMAP, 'createScaledBitmap', [BITMAP, 'I', 'I', 'Z'], BITMAP, [out, tw, th, 1]);
+    if (tw !== width || th !== height) out = callStatic(r, BITMAP, 'createScaledBitmap', [BITMAP, 'I', 'I', 'Z'], BITMAP, [out, tw, th, 0]);   // nearest, as the decoder's resize always was (createScaledBitmap honors `filter` now)
     if (s.crop) { const [l, t, rr, b] = s.crop; out = callStatic(r, BITMAP, 'createBitmap', [BITMAP, 'I', 'I', 'I', 'I'], BITMAP, [out, l, t, rr - l, b - t]); }
     if (s.mutable && !call(r, out, BITMAP, 'isMutable', [], 'Z')) out = call(r, out, BITMAP, 'copy', ['Landroid/graphics/Bitmap$Config;', 'Z'], BITMAP, [call(r, out, BITMAP, 'getConfig', [], 'Landroid/graphics/Bitmap$Config;'), 1]);
     const density = r.object(src).source.density;

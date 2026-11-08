@@ -77,7 +77,7 @@ export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: ()
       const entry = create({ api: via, kind, method, url, host, port, headers, bytes }); entry.refusedHost = offline ? null : (host ?? entry.host);
       return end(entry, offline ? 'offline' : 'refused-by-allowlist');
     },
-    /** A request that cannot be carried out here (a raw socket connect): the failure is explicit, never a faked success. */
+    /** A request that cannot be carried out here (a socket conversation that is not HTTP/1.1): the failure is explicit, never a faked success. */
     unsupported({ api: via = 'Socket', kind = 'socket', method = 'CONNECT', url, host, port = null, message }) {
       return end(create({ api: via, kind, method, url, host, port }), 'unsupported', { type: 'unsupported', message: String(message) });
     },

@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { throwNew } from './java-throw.js?v=2e29585a666b';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { throwNew } from './java-throw.js?v=beba259db142';
 
 // android.os.Parcel natives (android_os_Parcel.cpp over libbinder's Parcel.cpp, android-13.0.0_r1) behind the ORIGINAL Parcel.java in framework.dex.
 //
@@ -71,7 +71,7 @@ export function createParcelNativeBindings() {
     if (error === -32) throwNew(runtime, 'Landroid/os/DeadObjectException;', null);
     runtime.throwJava('Ljava/lang/RuntimeException;', messages[error] ?? `Unknown error: ${error}`);
   });
-  const writeBytes = (p, source, offset, length) => { const at = p.reserve(length); for (let i = 0; i < length; i++) p.bytes[at + i] = source[offset + i] & 255; };
+  const writeBytes = (p, source, offset, length) => { const at = p.reserve(length); if (ArrayBuffer.isView(source)) p.bytes.set(new Uint8Array(source.buffer, source.byteOffset + offset, length), at); else for (let i = 0; i < length; i++) p.bytes[at + i] = source[offset + i] & 255; };
   add('nativeWriteByteArray(J[BII)V', (runtime, [pointer, array, offset, length]) => {
     const p = parcel(runtime, pointer);
     if (array === null || array === 0) { writeInt(p, -1); return; }
@@ -112,20 +112,20 @@ export function createParcelNativeBindings() {
   add('nativeReadFloat(J)F', (runtime, [pointer]) => readInt(runtime, parcel(runtime, pointer)));
   add('nativeReadDouble(J)D', (runtime, [pointer]) => { const p = parcel(runtime, pointer); need(runtime, p, 8); const value = p.view.getBigInt64(p.position, true); p.position += 8; return value; });
   const readPadded = (runtime, p, length) => { const padded = (length + 3) & ~3; need(runtime, p, padded); const at = p.position; p.position += padded; return at; };
-  const javaBytes = (p, at, length) => Array.from(p.bytes.subarray(at, at + length), v => (v << 24) >> 24);
+  const javaBytes = (p, at, length) => p.bytes.subarray(at, at + length);   // copied into the byte[] by arrayOf
   add('nativeCreateByteArray(J)[B', (runtime, [pointer]) => {
     const p = parcel(runtime, pointer), length = readInt(runtime, p); if (length < 0) return null;
-    const at = readPadded(runtime, p, length), array = runtime.newArray('[B', length); runtime.object(array).elements = javaBytes(p, at, length); return array;
+    const at = readPadded(runtime, p, length); return runtime.arrayOf('[B', javaBytes(p, at, length));
   });
   add('nativeReadByteArray(J[BI)Z', (runtime, [pointer, dest, destLength]) => {
     const p = parcel(runtime, pointer), start = p.position, length = readInt(runtime, p);
     if (length !== destLength) { p.position = start + 4; if (length > 0) p.position = Math.min(p.size, p.position + ((length + 3) & ~3)); return 0; }
-    const at = readPadded(runtime, p, length), elements = runtime.object(dest).elements; for (let i = 0; i < length; i++) elements[i] = (p.bytes[at + i] << 24) >> 24; return 1;
+    const at = readPadded(runtime, p, length), cells = runtime.array(dest).cells; if (ArrayBuffer.isView(cells)) cells.set(p.bytes.subarray(at, at + length)); else for (let i = 0; i < length; i++) cells[i] = (p.bytes[at + i] << 24) >> 24; return 1;
   });
   add('nativeReadBlob(J)[B', (runtime, [pointer]) => {
     const p = parcel(runtime, pointer), length = readInt(runtime, p); if (length < 0) return null;
     const kind = readInt(runtime, p); if (kind !== 0) throw new APKError('Parcel.readBlob: shared-memory blobs are not produced by this VM', { kind: 'parcel-ashmem-unsupported' });
-    const at = readPadded(runtime, p, length), array = runtime.newArray('[B', length); runtime.object(array).elements = javaBytes(p, at, length); return array;
+    const at = readPadded(runtime, p, length); return runtime.arrayOf('[B', javaBytes(p, at, length));
   });
   const readString16 = (runtime, p) => {
     const length = readInt(runtime, p); if (length < 0) return null;
@@ -148,9 +148,9 @@ export function createParcelNativeBindings() {
   });
 
   // ---- whole-parcel operations
-  add('nativeMarshall(J)[B', (runtime, [pointer]) => { const p = parcel(runtime, pointer), array = runtime.newArray('[B', p.size); runtime.object(array).elements = javaBytes(p, 0, p.size); return array; });
+  add('nativeMarshall(J)[B', (runtime, [pointer]) => { const p = parcel(runtime, pointer); return runtime.arrayOf('[B', javaBytes(p, 0, p.size)); });
   add('nativeUnmarshall(J[BII)V', (runtime, [pointer, data, offset, length]) => {
-    const p = parcel(runtime, pointer), elements = runtime.object(data).elements; p.objects.clear(); p.ensure(length); for (let i = 0; i < length; i++) p.bytes[i] = elements[offset + i] & 255;
+    const p = parcel(runtime, pointer), source = runtime.bytesOf(data, offset, offset + length); p.objects.clear(); p.ensure(length); p.bytes.set(source);
     p.size = length; p.position = length;
   });
   add('nativeCompareData(JJ)I', (runtime, [a, b]) => { const x = parcel(runtime, a), y = parcel(runtime, b); if (x.size !== y.size) return x.size < y.size ? -1 : 1; for (let i = 0; i < x.size; i++) if (x.bytes[i] !== y.bytes[i]) return x.bytes[i] < y.bytes[i] ? -1 : 1; return 0; });

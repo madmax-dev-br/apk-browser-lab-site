@@ -1,14 +1,14 @@
-import {APKError} from './apk-runtime.js?v=2e29585a666b';
-import {getVectorGraphics} from './vector-native.js?v=2e29585a666b';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=2e29585a666b';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=2e29585a666b';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=2e29585a666b';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=2e29585a666b';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=2e29585a666b';
-import {createBitmapHost} from './bitmap-host.js?v=2e29585a666b';
-import { gcRoot } from './heap-gc.js?v=2e29585a666b';
-import {sha256Hex} from './sha256-sync.js?v=2e29585a666b';
-import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=2e29585a666b';
+import {APKError} from './apk-runtime.js?v=beba259db142';
+import {getVectorGraphics} from './vector-native.js?v=beba259db142';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=beba259db142';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=beba259db142';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=beba259db142';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=beba259db142';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=beba259db142';
+import {createBitmapHost} from './bitmap-host.js?v=beba259db142';
+import { gcRoot } from './heap-gc.js?v=beba259db142';
+import {sha256Hex} from './sha256-sync.js?v=beba259db142';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=beba259db142';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -159,6 +159,33 @@ function cacheRaster(runtime,key,result){
  cache.set(key,{result:{...result},size});runtime.rasterCacheBytes=(runtime.rasterCacheBytes??0)+size;
  for(const [oldKey,entry] of cache){if(runtime.rasterCacheBytes<=RASTER_CACHE_BYTES&&cache.size<=64)break;cache.delete(oldKey);runtime.rasterCacheBytes-=entry.size;}
 }
+/** A recorded 'raster' command's image: an encoded PNG (data URL) or exact pixel data (command.pixelData: base64 of rows in colorType/alphaType, written by Bitmap pixel setters). */
+function decodeRasterImage(CK,raster){
+ if(raster?.kind!=='raster'||!raster.dataURL?.startsWith('data:image/png;base64,')||raster.dataURL.length>12*1024*1024)fail('Canvas raster requires a bounded actual PNG');
+ const image=CK.MakeImageFromEncoded(Uint8Array.from(atob(raster.dataURL.slice(22)),c=>c.charCodeAt(0)));if(!image)fail('Skia rejected a recorded widget raster');return image;
+}
+/** Canvas.drawBitmapMesh: the bitmap sampled (bilinear, clamped) over a (meshWidth+1)x(meshHeight+1) lattice of two-triangle cells; per-vertex colors modulate it (SkBlendMode::kModulate). */
+function drawBitmapMesh(CK,canvas,image,mesh,paint){
+ const cw=mesh.width,ch=mesh.height,count=(cw+1)*(ch+1),tex=new Float32Array(count*2),indices=[];
+ for(let y=0;y<=ch;y++)for(let x=0;x<=cw;x++){const at=(y*(cw+1)+x)*2;tex[at]=x*mesh.bitmapWidth/cw;tex[at+1]=y*mesh.bitmapHeight/ch;}
+ for(let y=0;y<ch;y++)for(let x=0;x<cw;x++){const a=y*(cw+1)+x,b=a+1,c=a+cw+1,d=c+1;indices.push(a,b,c,b,d,c);}
+ const colors=mesh.colors?Float32Array.from(mesh.colors.flatMap(c=>[((c>>>16)&255)/255,((c>>>8)&255)/255,(c&255)/255,(c>>>24)/255])):null;
+ const vertices=CK.MakeVertices(CK.VertexMode.Triangles,Float32Array.from(mesh.positions),tex,colors,indices);
+ const shader=image.makeShaderOptions(CK.TileMode.Clamp,CK.TileMode.Clamp,CK.FilterMode.Linear,CK.MipmapMode.None),meshPaint=paint?paint.copy():new CK.Paint();
+ try{meshPaint.setShader(shader);canvas.drawVertices(vertices,CK.BlendMode.Modulate,meshPaint);}finally{meshPaint.delete();shader.delete();vertices.delete();}
+}
+const PIXEL_BYTES={RGBA_8888:4,RGB_565:2,RGBA_F16:8,RGBA_1010102:4};
+function makePixelDataImage(CK,data){
+ const bpp=PIXEL_BYTES[data.colorType];if(!bpp||CK.ColorType[data.colorType]===undefined||CK.AlphaType[data.alphaType]===undefined)fail('Unsupported Bitmap pixel data format '+data.colorType+'/'+data.alphaType);
+ const bytes=Uint8Array.from(atob(data.base64),c=>c.charCodeAt(0));if(bytes.length!==data.width*data.height*bpp)fail('Bitmap pixel data length does not match its extent');
+ const image=CK.MakeImage({width:data.width,height:data.height,colorType:CK.ColorType[data.colorType],alphaType:CK.AlphaType[data.alphaType],colorSpace:CK.ColorSpace.SRGB},bytes,data.width*bpp);if(!image)fail('Skia rejected Bitmap pixel data');return image;
+}
+/** Skia color types a Bitmap config rasterizes on (RGB_565 opaque 2 B, RGBA_F16 8 B, RGBA_1010102 4 B); other configs use the N32 surface. */
+function bitmapSurfaceSpec(CK,type){
+ const spec={RGB_565:[CK.ColorType.RGB_565,2,CK.AlphaType.Opaque],RGBA_F16:[CK.ColorType.RGBA_F16,8,CK.AlphaType.Premul],RGBA_1010102:[CK.ColorType.RGBA_1010102,4,CK.AlphaType.Premul]}[type];
+ if(!spec)fail('No Skia surface color type for Bitmap config '+type);if(spec[0]===undefined)fail('This CanvasKit build has no color type for Bitmap.Config.'+type);
+ return {colorType:spec[0],bytes:spec[1],alphaType:spec[2]};
+}
 export function rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,options={}){
  const stats=runtime.rasterStats??={calls:0,rasterized:0,hits:0,keyMs:0,replayMs:0,encodeMs:0};stats.calls++;
  const state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas');
@@ -179,7 +206,7 @@ export function rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,heig
 }
 function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,height,options={}){
  if(!(Number.isInteger(width)&&Number.isInteger(height)&&width>0&&height>0&&width<=4096&&height<=4096&&width*height<=4*1024*1024))fail('Skia raster extent exceeds4096px/4Mpixel VM limit');
- const CK=backend.CanvasKit,state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas'),surface=CK.MakeSurface(width,height);if(!surface)fail('Skia CPU surface allocation failed');const canvas=surface.getCanvas();canvas.clear(CK.TRANSPARENT);
+ const CK=backend.CanvasKit,state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas'),typed=options?.surfaceType?bitmapSurfaceSpec(CK,options.surfaceType):null,memory=typed?CK.Malloc(Uint8Array,width*height*typed.bytes):null,surface=typed?CK.MakeRasterDirectSurface({width,height,colorType:typed.colorType,alphaType:typed.alphaType,colorSpace:CK.ColorSpace.SRGB},memory,width*typed.bytes):CK.MakeSurface(width,height);if(!surface){if(memory)CK.Free(memory);fail('Skia CPU surface allocation failed');}const canvas=surface.getCanvas();canvas.clear(CK.TRANSPARENT);
  const activeNodes=new Set();let replayCount=0;
  const drawNodeShadow=node=>{
    const z=renderNodeShadowCaster(node);if(!z)return;const outline=node.outline,casterAlpha=node.alpha*outline.alpha;let path;
@@ -244,7 +271,7 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
     }
     else if(command.op==='color')canvas.drawColor(argb(CK,command.color),{value:command.blendMode??3});
     else if(command.op==='paint')canvas.drawPaint(paint);
-    else if(command.op==='raster'){const raster=command.raster;if(raster?.kind!=='raster'||!raster.dataURL?.startsWith('data:image/png;base64,')||raster.dataURL.length>12*1024*1024)fail('Canvas raster requires a bounded actual PNG');const binary=atob(raster.dataURL.slice(22)),bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));const image=CK.MakeImageFromEncoded(bytes);if(!image)fail('Skia rejected a recorded widget raster');try{if(image.width()>4096||image.height()>4096||image.width()*image.height()>4*1024*1024)fail('Recorded widget raster exceeds Skia bounds');const drawImage=p=>{if(command.src&&command.dst)canvas.drawImageRect(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),p);else{if(command.imageMatrix)canvas.concat(command.imageMatrix);if(command.imageScale&&command.imageScale!==1){canvas.translate(command.args[0],command.args[1]);canvas.scale(command.imageScale,command.imageScale);canvas.drawImage(image,0,0,p);}else canvas.drawImage(image,command.args[0],command.args[1],p);}};
+    else if(command.op==='raster'){const image=command.pixelData?makePixelDataImage(CK,command.pixelData):decodeRasterImage(CK,command.raster);try{if(image.width()>4096||image.height()>4096||image.width()*image.height()>4*1024*1024)fail('Recorded widget raster exceeds Skia bounds');const drawImage=p=>{if(command.mesh){drawBitmapMesh(CK,canvas,image,command.mesh,p);return;}if(command.imageMatrix)canvas.concat(command.imageMatrix);if(command.src&&command.dst){if(command.filter)canvas.drawImageRectOptions(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImageRect(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),p);}else{if(command.imageScale&&command.imageScale!==1){canvas.translate(command.args[0],command.args[1]);canvas.scale(command.imageScale,command.imageScale);if(command.filter)canvas.drawImageOptions(image,0,0,CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,0,0,p);}else if(command.filter)canvas.drawImageOptions(image,command.args[0],command.args[1],CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,command.args[0],command.args[1],p);}};
      if(command.alpha8){
       // ALPHA_8 is coverage only: Skia tints it with the Paint color, then applies the Paint's alpha/filter/blend to the result.
       const c=(command.paint?.argb??0xff000000)>>>0,filter=CK.ColorFilter.MakeMatrix([0,0,0,0,((c>>>16)&255)/255,0,0,0,0,((c>>>8)&255)/255,0,0,0,0,(c&255)/255,0,0,0,1,0]),mask=new CK.Paint();
@@ -272,12 +299,14 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
  const r0=performance.now();try{replay(state.draws);
   surface.flush();const image=surface.makeImageSnapshot();
   // options.pixels: the canvas as straight (unpremultiplied) sRGB RGBA8 bytes, for Bitmap.getPixel / compress.
-  if(options?.pixels){try{const pixels=image.readPixels(0,0,{width,height,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Unpremul,colorSpace:CK.ColorSpace.SRGB});if(!pixels)fail('Skia pixel read-back failed');return {kind:'pixels',width,height,pixels};}finally{image.delete();}}
+  // options.surfaceType (RGB_565 / RGBA_F16 / RGBA_1010102): the canvas was rasterized on a Skia surface of that color type; options.halfFloats also returns the unpremultiplied RGBA_F16 words (little-endian bytes) for Bitmap.getColor.
+  if(options?.pixels){try{const pixels=image.readPixels(0,0,{width,height,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Unpremul,colorSpace:CK.ColorSpace.SRGB});if(!pixels)fail('Skia pixel read-back failed');let raw=null;if(options.raw){   // the bitmap's memory: a typed surface is directly backed by it, the N32 surface is read as premultiplied RGBA8
+   if(memory)raw=Uint8Array.from(memory.toTypedArray());else{raw=image.readPixels(0,0,{width,height,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Premul,colorSpace:CK.ColorSpace.SRGB});if(!raw)fail('Skia native pixel read-back failed');raw=Uint8Array.from(raw);}}let halfFloats=null;if(options.halfFloats){halfFloats=image.readPixels(0,0,{width,height,colorType:CK.ColorType.RGBA_F16,alphaType:CK.AlphaType.Unpremul,colorSpace:CK.ColorSpace.SRGB});if(!halfFloats)fail('Skia RGBA_F16 read-back failed');halfFloats=Uint8Array.from(halfFloats);}return {kind:'pixels',width,height,pixels:Uint8Array.from(pixels),raw,halfFloats};}finally{image.delete();}}
   const stats=runtime.rasterStats;const e0=performance.now();if(stats)stats.replayMs+=e0-r0;
   // options.transport 'rgba': straight (unpremultiplied) sRGB RGBA8 bytes for the page to put on a canvas (no PNG encode, no base64, no decode); the page keeps a PNG path for every other raster.
   if(options?.transport==='rgba'){try{const pixels=image.readPixels(0,0,{width,height,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Unpremul,colorSpace:CK.ColorSpace.SRGB});if(!pixels)fail('Skia pixel read-back failed');if(stats)stats.encodeMs+=performance.now()-e0;return {kind:'rgba-raster',width,height,pixels,drawCalls:state.draws.length,source:'official-Skia-Wasm/CPU'};}finally{image.delete();}}
  try{const png=image.encodeToBytes(CK.ImageFormat.PNG);if(stats)stats.encodeMs+=performance.now()-e0;if(!png)fail('Skia PNG encoding failed');let binary='';for(let at=0;at<png.length;at+=32768)binary+=String.fromCharCode(...png.subarray(at,at+32768));return {kind:'raster',dataURL:'data:image/png;base64,'+btoa(binary),width,height,drawCalls:state.draws.length,source:'official-Skia-Wasm/CPU',pngBytes:png.length};}finally{image.delete();}
- }finally{surface.dispose();}
+ }finally{surface.dispose();if(memory)CK.Free(memory);}
 }
 export function createSkiaCanvasHost(runtime,backend){
  const matrixHost=createMatrixAllocationHost();
@@ -363,7 +392,7 @@ export function createSkiaCanvasHost(runtime,backend){
  const path=ref=>{const value=paths.get(ref?.ref);if(!value)fail('Path native state is unavailable');return value;};
  const snapshot=ref=>{const p=path(ref).builder.snapshot();try{return {commands:new Float32Array(p.toCmds()),fillType:p.getFillType().value};}finally{p.delete();}};
  const canvasState=ref=>getVectorGraphics(runtime).get(runtime.object(ref).nativeCanvasHandle,'canvas');
- const record=(receiver,command)=>{const state=canvasState(receiver);getVectorGraphics(runtime).reserveDrawStorage((command.commands?.length??0)*4+(command.text?.length??0));if(state.draws.length>=1024)fail('Skia command limit exceeded');let cells=command.commands?.length??command.text?.length??0;for(const object of getVectorGraphics(runtime).handles.values())if(object.kind==='canvas')for(const draw of object.draws){cells+=draw.commands?.length??draw.text?.length??0;if(cells>1000000)fail('Aggregate recorded Skia geometry/text limit exceeded');}state.draws.push({kind:'skia',...command,matrix:state.matrix.slice(),clips:(state.clips??[]).slice()});};
+ const record=(receiver,command)=>{const state=canvasState(receiver);bitmaps.flattenFullCanvas(runtime.object(receiver).nativeCanvasHandle);getVectorGraphics(runtime).reserveDrawStorage((command.commands?.length??0)*4+(command.text?.length??0));if(state.draws.length>=1024)fail('Skia command limit exceeded');let cells=command.commands?.length??command.text?.length??0;for(const object of getVectorGraphics(runtime).handles.values())if(object.kind==='canvas')for(const draw of object.draws){cells+=draw.commands?.length??draw.text?.length??0;if(cells>1000000)fail('Aggregate recorded Skia geometry/text limit exceeded');}state.draws.push({kind:'skia',...command,matrix:state.matrix.slice(),clips:(state.clips??[]).slice()});};
  let host;const bitmaps=createBitmapHost(runtime,{recordNative:(handle,command)=>host.recordNative(handle,command),rectF,matrixValues:getMatrixValues});
  host={
   bitmaps,
@@ -381,7 +410,7 @@ export function createSkiaCanvasHost(runtime,backend){
   /** The commands and fill type of the Path object `ref` (what JNI code sees through Path.mNativePath: src/skia-path-layout.js). */
   pathSnapshot(ref){return snapshot(ref);},
   pathByHandle(handle){const ref=pathHandles.get(handle);if(!ref)fail('Invalid or released VM SkPath token');return snapshot(ref);},
-  recordNative(handle,command){const graphics=getVectorGraphics(runtime),state=graphics.get(handle,'canvas');let rasterBytes=command.raster?.dataURL?.length??0;for(const value of graphics.handles.values())if(value.kind==='canvas')for(const draw of value.draws){rasterBytes+=draw.raster?.dataURL?.length??0;if(rasterBytes>32*1024*1024)fail('Recorded Canvas rasters exceed32MiB');}getVectorGraphics(runtime).reserveDrawStorage((command.commands?.length??0)*4+(command.text?.length??0));if(state.draws.length>=1024)fail('Skia command limit exceeded');state.draws.push({kind:'skia',...command,matrix:state.matrix.slice(),clips:(state.clips??[]).slice()});},
+  recordNative(handle,command){const graphics=getVectorGraphics(runtime),state=graphics.get(handle,'canvas');bitmaps.flattenFullCanvas(handle);let rasterBytes=(command.raster?.dataURL?.length??0)+(command.pixelData?.base64?.length??0);for(const value of graphics.handles.values())if(value.kind==='canvas')for(const draw of value.draws){rasterBytes+=(draw.raster?.dataURL?.length??0)+(draw.pixelData?.base64?.length??0);if(rasterBytes>32*1024*1024)fail('Recorded Canvas rasters exceed32MiB');}getVectorGraphics(runtime).reserveDrawStorage((command.commands?.length??0)*4+(command.text?.length??0));if(state.draws.length>=1024)fail('Skia command limit exceeded');state.draws.push({kind:'skia',...command,matrix:state.matrix.slice(),clips:(state.clips??[]).slice()});},
   textBounds(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaTextBounds(backend,text,{...state,...faceState(face)});},
   measureRun(text,options={},state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaRun(backend,text,{...state,...options,...faceState(face)});},
   /** Paint.hasGlyph: the paint's typeface (else Roboto of its weight/style) has a glyph for every character, the Android fallback chain included. */

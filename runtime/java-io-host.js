@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=2e29585a666b';
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { VirtualFileSystem, normalizePath } from './virtual-fs.js?v=2e29585a666b';
+import { createHostRegistry } from './host-contract.js?v=beba259db142';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { VirtualFileSystem, normalizePath } from './virtual-fs.js?v=beba259db142';
 
 // The app's virtual filesystem owner and the little java.io glue the platform still needs. java.io itself (File, the byte/char streams, FileDescriptor, RandomAccessFile,
 // UnixFileSystem) is the original Android 13 libcore in framework.dex; its syscalls land in src/libcore-io-native.js over the VirtualFileSystem created here.
@@ -28,8 +28,7 @@ export function createJavaIoHost(platform) {
   };
   const makeFile = (runtime, path) => construct(runtime, FILE, [STRING], [path]);
   const byteStream = (runtime, bytes) => {
-    const array = runtime.newArray('[B', bytes.length); runtime.array(array).elements = Array.from(bytes, v => (v << 24) >> 24);
-    return construct(runtime, BAIS, ['[B'], [array]);
+    return construct(runtime, BAIS, ['[B'], [runtime.arrayOf('[B', bytes)]);
   };
 
   // An APK entry as an InputStream. Small entries are a ByteArrayInputStream; a large one (the 23 MB Hermes bundle of a React Native app) is mounted read-only in the virtual file system

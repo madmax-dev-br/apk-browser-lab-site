@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { createHostRegistry } from './host-contract.js?v=2e29585a666b';
-import { CONTENT_DIGEST, TYPE, TYPE_NAMES, digestSteps, merkleSteps, signatureContentDigests } from './apk-checksums.js?v=2e29585a666b';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { createHostRegistry } from './host-contract.js?v=beba259db142';
+import { CONTENT_DIGEST, TYPE, TYPE_NAMES, digestSteps, merkleSteps, signatureContentDigests } from './apk-checksums.js?v=beba259db142';
 
 // PackageManager.requestChecksums (API 31+) with android.content.pm.Checksum / ApkChecksum, as ApplicationPackageManager and PackageManagerService/ApkChecksums (android-13.0.0_r1) answer for an app that
 // was side-loaded (no installer: no installer-provided checksums, so the trusted-installer part is empty):
@@ -44,7 +44,7 @@ export function createApkChecksumsHost(platform) {
   def(APK_CHECKSUM, 'describeContents', '()I', () => 0);
   def(APK_CHECKSUM, 'toString', `()${STRING}`, () => { throw new APKError('ApkChecksum.toString: its text is generated framework code that the lab does not carry; use getSplitName/getType/getValue', { kind: 'apk-checksum-tostring-unsupported' }); });
   const makeApkChecksum = (r, splitName, checksumType, bytes) => {
-    const value = r.newArray('[B', bytes.length); r.array(value).elements = Array.from(bytes, v => (v << 24) >> 24);
+    const value = r.arrayOf('[B', bytes);
     const checksum = construct(r, CHECKSUM, ['I', '[B'], [checksumType, value]), apk = r.allocate(APK_CHECKSUM);
     put(r, apk, APK_CHECKSUM, 'mSplitName', STRING, splitName); put(r, apk, APK_CHECKSUM, 'mChecksum', CHECKSUM, checksum); put(r, apk, APK_CHECKSUM, 'mInstallerPackageName', STRING, null); put(r, apk, APK_CHECKSUM, 'mInstallerCertificate', CERTIFICATE, null);
     return apk;

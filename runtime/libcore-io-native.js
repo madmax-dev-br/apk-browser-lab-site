@@ -1,10 +1,11 @@
-import { APKError } from './apk-error.js?v=2e29585a666b';
-import { throwNew } from './java-throw.js?v=2e29585a666b';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=2e29585a666b';
-import { networkOf, isIpLiteral } from './network-native.js?v=2e29585a666b';
-import { Blocked } from './scheduler.js?v=2e29585a666b';
-import { installUdp } from './udp-native.js?v=2e29585a666b';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=2e29585a666b';
+import { APKError } from './apk-error.js?v=beba259db142';
+import { throwNew } from './java-throw.js?v=beba259db142';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=beba259db142';
+import { networkOf, isIpLiteral } from './network-native.js?v=beba259db142';
+import { Blocked } from './scheduler.js?v=beba259db142';
+import { installUdp } from './udp-native.js?v=beba259db142';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=beba259db142';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=beba259db142';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -108,6 +109,53 @@ const stdLog = (runtime, desc, bytes) => {
   for (const line of parts) runtime.record(`LOG ${desc.name === 'stderr' ? 'W' : 'I'} System.${desc.name === 'stderr' ? 'err' : 'out'}: ${line}`);   // Android's AndroidPrintStream: one log line per newline
 };
 
+const timevalMillis = value => Number(value.sec * 1000n + value.usec / 1000n);
+// ---- stream sockets (virtual HTTP sockets, src/virtual-http-socket.js) ---------------------------------------------------------------------------------------------------
+/** Turns what the virtual socket reports into what the VM throws: a Java exception for network failures, the lab's explicit unsupported error (also logged) for a conversation it cannot serve. */
+function raiseSocketFailure(runtime, desc, failure) {
+  if (failure instanceof SocketFailure) throwNew(runtime, failure.javaType, failure.message);
+  const unserved = failure instanceof NotServed ? failure : failure?.notServed;
+  if (unserved) {
+    const peer = desc.http.peer, message = `Socket to ${peer.host}:${peer.port}: ${unserved.message}. Only HTTP/1.1 requests over java.net.Socket reach the network in the browser (src/virtual-http-socket.js)`;
+    networkOf(runtime).log?.unsupported({ api: 'Socket', kind: 'socket', method: 'CONNECT', url: `tcp://${peer.host.includes(':') ? `[${peer.host}]` : peer.host}:${peer.port}`, host: peer.host, port: peer.port, message });
+    throw new APKError(message, { kind: 'raw-socket-unsupported' });
+  }
+  if (failure?.type) throwNew(runtime, failure.type, failure.message);
+  throw failure;
+}
+/**
+ * read(2) on a connected stream socket: the bytes the app has not read, -1 at the end of the conversation, or a wait for the exchange in flight (SO_RCVTIMEO: `timeoutMs`).
+ * `deliver(bytes)` stores them in the caller's buffer and returns the count.
+ */
+/** The virtual HTTP socket behind a java.net.Socket (through its SocketImpl's FileDescriptor), or null when it is not connected to one. */
+export function httpSocketOf(runtime, socket) {
+  const impl = runtime.object(socket).fields.get('Ljava/net/Socket;->impl:Ljava/net/SocketImpl;'); if (!impl) return null;
+  const fd = runtime.object(impl).fields.get('Ljava/net/SocketImpl;->fd:Ljava/io/FileDescriptor;'); if (!fd) return null;
+  return state(runtime).table.get(runtime.object(fd).fields.get(FD_KEY) | 0)?.desc.http ?? null;
+}
+export function readSocket(runtime, desc, length, timeoutMs, deliver, roots = []) {
+  const http = desc.http; if (!http) { if (desc.pair) return -1; throwNew(runtime, 'Ljava/net/SocketException;', 'Socket is not connected'); }
+  const attempt = () => {
+    http.pump();
+    if (http.closed) throwNew(runtime, 'Ljava/net/SocketException;', 'Socket closed');
+    if (http.available > 0) return deliver(http.take(length));
+    const failure = http.takeError(); if (failure) raiseSocketFailure(runtime, desc, failure);
+    if (http.eof || http.readShut) return -1;
+    return null;
+  };
+  const now = attempt(); if (now !== null) return now;
+  const clock = runtime.platform.clock;
+  return new Blocked({
+    ready: () => http.readable(), deadline: timeoutMs > 0 ? clock.now() + timeoutMs : Infinity, reason: `socket read: ${http.label}`, interruptible: false, roots,
+    finish: timedOut => { const value = attempt(); if (value !== null) return value; if (timedOut) throwNew(runtime, 'Ljava/net/SocketTimeoutException;', 'Read timed out'); throw new APKError('socket read woke without data', { kind: 'network-boundary' }); },
+  });
+}
+export function writeSocket(runtime, desc, bytes) {
+  const http = desc.http; if (!http) { if (desc.pair) throwNew(runtime, 'Ljava/net/SocketException;', 'sendto failed: EPIPE (Broken pipe)'); throwNew(runtime, 'Ljava/net/SocketException;', 'Socket is not connected'); }
+  try { http.write(bytes); } catch (failure) { raiseSocketFailure(runtime, desc, failure); }
+  return bytes.length;
+}
+
 // ---- the syscalls -----------------------------------------------------------------------------------------------------------------------------
 function open(runtime, path, flags, mode) {
   const fs = files(runtime), name = requireString(runtime, path), found = lookup(fs, name), acc = flags & C.O_ACCMODE;
@@ -140,6 +188,7 @@ function readInto(runtime, fn, fdRef, buffer, offset, count, position) {
   if (desc.kind === 'dir') err(runtime, fn, 'EISDIR');
   if (!readable(desc) || (desc.kind === 'std' && desc.name !== 'stdin')) err(runtime, fn, 'EBADF');
   const target = bufferAccess(runtime, buffer, offset, count);
+  if (desc.kind === 'socket') { if (position !== null) err(runtime, fn, 'ESPIPE'); return count === 0 ? 0 : readSocket(runtime, desc, count, desc.options?.get(`${C.SOL_SOCKET}:${C.SO_RCVTIMEO}`) ? timevalMillis(desc.options.get(`${C.SOL_SOCKET}:${C.SO_RCVTIMEO}`)) : 0, bytes => { target.put(bytes); return bytes.length; }, [buffer]); }
   if (desc.kind === 'pipe') {   // a pipe end: data written so far, EOF once every write end is closed, EAGAIN for O_NONBLOCK; a blocking read with nothing to read cannot wait on this scheduler
     if (position !== null) err(runtime, fn, 'ESPIPE');
     const pipe = desc.pipe; if (count === 0) return 0;
@@ -161,6 +210,7 @@ function writeFrom(runtime, fn, fdRef, buffer, offset, count, position) {
   if (desc.kind === 'dir') err(runtime, fn, 'EBADF');
   if (!writable(desc)) err(runtime, fn, 'EBADF');
   const source = bufferAccess(runtime, buffer, offset, count), bytes = source.get();
+  if (desc.kind === 'socket') { if (position !== null) err(runtime, fn, 'ESPIPE'); return writeSocket(runtime, desc, bytes); }
   if (desc.kind === 'pipe') {
     if (position !== null) err(runtime, fn, 'ESPIPE');
     const pipe = desc.pipe; if (pipe.readers === 0) err(runtime, fn, 'EPIPE');
@@ -208,9 +258,9 @@ export function createLibcoreIoNativeBindings() {
     const array = runtime.newArray(`[${FD}`, 2); runtime.array(array).elements = [newFileDescriptor(runtime, readNumber), newFileDescriptor(runtime, writeNumber)]; return array;
   });
   L('open(Ljava/lang/String;II)Ljava/io/FileDescriptor;', (runtime, [, path, flags, mode]) => newFileDescriptor(runtime, open(runtime, path, flags, mode)));
-  // ---- sockets. The browser cannot open raw TCP: a socket descriptor exists (so java.net.Socket behaves up to connect()), connect() obeys the device network policy and
-  // fails with the errno an Android device reports (ENETUNREACH offline or for a host the policy does not allow); a connect the policy would allow stops with an explicit
-  // error because there is no TCP transport to carry it. HTTP(S) goes through dev.apkweb.net.NetBridge instead.
+  // ---- sockets. The browser cannot open raw TCP: a stream socket that connects to a host the device network policy permits becomes a *virtual HTTP socket* (src/virtual-http-socket.js):
+  // the descriptor serves HTTP/1.1 to the app over its byte streams while the real exchanges go through the same path as HttpURLConnection (fetch). A conversation that is not HTTP fails
+  // explicitly at its first bytes. connect() obeys the policy and fails with the errno an Android device reports (ENETUNREACH offline or for a host the policy does not allow).
   const INET = 'Ljava/net/InetAddress;', SOCKADDR = 'Ljava/net/SocketAddress;';
   L('socket(III)Ljava/io/FileDescriptor;', (runtime, [, domain, type, protocol]) => {
     if (!runtime.platform.holdsPermission?.(runtime, 'android.permission.INTERNET')) err(runtime, 'socket', 'EACCES');
@@ -226,7 +276,10 @@ export function createLibcoreIoNativeBindings() {
       if (number < 0) err(runtime, 'socketpair', 'EMFILE'); setFdNumber(runtime, target, number);
     }
   });
-  L('shutdown(Ljava/io/FileDescriptor;I)V', (runtime, [, fdRef]) => { const entry = entryOf(runtime, 'shutdown', fdRef); if (entry.desc.kind !== 'socket') err(runtime, 'shutdown', 'ENOTSOCK'); if (!entry.desc.connected) err(runtime, 'shutdown', 'ENOTCONN'); });
+  L('shutdown(Ljava/io/FileDescriptor;I)V', (runtime, [, fdRef, how]) => {
+    const entry = entryOf(runtime, 'shutdown', fdRef); if (entry.desc.kind !== 'socket') err(runtime, 'shutdown', 'ENOTSOCK'); if (!entry.desc.connected) err(runtime, 'shutdown', 'ENOTCONN');
+    entry.desc.http?.shutdown(how, C.SHUT_RD, C.SHUT_WR);
+  });
   const udp = installUdp({ L, C, err, entryOf, state, construct, byteArray: (runtime, bytes) => byteArray(runtime, bytes), interfaces: runtime => interfaces(runtime), INET, SOCKADDR });
   L(`getsockname(Ljava/io/FileDescriptor;)${SOCKADDR}`, (runtime, [, fdRef]) => {   // bound sockets answer their address and port; one that never bound or connected is on the wildcard address, port 0
     const desc = entryOf(runtime, 'getsockname', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'getsockname', 'ENOTSOCK');
@@ -275,15 +328,36 @@ export function createLibcoreIoNativeBindings() {
   const connectSocket = (runtime, fdRef, host, port, address = null) => {
     const entry = entryOf(runtime, 'connect', fdRef); if (entry.desc.kind !== 'socket') err(runtime, 'connect', 'ENOTSOCK');
     if (udp.isDatagram(entry.desc)) return udp.connectDatagram(runtime, fdRef, udp.bytesOf(runtime, address), port);
+    const desc = entry.desc; if (desc.connected) err(runtime, 'connect', 'EISCONN');
     host ??= hostOf(runtime, address);
-    const net = networkOf(runtime); net.noteHost(host);
-    const target = { api: 'Socket', kind: 'socket', method: 'CONNECT', url: `tcp://${host.includes(':') ? `[${host}]` : host}:${port}`, host, port };
-    if (!net.online || !net.allowed(host, port)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal(target); err(runtime, 'connect', 'ENETUNREACH'); }
-    const message = `Raw TCP connect to ${host}:${port} is not available in the browser; only HTTP(S) through java.net.HttpURLConnection reaches the network (src/network-native.js)`;
-    net.log?.unsupported({ ...target, message });
-    throw new APKError(message, { kind: 'raw-socket-unsupported' });
+    const net = networkOf(runtime), name = net.resolvedName(host) ?? host;   // a connect by the address a lookup returned is a connect to the name that was looked up
+    net.noteHost(name);
+    const target = { api: 'Socket', kind: 'socket', method: 'CONNECT', url: `tcp://${name.includes(':') ? `[${name}]` : name}:${port}`, host: name, port };
+    if (!net.online || !net.allowed(name, port)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal(target); err(runtime, 'connect', 'ENETUNREACH'); }
+    const loopback = /^127\./.test(host) || host === '::1' || host === 'localhost';
+    if (!desc.bound) udp.bindEphemeral(runtime, 'connect', desc, loopback ? [127, 0, 0, 1] : [10, 0, 2, 15]);   // the source address a connected socket reports: the Wi-Fi address (loopback for a loopback peer)
+    desc.http = new VirtualHttpSocket({ net, peer: { host: name, literal: host, port } }); desc.connected = true;
+    desc.onLastClose = () => desc.http.dispose();
   };
   const hostOf = (runtime, address) => runtime.stringCharacters(runtime.dispatch({ owner: INET, name: 'getHostAddress', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [address], 'virtual'));
+  // java.net.SocketInputStream.socketRead0 / SocketOutputStream.socketWrite0 (libcore's OpenJdk natives): the streams of Socket.getInputStream/getOutputStream; `timeout` is SO_TIMEOUT in ms (0 = none)
+  const SIS = 'Ljava/net/SocketInputStream;', SOS = 'Ljava/net/SocketOutputStream;';
+  add(SIS, 'socketRead0(Ljava/io/FileDescriptor;[BIII)I', (runtime, [, fdRef, buffer, offset, length, timeout]) => {
+    const desc = entryOf(runtime, 'read', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'read', 'ENOTSOCK');
+    const cells = runtime.object(buffer).elements;
+    if (offset < 0 || length < 0 || offset > cells.length - length) runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `length=${cells.length}; regionStart=${offset}; regionLength=${length}`);
+    return readSocket(runtime, desc, length, timeout, bytes => { for (let i = 0; i < bytes.length; i++) cells[offset + i] = (bytes[i] << 24) >> 24; return bytes.length; }, [buffer]);
+  });
+  add(SOS, 'socketWrite0(Ljava/io/FileDescriptor;[BII)V', (runtime, [, fdRef, buffer, offset, length]) => {
+    const desc = entryOf(runtime, 'write', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'write', 'ENOTSOCK');
+    const cells = runtime.object(buffer).elements;
+    if (offset < 0 || length < 0 || offset > cells.length - length) runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `length=${cells.length}; regionStart=${offset}; regionLength=${length}`);
+    writeSocket(runtime, desc, Uint8Array.from(cells.slice(offset, offset + length), v => v & 255));
+  });
+  // A browser has no inbound TCP: listening for connections is not available (explicitly, never a socket that never accepts).
+  const noServer = fn => runtime => { throw new APKError(`${fn}: ServerSocket is not available in the browser; the lab has no inbound TCP (only HTTP/1.1 requests over a connected java.net.Socket reach the network)`, { kind: 'raw-socket-unsupported' }); };
+  L('listen(Ljava/io/FileDescriptor;I)V', noServer('listen'));
+  L(`accept(Ljava/io/FileDescriptor;${SOCKADDR})Ljava/io/FileDescriptor;`, noServer('accept'));
   L(`connect(Ljava/io/FileDescriptor;${INET}I)V`, (runtime, [, fdRef, address, port]) => connectSocket(runtime, fdRef, null, port, address));
   L(`connect(Ljava/io/FileDescriptor;${SOCKADDR})V`, (runtime, [, fdRef, socketAddress]) => {
     const address = runtime.dispatch({ owner: 'Ljava/net/InetSocketAddress;', name: 'getAddress', parameters: [], result: INET, signature: `()${INET}` }, [socketAddress], 'virtual');
@@ -404,7 +478,7 @@ export function createLibcoreIoNativeBindings() {
     const entry = state(runtime).table.get(runtime.object(self).fields.get(FD_KEY) | 0);
     if (!entry || (entry.desc.kind !== 'file' && entry.desc.kind !== 'dir')) throwNew(runtime, 'Ljava/io/SyncFailedException;', 'sync failed');
   });
-  add(FD, 'isSocket(I)Z', () => 0);                                                              // no socket descriptor can exist: the VM has no network stack
+  add(FD, 'isSocket(I)Z', (runtime, [number]) => state(runtime).table.get(number)?.desc.kind === 'socket' ? 1 : 0);
   add(CLOSE_MONITOR, 'signalBlockedThreads(Ljava/io/FileDescriptor;)V', () => undefined);       // file reads and writes complete synchronously, so no thread is ever blocked in a descriptor operation
 
   // ---- java.io.FileInputStream (the descriptor-based natives Android keeps)
