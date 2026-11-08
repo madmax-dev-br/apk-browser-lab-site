@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=d330fc66b304';
+import { createHostRegistry } from './host-contract.js?v=5568051d2763';
 
 // The platform side of android.os.Parcel (original Parcel.java in framework.dex, natives in parcel-native.js): hidden framework hooks Parcel calls around transactions, and the
 // Parcel serialisation of the VM's Bundle/PersistableBundle (BaseBundle.writeToParcelInner / readFromParcelInner wire format: length, BUNDLE_MAGIC, count, then key + typed value

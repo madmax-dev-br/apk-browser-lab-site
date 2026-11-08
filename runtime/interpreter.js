@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=d330fc66b304';
-import { BUCKET } from './time-breakdown.js?v=d330fc66b304';
-import { Blocked, QUANTUM } from './scheduler.js?v=d330fc66b304';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=d330fc66b304';
+import { APKError } from './apk-error.js?v=5568051d2763';
+import { BUCKET } from './time-breakdown.js?v=5568051d2763';
+import { Blocked, QUANTUM } from './scheduler.js?v=5568051d2763';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=5568051d2763';
 
 // Frame-based DEX interpreter.
 //
@@ -427,11 +427,21 @@ export function runNested(rt, method, code, args) {
   if (rt.nestedRuns === 1) rt.scheduler.beginEvent(rt);
   thread.frames.push(makeFrame(rt, method, code, args));
   thread.nestedDepth++;
+  // The thread may be parked (a Java wait below on its stack, served by this run: the scheduler runs due main-Looper messages on the main thread while it waits -- serviceEvents, idle).
+  // The run has its own blocking inside (a message that sleeps or waits parks and resumes the thread through `blocked`); the outer wait's bookkeeping is kept aside and put back when the
+  // run ends, or the outer wait was lost: the thread went on after its wait() as if it had returned, without reacquiring the monitor, and its synchronized handler looped on
+  // IllegalMonitorStateException (a real app at HandlerThread.getLooper, 500 k exceptions). The outer wait's condition is re-checked by the scheduler's wake() once it is back.
+  const parked = thread.blocked !== null ? { blocked: thread.blocked, kind: thread.blockKind, state: thread.state, timedOut: thread.timedOut } : null;
+  if (parked !== null) { thread.blocked = null; thread.state = 'runnable'; }
   // A non-Java failure that escapes the outermost run leaves monitors in an undefined state; reset them to what they were when the event began.
   const checkpoint = rt.nestedRuns === 1 ? (rt.monitors?.size ? new Map(rt.monitors) : EMPTY_MONITORS) : null;
   try { return runLoop(rt, thread, base); }
   catch (error) { if (checkpoint && !(error instanceof JavaException)) rt.monitors = checkpoint === EMPTY_MONITORS ? new Map() : checkpoint; throw error; }
-  finally { thread.frames.length = base; thread.nestedDepth--; rt.nestedRuns--; rt.thread = thread; if (rt.nestedRuns === 0 && thread === rt.scheduler.main) rt.platform?.looperHost?.hostEventRan(rt); }   // the host event is over: its Looper goes back to MessageQueue.next() (IdleHandlers run once)
+  finally {
+    thread.frames.length = base; thread.nestedDepth--; rt.nestedRuns--; rt.thread = thread;
+    if (parked !== null) { thread.blocked = parked.blocked; thread.blockKind = parked.kind; thread.state = parked.state; thread.timedOut = parked.timedOut; }
+    if (rt.nestedRuns === 0 && thread === rt.scheduler.main) rt.platform?.looperHost?.hostEventRan(rt);   // the host event is over: its Looper goes back to MessageQueue.next() (IdleHandlers run once)
+  }
 }
 
 /** One scheduling slice with no owner: runs whichever thread the scheduler picks until it blocks, ends or uses its quantum (used by drainEvents and nested waits). */

@@ -1,5 +1,5 @@
-import { isMemoryStep } from './memory-budget.js?v=d330fc66b304';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=d330fc66b304';
+import { isMemoryStep } from './memory-budget.js?v=5568051d2763';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=5568051d2763';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: SCREEN_PRESETS.map(p => p.id), orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -34,6 +34,17 @@ export function sanitizeSettings(input = {}) {
 }
 /** A new user's device reaches every host (allowedHosts = ['*']); sanitizeSettings({}) alone stays the closed policy so embedders that pass no network config keep it. */
 export function defaultDeviceSettings() { return sanitizeSettings({ network: { allowedHosts: ['*'] } }); }
-export function loadDeviceSettings() { try { const text = globalThis.localStorage?.getItem(KEY); return text ? sanitizeSettings(JSON.parse(text)) : defaultDeviceSettings(); } catch { return defaultDeviceSettings(); } }
-export function saveDeviceSettings(settings) { try { globalThis.localStorage?.setItem(KEY, JSON.stringify(settings)); return true; } catch { return false; } }
+/** Stored-settings format: 2 since the "allow every host" option became the default; a record without the marker was saved by a page that only knew the closed allow list. */
+export const SETTINGS_VERSION = 2;
+export function loadDeviceSettings() {
+  try {
+    const text = globalThis.localStorage?.getItem(KEY); if (!text) return defaultDeviceSettings();
+    const stored = JSON.parse(text);
+    // A record saved before the allow-every-host default (no version marker) with no host of its own keeps that user on the closed policy for good ("16 requests, 16 refused" with the
+    // option shown as the default): it takes the default, like a new user; a list the user typed is kept.
+    if (stored && typeof stored === 'object' && !(stored.version >= SETTINGS_VERSION) && !sanitizeHosts(stored.network?.allowedHosts).length) stored.network = { ...(stored.network ?? {}), allowedHosts: ['*'] };
+    return sanitizeSettings(stored);
+  } catch { return defaultDeviceSettings(); }
+}
+export function saveDeviceSettings(settings) { try { globalThis.localStorage?.setItem(KEY, JSON.stringify({ ...settings, version: SETTINGS_VERSION })); return true; } catch { return false; } }
 export { resolveDevice };
