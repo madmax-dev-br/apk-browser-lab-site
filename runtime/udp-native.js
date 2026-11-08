@@ -2,11 +2,11 @@
 // original java.net.DatagramSocket / MulticastSocket / PlainDatagramSocketImpl. Datagrams are delivered between sockets inside the VM: loopback, the Wi-Fi address while the panel is online,
 // broadcast and multicast groups joined by sockets of this process. There is no route out of the browser, so a datagram for any other address fails like on a device that has no route to it
 // (ENETUNREACH), and a connected socket whose loopback peer is not there gets ECONNREFUSED (the ICMP port unreachable the kernel reports) on its next send or receive.
-import { Blocked } from './scheduler.js?v=beba259db142';
+import { Blocked } from './scheduler.js?v=125d28c243f8';
 
 const MAX_DATAGRAM = 65507, RECEIVE_QUEUE_BYTES = 212992, EPHEMERAL_FIRST = 32768, EPHEMERAL_LAST = 60999, OWN_V4 = [10, 0, 2, 15], BROADCAST_V4 = [10, 0, 2, 255];
 
-export function installUdp({ L, C, err, entryOf, state, construct, byteArray, interfaces, INET, SOCKADDR }) {
+export function installUdp({ loopback, L, C, err, entryOf, state, construct, byteArray, interfaces, INET, SOCKADDR }) {
   const key = bytes => bytes.join('.');
   const bytesOf = (runtime, address) => {   // InetAddress -> normalized bytes (an IPv4-mapped IPv6 address is the IPv4 address)
     const raw = runtime.dispatch({ owner: INET, name: 'getAddress', parameters: [], result: '[B', signature: '()[B' }, [address], 'virtual');
@@ -48,6 +48,7 @@ export function installUdp({ L, C, err, entryOf, state, construct, byteArray, in
       if (other === desc || !other.bound || other.type !== desc.type || other.bound.port !== port) continue;
       const overlap = isAny(other.bound.bytes) || isAny(bytes) || key(other.bound.bytes) === key(bytes);
       const reuse = opt(desc, C.SOL_SOCKET, C.SO_REUSEADDR) && opt(other, C.SOL_SOCKET, C.SO_REUSEADDR);
+      if (other.accepted && opt(desc, C.SOL_SOCKET, C.SO_REUSEADDR)) continue;   // an established connection of a listener does not keep the port from a SO_REUSEADDR bind
       if (overlap && !(reuse && desc.type === C.SOCK_DGRAM)) err(runtime, fn, 'EADDRINUSE');
     }
     desc.bound = { bytes, port };
@@ -141,7 +142,9 @@ export function installUdp({ L, C, err, entryOf, state, construct, byteArray, in
       let ready = 0;
       for (const row of rows) {
         let revents = 0;
-        if (row.desc?.kind === 'socket') {
+        const loopEvents = row.desc?.kind === 'socket' ? loopback.revents(row.desc, row.events) : null;
+        if (loopEvents !== null) revents |= loopEvents;
+        else if (row.desc?.kind === 'socket') {
           if (row.events & C.POLLIN && ((row.desc.queue?.length ?? 0) > 0 || row.desc.http?.readable())) revents |= C.POLLIN;
           if (row.desc.pendingError) revents |= C.POLLERR;
           if (row.events & C.POLLOUT) revents |= C.POLLOUT;
@@ -153,14 +156,14 @@ export function installUdp({ L, C, err, entryOf, state, construct, byteArray, in
     };
     const now = evaluate();
     if (now > 0 || timeout === 0) return now;
-    return new Blocked({ ready: () => evaluate() > 0, deadline: timeout < 0 ? Infinity : runtime.platform.clock.now() + timeout, interruptible: true, reason: 'poll(udp)', finish: () => evaluate() });
+    return new Blocked({ ready: () => evaluate() > 0, deadline: timeout < 0 ? Infinity : runtime.platform.clock.now() + timeout, interruptible: !rows.some(row => row.desc?.kind === 'socket' && row.desc.type === C.SOCK_STREAM), reason: 'poll(udp)', finish: () => evaluate() });
   });
 
   // ioctl(FIONREAD): the size of the datagram that recvfrom would return next (DatagramSocket.connect drains what a former peer left in the queue with it)
   const FIONREAD = 0x541b;
   L('ioctlInt(Ljava/io/FileDescriptor;I)I', (runtime, [, fdRef, command]) => {
     const desc = entryOf(runtime, 'ioctl', fdRef).desc;
-    if (desc.kind === 'socket' && command === FIONREAD) return desc.http ? (desc.http.pump(), Math.min(desc.http.available, 0x7fffffff)) : desc.queue?.[0]?.data.length ?? 0;
+    if (desc.kind === 'socket' && command === FIONREAD) return desc.loop ? loopback.available(desc) : desc.http ? (desc.http.pump(), Math.min(desc.http.available, 0x7fffffff)) : desc.queue?.[0]?.data.length ?? 0;
     return err(runtime, 'ioctl', 'ENOTTY');
   });
 

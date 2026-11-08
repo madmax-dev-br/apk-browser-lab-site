@@ -1,11 +1,11 @@
-import { APKError } from './apk-error.js?v=beba259db142';
-import { throwNew } from './java-throw.js?v=beba259db142';
-import { Blocked } from './scheduler.js?v=beba259db142';
-import { OS_CONSTANTS } from './os-constants-data.js?v=beba259db142';
-import { openExchange, describeFailure } from './network-transport.js?v=beba259db142';
-import { WorkerExecutor } from './network-worker-executor.js?v=beba259db142';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=beba259db142';
-import { TransportAuthority } from './transport-ca.js?v=beba259db142';
+import { APKError } from './apk-error.js?v=125d28c243f8';
+import { throwNew } from './java-throw.js?v=125d28c243f8';
+import { Blocked } from './scheduler.js?v=125d28c243f8';
+import { OS_CONSTANTS } from './os-constants-data.js?v=125d28c243f8';
+import { openExchange, describeFailure } from './network-transport.js?v=125d28c243f8';
+import { WorkerExecutor } from './network-worker-executor.js?v=125d28c243f8';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=125d28c243f8';
+import { TransportAuthority } from './transport-ca.js?v=125d28c243f8';
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
 //
@@ -36,7 +36,7 @@ class Operation {
 export class NetworkBridge {
   constructor(runtime) {
     this.runtime = runtime; this.ops = new Map(); this.nextHandle = 1; this.activity = false; this.waiters = new Set();
-    this.stats = { requests: 0, denied: 0, offlineRejections: 0, bytesIn: 0, bytesOut: 0, failures: 0, hosts: new Set(), redirectsObserved: 0 };
+    this.stats = { requests: 0, denied: 0, offlineRejections: 0, bytesIn: 0, bytesOut: 0, failures: 0, hosts: new Set(), redirectsObserved: 0, loopbackConnects: 0, loopbackRefused: 0 };
     this.droppedRequestHeaders = new Set();
     runtime.platform.addExternalSource?.({ delay: () => this.delay(), drained: () => this.drained(), pending: () => this.pending });
   }
@@ -257,7 +257,7 @@ export function createNetworkNativeBindings() {
       if (!bytes) gai('android_getaddrinfo', C.EAI_NONAME);
       return refArray(runtime, '[' + INET, [inetAddress(runtime, null, bytes)]);   // libcore leaves the host name unset here; Inet6AddressImpl names the results of a name lookup itself
     }
-    if (!net.allowed(host)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal({ api: 'DNS', kind: 'dns', method: 'LOOKUP', url: `dns://${host}`, host }); gai('android_getaddrinfo', C.EAI_NODATA); }
+    if (!loopbackHost(host) && !net.allowed(host)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal({ api: 'DNS', kind: 'dns', method: 'LOOKUP', url: `dns://${host}`, host }); gai('android_getaddrinfo', C.EAI_NODATA); }
     const bytes = loopbackHost(host) ? [127, 0, 0, 1] : syntheticAddress(host); net.rememberResolved(bytes.join('.'), host);
     const addresses = [inetAddress(runtime, null, bytes)];
     return refArray(runtime, '[' + INET, addresses);
@@ -269,7 +269,7 @@ export function createNetworkNativeBindings() {
     const namedHeaders = () => { const list = runtime.object(headerArray).elements, out = []; for (let i = 0; i + 1 < list.length; i += 2) out.push([text(runtime, list[i]), text(runtime, list[i + 1])]); return out; };
     const net = networkOf(runtime), url = text(runtime, urlText), parsed = new URL(url), port = Number(parsed.port || (parsed.protocol === 'https:' ? 443 : 80));
     net.noteHost(parsed.hostname);
-    const shown = isIpLiteral(parsed.hostname) ? `/${parsed.hostname.replace(/^\[|\]$/g, '')}` : `${parsed.hostname}/${syntheticAddress(parsed.hostname).join('.')}`;
+    const shown = isIpLiteral(parsed.hostname) ? `/${parsed.hostname.replace(/^\[|\]$/g, '')}` : `${parsed.hostname}/${(loopbackHost(parsed.hostname) ? [127, 0, 0, 1] : syntheticAddress(parsed.hostname)).join('.')}`;
     const refuse = () => { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal({ method: text(runtime, method), url, host: parsed.hostname, port, headers: namedHeaders(), bytes: bodyArray ? runtime.object(bodyArray).elements.length : 0 }); throwNew(runtime, 'Ljava/net/ConnectException;', `failed to connect to ${shown} (port ${port}) from /:: (port 0)${connectTimeout > 0 ? ` after ${connectTimeout}ms` : ''}: connect failed: ENETUNREACH (Network is unreachable)`); };
     if (!net.online || !(net.allowed(parsed.hostname, port))) refuse();
     const names = runtime.object(headerArray).elements, headers = [];

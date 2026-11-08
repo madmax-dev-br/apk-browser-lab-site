@@ -9,12 +9,13 @@
 //     status (null until a response head), reason, responseHeaders [[name, value]], contentType, responseBytes, finalUrl (a redirect the transport followed) or null, redirects (followed by the transport),
 //     closedEarly (the app closed the response before reading all of it), durationMs (null until it ends), failure { type, message } or null, refusedHost (host the allowlist refused) or null }
 //   outcome: 'pending' (no head yet) | 'response' (a status arrived) | 'refused-by-allowlist' | 'offline' | 'unknown-host' | 'timeout' | 'aborted' | 'error' | 'unsupported'
+//            | 'connected' (a loopback connection; kind 'loopback': the device's own interface, never refused by policy; a loopback connect nobody listens for ends 'error' with ECONNREFUSED)
 // Wire format (Worker -> page):  { type: 'netlog', reset?: true, rows: [entry, ...] (new and changed entries, by seq), dropped, total }
 //   dropped = entries the Worker has discarded because its buffer was full; total = entries created since the reset.
 
 export const MAX_ENTRIES = 5000;
 export const FLUSH_MS = 100;
-export const OUTCOMES = ['pending', 'response', 'refused-by-allowlist', 'offline', 'unknown-host', 'timeout', 'aborted', 'error', 'unsupported'];
+export const OUTCOMES = ['pending', 'response', 'refused-by-allowlist', 'offline', 'unknown-host', 'timeout', 'aborted', 'error', 'unsupported', 'connected'];
 
 const DEFAULT_PORTS = { 'http:': 80, 'https:': 443 };
 /** URL text -> { scheme, host, port, path } (path keeps the query); text that is not an absolute URL leaves the parts empty. */
@@ -80,6 +81,11 @@ export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: ()
     /** A request that cannot be carried out here (a socket conversation that is not HTTP/1.1): the failure is explicit, never a faked success. */
     unsupported({ api: via = 'Socket', kind = 'socket', method = 'CONNECT', url, host, port = null, message }) {
       return end(create({ api: via, kind, method, url, host, port }), 'unsupported', { type: 'unsupported', message: String(message) });
+    },
+    /** A TCP connect to the device's own loopback interface (127.0.0.0/8, ::1): kind 'loopback', outcome 'connected', or 'error' (ECONNREFUSED) when no socket of the app listens. Policy never applies. */
+    loopback({ api: via = 'Socket', method = 'CONNECT', url, host, port = null, refused = false }) {
+      const entry = create({ api: via, kind: 'loopback', method, url, host, port });
+      return refused ? end(entry, 'error', { type: 'errno', message: 'ECONNREFUSED (Connection refused)' }) : end(entry, 'connected');
     },
     /** Syncs an entry with the state of the network layer's operation: { head, ended, error, closed, received, request: { timedOut } }. Idempotent; call it whenever the operation moves. */
     observe(entry, op) {

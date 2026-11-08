@@ -1,11 +1,12 @@
-import { APKError } from './apk-error.js?v=beba259db142';
-import { throwNew } from './java-throw.js?v=beba259db142';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=beba259db142';
-import { networkOf, isIpLiteral } from './network-native.js?v=beba259db142';
-import { Blocked } from './scheduler.js?v=beba259db142';
-import { installUdp } from './udp-native.js?v=beba259db142';
-import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=beba259db142';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=beba259db142';
+import { APKError } from './apk-error.js?v=125d28c243f8';
+import { throwNew } from './java-throw.js?v=125d28c243f8';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=125d28c243f8';
+import { networkOf, isIpLiteral } from './network-native.js?v=125d28c243f8';
+import { Blocked } from './scheduler.js?v=125d28c243f8';
+import { installUdp } from './udp-native.js?v=125d28c243f8';
+import { createLoopback } from './loopback-socket.js?v=125d28c243f8';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=125d28c243f8';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=125d28c243f8';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -44,6 +45,7 @@ function throwErrno(runtime, functionName, errno) {
 }
 const err = (runtime, functionName, name) => throwErrno(runtime, functionName, ERRNO_BY_NAME(name));
 const text = (runtime, value) => runtime.stringCharacters(value);
+const loopback = createLoopback({ C, err }), loopbackOf = () => loopback;   // the device's loopback TCP (src/loopback-socket.js); its listeners live per runtime
 const requireString = (runtime, value) => { if (value === null) runtime.throwJava('Ljava/lang/NullPointerException;', null); return text(runtime, value); };
 
 // ---- path / node helpers ----------------------------------------------------------------------------------------------------------------------
@@ -133,7 +135,8 @@ export function httpSocketOf(runtime, socket) {
   const fd = runtime.object(impl).fields.get('Ljava/net/SocketImpl;->fd:Ljava/io/FileDescriptor;'); if (!fd) return null;
   return state(runtime).table.get(runtime.object(fd).fields.get(FD_KEY) | 0)?.desc.http ?? null;
 }
-export function readSocket(runtime, desc, length, timeoutMs, deliver, roots = []) {
+export function readSocket(runtime, desc, length, timeoutMs, deliver, roots = [], posix = false) {
+  if (desc.loop) return loopbackOf(runtime).read(runtime, desc, length, timeoutMs, deliver, roots, posix);
   const http = desc.http; if (!http) { if (desc.pair) return -1; throwNew(runtime, 'Ljava/net/SocketException;', 'Socket is not connected'); }
   const attempt = () => {
     http.pump();
@@ -150,7 +153,8 @@ export function readSocket(runtime, desc, length, timeoutMs, deliver, roots = []
     finish: timedOut => { const value = attempt(); if (value !== null) return value; if (timedOut) throwNew(runtime, 'Ljava/net/SocketTimeoutException;', 'Read timed out'); throw new APKError('socket read woke without data', { kind: 'network-boundary' }); },
   });
 }
-export function writeSocket(runtime, desc, bytes) {
+export function writeSocket(runtime, desc, bytes, options = {}) {
+  if (desc.loop) return loopbackOf(runtime).write(runtime, desc, bytes, options);
   const http = desc.http; if (!http) { if (desc.pair) throwNew(runtime, 'Ljava/net/SocketException;', 'sendto failed: EPIPE (Broken pipe)'); throwNew(runtime, 'Ljava/net/SocketException;', 'Socket is not connected'); }
   try { http.write(bytes); } catch (failure) { raiseSocketFailure(runtime, desc, failure); }
   return bytes.length;
@@ -188,7 +192,7 @@ function readInto(runtime, fn, fdRef, buffer, offset, count, position) {
   if (desc.kind === 'dir') err(runtime, fn, 'EISDIR');
   if (!readable(desc) || (desc.kind === 'std' && desc.name !== 'stdin')) err(runtime, fn, 'EBADF');
   const target = bufferAccess(runtime, buffer, offset, count);
-  if (desc.kind === 'socket') { if (position !== null) err(runtime, fn, 'ESPIPE'); return count === 0 ? 0 : readSocket(runtime, desc, count, desc.options?.get(`${C.SOL_SOCKET}:${C.SO_RCVTIMEO}`) ? timevalMillis(desc.options.get(`${C.SOL_SOCKET}:${C.SO_RCVTIMEO}`)) : 0, bytes => { target.put(bytes); return bytes.length; }, [buffer]); }
+  if (desc.kind === 'socket') { if (position !== null) err(runtime, fn, 'ESPIPE'); return count === 0 ? 0 : readSocket(runtime, desc, count, desc.options?.get(`${C.SOL_SOCKET}:${C.SO_RCVTIMEO}`) ? timevalMillis(desc.options.get(`${C.SOL_SOCKET}:${C.SO_RCVTIMEO}`)) : 0, bytes => { target.put(bytes); return bytes.length; }, [buffer], true); }
   if (desc.kind === 'pipe') {   // a pipe end: data written so far, EOF once every write end is closed, EAGAIN for O_NONBLOCK; a blocking read with nothing to read cannot wait on this scheduler
     if (position !== null) err(runtime, fn, 'ESPIPE');
     const pipe = desc.pipe; if (count === 0) return 0;
@@ -210,7 +214,7 @@ function writeFrom(runtime, fn, fdRef, buffer, offset, count, position) {
   if (desc.kind === 'dir') err(runtime, fn, 'EBADF');
   if (!writable(desc)) err(runtime, fn, 'EBADF');
   const source = bufferAccess(runtime, buffer, offset, count), bytes = source.get();
-  if (desc.kind === 'socket') { if (position !== null) err(runtime, fn, 'ESPIPE'); return writeSocket(runtime, desc, bytes); }
+  if (desc.kind === 'socket') { if (position !== null) err(runtime, fn, 'ESPIPE'); return writeSocket(runtime, desc, bytes, { posix: true }); }
   if (desc.kind === 'pipe') {
     if (position !== null) err(runtime, fn, 'ESPIPE');
     const pipe = desc.pipe; if (pipe.readers === 0) err(runtime, fn, 'EPIPE');
@@ -278,9 +282,9 @@ export function createLibcoreIoNativeBindings() {
   });
   L('shutdown(Ljava/io/FileDescriptor;I)V', (runtime, [, fdRef, how]) => {
     const entry = entryOf(runtime, 'shutdown', fdRef); if (entry.desc.kind !== 'socket') err(runtime, 'shutdown', 'ENOTSOCK'); if (!entry.desc.connected) err(runtime, 'shutdown', 'ENOTCONN');
-    entry.desc.http?.shutdown(how, C.SHUT_RD, C.SHUT_WR);
+    entry.desc.http?.shutdown(how, C.SHUT_RD, C.SHUT_WR); loopback.shutdown(runtime, entry.desc, how);
   });
-  const udp = installUdp({ L, C, err, entryOf, state, construct, byteArray: (runtime, bytes) => byteArray(runtime, bytes), interfaces: runtime => interfaces(runtime), INET, SOCKADDR });
+  const udp = installUdp({ loopback, L, C, err, entryOf, state, construct, byteArray: (runtime, bytes) => byteArray(runtime, bytes), interfaces: runtime => interfaces(runtime), INET, SOCKADDR });
   L(`getsockname(Ljava/io/FileDescriptor;)${SOCKADDR}`, (runtime, [, fdRef]) => {   // bound sockets answer their address and port; one that never bound or connected is on the wildcard address, port 0
     const desc = entryOf(runtime, 'getsockname', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'getsockname', 'ENOTSOCK');
     return udp.boundAddress(runtime, desc);
@@ -325,17 +329,32 @@ export function createLibcoreIoNativeBindings() {
     const left = groups.slice(0, bestStart).map(g => g.toString(16)).join(':'), right = groups.slice(bestStart + bestLength).map(g => g.toString(16)).join(':');
     return `${left}::${right}`;
   });
+  const connectLoopback = (runtime, desc, bytes, port) => {
+    const net = networkOf(runtime), shown = bytes.length === 4 ? bytes.join('.') : '::1', url = `tcp://${shown}:${port}`;
+    try { loopback.connect(runtime, desc, bytes, port, target => udp.bindEphemeral(runtime, 'connect', desc, target)); }
+    catch (failure) {
+      if (failure?.name === 'JavaException') { const code = (runtime.object(failure.value).fields.get('Landroid/system/ErrnoException;->errno:I')) ?? 0; if (code === C.ECONNREFUSED) net.stats.loopbackRefused++; net.log?.loopback({ url, host: shown, port, refused: code === C.ECONNREFUSED }); }
+      throw failure;
+    }
+    net.stats.loopbackConnects++; net.log?.loopback({ url, host: shown, port });
+  };
   const connectSocket = (runtime, fdRef, host, port, address = null) => {
     const entry = entryOf(runtime, 'connect', fdRef); if (entry.desc.kind !== 'socket') err(runtime, 'connect', 'ENOTSOCK');
     if (udp.isDatagram(entry.desc)) return udp.connectDatagram(runtime, fdRef, udp.bytesOf(runtime, address), port);
-    const desc = entry.desc; if (desc.connected) err(runtime, 'connect', 'EISCONN');
+    const desc = entry.desc; if (desc.connected) err(runtime, 'connect', 'EISCONN'); if (desc.listener) err(runtime, 'connect', 'EISCONN');
     host ??= hostOf(runtime, address);
+    const peerBytes = address === null ? null : udp.bytesOf(runtime, address);
     const net = networkOf(runtime), name = net.resolvedName(host) ?? host;   // a connect by the address a lookup returned is a connect to the name that was looked up
+    // Loopback (127.0.0.0/8, ::1, the any-address) is the device's own interface: a socket of this process listening there is connected at once, offline or not, whatever the allow-list says,
+    // and never through a virtual HTTP socket. With nothing listening the connect is refused (ECONNREFUSED) -- unless the user listed that loopback host in the allow-list on purpose, which
+    // designates a server on the machine that runs the browser and keeps the virtual HTTP socket path below.
+    if (peerBytes && loopback.isLoopback(peerBytes) && (loopback.listening(runtime, peerBytes, port) || !(net.online && net.allowed(name, port)))) return connectLoopback(runtime, desc, peerBytes, port);
     net.noteHost(name);
     const target = { api: 'Socket', kind: 'socket', method: 'CONNECT', url: `tcp://${name.includes(':') ? `[${name}]` : name}:${port}`, host: name, port };
     if (!net.online || !net.allowed(name, port)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal(target); err(runtime, 'connect', 'ENETUNREACH'); }
-    const loopback = /^127\./.test(host) || host === '::1' || host === 'localhost';
-    if (!desc.bound) udp.bindEphemeral(runtime, 'connect', desc, loopback ? [127, 0, 0, 1] : [10, 0, 2, 15]);   // the source address a connected socket reports: the Wi-Fi address (loopback for a loopback peer)
+    const isLoopbackName = /^127\./.test(host) || host === '::1' || host === 'localhost';
+    if (!desc.bound) udp.bindEphemeral(runtime, 'connect', desc, isLoopbackName ? [127, 0, 0, 1] : [10, 0, 2, 15]);   // the source address a connected socket reports: the Wi-Fi address (loopback for a loopback peer)
+    if (peerBytes) desc.peerAddr = { bytes: peerBytes, port };
     desc.http = new VirtualHttpSocket({ net, peer: { host: name, literal: host, port } }); desc.connected = true;
     desc.onLastClose = () => desc.http.dispose();
   };
@@ -352,12 +371,32 @@ export function createLibcoreIoNativeBindings() {
     const desc = entryOf(runtime, 'write', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'write', 'ENOTSOCK');
     const cells = runtime.object(buffer).elements;
     if (offset < 0 || length < 0 || offset > cells.length - length) runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `length=${cells.length}; regionStart=${offset}; regionLength=${length}`);
-    writeSocket(runtime, desc, Uint8Array.from(cells.slice(offset, offset + length), v => v & 255));
+    const result = writeSocket(runtime, desc, Uint8Array.from(cells.slice(offset, offset + length), v => v & 255), { all: true });
+    if (result instanceof Blocked) return result;
   });
-  // A browser has no inbound TCP: listening for connections is not available (explicitly, never a socket that never accepts).
-  const noServer = fn => runtime => { throw new APKError(`${fn}: ServerSocket is not available in the browser; the lab has no inbound TCP (only HTTP/1.1 requests over a connected java.net.Socket reach the network)`, { kind: 'raw-socket-unsupported' }); };
-  L('listen(Ljava/io/FileDescriptor;I)V', noServer('listen'));
-  L(`accept(Ljava/io/FileDescriptor;${SOCKADDR})Ljava/io/FileDescriptor;`, noServer('accept'));
+  // ---- listen / accept over the loopback stack (src/loopback-socket.js). Nothing outside the device ever connects: only sockets of this process reach a listener.
+  L('listen(Ljava/io/FileDescriptor;I)V', (runtime, [, fdRef, backlog]) => {
+    const desc = entryOf(runtime, 'listen', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'listen', 'ENOTSOCK');
+    if (desc.type !== C.SOCK_STREAM) err(runtime, 'listen', 'EOPNOTSUPP');
+    if (!desc.bound && !desc.listener && !desc.connected) udp.bindEphemeral(runtime, 'listen', desc, new Array(desc.domain === C.AF_INET6 ? 16 : 4).fill(0));   // an unbound socket listens on a kernel-chosen port, like autobind
+    loopback.listen(runtime, 'listen', desc, backlog);
+  });
+  L(`accept(Ljava/io/FileDescriptor;${SOCKADDR})Ljava/io/FileDescriptor;`, (runtime, [, fdRef, peer]) => {
+    const desc = entryOf(runtime, 'accept', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'accept', 'ENOTSOCK');
+    const taken = loopback.accept(runtime, 'accept', desc); if (taken instanceof Blocked) return taken;
+    const number = allocateFd(runtime, taken, 0, false);
+    if (number < 0) { taken.loop.close(); err(runtime, 'accept', 'EMFILE'); }
+    if (peer !== null && peer !== 0) {   // the peer's address goes into the caller's InetSocketAddress (the way recvfrom fills its source)
+      const fresh = construct(runtime, 'Ljava/net/InetSocketAddress;', [INET, 'I'], [address(runtime, taken.peerAddr.bytes), taken.peerAddr.port]), holder = 'Ljava/net/InetSocketAddress;->holder:Ljava/net/InetSocketAddress$InetSocketAddressHolder;';
+      runtime.storeField(runtime.object(peer).fields, holder, runtime.object(fresh).fields.get(holder));
+    }
+    return newFileDescriptor(runtime, number);
+  });
+  L(`getpeername(Ljava/io/FileDescriptor;)${SOCKADDR}`, (runtime, [, fdRef]) => {
+    const desc = entryOf(runtime, 'getpeername', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'getpeername', 'ENOTSOCK');
+    if (!desc.connected || !desc.peerAddr) err(runtime, 'getpeername', 'ENOTCONN');
+    return construct(runtime, 'Ljava/net/InetSocketAddress;', [INET, 'I'], [address(runtime, desc.peerAddr.bytes), desc.peerAddr.port]);
+  });
   L(`connect(Ljava/io/FileDescriptor;${INET}I)V`, (runtime, [, fdRef, address, port]) => connectSocket(runtime, fdRef, null, port, address));
   L(`connect(Ljava/io/FileDescriptor;${SOCKADDR})V`, (runtime, [, fdRef, socketAddress]) => {
     const address = runtime.dispatch({ owner: 'Ljava/net/InetSocketAddress;', name: 'getAddress', parameters: [], result: INET, signature: `()${INET}` }, [socketAddress], 'virtual');
@@ -379,13 +418,13 @@ export function createLibcoreIoNativeBindings() {
     const entry = entryOf(runtime, 'fcntl', fdRef);
     if (command === C.F_DUPFD || command === C.F_DUPFD_CLOEXEC) { const number = allocateFd(runtime, entry.desc, argument, command === C.F_DUPFD_CLOEXEC); if (number < 0) err(runtime, 'fcntl', 'EMFILE'); return number; }
     if (command === C.F_SETFD) { entry.cloexec = !!(argument & C.FD_CLOEXEC); state(runtime).table.get(entry.number).cloexec = entry.cloexec; return 0; }
-    if (command === C.F_SETFL) { entry.desc.append = !!(argument & C.O_APPEND); return 0; }
+    if (command === C.F_SETFL) { entry.desc.append = !!(argument & C.O_APPEND); entry.desc.nonblock = !!(argument & C.O_NONBLOCK); return 0; }
     err(runtime, 'fcntl', 'EINVAL');
   });
   L('fcntlVoid(Ljava/io/FileDescriptor;I)I', (runtime, [, fdRef, command]) => {
     const entry = entryOf(runtime, 'fcntl', fdRef);
     if (command === C.F_GETFD) return entry.cloexec ? C.FD_CLOEXEC : 0;
-    if (command === C.F_GETFL) return entry.desc.acc | (entry.desc.append ? C.O_APPEND : 0);
+    if (command === C.F_GETFL) return entry.desc.acc | (entry.desc.append ? C.O_APPEND : 0) | (entry.desc.nonblock ? C.O_NONBLOCK : 0);
     err(runtime, 'fcntl', 'EINVAL');
   });
   L('readBytes(Ljava/io/FileDescriptor;Ljava/lang/Object;II)I', (runtime, [, fdRef, buffer, offset, count]) => readInto(runtime, 'read', fdRef, buffer, offset, count, null));

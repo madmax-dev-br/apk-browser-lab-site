@@ -1,16 +1,17 @@
 // The "Rede" panel of the lab page: the app's network requests (src/netlog.js batches from the Worker) as a table coloured by outcome, with a text filter, an outcome filter, a detail
 // view per row (full URL, headers, timing, failure), "Permitir <host>" for a request the allowlist refused, "Limpar" and "Salvar" (HAR 1.2 or plain text, bodies omitted).
 // The formatting, filter and export functions are pure (tested without a DOM); createNetlogPanel() wires them to the page. Nothing here is persisted: the entries live in memory.
-import { MAX_ENTRIES } from './netlog.js?v=beba259db142';
-import { sanitizeHosts } from './device-settings.js?v=beba259db142';
+import { MAX_ENTRIES } from './netlog.js?v=125d28c243f8';
+import { sanitizeHosts } from './device-settings.js?v=125d28c243f8';
 
 export const RENDER_MAX = 500;   // rows kept in the DOM; "Salvar" still writes the whole buffer
-export const CATEGORIES = ['pending', 'ok', 'redirect', 'fail', 'refused', 'error'];
-export const CATEGORY_NAMES = { pending: 'Em andamento', ok: '2xx', redirect: '3xx', fail: '4xx / 5xx', refused: 'Recusadas', error: 'Erros' };
+export const CATEGORIES = ['pending', 'ok', 'redirect', 'fail', 'refused', 'error', 'loopback'];
+export const CATEGORY_NAMES = { pending: 'Em andamento', ok: '2xx', redirect: '3xx', fail: '4xx / 5xx', refused: 'Recusadas', error: 'Erros', loopback: 'Loopback' };
 const REFUSED = new Set(['refused-by-allowlist', 'offline']);
 
 /** The colour class of an entry: pending | ok (1xx/2xx) | redirect (3xx) | fail (4xx/5xx) | refused (allowlist or offline) | error (every other failure). */
 export function categoryOf(entry) {
+  if (entry.kind === 'loopback' && entry.outcome === 'connected') return 'loopback';   // the device's own interface: never a refusal
   if (REFUSED.has(entry.outcome)) return 'refused';
   if (entry.outcome === 'pending') return 'pending';
   if (entry.status !== null && entry.status !== undefined && entry.outcome === 'response') return entry.status >= 400 ? 'fail' : entry.status >= 300 ? 'redirect' : 'ok';
@@ -40,6 +41,7 @@ export function statusLabel(entry) {
     case 'timeout': return 'timeout';
     case 'aborted': return 'abortado';
     case 'unsupported': return 'não suportado';
+    case 'connected': return 'loopback: conectado';
     default: return entry.status !== null && entry.status !== undefined ? `${entry.status} · erro na leitura` : 'erro';
   }
 }
@@ -54,6 +56,7 @@ export function describeOutcome(entry) {
     case 'timeout': return `A requisição estourou o tempo limite do app.${failure}`;
     case 'aborted': return `A requisição foi interrompida antes de terminar (conexão fechada pelo app ou rede desligada).${failure}`;
     case 'unsupported': return `Operação sem suporte no navegador.${failure}`;
+    case 'connected': return 'Conexão ao loopback do próprio dispositivo (127.0.0.1 / ::1): fica dentro da VM, não depende da rede nem da lista de hosts permitidos.';
     case 'error': return `Falhou${entry.status !== null ? ` depois de receber ${entry.status}` : ''}.${failure}${/CORS/.test(entry.failure?.message ?? '') ? ' O navegador não distingue CORS, host inacessível e bloqueio; o console do navegador diz qual foi.' : ''}`;
     case 'pending': return 'Aguardando a resposta.';
     default: return entry.closedEarly ? 'O app fechou a resposta antes de ler o corpo inteiro.' : null;
