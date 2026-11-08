@@ -1,6 +1,6 @@
-import { floatBits } from './host-contract.js?v=cde218cfa9f2';
-import { gcRoot } from './heap-gc.js?v=cde218cfa9f2';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=cde218cfa9f2';
+import { floatBits } from './host-contract.js?v=fc06dc17d6d8';
+import { gcRoot } from './heap-gc.js?v=fc06dc17d6d8';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=fc06dc17d6d8';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,
@@ -495,7 +495,9 @@ export function createSystemManagersHost(platform) {
   def(PROJECTION, 'getMediaProjection', `(I${INTENT})${MEDIA_PROJECTION}`, (r, _m, [, resultCode, data]) => { if (nullish(data)) npe(r); void resultCode; return null; });   // no projection token in the result: MediaProjectionManager returns null
 
   // ---- LocaleManager (per-app languages)
-  const LOCALE = service('locale', 'Landroid/app/LocaleManager;'), appLocales = new WeakMap();
+  const LOCALE = service('locale', 'Landroid/app/LocaleManager;'), appLocaleTables = new WeakMap();
+  // the LocaleList an app set is kept in a collector root (a WeakMap's values are invisible to the collector and the list is handed out again)
+  const appLocales = { get: r => appLocaleTables.get(r)?.get('locales'), set: (r, value) => { (appLocaleTables.get(r) ?? appLocaleTables.set(r, gcRoot(new Map())).get(r)).set('locales', value); } };
   def(LOCALE, 'getApplicationLocales', `()${LOCALE_LIST}`, r => appLocales.get(r) ?? callStatic(r, LOCALE_LIST, 'getEmptyLocaleList', [], LOCALE_LIST));
   def(LOCALE, 'getApplicationLocales', `(${STRING})${LOCALE_LIST}`, (r, _m, [, packageName]) => {
     if (requireText(r, packageName, 'appPackageName') !== pkg()) enforce(r, 'android.permission.READ_APP_SPECIFIC_LOCALES');

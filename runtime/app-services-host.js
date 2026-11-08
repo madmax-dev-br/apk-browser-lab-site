@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=cde218cfa9f2';
-import { registerPackageValueFields } from './package-value-fields.js?v=cde218cfa9f2';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=cde218cfa9f2';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=cde218cfa9f2';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=cde218cfa9f2';
+import { APKError } from './apk-error.js?v=fc06dc17d6d8';
+import { registerPackageValueFields } from './package-value-fields.js?v=fc06dc17d6d8';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=fc06dc17d6d8';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=fc06dc17d6d8';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=fc06dc17d6d8';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -917,7 +917,7 @@ export function createAppServicesHost(platform) {
   ];
   const systemInfos = new WeakMap();
   const systemApplicationInfo = (r, entry) => {
-    const cache = systemInfos.get(r) ?? systemInfos.set(r, new Map()).get(r);
+    const cache = systemInfos.get(r) ?? systemInfos.set(r, gcRoot(new Map())).get(r);   // a collector root: the cached ApplicationInfo objects are handed out again (a WeakMap's values are invisible to the collector)
     if (cache.has(entry.name)) return cache.get(entry.name);
     const info = r.makeObject(APPLICATION_INFO), put = (name, type, value) => platform.infoField(r, info, APPLICATION_INFO, name, type, value), data = entry.dataDir ?? `/data/user/0/${entry.name}`;
     put('packageName', STRING, entry.name); put('name', STRING, null); put('processName', STRING, entry.process); put('taskAffinity', STRING, entry.name); put('uid', 'I', entry.uid(platform.virtualProcess.uid));

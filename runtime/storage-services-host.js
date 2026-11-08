@@ -1,6 +1,6 @@
-import { floatBits } from './host-contract.js?v=cde218cfa9f2';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=cde218cfa9f2';
-import { networkOf } from './network-native.js?v=cde218cfa9f2';
+import { floatBits } from './host-contract.js?v=fc06dc17d6d8';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=fc06dc17d6d8';
+import { networkOf } from './network-native.js?v=fc06dc17d6d8';
 
 // Storage-related system services over the app's virtual filesystem and the lab's network bridge (android-13.0.0_r1 StorageManager, StorageStatsManager, DownloadManager,
 // NetworkStatsManager). The device has one 8 GiB volume (the numbers StatFs reports); downloads are real HTTP(S) exchanges made through the network bridge under the device's
@@ -20,7 +20,7 @@ export function createStorageServicesHost(platform) {
   // ---- StorageManager / StorageVolume
   const STORAGE = service('storage', 'Landroid/os/storage/StorageManager;'), VOLUME = 'Landroid/os/storage/StorageVolume;';
   type(VOLUME, OBJECT, [], { allocatable: true });
-  const primaryVolume = r => { const cache = platform.primaryVolume ??= new WeakMap(); if (!cache.has(r)) { const v = r.allocate(VOLUME); r.object(v).volume = { path: '/storage/emulated/0' }; cache.set(r, v); } return cache.get(r); };
+  const primaryVolume = r => { const cache = platform.primaryVolume ??= new WeakMap(); if (!cache.has(r)) { const v = r.allocate(VOLUME); r.object(v).volume = { path: '/storage/emulated/0' }; cache.set(r, v); (r.hostStaticValues ??= []).push(v); } return cache.get(r); };   // hostStaticValues: a collector root (a WeakMap's values are invisible to the collector)
   registry.staticField(STORAGE, 'UUID_DEFAULT', UUID, r => callStatic(r, UUID, 'fromString', [STRING], UUID, [UUID_DEFAULT]));
   registry.staticField(STORAGE, 'UUID_PRIMARY_PHYSICAL', UUID, r => callStatic(r, UUID, 'fromString', [STRING], UUID, ['0f95a519-dae7-4abf-9c0c-5e5e3ab6c0d2']));
   def(STORAGE, 'getStorageVolumes', `()${LIST}`, r => listOf(r, [primaryVolume(r)]));
