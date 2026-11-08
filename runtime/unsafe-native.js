@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=7a404aba383f';
+import { APKError } from './apk-error.js?v=59bcd832b97c';
 
 // The VM's raw-memory model and the natives that expose it to the original libcore classes:
 //   sun.misc.Unsafe / jdk.internal.misc.Unsafe     (get/put/compareAndSwap on (Object, offset) and on native addresses)
@@ -172,16 +172,26 @@ function putValue(runtime, object, offset, component, value) {
   const bytes = new Uint8Array(size); encode(component, value, bytes, 0);
   if (spot.native) writeNative(runtime, spot.address, bytes); else writeArray(spot.info, spot.offset, bytes);
 }
-function objectSlot(runtime, object, offset) {
-  const target = runtime.object(object);
-  if (target.elements) {
-    const info = arrayInfo(runtime, object), index = (Number(offset) - info.base) / info.size;
-    if (!Number.isInteger(index) || index < 0 || index >= target.elements.length) runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `Unsafe object-array access at offset ${offset}`);
-    return { get: () => target.elements[index], set: value => { runtime.checkArrayValue(target, value); target.elements[index] = value; } };
-  }
-  const key = fieldKey(runtime, offset);
-  return { get: () => target.fields.get(key) ?? null, set: value => runtime.storeField(target.fields, key, value) };
+// Reference slots: an element of a reference array (record.cells is a plain Array of references; element i is at byte offset REFERENCE_BASE + i * REFERENCE_SIZE, the values
+// arrayBaseOffset/arrayIndexScale report for any Object[] type) or an object field. These sit on the hottest path of the original ConcurrentHashMap (tabAt/casTabAt/setTabAt on
+// every get and put), so they resolve the slot directly instead of building accessor objects.
+function referenceIndex(runtime, target, offset) {
+  if (ARRAY_BASE[target.type] !== undefined) fail('Unsafe reference access to a primitive array is not supported', 'unsafe-primitive-array');
+  const at = Number(offset) - REFERENCE_BASE, index = at >> 2;
+  if (at < 0 || (at & 3) !== 0 || index >= target.cells.length) runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `Unsafe object-array access at offset ${offset}`);
+  return index;
 }
+function getReference(runtime, object, offset) {
+  const target = runtime.object(object);
+  if (target.cells !== undefined) return target.cells[referenceIndex(runtime, target, offset)];
+  return target.fields.get(fieldKey(runtime, offset)) ?? null;
+}
+function putReference(runtime, object, offset, value) {
+  const target = runtime.object(object);
+  if (target.cells !== undefined) { const index = referenceIndex(runtime, target, offset); runtime.checkArrayValue(target, value); target.cells[index] = value; return; }
+  runtime.storeField(target.fields, fieldKey(runtime, offset), value);
+}
+const sameReference = (a, b) => a === b || (a !== null && b !== null && typeof a === 'object' && typeof b === 'object' && a.ref !== undefined && a.ref === b.ref) || ((a === null || a === 0) && (b === null || b === 0));
 
 export function createUnsafeNativeBindings() {
   const bindings = new Map(), add = (owner, signature, callback) => bindings.set(`${owner}->${signature}`, callback);
@@ -201,20 +211,21 @@ export function createUnsafeNativeBindings() {
       void wide;
     }
     for (const [name, component] of [['Int', 'I'], ['Long', 'J']]) add(owner, `putOrdered${name}(Ljava/lang/Object;J${component})V`, (runtime, [, object, offset, value]) => { putValue(runtime, object, offset, component, value); });
-    add(owner, 'putOrderedObject(Ljava/lang/Object;JLjava/lang/Object;)V', (runtime, [, object, offset, value]) => { objectSlot(runtime, object, offset).set(value); });
-    add(owner, 'getObject(Ljava/lang/Object;J)Ljava/lang/Object;', (runtime, [, object, offset]) => objectSlot(runtime, object, offset).get());
-    add(owner, 'getObjectVolatile(Ljava/lang/Object;J)Ljava/lang/Object;', (runtime, [, object, offset]) => objectSlot(runtime, object, offset).get());
-    add(owner, 'putObject(Ljava/lang/Object;JLjava/lang/Object;)V', (runtime, [, object, offset, value]) => { objectSlot(runtime, object, offset).set(value); });
-    add(owner, 'putObjectVolatile(Ljava/lang/Object;JLjava/lang/Object;)V', (runtime, [, object, offset, value]) => { objectSlot(runtime, object, offset).set(value); });
+    add(owner, 'putOrderedObject(Ljava/lang/Object;JLjava/lang/Object;)V', (runtime, [, object, offset, value]) => { putReference(runtime, object, offset, value); });
+    add(owner, 'getObject(Ljava/lang/Object;J)Ljava/lang/Object;', (runtime, [, object, offset]) => getReference(runtime, object, offset));
+    add(owner, 'getObjectVolatile(Ljava/lang/Object;J)Ljava/lang/Object;', (runtime, [, object, offset]) => getReference(runtime, object, offset));
+    add(owner, 'putObject(Ljava/lang/Object;JLjava/lang/Object;)V', (runtime, [, object, offset, value]) => { putReference(runtime, object, offset, value); });
+    add(owner, 'putObjectVolatile(Ljava/lang/Object;JLjava/lang/Object;)V', (runtime, [, object, offset, value]) => { putReference(runtime, object, offset, value); });
     const cas = (name, component) => (runtime, [, object, offset, expected, value]) => {
       const current = getValue(runtime, object, offset, component); if (current !== (component === 'J' ? BigInt.asIntN(64, expected) : expected)) return 0;
       putValue(runtime, object, offset, component, value); return 1;
     };
     add(owner, 'compareAndSwapInt(Ljava/lang/Object;JII)Z', cas('Int', 'I')); add(owner, 'compareAndSwapLong(Ljava/lang/Object;JJJ)Z', cas('Long', 'J'));
     add(owner, 'compareAndSetInt(Ljava/lang/Object;JII)Z', cas('Int', 'I')); add(owner, 'compareAndSetLong(Ljava/lang/Object;JJJ)Z', cas('Long', 'J'));
+    // One green thread runs at a time and a native is never preempted, so compare-then-store is atomic; the comparison is reference identity (null and the 0 of a null register are the same).
     const casObject = (runtime, [, object, offset, expected, value]) => {
-      const slot = objectSlot(runtime, object, offset), current = slot.get();
-      const same = current === expected || (current?.ref !== undefined && current.ref === expected?.ref); if (!same) return 0; slot.set(value); return 1;
+      if (!sameReference(getReference(runtime, object, offset), expected)) return 0;
+      putReference(runtime, object, offset, value); return 1;
     };
     add(owner, 'compareAndSwapObject(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z', casObject); add(owner, 'compareAndSetObject(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z', casObject);
     add(owner, 'allocateInstance(Ljava/lang/Class;)Ljava/lang/Object;', (runtime, [, cls]) => runtime.allocate(runtime.object(cls).classType));

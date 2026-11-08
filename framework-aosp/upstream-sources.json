@@ -31725,5 +31725,68 @@
     "sha256": "6498b9f90af5f3b8bde56ff1e5e97b51720941e000f67cdc9d4661208110bbe7",
     "bytes": 23762,
     "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/HashSet.java",
+    "localPath": "framework-aosp/upstream/java/util/HashSet.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/HashSet.java?format=TEXT",
+    "sha256": "f6a0ca06f1fd27aaf6ca3bbd916912f8a6ca4134b101f63783f34551a8ac3013",
+    "bytes": 13851,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0",
+    "compilerStage": "javac-release8"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/LinkedHashSet.java",
+    "localPath": "framework-aosp/upstream/java/util/LinkedHashSet.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/LinkedHashSet.java?format=TEXT",
+    "sha256": "d51977713565e40d0032cf77b33f2d4c4dd54b741ba93123fc909e4055e7719f",
+    "bytes": 8801,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0",
+    "compilerStage": "javac-release8"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/ConcurrentMap.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/ConcurrentMap.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/ConcurrentMap.java?format=TEXT",
+    "sha256": "10c6275bf933d93d9eff7ea56c47538be650578a7295c6ed571acf76903db5c5",
+    "bytes": 19785,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/ConcurrentHashMap.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/ConcurrentHashMap.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/ConcurrentHashMap.java?format=TEXT",
+    "sha256": "d098af25a08216a0122b5575f9281436937bf26aec845b1340bfac2f12d2a588",
+    "bytes": 267173,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/Helpers.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/Helpers.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/Helpers.java?format=TEXT",
+    "sha256": "bfbb86f9da30f2183659dc4660b26ce1287f9ab402fff453b3e4c9485a706af6",
+    "bytes": 4469,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/WeakHashMap.java",
+    "localPath": "framework-aosp/upstream/java/util/WeakHashMap.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/WeakHashMap.java?format=TEXT",
+    "sha256": "b6a6480a531bf50c2c64f77bb7d6c581ec05b9dc2f1b542a7755078e761d16af",
+    "bytes": 47877,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0",
+    "compilerStage": "javac-release8"
   }
 ]

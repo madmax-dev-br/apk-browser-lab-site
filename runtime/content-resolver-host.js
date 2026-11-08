@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=7a404aba383f';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=7a404aba383f';
+import { APKError } from './apk-runtime.js?v=59bcd832b97c';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=59bcd832b97c';
 const RESOLVER = 'Landroid/content/ContentResolver;', URI = 'Landroid/net/Uri;', GLOBAL = 'Landroid/provider/Settings$Global;', OBSERVER = 'Landroid/database/ContentObserver;';
 const fail = message => { throw new APKError(message, { kind: 'virtual-content-provider-unsupported' }); };
 const keys = new Set();
@@ -156,7 +156,7 @@ export function createContentResolverHost(platform) {
         const text = textOf(runtime, args[0]), parts = parseUriParts(text);
         const opaqueGuard = () => { if (!parts.hierarchical) runtime.throwJava('Ljava/lang/UnsupportedOperationException;', "This isn't a hierarchical URI."); };
         const decoded = value => value == null ? null : decodeUri(value, false);
-        const collection = (type, items) => { const list = runtime.allocate(type); runtime.dispatch({ owner: type, name: '<init>', signature: '()V', parameters: [], result: 'V' }, [list], 'direct'); for (const item of items) runtime.dispatch({ owner: type, name: 'add', signature: '(Ljava/lang/Object;)Z', parameters: ['Ljava/lang/Object;'], result: 'Z' }, [list, item], 'virtual'); runtime.object(list).readOnly = true; return list; }; // Collections.unmodifiable*: VM collections honor readOnly.
+        const collection = (type, items) => { const list = runtime.allocate(type); runtime.dispatch({ owner: type, name: '<init>', signature: '()V', parameters: [], result: 'V' }, [list], 'direct'); for (const item of items) runtime.dispatch({ owner: type, name: 'add', signature: '(Ljava/lang/Object;)Z', parameters: ['Ljava/lang/Object;'], result: 'Z' }, [list, item], 'virtual'); const set = type !== 'Ljava/util/ArrayList;', view = set ? 'Ljava/util/Set;' : 'Ljava/util/List;'; return runtime.dispatch({ owner: 'Ljava/util/Collections;', name: set ? 'unmodifiableSet' : 'unmodifiableList', signature: `(${view})${view}`, parameters: [view], result: view }, [list], 'static'); }; // AOSP Uri: getQueryParameterNames is Collections.unmodifiableSet(LinkedHashSet), getPathSegments an unmodifiable list (the original Collections wrappers)
         const pathSegments = () => { // AOSP PathPart.getPathSegments: empty segments are skipped, each is decoded
           const path = parts.path ?? '', found = []; let previous = 0, current;
           while ((current = path.indexOf('/', previous)) > -1) { if (previous < current) found.push(decodeUri(path.slice(previous, current), false)); previous = current + 1; }

@@ -134,3 +134,16 @@ the runtime group (ClipDescription reads TextClassifier.EntityType). TextClassif
 Settings.Global/DeviceConfig flags; SystemTextClassifier and TextClassificationConstants are not packaged. Recorded source transforms (build/javatime-transforms.json): TextLinks.TextLinkSpan.onClick takes the
 AOSP default of the smart-linkify flag and its two hidden TextView hooks refuse explicitly; TextClassification.maybeLoadDrawable (documented best effort) skips the hidden Icon accessors; TextClassificationSession
 drops the SystemTextClassifier remote-session initialization (the lab has no such service).
+
+Hash collections: java.util.HashSet, LinkedHashSet and WeakHashMap (java8 group, javac --release 8, next to HashMap/LinkedHashMap) and java.util.concurrent.ConcurrentHashMap, ConcurrentMap
+and Helpers (java.time group, which compiles the pinned jdk.internal.misc.Unsafe) are complete pinned originals; the host JavaScript implementations of HashSet, LinkedHashSet,
+ConcurrentHashMap (+KeySetView) and WeakHashMap are gone, so iteration order, resizing, treeification and weak consistency are libcore's. ConcurrentHashMap reaches its table through
+jdk.internal.misc.Unsafe (getObjectAcquire/compareAndSetObject/putObjectRelease on Node[] elements at arrayBaseOffset + i << ASHIFT, compareAndSetInt/Long and getAndAddInt on its
+fields): the VM natives address the reference-array storage and the object field slots directly; one green thread runs at a time and a native is never preempted, so each
+compare-and-set is an exact compare-then-store. One recorded source transform (build/javatime-transforms.json, kind thread-local-random-probe-to-lab-thread-probe): the counter-cell
+probe calls ThreadLocalRandom.getProbe/localInit/advanceProbe (package-private, ThreadLocalRandom is a host class) go to the lab dev.apkweb.util.ThreadProbe (the per-thread probe
+Striped64 already uses, with ThreadLocalRandom's Weyl increment and xorshift), and the @Contended padding hint on CounterCell is dropped. The parallel bulk operations
+(forEach/search/reduce with a parallelismThreshold) build ForkJoin CountedCompleter tasks and the VM has no ForkJoinPool: those 31 methods are served sequentially by the lab
+dev.apkweb.util.ChmBulkOps over the original map's iterator. WeakHashMap entries are original WeakReferences on the map's ReferenceQueue: the collector clears them like any weak
+reference and enqueues them at the next looper pump, and the original expungeStaleEntries removes them (a value that references its key keeps it alive, as on ART).
+CopyOnWriteArraySet stays a host set: its original delegates to CopyOnWriteArrayList internals (getArray, addAllAbsent) and CopyOnWriteArrayList is still a host class.

@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=7a404aba383f';
-import { JavaException } from './apk-runtime.js?v=7a404aba383f';
-import { bitsDouble, doubleBits } from './host-contract.js?v=7a404aba383f';
+import { APKError } from './apk-error.js?v=59bcd832b97c';
+import { JavaException } from './apk-runtime.js?v=59bcd832b97c';
+import { bitsDouble, doubleBits } from './host-contract.js?v=59bcd832b97c';
 
 // Host bindings for the framework's SQLite natives.
 //
