@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=125d28c243f8';
-import { BUCKET } from './time-breakdown.js?v=125d28c243f8';
-import { Blocked, QUANTUM } from './scheduler.js?v=125d28c243f8';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=125d28c243f8';
+import { APKError } from './apk-error.js?v=967d9272d044';
+import { BUCKET } from './time-breakdown.js?v=967d9272d044';
+import { Blocked, QUANTUM } from './scheduler.js?v=967d9272d044';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=967d9272d044';
 
 // Frame-based DEX interpreter.
 //
@@ -116,7 +116,7 @@ function makeFrame(rt, method, code, args, known = null) {
 }
 /** Static description of an invoke instruction, built on first execution: the callee reference, the invoke mode and where its arguments live. */
 function makeInvokeSite(dex, u, pc, op, a, hi) {
-  const target = dex.methods[u[pc + 1]]; if (!target) fail('Invalid method index');
+  if (!(u[pc + 1] < dex.methods.length)) fail('Invalid method index'); const target = dex.method(u[pc + 1]);
   const range = op >= 0x74, mode = op === 0x71 || op === 0x77 ? 'static' : op === 0x6f || op === 0x75 ? 'super' : op === 0x6e || op === 0x72 || op === 0x74 || op === 0x78 ? 'virtual' : 'direct';
   const argc = range ? a : hi;
   if (!range && hi > 5) fail('Invalid invoke register count');
@@ -323,13 +323,13 @@ function refineNullPointerMessage(rt, error, dex, u, pc, regs) {
     let message = null;
     const nullAt = register => { const v = regs[register]; return v === null || v === undefined || v === 0; };
     if ((op >= 0x6e && op <= 0x72) || (op >= 0x74 && op <= 0x78)) {
-      const first = op >= 0x74 ? u[pc + 2] : u[pc + 2] & 15, target = dex.methods[u[pc + 1]];
+      const first = op >= 0x74 ? u[pc + 2] : u[pc + 2] & 15, target = u[pc + 1] < dex.methods.length ? dex.method(u[pc + 1]) : null;
       if (target && nullAt(first)) {
         const kind = op === 0x72 || op === 0x78 ? 'interface' : op === 0x70 || op === 0x76 ? 'direct' : 'virtual';
         message = `Attempt to invoke ${kind} method '${typeName(target.result)} ${typeName(target.owner)}.${target.name}(${target.parameters.map(typeName).join(', ')})' on a null object reference`;
       }
-    } else if (op >= 0x52 && op <= 0x58 && nullAt(b)) { const field = dex.fields[u[pc + 1]]; if (field) message = `Attempt to read from field '${typeName(field.type)} ${typeName(field.owner)}.${field.name}' on a null object reference`; }
-    else if (op >= 0x59 && op <= 0x5f && nullAt(b)) { const field = dex.fields[u[pc + 1]]; if (field) message = `Attempt to write to field '${typeName(field.type)} ${typeName(field.owner)}.${field.name}' on a null object reference`; }
+    } else if (op >= 0x52 && op <= 0x58 && nullAt(b)) { const field = u[pc + 1] < dex.fields.length ? dex.field(u[pc + 1]) : null; if (field) message = `Attempt to read from field '${typeName(field.type)} ${typeName(field.owner)}.${field.name}' on a null object reference`; }
+    else if (op >= 0x59 && op <= 0x5f && nullAt(b)) { const field = u[pc + 1] < dex.fields.length ? dex.field(u[pc + 1]) : null; if (field) message = `Attempt to write to field '${typeName(field.type)} ${typeName(field.owner)}.${field.name}' on a null object reference`; }
     else if (op >= 0x44 && op <= 0x4a && nullAt(u[pc + 1] & 255)) message = 'Attempt to read from null array';
     else if (op >= 0x4b && op <= 0x51 && nullAt(u[pc + 1] & 255)) message = 'Attempt to write to null array';
     else if (op === 0x21 && nullAt(b)) message = 'Attempt to get length of null array';
@@ -538,7 +538,7 @@ function runLoop(rt, owner, base) {
           case 0x1a: case 0x1b: {
             const index = op === 0x1a ? u[pc + 1] : u[pc + 1] + u[pc + 2] * 65536;
             if (index >= dex.strings.length) fail('Invalid string index');
-            regs[a] = dex.strings[index]; pc += op === 0x1a ? 2 : 3; break;
+            regs[a] = dex.string(index); pc += op === 0x1a ? 2 : 3; break;
           }
           case 0x1d: case 0x1e: {
             const value = regs[a]; if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'null monitor');
@@ -593,7 +593,7 @@ function runLoop(rt, owner, base) {
           }
           case 0x52: case 0x53: case 0x54: case 0x55: case 0x56: case 0x57: case 0x58: {
             const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.object(objectRef);
-            let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = fieldSiteAt(rt, prog, pc, dex.fields[u[pc + 1]], obj.type);
+            let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = fieldSiteAt(rt, prog, pc, dex.field(u[pc + 1]), obj.type);
             let v = obj.fields.get(site.key); if (v === undefined) v = site.def;
             const variant = op - 0x52;
             if (variant === 0 || variant === 2) regs[lo] = v;
@@ -602,26 +602,24 @@ function runLoop(rt, owner, base) {
           }
           case 0x59: case 0x5a: case 0x5b: case 0x5c: case 0x5d: case 0x5e: case 0x5f: {
             const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.object(objectRef);
-            let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = fieldSiteAt(rt, prog, pc, dex.fields[u[pc + 1]], obj.type);
+            let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = fieldSiteAt(rt, prog, pc, dex.field(u[pc + 1]), obj.type);
             const variant = op - 0x59, v = regs[lo], value = variant <= 2 ? v : variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : (v << 16) >> 16;
             const fields = obj.fields; if (fields.has(site.key)) fields.set(site.key, value); else rt.storeField(fields, site.key, value);
             pc += 2; break;
           }
           case 0x60: case 0x61: case 0x62: case 0x63: case 0x64: case 0x65: case 0x66: {
-            const reference = dex.fields[u[pc + 1]]; if (!reference) fail('Invalid static field index');
             let site = prog.refs[pc], v;
-            if (site !== undefined && site.ready) { v = rt.staticFields.get(site.key); if (v === undefined) v = rt.readStatic(reference); }
-            else { const field = rt.resolveField(reference); if (rt.initialized.get(field.owner)?.status !== 'initialized') { const gate = rt.initStep(field.owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } v = rt.readStatic(reference); prog.refs[pc] = { ready: rt.initialized.get(field.owner)?.status === 'initialized' && rt.staticFields.has(field.key), key: field.key }; }
+            if (site !== undefined && site.ready) { v = rt.staticFields.get(site.key); if (v === undefined) v = rt.readStatic(dex.field(u[pc + 1])); }
+            else { const reference = dex.field(u[pc + 1]), field = rt.resolveField(reference); if (rt.initialized.get(field.owner)?.status !== 'initialized') { const gate = rt.initStep(field.owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } v = rt.readStatic(reference); prog.refs[pc] = { ready: rt.initialized.get(field.owner)?.status === 'initialized' && rt.staticFields.has(field.key), key: field.key }; }
             const variant = op - 0x60;
             if (variant === 1) { regs[a] = v; regs[a + 1] = WIDE_HIGH; } else regs[a] = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
             pc += 2; break;
           }
           case 0x67: case 0x68: case 0x69: case 0x6a: case 0x6b: case 0x6c: case 0x6d: {
-            const reference = dex.fields[u[pc + 1]]; if (!reference) fail('Invalid static field index');
             const variant = op - 0x67, v = regs[a], value = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
             const site = prog.refs[pc];
             if (site !== undefined && site.ready && rt.staticFields.has(site.key)) rt.staticFields.set(site.key, value);
-            else { const field = rt.resolveField(reference); if (rt.initialized.get(field.owner)?.status !== 'initialized') { const gate = rt.initStep(field.owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.writeStatic(reference, value); prog.refs[pc] = { ready: rt.initialized.get(field.owner)?.status === 'initialized' && rt.staticFields.has(field.key), key: field.key }; }
+            else { const reference = dex.field(u[pc + 1]), field = rt.resolveField(reference); if (rt.initialized.get(field.owner)?.status !== 'initialized') { const gate = rt.initStep(field.owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.writeStatic(reference, value); prog.refs[pc] = { ready: rt.initialized.get(field.owner)?.status === 'initialized' && rt.staticFields.has(field.key), key: field.key }; }
             pc += 2; break;
           }
           case 0x6e: case 0x6f: case 0x70: case 0x71: case 0x72:

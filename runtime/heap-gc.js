@@ -29,8 +29,8 @@
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=125d28c243f8';
-import { cellBytes } from './java-arrays.js?v=125d28c243f8';
+import { BUCKET } from './time-breakdown.js?v=967d9272d044';
+import { cellBytes } from './java-arrays.js?v=967d9272d044';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -105,7 +105,7 @@ const weakTypeCache = runtime => weakTypeCaches.get(runtime) ?? weakTypeCaches.s
  * nested objects in its sample is walked in full. `markNoJavaRefs(object)` declares an object (and everything under it) reference-free explicitly.
  */
 /** Instances of these classes are code and metadata (DEX files, programs, compiled functions, frames, threads): never Java references, never walked. */
-const SKIP_CONSTRUCTORS = new Set(['DexFile', 'DexProgram', 'CompiledFunction', 'Frame', 'ClassDefinition']);   // not VMThread: the threads the scheduler runs are skipped by identity above (enumerateRoots covers them), but the host record of a Thread that was created and not started yet (a ThreadFactory's product before start()) holds its Runnable target, group and handler only there
+const SKIP_CONSTRUCTORS = new Set(['DexFile', 'DexProgram', 'DexClassTable', 'ClassTable', 'CompiledFunction', 'Frame', 'ClassDefinition']);   // not VMThread: the threads the scheduler runs are skipped by identity above (enumerateRoots covers them), but the host record of a Thread that was created and not started yet (a ThreadFactory's product before start()) holds its Runnable target, group and handler only there
 const FLAT_CONTAINER_MIN = 2048, FLAT_SAMPLE = 48;
 const noRefs = new WeakSet();
 export function markNoJavaRefs(object) { if (object !== null && typeof object === 'object') noRefs.add(object); return object; }

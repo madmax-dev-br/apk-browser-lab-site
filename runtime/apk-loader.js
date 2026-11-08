@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=125d28c243f8';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=125d28c243f8';
-import { inspectELF } from './native-inspector.js?v=125d28c243f8';
-import { inflateRaw } from './inflate.js?v=125d28c243f8';
-import { resolveDevice } from './device-profile.js?v=125d28c243f8';
-import { resourceProfileFor } from './device-configuration.js?v=125d28c243f8';
-import { JniBridge } from './jni-host.js?v=125d28c243f8';
-import { providerForApk } from './native-provider-variants.js?v=125d28c243f8';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=125d28c243f8';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=125d28c243f8';
-import { AndroidResources } from './android-resources.js?v=125d28c243f8';
-import { AndroidPlatform } from './android-platform.js?v=125d28c243f8';
-import { FrameworkProvider } from './framework-provider.js?v=125d28c243f8';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=967d9272d044';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=967d9272d044';
+import { inspectELF } from './native-inspector.js?v=967d9272d044';
+import { inflateRaw } from './inflate.js?v=967d9272d044';
+import { resolveDevice } from './device-profile.js?v=967d9272d044';
+import { resourceProfileFor } from './device-configuration.js?v=967d9272d044';
+import { JniBridge } from './jni-host.js?v=967d9272d044';
+import { providerForApk } from './native-provider-variants.js?v=967d9272d044';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=967d9272d044';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=967d9272d044';
+import { AndroidResources } from './android-resources.js?v=967d9272d044';
+import { AndroidPlatform } from './android-platform.js?v=967d9272d044';
+import { FrameworkProvider } from './framework-provider.js?v=967d9272d044';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -521,10 +521,11 @@ export async function loadAPK(arrayBuffer, options = {}) {
     if (!framework?.files || !(framework.nativeBindings instanceof Map)) fail('Invalid framework provider result');
     await yieldControl();
   }
-  const apkClasses=new Map();for(const file of files)for(const [name,definition]of file.dex.classes)apkClasses.set(name,definition);
+  // Superclass chains through the class_def headers: no class record is built for a check that only follows `superclass`.
+  const apkSuperclass=type=>{for(const file of files){const parent=file.dex.classes.superclassOf(type);if(parent!==undefined)return parent;}return undefined;};
   const appCompatActivity=manifest.activities.some(activity=>{
     let type=activity.name.startsWith('L')?activity.name:'L'+activity.name.replaceAll('.','/')+';',seen=new Set();
-    while(type){if(type==='Landroidx/appcompat/app/AppCompatActivity;')return true;if(seen.has(type)||seen.size>=128)fail('Invalid/excessive Activity superclass chain');seen.add(type);type=apkClasses.get(type)?.superclass;}return false;
+    while(type){if(type==='Landroidx/appcompat/app/AppCompatActivity;')return true;if(seen.has(type)||seen.size>=128)fail('Invalid/excessive Activity superclass chain');seen.add(type);type=apkSuperclass(type);}return false;
   });
   const usesWindowSurfaces=files.some(file=>file.dex.types.some(type=>['Landroid/app/Dialog;','Landroid/view/WindowManager;'].includes(type)));
   // Gravity-dependent drawables (LayerDrawable, InsetDrawable, ScaleDrawable, ClipDrawable, RippleDrawable) need the original View/Gravity layer of the layouts profile: load it when the code names
@@ -570,17 +571,19 @@ export async function loadAPK(arrayBuffer, options = {}) {
     const seen = new Set();
     while (owner && !seen.has(owner) && seen.size < 128) {
       if (owner === 'Landroid/view/View;') return true;
-      seen.add(owner); const definition = program.resolvedClasses.get(owner);
-      if (!definition && /^Landroid\/(?:view\/(?:ViewGroup|ViewStub|SurfaceView|TextureView)|webkit\/WebView|widget\/[^;$]+);$/.test(owner)) return true;
-      owner = definition?.superclass;
+      seen.add(owner); const parent = program.resolvedClasses.superclassOf(owner);
+      if (parent === undefined && /^Landroid\/(?:view\/(?:ViewGroup|ViewStub|SurfaceView|TextureView)|webkit\/WebView|widget\/[^;$]+);$/.test(owner)) return true;
+      owner = parent;
     }
     return false;
   };
   // Only APK method references participate. The boot layer contains Matrix for
   // every app, and would otherwise turn this lazy backend into an eager load.
-  const usesViewTransforms = program.methods.some(method => transformSignatures.has(method.name + method.signature) && viewOwner(method.owner));
+  // The id tables are decoded on demand: only the method ids carrying one of these names are looked at.
+  const transformNames = new Set([...transformSignatures].map(signature => signature.slice(0, signature.indexOf('('))));
+  const usesViewTransforms = program.files.some(({ dex }) => dex.methodsNamed(transformNames).some(method => transformSignatures.has(method.name + method.signature) && viewOwner(method.owner)));
   const needsSkia=program.types.some(type=>/^Landroid\/graphics\//.test(type)||type==='Landroid/view/View$MeasureSpec;')||
-    usesViewTransforms || program.methods.some(method=>method.name==='onMeasure'&&method.signature==='(II)V')&&program.types.some(type=>['Landroid/widget/TextView;','Landroid/widget/Button;'].includes(type));
+    usesViewTransforms || program.files.some(({ dex }) => dex.methodsNamed('onMeasure').some(method => method.signature === '(II)V'))&&program.types.some(type=>['Landroid/widget/TextView;','Landroid/widget/Button;'].includes(type));
   let skia=options.skiaBackend??null;
   if(!skia&&options.skiaProvider&&(needsSkia||options.forceSkia===true)){const source=options.skiaProvider;skia=typeof source==='function'?await source({onProgress:options.onProgress}):await source.load({onProgress:options.onProgress});}
   // JPEG/WebP/AVIF codecs (vendor/lab-codecs) load only for an APK that can decode or encode images: it references BitmapFactory / ImageDecoder / Bitmap.CompressFormat, or ships image files.
@@ -690,13 +693,14 @@ export async function loadAPK(arrayBuffer, options = {}) {
     } catch (error) { bundle.inspectionError = error.message; }
     bundles.push(bundle);
   }
-  const dependencyOwners = [...new Set(program.methods.map(m => m.owner).filter(t => !program.classes.has(t)))];
+  const dependencyOwnerSet = new Set(); for (const { dex } of program.files) for (let i = 0; i < dex.methods.length; i++) { const owner = dex.methodOwner(i); if (!program.classes.has(owner)) dependencyOwnerSet.add(owner); }
+  const dependencyOwners = [...dependencyOwnerSet];
   const inventory = { ...manifest, classes: program.classes.size, classNames: [...program.classes.keys()].map(dottedName),
     framework: framework ? { ...framework.metadata, ...program.frameworkSummary } : { enabled: false, classes: 0, dexFiles: [], policy: 'no-boot-layer' },
     frameworkResources: frameworkResources ? { ...frameworkResources.metadata, enabled: true, entries: frameworkResources.table.entries?.size ?? null, packages: frameworkResources.table.packages } : { enabled: false, entries: 0 },
     resourceConfiguration: resourceConfiguration ? {...resourceConfiguration.metadata,enabled:true,stats:resourceConfiguration.stats?.()??null} : {enabled:false},
     skia:skia?{...skia.metadata,enabled:true}:{enabled:false,reason:needsSkia?'provider-not-supplied':'no-APK-graphics-references'},
-    methods: program.methods.length, strings: program.strings.length, inspectionComplete: true,
+    methods: program.methodCount, strings: program.stringCount, inspectionComplete: true,
     dexFiles, dexSummaries, totalDexBytes, nativeLibraries, nativeLibraryDetails, nativeByABI, nativeSummary,
     resourceSummary: resources.summary,
     kotlin, compose, embeddedFrameworks, bundles, dependencies: dependencyOwners.map(dottedName),

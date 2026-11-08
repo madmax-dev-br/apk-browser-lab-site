@@ -29,12 +29,12 @@ function boxedIntegerConstants(units) {
  * version is the sequence of boxed integer constants paired with the three keys.
  */
 function versionInMethod(cls, code) {
-  const reader = cls.dex.reader, units = Array.from({ length: code.units }, (_, i) => reader.u16(code.offset + 2 * i)), strings = cls.dex.strings;
+  const dex = cls.dex, reader = dex.reader, units = Array.from({ length: code.units }, (_, i) => reader.u16(code.offset + 2 * i));
   const keys = {};
   for (let i = 0; i < units.length; i++) {
     const op = units[i] & 0xff;
     if (op !== CONST_STRING && op !== CONST_STRING_JUMBO) continue;
-    const text = strings[op === CONST_STRING ? units[i + 1] : units[i + 1] | (units[i + 2] << 16)];
+    const index = op === CONST_STRING ? units[i + 1] : units[i + 1] | (units[i + 2] << 16), text = index < dex.strings.length ? dex.string(index) : undefined;
     if ((text === 'major' || text === 'minor' || text === 'patch') && !(text in keys)) keys[text] = i;
   }
   if (!('major' in keys && 'minor' in keys && 'patch' in keys)) return null;
@@ -47,10 +47,10 @@ function versionInMethod(cls, code) {
 
 /** The static field loaded right after the string `key` in a method (sget-object, op 0x62), as { owner, name }, or null. */
 function fieldAfterString(cls, code, key) {
-  const reader = cls.dex.reader, units = Array.from({ length: code.units }, (_, i) => reader.u16(code.offset + 2 * i)), strings = cls.dex.strings;
+  const dex = cls.dex, reader = dex.reader, units = Array.from({ length: code.units }, (_, i) => reader.u16(code.offset + 2 * i));
   for (let i = 0; i < units.length; i++) {
-    if ((units[i] & 0xff) !== CONST_STRING || strings[units[i + 1]] !== key) continue;
-    for (let k = i + 2; k < Math.min(units.length - 1, i + 8); k++) if ((units[k] & 0xff) === 0x62) { const field = cls.dex.fields[units[k + 1]]; return field ? { owner: field.owner, name: field.name } : null; }
+    if ((units[i] & 0xff) !== CONST_STRING || !(units[i + 1] < dex.strings.length) || dex.string(units[i + 1]) !== key) continue;
+    for (let k = i + 2; k < Math.min(units.length - 1, i + 8); k++) if ((units[k] & 0xff) === 0x62) { const field = units[k + 1] < dex.fields.length ? dex.field(units[k + 1]) : null; return field ? { owner: field.owner, name: field.name } : null; }
   }
   return null;
 }

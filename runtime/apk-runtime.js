@@ -1,29 +1,29 @@
-import { VMClock } from './vm-clock.js?v=125d28c243f8';
-import { OperationMonitor } from './operation-monitor.js?v=125d28c243f8';
-import { ExecutionProfile } from './execution-profile.js?v=125d28c243f8';
-import { SamplingProfiler } from './sampling-profiler.js?v=125d28c243f8';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=125d28c243f8';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=125d28c243f8';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=125d28c243f8';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=125d28c243f8';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=125d28c243f8';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=125d28c243f8';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=125d28c243f8';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=125d28c243f8';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=125d28c243f8';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=125d28c243f8';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=125d28c243f8';
-import { APKError } from './apk-error.js?v=125d28c243f8';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=125d28c243f8';
-import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=125d28c243f8';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=125d28c243f8';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=125d28c243f8';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=125d28c243f8';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=125d28c243f8';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=125d28c243f8';
-import { Scheduler, Blocked } from './scheduler.js?v=125d28c243f8';
-import { bootClassLacksMember } from './boot-class-members.js?v=125d28c243f8';
-export { APKError } from './apk-error.js?v=125d28c243f8';
+import { VMClock } from './vm-clock.js?v=967d9272d044';
+import { OperationMonitor } from './operation-monitor.js?v=967d9272d044';
+import { ExecutionProfile } from './execution-profile.js?v=967d9272d044';
+import { SamplingProfiler } from './sampling-profiler.js?v=967d9272d044';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=967d9272d044';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=967d9272d044';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=967d9272d044';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=967d9272d044';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=967d9272d044';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=967d9272d044';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=967d9272d044';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=967d9272d044';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=967d9272d044';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=967d9272d044';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=967d9272d044';
+import { APKError } from './apk-error.js?v=967d9272d044';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=967d9272d044';
+import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=967d9272d044';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=967d9272d044';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=967d9272d044';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=967d9272d044';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=967d9272d044';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=967d9272d044';
+import { Scheduler, Blocked } from './scheduler.js?v=967d9272d044';
+import { bootClassLacksMember } from './boot-class-members.js?v=967d9272d044';
+export { APKError } from './apk-error.js?v=967d9272d044';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -78,9 +78,93 @@ function utf16String(units) {
 const cellRange = (cells, from, to) => ArrayBuffer.isView(cells) ? cells.subarray(from, to) : cells.slice(from, to);
 const methodKey = m => `${m.owner}->${m.name}${m.signature}`;
 const fieldKey = f => `${f.owner}->${f.name}:${f.type}`;
+/** A dense array of `n` nulls: the "not decoded yet" cache of a lazy table. Built by pushing so it is a packed array; `new Array(n)` above a few
+ *  thousand elements is dictionary-mode in V8 and every index read on the interpreter's path would pay for it. */
+const nulls = n => { const a = []; for (let i = 0; i < n; i++) a.push(null); return a; };
+const dataProperty = (o, k, v) => { Object.defineProperty(o, k, { value: v, writable: true, enumerable: true, configurable: true }); return v; };
+// Derived strings of an id are own accessors that replace themselves with a data property on first read (docs/MEMORY-ON-DEMAND.md, A.4): a method id that
+// is only ever compared by owner/name never pays for its `owner->name(sig)` key, and after the first read the property costs exactly what the eager string did.
+// They stay enumerable so a spread ({ ...method }) or a deep comparison sees the computed value, as with the former data properties.
+const LAZY_METHOD = {
+  signature: { enumerable: true, configurable: true, get() { return dataProperty(this, 'signature', this.dex.proto(this.dex.reader.u16(this.dex.methodIdsOffset + this.index * 8 + 2)).signature); }, set(v) { dataProperty(this, 'signature', v); } },
+  key: { enumerable: true, configurable: true, get() { return dataProperty(this, 'key', this.dex.intern(methodKey(this))); }, set(v) { dataProperty(this, 'key', v); } },
+};
+const LAZY_FIELD = { key: { enumerable: true, configurable: true, get() { return dataProperty(this, 'key', this.dex.intern(fieldKey(this))); }, set(v) { dataProperty(this, 'key', v); } } };
+const LAZY_PROTO = { signature: { enumerable: true, configurable: true, get() { return dataProperty(this, 'signature', this.dex.intern(`(${this.parameters.join('')})${this.result}`)); }, set(v) { dataProperty(this, 'signature', v); } } };
 
+/**
+ * Class table of one DEX file: the class_def index by descriptor, with the class record (fields, methods Map, offsets) built on the first lookup of
+ * that class and cached (docs/MEMORY-ON-DEMAND.md, A.1). Map-like: get/has/set/delete/keys/values/entries/forEach/size/iteration; values() and
+ * iteration materialize every class, which only the diagnostics that scan the whole table do.
+ */
+export class DexClassTable {
+  constructor(dex, names) { this.dex = dex; this.names = names; this.records = nulls(names.size); this.extra = null; }
+  get size() { return this.names.size + (this.extra ? this.extra.size : 0); }
+  get(name) {
+    const i = this.names.get(name);
+    if (i === undefined) return this.extra ? this.extra.get(name) : undefined;
+    const cls = this.records[i]; return cls !== null ? cls : this.dex.materializeClass(i);
+  }
+  has(name) { return this.names.has(name) || (this.extra !== null && this.extra.has(name)); }
+  set(name, cls) { const i = this.names.get(name); if (i !== undefined) this.records[i] = cls; else (this.extra ??= new Map()).set(name, cls); return this; }
+  delete(name) { const i = this.names.get(name); if (i === undefined) return this.extra ? this.extra.delete(name) : false; this.names.delete(name); this.records[i] = null; return true; }
+  /** The superclass descriptor of a class (null for java.lang.Object, undefined when the table lacks the class) without building its record. */
+  superclassOf(name) {
+    const i = this.names.get(name);
+    if (i === undefined) return this.extra?.get(name)?.superclass;
+    const cls = this.records[i]; if (cls !== null) return cls.superclass;
+    const parent = this.dex.reader.u32(this.dex.classDefsOffset + i * 32 + 8); return parent === NO_INDEX ? null : this.dex.type(parent);
+  }
+  /** The interfaces a class declares (the shared type_list; callers copy if they keep it), undefined when the table lacks the class; no record is built. */
+  interfacesOf(name) {
+    const i = this.names.get(name);
+    if (i === undefined) return this.extra?.get(name)?.interfaces;
+    const cls = this.records[i]; return cls !== null ? cls.interfaces : this.dex.typeList(this.dex.reader.u32(this.dex.classDefsOffset + i * 32 + 12));
+  }
+  /** The DEX that defines `name`, without building the record. */
+  dexOf(name) { return this.names.has(name) ? this.dex : this.extra?.get(name)?.dex; }
+  *keys() { yield* this.names.keys(); if (this.extra) yield* this.extra.keys(); }
+  *values() { for (const name of this.keys()) yield this.get(name); }
+  *entries() { for (const name of this.keys()) yield [name, this.get(name)]; }
+  [Symbol.iterator]() { return this.entries(); }
+  forEach(callback, thisArg) { for (const [name, cls] of this.entries()) callback.call(thisArg, cls, name, this); }
+  /** The records built so far (diagnostics; never materializes). */
+  materialized() { const out = []; for (const cls of this.records) if (cls !== null) out.push(cls); if (this.extra) out.push(...this.extra.values()); return out; }
+}
+
+/**
+ * Class table of a program (APK layer, framework layer, both): descriptor -> class record, or the DexFile that defines it until the record is first
+ * looked up. Same Map-like surface as DexClassTable; the record identity is the DEX table's, so every table hands out the same object for a class.
+ */
+export class ClassTable {
+  constructor(source = null) { this.map = new Map(); if (source) for (const [name, value] of (source instanceof ClassTable ? source.map : source)) this.map.set(name, value); }
+  get size() { return this.map.size; }
+  get(name) {
+    const value = this.map.get(name);
+    if (value === undefined || !(value instanceof DexFile)) return value;
+    const cls = value.classes.get(name); this.map.set(name, cls); return cls;
+  }
+  has(name) { return this.map.has(name); }
+  set(name, value) { this.map.set(name, value); return this; }
+  delete(name) { return this.map.delete(name); }
+  superclassOf(name) { const value = this.map.get(name); return value === undefined ? undefined : value instanceof DexFile ? value.classes.superclassOf(name) : value.superclass; }
+  interfacesOf(name) { const value = this.map.get(name); return value === undefined ? undefined : value instanceof DexFile ? value.classes.interfacesOf(name) : value.interfaces; }
+  dexOf(name) { const value = this.map.get(name); return value instanceof DexFile ? value : value?.dex; }
+  keys() { return this.map.keys(); }
+  *values() { for (const name of this.map.keys()) yield this.get(name); }
+  *entries() { for (const name of this.map.keys()) yield [name, this.get(name)]; }
+  [Symbol.iterator]() { return this.entries(); }
+  forEach(callback, thisArg) { for (const [name, cls] of this.entries()) callback.call(thisArg, cls, name, this); }
+}
+
+/**
+ * One DEX file. The header and the type descriptors are read at construction; everything else is decoded on demand and cached by index
+ * (docs/MEMORY-ON-DEMAND.md, A): `string(i)`, `proto(i)`, `method(i)`, `field(i)` and the class records of `classes`. The arrays `strings`,
+ * `protos`, `methods` and `fields` are the caches (null until decoded; their `length` is the table size), so callers use the accessors; a method or
+ * field id keeps one identity for the life of the DEX (dispatch caches key on it) and carries non-enumerable `dex` and `index`.
+ */
 export class DexFile {
-  constructor(input, { filename = 'classes.dex', maxBytes = 64 * 1024 * 1024, typeRename = null } = {}) {
+  constructor(input, { filename = 'classes.dex', maxBytes = 64 * 1024 * 1024, typeRename = null, internTable = null } = {}) {
     this.filename = filename;
     const b = this.reader = new BinaryReader(input);
     if (b.length < 112 || b.length > maxBytes) fail(`Invalid DEX size (maximum ${maxBytes / 1024 / 1024} MiB): ${filename}`);
@@ -88,113 +172,155 @@ export class DexFile {
     if (!/^dex\n0(35|36|37|38|39|40)\0$/.test(magic)) fail('Unsupported DEX magic/version; expected dex 035–040');
     if (b.u32(32) !== b.length || b.u32(36) !== 112 || b.u32(40) !== 0x12345678) fail('Malformed DEX header or byte order');
     const table = (p, width) => { const n = b.u32(p), offset = b.u32(p + 4); b.table(n, offset, width); return [n, offset]; };
-    const indexed = (list, i, name) => { if (i >= list.length) fail(`Invalid DEX ${name} index ${i}`); return list[i]; };
-    const [sn, so] = table(56, 4);
-    this.strings = [];
-    for (let i = 0; i < sn; i++) {
-      const c = { p: b.u32(so + i * 4) }, size = b.uleb(c);
-      // Each UTF-16 unit takes at least one MUTF-8 byte, so the file itself bounds every string.
-      if (size > b.length - c.p) fail('DEX string is longer than its file');
-      const units = [];
-      while (true) {
-        const a = b.u8(c.p++);
-        if (!a) break;
-        let unit;
-        if (a < 128) unit = a;
-        else if ((a & 0xe0) === 0xc0) {
-          const z = b.u8(c.p++);
-          if ((z & 0xc0) !== 0x80) fail('Malformed DEX MUTF-8');
-          unit = ((a & 31) << 6) | (z & 63);
-          if (unit < 128 && !(a === 0xc0 && z === 0x80)) fail('Overlong DEX MUTF-8');
-        } else if ((a & 0xf0) === 0xe0) {
-          const z = b.u8(c.p++), q = b.u8(c.p++);
-          if ((z & 0xc0) !== 0x80 || (q & 0xc0) !== 0x80) fail('Malformed DEX MUTF-8');
-          unit = ((a & 15) << 12) | ((z & 63) << 6) | (q & 63);
-          if (unit < 0x800) fail('Overlong DEX MUTF-8');
-        } else fail('Malformed DEX MUTF-8');
-        units.push(unit);
-        if (units.length > size) fail('DEX string length mismatch');
-      }
-      if (units.length !== size) fail('DEX string length mismatch');
-      this.strings.push(utf16String(units));
-    }
-    const string = i => indexed(this.strings, i, 'string');
+    this.internTable = internTable ?? new Map();
+    const [sn, so] = table(56, 4); this.stringIdsOffset = so; this.strings = nulls(sn);
     const [tn, to] = table(64, 4);
     // typeRename lets a ClassLoader define a second copy of a class under an alias descriptor: every type reference of this DEX (instructions,
     // method/field refs, supertypes, annotations) is read from this table, so renaming here re-binds the whole DEX to its own copies.
-    this.types = Array.from({ length: tn }, (_, i) => { const t = string(b.u32(to + i * 4)); return typeRename ? typeRename(t) : t; });
-    const type = i => indexed(this.types, i, 'type');
-    // Protos and classes may share one type_list; parse each offset once so shared lists cost nothing extra.
-    const typeLists = new Map();
-    const typeList = offset => {
-      if (!offset) return [];
-      let list = typeLists.get(offset);
-      if (!list) {
-        const n = b.u32(offset); b.table(n, offset + 4, 2);
-        list = Array.from({ length: n }, (_, i) => type(b.u16(offset + 4 + i * 2)));
-        typeLists.set(offset, list);
-      }
-      return list.slice();
-    };
-    const [pn, po] = table(72, 12), protos = [];
-    for (let i = 0; i < pn; i++) {
-      const p = po + i * 12, parameters = typeList(b.u32(p + 8)), result = type(b.u32(p + 4));
-      protos.push({ parameters, result, signature: `(${parameters.join('')})${result}` });
+    this.types = [];
+    for (let i = 0; i < tn; i++) { const t = this.string(b.u32(to + i * 4)); this.types.push(typeRename ? typeRename(t) : t); }
+    this.typeLists = new Map();
+    const [pn, po] = table(72, 12); this.protoIdsOffset = po; this.protos = nulls(pn);
+    const [fn, fo] = table(80, 8); this.fieldIdsOffset = fo; this.fields = nulls(fn);
+    const [mn, mo] = table(88, 8); this.methodIdsOffset = mo; this.methods = nulls(mn);
+    const [cn, co] = table(96, 32); this.classDefsOffset = co;
+    const names = new Map();
+    for (let i = 0; i < cn; i++) { const name = this.type(b.u32(co + i * 32)); if (names.has(name)) fail(`Duplicate DEX class ${name}`); names.set(name, i); }
+    this.classes = new DexClassTable(this, names);
+    this.definitions = 0; this.materializedClasses = 0;
+  }
+  /** One copy of each derived string per program: the same descriptors, signatures and keys repeat in every DEX of an APK. */
+  intern(text) { const known = this.internTable.get(text); if (known !== undefined) return known; this.internTable.set(text, text); return text; }
+  string(i) { const s = this.strings[i]; return s != null ? s : this.decodeString(i); }
+  decodeString(i) {
+    const b = this.reader;
+    if (!(i < this.strings.length)) fail(`Invalid DEX string index ${i}`);
+    const c = { p: b.u32(this.stringIdsOffset + i * 4) }, size = b.uleb(c);
+    // Each UTF-16 unit takes at least one MUTF-8 byte, so the file itself bounds every string.
+    if (size > b.length - c.p) fail('DEX string is longer than its file');
+    const units = [];
+    while (true) {
+      const a = b.u8(c.p++);
+      if (!a) break;
+      let unit;
+      if (a < 128) unit = a;
+      else if ((a & 0xe0) === 0xc0) {
+        const z = b.u8(c.p++);
+        if ((z & 0xc0) !== 0x80) fail('Malformed DEX MUTF-8');
+        unit = ((a & 31) << 6) | (z & 63);
+        if (unit < 128 && !(a === 0xc0 && z === 0x80)) fail('Overlong DEX MUTF-8');
+      } else if ((a & 0xf0) === 0xe0) {
+        const z = b.u8(c.p++), q = b.u8(c.p++);
+        if ((z & 0xc0) !== 0x80 || (q & 0xc0) !== 0x80) fail('Malformed DEX MUTF-8');
+        unit = ((a & 15) << 12) | ((z & 63) << 6) | (q & 63);
+        if (unit < 0x800) fail('Overlong DEX MUTF-8');
+      } else fail('Malformed DEX MUTF-8');
+      units.push(unit);
+      if (units.length > size) fail('DEX string length mismatch');
     }
-    const [fn, fo] = table(80, 8);
-    this.fields = Array.from({ length: fn }, (_, i) => {
-      const p = fo + i * 8, f = { owner: type(b.u16(p)), type: type(b.u16(p + 2)), name: string(b.u32(p + 4)) };
-      f.key = fieldKey(f); Object.defineProperty(f, 'dex', { value: this });Object.defineProperty(f,'index',{value:i});return f;
-    });
-    const [mn, mo] = table(88, 8);
-    this.methods = Array.from({ length: mn }, (_, i) => {
-      const p = mo + i * 8, proto = indexed(protos, b.u16(p + 2), 'proto');
-      const m = { owner: type(b.u16(p)), name: string(b.u32(p + 4)), ...proto };
-      m.key = methodKey(m); Object.defineProperty(m, 'dex', { value: this });Object.defineProperty(m,'index',{value:i});return m;
-    });
-    const [cn, co] = table(96, 32);
-    this.classes = new Map();
-    let definitions = 0;
-    for (let i = 0; i < cn; i++) {
-      const p = co + i * 32, name = type(b.u32(p)), parent = b.u32(p + 8);
-      const cls = { name, superclass: parent === NO_INDEX ? null : type(parent), interfaces: typeList(b.u32(p + 12)),
-        staticValuesOffset: b.u32(p + 28), annotationsOffset: b.u32(p + 20), staticFields: [], fields: [], methods: new Map(), flags: b.u32(p + 4) };
-      Object.defineProperty(cls, 'dex', { value: this });
-      const c = { p: b.u32(p + 24) };
-      if (c.p) {
-        const ns = b.uleb(c), ni = b.uleb(c), nd = b.uleb(c), nv = b.uleb(c);
-        definitions += ns + ni + nd + nv;
-        // Each field_id and method_id is defined by at most one class, so the id tables bound the total.
-        if (ns > fn || ni > fn || nd > mn || nv > mn || definitions > fn + mn) fail('Invalid/excessive DEX class data');
-        for (const [count, target] of [[ns, cls.staticFields], [ni, cls.fields]]) {
-          let index = 0;
-          for (let j = 0; j < count; j++) {
-            index += b.uleb(c); const flags = b.uleb(c);
-            indexed(this.fields, index, 'encoded field'); target.push({ index, flags });
-          }
-        }
-        for (const count of [nd, nv]) {
-          let index = 0;
-          for (let j = 0; j < count; j++) {
-            index += b.uleb(c);
-            const m = indexed(this.methods, index, 'encoded method'), flags = b.uleb(c), offset = b.uleb(c);
-            let code = null;
-            if (offset) {
-              const registers = b.u16(offset), incoming = b.u16(offset + 2), tries = b.u16(offset + 6), units = b.u32(offset + 12);
-              // registers and ins are u16 in the format; b.check below bounds the code by the file.
-              if (incoming > registers) fail('DEX code has more incoming than total registers');
-              b.check(offset + 16, units * 2);
-              code = { registers, incoming, tries, units, offset: offset + 16 };
-            }
-            const key = m.name + m.signature;
-            if (cls.methods.has(key)) fail(`Duplicate DEX method ${m.key}`);
-            cls.methods.set(key, { method: m, flags, code });
-          }
+    if (units.length !== size) fail('DEX string length mismatch');
+    return this.strings[i] = utf16String(units);
+  }
+  /** Index of `text` in the string table, or -1. string_ids are sorted by UTF-16 code unit value (the format requires it; ART rejects out-of-order ids), so this is a binary search. */
+  stringIndex(text) {
+    let low = 0, high = this.strings.length - 1;
+    while (low <= high) { const mid = (low + high) >> 1, s = this.string(mid); if (s === text) return mid; if (s < text) low = mid + 1; else high = mid - 1; }
+    return -1;
+  }
+  type(i) { if (!(i < this.types.length)) fail(`Invalid DEX type index ${i}`); return this.types[i]; }
+  /** Protos and classes may share one type_list; each offset is parsed once and callers copy if they keep it. */
+  typeList(offset) {
+    if (!offset) return [];
+    let list = this.typeLists.get(offset);
+    if (!list) {
+      const b = this.reader, n = b.u32(offset); b.table(n, offset + 4, 2);
+      list = []; for (let i = 0; i < n; i++) list.push(this.type(b.u16(offset + 4 + i * 2)));
+      this.typeLists.set(offset, list);
+    }
+    return list;
+  }
+  proto(i) { const p = this.protos[i]; return p != null ? p : this.decodeProto(i); }
+  decodeProto(i) {
+    if (!(i < this.protos.length)) fail(`Invalid DEX proto index ${i}`);
+    const b = this.reader, p = this.protoIdsOffset + i * 12, proto = { parameters: this.typeList(b.u32(p + 8)).slice(), result: this.type(b.u32(p + 4)) };
+    Object.defineProperties(proto, LAZY_PROTO); Object.defineProperty(proto, 'dex', { value: this });
+    return this.protos[i] = proto;
+  }
+  field(i) { const f = this.fields[i]; return f != null ? f : this.decodeField(i); }
+  decodeField(i) {
+    if (!(i < this.fields.length)) fail(`Invalid DEX field index ${i}`);
+    const b = this.reader, p = this.fieldIdsOffset + i * 8, f = { owner: this.type(b.u16(p)), type: this.type(b.u16(p + 2)), name: this.string(b.u32(p + 4)) };
+    Object.defineProperties(f, LAZY_FIELD); Object.defineProperty(f, 'dex', { value: this }); Object.defineProperty(f, 'index', { value: i });
+    return this.fields[i] = f;
+  }
+  method(i) { const m = this.methods[i]; return m != null ? m : this.decodeMethod(i); }
+  decodeMethod(i) {
+    if (!(i < this.methods.length)) fail(`Invalid DEX method index ${i}`);
+    const b = this.reader, p = this.methodIdsOffset + i * 8, proto = this.proto(b.u16(p + 2));
+    const m = { owner: this.type(b.u16(p)), name: this.string(b.u32(p + 4)), parameters: proto.parameters, result: proto.result };
+    Object.defineProperties(m, LAZY_METHOD); Object.defineProperty(m, 'dex', { value: this }); Object.defineProperty(m, 'index', { value: i });
+    return this.methods[i] = m;
+  }
+  /** Owner descriptor of a method / field id without decoding the id (inventory scans). */
+  methodOwner(i) { if (!(i < this.methods.length)) fail(`Invalid DEX method index ${i}`); return this.type(this.reader.u16(this.methodIdsOffset + i * 8)); }
+  fieldOwner(i) { if (!(i < this.fields.length)) fail(`Invalid DEX field index ${i}`); return this.type(this.reader.u16(this.fieldIdsOffset + i * 8)); }
+  /** The method ids whose name is one of `names` (a string or an iterable of strings), decoding only those. */
+  methodsNamed(names) { return this.idsNamed(names, this.methodIdsOffset, this.methods.length, i => this.method(i)); }
+  fieldsNamed(names) { return this.idsNamed(names, this.fieldIdsOffset, this.fields.length, i => this.field(i)); }
+  idsNamed(names, offset, count, decode) {
+    const wanted = new Set(); for (const name of typeof names === 'string' ? [names] : names) { const index = this.stringIndex(name); if (index >= 0) wanted.add(index); }
+    const out = []; if (!wanted.size) return out;
+    const b = this.reader;
+    for (let i = 0, p = offset + 4; i < count; i++, p += 8) if (wanted.has(b.u32(p))) out.push(decode(i));
+    return out;
+  }
+  /** Every method / field id / string decoded (dense arrays; inventory and tests). */
+  allMethods() { for (let i = 0; i < this.methods.length; i++) if (this.methods[i] === null) this.decodeMethod(i); return this.methods; }
+  allFields() { for (let i = 0; i < this.fields.length; i++) if (this.fields[i] === null) this.decodeField(i); return this.fields; }
+  allStrings() { for (let i = 0; i < this.strings.length; i++) if (this.strings[i] === null) this.decodeString(i); return this.strings; }
+  /** The class records built so far (diagnostics). */
+  materializedClassRecords() { return this.classes.materialized(); }
+  /** Builds the record of class_def `i`: header, class_data (fields, methods with their code headers) and the offsets of static values and annotations. */
+  materializeClass(i) {
+    const b = this.reader, fn = this.fields.length, mn = this.methods.length, p = this.classDefsOffset + i * 32, name = this.type(b.u32(p)), parent = b.u32(p + 8);
+    const cls = { name, superclass: parent === NO_INDEX ? null : this.type(parent), interfaces: this.typeList(b.u32(p + 12)).slice(),
+      staticValuesOffset: b.u32(p + 28), annotationsOffset: b.u32(p + 20), staticFields: [], fields: [], methods: new Map(), flags: b.u32(p + 4) };
+    Object.defineProperty(cls, 'dex', { value: this });
+    const c = { p: b.u32(p + 24) };
+    if (c.p) {
+      const ns = b.uleb(c), ni = b.uleb(c), nd = b.uleb(c), nv = b.uleb(c);
+      this.definitions += ns + ni + nd + nv;
+      // Each field_id and method_id is defined by at most one class, so the id tables bound the total.
+      if (ns > fn || ni > fn || nd > mn || nv > mn || this.definitions > fn + mn) fail('Invalid/excessive DEX class data');
+      for (const [count, target] of [[ns, cls.staticFields], [ni, cls.fields]]) {
+        let index = 0;
+        for (let j = 0; j < count; j++) {
+          index += b.uleb(c); const flags = b.uleb(c);
+          if (index >= fn) fail(`Invalid DEX encoded field index ${index}`); target.push({ index, flags });
         }
       }
-      if (this.classes.has(name)) fail(`Duplicate DEX class ${name}`);
-      this.classes.set(name, cls);
+      for (const count of [nd, nv]) {
+        let index = 0;
+        for (let j = 0; j < count; j++) {
+          index += b.uleb(c);
+          if (index >= mn) fail(`Invalid DEX encoded method index ${index}`);
+          const m = this.method(index), flags = b.uleb(c), offset = b.uleb(c);
+          let code = null;
+          if (offset) {
+            const registers = b.u16(offset), incoming = b.u16(offset + 2), tries = b.u16(offset + 6), units = b.u32(offset + 12);
+            // registers and ins are u16 in the format; b.check below bounds the code by the file.
+            if (incoming > registers) fail('DEX code has more incoming than total registers');
+            b.check(offset + 16, units * 2);
+            code = { registers, incoming, tries, units, offset: offset + 16 };
+          }
+          const key = m.name + m.signature;
+          if (cls.methods.has(key)) fail(`Duplicate DEX method ${m.key}`);
+          cls.methods.set(key, { method: m, flags, code });
+        }
+      }
     }
+    this.materializedClasses++;
+    return this.classes.records[i] = cls;
   }
   annotationSet(offset,visibilityFilter=1){
     if(!offset)return [];const b=this.reader,count=b.u32(offset);if(count>100000)fail('Excessive DEX annotations');b.table(count,offset+4,4);const values=[];
@@ -209,7 +335,7 @@ export class DexFile {
     if(depth>32)fail('DEX annotation nesting limit exceeded');
     const index=this.reader.uleb(cursor),type=this.types[index],size=this.reader.uleb(cursor);
     if(!type||size>100000)fail('Invalid/excessive DEX annotation');
-    const values=new Map();for(let i=0;i<size;i++){const name=this.strings[this.reader.uleb(cursor)];if(name===undefined||values.has(name))fail('Invalid annotation element name');values.set(name,this.encodedValue(cursor,depth+1));}
+    const values=new Map();for(let i=0;i<size;i++){const nameIndex=this.reader.uleb(cursor),name=nameIndex<this.strings.length?this.string(nameIndex):undefined;if(name===undefined||values.has(name))fail('Invalid annotation element name');values.set(name,this.encodedValue(cursor,depth+1));}
     return {encoded:'annotation',type,values};
   }
   encodedValue(cursor, depth = 0) {
@@ -230,9 +356,10 @@ export class DexFile {
     if (type === 0x11) return BigInt.asIntN(64, read(8) << BigInt((7 - arg) * 8));
     if ([0x17, 0x18, 0x19, 0x1a, 0x1b].includes(type)) {
       const index = Number(read(4));
-      const list = type === 0x17 ? this.strings : type === 0x18 ? this.types : type === 0x1a ? this.methods : this.fields;
-      if (index >= list.length) fail('Invalid encoded DEX reference');
-      return type === 0x17 ? list[index] : { encoded: type === 0x18 ? 'class' : type === 0x1a ? 'method' : type === 0x19 ? 'field' : 'enum', value: list[index] };
+      const count = type === 0x17 ? this.strings.length : type === 0x18 ? this.types.length : type === 0x1a ? this.methods.length : this.fields.length;
+      if (index >= count) fail('Invalid encoded DEX reference');
+      if (type === 0x17) return this.string(index);
+      return { encoded: type === 0x18 ? 'class' : type === 0x1a ? 'method' : type === 0x19 ? 'field' : 'enum', value: type === 0x18 ? this.types[index] : type === 0x1a ? this.method(index) : this.field(index) };
     }
     if(type===0x1d&&arg===0)return this.encodedAnnotation(cursor,depth+1);
     if (type === 0x1c && arg === 0) {
@@ -249,48 +376,53 @@ export class DexFile {
 export class DexProgram {
   constructor(files, { bootFiles = [] } = {}) {
     if (!Array.isArray(files) || !files.length || files.length > 1024) fail('DEX program requires 1–1024 DEX files');
-    this.files = []; this.classes = new Map(); this.methods = []; this.fields = []; this.types = []; this.strings = [];
+    this.files = []; this.classes = new ClassTable(); this.types = []; this.internTable = new Map();
+    this.methodCount = 0; this.fieldCount = 0; this.stringCount = 0; this.allIds = null;
     let bytes = 0;
     for (let i = 0; i < files.length; i++) {
       const item = files[i], dex = item instanceof DexFile ? item : item.dex;
       if (!(dex instanceof DexFile)) fail('DexProgram requires parsed DexFile instances');
       const filename = item.filename ?? item.name ?? dex.filename ?? `classes${i ? i + 1 : ''}.dex`;
-      dex.filename = filename; bytes += dex.reader.length;
+      dex.filename = filename; dex.internTable = this.internTable; bytes += dex.reader.length;
       if (bytes > 768 * 1024 * 1024) fail('Aggregate DEX size exceeds 768 MiB limit');
       this.files.push({ filename, dex });
-      for (const [name, cls] of dex.classes) {
+      for (const name of dex.classes.keys()) {
         // DexPathList searches its dex elements in order, so the first definition wins and later ones are never loaded.
-        if (this.classes.has(name)) { (this.duplicateClasses ??= []).push({ name, kept: this.classes.get(name).dex.filename, ignored: filename }); continue; }
-        this.classes.set(name, cls);
+        if (this.classes.has(name)) { (this.duplicateClasses ??= []).push({ name, kept: this.classes.dexOf(name).filename, ignored: filename }); continue; }
+        this.classes.set(name, dex);
       }
-      this.methods = this.methods.concat(dex.methods); this.fields = this.fields.concat(dex.fields);
-      this.types = this.types.concat(dex.types); this.strings = this.strings.concat(dex.strings);
+      this.methodCount += dex.methods.length; this.fieldCount += dex.fields.length; this.stringCount += dex.strings.length;
+      this.types = this.types.concat(dex.types);
     }
     if (!Array.isArray(bootFiles) || bootFiles.length > 16) fail('Framework layer requires at most 16 DEX files');
-    this.bootFiles = []; this.bootClasses = new Map(); this.bootDexes = new Set(); let bootBytes = 0;
+    this.bootFiles = []; this.bootClasses = new ClassTable(); this.bootDexes = new Set(); let bootBytes = 0;
     for (let i = 0; i < bootFiles.length; i++) {
       const item = bootFiles[i], dex = item instanceof DexFile ? item : item.dex;
       if (!(dex instanceof DexFile)) fail('Framework layer requires parsed DexFile instances');
       if (this.files.some(file => file.dex === dex)) fail('A DEX instance cannot belong to both APK and framework layers');
       const filename = item.filename ?? item.name ?? dex.filename ?? `framework-${i}.dex`;
-      dex.filename = filename; bootBytes += dex.reader.length;
+      dex.filename = filename; dex.internTable = this.internTable; bootBytes += dex.reader.length;
       if (bootBytes > 128 * 1024 * 1024) fail('Framework DEX layer exceeds 128 MiB');
       this.bootFiles.push({ filename, dex }); this.bootDexes.add(dex);
-      for (const [name, cls] of dex.classes) {
+      for (const name of dex.classes.keys()) {
         if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/w3c\/dom\/|org\/apache\/harmony\/xml\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore|services)\/|com\/(?:android\/(?:internal|icu|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/collect|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
         if (this.bootClasses.has(name)) fail(`Duplicate framework class: ${name}`);
-        this.bootClasses.set(name, cls);
+        this.bootClasses.set(name, dex);
       }
       if (this.bootClasses.size > 100000) fail('Framework class count limit exceeded');
     }
     // APK inventory is deliberately separate. Curated boot definitions win even if an APK
     // embeds a same-named android/java class, matching the parent-first boot lookup policy.
-    this.resolvedClasses = new Map(this.classes);
-    for (const [name, cls] of this.bootClasses) this.resolvedClasses.set(name, cls);
+    this.resolvedClasses = new ClassTable(this.classes);
+    for (const [name, value] of this.bootClasses.map) this.resolvedClasses.set(name, value);
     this.dynamicFiles = [];
     this.frameworkSummary = { enabled: this.bootFiles.length > 0, dexFiles: this.bootFiles.map(file => file.filename), classes: this.bootClasses.size, bytes: bootBytes,
       shadowedAPKClasses: [...this.bootClasses.keys()].filter(name => this.classes.has(name)), policy: this.bootFiles.length ? 'curated-boot-parent-first' : 'no-boot-layer' };
   }
+  /** Every method / field id / string of the APK layer, decoded (tests and whole-program inventories; the run itself never needs them all). */
+  get methods() { return (this.allIds ??= {}).methods ??= this.files.flatMap(file => file.dex.allMethods()); }
+  get fields() { return (this.allIds ??= {}).fields ??= this.files.flatMap(file => file.dex.allFields()); }
+  get strings() { return (this.allIds ??= {}).strings ??= this.files.flatMap(file => file.dex.allStrings()); }
   /**
    * Adds a DEX loaded at run time (InMemoryDexClassLoader / DexClassLoader / DexFile). Classes join the shared class namespace after the
    * boot layer and the APK; a name that already exists is an error (the VM has one class table, so shadowing would silently change behavior).
@@ -303,11 +435,11 @@ export class DexProgram {
     const added = [];
     for (const name of dex.classes.keys()) {
       if (skip.has(name)) continue; // shadowed by a parent loader (parent-first delegation): that definition stays authoritative
-      if (this.resolvedClasses.has(name)) throw new APKError(`Dynamic DEX class ${name} already exists in ${this.resolvedClasses.get(name).dex.filename}; the ClassLoader must alias or shadow it first`, { kind: 'duplicate-dynamic-class' });
+      if (this.resolvedClasses.has(name)) throw new APKError(`Dynamic DEX class ${name} already exists in ${this.resolvedClasses.dexOf(name).filename}; the ClassLoader must alias or shadow it first`, { kind: 'duplicate-dynamic-class' });
       added.push(name);
     }
-    dex.filename = filename; this.dynamicFiles.push({ filename, dex });
-    for (const name of added) { const cls = dex.classes.get(name); this.classes.set(name, cls); this.resolvedClasses.set(name, cls); }
+    dex.filename = filename; dex.internTable = this.internTable; this.dynamicFiles.push({ filename, dex });
+    for (const name of added) { this.classes.set(name, dex); this.resolvedClasses.set(name, dex); }
     return added;
   }
 }
@@ -1059,8 +1191,8 @@ export class APKRuntime {
     let answer = this.parentMemo.get(type); if (answer === undefined) { answer = this.parentUncached(type); if (this.parentMemo.size < 200000) this.parentMemo.set(type, answer); }
     return answer;
   }
-  parentUncached(type) { return type?.startsWith('[') ? 'Ljava/lang/Object;' : this.classes.get(type)?.superclass ?? this.skiaHost?.parent?.(type) ?? this.platform?.parent?.(type) ?? EXTERNAL_PARENTS.get(type) ?? this.platform?.fallbackParent?.(type) ?? (type === 'Ljava/lang/Object;' || type.length === 1 ? null : 'Ljava/lang/Object;'); }   // every reference type reaches Object (a host class declared without a parent, e.g. Resources$Theme, still answers Object.hashCode/equals)
-  interfaces(type) { return this.classes.get(type)?.interfaces ?? [...new Set([...(EXTERNAL_INTERFACES.get(type) ?? []), ...(this.skiaHost?.interfaces?.(type) ?? []), ...(this.platform?.interfaces?.(type) ?? [])])]; }
+  parentUncached(type) { return type?.startsWith('[') ? 'Ljava/lang/Object;' : (this.classes.superclassOf ? this.classes.superclassOf(type) : this.classes.get(type)?.superclass) ?? this.skiaHost?.parent?.(type) ?? this.platform?.parent?.(type) ?? EXTERNAL_PARENTS.get(type) ?? this.platform?.fallbackParent?.(type) ?? (type === 'Ljava/lang/Object;' || type.length === 1 ? null : 'Ljava/lang/Object;'); }   // every reference type reaches Object (a host class declared without a parent, e.g. Resources$Theme, still answers Object.hashCode/equals)
+  interfaces(type) { return (this.classes.interfacesOf ? this.classes.interfacesOf(type) : this.classes.get(type)?.interfaces) ?? [...new Set([...(EXTERNAL_INTERFACES.get(type) ?? []), ...(this.skiaHost?.interfaces?.(type) ?? []), ...(this.platform?.interfaces?.(type) ?? [])])]; }
   /** Memoized subtype test (the class graph only grows when more DEX files are loaded, which clears the memo). */
   isSubtype(child, ancestor) {
     const epoch = this.dex.dynamicFiles?.length ?? 0;
@@ -1237,13 +1369,13 @@ export class APKRuntime {
   initWait(type) { return new Blocked({ ready: () => this.initialized.get(type)?.status !== 'initializing', retry: true, reason: `class initialization of ${type}` }); }
   prepareStatics(cls, type) {
     for (const entry of cls.staticFields) {
-      const field = cls.dex.fields[entry.index]; this.storeField(this.staticFields, field.key, defaultValue(field.type));
+      const field = cls.dex.field(entry.index); this.storeField(this.staticFields, field.key, defaultValue(field.type));
     }
     if (cls.staticValuesOffset) {
       const cursor = { p: cls.staticValuesOffset }, count = cls.dex.reader.uleb(cursor);
       if (count > cls.staticFields.length) fail(`Invalid encoded static values in ${type}`);
       for (let i = 0; i < count; i++) {
-        const field = cls.dex.fields[cls.staticFields[i].index];
+        const field = cls.dex.field(cls.staticFields[i].index);
         this.staticFields.set(field.key, this.materialize(cls.dex.encodedValue(cursor), field.type));
       }
     }
@@ -1332,7 +1464,7 @@ export class APKRuntime {
     const declaredIn = owner => {
       const cls = this.classes.get(owner); if (!cls) return undefined;
       let index = cls.fieldIndex;
-      if (index === undefined) { index = cls.fieldIndex = new Map(); for (const entry of [...cls.fields, ...cls.staticFields]) { const declared = cls.dex.fields[entry.index]; const key = declared.name + ':' + declared.type; if (!index.has(key)) index.set(key, declared); } }
+      if (index === undefined) { index = cls.fieldIndex = new Map(); for (const entry of [...cls.fields, ...cls.staticFields]) { const declared = cls.dex.field(entry.index); const key = declared.name + ':' + declared.type; if (!index.has(key)) index.set(key, declared); } }
       return index.get(field.ntKey ??= field.name + ':' + field.type);
     };
     const inInterfaces = (owner, depth = 0) => {
@@ -1424,7 +1556,7 @@ export class APKRuntime {
       if (!['Ldalvik/annotation/InnerClass;', 'Ldalvik/annotation/EnclosingClass;', 'Ldalvik/annotation/EnclosingMethod;', 'Ldalvik/annotation/MemberClasses;'].includes(annotationType)) continue;
       const size = b.uleb(cursor); if (size > 32) fail('Malformed class nesting annotation');
       const attributes = new Map();
-      for (let j = 0; j < size; j++) attributes.set(cls.dex.strings[b.uleb(cursor)], cls.dex.encodedValue(cursor));
+      for (let j = 0; j < size; j++) attributes.set(cls.dex.string(b.uleb(cursor)), cls.dex.encodedValue(cursor));
       if (annotationType.endsWith('/InnerClass;')) { info.inner = true; info.simpleName = attributes.get('name'); info.modifiers = attributes.get('accessFlags'); }
       if (annotationType.endsWith('/EnclosingClass;')) info.declaringClass = attributes.get('value')?.value;
       if (annotationType.endsWith('/MemberClasses;')) info.members = (attributes.get('value')?.values ?? []).map(entry => entry.value).filter(value => typeof value === 'string');
@@ -1674,7 +1806,7 @@ export class APKRuntime {
     while (owner && !seenClasses.has(owner)) {
       seenClasses.add(owner); const cls = this.classes.get(owner);
       if (cls) for (const entry of cls.fields) {
-        const field = cls.dex.fields[entry.index]; if (field.type !== 'I') continue;
+        const field = cls.dex.field(entry.index); if (field.type !== 'I') continue;
         const key = Object.hasOwn(counters, field.name) ? `${dottedName(field.owner)}.${field.name}` : field.name;
         counters[key] = activity.fields.get(field.key) ?? 0;
       }
@@ -2392,7 +2524,7 @@ export class APKRuntime {
       }
       if (kind === 'field') {
         for (const item of [...cls.fields, ...cls.staticFields]) {
-          const field = cls.dex.fields[item.index]; if (field.name === name && (!publicOnly || item.flags & 1)) return { field, flags: item.flags };
+          const field = cls.dex.field(item.index); if (field.name === name && (!publicOnly || item.flags & 1)) return { field, flags: item.flags };
         }
       } else {
         const matches = [...cls.methods.values()].filter(def => def.method.name === name && def.method.parameters.join('') === parameters.join('') && (!publicOnly || def.flags & 1));
@@ -3173,7 +3305,7 @@ export class APKRuntime {
       const wanted = this.stringCharacters(args[1]);
       for (const entry of cls.staticFields) {
         if (!(entry.flags & 0x4000)) continue;
-        const field = cls.dex.fields[entry.index], value = this.staticFields.get(field.key);
+        const field = cls.dex.field(entry.index), value = this.staticFields.get(field.key);
         if (value && typeof value === 'object' && this.object(value).enumName !== undefined && this.stringCharacters(this.object(value).enumName) === wanted) return value;
       }
       this.throwJava('Ljava/lang/IllegalArgumentException;', `No enum constant ${type.slice(1, -1).replaceAll('/', '.').replaceAll('$', '.')}.${wanted}`);
@@ -3228,9 +3360,9 @@ export class APKRuntime {
     if (method.owner.endsWith('FieldUpdater;') && name === 'newUpdater') {
       const owner = this.object(args[0]).classType, fieldName = args[args.length - 1], cls = this.classes.get(owner);
       const expected = method.owner.includes('Reference') ? this.object(args[1]).classType : method.owner.includes('Integer') ? 'I' : 'J';
-      const entry = cls?.fields.find(item => { const field = cls.dex.fields[item.index]; return field.name === fieldName && field.type === expected; });
+      const entry = cls?.fields.find(item => { const field = cls.dex.field(item.index); return field.name === fieldName && field.type === expected; });
       if (!entry || !(entry.flags & 0x40)) this.throwJava('Ljava/lang/IllegalArgumentException;', `Atomic updater requires volatile field ${owner}->${fieldName}:${expected}`);
-      const value = this.makeObject(method.owner); this.object(value).updaterField = cls.dex.fields[entry.index]; return value;
+      const value = this.makeObject(method.owner); this.object(value).updaterField = cls.dex.field(entry.index); return value;
     }
     if (method.owner === 'Ljava/lang/Class;' && name === 'forName') {
       return this.resolveClass(args[0], args.length === 1 || !!args[1], args.length === 3 ? (isNull(args[2]) ? 'boot' : args[2]) : undefined); // explicit null = the boot loader
@@ -3859,7 +3991,7 @@ export class APKRuntime {
         while (pending.length && seen.size < 256) {
           const owner = pending.shift(); if (!owner || seen.has(owner)) continue; seen.add(owner);
           const cls = this.classes.get(owner);
-          if (cls) { for (const item of [...cls.fields, ...cls.staticFields]) if (item.flags & 1) out.push({ field: cls.dex.fields[item.index], flags: item.flags }); pending.push(cls.superclass, ...cls.interfaces); }
+          if (cls) { for (const item of [...cls.fields, ...cls.staticFields]) if (item.flags & 1) out.push({ field: cls.dex.field(item.index), flags: item.flags }); pending.push(cls.superclass, ...cls.interfaces); }
           else { for (const c of constantFields(owner) ?? []) if (c.flags & 1) out.push({ field: { owner, name: c.name, type: c.type, key: `${owner}->${c.name}:${c.type}` }, flags: c.flags }); const parent = this.parent(owner); if (parent) pending.push(parent); }
         }
         const result = this.newArray('[Ljava/lang/reflect/Field;', out.length); this.object(result).elements = out.map(member => this.reflectionObject('field', member)); return result;
@@ -3882,7 +4014,7 @@ export class APKRuntime {
           this.object(result).elements = merged.map(member => this.reflectionObject(kind, member)); return result;
         }
         const kind = name.includes('Constructors') ? 'constructor' : name.includes('Fields') ? 'field' : 'method';
-        const members = kind === 'field' ? [...cls.fields, ...cls.staticFields].map(item => ({ field: cls.dex.fields[item.index], flags: item.flags }))
+        const members = kind === 'field' ? [...cls.fields, ...cls.staticFields].map(item => ({ field: cls.dex.field(item.index), flags: item.flags }))
           : [...cls.methods.values()].filter(def => (kind === 'constructor' ? def.method.name === '<init>' : !def.method.name.startsWith('<'))&&(name!=='getConstructors'||!!(def.flags&1)));
         const result = this.newArray(`[Ljava/lang/reflect/${kind === 'constructor' ? 'Constructor' : kind === 'field' ? 'Field' : 'Method'};`, members.length);
         this.object(result).elements = members.map(member => this.reflectionObject(kind, member)); return result;

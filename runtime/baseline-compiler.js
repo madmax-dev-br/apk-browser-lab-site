@@ -157,7 +157,7 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         case 0x17: return putWide(a, `${BigInt(u[pc + 1] | (u[pc + 2] << 16))}n`);
         case 0x18: return putWide(a, `${BigInt.asIntN(64, BigInt(u[pc + 1]) | BigInt(u[pc + 2]) << 16n | BigInt(u[pc + 3]) << 32n | BigInt(u[pc + 4]) << 48n)}n`);
         case 0x19: return putWide(a, `${BigInt.asIntN(64, BigInt(u[pc + 1]) << 48n)}n`);
-        case 0x1a: case 0x1b: { const i = op === 0x1a ? u[pc + 1] : u[pc + 1] + u[pc + 2] * 65536; return `r[${a}] = S[${i}];`; }
+        case 0x1a: case 0x1b: { const i = op === 0x1a ? u[pc + 1] : u[pc + 1] + u[pc + 2] * 65536; dex.string(i); return `r[${a}] = S[${i}];`; }   // decoded now: S is the lazy string cache, filled for good
         case 0x1c: return `{ const t = T[${u[pc + 1]}]; if (!rt.classes.has(t)) rt.assertResolvable(t); r[${a}] = rt.classObject(t); }`;
         case 0x1f: { const s = site({ type: null, epoch: -1, answer: false }); return `{ const v = r[${a}]; if (v !== null && v !== 0 && !H.subtype(rt, Z[${s}], rt.typeOf(v), T[${u[pc + 1]}])) { rt.assertResolvable(T[${u[pc + 1]}]); H.castFail(rt, v, T[${u[pc + 1]}]); } }`; }
         case 0x20: { const s = site({ type: null, epoch: -1, answer: false }); return `{ const v = r[${hi}]; r[${lo}] = v !== null && v !== 0 && H.subtype(rt, Z[${s}], rt.typeOf(v), T[${u[pc + 1]}]) ? 1 : (rt.assertResolvable(T[${u[pc + 1]}]), 0); }`; }
@@ -199,7 +199,7 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         }
         case 0x52: case 0x53: case 0x54: case 0x55: case 0x56: case 0x57: case 0x58:
         case 0x59: case 0x5a: case 0x5b: case 0x5c: case 0x5d: case 0x5e: case 0x5f: {
-          const s = site({ field: null, key: null, type: null, def: undefined, more: null }), store = op >= 0x59, variant = op - (store ? 0x59 : 0x52), ref = u[pc + 1];
+          const s = site({ field: null, key: null, type: null, def: undefined, more: null }), store = op >= 0x59, variant = op - (store ? 0x59 : 0x52), ref = u[pc + 1]; dex.field(ref);   // FR is the lazy field-id cache: decode it now
           const prelude = `const o = rt.object(r[${hi}]); const s = Z[${s}]; if (o.type !== s.type) H.fieldSite(rt, s, FR[${ref}], o);`;
           if (!store) {
             const narrowed = variant === 3 ? 'v & 1' : variant === 4 ? '(v << 24) >> 24' : variant === 5 ? 'v & 65535' : variant === 6 ? '(v << 16) >> 16' : 'v';
@@ -210,7 +210,7 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         }
         case 0x60: case 0x61: case 0x62: case 0x63: case 0x64: case 0x65: case 0x66:
         case 0x67: case 0x68: case 0x69: case 0x6a: case 0x6b: case 0x6c: case 0x6d: {
-          const s = site({ field: null, key: null, ready: false }), store = op >= 0x67, variant = op - (store ? 0x67 : 0x60), ref = u[pc + 1];
+          const s = site({ field: null, key: null, ready: false }), store = op >= 0x67, variant = op - (store ? 0x67 : 0x60), ref = u[pc + 1]; dex.field(ref);
           if (!store) {
             const narrowed = variant === 3 ? 'v & 1' : variant === 4 ? '(v << 24) >> 24' : variant === 5 ? 'v & 65535' : variant === 6 ? '(v << 16) >> 16' : 'v';
             const read = `const s = Z[${s}]; let v; if (s.ready) { v = rt.staticFields.get(s.key); if (v === undefined) v = rt.readStatic(FR[${ref}]); } else v = H.staticSite(rt, s, FR[${ref}]);`;
@@ -273,7 +273,7 @@ export function compileMethod(rt, method, code, prog, tries, support) {
   try {
     const factory = new Function('rt', 'H', 'S', 'T', 'FR', 'Z', 'W', source);
     if (typeof process !== 'undefined' && process.env?.APKWEB_DEBUG_JIT_DUMP && method.key.includes(process.env.APKWEB_DEBUG_JIT_DUMP)) console.error('JIT', method.key, '\n' + source);
-    return factory(rt, support.helpers, dex.strings, dex.types, dex.fields, sites, support.WIDE_HIGH);
+    return factory(rt, support.helpers, dex.strings, dex.types, dex.fields, sites, support.WIDE_HIGH);   // S/T/FR: the DexFile caches themselves (every index this code uses was decoded above)
   } catch (error) {
     if (typeof process !== 'undefined' && process.env?.APKWEB_DEBUG_JIT) console.error('JIT compile failed for', method.key, error.message, '\n', source.slice(0, 2000));
     return null;

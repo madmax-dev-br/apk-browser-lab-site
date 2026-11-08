@@ -10,8 +10,8 @@
 // The report holds ONLY framework/JDK names and counts (and the native library file names the user asked for): app class names, method names and strings never
 // enter it, so it can be pasted into a chat. DOM-free and process-free: it runs in the Worker and in Node.
 
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=125d28c243f8';
-import { describeNativeLibrary } from './native-library-hints.js?v=125d28c243f8';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=967d9272d044';
+import { describeNativeLibrary } from './native-library-hints.js?v=967d9272d044';
 
 export const FRAMEWORK = /^L(android|java|javax|dalvik|libcore|sun|org\/(json|xml|w3c))\//;
 const SDK_INT_FIELD = 'Landroid/os/Build$VERSION;->SDK_INT:I';
@@ -47,7 +47,7 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
   const perDex = new Map();   // dex -> { methodCounts: Map(idx -> [direct, sdk, unknown]), typeCounts: Map(`${kind}:${idx}` -> [..]) , sdkFields: Set }
   const dexState = dex => {
     let state = perDex.get(dex);
-    if (!state) { const sdkFields = new Set(); dex.fields.forEach((f, i) => { if (f.key === SDK_INT_FIELD) sdkFields.add(i); }); perDex.set(dex, state = { methodCounts: new Map(), typeCounts: new Map(), sdkFields, nonVirtual: new Set() }); }
+    if (!state) { const sdkFields = new Set(); for (const f of dex.fieldsNamed('SDK_INT')) if (f.key === SDK_INT_FIELD) sdkFields.add(f.index); perDex.set(dex, state = { methodCounts: new Map(), typeCounts: new Map(), sdkFields, nonVirtual: new Set() }); }
     return state;
   };
   let scannedMethods = 0, interfaceSites = 0;
@@ -122,7 +122,7 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
   for (const [dex, state] of perDex) {
     if (cancelled()) return null;
     for (const [idx, counts] of state.methodCounts) {
-      const ref = dex.methods[idx]; if (!ref) continue;
+      const ref = idx < dex.methods.length ? dex.method(idx) : null; if (!ref) continue;
       referenced++;
       const owner = rejected(ref); if (!owner) continue;
       // a virtual call on a base class dispatches on the receiver: a concrete framework subclass that provides the method makes it runnable (DateFormat.format -> SimpleDateFormat)

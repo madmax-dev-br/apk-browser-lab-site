@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=125d28c243f8';
-import { APKError } from './apk-error.js?v=125d28c243f8';
-import { createHostRegistry, floatBits } from './host-contract.js?v=125d28c243f8';
-import { DIGESTS } from './crypto-host.js?v=125d28c243f8';
+import { gcRoot } from './heap-gc.js?v=967d9272d044';
+import { APKError } from './apk-error.js?v=967d9272d044';
+import { createHostRegistry, floatBits } from './host-contract.js?v=967d9272d044';
+import { DIGESTS } from './crypto-host.js?v=967d9272d044';
 
 // java.io.ObjectOutputStream / ObjectInputStream: the Java Object Serialization Stream Protocol (JDK 8 ObjectStreamConstants, protocol version 5) for the types a VM app
 // serializes through Parcel.writeSerializable, Bundle/Intent extras, WorkManager's Data, caches and Externalizable models: String, boxed primitives, primitive and reference
@@ -80,10 +80,10 @@ export function createSerializationHost(platform) {
 
   // ---- ObjectStreamClass: what the stream says about a class ---------------------------------------------------------------------------------------
   const descriptors = new WeakMap();
-  const dexInstanceFields = (r, t) => { const cls = r.classes.get(t); return cls ? cls.fields.map(item => ({ ...cls.dex.fields[item.index], flags: item.flags })) : []; };
+  const dexInstanceFields = (r, t) => { const cls = r.classes.get(t); return cls ? cls.fields.map(item => ({ ...cls.dex.field(item.index), flags: item.flags })) : []; };
   const explicitSuid = (r, t) => {
     const cls = r.classes.get(t);
-    for (const item of cls.staticFields) { const f = cls.dex.fields[item.index]; if (f.name === 'serialVersionUID' && f.type === 'J') { r.initialize(t); return BigInt.asIntN(64, BigInt(r.readStatic(f))); } }
+    for (const item of cls.staticFields) { const f = cls.dex.field(item.index); if (f.name === 'serialVersionUID' && f.type === 'J') { r.initialize(t); return BigInt.asIntN(64, BigInt(r.readStatic(f))); } }
     return null;
   };
   /** The JVM's default serialVersionUID (Object Serialization Specification 4.6): SHA-1 over class name, modifiers, interfaces, non-private members and <clinit>. Arrays: name + 0x411. */
@@ -93,7 +93,7 @@ export function createSerializationHost(platform) {
     else {
       const cls = r.classes.get(t); utf(dotted(t)); int(cls.flags & (0x1 | 0x10 | 0x200 | 0x400));
       for (const name of [...(cls.interfaces ?? [])].map(dotted).sort()) utf(name);
-      const fields = dexInstanceFields(r, t).concat(cls.staticFields.map(item => ({ ...cls.dex.fields[item.index], flags: item.flags })));
+      const fields = dexInstanceFields(r, t).concat(cls.staticFields.map(item => ({ ...cls.dex.field(item.index), flags: item.flags })));
       for (const f of fields.filter(f => !((f.flags & 0x2) && (f.flags & (0x8 | 0x80)))).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) { utf(f.name); int(f.flags & 0xdf); utf(f.type.replaceAll('/', '.')); }
       const methods = [...cls.methods.values()], jsig = m => m.method.signature.replaceAll('/', '.'), mask = m => m.flags & (0x1 | 0x2 | 0x4 | 0x8 | 0x10 | 0x20 | 0x100 | 0x400 | 0x800);
       if (methods.some(m => m.method.name === '<clinit>')) { utf('<clinit>'); int(8); utf('()V'); }

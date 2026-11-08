@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=125d28c243f8';
-import { NativeLibraryProvider, BASE_SONAME } from './jni-host.js?v=125d28c243f8';
+import { APKError } from './apk-error.js?v=967d9272d044';
+import { NativeLibraryProvider, BASE_SONAME } from './jni-host.js?v=967d9272d044';
 
 // SQLCipher for Android: System.loadLibrary("sqlcipher").
 //
@@ -30,7 +30,7 @@ export const SQLCIPHER_ARTIFACTS = [
 /** BuildConfig.VERSION_NAME as the DEX stores it (a static_values_list string constant), or null when the class or the constant is absent (R8 removes unused BuildConfigs). */
 function buildConfigVersion(program, className) {
   const cls = program.classes.get(className); if (!cls?.staticValuesOffset) return null;
-  const position = cls.staticFields.findIndex(({ index }) => cls.dex.fields[index].name === 'VERSION_NAME'); if (position < 0) return null;
+  const position = cls.staticFields.findIndex(({ index }) => cls.dex.field(index).name === 'VERSION_NAME'); if (position < 0) return null;
   const cursor = { p: cls.staticValuesOffset }, count = cls.dex.reader.uleb(cursor); if (position >= count) return null;
   let value = null;
   for (let i = 0; i <= position; i++) value = cls.dex.encodedValue(cursor);
@@ -43,8 +43,9 @@ export function detectSqlcipher(program) {
   for (const spec of SQLCIPHER_ARTIFACTS) {
     if (!program.classes.has(spec.entry)) continue;
     const natives = [];
-    for (const [name, cls] of program.classes) {
+    for (const name of program.classes.keys()) {
       if (!name.startsWith(spec.prefix)) continue;
+      const cls = program.classes.get(name);
       for (const { method, flags } of cls.methods.values()) if (flags & NATIVE) natives.push(`${name}.${method.name}${method.signature}`);
     }
     natives.sort();
