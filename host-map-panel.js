@@ -1,6 +1,6 @@
 // The "Redirecionar hosts" section of the Controles panel (src/host-map.js): N from -> to rows kept in the device settings (network.hostMap) and applied live through the same path as the
 // other device settings (the running VM gets them at once; the app keeps its URLs, only the exchange goes elsewhere).
-import { parseRule } from './host-map.js?v=e96a854757f6';
+import { parseRule } from './host-map.js?v=9cb1ef3bb75a';
 
 export function createHostMapPanel({ $, get, set }) {
   const list = () => $('hm-list');
