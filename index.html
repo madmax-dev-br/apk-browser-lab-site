@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=96c9de77f557">
-  <meta name="apk-browser-build" content="96c9de77f557">
+  <link rel="stylesheet" href="./styles.css?v=f14c82d5ae90">
+  <meta name="apk-browser-build" content="f14c82d5ae90">
 </head>
 <body>
   <header class="topbar">
@@ -105,9 +105,9 @@
               <p id="vm-memory-note" class="cp-note">Este número é o orçamento do heap Java (objetos e arrays da VM; os demais orçamentos crescem junto). O navegador gasta mais que isso: tabelas do DEX, CanvasKit, rasters e um objeto JavaScript por objeto Java. Uma aba acima de ~2–4 GiB pode ser encerrada pelo navegador. O limite do motor é 2 097 152 objetos (4 GiB é limitado a ele).</p>
               <p id="vm-memory-device" class="cp-note"></p>
               <label class="cp-field" for="vm-event-time"><span>Tempo máximo por evento<small>Quanto a VM espera um evento terminar antes de encerrá-lo com o relatório; vale na hora</small></span><select id="vm-event-time" aria-describedby="vm-event-note"></select></label>
+              <p id="vm-event-note" class="cp-note">A VM roda o código do app muitas vezes mais devagar que um aparelho. Uma inicialização com centenas de threads pode passar dos 25 s padrão sem estar travada: o relatório "Instruction budget exceeded" mostra as threads ainda avançando. Um tempo maior deixa terminar; um laço infinito de verdade continua sendo encerrado com relatório, só que mais tarde.</p>
               <label class="cp-field" for="vm-raster-scale"><span>Resolução no movimento<small>Enquanto a tela se mexe (animação, rolagem, transição), o quadro é desenhado nesta escala e refeito nítido quando para; vale na hora</small></span><select id="vm-raster-scale"><option value="1">100% (sempre nítido)</option><option value="0.75">75%</option><option value="0.5">50% (padrão)</option><option value="0.35">35%</option><option value="0.25">25%</option></select></label>
               <label class="cp-check" for="vm-raster-navigation"><input id="vm-raster-navigation" type="checkbox"><span>Tela nova começa em baixa resolução<small>O primeiro quadro de uma Activity ou janela nova sai na resolução de movimento e é refeito nítido quando a tela para; vale na hora</small></span></label>
-              <p id="vm-event-note" class="cp-note">A VM roda o código do app muitas vezes mais devagar que um aparelho. Uma inicialização com centenas de threads pode passar dos 25 s padrão sem estar travada: o relatório "Instruction budget exceeded" mostra as threads ainda avançando. Um tempo maior deixa terminar; um laço infinito de verdade continua sendo encerrado com relatório, só que mais tarde.</p>
               <label class="cp-field" for="tolerate-missing"><span>Modo tolerante<small>APIs do Android que faltam viram <code>STUB-VOID</code>/<code>STUB-RETURN</code> no log em vez de parar o app</small></span><select id="tolerate-missing"><option value="off">Desligado (estrito)</option><option value="void">Só métodos void</option><option value="primitives" selected>void e primitivos (0, false)</option><option value="all">Todos os tipos (0, false, null)</option></select></label>
               <label class="cp-check" for="strict-crash"><input id="strict-crash" type="checkbox"><span>Modo estrito de falhas<small>Uma exceção fatal em qualquer thread encerra o app (como o Android). Desligado, ela é registrada como <code>FATAL (tolerada)</code> no resumo e só a thread que falhou termina</small></span></label>
               <div id="app-data-row" class="app-data-row">
@@ -206,7 +206,7 @@
     </details>
     <footer><span><span class="footer-dot"></span> Sem instalação. Sem emulador. Sem upload.</span><a href="./hermes-proof/">Experimento Hermes no navegador ↗</a><span>APK Browser Lab <span class="footer-slash">/</span> protótipo técnico</span></footer>
   </main>
-  <script type="module" src="./app.js?v=96c9de77f557"></script>
+  <script type="module" src="./app.js?v=f14c82d5ae90"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>
