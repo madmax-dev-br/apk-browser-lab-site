@@ -1,6 +1,6 @@
 // The wire side of the web device's network: one HTTP exchange over fetch, shared by the in-realm executor (network-native.js) and the synchronous network worker
 // (network-worker.js). No VM state in here.
-import { mapUrl } from './host-map.js?v=c0aca60d691b';
+import { mapUrl } from './host-map.js?v=5c6c5cdda771';
 export const FORBIDDEN_REQUEST_HEADERS = new Set(['content-length', 'host', 'connection', 'transfer-encoding', 'keep-alive', 'upgrade', 'expect', 'te', 'trailer', 'proxy-connection']);
 /** Header names a browser's fetch silently drops; with a relay they travel under an x-apkweb- prefix instead. */
 export const BROWSER_ONLY_FORBIDDEN = new Set(['cookie', 'cookie2', 'user-agent', 'accept-encoding', 'origin', 'referer', 'date', 'dnt', 'via']);
@@ -21,7 +21,8 @@ export async function openExchange(request, { fetch: fetchFunction = globalThis.
     if (browser && BROWSER_ONLY_FORBIDDEN.has(lower) && !proxyUrl) { dropped?.add(lower); continue; }
     headers.push([proxyUrl && browser && BROWSER_ONLY_FORBIDDEN.has(lower) ? 'x-apkweb-' + lower : name, value]);
   }
-  let target = mapUrl(request.url, hostMap)?.url ?? request.url;   // "Redirecionar hosts" (src/host-map.js): the exchange goes to the mapped host, the app keeps its URL
+  const mapped = mapUrl(request.url, hostMap);
+  let target = mapped?.url ?? request.url;   // "Redirecionar hosts" (src/host-map.js): the exchange goes to the mapped host, the app keeps its URL
   if (proxyUrl) target = proxyUrl.includes('{url}') ? proxyUrl.replace('{url}', encodeURIComponent(target)) : proxyUrl + encodeURIComponent(target);   // the relay repeats the (mapped) target
   const manual = redirect === 'manual' || (redirect !== 'follow' && !browser) || request.redirect === 0;
   const init = { method: request.method, headers, redirect: manual ? 'manual' : 'follow', signal, credentials: 'omit', cache: 'no-store' };
@@ -40,8 +41,14 @@ export async function openExchange(request, { fetch: fetchFunction = globalThis.
     out.push([name, value]);
   });
   const kept = encoded ? out.filter(([name]) => name.toLowerCase() !== 'content-length') : out;   // the transport already decoded the body (OkHttp's transparent gzip drops both too)
-  const url = !proxyUrl && response.redirected && response.url ? response.url : request.url;       // only a followed redirect changes the URL
+  let url = !proxyUrl && response.redirected && response.url ? response.url : request.url;         // only a followed redirect changes the URL
+  if (mapped && url !== request.url) url = unmapOrigin(url, mapped.url, request.url);              // a redirect the target followed on its own origin stays on the app's origin
   return { head: { version: 'HTTP/1.1', status: response.status, reason: response.statusText ?? '', url, headers: kept }, reader: response.body ? response.body.getReader() : null };
+}
+
+/** `url` on the origin of `mappedUrl` -> the same path on the origin of `originalUrl` (any other URL is returned as is). */
+function unmapOrigin(url, mappedUrl, originalUrl) {
+  try { const at = new URL(url), mapped = new URL(mappedUrl); if (at.origin !== mapped.origin) return url; const original = new URL(originalUrl); return original.origin + at.pathname + at.search + at.hash; } catch { return url; }
 }
 
 /** The Set-Cookie values a relay returned in x-apkweb-set-cookie: a JSON array (a header value cannot hold line breaks), or the older newline-separated form. */
@@ -64,6 +71,7 @@ export function describeFailure(error, request, timedOut = false) {
   if (/^(CERT_|DEPTH_ZERO|SELF_SIGNED|UNABLE_TO_|ERR_TLS|ERR_SSL|ERR_CERT|HANDSHAKE)/.test(code) || /certificate|tls|ssl/i.test(message)) return { type: 'Ljavax/net/ssl/SSLHandshakeException;', message: `Chain validation failed: ${message}` };
   if (code === 'UND_ERR_ABORTED' || code === 'ERR_STREAM_PREMATURE_CLOSE') return { type: 'Ljava/io/IOException;', message: 'unexpected end of stream' };
   if (code === 'APKWEB_OPAQUE_REDIRECT') return { type: 'Ljava/io/IOException;', message };
+  if (code === 'APKWEB_RELAY_PRIVATE') return { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${host} (port ${port}) from /:: (port 0): the CORS relay refused the target (${message})` };
   if (name === 'TypeError' && /fetch/i.test(message)) return { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${host} (port ${port}): the browser reports unreachable hosts, CORS rejections and blocked requests identically ("${message}")` };
   return { type: 'Ljava/io/IOException;', message: `${name || 'Error'}: ${message}` };
 }

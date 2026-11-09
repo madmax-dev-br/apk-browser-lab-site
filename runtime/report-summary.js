@@ -1,10 +1,11 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=c0aca60d691b';
-import { staticRetentionLines } from './heap-gc.js?v=c0aca60d691b';
-import { overrideSummaryLines } from './method-overrides.js?v=c0aca60d691b';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=c0aca60d691b';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=c0aca60d691b';
+import { TimeBreakdown } from './time-breakdown.js?v=5c6c5cdda771';
+import { staticRetentionLines } from './heap-gc.js?v=5c6c5cdda771';
+import { overrideSummaryLines } from './method-overrides.js?v=5c6c5cdda771';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=5c6c5cdda771';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=5c6c5cdda771';
+import { hostMapSummaryLines } from './host-map.js?v=5c6c5cdda771';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -46,6 +47,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
   part(() => { const lines = overrideSummaryLines(runtime); if (lines) out.push(...lines); });   // debugging tool in use: never silent (src/method-overrides.js)
   part(() => { const line = ignoredActivitiesLine(runtime); if (line) out.push(line); });   // debugging tool in use: never silent (src/ignored-activities.js)
   part(() => { const lines = endpointMockSummaryLines(runtime); if (lines) out.push(...lines); });   // debugging tool in use: never silent (src/endpoint-mocks.js)
+  part(() => { const lines = hostMapSummaryLines(runtime.network?.policy?.hostMap ?? runtime.platform?.device?.network?.hostMap, runtime.network?.redirectTable); if (lines) out.push(...lines); });   // "Redirecionar hosts" in use: never silent (src/host-map.js)
   if (tela?.length) out.push(...tela);   // "Tela:" lines computed by the screen-state report (activity, first frame verdict, Compose, layout)
   part(() => {   // fatal exceptions the tolerant mode let pass: never silent
     const table = runtime.toleratedFatals; if (!table?.size) return;

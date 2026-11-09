@@ -231,13 +231,20 @@
 .ia-available li button:disabled{opacity:.55;cursor:default}
 .ia-available .ia-empty{padding:6px 8px;font-size:9px;color:#9aa0ae}
 /* Redirecionar hosts: origin, arrow, target and Remover on one line, the explanation below */
-.hm-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr) auto;gap:6px 6px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:6px}
-.hm-row input[type=checkbox]{accent-color:var(--accent)}
-.hm-row .hm-from,.hm-row .hm-to{width:100%;min-width:0;box-sizing:border-box;font:9px ui-monospace,monospace}
-.hm-row .hm-arrow{color:#9aa0ae;font-size:11px}
-.hm-row .hm-meta{grid-column:1/-1;font-size:9px;color:#9aa0ae;overflow-wrap:anywhere}.hm-row .hm-meta[data-state=error]{color:#d4504a}.hm-row .hm-meta[data-state=ok]{color:#3c9a64}
-:root[data-theme=dark] .hm-row .hm-meta[data-state=error]{color:#f08a84}:root[data-theme=dark] .hm-row .hm-meta[data-state=ok]{color:#7bd19b}
-@media (max-width:480px){.hm-row{grid-template-columns:auto minmax(0,1fr) auto}.hm-row .hm-arrow{display:none}.hm-row .hm-to{grid-column:2/3}}
+.hm-list{container-type:inline-size}
+.hm-row{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--line);border-radius:8px}
+.hm-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hm-toggle{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#4a5060;cursor:pointer}.hm-toggle input{accent-color:var(--accent);width:15px;height:15px;margin:0}
+.hm-fields{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:6px 12px;align-items:end}
+.hm-field{display:flex;flex-direction:column;gap:4px;min-width:0}.hm-field-name{font-size:10px;color:#7a8191}
+.hm-row .hm-from,.hm-row .hm-to{width:100%;min-width:0;box-sizing:border-box;min-height:34px;font:12px ui-monospace,monospace;padding:7px 9px;border:1px solid #d5d8e2;border-radius:6px;background:#fff;color:inherit}
+.hm-row .hm-from[aria-invalid=true],.hm-row .hm-to[aria-invalid=true]{border-color:#d4504a;outline-color:#d4504a}
+.hm-arrow{color:#9aa0ae;font-size:16px;line-height:34px;text-align:center}
+.hm-row .hm-meta{font:10px ui-monospace,monospace;color:#9aa0ae;overflow-wrap:anywhere}.hm-row .hm-meta[data-state=error]{font-family:inherit;color:#d4504a}.hm-row .hm-meta[data-state=ok]{color:#3c9a64}
+.hm-hits{font-size:10px;color:#5d6473}.hm-hits[data-state=warn]{color:#a8740c}.hm-hits[hidden]{display:none}
+:root[data-theme=dark] .hm-row .hm-meta[data-state=error]{color:#f08a84}:root[data-theme=dark] .hm-row .hm-meta[data-state=ok]{color:#7bd19b}:root[data-theme=dark] .hm-toggle{color:#b6b9c2}:root[data-theme=dark] .hm-hits{color:#b6b9c2}:root[data-theme=dark] .hm-hits[data-state=warn]{color:#e0b04a}
+:root[data-theme=dark] .hm-row .hm-from,:root[data-theme=dark] .hm-row .hm-to{background:#101520;border-color:#363944}
+@container (max-width:380px){.hm-fields{grid-template-columns:minmax(0,1fr)}.hm-arrow{line-height:1;transform:rotate(90deg);justify-self:start;padding-left:8px}}
 /* "Mock de endpoints" (src/endpoint-mocks-panel.js): the list in Controles and the dialog that configures one mock */
 .em-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:6px}
 .em-row input[type=checkbox]{accent-color:var(--accent)}
@@ -266,6 +273,7 @@
 .em-buttons{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.em-buttons .cp-button{font-size:12px;padding:7px 14px}
 .netlog-mock{font:600 8px ui-monospace,monospace;color:#fff;background:#a8740c;border-radius:3px;padding:0 4px;margin-right:6px}
 .netlog-note-mock{color:#a8740c}
+.netlog-redirected{font:600 8px ui-monospace,monospace;color:#fff;background:#3d6fd6;border-radius:3px;padding:0 4px;margin-right:6px}.netlog-redirect-block .netlog-header b{font-weight:600}
 :root[data-theme=dark] .em-card{background:#17181f;color:#d9dce4}:root[data-theme=dark] .em-field,:root[data-theme=dark] .em-label{color:#b6b9c2}
 :root[data-theme=dark] .em-field input,:root[data-theme=dark] .em-field select,:root[data-theme=dark] .em-field textarea,:root[data-theme=dark] .em-header input{background:#101520;border-color:#363944}
 :root[data-theme=dark] .em-field textarea:disabled{background:#1b1d24}:root[data-theme=dark] .em-code{color:#b6b9c2}

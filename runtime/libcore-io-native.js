@@ -1,12 +1,12 @@
-import { APKError } from './apk-error.js?v=c0aca60d691b';
-import { throwNew } from './java-throw.js?v=c0aca60d691b';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=c0aca60d691b';
-import { networkOf, isIpLiteral } from './network-native.js?v=c0aca60d691b';
-import { Blocked } from './scheduler.js?v=c0aca60d691b';
-import { installUdp } from './udp-native.js?v=c0aca60d691b';
-import { createLoopback } from './loopback-socket.js?v=c0aca60d691b';
-import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=c0aca60d691b';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=c0aca60d691b';
+import { APKError } from './apk-error.js?v=5c6c5cdda771';
+import { throwNew } from './java-throw.js?v=5c6c5cdda771';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=5c6c5cdda771';
+import { networkOf, isIpLiteral } from './network-native.js?v=5c6c5cdda771';
+import { Blocked } from './scheduler.js?v=5c6c5cdda771';
+import { installUdp } from './udp-native.js?v=5c6c5cdda771';
+import { createLoopback } from './loopback-socket.js?v=5c6c5cdda771';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=5c6c5cdda771';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=5c6c5cdda771';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -348,10 +348,10 @@ export function createLibcoreIoNativeBindings() {
     // Loopback (127.0.0.0/8, ::1, the any-address) is the device's own interface: a socket of this process listening there is connected at once, offline or not, whatever the allow-list says,
     // and never through a virtual HTTP socket. With nothing listening the connect is refused (ECONNREFUSED) -- unless the user listed that loopback host in the allow-list on purpose, which
     // designates a server on the machine that runs the browser and keeps the virtual HTTP socket path below.
-    if (peerBytes && loopback.isLoopback(peerBytes) && (loopback.listening(runtime, peerBytes, port) || !((net.online && net.allowed(name, port)) || net.mockServesHost(name, port, { hostless: false })))) return connectLoopback(runtime, desc, peerBytes, port);   // a mock naming this loopback host explicitly keeps the virtual HTTP socket
+    if (peerBytes && loopback.isLoopback(peerBytes) && (loopback.listening(runtime, peerBytes, port) || !((net.online && net.allowed(name, port)) || net.mockServesHost(name, port, { hostless: false }) || net.redirectServesHost(name, port)))) return connectLoopback(runtime, desc, peerBytes, port);   // a mock or a "Redirecionar hosts" rule naming this loopback host explicitly keeps the virtual HTTP socket
     net.noteHost(name);
     const target = { api: 'Socket', kind: 'socket', method: 'CONNECT', url: `tcp://${name.includes(':') ? `[${name}]` : name}:${port}`, host: name, port };
-    if ((!net.online || !net.allowed(name, port)) && !net.mockServesHost(name, port)) { net.stats.denied++;   // a host a mock serves (src/endpoint-mocks.js) connects: its requests are answered by the lab
+    if ((!net.online || !net.allowed(name, port)) && !net.mockServesHost(name, port) && !net.redirectServesHost(name, port)) { net.stats.denied++;   // a host a mock serves (src/endpoint-mocks.js) connects: its requests are answered by the lab; a host a redirect rule serves (src/host-map.js) connects: its exchanges go to the rule's target
       if (!net.online) net.stats.offlineRejections++; net.logRefusal(target); err(runtime, 'connect', 'ENETUNREACH'); }
     const isLoopbackName = /^127\./.test(host) || host === '::1' || host === 'localhost';
     if (!desc.bound) udp.bindEphemeral(runtime, 'connect', desc, isLoopbackName ? [127, 0, 0, 1] : [10, 0, 2, 15]);   // the source address a connected socket reports: the Wi-Fi address (loopback for a loopback peer)

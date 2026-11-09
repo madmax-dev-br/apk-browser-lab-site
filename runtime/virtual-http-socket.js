@@ -297,7 +297,7 @@ export class VirtualHttpSocket {
     const port = Number(url.port || (url.protocol === 'https:' ? 443 : 80)), host = url.hostname;
     const headers = request.headers.filter(([name]) => name.toLowerCase() !== 'host');
     const mock = net.matchMock?.({ method: request.method, url: url.href, body: request.body }) ?? null;   // "Mock de endpoints" (src/endpoint-mocks.js): answered by the lab, before the policy
-    if (!mock && (!net.online || !net.allowed(host, port))) {
+    if (!mock && !(net.permits ? net.permits(url.href, host, port) : net.online && net.allowed(host, port))) {   // a request a "Redirecionar hosts" rule maps is not refused by the allow list
       net.stats.denied++; if (!net.online) net.stats.offlineRejections++;
       net.logRefusal({ api: 'Socket', method: request.method, url: url.href, host, port, headers, bytes: request.body.length });
       throw new SocketFailure('Ljava/net/SocketException;', 'sendto failed: ENETUNREACH (Network is unreachable)');

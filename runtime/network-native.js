@@ -1,13 +1,13 @@
-import { APKError } from './apk-error.js?v=c0aca60d691b';
-import { throwNew } from './java-throw.js?v=c0aca60d691b';
-import { mapUrl } from './host-map.js?v=c0aca60d691b';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=c0aca60d691b';
-import { Blocked } from './scheduler.js?v=c0aca60d691b';
-import { OS_CONSTANTS } from './os-constants-data.js?v=c0aca60d691b';
-import { openExchange, describeFailure } from './network-transport.js?v=c0aca60d691b';
-import { WorkerExecutor } from './network-worker-executor.js?v=c0aca60d691b';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=c0aca60d691b';
-import { TransportAuthority } from './transport-ca.js?v=c0aca60d691b';
+import { APKError } from './apk-error.js?v=5c6c5cdda771';
+import { throwNew } from './java-throw.js?v=5c6c5cdda771';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=5c6c5cdda771';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=5c6c5cdda771';
+import { Blocked } from './scheduler.js?v=5c6c5cdda771';
+import { OS_CONSTANTS } from './os-constants-data.js?v=5c6c5cdda771';
+import { openExchange, describeFailure } from './network-transport.js?v=5c6c5cdda771';
+import { WorkerExecutor } from './network-worker-executor.js?v=5c6c5cdda771';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=5c6c5cdda771';
+import { TransportAuthority } from './transport-ca.js?v=5c6c5cdda771';
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
 //
@@ -19,6 +19,8 @@ import { TransportAuthority } from './transport-ca.js?v=c0aca60d691b';
 //    java.net.Socket / OkHttp, DownloadManager). A request a mock matches is answered here, before the policy below and before any executor: the operation gets the configured head and
 //    body (after the configured delay on the VM clock) and never reaches fetch. The callers ask matchMock() before applying the policy, and the resolver and Socket.connect let a
 //    host a mock serves through (mockServesHost), so the request can reach the mock without the host being in the allow list.
+//  * "Redirecionar hosts" (src/host-map.js): a request an enabled rule maps is not refused by the allow list (the rule names where it goes), the resolver and Socket.connect let a
+//    host a rule serves through (redirectServesHost), and start() counts it per rule (responses / failures), with a Logcat warning at the first one. Offline still refuses it.
 //  * Policy: offline device => every lookup fails and every connect is ENETUNREACH; otherwise only hosts in the allowlist (platform.networkPolicy.allowedHosts) are
 //    reachable. The default allowlist is empty, i.e. the device is effectively offline. TCP is never opened: a java.net.Socket connected to a permitted host is a virtual HTTP socket
 //    (src/virtual-http-socket.js) whose requests are exchanges of this bridge, and an SSLSocket over it presents the lab transport CA's chain (src/tls-socket-host.js, docs/NETWORK.md).
@@ -59,7 +61,14 @@ export class NetworkBridge {
   /** Reports a request the policy refused (allowlist, or the device being offline) to the network log; the caller still counts and fails it. */
   logRefusal(info) { this.log?.refuse({ ...info, offline: !this.online }); }
   /** Syncs the operation's log entry with what the exchange has produced so far. */
-  observe(op) { if (op.log) this.log?.observe(op.log, op); }
+  observe(op) { if (op.redirect) this.settleRedirect(op); if (op.log) this.log?.observe(op.log, op); }
+  /** A redirected exchange that got its head counts as a response of its rule, one that failed before it as a failure (once per exchange). */
+  settleRedirect(op) {
+    const state = op.redirect; if (state.settled) return;
+    if (op.head) { state.settled = true; state.record.responses++; }
+    else if (op.error) { state.settled = true; state.record.failures++; state.record.lastFailure = String(op.error.message ?? op.error.type ?? '').slice(0, 300); }
+    else if (op.closed) { state.settled = true; state.record.closed++; }   // the app closed it before anything came back
+  }
   get online() { return (this.platform.device?.connectivity ?? 'online') !== 'offline'; }
   get pending() { let n = this.jobs ?? 0; for (const op of this.ops.values()) if (op.executor !== 'mock' && !op.ended && op.error === null && !op.closed) n++; return n; }   // a mocked answer is a timer on the VM clock (delay()), not I/O
   /** Asynchronous host work the VM may have to wait for (WebCrypto certificate signing): counted as pending so the scheduler waits for the event loop instead of reporting a deadlock. */
@@ -79,6 +88,14 @@ export class NetworkBridge {
     }
     return false;
   }
+  /** "Redirecionar hosts": where the exchange for `url` goes ({ url, rule, shape, key }), or null. */
+  redirectFor(url) { return mapUrl(url, this.policy.hostMap); }
+  /** Could a redirect rule serve `host`(:port)? (the scheme is not known at a lookup or a connect). Offline: no. */
+  redirectServesHost(host, port = null) { return this.online && hostMapServesHost(this.policy.hostMap, host, port); }
+  /** May an exchange for `url` (host, port) go out: online and either allowed or redirected by a rule. */
+  permits(url, host, port) { return this.online && (this.allowed(host, port) || !!this.redirectFor(url)); }
+  /** The per-rule counts of "Redirecionar hosts" (key -> { hits, responses, failures, lastFailure }). */
+  get redirects() { return this.redirectTable ??= new Map(); }
   noteHost(host) { this.stats.hosts.add(String(host).toLowerCase()); }
   /** The resolver's table: the address text a lookup returned -> the name that was looked up (a Socket connects to the address; the policy and the HTTP Host live in the name). Bounded. */
   rememberResolved(address, host) { const table = this.resolved ??= new Map(); table.delete(address); table.set(address, host); if (table.size > 256) table.delete(table.keys().next().value); }
@@ -129,7 +146,8 @@ export class NetworkBridge {
     const mock = request.mock !== undefined ? request.mock : this.matchMock(request);
     if (mock) return this.startMock(op, mock);
     this.stats.bytesOut += request.body?.length ?? 0;
-    op.executor = this.executorFor(); const mapped = mapUrl(request.url, this.policy.hostMap); op.log = this.log?.begin(request, { api: request.api, mapped }) ?? null;
+    op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped }) ?? null;
+    if (mapped) { op.redirect = { record: noteRedirect(this.runtime, this.redirects, mapped, request), settled: false }; this.stats.redirected = (this.stats.redirected ?? 0) + 1; }
     if (op.executor === 'worker') { try { (this.worker ??= new WorkerExecutor(this)).start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [] }); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
     else this.run(op).catch(error => { op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => { this.observe(op); this.signal(); });
     return op;
@@ -302,7 +320,7 @@ export function createNetworkNativeBindings() {
       if (!bytes) gai('android_getaddrinfo', C.EAI_NONAME);
       return refArray(runtime, '[' + INET, [inetAddress(runtime, null, bytes)]);   // libcore leaves the host name unset here; Inet6AddressImpl names the results of a name lookup itself
     }
-    if (!loopbackHost(host) && !net.allowed(host) && !net.mockServesHost(host)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal({ api: 'DNS', kind: 'dns', method: 'LOOKUP', url: `dns://${host}`, host }); gai('android_getaddrinfo', C.EAI_NODATA); }
+    if (!loopbackHost(host) && !net.allowed(host) && !net.mockServesHost(host) && !net.redirectServesHost(host)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal({ api: 'DNS', kind: 'dns', method: 'LOOKUP', url: `dns://${host}`, host }); gai('android_getaddrinfo', C.EAI_NODATA); }
     const bytes = loopbackHost(host) ? [127, 0, 0, 1] : syntheticAddress(host); net.rememberResolved(bytes.join('.'), host);
     const addresses = [inetAddress(runtime, null, bytes)];
     return refArray(runtime, '[' + INET, addresses);
@@ -320,7 +338,7 @@ export function createNetworkNativeBindings() {
     const body = (bodyArray === null || bodyArray === 0) ? null : Uint8Array.from(runtime.object(bodyArray).elements, v => v & 255);
     const mock = net.matchMock({ method: text(runtime, method), url, body });   // "Mock de endpoints": answered by the lab, before the policy
     const refuse = () => { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal({ method: text(runtime, method), url, host: parsed.hostname, port, headers: namedHeaders(), bytes: bodyArray ? runtime.object(bodyArray).elements.length : 0 }); throwNew(runtime, 'Ljava/net/ConnectException;', `failed to connect to ${shown} (port ${port}) from /:: (port 0)${connectTimeout > 0 ? ` after ${connectTimeout}ms` : ''}: connect failed: ENETUNREACH (Network is unreachable)`); };
-    if (!mock && (!net.online || !(net.allowed(parsed.hostname, port)))) refuse();
+    if (!mock && !net.permits(url, parsed.hostname, port)) refuse();   // a request a "Redirecionar hosts" rule maps goes where the rule says, whatever the allow list
     const reserved = net.ops.get(ticket);
     if (!reserved || reserved.closed) throwNew(runtime, 'Ljava/net/SocketException;', 'Socket closed');
     const op = net.start({ method: text(runtime, method), url, headers, body, redirect, connectTimeout, readTimeout, mock }, reserved);
