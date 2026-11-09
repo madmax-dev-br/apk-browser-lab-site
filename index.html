@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=5eb77725df72">
-  <meta name="apk-browser-build" content="5eb77725df72">
+  <link rel="stylesheet" href="./styles.css?v=5a658fe32fd7">
+  <meta name="apk-browser-build" content="5a658fe32fd7">
 </head>
 <body>
   <header class="topbar">
@@ -214,7 +214,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=5eb77725df72"></script>
+  <script type="module" src="./app.js?v=5a658fe32fd7"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>
@@ -255,6 +255,10 @@
       <div class="pl-fields">
         <label class="em-field" for="pl-name"><span>Nome</span><input id="pl-name" type="text" autocomplete="off" spellcheck="false" maxlength="120" required aria-describedby="pl-err-name"></label>
         <label class="em-field" for="pl-package"><span>Pacote <small>opcional; vazio = qualquer app. Vários separados por vírgula, <code>*</code> como curinga</small></span><input id="pl-package" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="com.exemplo.app"></label>
+      </div>
+      <div class="pl-fields">
+        <label class="em-field" for="pl-updates"><span>Atualização da saída <small>automática: os blocos seguem o plugin; manual: ficam parados até Atualizar no cartão</small></span><select id="pl-updates"><option value="auto">Automática</option><option value="manual">Manual</option></select></label>
+        <label class="em-field" for="pl-height"><span>Altura dos blocos <small>limitada rola acima de 320 px; fixa usa a altura em px</small></span><span class="pl-height-row"><select id="pl-height"><option value="wrap">Limitada (320 px)</option><option value="auto">Conteúdo inteiro</option><option value="fixed">Fixa</option></select><input id="pl-height-px" type="number" min="80" max="2000" step="20" value="240" aria-label="Altura fixa dos blocos em px" hidden></span></label>
       </div>
       <small id="pl-err-name" class="em-error" hidden></small>
       <label class="em-field em-wide" for="pl-code"><span>Código <small>Tab insere espaços; Esc fecha</small></span><textarea id="pl-code" class="pl-code" rows="18" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" aria-describedby="pl-err-code"></textarea></label>

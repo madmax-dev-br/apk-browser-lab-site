@@ -438,3 +438,7 @@ main>.workspace:first-child{margin-top:28px}
 .po-card[data-height=fixed] .po-text,.po-card[data-height=fixed] .po-kv{max-height:var(--po-h,240px);overflow:auto}
 :root[data-theme=dark] .po-fresh{background:#3a2c10;color:#f0c46a}
 :root[data-theme=dark] .po-tools select,:root[data-theme=dark] .po-tools input{background:#14161c;border-color:#2c303b;color:#c4c8d2}
+.em-field>.pl-height-row{display:flex;flex-direction:row;gap:6px;align-items:center}
+.pl-height-row select{flex:1 1 auto;min-width:0}
+.pl-height-row input{width:84px}
+.pl-height-row input[hidden]{display:none}

@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=5eb77725df72">
+  <link rel="stylesheet" href="./site-pages.css?v=5a658fe32fd7">
 </head>
 <body>
   <header class="topbar">
@@ -111,9 +111,9 @@
           <li><b>Remover</b> pede confirmação e apaga o plugin da lista.</li>
           <li>No cartão do painel Plugins, <b>Parar</b> encerra o Worker do plugin (útil se ele entrou em laço) e <b>Reiniciar</b> cria outro do zero.</li>
           <li>Os cartões começam <b>recolhidos</b>: um clique no nome abre. Fechado, o cartão só atualiza o cabeçalho (estado, selo, “novos dados”) e não redesenha os blocos.</li>
-          <li><b>Atualização automática ou manual</b>, por plugin: na automática os blocos acompanham o plugin; na manual eles ficam parados até você clicar em <b>Atualizar</b> (o cartão mostra “novos dados” quando há saída nova). <b>Atualizar</b> também chama <code>lab.on('refresh')</code> do plugin, para quem lê sob demanda.</li>
-          <li><b>Altura dos blocos</b>, por plugin: <i>Limitada</i> (até 320 px, com rolagem, o padrão), <i>Conteúdo inteiro</i> ou <i>Fixa</i> (80 a 2000 px). Um bloco com <code>id</code> é atualizado no lugar e mantém a rolagem e a posição de leitura quando o plugin escreve de novo.</li>
-          <li>Essas preferências ficam com o plugin (vão junto na exportação) e não reiniciam o plugin.</li>
+          <li>Ao criar ou editar o plugin, no mesmo diálogo do código: <b>Atualização da saída</b> automática (os blocos acompanham o plugin) ou manual (ficam parados até você clicar em <b>Atualizar</b> no cartão, que mostra “novos dados” quando há saída nova); e <b>Altura dos blocos</b>: <i>Limitada</i> (até 320 px, com rolagem, o padrão), <i>Conteúdo inteiro</i> ou <i>Fixa</i> (80 a 2000 px). O cartão fica simples: <b>Atualizar</b>, <b>Parar</b> e <b>Reiniciar</b>. <b>Atualizar</b> também chama <code>lab.on('refresh')</code> do plugin.</li>
+          <li>Um bloco com <code>id</code> é atualizado no lugar e mantém a rolagem quando o plugin escreve de novo.</li>
+          <li>Essas opções ficam com o plugin (vão junto na exportação) e mudá-las não reinicia o plugin.</li>
           <li>A linha mostra o estado: <i>rodando</i>, <i>iniciando</i>, <i>parado</i> (com o motivo: desligado, parado no painel, só para outro pacote) ou <i>erro</i>, e quantos erros houve.</li>
         </ul>
       </section>
@@ -365,6 +365,6 @@ await mostrar();</code></pre></div>
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./arquitetura.html">Arquitetura da VM</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=5eb77725df72"></script>
+  <script type="module" src="./site-pages.js?v=5a658fe32fd7"></script>
 </body>
 </html>

@@ -2,8 +2,8 @@
 // Remover, order, export / import) and the dialog edits one (name, package filter, code); the list lives in localStorage (src/plugin-store.js) and is handed to the host
 // (src/plugin-host.js), which runs each enabled plugin in its own Worker. The output panel shows one card per running or failed plugin: its blocks (rendered with textContent
 // and DOM building only, never HTML), badge, console and errors, with Parar / Reiniciar. Renders are coalesced (at most every RENDER_MS) and skipped while the panel is closed.
-import { RENDER_MS } from './plugin-host.js?v=5eb77725df72';
-import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, templates, fromTemplate } from './plugin-store.js?v=5eb77725df72';
+import { RENDER_MS } from './plugin-host.js?v=5a658fe32fd7';
+import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, templates, fromTemplate } from './plugin-store.js?v=5a658fe32fd7';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const STATUS_LABEL = { rodando: 'rodando', iniciando: 'iniciando', parado: 'parado', erro: 'erro' };
@@ -103,6 +103,8 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     const data = plugin ?? draft ?? fromTemplate('blank');
     $('pl-dialog-title').textContent = plugin ? 'Editar plugin' : 'Adicionar plugin';
     $('pl-name').value = data.name; $('pl-package').value = data.packageFilter; $('pl-code').value = data.code; S.draft = data; showErrors();
+    const fixed = typeof data.height === 'number';
+    $('pl-updates').value = data.updates === 'manual' ? 'manual' : 'auto'; $('pl-height').value = fixed ? 'fixed' : (data.height ?? 'wrap'); $('pl-height-px').value = String(fixed ? data.height : 240); $('pl-height-px').hidden = !fixed;
     $('pl-dialog').hidden = false; doc.body?.classList?.add('em-modal-open');
     for (const node of doc.querySelectorAll?.('main, header') ?? []) node.inert = true;
     $('pl-code').focus?.();
@@ -118,7 +120,8 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     event?.preventDefault?.(); S.submitted = true;
     if (showErrors().length) { (validatePlugin({ name: $('pl-name').value, code: '' }).errors.some(e => e.field === 'name') ? $('pl-name') : $('pl-code')).focus?.(); return; }
     const at = S.plugins.findIndex(item => item.id === S.editing), base = at >= 0 ? S.plugins[at] : S.draft;
-    const plugin = normalizePlugin({ ...base, name: $('pl-name').value, packageFilter: $('pl-package').value, code: $('pl-code').value });
+    const plugin = normalizePlugin({ ...base, name: $('pl-name').value, packageFilter: $('pl-package').value, code: $('pl-code').value,
+      updates: $('pl-updates').value, height: $('pl-height').value === 'fixed' ? Number($('pl-height-px').value) || 240 : $('pl-height').value });   // display options: never restart the plugin
     if (at >= 0) S.plugins[at] = plugin;
     else { if (S.plugins.length >= MAX_PLUGINS) { $('pl-err-code').textContent = `No máximo ${MAX_PLUGINS} plugins.`; $('pl-err-code').hidden = false; return; } S.plugins.push(plugin); }
     closeDialog(); if (outputRoot && plugin.enabled) outputRoot.open = true;   // its output shows at once
@@ -136,6 +139,7 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
   });
   $('pl-dialog').addEventListener('mousedown', event => { if (event.target === $('pl-dialog')) event.preventDefault(); });
   $('pl-form').addEventListener('submit', submit);
+  $('pl-height').addEventListener('change', () => { $('pl-height-px').hidden = $('pl-height').value !== 'fixed'; });
   $('pl-cancel').addEventListener('click', closeDialog);
   $('pl-close').addEventListener('click', closeDialog);
   for (const id of ['pl-name', 'pl-code']) $(id).addEventListener('input', showErrors);
@@ -160,17 +164,10 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
   // ---- output cards ---------------------------------------------------------------------------------------------------------------------------------------------------
   // Each card is a <details>, collapsed on every page load (S.open: the ones the viewer opened since); a closed card only updates its header (status, badge, "novos dados").
   // Display settings live with the plugin (plugin-store.js): updates 'auto' (the blocks follow the plugin) or 'manual' (they hold until Atualizar), and the block height.
-  const HEIGHT_PRESETS = [['wrap', 'Limitada (320 px)'], ['auto', 'Conteúdo inteiro'], ['fixed', 'Fixa…']];
-  function saveDisplay(plugin, patch) {
-    const index = S.plugins.findIndex(item => item.id === plugin.id); if (index < 0) return;
-    S.plugins[index] = normalizePlugin({ ...S.plugins[index], ...patch }); savePlugins(S.plugins);   // display only: the host does not restart the plugin
-    const entry = S.cards.get(plugin.id); if (entry) { entry.force = true; applyDisplay(entry, S.plugins[index]); } schedule(plugin.id);
-  }
+  // Display options come from the plugin (set when creating / editing it, plugin-store.js): updates 'auto' or 'manual' and the block height. The card stays simple.
   function applyDisplay(entry, plugin) {
     const fixed = typeof plugin.height === 'number';
-    entry.root.dataset.height = fixed ? 'fixed' : plugin.height; entry.root.style.setProperty('--po-h', fixed ? `${plugin.height}px` : '');
-    entry.heightSelect.value = fixed ? 'fixed' : plugin.height; entry.heightInput.hidden = !fixed; if (fixed && doc.activeElement !== entry.heightInput) entry.heightInput.value = String(plugin.height);
-    entry.updatesSelect.value = plugin.updates; entry.root.dataset.updates = plugin.updates;
+    entry.root.dataset.height = fixed ? 'fixed' : plugin.height; entry.root.style.setProperty('--po-h', fixed ? `${plugin.height}px` : ''); entry.root.dataset.updates = plugin.updates;
   }
   /** Replaces the block DOM keeping what the viewer did: a block with the same id is updated in place (text / JSON) or rebuilt with its scroll position restored. */
   function patchBlocks(container, blocks) {
@@ -191,26 +188,18 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
       const root = el('details', 'po-card'), head = el('summary', 'po-head'), name = el('b', 'po-name'), status = el('span', 'po-status'), badge = el('span', 'po-badge'), fresh = el('span', 'po-fresh', 'novos dados');
       fresh.hidden = true;
       const tools = el('div', 'po-tools');
-      const updatesSelect = el('select', 'po-updates'); updatesSelect.setAttribute('aria-label', `Atualização da saída de ${plugin.name}`);
-      for (const [value, label] of [['auto', 'Atualização automática'], ['manual', 'Atualização manual']]) { const option = el('option', '', label); option.value = value; updatesSelect.append(option); }
-      updatesSelect.addEventListener('change', () => saveDisplay(plugin, { updates: updatesSelect.value }));
-      const heightSelect = el('select', 'po-height'); heightSelect.setAttribute('aria-label', `Altura dos blocos de ${plugin.name}`);
-      for (const [value, label] of HEIGHT_PRESETS) { const option = el('option', '', label); option.value = value; heightSelect.append(option); }
-      const heightInput = el('input', 'po-height-px'); heightInput.type = 'number'; heightInput.min = '80'; heightInput.max = '2000'; heightInput.step = '20'; heightInput.setAttribute('aria-label', 'Altura fixa em px');
-      heightSelect.addEventListener('change', () => saveDisplay(plugin, { height: heightSelect.value === 'fixed' ? Number(heightInput.value) || 240 : heightSelect.value }));
-      heightInput.addEventListener('change', () => saveDisplay(plugin, { height: Number(heightInput.value) || 240 }));
       const refresh = button('Atualizar', 'po-refresh', `Atualizar a saída de ${plugin.name}`, () => {
         const current = S.cards.get(plugin.id); if (!current) return;
         current.force = true; current.acceptUntil = now() + 1500;   // manual mode: the output the refresh produces shows too
         host.refresh?.(plugin.id); schedule(plugin.id);
       });
       const stop = button('Parar', 'po-stop', `Parar o plugin ${plugin.name}`, () => { host.stop(plugin.id); schedule(plugin.id); }), restart = button('Reiniciar', 'po-restart', `Reiniciar o plugin ${plugin.name}`, () => { host.restart(plugin.id); schedule(plugin.id); });
-      tools.append(updatesSelect, heightSelect, heightInput, refresh, stop, restart);
+      tools.append(refresh, stop, restart);
       const blocks = el('div', 'po-blocks'), errors = el('div', 'po-errors'), consoleBox = el('details', 'po-console'), consoleSummary = el('summary', '', 'Console'), consoleLines = el('div', 'po-console-lines');
       consoleBox.append(consoleSummary, consoleLines); head.append(name, status, badge, fresh); root.append(head, tools, errors, blocks, consoleBox);
       root.open = S.open.has(plugin.id);
       root.addEventListener('toggle', () => { if (root.open) { S.open.add(plugin.id); const current = S.cards.get(plugin.id); if (current) current.force = true; schedule(plugin.id); } else S.open.delete(plugin.id); });
-      entry = { root, name, status, badge, fresh, updatesSelect, heightSelect, heightInput, refresh, stop, restart, blocks, errors, consoleBox, consoleSummary, consoleLines, consoleCount: -1, errorCount: -1, force: true, acceptUntil: 0 };
+      entry = { root, name, status, badge, fresh, refresh, stop, restart, blocks, errors, consoleBox, consoleSummary, consoleLines, consoleCount: -1, errorCount: -1, force: true, acceptUntil: 0 };
       S.cards.set(plugin.id, entry);
     }
     const live = host.get(plugin.id), status = live?.status ?? 'parado';
