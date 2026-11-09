@@ -206,12 +206,23 @@ export function resolveIntent(manifest, input) {
     if (!enabled(activity)) return { kind: 'explicit', request, matches: [], considered: [], error: `component ${request.component}: ${component.className} is disabled (android:enabled="false")` };
     return { kind: 'explicit', request, matches: [{ activity: activity.name, filter: null, filterText: null, match: null, priority: 0 }], considered: [] };
   }
-  const uri = request.data ? parseUri(request.data) : null, query = { action: request.action, categories: request.category, uri, type: request.type };
+  return { kind: 'implicit', request, ...resolveIntentFields(manifest, { action: request.action, data: request.data, type: request.type, categories: request.category }) };
+}
+
+/**
+ * PackageManager-side resolution of an Intent the app built (startActivity with no component, queryIntentActivities, resolveActivity): its fields as the Intent holds them; never throws.
+ * `defaultOnly` is MATCH_DEFAULT_ONLY (every implicit startActivity carries it; queryIntentActivities only with the flag). An Intent restricted to another package (setPackage) resolves to
+ * nothing: only this app is installed. Ordered as resolveIntent: priority, match quality, manifest order; one entry per Activity.
+ */
+export function resolveIntentFields(manifest, { action = null, data = null, type = null, categories = [], package: wanted = null } = {}, { defaultOnly = true } = {}) {
+  const packageName = manifest?.packageName ?? '', activities = manifest?.activities ?? [];
+  if (wanted && wanted !== packageName) return { matches: [], considered: [{ activity: wanted, filter: null, reason: `the Intent is restricted to package ${wanted}, which is not installed` }] };
+  const uri = data ? parseUri(data) : null, query = { action: action || null, categories: categories ?? [], uri, type: type || null };
   const matches = [], considered = []; let order = 0;
   for (const activity of activities) {
     if (!enabled(activity)) { considered.push({ activity: activity.name, filter: null, reason: 'the Activity is disabled' }); continue; }
     for (const filter of activity.filters ?? []) {
-      const outcome = matchFilter(filter, query);
+      const outcome = matchFilter(filter, query, { defaultOnly });
       if (outcome.match >= 0) matches.push({ activity: activity.name, filter: describeFilter(filter), filterText: describeFilter(filter), match: outcome.match, priority: filter.priority | 0, order: order++ });
       else considered.push({ activity: activity.name, filter: describeFilter(filter), reason: outcome.reason });
     }
@@ -219,7 +230,7 @@ export function resolveIntent(manifest, input) {
   }
   matches.sort((a, b) => b.priority - a.priority || b.match - a.match || a.order - b.order);
   const unique = []; for (const entry of matches) if (!unique.some(value => value.activity === entry.activity)) unique.push(entry);
-  return { kind: 'implicit', request, matches: unique, considered };
+  return { matches: unique, considered };
 }
 
 /** The message shown when nothing matches (the page prints it as is). */

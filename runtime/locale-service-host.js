@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=9cb1ef3bb75a';
+import { APKError } from './apk-runtime.js?v=7f18c4910ec1';
 const ULOCALE = 'Landroid/icu/util/ULocale;', OPTIONAL = 'Ljava/util/Optional;', DISPLAY = 'Landroid/sysprop/DisplayProperties;';
 const keys = new Set([`${ULOCALE}->forLocale(Ljava/util/Locale;)Landroid/icu/util/ULocale;`, `${ULOCALE}->isRightToLeft()Z`, `${DISPLAY}->debug_force_rtl()Ljava/util/Optional;`]);
 const fail = message => { throw new APKError(message, { kind: 'locale-service-unsupported' }); };

@@ -1,20 +1,20 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=9cb1ef3bb75a';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=9cb1ef3bb75a';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=9cb1ef3bb75a';
-import { initCollapsibleSections } from './panel-sections.js?v=9cb1ef3bb75a';
-import { createPermissionsPanel } from './permissions-panel.js?v=9cb1ef3bb75a';
-import { createOverridesPanel } from './overrides-panel.js?v=9cb1ef3bb75a';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=9cb1ef3bb75a';
-import { createHostMapPanel } from './host-map-panel.js?v=9cb1ef3bb75a';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=9cb1ef3bb75a';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=9cb1ef3bb75a';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=9cb1ef3bb75a';
-import { createDeviceView, createViewState } from './device-view.js?v=9cb1ef3bb75a';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=9cb1ef3bb75a';
-import { formatApiGapReport } from './api-gap-scan.js?v=9cb1ef3bb75a';
-import { createLogcatPanel } from './logcat-panel.js?v=9cb1ef3bb75a';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=9cb1ef3bb75a';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=9cb1ef3bb75a';
+import { APKWorkerClient } from './apk-worker-client.js?v=7f18c4910ec1';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=7f18c4910ec1';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=7f18c4910ec1';
+import { initCollapsibleSections } from './panel-sections.js?v=7f18c4910ec1';
+import { createPermissionsPanel } from './permissions-panel.js?v=7f18c4910ec1';
+import { createOverridesPanel } from './overrides-panel.js?v=7f18c4910ec1';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=7f18c4910ec1';
+import { createHostMapPanel } from './host-map-panel.js?v=7f18c4910ec1';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=7f18c4910ec1';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=7f18c4910ec1';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=7f18c4910ec1';
+import { createDeviceView, createViewState } from './device-view.js?v=7f18c4910ec1';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=7f18c4910ec1';
+import { formatApiGapReport } from './api-gap-scan.js?v=7f18c4910ec1';
+import { createLogcatPanel } from './logcat-panel.js?v=7f18c4910ec1';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=7f18c4910ec1';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=7f18c4910ec1';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -143,15 +143,17 @@ function sizeBootOverlay() {
   const d = resolveDevice(deviceState.settings), w = d.widthDp, h = d.heightDp, scale = Math.min(0.7, Math.max(120, stage.clientWidth - 24) / (w + 10), Math.max(160, stage.clientHeight - 16) / (h + 10));
   overlay.style.setProperty('--boot-w', String(w)); overlay.style.setProperty('--boot-h', String(h)); overlay.style.setProperty('--boot-scale', scale.toFixed(4));
 }
+// The caption sits in a box of fixed height under the logo (styles.css .boot-caption): a longer or shorter status never moves the logo; the full text is the tooltip.
+function setBootCaption(text) { const caption = $('boot-caption'); if (!caption) return; caption.textContent = text; caption.title = text; }
 function showBoot(caption) {
   const overlay = $('boot-overlay'); if (!overlay) return;
-  clearTimeout(state.bootTimer); sizeBootOverlay(); $('boot-caption').textContent = caption; overlay.classList.remove('fading', 'idle'); overlay.hidden = false; $('empty-preview').hidden = true; state.bootVisible = true;
+  clearTimeout(state.bootTimer); sizeBootOverlay(); setBootCaption(caption); overlay.classList.remove('fading', 'idle'); overlay.hidden = false; $('empty-preview').hidden = true; state.bootVisible = true;
 }
 function hideBoot({ force = false } = {}) {
   const overlay = $('boot-overlay'); if (!overlay || !state.bootVisible) return;
   // An APK that is loaded but not running keeps the phone frame on screen, idle, with the one thing the user can do next; the frame only goes away when the app
   // draws its first frame (force) or when there is no APK (an error, a closed file).
-  if (!force && state.currentSource && !state.apkRunning && !state.lastAPKError && state.mode === 'apk') { overlay.classList.add('idle'); overlay.classList.remove('fading'); $('boot-caption').textContent = 'APK pronto. Clique em Executar APK para iniciar.'; $('empty-preview').hidden = true; return; }
+  if (!force && state.currentSource && !state.apkRunning && !state.lastAPKError && state.mode === 'apk') { overlay.classList.add('idle'); overlay.classList.remove('fading'); setBootCaption('APK pronto. Clique em Executar APK para iniciar.'); $('empty-preview').hidden = true; return; }
   state.bootVisible = false; overlay.classList.add('fading'); overlay.classList.remove('idle'); clearTimeout(state.bootTimer);
   state.bootTimer = setTimeout(() => { overlay.hidden = true; overlay.classList.remove('fading'); if (!state.apkRunning && state.mode === 'apk') $('empty-preview').hidden = false; }, 380);
 }
@@ -171,7 +173,7 @@ function finishOperation(token) {
 function onWorkerProgress(progress = {}) {
   const phases = { 'framework-resources': 'Carregando dados originais de estilos Android', framework: 'Carregando código AOSP compilado', manifest: 'Lendo o manifesto', dex: 'Inspecionando DEX', native: 'Inventariando bibliotecas nativas', complete: 'Inspeção concluída', launch: 'Tentando iniciar a Activity', intent: 'Abrindo o link', click: 'Executando callback DEX', back: 'Retornando à Activity anterior', resources: 'Lendo recursos e layouts XML' };
   const message = `${phases[progress.phase] || 'Processando no Worker'}${progress.filename ? ` · ${progress.filename}` : ''}`;
-  $('operation-message').textContent = message; if (state.bootVisible) $('boot-caption').textContent = message;
+  $('operation-message').textContent = message; if (state.bootVisible) setBootCaption(message);
   const bar = $('operation-progress');
   if (progress.total > 0) { bar.max = progress.total; bar.value = progress.completed || 0; }
   else bar.removeAttribute('value');
@@ -577,6 +579,7 @@ async function runDemo() {
 async function inspectCatalogAPK(entry) {
   if (state.busy) return;
   await importSource({ name: entry.file, url: new URL(`./fixtures/${encodeURIComponent(entry.file)}`, import.meta.url).href });
+  $('inspection-panel').open = true;   // "Inspecionar" asks to see the package: the section opens (collapsed by default)
   $('inspection-badge').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' });
 }
 async function loadScenarioCatalog() {

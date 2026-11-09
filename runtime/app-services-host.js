@@ -1,8 +1,9 @@
-import { APKError } from './apk-error.js?v=9cb1ef3bb75a';
-import { registerPackageValueFields } from './package-value-fields.js?v=9cb1ef3bb75a';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=9cb1ef3bb75a';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=9cb1ef3bb75a';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=9cb1ef3bb75a';
+import { resolveIntentFields } from './intent-resolver.js?v=7f18c4910ec1';
+import { APKError } from './apk-error.js?v=7f18c4910ec1';
+import { registerPackageValueFields } from './package-value-fields.js?v=7f18c4910ec1';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=7f18c4910ec1';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=7f18c4910ec1';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=7f18c4910ec1';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -791,19 +792,26 @@ export function createAppServicesHost(platform) {
     if (kind === 'service') { const info = r.allocate(SERVICE_INFO), put = fillComponentInfo(r, info, detail, withMeta); put(SERVICE_INFO, 'permission', STRING, detail.permission); put(SERVICE_INFO, 'flags', 'I', 0); put(SERVICE_INFO, 'foregroundServiceType', 'I', Number(detail.foregroundServiceType) | 0); return info; }
     const info = r.makeObject(ACTIVITY_INFO_TYPE), put = fillComponentInfo(r, info, detail, withMeta); put(ACTIVITY_INFO_TYPE, 'permission', STRING, detail.permission ?? null); put(ACTIVITY_INFO_TYPE, 'flags', 'I', 0); return info;
   };
-  const matchingComponents = (r, intent, kind) => {
+  const matchingComponents = (r, intent, kind, flags = 0) => {
     const call = (name, result) => r.dispatch({ owner: INTENT_TYPE, name, parameters: [], result, signature: `()${result}` }, [intent], 'virtual');
     const component = call('getComponent', COMPONENT_NAME), wantedPackage = call('getPackage', STRING), action = call('getAction', STRING);
     // activities come from the manifest's activity list (name, exported flag, launcher); the launcher activity answers MAIN with the LAUNCHER category (its intent filter), the rest by explicit component only
     const details = kind === 'activity' ? (platform.manifest?.activities ?? []).map(a => ({ ...a, kind: 'activity', actions: a.launcher ? ['android.intent.action.MAIN'] : [], categories: a.launcher ? ['android.intent.category.LAUNCHER', 'android.intent.category.DEFAULT'] : [] })) : (platform.manifest?.componentDetails ?? []).filter(d => d.kind === kind && !isFalse(d.enabled));
     if (component !== null) { const c = r.object(component); return c.packageName === pkg() ? details.filter(d => d.name === c.className) : []; }
+    // Activities: the manifest's <intent-filter>s decide (src/intent-resolver.js, as PackageManager.queryIntentActivities); MATCH_DEFAULT_ONLY (0x10000) requires CATEGORY_DEFAULT.
+    // A manifest record without parsed filters (a hand-built one) keeps the launcher filter its launcher flag stands for.
+    if (kind === 'activity') {
+      const manifest = { ...platform.manifest, activities: (platform.manifest?.activities ?? []).map(a => a.filters || !a.launcher ? a : { ...a, filters: [{ actions: ['android.intent.action.MAIN'], categories: ['android.intent.category.LAUNCHER'], data: [] }] }) };
+      const { matches } = resolveIntentFields(manifest, platform.intentFields(r, r.object(intent)), { defaultOnly: (flags & 0x10000) !== 0 });
+      return matches.map(match => details.find(d => d.name === match.activity)).filter(Boolean);
+    }
     if (wantedPackage !== null && r.stringCharacters(wantedPackage) !== pkg()) return [];
     const categories = call('getCategories', 'Ljava/util/Set;'), asArray = categories === null ? null : r.dispatch({ owner: 'Ljava/util/Set;', name: 'toArray', parameters: [], result: '[Ljava/lang/Object;', signature: '()[Ljava/lang/Object;' }, [categories], 'interface'), wanted = asArray === null ? [] : r.array(asArray).elements.map(c => r.stringCharacters(c));
     return action === null ? [] : details.filter(d => d.actions?.includes(r.stringCharacters(action)) && (kind !== 'activity' || wanted.every(c => d.categories?.includes(c))));
   };
-  const resolveInfos = (r, intent, kind, withMeta) => {
+  const resolveInfos = (r, intent, kind, withMeta, flags = 0) => {
     const list = newEmptyList(r);
-    for (const detail of matchingComponents(r, intent, kind)) {
+    for (const detail of matchingComponents(r, intent, kind, flags)) {
       const resolved = r.allocate(RESOLVE_INFO); r.dispatch({ owner: RESOLVE_INFO, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [resolved], 'direct');
       r.storeField(r.object(resolved).fields, kind === 'service' ? `${RESOLVE_INFO}->serviceInfo:${SERVICE_INFO}` : `${RESOLVE_INFO}->activityInfo:${ACTIVITY_INFO_TYPE}`, makeInfo(r, detail, kind, withMeta));
       r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, resolved], 'virtual');
@@ -818,9 +826,9 @@ export function createAppServicesHost(platform) {
   def(PACKAGE_MANAGER, 'queryIntentServices', `(${INTENT_TYPE}I)Ljava/util/List;`, (r, _m, [, intent, flags]) => resolveInfos(r, intent, 'service', (flags & 128) !== 0));
   def(PACKAGE_MANAGER, 'queryBroadcastReceivers', `(${INTENT_TYPE}I)Ljava/util/List;`, (r, _m, [, intent, flags]) => resolveInfos(r, intent, 'receiver', (flags & 128) !== 0));
   // Activities resolve the same way: only this app is installed, so an external intent (a browser, the Play Store, the dialer) truthfully resolves to nothing.
-  def(PACKAGE_MANAGER, 'queryIntentActivities', `(${INTENT_TYPE}I)Ljava/util/List;`, (r, _m, [, intent, flags]) => resolveInfos(r, intent, 'activity', (flags & 128) !== 0));
+  def(PACKAGE_MANAGER, 'queryIntentActivities', `(${INTENT_TYPE}I)Ljava/util/List;`, (r, _m, [, intent, flags]) => resolveInfos(r, intent, 'activity', (flags & 128) !== 0, flags));
   def(PACKAGE_MANAGER, 'resolveActivity', `(${INTENT_TYPE}I)${RESOLVE_INFO}`, (r, _m, [, intent, flags]) => {
-    const list = resolveInfos(r, intent, 'activity', (flags & 128) !== 0);
+    const list = resolveInfos(r, intent, 'activity', (flags & 128) !== 0, flags);
     return r.dispatch({ owner: 'Ljava/util/List;', name: 'isEmpty', parameters: [], result: 'Z', signature: '()Z' }, [list], 'virtual') ? null : r.dispatch({ owner: 'Ljava/util/List;', name: 'get', parameters: ['I'], result: OBJECT, signature: `(I)${OBJECT}` }, [list, 0], 'virtual');
   });
   def(PACKAGE_MANAGER, 'resolveService', `(${INTENT_TYPE}I)${RESOLVE_INFO}`, (r, _m, [, intent, flags]) => { const list = resolveInfos(r, intent, 'service', (flags & 128) !== 0); return r.dispatch({ owner: 'Ljava/util/List;', name: 'isEmpty', parameters: [], result: 'Z', signature: '()Z' }, [list], 'virtual') ? null : r.dispatch({ owner: 'Ljava/util/List;', name: 'get', parameters: ['I'], result: OBJECT, signature: `(I)${OBJECT}` }, [list, 0], 'virtual'); });

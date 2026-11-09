@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 8303760,
-  "sha256": "614dc18b4feb13cc91a442b0be251a502a83564ce7ab0c63ba9c1c0fdd235c2d",
-  "classCount": 6409,
+  "bytes": 8305024,
+  "sha256": "862bb554a287a43aa4f1dfaaf3bf523263d11fbe6c53c2390094f87b0b7ba5a6",
+  "classCount": 6411,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -1336,6 +1336,8 @@
     "Landroid/os/CancellationSignal$1;",
     "Landroid/os/CancellationSignal$Transport;",
     "Landroid/os/CancellationSignal;",
+    "Landroid/os/CountDownTimer$1;",
+    "Landroid/os/CountDownTimer;",
     "Landroid/os/RemoteException;",
     "Landroid/os/DeadObjectException;",
     "Landroid/os/DeadSystemRuntimeException;",
@@ -38453,6 +38455,16 @@
       "bytes": 47877,
       "license": "GPL-2.0-only WITH Classpath-exception-2.0",
       "compilerStage": "javac-release8"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/CountDownTimer.java",
+      "localPath": "framework-aosp/upstream/android/os/CountDownTimer.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/CountDownTimer.java?format=TEXT",
+      "sha256": "7c981cfa4b5bd49fd68bb5b1ab10ecf284ce36794cbde53ec3b66acb52cac3e6",
+      "bytes": 5374,
+      "license": "Apache-2.0"
     }
   ],
   "algorithmPatches": [],

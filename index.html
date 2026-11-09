@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=9cb1ef3bb75a">
-  <meta name="apk-browser-build" content="9cb1ef3bb75a">
+  <link rel="stylesheet" href="./styles.css?v=7f18c4910ec1">
+  <meta name="apk-browser-build" content="7f18c4910ec1">
 </head>
 <body>
   <header class="topbar">
@@ -30,7 +30,8 @@
           <div class="demo-row"><span>Quer experimentar primeiro?</span><button id="demo-button">Rodar demo <span aria-hidden="true">↗</span></button></div>
           <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div><button id="stop-vm" class="stop-vm" aria-label="Encerrar VM e cancelar callbacks" hidden>Encerrar</button><button id="reopen-file" class="reopen-file" hidden>Reabrir</button><span class="file-check">✓</span></div>
           <div id="operation-panel" class="operation-panel" hidden><div><span class="spinner"></span><strong id="operation-message">Processando no Web Worker…</strong><button id="cancel-operation">Cancelar</button></div><progress id="operation-progress" max="1"></progress><small id="operation-detail">A interface permanece disponível · limite de 120 s para inspeção</small></div>
-          <div class="section-label inspection-label">02 <span>INSPEÇÃO DO PACOTE</span><span id="inspection-badge" class="quiet-badge">AGUARDANDO</span></div>
+          <details id="inspection-panel" class="inspection-panel">
+          <summary class="section-label inspection-label">02 <span>INSPEÇÃO DO PACOTE</span><span id="inspection-badge" class="quiet-badge">AGUARDANDO</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
           <div id="inventory-empty" class="inventory-empty"><span aria-hidden="true">⌘</span><p>Pacote, classes e dependências<br>aparecerão aqui.</p></div>
           <div id="inventory" class="inventory" hidden>
             <div class="inventory-heading"><span class="tiny-label">PACOTE</span><strong id="package-name"></strong></div>
@@ -39,6 +40,7 @@
             <div id="archive-summary" class="archive-summary" hidden></div><details class="findings"><summary>Classes e dependências <span>+</span></summary><div id="inventory-details"></div></details>
           </div>
           <details id="native-inspection" class="native-inspection" hidden><summary>Analisar bibliotecas nativas <span>ELF</span></summary><p>Inspeção de metadados de uma biblioteca por vez, até 32 MiB. Não executa código nativo nem implementa JNI.</p><label for="native-abi">ABI</label><select id="native-abi"></select><label for="native-library">Biblioteca</label><select id="native-library"></select><button id="inspect-native-button">Analisar ELF selecionado</button><pre id="native-result" hidden></pre></details>
+          </details>
           <div id="unsupported-notice" class="unsupported-notice" role="status" hidden><strong>Este APK ainda não pode ser executado</strong><p>O relatório indica limites de arquivo que impedem a tentativa. Veja os detalhes abaixo; uma inspeção parcial não comprova compatibilidade.</p><ul id="unsupported-list"></ul></div>
           <details id="control-panel" class="device-panel control-panel">
             <summary><span>Controles</span><span id="device-summary" class="quiet-badge" title="Tela e orientação do dispositivo virtual">411 × 914 · retrato</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
@@ -189,7 +191,7 @@
     </details>
     <footer><span><span class="footer-dot"></span> Sem instalação. Sem emulador. Sem upload.</span><a href="./hermes-proof/">Experimento Hermes no navegador ↗</a><span>APK Browser Lab <span class="footer-slash">/</span> protótipo técnico</span></footer>
   </main>
-  <script type="module" src="./app.js?v=9cb1ef3bb75a"></script>
+  <script type="module" src="./app.js?v=7f18c4910ec1"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>

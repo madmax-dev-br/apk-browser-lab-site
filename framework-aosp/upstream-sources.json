@@ -31788,5 +31788,15 @@
     "bytes": 47877,
     "license": "GPL-2.0-only WITH Classpath-exception-2.0",
     "compilerStage": "javac-release8"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/CountDownTimer.java",
+    "localPath": "framework-aosp/upstream/android/os/CountDownTimer.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/CountDownTimer.java?format=TEXT",
+    "sha256": "7c981cfa4b5bd49fd68bb5b1ab10ecf284ce36794cbde53ec3b66acb52cac3e6",
+    "bytes": 5374,
+    "license": "Apache-2.0"
   }
 ]
