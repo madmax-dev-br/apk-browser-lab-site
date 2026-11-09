@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
+  <title>Arquitetura da VM · APK Browser Lab</title>
+  <meta name="description" content="Como o APK Browser Lab executa um APK Android no navegador: do arquivo à tela, threads e tempo, memória, renderização, rede, código nativo, ferramentas e limitações.">
+  <link rel="stylesheet" href="./site-pages.css?v=f863dd365e39">
+</head>
+<body>
+  <header class="topbar">
+    <a href="./" class="brand" aria-label="APK Browser Lab: voltar ao laboratório"><span class="brand-icon" aria-hidden="true">a<span>›</span></span><span>APK <b>Browser Lab</b></span></a>
+    <nav class="topnav" aria-label="Páginas do site">
+      <a href="./">Laboratório</a>
+      <a href="./arquitetura.html" aria-current="page">Arquitetura</a>
+      <a href="./plugins.html">Plugins</a>
+      <a href="./player/example.html">Exemplo de integração</a>
+    </nav>
+    <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Alternar tema claro/escuro"><span aria-hidden="true">◐</span></button>
+  </header>
+
+  <div class="page">
+    <nav class="toc" aria-label="Nesta página">
+      <p>Nesta página</p>
+      <ol>
+        <li><a href="#visao-geral">Visão geral</a></li>
+        <li><a href="#do-apk-a-tela">Do APK à tela</a></li>
+        <li><a href="#carregar-executar">Carregar e Executar</a></li>
+        <li><a href="#threads">Threads, eventos e tempo</a></li>
+        <li><a href="#memoria">Memória</a></li>
+        <li><a href="#renderizacao">Renderização</a></li>
+        <li><a href="#rede">Rede</a></li>
+        <li><a href="#nativo">Código nativo</a></li>
+        <li><a href="#ferramentas">Ferramentas</a></li>
+        <li><a href="#limitacoes">Limitações</a></li>
+      </ol>
+    </nav>
+
+    <article>
+      <div class="intro">
+        <a class="back" href="./">‹ Voltar ao laboratório</a>
+        <h1>Como um APK roda dentro do navegador</h1>
+        <p class="lead">O laboratório não converte nem recompila o aplicativo. Ele abre o <code>.apk</code>, lê o bytecode Dalvik que está dentro e o executa numa máquina virtual escrita em JavaScript, num Web Worker, sobre um framework Android compilado das fontes originais do AOSP. Esta página mostra cada etapa e o que ainda não funciona.</p>
+        <details class="toc-inline">
+          <summary>Nesta página</summary>
+          <ol>
+            <li><a href="#visao-geral">Visão geral</a></li>
+            <li><a href="#do-apk-a-tela">Do APK à tela</a></li>
+            <li><a href="#carregar-executar">Carregar e Executar</a></li>
+            <li><a href="#threads">Threads, eventos e tempo</a></li>
+            <li><a href="#memoria">Memória</a></li>
+            <li><a href="#renderizacao">Renderização</a></li>
+            <li><a href="#rede">Rede</a></li>
+            <li><a href="#nativo">Código nativo</a></li>
+            <li><a href="#ferramentas">Ferramentas</a></li>
+            <li><a href="#limitacoes">Limitações</a></li>
+          </ol>
+        </details>
+      </div>
+
+      <section id="visao-geral" aria-labelledby="h-visao">
+        <h2 id="h-visao">Visão geral</h2>
+        <p>Tudo acontece na máquina de quem abre a página. O servidor só entrega arquivos estáticos; o APK escolhido é lido pelo navegador e não é enviado a lugar nenhum.</p>
+        <ul>
+          <li><b>O código do app roda como está.</b> As Activities, os ViewModels, o AndroidX, o Kotlin e o Jetpack Compose empacotados no APK são executados a partir do próprio DEX, instrução por instrução.</li>
+          <li><b>O Android por baixo vem das fontes originais.</b> O <code>framework.dex</code> é compilado (javac e D8) de fontes fixadas por hash do AOSP <code>android-13.0.0_r1</code> e do libcore: 6.411 classes na build atual (<code>framework-aosp/manifest.json</code>). As adaptações de fonte ficam registradas em <code>framework-aosp/ADAPTATIONS.txt</code>.</li>
+          <li><b>JavaScript só onde o dispositivo ou o navegador precisa responder.</b> Janelas, entrada, sistema de arquivos virtual, rede, relógio, serviços do sistema e as funções nativas (JNI) do framework são contratos de host escritos para o laboratório. Partes nativas do Android, como o Skia e o ICU, vêm de fonte C/C++ original compilada para WebAssembly.</li>
+          <li><b>O dispositivo virtual responde <code>SDK_INT</code> 33.</b> O alvo são apps com <code>minSdk</code>/<code>targetSdk</code> 24 ou mais; comportamentos que mudam com a versão seguem o <code>targetSdk</code> do app.</li>
+          <li><b>Nada finge sucesso.</b> Uma API que o laboratório não implementa falha com um erro explícito que diz o nome dela, em vez de devolver um valor vazio.</li>
+        </ul>
+        <p>Quando o bytecode chama um método, a VM decide quem executa, nesta ordem: o bytecode do APK, o bytecode do framework AOSP, um nativo do framework com binding aprovado, um contrato de host em JavaScript. Se nenhum serve, o erro aponta o método que faltou.</p>
+      </section>
+
+      <section id="do-apk-a-tela" aria-labelledby="h-pipeline">
+        <h2 id="h-pipeline">Do APK à tela</h2>
+        <p>Três lugares trabalham juntos: a página (a aba que você vê), o Web Worker onde a VM roda e os módulos WebAssembly que o Worker chama. A página nunca executa código do app; ela desenha o que o Worker manda e devolve o que você faz.</p>
+        <figure class="diagram">
+          <div class="diagram-box"><!--SVG:pipeline--><svg class="dg" viewBox="0 0 760 900" role="img" aria-labelledby="fig-pipeline-cap" style="--min:660px"><defs><marker id="ah-pipeline" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0 0L10 5L0 10z"/></marker></defs><g class="anim"><rect class="lane-page" x="0" y="0" width="220" height="900" rx="12"/><rect class="lane-vm" x="228" y="0" width="316" height="900" rx="12"/><rect class="lane-wasm" x="552" y="0" width="208" height="900" rx="12"/><text class="t-lane ink-page" x="14" y="28">Página (thread da interface)</text><text class="t-lane ink-vm" x="242" y="28">Web Worker: a VM</text><text class="t-lane ink-wasm" x="568" y="28">WebAssembly</text><rect class="glow" x="9" y="57" width="202" height="52" rx="11" style="--d:0s;--cycle:14s"/><rect class="node page" x="12" y="60" width="196" height="46" rx="8"/><text x="24" y="79" font-weight="600">Arquivo .apk</text><text class="t-small" x="24" y="96">lido aqui, nada é enviado</text><path class="edge" d="M208 83 H386 V128" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M208 83 H386 V128" style="--d:0s;--dur:2.4s"/><rect class="glow" x="237" y="127" width="298" height="52" rx="11" style="--d:1s;--cycle:14s"/><rect class="node vm" x="240" y="130" width="292" height="46" rx="8"/><text x="252" y="149" font-weight="600">Pacote</text><text class="t-small" x="252" y="166">ZIP · manifesto AXML · resources.arsc · DEX</text><path class="edge" d="M386 176 V198" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M386 176 V198" style="--d:0s;--dur:1.1s"/><rect class="glow" x="237" y="197" width="298" height="52" rx="11" style="--d:2s;--cycle:14s"/><rect class="node vm" x="240" y="200" width="292" height="46" rx="8"/><text x="252" y="219" font-weight="600">Tabelas DEX sob demanda</text><text class="t-small" x="252" y="236">multidex do APK + framework.dex (AOSP 13)</text><path class="edge" d="M386 246 V268" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M386 246 V268" style="--d:0.35s;--dur:1.1s"/><rect class="glow" x="237" y="267" width="298" height="52" rx="11" style="--d:3s;--cycle:14s"/><rect class="node vm" x="240" y="270" width="292" height="46" rx="8"/><text x="252" y="289" font-weight="600">Carregamento de classes</text><text class="t-small" x="252" y="306">framework primeiro, depois o APK</text><path class="edge" d="M386 316 V338" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M386 316 V338" style="--d:0.7s;--dur:1.1s"/><rect class="glow" x="237" y="337" width="298" height="52" rx="11" style="--d:4s;--cycle:14s"/><rect class="node vm" x="240" y="340" width="292" height="46" rx="8"/><text x="252" y="359" font-weight="600">Interpretador + compilador baseline</text><text class="t-small" x="252" y="376">bytecode Dalvik do próprio APK</text><path class="edge" d="M386 386 V408" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M386 386 V408" style="--d:1.0499999999999998s;--dur:1.1s"/><rect class="glow" x="237" y="407" width="298" height="52" rx="11" style="--d:5s;--cycle:14s"/><rect class="node vm" x="240" y="410" width="292" height="46" rx="8"/><text x="252" y="429" font-weight="600">Threads verdes e laço de eventos</text><text class="t-small" x="252" y="446">Looper/MessageQueue · relógio virtual</text><path class="edge" d="M386 456 V478" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M386 456 V478" style="--d:1.4s;--dur:1.1s"/><rect class="glow" x="237" y="477" width="298" height="52" rx="11" style="--d:6s;--cycle:14s"/><rect class="node vm" x="240" y="480" width="292" height="46" rx="8"/><text x="252" y="499" font-weight="600">Application → Activity</text><text class="t-small" x="252" y="516">ciclo de vida executado pelo app</text><path class="edge" d="M386 526 V548" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M386 526 V548" style="--d:1.75s;--dur:1.1s"/><rect class="glow" x="237" y="547" width="298" height="52" rx="11" style="--d:7s;--cycle:14s"/><rect class="node vm" x="240" y="550" width="292" height="46" rx="8"/><text x="252" y="569" font-weight="600">Views (XML inflado) e Compose</text><text class="t-small" x="252" y="586">medir · posicionar · árvore Semantics</text><path class="edge" d="M386 596 V618" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M386 596 V618" style="--d:2.0999999999999996s;--dur:1.1s"/><rect class="glow" x="237" y="617" width="298" height="52" rx="11" style="--d:8s;--cycle:14s"/><rect class="node vm" x="240" y="620" width="292" height="46" rx="8"/><text x="252" y="639" font-weight="600">Canvas / RenderNode</text><text class="t-small" x="252" y="656">gravam os comandos de desenho</text><path class="edge" d="M386 666 V688" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M386 666 V688" style="--d:2.4499999999999997s;--dur:1.1s"/><rect class="glow" x="237" y="687" width="298" height="52" rx="11" style="--d:9s;--cycle:14s"/><rect class="node vm" x="240" y="690" width="292" height="46" rx="8"/><text x="252" y="709" font-weight="600">Snapshot do quadro</text><text class="t-small" x="252" y="726">árvore, posições, rasters, Semantics</text><rect class="glow" x="563" y="267" width="188" height="52" rx="11" style="--d:2.5s;--cycle:14s"/><rect class="node wasm" x="566" y="270" width="182" height="46" rx="8"/><text x="578" y="289" font-weight="600">ICU · recursos</text><text class="t-small" x="578" y="306">C/C++ do AOSP e ICU</text><rect class="glow" x="563" y="407" width="188" height="52" rx="11" style="--d:4.5s;--cycle:14s"/><rect class="node wasm" x="566" y="410" width="182" height="46" rx="8"/><text x="578" y="429" font-weight="600">Bibliotecas nativas</text><text class="t-small" x="578" y="446">builds wasm32 + JNI</text><rect class="glow" x="563" y="617" width="188" height="52" rx="11" style="--d:8.5s;--cycle:14s"/><rect class="node wasm" x="566" y="620" width="182" height="46" rx="8"/><text x="578" y="639" font-weight="600">CanvasKit (Skia)</text><text class="t-small" x="578" y="656">raster; menor em movimento</text><path class="edge" d="M532 293 H564" marker-end="url(#${mk})"/><path class="edge" d="M566 303 H534" marker-end="url(#${mk})"/><path class="edge" d="M532 433 H564" marker-end="url(#${mk})"/><path class="edge" d="M566 443 H534" marker-end="url(#${mk})"/><path class="edge" d="M532 643 H564" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M532 643 H564" style="--d:0.6s;--dur:1.2s"/><path class="edge" d="M657 666 V713 H534" marker-end="url(#${mk})"/><path class="packet wasm" pathLength="200" d="M657 666 V713 H534" style="--d:1.2s;--dur:1.4s"/><path class="edge" d="M240 713 H110 V758" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M240 713 H110 V758" style="--d:1.6s;--dur:1.6s"/><rect class="glow" x="9" y="757" width="202" height="52" rx="11" style="--d:10s;--cycle:14s"/><rect class="node page" x="12" y="760" width="196" height="46" rx="8"/><text x="24" y="779" font-weight="600">Desenho na página</text><text class="t-small" x="24" y="796">aparelho + camada Semantics</text><path class="edge" d="M110 806 V828" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M110 806 V828" style="--d:2.4s;--dur:0.8s"/><rect class="glow" x="9" y="827" width="202" height="52" rx="11" style="--d:11s;--cycle:14s"/><rect class="node page" x="12" y="830" width="196" height="46" rx="8"/><text x="24" y="849" font-weight="600">Entrada do usuário</text><text class="t-small" x="24" y="866">toque, texto, voltar, rolagem</text><path class="edge" d="M208 853 H222 V433 H238" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M208 853 H222 V433 H238" style="--d:2.8s;--dur:2.2s"/><text class="t-small" x="226" y="842" text-anchor="start">MotionEvent, ação Semantics, texto → próximo quadro</text></g></svg><!--/SVG--></div>
+          <p class="scroll-hint">Arraste o diagrama para o lado para ver as três colunas.</p>
+          <button type="button" class="motion-control" aria-pressed="false">Pausar animação</button>
+          <figcaption id="fig-pipeline-cap"><strong>Figura 1.</strong> O caminho de um APK até a tela, em três colunas: página, Worker da VM e WebAssembly. Os pontos que andam nas setas são dados passando de uma etapa à seguinte.</figcaption>
+          <ol class="steps">
+            <li>A página lê o arquivo com <code>File.arrayBuffer()</code> e transfere os bytes para o Worker.</li>
+            <li><code>apk-loader.js</code> abre o ZIP, decodifica o <code>AndroidManifest.xml</code> binário (AXML), a tabela <code>resources.arsc</code> e todos os <code>classes*.dex</code> (multidex). Limites: 1 GiB por APK, 64 MiB por DEX, 768 MiB de DEX no total.</li>
+            <li>As tabelas de cada DEX são decodificadas sob demanda: só o índice das classes e os descritores de tipo são lidos na abertura; strings, métodos e campos são lidos no primeiro uso.</li>
+            <li>As classes são resolvidas como no Android: o framework primeiro (parent-first), depois o APK. ICU e a seleção de recursos do AOSP rodam como WebAssembly.</li>
+            <li>O interpretador executa o bytecode; métodos quentes passam pelo compilador baseline, que os transforma em funções JavaScript sobre o mesmo quadro de registradores.</li>
+            <li>O escalonador de threads verdes, o <code>Looper</code>/<code>MessageQueue</code> originais e o relógio virtual mantêm o app vivo entre eventos. Bibliotecas nativas compiladas para wasm32 são ligadas quando o app as carrega.</li>
+            <li>A <code>Application</code> e a <code>Activity</code> de entrada passam pelo ciclo de vida, com o código do próprio app.</li>
+            <li>Views infladas de XML e conteúdo Compose são medidos e posicionados pelo código original.</li>
+            <li><code>Canvas</code> e <code>RenderNode</code> gravam os comandos de desenho; o CanvasKit (Skia em WebAssembly) os transforma em pixels, em escala reduzida enquanto a tela se move.</li>
+            <li>O Worker monta o snapshot do quadro (árvore de Views, posições, rasters, árvore Semantics do Compose) e o envia à página.</li>
+            <li>A página desenha o aparelho e, por cima do conteúdo Compose, uma camada transparente tirada da árvore Semantics.</li>
+            <li>Toques, texto, Voltar e rolagem voltam ao Worker como <code>MotionEvent</code>, ações Semantics ou texto para a <code>InputConnection</code>, e o próximo quadro começa.</li>
+          </ol>
+        </figure>
+      </section>
+
+      <section id="carregar-executar" aria-labelledby="h-carregar">
+        <h2 id="h-carregar">Carregar e Executar fazem coisas diferentes</h2>
+        <p>Escolher um APK e apertar <b>Executar</b> são duas mensagens diferentes ao Worker. A primeira, <code>load</code>, prepara tudo sem rodar nenhuma linha do app. A segunda, <code>launch</code>, começa o processo do app.</p>
+        <figure class="diagram">
+          <div class="lanes">
+            <div class="lane load">
+              <h3>Carregar</h3>
+              <p class="when">Ao escolher ou reabrir um APK (mensagem <code>load</code>)</p>
+              <ol>
+                <li>A página lê o arquivo e termina o Worker da execução anterior; a VM anterior é descartada.</li>
+                <li>O Worker prepara os provedores: <code>framework.dex</code> e os perfis do framework, os recursos do sistema, a seleção de recursos, Skia, ICU, SQLite, tzdata, zlib e as bibliotecas nativas (só a proveniência; os bytes de cada uma são buscados quando o app a carregar).</li>
+                <li><code>loadAPK</code> abre o ZIP, o manifesto AXML, o <code>resources.arsc</code> e os DEX em tabelas sob demanda, e monta o runtime e o inventário mostrado em “Inspeção do pacote”.</li>
+                <li>Antes de qualquer código do app: aplica retornos de métodos, Activities ignoradas, mocks de endpoint, tempo máximo por evento e permissões; liga o Logcat e o log de rede.</li>
+                <li>Devolve ao sistema de arquivos virtual os dados guardados do app (se “Manter dados do app” estiver ligado).</li>
+                <li>Nenhuma classe do app é inicializada nesta fase.</li>
+              </ol>
+            </div>
+            <div class="lane run">
+              <h3>Executar</h3>
+              <p class="when">Ao apertar Executar (mensagem <code>launch</code>)</p>
+              <ol>
+                <li>A <code>Application</code> declarada é criada; <code>attachBaseContext</code> e <code>onCreate</code> rodam.</li>
+                <li>A Activity escolhida (a launcher, por padrão) passa por <code>onCreate</code>, <code>onStart</code> e <code>onResume</code>.</li>
+                <li>Primeiro layout e primeiro desenho; o primeiro snapshot chega à página.</li>
+                <li>Daí em diante o pump de eventos mantém o app vivo: mensagens, quadros, threads de fundo, rede.</li>
+                <li>Depois da primeira tentativa de execução começa, em segundo plano, a estimativa estática de APIs ausentes do APK.</li>
+                <li>Executar de novo reimporta o APK (passa outra vez por Carregar) para um início limpo.</li>
+              </ol>
+            </div>
+          </div>
+          <figcaption><strong>Figura 2.</strong> As duas fases lado a lado. Carregar inspeciona e prepara; Executar inicia o processo do app. Fontes: os casos <code>load</code> e <code>launch</code> de <code>src/apk-worker.js</code>, <code>importSource</code> e <code>runAPKOnce</code> de <code>src/app.js</code>.</figcaption>
+        </figure>
+      </section>
+
+      <section id="threads" aria-labelledby="h-threads">
+        <h2 id="h-threads">Threads, eventos e tempo</h2>
+        <p>Um Worker tem uma só thread JavaScript, mas um app Android tem dezenas. A VM resolve isso com <b>threads verdes</b>: cada thread Java é uma pilha de quadros explícita, e o escalonador troca de thread em pontos seguros (quando uma thread bloqueia, termina ou gasta seu quantum de instruções). <code>Object.wait</code>, <code>LockSupport.park</code>, <code>Thread.sleep</code> e monitores disputados estacionam a thread em vez de esperar em JavaScript.</p>
+        <p><code>Looper</code>, <code>MessageQueue</code>, <code>Handler</code>, <code>Message</code> e <code>HandlerThread</code> são as classes originais do AOSP. O laboratório só implementa os métodos nativos de <code>MessageQueue</code>, ligados ao escalonador e ao relógio virtual.</p>
+        <figure class="diagram">
+          <div class="diagram-box"><!--SVG:loop--><svg class="dg" viewBox="0 0 600 430" role="img" aria-labelledby="fig-loop-cap" style="--min:540px"><g class="anim"><circle cx="300" cy="215" r="128" fill="none" stroke="var(--line)" stroke-width="10"/><g class="spin" style="--ox:300px;--oy:215px;--dur:9s"><path d="M300 87 A128 128 0 0 1 410.8512516844081 151" fill="none" stroke="var(--accent)" stroke-width="10" stroke-linecap="round"/></g><text x="300" y="209" text-anchor="middle" font-weight="600">drainEvents</text><text class="t-small" x="300" y="229" text-anchor="middle">uma volta do pump</text><circle cx="366.0" cy="100.7" r="6" fill="var(--accent)"/><rect class="glow" x="379" y="75" width="220" height="52" rx="11" style="--d:0s;--cycle:9s"/><rect class="node vm" x="382" y="78" width="214" height="46" rx="8"/><text x="394" y="97" font-weight="600">Coleta, se devida</text><text class="t-small" x="394" y="114">ponto quieto entre eventos</text><circle cx="432.0" cy="215.0" r="6" fill="var(--accent)"/><rect class="glow" x="379" y="189" width="220" height="52" rx="11" style="--d:1.5s;--cycle:9s"/><rect class="node vm" x="382" y="192" width="214" height="46" rx="8"/><text x="394" y="211" font-weight="600">Eventos do Looper principal</text><text class="t-small" x="394" y="228">quadro e layout passam à frente</text><circle cx="366.0" cy="329.3" r="6" fill="var(--accent)"/><rect class="glow" x="379" y="303" width="220" height="52" rx="11" style="--d:3s;--cycle:9s"/><rect class="node vm" x="382" y="306" width="214" height="46" rx="8"/><text x="394" y="325" font-weight="600">Uma fatia das threads de fundo</text><text class="t-small" x="394" y="342">8 ms (2 ms antes do 1º quadro)</text><circle cx="234.0" cy="329.3" r="6" fill="var(--accent)"/><rect class="glow" x="1" y="303" width="220" height="52" rx="11" style="--d:4.5s;--cycle:9s"/><rect class="node vm" x="4" y="306" width="214" height="46" rx="8"/><text x="16" y="325" font-weight="600">Repete enquanto há tempo</text><text class="t-small" x="16" y="342">até 64 voltas no orçamento</text><circle cx="168.0" cy="215.0" r="6" fill="var(--accent)"/><rect class="glow" x="1" y="189" width="220" height="52" rx="11" style="--d:6s;--cycle:9s"/><rect class="node vm" x="4" y="192" width="214" height="46" rx="8"/><text x="16" y="211" font-weight="600">Quadro para a página</text><text class="t-small" x="16" y="228">snapshot do que a VM desenhou</text><circle cx="234.0" cy="100.7" r="6" fill="var(--accent)"/><rect class="glow" x="1" y="75" width="220" height="52" rx="11" style="--d:7.5s;--cycle:9s"/><rect class="node vm" x="4" y="78" width="214" height="46" rx="8"/><text x="16" y="97" font-weight="600">Tudo esperando?</text><text class="t-small" x="16" y="114">o relógio salta ao próximo prazo</text></g></svg><!--/SVG--></div>
+          <button type="button" class="motion-control" aria-pressed="false">Pausar animação</button>
+          <figcaption id="fig-loop-cap"><strong>Figura 3.</strong> Uma volta do pump do Worker (<code>drainEvents</code> em <code>src/android-platform.js</code>). O arco que gira marca a fase atual.</figcaption>
+          <ol class="steps">
+            <li>Num ponto quieto entre eventos, o coletor roda se uma coleta estiver devida.</li>
+            <li>Os eventos vencidos do Looper principal rodam primeiro. Se a thread principal está atrasada, layout e quadro do Choreographer passam à frente das mensagens comuns.</li>
+            <li>Se há trabalho de fundo esperando, ele ganha uma fatia limitada: 8 ms de tempo de host, ou 2 ms antes do primeiro quadro.</li>
+            <li>A volta se repete (até 64 vezes) enquanto houver tempo no orçamento do pump; depois a página e a entrada têm a vez.</li>
+            <li>O quadro novo vai para a página como snapshot.</li>
+            <li>Quando todas as threads esperam, o relógio virtual salta para o prazo mais próximo em vez de esperar em tempo real.</li>
+          </ol>
+        </figure>
+        <h3>O relógio virtual</h3>
+        <p>Todo relógio que o app pode ler (<code>System.currentTimeMillis</code>, <code>nanoTime</code>, <code>SystemClock</code>, <code>Date</code>, prazos do Handler) lê o mesmo relógio da VM (<code>src/vm-clock.js</code>). Ele anda com o tempo real e só pode avançar mais rápido, nunca voltar. Durante um quadro do Choreographer o tempo fica parado no instante do vsync, como num aparelho rápido, para que o código que mede “quanto do quadro sobra” não veja a lentidão do interpretador.</p>
+        <h3>Execuções aninhadas e deadlocks</h3>
+        <p>Código de host que não pode ser suspenso (um nativo que chamou de volta o Java, um inicializador de classe) espera deixando as outras threads rodarem por cima da pilha JavaScript. Se a thread que acordaria a espera está presa embaixo dessa pilha, o escalonador relata um deadlock em vez de travar. Uma exceção que escapa de uma mensagem rodada nesse aninhamento é entregue à thread da mensagem, como no Android, e não ao quadro estacionado embaixo dela.</p>
+        <h3>Limites de tempo</h3>
+        <p>Um evento pode rodar até 25 s e uma operação inteira até 20 s de tempo de host por padrão (<code>src/time-limits.js</code>); “Tempo máximo por evento” em Controles aumenta esses limites para 60, 120 ou 300 s. Nenhuma escolha remove o limite: um laço infinito termina com o relatório de diagnóstico.</p>
+      </section>
+
+      <section id="memoria" aria-labelledby="h-memoria">
+        <h2 id="h-memoria">Memória</h2>
+        <p>Os objetos Java vivem no heap da VM como registros JavaScript, e os arrays em armazenamento tipado. Um coletor <b>mark-and-sweep</b> (<code>src/heap-gc.js</code>) libera o que ficou inacessível.</p>
+        <ul>
+          <li><b>Raízes:</b> as threads do escalonador (quadros, registradores, exceções pendentes), as tabelas do runtime (campos estáticos, objetos <code>Class</code>, monitores) e o estado dos hosts. A varredura do estado de host é conservadora: pode manter lixo vivo, nunca libera algo alcançável.</li>
+          <li><b>Quando:</b> em pontos quietos entre eventos e, sob pressão, nos pontos seguros de uma execução longa.</li>
+          <li><b>Referências como no ART:</b> <code>WeakReference</code> não segura o objeto. <code>SoftReference</code> segura numa coleta normal e é limpa numa coleta sob pressão, antes de um <code>OutOfMemoryError</code>. Finalizadores não rodam.</li>
+          <li><b>Fora do movimento:</b> uma coleta que fica devida enquanto há quadros pendentes ou logo depois de uma entrada espera o primeiro momento ocioso da thread principal, com um teto rígido. Medido em <code>docs/INTERACTION-PERFORMANCE.md</code>: num exemplo Compose as coletas durante animação caíram de 9 de 9 para 2 de 8.</li>
+          <li><b>Limite e erro:</b> o limite de objetos sai de um orçamento de memória (<code>src/memory-budget.js</code>) que segue <code>navigator.deviceMemory</code> ou a escolha “Memória da VM” em Controles. Quando o heap não cabe nem depois da coleta de emergência, o app recebe um <code>OutOfMemoryError</code> de verdade, e o relatório mostra quem retém a memória.</li>
+          <li><b>Tabelas DEX sob demanda:</b> decodificar só o que é usado reduziu o heap de um exemplo Compose de 182 MiB para 68 MiB depois de carregar e de 245 MiB para 158 MiB no primeiro quadro (medido em <code>docs/MEMORY-ON-DEMAND.md</code>).</li>
+        </ul>
+      </section>
+
+      <section id="renderizacao" aria-labelledby="h-render">
+        <h2 id="h-render">Renderização</h2>
+        <p>O layout é sempre calculado na VM, pelo código original (<code>onMeasure</code>, <code>onLayout</code>, Compose), nunca pelo CSS da página. A página posiciona elementos nos retângulos que a VM calculou e mostra, dentro deles, os pixels que o Skia produziu.</p>
+        <ul>
+          <li><b>Views:</b> cada View vira um elemento posicionado nos limites que a VM calculou; fundos, Drawables, texto e sombras são, em geral, rasters do Skia. Alguns widgets XML simples são desenhados com elementos da própria página e por isso não têm raster.</li>
+          <li><b>Compose:</b> o runtime, o layout e o desenho do Compose são o DEX do próprio APK. O conteúdo chega como raster, e a página põe por cima uma camada transparente de controles tirada da árvore Semantics, para receber toque, foco e texto.</li>
+          <li><b>Texto:</b> a forma do texto vem do SkParagraph/HarfBuzz; as quebras de linha usam o iterador de quebra do ICU e os algoritmos de quebra do Minikin; a escolha de fonte percorre a cadeia de fallback do Android 13, baixando cada fonte Noto só quando um trecho precisa dela.</li>
+          <li><b>Transporte:</b> rasters iguais viajam uma vez e depois só como identificador (cache por conteúdo em <code>src/raster-cache.js</code>); o conteúdo de Canvas e Compose vai como RGBA cru, sem codificar PNG. O Worker não manda um quadro novo enquanto a página não confirmou os anteriores (contrapressão).</li>
+        </ul>
+        <figure class="diagram">
+          <div class="diagram-box"><!--SVG:frame--><svg class="dg" viewBox="0 0 730 190" role="img" aria-labelledby="fig-frame-cap" style="--min:620px"><defs><marker id="ah-frame" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0 0L10 5L0 10z"/></marker></defs><g class="anim"><rect class="glow" x="7" y="17" width="216" height="56" rx="11" style="--d:0s;--cycle:7.2s"/><rect class="node vm" x="10" y="20" width="210" height="50" rx="8"/><text x="22" y="39" font-weight="600">Canvas grava</text><text class="t-small" x="22" y="56">comandos do quadro, sem pixels</text><path class="edge" d="M220 45 H248" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M220 45 H248" style="--d:0s;--dur:1.2s"/><rect class="glow" x="247" y="17" width="216" height="56" rx="11" style="--d:1.2s;--cycle:7.2s"/><rect class="node wasm" x="250" y="20" width="210" height="50" rx="8"/><text x="262" y="39" font-weight="600">Tela em movimento?</text><text class="t-small" x="262" y="56">raster em escala 0,5</text><path class="edge" d="M460 45 H488" marker-end="url(#${mk})"/><path class="packet wasm" pathLength="200" d="M460 45 H488" style="--d:1.2s;--dur:1.2s"/><rect class="glow" x="487" y="17" width="216" height="56" rx="11" style="--d:2.4s;--cycle:7.2s"/><rect class="node vm" x="490" y="20" width="210" height="50" rx="8"/><text x="502" y="39" font-weight="600">Transporte</text><text class="t-small" x="502" y="56">cache por conteúdo; RGBA sem PNG</text><rect class="glow" x="7" y="127" width="216" height="56" rx="11" style="--d:3.5999999999999996s;--cycle:7.2s"/><rect class="node page" x="10" y="130" width="210" height="50" rx="8"/><text x="22" y="149" font-weight="600">Página desenha</text><text class="t-small" x="22" y="166">e confirma o quadro recebido</text><path class="edge" d="M220 155 H248" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M220 155 H248" style="--d:3.5999999999999996s;--dur:1.2s"/><rect class="glow" x="247" y="127" width="216" height="56" rx="11" style="--d:4.8s;--cycle:7.2s"/><rect class="node wasm" x="250" y="130" width="210" height="50" rx="8"/><text x="262" y="149" font-weight="600">Parado por 100 ms</text><text class="t-small" x="262" y="166">mesma gravação, densidade cheia</text><path class="edge" d="M460 155 H488" marker-end="url(#${mk})"/><path class="packet wasm" pathLength="200" d="M460 155 H488" style="--d:4.8s;--dur:1.2s"/><rect class="glow" x="487" y="127" width="216" height="56" rx="11" style="--d:6s;--cycle:7.2s"/><rect class="node page" x="490" y="130" width="210" height="50" rx="8"/><text x="502" y="149" font-weight="600">Quadro nítido</text><text class="t-small" x="502" y="166">igual ao raster sem o recurso</text><path class="edge" d="M595 70 V100 H115 V128" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M595 70 V100 H115 V128" style="--d:3.4s;--dur:1.4s"/></g></svg><!--/SVG--></div>
+          <button type="button" class="motion-control" aria-pressed="false">Pausar animação</button>
+          <figcaption id="fig-frame-cap"><strong>Figura 4.</strong> O caminho de um quadro com o raster progressivo (<code>src/motion-raster.js</code>). As etapas acendem na ordem.</figcaption>
+          <ol class="steps">
+            <li>O Canvas grava os comandos do quadro; ainda não há pixels.</li>
+            <li>Se a tela está em movimento (quadro pendente, gesto em curso, rolagem), o Skia reproduz a gravação em escala 0,5, um quarto dos pixels.</li>
+            <li>O raster vai para a página pelo cache por conteúdo.</li>
+            <li>A página desenha o bitmap menor esticado na mesma caixa e confirma o quadro.</li>
+            <li>Quando a tela para por 100 ms, a mesma gravação é reproduzida em densidade cheia.</li>
+            <li>O quadro final é idêntico, byte a byte, ao que sairia com o recurso desligado (<code>?raster=full</code>).</li>
+          </ol>
+        </figure>
+        <p class="source">Efeito medido em <code>docs/INTERACTION-PERFORMANCE.md</code>: um quadro Compose foi reproduzido em cerca de 8,4 ms em vez de cerca de 20 ms no Worker do navegador, e a taxa exibida do exemplo XML durante animação passou de 24,3 para 38,9 quadros por segundo, somadas as outras mudanças daquela etapa.</p>
+      </section>
+
+      <section id="rede" aria-labelledby="h-rede">
+        <h2 id="h-rede">Rede</h2>
+        <p>Um navegador não abre TCP. Tudo o que o app manda para a rede sai pela <code>fetch</code> do navegador, sob a política de rede do aparelho virtual (<code>docs/NETWORK.md</code>).</p>
+        <figure class="diagram">
+          <div class="diagram-box"><!--SVG:network--><svg class="dg" viewBox="0 0 722 285" role="img" aria-labelledby="fig-net-cap" style="--min:640px"><defs><marker id="ah-network" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0 0L10 5L0 10z"/></marker></defs><g class="anim"><rect class="node vm" x="10" y="20" width="200" height="46" rx="8"/><text x="22" y="39" font-weight="600">HttpURLConnection</text><text class="t-small" x="22" y="56">natives do NetBridge</text><path class="edge" d="M210 43 H238" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M210 43 H238" style="--d:0s;--dur:1s"/><rect class="node vm" x="10" y="82" width="200" height="46" rx="8"/><text x="22" y="101" font-weight="600">java.net.Socket (HTTP/1.1)</text><text class="t-small" x="22" y="118">OkHttp: socket HTTP virtual</text><path class="edge" d="M210 105 H238" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M210 105 H238" style="--d:0.5s;--dur:1s"/><rect class="node vm" x="10" y="144" width="200" height="46" rx="8"/><text x="22" y="163" font-weight="600">DownloadManager</text><text class="t-small" x="22" y="180">mesma troca</text><path class="edge" d="M210 167 H238" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M210 167 H238" style="--d:1s;--dur:1s"/><path class="edge" d="M238 43 V167"/><path class="edge" d="M238 43 H262" marker-end="url(#${mk})"/><rect class="glow" x="261" y="17" width="216" height="52" rx="11" style="--d:0s;--cycle:6.6s"/><rect class="node vm" x="264" y="20" width="210" height="46" rx="8"/><text x="276" y="39" font-weight="600">NetworkBridge</text><text class="t-small" x="276" y="56">uma troca para os três</text><path class="edge" d="M369 66 V82" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M369 66 V82" style="--d:1s;--dur:0.6s"/><rect class="glow" x="261" y="79" width="216" height="52" rx="11" style="--d:1.1s;--cycle:6.6s"/><rect class="node vm" x="264" y="82" width="210" height="46" rx="8"/><text x="276" y="101" font-weight="600">Mock de endpoints</text><text class="t-small" x="276" y="118">casou? responde o lab</text><path class="edge" d="M369 128 V144" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M369 128 V144" style="--d:1.6s;--dur:0.6s"/><rect class="glow" x="261" y="141" width="216" height="52" rx="11" style="--d:2.2s;--cycle:6.6s"/><rect class="node vm" x="264" y="144" width="210" height="46" rx="8"/><text x="276" y="163" font-weight="600">Redirecionar hosts</text><text class="t-small" x="276" y="180">troca o destino da troca</text><path class="edge" d="M369 190 V206" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M369 190 V206" style="--d:2.2s;--dur:0.6s"/><rect class="glow" x="261" y="203" width="216" height="52" rx="11" style="--d:3.3000000000000003s;--cycle:6.6s"/><rect class="node vm" x="264" y="206" width="210" height="46" rx="8"/><text x="276" y="225" font-weight="600">Política do aparelho</text><text class="t-small" x="276" y="242">offline · hosts permitidos</text><path class="edge" d="M474 229 H500 V43 H514" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M474 229 H500 V43 H514" style="--d:3.2s;--dur:1.4s"/><rect class="glow" x="513" y="17" width="202" height="52" rx="11" style="--d:4.4s;--cycle:6.6s"/><rect class="node page" x="516" y="20" width="196" height="46" rx="8"/><text x="528" y="39" font-weight="600">Proxy (opcional)</text><text class="t-small" x="528" y="56">relay CORS na sua máquina</text><path class="edge" d="M614 66 V82" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M614 66 V82" style="--d:4.4s;--dur:0.6s"/><rect class="glow" x="513" y="79" width="202" height="52" rx="11" style="--d:5.5s;--cycle:6.6s"/><rect class="node page" x="516" y="82" width="196" height="46" rx="8"/><text x="528" y="101" font-weight="600">fetch do navegador</text><text class="t-small" x="528" y="118">TLS, CORS e cookies dele</text><path class="edge" d="M614 128 V144" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M614 128 V144" style="--d:5s;--dur:0.6s"/><rect class="node page" x="516" y="144" width="196" height="46" rx="8"/><text x="528" y="163" font-weight="600">Servidor</text><text class="t-small" x="528" y="180">precisa aceitar a origem</text><text class="t-small" x="264" y="272">Toda troca, recusa ou mock vira uma entrada do painel Rede.</text></g></svg><!--/SVG--></div>
+          <button type="button" class="motion-control" aria-pressed="false">Pausar animação</button>
+          <figcaption id="fig-net-cap"><strong>Figura 5.</strong> De uma requisição do app até o servidor.</figcaption>
+          <ol class="steps">
+            <li>O app usa <code>HttpURLConnection</code>, um cliente que escreve HTTP/1.1 sobre <code>java.net.Socket</code> (como o OkHttp, inclusive sobre <code>SSLSocket</code>) ou o <code>DownloadManager</code>.</li>
+            <li>Os três caminhos chegam à mesma troca da <code>NetworkBridge</code>.</li>
+            <li>Um mock de endpoint que casa responde ali mesmo; a requisição não vai à rede.</li>
+            <li>Uma regra de “Redirecionar hosts” troca o destino da troca; o app continua vendo a URL original.</li>
+            <li>A política do aparelho decide: sem conexão, ou host fora da lista permitida, a requisição falha como num telefone (<code>UnknownHostException</code>, <code>ENETUNREACH</code>).</li>
+            <li>Se houver proxy configurado, a requisição passa pelo relay CORS que roda na sua máquina.</li>
+            <li>A <code>fetch</code> do navegador faz a troca real, com o TLS, o CORS e os cookies do navegador.</li>
+            <li>O servidor só responde à página se aceitar a origem dela (CORS). Toda troca, recusa ou mock aparece no painel Rede.</li>
+          </ol>
+        </figure>
+        <ul>
+          <li><b>TLS é do navegador.</b> Um <code>SSLSocket</code> do app não cifra nada na VM: ele apresenta uma cadeia de certificados gerada pelo laboratório na sessão (como um proxy de depuração), e o navegador valida o certificado real. Um app que fixa a chave do servidor real recusa essa cadeia, e a recusa é do próprio app.</li>
+          <li><b>Só HTTP/1.x sobre socket.</b> Uma conversa que não é HTTP/1.x falha nos primeiros bytes com um erro que os nomeia. O loopback (<code>ServerSocket</code> do próprio app em 127.0.0.1) funciona.</li>
+          <li><b>CORS e o relay.</b> Os servidores de um app real raramente autorizam a origem do laboratório. <code>scripts/cors-relay.mjs</code> roda na máquina de quem testa, escuta só em 127.0.0.1, exige um token e recusa endereços locais e privados por padrão.</li>
+        </ul>
+      </section>
+
+      <section id="nativo" aria-labelledby="h-nativo">
+        <h2 id="h-nativo">Código nativo</h2>
+        <p>Bibliotecas <code>.so</code> de ARM ou x86 não executam no navegador. O laboratório segue outro caminho:</p>
+        <ul>
+          <li><b>Nativo do Android, da fonte original.</b> Skia (CanvasKit), ICU, a seleção de recursos (<code>ResTable_config::match</code>) e a aproximação de curvas de <code>Path</code> do AOSP, BoringSSL e a camada JNI do Conscrypt são compilados de C/C++ para WebAssembly, com hashes e proveniência.</li>
+          <li><b>Bibliotecas de código aberto em wasm32.</b> Para bibliotecas abertas que apps carregam (por exemplo Hermes, React Native, fbjni, SQLCipher), o laboratório tem builds wasm32 com <code>provenance.json</code> e SHA-256 fixado. Um ligador dinâmico próprio (<code>src/native-linker.js</code>) as liga numa memória por processo, e os bytes só são buscados quando o app chama <code>System.loadLibrary</code>.</li>
+          <li><b>JNI.</b> A ponte JNI (<code>src/jni-host.js</code>) dá a essas bibliotecas a tabela de funções JNI; uma função ainda não implementada falha com erro específico.</li>
+          <li><b>Sem build, sem execução.</b> Uma biblioteca do app sem build correspondente gera <code>UnsatisfiedLinkError</code> explícito; o app só continua se ele mesmo tratar o erro.</li>
+          <li><b>Proteção nunca é contornada.</b> Bibliotecas que parecem proteção do app, antifraude ou atestação (<code>src/protected-native.js</code>) nunca recebem stub, nem no modo tolerante. Verificações de integridade, detecção de root ou emulador e criptografia do app rodam como o app as escreveu, ou falham.</li>
+        </ul>
+        <p class="source">Fila de trabalho estática dos nativos do framework: <code>docs/NATIVE-CLOSURE.md</code>.</p>
+      </section>
+
+      <section id="ferramentas" aria-labelledby="h-ferramentas">
+        <h2 id="h-ferramentas">Ferramentas</h2>
+        <p>O painel <b>Controles</b> e os painéis abaixo do aparelho servem para testar e entender o app. Toda ferramenta que muda o comportamento do app é contada, avisada no Logcat e listada no Resumo.</p>
+        <ul class="tools">
+          <li><b>Abrir</b>Deep links e Intents resolvidos pelos intent-filters do manifesto, como <code>am start</code>.</li>
+          <li><b>Aparência</b>Tema escuro, escala da fonte, idioma e região, orientação, tela, navegação por gestos ou botões, escala de animação, limites de layout.</li>
+          <li><b>Dispositivo</b>Relógio de 24 horas, fuso, bateria, conectividade, hosts permitidos e proxy.</li>
+          <li><b>Permissões</b>Permissões perigosas do manifesto (perguntar, conceder, negar) e localização simulada.</li>
+          <li><b>Execução</b>Memória da VM, tempo máximo por evento, modo tolerante, modo estrito de falhas, dados do app.</li>
+          <li><b>Retornos de métodos</b>Faz um método escolhido devolver um valor sem executar o corpo.</li>
+          <li><b>Activities ignoradas</b>Descarta pedidos do app para abrir certas Activities.</li>
+          <li><b>Redirecionar hosts</b>Manda as requisições de um host para outro destino, como <code>/etc/hosts</code>.</li>
+          <li><b>Mock de endpoints</b>Responde requisições que casam com um padrão, sem ir à rede; exporta e importa JSON.</li>
+          <li><b>Plugins</b>Trechos de JavaScript seus que observam o app e recortam a tela, só leitura. <a href="./plugins.html">Como configurar</a>.</li>
+          <li><b>Logcat e Rede</b>As linhas do <code>android.util.Log</code> e cada requisição, recusa e mock.</li>
+          <li><b>Compose</b>Os elementos da tela recortados do quadro pelos limites de layout, com detalhes e a árvore completa.</li>
+          <li><b>Resumo e diagnóstico</b>Memória, quem retém, exceções, thread principal e métodos mais ocupados; “Copiar diagnóstico” leva o relatório inteiro.</li>
+          <li><b>Comparar com Android</b>Capturas do mesmo fluxo num emulador e no navegador, lado a lado (<a href="./comparison/">páginas de comparação</a>).</li>
+          <li><b>Player</b>O elemento <code>&lt;apk-player&gt;</code> para embutir um APK em outra página (<code>docs/EMBED.md</code>).</li>
+        </ul>
+        <h3>Validação contra o Android</h3>
+        <p>Cinco exemplos (Compose com estado, Compose com navegação, navegação híbrida, um fluxo de aprovações em Compose e um app de projetos em XML) são validados por <code>scripts/check-validation.mjs</code>. Cada um precisa passar em tudo: os fluxos completos na VM, zero APIs não resolvidas e zero erros, capturas da página comparadas às do Android (paridade), checagem de layout, os mesmos fluxos no navegador com toques reais e o coletor em modo de auditoria. A evidência fica presa ao SHA do framework e envelhece a cada rebuild.</p>
+      </section>
+
+      <section id="limitacoes" aria-labelledby="h-limites">
+        <h2 id="h-limites">Limitações</h2>
+        <p>O laboratório é experimental. Estes limites estão no código e na documentação do projeto:</p>
+        <ul class="limits">
+          <li><b>Nem toda API Android existe.</b><span>Nos APKs do catálogo público, 886 de 7.865 métodos de plataforma referenciados (11,3%) ainda não têm implementação, concentrados em gráficos, Views e widgets (<code>docs/CORE-GAPS.md</code>). Chamar um deles é um erro explícito com o nome do método.</span></li>
+          <li><b>É um interpretador em JavaScript.</b><span>Há um compilador baseline, mas não um JIT otimizador. Um quadro Compose ainda executa cerca de 350 mil instruções a cerca de 100 ns cada, o que sozinho limita uma animação Compose perto de 28 quadros por segundo (<code>docs/INTERACTION-PERFORMANCE.md</code>).</span></li>
+          <li><b>Desenho na CPU.</b><span>O Skia rasteriza em CPU no Worker; não há RenderThread nem GPU. Rotação 3D de Views falha de forma explícita.</span></li>
+          <li><b>Rede só pelo navegador.</b><span>Sem TCP, sem UDP real, sem conexões de fora. O que o servidor não autoriza por CORS não chega sem o relay; extensões de bloqueio do navegador também barram requisições.</span></li>
+          <li><b>WebView carrega no próprio navegador.</b><span>O conteúdo de uma <code>WebView</code> é um iframe da página, sujeito às regras do navegador; as páginas da WebView não passam pelos mocks de endpoint.</span></li>
+          <li><b>Código nativo só com build wasm32.</b><span>Bibliotecas <code>.so</code> sem build correspondente não executam e geram <code>UnsatisfiedLinkError</code>.</span></li>
+          <li><b>Proteção não é falsificada.</b><span>Verificações de integridade, atestação, root ou emulador e nativos protegidos rodam como estão ou falham; o laboratório não altera identificadores do aparelho para passar por elas.</span></li>
+          <li><b>Serviços que o aparelho virtual não tem.</b><span>Google Play services não existe aqui; o cliente de localização dele, por exemplo, falha de forma explícita.</span></li>
+          <li><b>Barra de ações de seleção de texto.</b><span><code>View.startActionMode</code> precisa da superfície de action mode da janela, que o aparelho virtual não tem, e falha de forma explícita.</span></li>
+          <li><b>Keystore em software.</b><span>O Android Keystore é um KeyMint de software: <code>isInsideSecureHardware()</code> é falso, não há StrongBox nem chave de atestação.</span></li>
+          <li><b>Texto não é idêntico ao do aparelho.</b><span>A forma do texto vem do SkParagraph, não do Minikin inteiro; não há padrões de hifenização. Quebras e métricas podem diferir em casos raros.</span></li>
+          <li><b>Memória do navegador.</b><span>O navegador gasta bem mais que o heap Java: tabelas do DEX, o heap do CanvasKit, rasters. Uma aba muito grande pode ser encerrada pelo navegador.</span></li>
+        </ul>
+      </section>
+
+      <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./plugins.html">Como configurar plugins</a></p>
+    </article>
+  </div>
+  <script type="module" src="./site-pages.js?v=f863dd365e39"></script>
+</body>
+</html>

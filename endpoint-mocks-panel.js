@@ -1,7 +1,7 @@
 // The "Mock de endpoints" section of the Controles panel (src/endpoint-mocks.js): the list of mocked endpoints of the open package (method, URL pattern, status, on/off, hits, edit,
 // remove, order), the dialog that configures one mock, and export / import as JSON. The list is kept per package in localStorage (every access guarded; without storage it lasts for
 // the page), and applied live to the Worker; hit counts come back with every snapshot.
-import { MOCK_METHODS, MAX_MOCKS, MAX_BODY_BYTES, defaultMock, normalizeMock, validateMock, loadMocks, saveMocks, exportMocks, importMocks, bytesToBase64, mockLabel } from './endpoint-mocks.js?v=785d33ba3587';
+import { MOCK_METHODS, MAX_MOCKS, MAX_BODY_BYTES, defaultMock, normalizeMock, validateMock, loadMocks, saveMocks, exportMocks, importMocks, bytesToBase64, mockLabel } from './endpoint-mocks.js?v=f863dd365e39';
 
 const FIELD_ERROR = { method: 'em-err-method', url: 'em-err-url', query: 'em-err-query', status: 'em-err-status', reason: 'em-err-status', headers: 'em-err-headers', body: 'em-err-body', delayMs: 'em-err-delay' };
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';

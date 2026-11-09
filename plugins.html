@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
+  <title>Plugins · APK Browser Lab</title>
+  <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
+  <link rel="stylesheet" href="./site-pages.css?v=f863dd365e39">
+</head>
+<body>
+  <header class="topbar">
+    <a href="./" class="brand" aria-label="APK Browser Lab: voltar ao laboratório"><span class="brand-icon" aria-hidden="true">a<span>›</span></span><span>APK <b>Browser Lab</b></span></a>
+    <nav class="topnav" aria-label="Páginas do site">
+      <a href="./">Laboratório</a>
+      <a href="./arquitetura.html">Arquitetura</a>
+      <a href="./plugins.html" aria-current="page">Plugins</a>
+      <a href="./player/example.html">Exemplo de integração</a>
+    </nav>
+    <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Alternar tema claro/escuro"><span aria-hidden="true">◐</span></button>
+  </header>
+
+  <div class="page">
+    <nav class="toc" aria-label="Nesta página">
+      <p>Nesta página</p>
+      <ol>
+        <li><a href="#o-que-sao">O que são</a></li>
+        <li><a href="#onde-ficam">Onde ficam</a></li>
+        <li><a href="#adicionar">Adicionar um plugin</a></li>
+        <li><a href="#gerenciar">Ligar, parar e editar</a></li>
+        <li><a href="#pacote">Filtro de pacote</a></li>
+        <li><a href="#json">Exportar e importar</a></li>
+        <li><a href="#api">A API lab</a></li>
+        <li><a href="#valores">Valores e handles</a></li>
+        <li><a href="#custos">Custos e limites</a></li>
+        <li><a href="#nao-permitido">O que não é permitido</a></li>
+        <li><a href="#seguranca">Segurança</a></li>
+        <li><a href="#exemplos">Exemplos</a></li>
+      </ol>
+    </nav>
+
+    <article>
+      <div class="intro">
+        <a class="back" href="./">‹ Voltar ao laboratório</a>
+        <h1>Plugins: ferramentas suas sobre o app em execução</h1>
+        <p class="lead">Um plugin é um trecho de JavaScript que você escreve no laboratório. Ele observa a tela ativa, a árvore do Compose, os ViewModels, o Logcat e a rede do app, recorta partes da tela e mostra o resultado num painel abaixo do aparelho. Ele só lê: nada do que um plugin faz muda o app.</p>
+        <details class="toc-inline">
+          <summary>Nesta página</summary>
+          <ol>
+            <li><a href="#o-que-sao">O que são</a></li>
+            <li><a href="#onde-ficam">Onde ficam</a></li>
+            <li><a href="#adicionar">Adicionar um plugin</a></li>
+            <li><a href="#gerenciar">Ligar, parar e editar</a></li>
+            <li><a href="#pacote">Filtro de pacote</a></li>
+            <li><a href="#json">Exportar e importar</a></li>
+            <li><a href="#api">A API lab</a></li>
+            <li><a href="#valores">Valores e handles</a></li>
+            <li><a href="#custos">Custos e limites</a></li>
+            <li><a href="#nao-permitido">O que não é permitido</a></li>
+            <li><a href="#seguranca">Segurança</a></li>
+            <li><a href="#exemplos">Exemplos</a></li>
+          </ol>
+        </details>
+      </div>
+
+      <section id="o-que-sao" aria-labelledby="h-oque">
+        <h2 id="h-oque">O que são</h2>
+        <p>Cada plugin ligado roda num Web Worker só dele, separado da página e da VM. Um plugin lento ou preso num laço trava apenas o próprio Worker. As perguntas à VM passam por uma fila com limite de custo, e a saída vira blocos de texto, tabelas e imagens no painel <b>Plugins</b>.</p>
+        <figure class="diagram">
+          <div class="diagram-box"><!--SVG:plugins--><svg class="dg" viewBox="0 0 612 250" role="img" aria-labelledby="fig-plugins-cap" style="--min:520px"><defs><marker id="ah-plugins" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0 0L10 5L0 10z"/></marker></defs><g class="anim"><rect class="lane-page" x="0" y="0" width="300" height="250" rx="12"/><rect class="lane-vm" x="312" y="0" width="300" height="250" rx="12"/><text class="t-lane ink-page" x="14" y="26">Página</text><text class="t-lane ink-vm" x="326" y="26">Web Worker da VM</text><rect class="glow" x="11" y="41" width="278" height="52" rx="11" style="--d:0s;--cycle:6s"/><rect class="node page" x="14" y="44" width="272" height="46" rx="8"/><text x="26" y="63" font-weight="600">Worker do plugin</text><text class="t-small" x="26" y="80">seu código, um Worker por plugin</text><rect class="glow" x="11" y="117" width="278" height="52" rx="11" style="--d:1.5s;--cycle:6s"/><rect class="node page" x="14" y="120" width="272" height="46" rx="8"/><text x="26" y="139" font-weight="600">Host de plugins</text><text class="t-small" x="26" y="156">tela, Logcat, rede; cache por quadro</text><rect class="glow" x="11" y="191" width="278" height="52" rx="11" style="--d:4.5s;--cycle:6s"/><rect class="node page" x="14" y="194" width="272" height="46" rx="8"/><text x="26" y="213" font-weight="600">Painel Plugins</text><text class="t-small" x="26" y="230">blocos de texto, no máximo 10/s</text><rect class="glow" x="323" y="117" width="278" height="52" rx="11" style="--d:3s;--cycle:6s"/><rect class="node vm" x="326" y="120" width="272" height="46" rx="8"/><text x="338" y="139" font-weight="600">Fila de consultas</text><text class="t-small" x="338" y="156">entre eventos, 40 ms por segundo</text><path class="edge" d="M120 90 V118" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M120 90 V118" style="--d:0s;--dur:0.8s"/><path class="edge" d="M180 118 V90" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M180 118 V90" style="--d:4s;--dur:0.8s"/><path class="edge" d="M286 136 H324" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M286 136 H324" style="--d:1.6s;--dur:0.8s"/><path class="edge" d="M326 152 H288" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M326 152 H288" style="--d:3.4s;--dur:0.8s"/><path class="edge" d="M150 166 V192" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M150 166 V192" style="--d:4.6s;--dur:0.8s"/></g></svg><!--/SVG--></div>
+          <button type="button" class="motion-control" aria-pressed="false">Pausar animação</button>
+          <figcaption id="fig-plugins-cap"><strong>Figura 1.</strong> Por onde passa uma consulta de plugin.</figcaption>
+          <ol class="steps">
+            <li>Seu código roda no Worker do plugin e chama a API <code>lab</code>.</li>
+            <li>O host de plugins, na página, responde o que a página já tem (a tela, as linhas do Logcat, a rede, o quadro desenhado) sem trabalho na VM.</li>
+            <li>O que precisa da VM (ViewModels, campos, árvore Compose) vai para uma fila no Worker da VM e roda entre eventos do app, com um orçamento de tempo por segundo.</li>
+            <li>A resposta volta ao plugin; o que ele escreve com <code>lab.ui</code> aparece no painel Plugins.</li>
+          </ol>
+        </figure>
+        <p>Sem nenhum plugin ligado não existe Worker, timer, mensagem à VM nem gancho nos caminhos do app. Como um plugin se encaixa no resto do laboratório: <a href="./arquitetura.html#ferramentas">arquitetura, ferramentas</a>.</p>
+      </section>
+
+      <section id="onde-ficam" aria-labelledby="h-onde">
+        <h2 id="h-onde">Onde ficam</h2>
+        <ul>
+          <li><b>Configuração:</b> painel <b>Controles</b> do laboratório, seção <b>Plugins</b> (a última). O título mostra quantos estão rodando.</li>
+          <li><b>Saída:</b> painel <b>Plugins</b> abaixo do aparelho, ao lado de Logcat, Rede e Compose. Ele aparece quando há pelo menos um plugin na lista e mostra um cartão por plugin: os blocos de saída, um selo curto, o console e os erros.</li>
+          <li><b>Armazenamento:</b> a lista é guardada no <code>localStorage</code> deste navegador e vale para qualquer APK (não é por pacote). Cabem até 32 plugins, com até 200.000 caracteres de código cada.</li>
+        </ul>
+      </section>
+
+      <section id="adicionar" aria-labelledby="h-adicionar">
+        <h2 id="h-adicionar">Adicionar um plugin</h2>
+        <ol>
+          <li>Abra <b>Controles › Plugins</b>.</li>
+          <li>Em <b>Modelo</b>, escolha um ponto de partida: <b>Em branco</b>, <b>Tela atual</b>, <b>Logs filtrados</b>, <b>Observar ViewModel</b>, <b>Componentes da tela</b> ou <b>Árvore Compose resumida</b>.</li>
+          <li>Clique em <b>+ Adicionar</b>. Abre o diálogo com três campos: <b>Nome</b>, <b>Pacote</b> (opcional) e <b>Código</b>. No editor, Tab insere dois espaços e Esc fecha.</li>
+          <li>Clique em <b>Salvar</b>. Um plugin criado de um modelo já vem ligado e começa a rodar quando há um APK aberto que passa no filtro de pacote.</li>
+        </ol>
+        <p>O código é o corpo de uma função assíncrona: use <code>await</code> no topo à vontade. <code>import</code> estático não funciona; <code>await import(url)</code> funciona. O objeto global <code>lab</code> é a API.</p>
+      </section>
+
+      <section id="gerenciar" aria-labelledby="h-gerenciar">
+        <h2 id="h-gerenciar">Ligar, parar e editar</h2>
+        <ul>
+          <li><b>Caixa de seleção</b> na linha do plugin: liga ou desliga. Desligado, o Worker dele é encerrado.</li>
+          <li><b>↑ e ↓</b> mudam a ordem da lista (e dos cartões).</li>
+          <li><b>Editar</b> abre o mesmo diálogo; ao salvar, o plugin recomeça com o código novo.</li>
+          <li><b>Remover</b> pede confirmação e apaga o plugin da lista.</li>
+          <li>No cartão do painel Plugins, <b>Parar</b> encerra o Worker do plugin (útil se ele entrou em laço) e <b>Reiniciar</b> cria outro do zero.</li>
+          <li>A linha mostra o estado: <i>rodando</i>, <i>iniciando</i>, <i>parado</i> (com o motivo: desligado, parado no painel, só para outro pacote) ou <i>erro</i>, e quantos erros houve.</li>
+        </ul>
+      </section>
+
+      <section id="pacote" aria-labelledby="h-pacote">
+        <h2 id="h-pacote">Filtro de pacote</h2>
+        <p>O campo <b>Pacote</b> limita o plugin a certos apps. Vazio ou <code>*</code>: qualquer app. Vários pacotes podem ser separados por vírgula ou espaço, e <code>*</code> funciona como curinga dentro de um nome (por exemplo <code>com.exemplo.*</code>). Quando o APK aberto não casa, o plugin fica parado com o motivo “só para …”.</p>
+      </section>
+
+      <section id="json" aria-labelledby="h-json">
+        <h2 id="h-json">Exportar e importar</h2>
+        <p><b>Exportar</b> baixa um arquivo <code>plugins-AAAAMMDD-hhmmss.json</code> com a lista inteira. <b>Importar</b> lê um arquivo nesse formato (ou só um array de plugins) e acrescenta os plugins à lista.</p>
+        <div class="code" data-name="formato do arquivo"><pre><code>{
+  "format": "apk-web-lab-plugins",
+  "version": 1,
+  "plugins": [
+    { "name": "Tela atual", "code": "lab.on('screen', tela => lab.ui.text(tela.activity ?? '—'));", "enabled": true, "packageFilter": "" }
+  ]
+}</code></pre></div>
+        <p class="note">Plugins importados chegam <b>desligados</b>: o código é de outra pessoa, então leia antes de ligar. Só os primeiros 32 da lista são importados.</p>
+      </section>
+
+      <section id="api" aria-labelledby="h-api">
+        <h2 id="h-api">A API lab</h2>
+        <h3>Eventos</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Chamada</th><th scope="col">O que entrega</th></tr></thead>
+          <tbody>
+            <tr><td><code>lab.on('screen', fn)</code></td><td>A tela ativa mudou: <code>{ activity, activityStack, tasks, windows, dialogs, canGoBack, closed, packageName, frame }</code>. Destinos do Navigation dentro da mesma Activity não contam como mudança de tela. Devolve a função que cancela.</td></tr>
+            <tr><td><code>lab.on('log', fn)</code></td><td>Lotes (arrays) de linhas do Logcat: <code>{ seq, uptime, wall, pid, tid, thread, level, tag, message }</code>.</td></tr>
+            <tr><td><code>lab.on('network', fn)</code></td><td>Lotes de entradas do log de rede, novas ou atualizadas.</td></tr>
+            <tr><td><code>lab.off(nome, fn?)</code></td><td>Cancela uma escuta (ou todas daquele evento).</td></tr>
+          </tbody>
+        </table></div>
+        <h3>Consultas</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Chamada</th><th scope="col">O que devolve</th></tr></thead>
+          <tbody>
+            <tr><td><code>await lab.screen()</code></td><td>A tela atual, no mesmo formato do evento, sem trabalho na VM.</td></tr>
+            <tr><td><code>await lab.composeTree({ maxNodes })</code></td><td>A árvore de layout do Compose: <code>{ owners: [{ nodes: [{ id, parentId, depth, name, bounds, texts, editableText, role, testTag, actions, … }] }], totalNodes, truncated }</code>. Custa dezenas de milissegundos na VM: no máximo uma por segundo por plugin.</td></tr>
+            <tr><td><code>await lab.layoutBounds({ names })</code></td><td>As caixas que “Mostrar limites de layout” desenha (Views e nós semânticos do Compose), como no painel Compose: <code>[{ key, kind, name, nameSource, bounds, size, texts, editableText, role, testTag, contentDescriptions, actions, modifiers, measurePolicy, type, hasImage }]</code>, com <code>bounds</code> em pixels da janela. Os nomes vêm de uma <code>composeTree</code> (mesmo limite de uma por segundo); <code>names: false</code> não consulta a VM.</td></tr>
+            <tr><td><code>await lab.screenshot({ key, maxWidth, type })</code></td><td>Imagem da tela inteira, ou de uma caixa (<code>key</code> de <code>layoutBounds</code>), cortada do quadro que a página mostra, sem trabalho na VM: <code>{ blob, width, height, type, notes }</code>. Padrões: <code>maxWidth</code> 1080, <code>type</code> <code>'image/png'</code>. No máximo uma a cada 500 ms por plugin. Views que a página desenha com elementos próprios (widgets XML simples) não têm raster: ficam de fora da tela inteira (<code>notes</code> diz quantas) e a caixa delas responde <code>no-image</code>.</td></tr>
+            <tr><td><code>await lab.viewModels()</code></td><td>Os ViewModels da tela: da Activity, dos fragments na tela e os guardados pelas entradas da pilha do Navigation. <code>[{ handle, className, key, library, owner: { kind, label, className, handle } }]</code>.</td></tr>
+            <tr><td><code>await lab.fragments()</code></td><td>Os fragments androidx na tela, com os filhos: <code>[{ handle, className, who, tag, id, hidden, state, children }]</code>.</td></tr>
+            <tr><td><code>await lab.activity()</code></td><td><code>{ handle, className }</code> da Activity atual.</td></tr>
+            <tr><td><code>await lab.inspect(handle, opções)</code></td><td>Os campos de um objeto em JSON. Opções: <code>depth</code> (2), <code>maxFields</code> (200), <code>maxItems</code> (20), <code>maxString</code> (1000).</td></tr>
+            <tr><td><code>await lab.field(handle, 'a.b.0.c', opções)</code></td><td>Um valor por caminho: nomes de campo (um delegate Kotlin <code>x$delegate</code> responde por <code>x</code>), índices de lista ou array, chaves de mapa, <code>size</code>. Um StateFlow, LiveData, MutableState ou atômico é atravessado; <code>x.value</code> é o valor atual.</td></tr>
+            <tr><td><code>lab.watch(handle, caminho, fn, opções)</code></td><td>Lê o campo a cada <code>intervalMs</code> (padrão 500, mínimo 250) e chama <code>fn(valor, anterior)</code> só quando muda. Se o objeto for coletado, o watch para e <code>onError</code> recebe o erro. Devolve a função que para.</td></tr>
+          </tbody>
+        </table></div>
+        <h3>Saída e utilidades</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Chamada</th><th scope="col">O que faz</th></tr></thead>
+          <tbody>
+            <tr><td><code>lab.ui.text(s, { id })</code></td><td>Um bloco de texto.</td></tr>
+            <tr><td><code>lab.ui.kv(objeto, { id })</code></td><td>Pares chave e valor.</td></tr>
+            <tr><td><code>lab.ui.table(linhas, colunas?, { id })</code></td><td>Uma tabela (até 500 linhas e 20 colunas).</td></tr>
+            <tr><td><code>lab.ui.json(valor, { id })</code></td><td>JSON formatado.</td></tr>
+            <tr><td><code>lab.ui.image(blob, { id, caption })</code></td><td>Uma imagem: um Blob <code>image/*</code> de até 8 MiB. O resultado de <code>lab.screenshot</code> serve direto.</td></tr>
+            <tr><td><code>lab.ui.clear()</code>, <code>lab.ui.badge(s)</code></td><td>Limpa os blocos; põe um selo curto no cartão.</td></tr>
+            <tr><td><code>lab.sleep(ms)</code>, <code>lab.info</code></td><td>Espera; <code>{ id, name, packageName }</code> do plugin.</td></tr>
+            <tr><td><code>console.log</code> e afins</td><td>Vão para o console do cartão do plugin (limitado).</td></tr>
+          </tbody>
+        </table></div>
+        <p>Cada chamada de <code>lab.ui</code> acrescenta um bloco. Um bloco com o mesmo <code>id</code> é substituído no lugar, o que permite atualizar um valor sem empilhar saída. Texto é sempre mostrado como texto, nunca como HTML.</p>
+      </section>
+
+      <section id="valores" aria-labelledby="h-valores">
+        <h2 id="h-valores">Valores e handles</h2>
+        <ul>
+          <li><b>Primitivos</b> viram números e booleanos; <code>long</code> fora do intervalo seguro vira string; <code>char</code> e <code>String</code> viram string (cortada em <code>maxString</code>).</li>
+          <li><b>Objetos</b> viram <code>{ $type, $handle, fields }</code> até a profundidade pedida; além dela, só <code>{ $type, $handle }</code>.</li>
+          <li><b>Coleções conhecidas</b> viram <code>{ $kind: 'list' | 'set', size, items }</code>, mapas <code>{ $kind: 'map', size, entries }</code>, arrays <code>{ $kind: 'array', size, items }</code>, enums <code>{ $kind: 'enum', name }</code>.</li>
+          <li><b>Observáveis</b> mostram o valor atual: <code>{ $kind: 'StateFlow' | 'LiveData' | 'MutableState' | 'Atomic', value }</code>. Coleções e observáveis não gastam profundidade; ciclos viram <code>$seen</code>; um corte por tempo ou por número de campos marca <code>$truncated</code>.</li>
+        </ul>
+        <h3>Handles e “objeto coletado”</h3>
+        <p>Um handle tem a forma <code>"h&lt;id&gt;.&lt;época&gt;"</code>: o id do objeto na VM e a época da VM. Um handle de outra execução é recusado. Guardar um handle <b>não</b> mantém o objeto vivo: quando o app o solta, o coletor o libera e a consulta responde com o código <code>collected</code> (“objeto coletado”). Trate esse erro buscando o objeto de novo, como faz o modelo Observar ViewModel.</p>
+        <h3>Códigos de erro</h3>
+        <p>Os erros de consulta têm <code>error.code</code>: <code>no-apk</code>, <code>collected</code>, <code>bad-handle</code>, <code>bad-path</code>, <code>bad-query</code>, <code>busy</code> (a fila estava cheia ou a VM ficou ocupada; tente depois), <code>failed</code>. <code>lab.screenshot</code> também usa <code>no-image</code>, <code>not-found</code> (a <code>key</code> não está mais na tela) e <code>unsupported</code>.</p>
+      </section>
+
+      <section id="custos" aria-labelledby="h-custos">
+        <h2 id="h-custos">Custos e limites</h2>
+        <p>Os limites existem para que um plugin não deixe o app mais lento. Valores de <code>src/plugin-host.js</code> e <code>src/apk-worker.js</code>:</p>
+        <ul>
+          <li><b>Eventos:</b> <code>screen</code> vem do quadro que a página já desenhou. Logcat e rede são os lotes que a página já recebe, entregues no máximo a cada 250 ms. A VM só envia linhas do Logcat enquanto algum plugin escuta <code>log</code> ou o painel Logcat está aberto.</li>
+          <li><b>Consultas à VM:</b> uma por vez, no máximo uma a cada 25 ms, respondidas de um cache por quadro (a mesma pergunta no mesmo quadro não vai à VM). Até 16 consultas pendentes por plugin.</li>
+          <li><b>Na VM:</b> as consultas esperam numa fila e rodam só entre eventos do app, nunca até 120 ms depois de uma entrada sua, com no máximo 40 ms de consulta por segundo.</li>
+          <li><b>Mais caras:</b> <code>composeTree</code> e <code>layoutBounds</code> com nomes, uma por segundo por plugin; <code>screenshot</code>, uma a cada 500 ms (uma chamada antes disso espera a vez).</li>
+          <li><b>Saída:</b> o painel redesenha no máximo 10 vezes por segundo e só aberto; console, erros e blocos têm limite.</li>
+        </ul>
+      </section>
+
+      <section id="nao-permitido" aria-labelledby="h-nao">
+        <h2 id="h-nao">O que não é permitido</h2>
+        <ul>
+          <li><b>Escrever no app.</b> Não há API para mudar campos, estado ou arquivos do app.</li>
+          <li><b>Chamar métodos.</b> Nenhuma consulta executa código do app ou de bibliotecas. Os valores são lidos dos campos que os objetos já têm, como num heap dump: uma consulta não cria estado (um getter que criaria um objeto não é chamado; o campo é lido).</li>
+          <li><b>Mexer em nativos protegidos.</b> Plugins não têm acesso a código nativo.</li>
+        </ul>
+        <p>Para mudar o comportamento do app há ferramentas próprias, que deixam rastro no Logcat e no Resumo: Retornos de métodos, Activities ignoradas, Redirecionar hosts e Mock de endpoints, em Controles.</p>
+      </section>
+
+      <section id="seguranca" aria-labelledby="h-seguranca">
+        <h2 id="h-seguranca">Segurança</h2>
+        <p class="note warn">O código de um plugin roda com a origem desta página, dentro de um Worker. Ele pode usar <code>fetch</code> como qualquer script da página. O laboratório não acrescenta nenhuma permissão de rede, mas também não impede o que o navegador permite. Use só código seu ou que você revisou.</p>
+      </section>
+
+      <section id="exemplos" aria-labelledby="h-exemplos">
+        <h2 id="h-exemplos">Exemplos</h2>
+        <p>Copie um exemplo, crie um plugin <b>Em branco</b> e cole no campo Código.</p>
+
+        <h3>Tela atual</h3>
+        <p>Mostra a Activity, a pilha e as janelas a cada mudança de tela. Não custa nada na VM.</p>
+        <div class="code" data-name="Tela atual"><pre><code>async function mostrar(tela) {
+  lab.ui.badge(tela.activity ? tela.activity.split('.').pop() : '—');
+  lab.ui.kv({
+    Activity: tela.activity ?? '—',
+    Pilha: tela.activityStack.join(' › ') || '—',
+    Janelas: tela.windows.map(j => j.kind + (j.modal ? ' (modal)' : '')).join(', ') || 'só a Activity',
+    Voltar: tela.canGoBack ? 'sim' : 'não',
+  }, { id: 'tela' });
+}
+lab.on('screen', mostrar);
+mostrar(await lab.screen());</code></pre></div>
+
+        <h3>Logs filtrados</h3>
+        <p>Guarda as últimas 100 linhas do Logcat cuja tag ou mensagem casa com uma expressão regular.</p>
+        <div class="code" data-name="Logs filtrados"><pre><code>const FILTRO = /erro|error|exception|warn/i;   // edite a expressão
+const MAXIMO = 100;
+const linhas = [];
+let total = 0;
+lab.on('log', lote => {
+  for (const linha of lote) {
+    if (!FILTRO.test(linha.tag + ' ' + linha.message)) continue;
+    total++;
+    linhas.push({ hora: new Date(linha.wall).toLocaleTimeString(), nível: linha.level, tag: linha.tag, mensagem: linha.message });
+  }
+  if (linhas.length > MAXIMO) linhas.splice(0, linhas.length - MAXIMO);
+  lab.ui.badge(String(total));
+  lab.ui.table(linhas.slice().reverse(), ['hora', 'nível', 'tag', 'mensagem'], { id: 'linhas' });
+});
+lab.ui.text('Esperando linhas que casem com ' + FILTRO + '…', { id: 'linhas' });</code></pre></div>
+
+        <h3>Observar um campo de ViewModel</h3>
+        <p>Pega o primeiro ViewModel do app na tela e mostra um campo ao vivo. Quando o objeto é coletado ou a tela muda, procura de novo.</p>
+        <div class="code" data-name="Observar ViewModel"><pre><code>const CAMPO = 'estado.value';   // um caminho: 'contador', 'itens.size', 'estado.value'
+let parar = null, atual = null;
+async function conectar() {
+  const lista = await lab.viewModels();
+  const vm = lista.find(item => !item.library) ?? lista[0];
+  if (vm?.handle === atual) return;
+  parar?.(); parar = null; atual = vm?.handle ?? null;
+  if (!vm) { lab.ui.text('Nenhum ViewModel na tela.', { id: 'valor' }); return; }
+  lab.ui.badge(vm.className.split('.').pop());
+  parar = lab.watch(vm.handle, CAMPO, valor => lab.ui.json(valor, { id: 'valor' }), {
+    intervalMs: 250,
+    onError: erro => { if (erro.code === 'collected') { atual = null; conectar(); } else lab.ui.text(erro.message, { id: 'valor' }); },
+  });
+}
+lab.on('screen', () => conectar().catch(erro => lab.ui.text(erro.message, { id: 'erro' })));
+await conectar();</code></pre></div>
+
+        <h3>Árvore Compose resumida</h3>
+        <p>Lista só os nós do Compose com texto, papel ou testTag. A árvore custa dezenas de milissegundos na VM, por isso é lida a cada mudança de tela e no máximo a cada 2 s.</p>
+        <div class="code" data-name="Árvore Compose resumida"><pre><code>async function mostrar() {
+  const arvore = await lab.composeTree();
+  if (!arvore.owners.length) { lab.ui.text('A tela não tem Compose.', { id: 'arvore' }); return; }
+  const nos = arvore.owners.flatMap(dono => dono.nodes)
+    .filter(no => no.texts.length || no.editableText !== null || no.role || no.testTag);
+  lab.ui.badge(`${nos.length}/${arvore.totalNodes} nós`);
+  lab.ui.table(nos.slice(0, 150).map(no => ({
+    nível: no.depth, nome: no.name,
+    texto: (no.editableText ?? no.texts.join(' ')).slice(0, 60),
+    tag: no.testTag ?? '', ações: no.actions.join(' '),
+  })), ['nível', 'nome', 'texto', 'tag', 'ações'], { id: 'arvore' });
+}
+lab.on('screen', () => mostrar().catch(() => {}));
+setInterval(() => mostrar().catch(() => {}), 2000);
+await mostrar();</code></pre></div>
+
+        <h3>Recortes dos componentes</h3>
+        <p>Lista as caixas do Compose com nome e posição e mostra o recorte das primeiras. Como cada recorte espera 500 ms pela vez, só as primeiras ganham imagem.</p>
+        <div class="code" data-name="Recortes dos componentes"><pre><code>const LIMITE = 6;
+let rodada = 0;
+async function mostrar() {
+  const minha = ++rodada;
+  const caixas = (await lab.layoutBounds()).filter(caixa => caixa.kind === 'compose');
+  lab.ui.clear();
+  lab.ui.badge(String(caixas.length));
+  lab.ui.table(caixas.map(caixa => ({ nome: caixa.name, x: caixa.bounds.left, y: caixa.bounds.top, largura: caixa.size.width, altura: caixa.size.height })),
+    ['nome', 'x', 'y', 'largura', 'altura'], { id: 'lista' });
+  for (const caixa of caixas.slice(0, LIMITE)) {
+    if (minha !== rodada) return;   // a tela mudou: a próxima rodada recomeça
+    try { lab.ui.image(await lab.screenshot({ key: caixa.key, maxWidth: 360 }), { id: caixa.key, caption: caixa.name }); }
+    catch (erro) { lab.ui.text(caixa.name + ': ' + erro.message, { id: caixa.key }); }
+  }
+}
+lab.on('screen', () => mostrar().catch(erro => lab.ui.text(erro.message, { id: 'erro' })));
+await mostrar();</code></pre></div>
+      </section>
+
+      <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./arquitetura.html">Arquitetura da VM</a></p>
+    </article>
+  </div>
+  <script type="module" src="./site-pages.js?v=f863dd365e39"></script>
+</body>
+</html>

@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=785d33ba3587';
-import { bitsFloat } from './host-contract.js?v=785d33ba3587';
+import { APKError } from './apk-error.js?v=f863dd365e39';
+import { bitsFloat } from './host-contract.js?v=f863dd365e39';
 
 const FILTER='Landroid/graphics/ColorFilter;',REGISTRY='Llibcore/util/NativeAllocationRegistry;',FINALIZER=0x43464c5401n;
 export const COLOR_FILTER_CLEANER='Lapkweb/bridge/ColorFilterCleaner;';
