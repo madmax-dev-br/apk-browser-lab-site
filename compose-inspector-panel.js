@@ -2,10 +2,15 @@
 // carousel of every element cut out of the frame the page shows, by the element's bounds, its details, a highlight on the device screen and a filterable table.
 // Nothing runs while the panel is closed: no Worker message, no DOM, no images. Opening captures once; "Capturar" takes a new capture; "Atualizar ao navegar" (off by
 // default) captures again after the screen navigates. Closing drops the DOM, the frozen frame and every crop.
+// By default the elements are the boxes "Mostrar limites de layout" draws (src/layout-bounds.js: Views and Compose semantics nodes), each crop outlined like that overlay and named from
+// the inspected LayoutNode with the same semanticsId; "Árvore completa" lists every LayoutNode of the inspection instead.
 // The pure functions (element list, crop rectangles, bounds text, filter, JSON) are exported and tested without a DOM; createComposeInspectorPanel() wires them to the page.
+
+import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=76605c7a7c39';
 
 export const MAX_CROPS = 300;   // cards with an image in the carousel; the table lists every element
 export const EAGER_CROPS = 12;   // without IntersectionObserver, the first cards are cut at once and the others when chosen
+const NO_RASTER = 'o quadro exibido não tem raster de conteúdo para este elemento';
 const THUMB_W = 200, THUMB_H = 120, DETAIL_W = 360, DETAIL_H = 260;
 const NAME_SOURCES = { composable: 'nome do composable (informação de fonte do slot table)', semantics: 'semântica (Role, texto ou ação do nó)', layout: 'classe da measure policy e modificadores (sem nome de composable no APK)', view: 'classe da View' };
 
@@ -33,8 +38,53 @@ export function flattenViews(snapshot) {
   return out;
 }
 
+/** A name for a semantics node of the page snapshot that has no inspected LayoutNode with a better one: role and text, a text field, a text, a clickable, the testTag, or its id. */
+export function semanticsName(node) {
+  const text = [...(node.texts ?? []), ...(node.contentDescriptions ?? [])].find(value => typeof value === 'string' && value.trim()), short = value => value.length > 40 ? value.slice(0, 39) + '…' : value;
+  const actions = new Set((node.actions ?? []).map(action => action.name ?? action)), tag = node.testTag ? ` #${node.testTag}` : '';
+  if (node.role) return `${node.role}${text ? ` "${short(text)}"` : ''}${tag}`;
+  if (actions.has('SetText')) return `Campo de texto${node.editableText ? ` "${short(node.editableText)}"` : ''}${tag}`;
+  if (text) return `Texto "${short(text)}"${tag}`;
+  if (actions.has('OnClick')) return `Clicável${tag}`;
+  return node.testTag ? `#${node.testTag}` : `Nó semântico ${node.nodeId}`;
+}
+
+/**
+ * The elements "Mostrar limites de layout" draws (src/layout-bounds.js): every laid-out View and, for Compose, each semantics node of the page snapshot (boundsInRoot of the
+ * AndroidComposeView), cut by that same rectangle. A Compose element takes the name and the layout details of the inspected LayoutNode with the same semanticsId (the composable's
+ * name when the APK carries source information), else a name from its semantics.
+ */
+export function buildLayoutBoundsElements(inspection, snapshot) {
+  const density = inspection?.density ?? snapshot?.density ?? null, list = [], views = flattenViews(snapshot), viewById = new Map(views.map(view => [String(view.id), view]));
+  const inspected = new Map(); for (const owner of inspection?.owners ?? []) for (const node of owner.nodes ?? []) { const key = `${owner.ownerViewId}:${node.semanticsId}`, had = inspected.get(key); if (!had || (had.nameSource !== 'composable' && node.nameSource === 'composable')) inspected.set(key, { ...node, window: owner.window }); }
+  for (const owner of snapshot?.composeSemantics?.owners ?? []) {
+    const ownerView = viewById.get(String(owner.ownerViewId)); if (!ownerView?.bounds || owner.attached === false) continue;
+    const hostSize = sizeOf(ownerView.bounds);
+    for (const node of owner.nodes ?? []) {
+      const r = node.boundsInRoot; if (!r || node.invisibleToUser || node.placed === false || !(r.right > r.left && r.bottom > r.top)) continue;
+      const match = inspected.get(`${owner.ownerViewId}:${node.nodeId}`), semantics = { texts: node.texts ?? [], editableText: node.editableText ?? null, role: node.role ?? null, testTag: node.testTag ?? null, contentDescriptions: node.contentDescriptions ?? [],
+        actions: (node.actions ?? []).map(action => action.name ?? action), enabled: !node.disabled, focused: node.focused ?? null, selected: node.selected ?? null, toggleState: node.toggleState ?? null, textSelection: node.textSelection ?? null };
+      const named = match && (match.nameSource === 'composable' || match.nameSource === 'semantics'), fromSemantics = semanticsName(node), bare = fromSemantics.startsWith('Nó semântico ');
+      const name = named ? match.name : bare && match ? match.name : fromSemantics, nameSource = named ? match.nameSource : bare && match ? match.nameSource : 'semantics';   // a node with no semantics text takes its LayoutNode's description
+      list.push({ key: `c:${owner.ownerViewId}:${node.nodeId}`, kind: 'compose', name, nameSource, id: node.nodeId, ownerViewId: owner.ownerViewId,
+        parentName: null, depth: match?.depth ?? 0, childCount: match?.childCount ?? 0, hostId: owner.ownerViewId, hostSize, cropBounds: r, bounds: match?.bounds ?? r, visibleBounds: r, windowBounds: shift(r, ownerView.bounds),
+        placed: true, attached: true, zIndex: match?.zIndex ?? null, measurePolicy: match?.measurePolicy ?? null, modifiers: match?.modifiers ?? [], semantics, calls: match?.calls ?? [], window: match?.window ?? ownerView.window, density, layoutBounds: true });
+    }
+  }
+  for (const element of viewElements(views, viewById, density)) if (element.bounds && element.placed) list.push({ ...element, layoutBounds: true });
+  return list;
+}
+
+const viewElements = (views, viewById, density) => views.map(view => {
+  const label = view.text || view.contentDescription;
+  return { key: `v:${view.id}`, kind: 'view', name: `${simple(view.type)}${label ? ` "${label.length > 40 ? label.slice(0, 39) + '…' : label}"` : ''}`, nameSource: 'view', id: view.id, parentName: view.parentId !== null ? simple(viewById.get(String(view.parentId))?.type) : null,
+    depth: view.depth, hostId: view.rasterHostId, hostSize: view.rasterHostId === null ? null : sizeOf(viewById.get(String(view.rasterHostId))?.bounds), cropBounds: view.rasterBounds, bounds: view.bounds, visibleBounds: view.bounds, windowBounds: view.bounds, placed: view.visible,
+    zIndex: null, type: view.type, viewKind: view.kind, text: view.text, contentDescription: view.contentDescription, androidId: view.androidId, visibility: view.visibility, clickable: view.clickable, compose: view.compose, window: view.window, density };
+});
+
 /** One list for the carousel and the table: the Compose elements of the inspection (by owner), then the Views of the snapshot. */
-export function buildElements(inspection, snapshot) {
+export function buildElements(inspection, snapshot, { mode = 'tree' } = {}) {
+  if (mode === 'layout') return buildLayoutBoundsElements(inspection, snapshot);
   const density = inspection?.density ?? snapshot?.density ?? null, list = [], views = flattenViews(snapshot), viewById = new Map(views.map(view => [String(view.id), view]));
   for (const owner of inspection?.owners ?? []) {
     const ownerView = viewById.get(String(owner.ownerViewId)), names = new Map(owner.nodes.map(node => [node.id, node.name]));
@@ -45,12 +95,7 @@ export function buildElements(inspection, snapshot) {
         measurePolicy: node.measurePolicy, modifiers: node.modifiers ?? [], semantics: node.semantics, calls: node.calls ?? [], window: owner.window, density });
     }
   }
-  for (const view of views) {
-    const label = view.text || view.contentDescription;
-    list.push({ key: `v:${view.id}`, kind: 'view', name: `${simple(view.type)}${label ? ` "${label.length > 40 ? label.slice(0, 39) + '…' : label}"` : ''}`, nameSource: 'view', id: view.id, parentName: view.parentId !== null ? simple(viewById.get(String(view.parentId))?.type) : null,
-      depth: view.depth, hostId: view.rasterHostId, hostSize: view.rasterHostId === null ? null : sizeOf(viewById.get(String(view.rasterHostId))?.bounds), cropBounds: view.rasterBounds, bounds: view.bounds, visibleBounds: view.bounds, windowBounds: view.bounds, placed: view.visible, attached: true,
-      zIndex: null, type: view.type, viewKind: view.kind, text: view.text, contentDescription: view.contentDescription, androidId: view.androidId, visibility: view.visibility, clickable: view.clickable, compose: view.compose, window: view.window, density });
-  }
+  list.push(...viewElements(views, viewById, density));
   return list;
 }
 const shift = (b, origin) => ({ left: round(b.left + origin.left), top: round(b.top + origin.top), right: round(b.right + origin.left), bottom: round(b.bottom + origin.top) });
@@ -143,7 +188,11 @@ export function detailRows(element) {
 export function createComposeInspectorPanel({ root, inspect, getSnapshot = () => null, getHost = () => null, getScreen = () => null, copyText = text => navigator.clipboard.writeText(text), fullDensityWaitMs = 2000 } = {}) {
   const q = selector => root.querySelector(selector), body = q('.ci-body'), count = q('.ci-count'), captureButton = q('.ci-capture'), follow = q('.ci-follow'), filterInput = q('.ci-filter'), copyButton = q('.ci-copy');
   const el = (tag, className = '', text = null) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== null) node.textContent = text; return node; };
-  const S = { capture: null, elements: [], visible: [], selected: null, frames: new Map(), thumbs: [], observer: null, highlight: null, token: 0, waiters: [], followKey: null, followTimer: null, busy: false };
+  // "Árvore completa" (off by default): every LayoutNode of the inspection instead of the boxes "Mostrar limites de layout" draws
+  let treeToggle = q('.ci-tree');
+  if (!treeToggle && follow?.parentElement?.parentElement) { const label = document.createElement('label'); label.className = 'logcat-auto'; label.title = 'Mostra cada LayoutNode da árvore do Compose, não só as caixas de \'Mostrar limites de layout\''; treeToggle = document.createElement('input'); treeToggle.type = 'checkbox'; treeToggle.className = 'ci-tree'; label.append(treeToggle, ' Árvore completa'); follow.parentElement.after(label); }
+  const mode = () => treeToggle?.checked ? 'tree' : 'layout';
+  const S = { capture: null, elements: [], visible: [], selected: null, frames: new Map(), thumbs: [], waitingRaster: new Set(), observer: null, highlight: null, token: 0, waiters: [], followKey: null, followTimer: null, busy: false };
   const setCount = text => { count.textContent = text; };
   setCount('fechado');
 
@@ -155,7 +204,7 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     S.token++; S.observer?.disconnect(); S.observer = null; clearTimeout(S.followTimer); S.followTimer = null;
     for (const canvas of S.thumbs) { canvas.width = 0; canvas.height = 0; } S.thumbs = [];
     for (const frame of S.frames.values()) { if (frame.canvas) { frame.canvas.width = 0; frame.canvas.height = 0; } } S.frames.clear();
-    S.highlight?.remove(); S.highlight = null; S.capture = null; S.elements = []; S.visible = []; S.selected = null;
+    S.waitingRaster.clear(); S.highlight?.remove(); S.highlight = null; S.capture = null; S.elements = []; S.visible = []; S.selected = null;
     for (const resolve of S.waiters.splice(0)) resolve(null);
     body.replaceChildren();
   };
@@ -172,22 +221,26 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
       const width = layer?.tagName === 'CANVAS' ? layer.width : layer?.naturalWidth ?? 0, height = layer?.tagName === 'CANVAS' ? layer.height : layer?.naturalHeight ?? 0;
       if (width > 0 && height > 0) { const canvas = el('canvas'); canvas.width = width; canvas.height = height; canvas.getContext('2d').drawImage(layer, 0, 0); frame = { canvas, width, height, reduced: !!layer.dataset?.rasterScale }; }
     } catch { frame = { canvas: null, width: 0, height: 0, reduced: false }; }
-    S.frames.set(key, frame); return frame;
+    if (frame.canvas) S.frames.set(key, frame);   // a layer caught empty (a canvas being resized for the next frame) is copied again at the next crop, never cached as "no raster"
+    return frame;
   };
   /** Draws the element's crop on `canvas`, at most maxW × maxH CSS px; returns the reason when there is none. */
   const paint = (element, canvas, maxW, maxH) => {
     const size = element.hostSize, problem = cropProblem(element, size); if (problem) return problem;
-    const frame = freeze(element.hostId); if (!frame.canvas) return 'o quadro exibido não tem raster de conteúdo para este elemento';
+    const frame = freeze(element.hostId); if (!frame.canvas) return NO_RASTER;
     const r = cropRect(element.cropBounds, size, frame); if (!r) return 'fora da área visível';
     const css = fit(r.sw, r.sh, maxW, maxH), ratio = Math.min(2, globalThis.devicePixelRatio || 1), px = fit(r.sw, r.sh, css.width * ratio, css.height * ratio);
     canvas.width = px.width; canvas.height = px.height; canvas.style.width = `${css.width}px`; canvas.style.height = "auto";   // height follows the canvas aspect, also when max-width narrows it
     const ctx = canvas.getContext('2d'); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(frame.canvas, r.sx, r.sy, r.sw, r.sh, 0, 0, px.width, px.height);
+    if (element.layoutBounds) { const line = Math.max(1, Math.round(ratio)); ctx.strokeStyle = LAYOUT_BOUNDS_COLORS.bounds; ctx.lineWidth = line; ctx.strokeRect(line / 2, line / 2, px.width - line, px.height - line); }   // the box as "Mostrar limites de layout" draws it
     return null;
   };
   const drawThumb = card => {
-    if (card._drawn) return; card._drawn = true; const element = card._element, canvas = card.querySelector('canvas');
+    if (card._drawn) return; card._drawn = true; const element = card._element, canvas = card.querySelector('canvas'), note = card.querySelector('.ci-noimage');
     const problem = card._index >= MAX_CROPS ? `limite de ${MAX_CROPS} recortes por captura` : paint(element, canvas, THUMB_W, THUMB_H);
-    if (problem) { canvas.hidden = true; card.querySelector('.ci-noimage').textContent = `sem recorte: ${problem}`; card.querySelector('.ci-noimage').hidden = false; } else S.thumbs.push(canvas);
+    S.waitingRaster.delete(card);
+    if (problem === NO_RASTER) { card._drawn = false; S.waitingRaster.add(card); }   // the host's layer was empty (the app had not drawn yet, or a canvas being resized): cut again on the next frame
+    if (problem) { canvas.hidden = true; note.textContent = `sem recorte: ${problem}`; note.hidden = false; } else { canvas.hidden = false; note.hidden = true; S.thumbs.push(canvas); }
   };
 
   const highlight = element => {
@@ -219,13 +272,13 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
 
   const renderList = () => {
     const capture = S.capture; if (!capture) return;
-    S.observer?.disconnect(); S.observer = null; for (const canvas of S.thumbs) { canvas.width = 0; canvas.height = 0; } S.thumbs = [];
+    S.observer?.disconnect(); S.observer = null; for (const canvas of S.thumbs) { canvas.width = 0; canvas.height = 0; } S.thumbs = []; S.waitingRaster.clear();
     S.visible = S.elements.filter(element => matchesElement(element, filterInput.value));
     const compose = S.elements.filter(element => element.kind === 'compose').length, views = S.elements.length - compose;
     const status = el('p', 'ci-status'), notes = [...(capture.inspection?.notes ?? [])];
     for (const owner of capture.inspection?.owners ?? []) if (owner.names?.note) notes.push(owner.names.note);
     if (!capture.fullDensity) notes.push('o quadro ainda estava em densidade reduzida (tela em movimento): recortes menos nítidos');
-    status.textContent = `${compose} elementos Compose · ${views} Views${capture.inspection?.ms !== undefined ? ` · inspeção em ${capture.inspection.ms} ms` : ''}${S.visible.length !== S.elements.length ? ` · ${S.visible.length} passam pelo filtro` : ''}${notes.length ? ' · ' + [...new Set(notes)].join(' · ') : ''}`;
+    status.textContent = `${mode() === 'layout' ? 'Limites de layout: ' : 'Árvore completa: '}${compose} elementos Compose · ${views} Views${capture.inspection?.ms !== undefined ? ` · inspeção em ${capture.inspection.ms} ms` : ''}${S.visible.length !== S.elements.length ? ` · ${S.visible.length} passam pelo filtro` : ''}${notes.length ? ' · ' + [...new Set(notes)].join(' · ') : ''}`;
     // carousel
     const strip = el('div', 'ci-strip'), track = el('div', 'ci-track'); track.setAttribute('role', 'listbox'); track.setAttribute('aria-label', 'Elementos da tela'); track.setAttribute('aria-orientation', 'horizontal');
     const shown = S.visible.slice(0, MAX_CROPS), cards = shown.map((element, index) => {
@@ -280,7 +333,7 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
       const shownNow = getSnapshot() ?? snapshot;
       for (const frame of S.frames.values()) if (frame.canvas) { frame.canvas.width = 0; frame.canvas.height = 0; } S.frames.clear();
       S.capture = { inspection, snapshot: shownNow, fullDensity: !shownNow.rasterReduced, capturedAt: new Date().toISOString() }; S.followKey = navigationKey(shownNow);
-      S.elements = buildElements(inspection, shownNow);
+      S.elements = buildElements(inspection, shownNow, { mode: mode() });
       for (const element of S.elements) if (element.hostId !== null && element.hostId !== undefined) freeze(element.hostId);   // the frame of this capture, before the screen moves on
       renderList();
     } catch (error) {
@@ -292,6 +345,7 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
   root.addEventListener('toggle', () => { if (root.open) capture(); else { release(); setCount('fechado'); } });
   captureButton.addEventListener('click', () => capture());
   filterInput.addEventListener('input', () => { if (S.capture) renderList(); });
+  treeToggle?.addEventListener('change', () => { if (S.capture) { S.elements = buildElements(S.capture.inspection, S.capture.snapshot, { mode: mode() }); S.selected = null; renderList(); } });
   copyButton.addEventListener('click', async () => {
     if (!S.capture) return; const label = copyButton.textContent;
     try { await copyText(exportJSON(S.capture)); copyButton.textContent = 'Copiado'; } catch { copyButton.textContent = 'Falhou'; }
@@ -305,6 +359,7 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
       if (!root.open) return;
       if (!snapshot?.rasterReduced && S.waiters.length) for (const resolve of S.waiters.splice(0)) resolve(snapshot);
       if (S.selected) highlight(S.elements.find(element => element.key === S.selected));
+      if (S.waitingRaster.size) { for (const card of [...S.waitingRaster]) drawThumb(card); const pane = body.querySelector('.ci-details'), chosen = S.elements.find(element => element.key === S.selected); if (pane && chosen && pane.querySelector('.ci-noimage')?.textContent.includes(NO_RASTER)) renderDetails(pane, chosen); }   // the app drew: cut what was waiting
       if (follow?.checked && S.capture && !S.busy && navigationKey(snapshot) !== S.followKey) { clearTimeout(S.followTimer); S.followTimer = setTimeout(() => { S.followTimer = null; capture(); }, 600); }
     },
     /** A new run: what the panel shows belongs to the previous one. */

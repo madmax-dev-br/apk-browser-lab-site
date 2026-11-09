@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=fde750be0455';
+import { createHostRegistry } from './host-contract.js?v=76605c7a7c39';
 
 // More of android.app.ActivityManager for the one-process virtual device (frameworks/base ActivityManager.java and ActivityManagerService, android-13.0.0_r1):
 //  getHistoricalProcessExitReasons / setProcessStateSummary (ApplicationExitInfo is the original class): nothing of this app has ever exited in the VM, so the history is empty;

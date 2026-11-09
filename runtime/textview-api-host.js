@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=fde750be0455';
-import { gcRoot } from './heap-gc.js?v=fde750be0455';
-import { APKError } from './apk-error.js?v=fde750be0455';
+import { createHostRegistry } from './host-contract.js?v=76605c7a7c39';
+import { gcRoot } from './heap-gc.js?v=76605c7a7c39';
+import { APKError } from './apk-error.js?v=76605c7a7c39';
 
 // Public android.widget.TextView API (API 33) beyond what the platform's native text model carries, with the semantics of android-13.0.0_r1 TextView.java.
 // The lab renders TextView / Button / EditText text through its native SkParagraph path (view-layout-host measure, compose-canvas-host draw), which honours the text, size, colour, typeface,
