@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Arquitetura da VM · APK Browser Lab</title>
   <meta name="description" content="Como o APK Browser Lab executa um APK Android no navegador: do arquivo à tela, threads e tempo, memória, renderização, rede, código nativo, ferramentas e limitações.">
-  <link rel="stylesheet" href="./site-pages.css?v=2f0501505dc8">
+  <link rel="stylesheet" href="./site-pages.css?v=93d82df0437e">
 </head>
 <body>
   <header class="topbar">
@@ -31,6 +31,7 @@
         <li><a href="#memoria">Memória</a></li>
         <li><a href="#renderizacao">Renderização</a></li>
         <li><a href="#rede">Rede</a></li>
+        <li><a href="#cors">CORS e como resolver</a></li>
         <li><a href="#nativo">Código nativo</a></li>
         <li><a href="#ferramentas">Ferramentas</a></li>
         <li><a href="#limitacoes">Limitações</a></li>
@@ -52,6 +53,7 @@
             <li><a href="#memoria">Memória</a></li>
             <li><a href="#renderizacao">Renderização</a></li>
             <li><a href="#rede">Rede</a></li>
+            <li><a href="#cors">CORS e como resolver</a></li>
             <li><a href="#nativo">Código nativo</a></li>
             <li><a href="#ferramentas">Ferramentas</a></li>
             <li><a href="#limitacoes">Limitações</a></li>
@@ -215,8 +217,41 @@
         <ul>
           <li><b>TLS é do navegador.</b> Um <code>SSLSocket</code> do app não cifra nada na VM: ele apresenta uma cadeia de certificados gerada pelo laboratório na sessão (como um proxy de depuração), e o navegador valida o certificado real. Um app que fixa a chave do servidor real recusa essa cadeia, e a recusa é do próprio app.</li>
           <li><b>Só HTTP/1.x sobre socket.</b> Uma conversa que não é HTTP/1.x falha nos primeiros bytes com um erro que os nomeia. O loopback (<code>ServerSocket</code> do próprio app em 127.0.0.1) funciona.</li>
-          <li><b>CORS e o relay.</b> Os servidores de um app real raramente autorizam a origem do laboratório. <code>scripts/cors-relay.mjs</code> roda na máquina de quem testa, escuta só em 127.0.0.1, exige um token e recusa endereços locais e privados por padrão.</li>
+          <li><b>CORS.</b> Os servidores de um app real raramente autorizam a origem do laboratório: veja <a href="#cors">CORS e como resolver</a>.</li>
         </ul>
+      </section>
+
+      <section id="cors" aria-labelledby="h-cors">
+        <h2 id="h-cors">CORS e como resolver</h2>
+        <p>No celular, o app conversa direto com o servidor. Aqui, quem faz a requisição é a <code>fetch</code> do navegador, a partir da origem da página do laboratório. O navegador só entrega a resposta à página se o servidor autorizar essa origem (CORS, <i>Cross-Origin Resource Sharing</i>). A API de um app real foi feita para o app, não para uma página web, e quase nunca autoriza: a requisição sai, o servidor responde, e o navegador descarta a resposta.</p>
+        <h3>Como aparece</h3>
+        <ul>
+          <li><b>No app:</b> a chamada falha como uma falha de conexão (o Java recebe uma <code>IOException</code>), não como uma resposta HTTP.</li>
+          <li><b>No painel Rede:</b> a entrada fica como falha, com a explicação de que o destino não respondeu CORS para a página. O console do navegador (F12) mostra o bloqueio pelo nome.</li>
+          <li><b>Pré-voo (preflight):</b> requisições com cabeçalhos próprios (<code>Authorization</code>, <code>Content-Type: application/json</code>…) ou métodos como <code>PUT</code>/<code>DELETE</code> fazem antes um <code>OPTIONS</code>; se o servidor não responder a ele, a requisição real nem sai.</li>
+          <li><b>Servidor local a partir do site público:</b> uma página <code>https</code> chamando <code>http://localhost</code> também passa pela verificação de rede privada do Chrome (<i>Private Network Access</i>), que pede um pré-voo extra.</li>
+        </ul>
+        <h3>Quatro formas de resolver</h3>
+        <ol>
+          <li><b>Relay CORS local (para usar a API real).</b> Um pequeno programa Node que roda na sua máquina, repete cada requisição como o celular faria e devolve a resposta à página com os cabeçalhos CORS. Ele escuta só em 127.0.0.1, exige o token impresso ao iniciar, aceita só a origem do laboratório (o site público e uma cópia local, por padrão), responde ao pré-voo de rede privada, segue redirecionamentos e devolve os <code>Set-Cookie</code>, que o navegador esconderia. Não guarda nada.
+            <div class="code" data-name="relay CORS"><pre><code># Node 18 ou mais novo
+curl -O https://madmax-dev-br.github.io/apk-browser-lab-site/tools/cors-relay.mjs
+node cors-relay.mjs
+# opções: --port 8787 · --origin &lt;origem da página&gt; (repetível) · --token &lt;token&gt; · --allow-private</code></pre></div>
+            O arquivo também pode ser baixado direto: <a href="./tools/cors-relay.mjs" download>cors-relay.mjs</a>.
+            Copie a URL de Proxy que ele imprime para <b>Controles › Dispositivo › Proxy</b> (no componente incorporado, a opção <code>proxyUrl</code>). O <code>{url}</code> da URL é trocado pelo destino de cada requisição. Para alcançar um servidor nesta máquina ou na rede local (localhost, 192.168…), inicie com <code>--allow-private</code>.</li>
+          <li><b>Mock de endpoint (sem rede).</b> Em <b>Controles › Mock de endpoints</b>, a resposta é dada pelo próprio laboratório e a requisição nunca sai, então não existe CORS. Bom para telas que dependem de uma resposta específica.</li>
+          <li><b>Redirecionar para um servidor seu.</b> Em <b>Controles › Redirecionar hosts</b>, mande o host da API para um servidor que você controla (um mock server, um proxy de depuração, um ambiente de testes). Esse servidor precisa responder CORS para a origem do laboratório, inclusive no <code>OPTIONS</code>:
+            <div class="code" data-name="cabeçalhos CORS"><pre><code>Access-Control-Allow-Origin: https://madmax-dev-br.github.io
+Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+Access-Control-Allow-Headers: Authorization, Content-Type
+Access-Control-Expose-Headers: Location, ETag   # os cabeçalhos da resposta que o app precisa ler
+Access-Control-Allow-Private-Network: true      # só quando o servidor é local e a página é https
+Vary: Origin</code></pre></div>
+            A VM nunca manda os cookies do navegador (os cookies do app vão como cabeçalhos dele), então <code>Allow-Credentials</code> não é necessário; o app só enxerga os cabeçalhos de resposta listados em <code>Expose-Headers</code>. Um servidor local sem CORS também funciona combinando o redirecionamento com o relay (<code>--allow-private</code>).</li>
+          <li><b>Rodar a VM no servidor.</b> Os serviços Node do repositório público <code>apk-lab-node-service</code> executam a mesma VM fora do navegador: lá não existe CORS, e as requisições saem direto (respeitando a lista de hosts, os redirecionamentos e os mocks da sessão).</li>
+        </ol>
+        <p>A lista de hosts permitidos, os mocks e os redirecionamentos continuam valendo com qualquer uma das formas: o que muda é só quem faz a troca com o servidor.</p>
       </section>
 
       <section id="nativo" aria-labelledby="h-nativo">
@@ -277,6 +312,6 @@
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./plugins.html">Como configurar plugins</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=2f0501505dc8"></script>
+  <script type="module" src="./site-pages.js?v=93d82df0437e"></script>
 </body>
 </html>

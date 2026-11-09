@@ -1,83 +1,604 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>APK player: embedding example</title>
+  <title>APK Player · integração</title>
+  <meta name="description" content="Documentação do componente APK Player: incorporar, carregar um APK, configurar o dispositivo e todos os recursos do laboratório, plugins, eventos e segurança, com demonstração ao vivo.">
+  <script>try { const theme = localStorage.getItem('apkweb-theme'); if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme; } catch {}</script>
   <style>
-    :root{color-scheme:light dark;--bg:#f7f8fa;--card:#fff;--ink:#252a35;--muted:#667085;--line:#e4e6ed;--accent:#6159e8;--code:#f1f2f6}
-    @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#14161c;--card:#1b1e26;--ink:#e9ebf2;--muted:#9aa1b2;--line:#2b303b;--code:#0f1116}}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
-    main{max-width:1100px;margin:0 auto;padding:24px 16px 56px}h1{font-size:26px;margin:0 0 4px}p.lead{color:var(--muted);margin:0 0 24px;max-width:70ch}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
-    figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px}
-    figcaption{font-size:13px;color:var(--muted)}figcaption b{color:var(--ink)}
-    apk-player{height:640px;border-radius:10px;background:repeating-linear-gradient(45deg,transparent 0 10px,rgba(127,127,127,.06) 10px 20px)}
+    :root{color-scheme:light;--bg:#f7f8fa;--card:#fff;--ink:#252a35;--muted:#667085;--line:#e4e6ed;--accent:#6159e8;--accent-soft:#f1f0fd;--accent-ink:#4b44c9;--code:#f3f4f8;--code-ink:#2b3040;--ok:#1f7a4d;--ok-soft:#e7f6ee;--warn:#8a5a00;--warn-soft:#fff5dc;--bad:#a12b2b;--bad-soft:#fdeeee;--stripe:rgba(127,127,127,.06)}
+    @media (prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;--bg:#13151b;--card:#1b1e26;--ink:#e9ebf2;--muted:#9aa1b2;--line:#2b303b;--accent:#8c86ff;--accent-soft:#25234a;--accent-ink:#c3bfff;--code:#0f1116;--code-ink:#d8dbe6;--ok:#7fd8a6;--ok-soft:#14301f;--warn:#f0c66b;--warn-soft:#33280f;--bad:#ff9d9d;--bad-soft:#3a1d1d}}
+    :root[data-theme=dark]{color-scheme:dark;--bg:#13151b;--card:#1b1e26;--ink:#e9ebf2;--muted:#9aa1b2;--line:#2b303b;--accent:#8c86ff;--accent-soft:#25234a;--accent-ink:#c3bfff;--code:#0f1116;--code-ink:#d8dbe6;--ok:#7fd8a6;--ok-soft:#14301f;--warn:#f0c66b;--warn-soft:#33280f;--bad:#ff9d9d;--bad-soft:#3a1d1d}
+    *{box-sizing:border-box}html{scroll-padding-top:72px}
+    body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;font-synthesis:none}
+    a{color:var(--accent-ink)}a:hover{text-decoration-thickness:2px}
+    button,select,input,textarea{font:inherit;color:inherit}
+    :focus-visible{outline:3px solid #b1adff;outline-offset:2px}
+    [hidden]{display:none!important}
+    .topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 5%;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+    .brand{display:flex;align-items:center;gap:10px;font-size:15px;letter-spacing:-.3px}.brand b{font-weight:600}
+    .brand-icon{background:#6159e8;color:#fff;border-radius:9px;width:28px;height:30px;display:grid;place-items:center;font-weight:700}
+    .top-links{display:flex;align-items:center;gap:14px;font-size:13px}.top-links a{color:var(--muted);text-decoration:none}.top-links a:hover{color:var(--ink)}
+    .icon-button{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:5px 10px;cursor:pointer}
+    .layout{max-width:1240px;margin:0 auto;padding:0 5%;display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px}
+    nav.toc{position:sticky;top:70px;align-self:start;max-height:calc(100vh - 90px);overflow:auto;padding:28px 0;font-size:13px}
+    nav.toc p{margin:0 0 8px;font-size:10px;letter-spacing:1.4px;font-weight:700;color:var(--muted);text-transform:uppercase}
+    nav.toc ol{list-style:none;margin:0;padding:0}nav.toc li a{display:block;padding:4px 10px;border-left:2px solid var(--line);color:var(--muted);text-decoration:none}nav.toc li a:hover{color:var(--ink);border-color:var(--accent)}
+    main{padding:28px 0 80px;min-width:0}
+    .eyebrow{font-size:10px;letter-spacing:1.6px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:0}
+    h1{font-size:34px;line-height:1.15;letter-spacing:-.8px;margin:6px 0 12px}
+    h2{font-size:22px;letter-spacing:-.3px;margin:56px 0 8px;padding-top:8px;border-top:1px solid var(--line)}
+    h3{font-size:16px;margin:28px 0 6px}
+    p,li{max-width:76ch}.lead{font-size:17px;color:var(--muted);margin:0 0 20px}
+    code{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code);color:var(--code-ink);padding:1px 5px;border-radius:5px;overflow-wrap:anywhere}
+    .code{position:relative;margin:12px 0 18px}
+    .code pre{margin:0;background:var(--code);color:var(--code-ink);border:1px solid var(--line);border-radius:12px;padding:14px 16px;overflow:auto;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2}
+    .code pre code{background:none;padding:0;overflow-wrap:normal}
+    .copy{position:absolute;top:8px;right:8px;font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;opacity:.9}.copy:hover{color:var(--ink)}
+    .table-wrap{overflow-x:auto;margin:12px 0 18px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+    table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{text-align:left;vertical-align:top;padding:8px 12px;border-bottom:1px solid var(--line)}tr:last-child td{border-bottom:0}
+    th{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:700;background:color-mix(in srgb,var(--code) 60%,transparent)}
+    td code{white-space:nowrap}td.wrap code{white-space:normal}
+    .note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--card);border-radius:10px;padding:10px 14px;margin:14px 0;max-width:80ch}
+    .note.warn{border-left-color:var(--warn)}
+    .pill{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);white-space:nowrap}
+    .pill.next{background:var(--warn-soft);color:var(--warn)}
+    /* demo */
+    .demo{display:grid;grid-template-columns:minmax(280px,400px) minmax(0,1fr);gap:20px;margin-top:14px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .device-slot{height:680px;border-radius:10px;background:repeating-linear-gradient(45deg,transparent 0 10px,var(--stripe) 10px 20px);display:grid;place-items:center;color:var(--muted);font-size:13px;text-align:center;overflow:hidden}
+    .device-slot>p{padding:0 24px}
+    .source{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+    .file-pick{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .file-pick label.button{display:inline-block}
+    .button,.controls button{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 11px;cursor:pointer;font-size:13.5px;line-height:1.3}
+    .button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    .button:disabled,.controls button:disabled{opacity:.5;cursor:not-allowed}
+    .controls{display:flex;flex-direction:column;gap:12px}
+    .group{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+    .group>h4{margin:0 0 8px;font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
     .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-    button,select{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
-    button:focus-visible,select:focus-visible{outline:3px solid #b1adff;outline-offset:2px}
-    pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;font-size:13px;line-height:1.5}
-    code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}h2{margin:36px 0 10px;font-size:19px}
-    .log{font-size:12px;color:var(--muted);max-height:96px;overflow:auto;white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace}
+    .row input[type=text],.row select,textarea{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 9px;min-width:0;font-size:13.5px}
+    .row input[type=text]{flex:1 1 180px}.row select{max-width:100%}#demo-catalog{flex:1 1 200px;width:0}
+    .demo>*{min-width:0}
+    textarea{width:100%;min-height:150px;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}
+    .log{margin:8px 0 0;max-height:180px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);background:var(--code);border-radius:8px;padding:8px 10px}
+    .log:empty::before{content:attr(data-empty)}
+    .status-line{font-size:12.5px;color:var(--muted);margin:6px 0 0;min-height:1.4em}
+    .plugin-out{display:flex;flex-direction:column;gap:8px;margin-top:8px}.plugin-out img{max-width:100%;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+    .plugin-out table{font-size:12px}.plugin-out figure{margin:0}.plugin-out figcaption{font-size:12px;color:var(--muted)}
+    .perm-ask{border:1px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:10px;margin-top:8px}
+    .shot img{max-width:100%;border-radius:8px;border:1px solid var(--line);margin-top:8px}
+    @media (max-width:1000px){.layout{grid-template-columns:1fr;gap:0}nav.toc{position:static;max-height:none;padding:16px 0 0}nav.toc ol{display:flex;flex-wrap:wrap;gap:4px}nav.toc li a{border:1px solid var(--line);border-radius:999px;padding:3px 10px}.demo{grid-template-columns:minmax(0,1fr)}}
+    @media (max-width:560px){.topbar,.layout{padding-left:16px;padding-right:16px}h1{font-size:27px}.device-slot{height:620px}.top-links .hide-sm{display:none}}
   </style>
 </head>
 <body>
-<main>
-  <h1>APK player</h1>
-  <p class="lead">Two independent players on one page. Each APK runs in its own isolated frame with its own VM Worker; the attributes below are the same settings as the lab's "Dispositivo virtual" panel.</p>
-  <div class="grid">
-    <figure>
-      <apk-player id="p1" src="../fixtures/xml-projects-debug.apk" device="phone" locale="pt-BR" theme="light" aria-label="xml-projects, light, pt-BR"></apk-player>
-      <figcaption><b>xml-projects</b> · phone · light · pt-BR · portrait</figcaption>
-      <div class="row"><button data-act="back" data-target="p1">Back</button><button data-act="restart" data-target="p1">Restart</button><button data-act="large" data-target="p1">Font ×1.3</button></div>
-      <div class="log" id="log1" aria-live="polite"></div>
-    </figure>
-    <figure>
-      <apk-player id="p2" src="../fixtures/compose-approvals-debug.apk" device="phone" orientation="landscape" theme="dark" locale="en-US" aria-label="compose-approvals, dark, landscape"></apk-player>
-      <figcaption><b>compose-approvals</b> · phone · dark · landscape · en-US</figcaption>
-      <div class="row"><button data-act="back" data-target="p2">Back</button><button data-act="restart" data-target="p2">Restart</button><button data-act="portrait" data-target="p2">Portrait</button></div>
-      <div class="log" id="log2" aria-live="polite"></div>
-    </figure>
-  </div>
+<header class="topbar">
+  <a class="brand" href="../index.html" style="text-decoration:none;color:inherit"><span class="brand-icon" aria-hidden="true">A</span><span>APK Browser <b>Lab</b> · Player</span></a>
+  <div class="top-links"><a class="hide-sm" href="../index.html">← Laboratório</a><a class="hide-sm" href="#api">API</a><button id="theme-toggle" class="icon-button" type="button" aria-label="Alternar tema claro/escuro">◐</button></div>
+</header>
+<div class="layout">
+  <nav class="toc" aria-label="Nesta página">
+    <p>Nesta página</p>
+    <ol>
+      <li><a href="#o-que-e">O que é</a></li>
+      <li><a href="#demo">Demonstração</a></li>
+      <li><a href="#incorporar">Incorporar</a></li>
+      <li><a href="#carregar">Carregar um APK</a></li>
+      <li><a href="#opcoes">Opções e atributos</a></li>
+      <li><a href="#configuracao">Configuração</a></li>
+      <li><a href="#api">Métodos</a></li>
+      <li><a href="#eventos">Eventos</a></li>
+      <li><a href="#recursos">Recursos do laboratório</a></li>
+      <li><a href="#cors">CORS</a></li>
+      <li><a href="#plugins">Plugins</a></li>
+      <li><a href="#seguranca">Segurança e privacidade</a></li>
+      <li><a href="#limites">Limitações</a></li>
+      <li><a href="#protocolo">Protocolo</a></li>
+    </ol>
+  </nav>
+  <main>
+    <p class="eyebrow">Componente de integração</p>
+    <h1 id="o-que-e">APK Player</h1>
+    <p class="lead">Um elemento <code>&lt;apk-player&gt;</code> (e a classe <code>ApkPlayer</code>) que roda um APK Android de verdade dentro da sua página, no navegador do visitante, com a mesma VM e os mesmos recursos da página de testes do laboratório.</p>
+    <p>O APK roda num <code>iframe</code> servido pela origem do runtime, que mostra só o aparelho emulado (tela, barra de status, barra de navegação). A VM Dalvik roda num Web Worker desse frame. Sua página conversa com ele por <code>postMessage</code> versionado e validado dos dois lados. Tudo o que a página de testes oferece no painel <b>Controles</b> (dispositivo virtual, rede, redirecionamento de hosts, mocks de endpoints, permissões, retornos de métodos, Activities ignoradas, tempo por evento, memória, Intents, dados do app, Logcat, rede, Compose, limites de layout, diagnóstico e plugins) está disponível por opções e métodos, pelos mesmos caminhos do Worker.</p>
 
-  <h2>Embed it</h2>
-  <pre><code>&lt;script type="module" src="https://YOUR-HOST/player/apk-player.js"&gt;&lt;/script&gt;
+    <h2 id="demo">Demonstração ao vivo</h2>
+    <p>Escolha um APK seu (ele é lido pelo navegador e não sai deste computador). Quando a página roda localmente com os exemplos do laboratório, eles também aparecem na lista.</p>
+    <div class="demo">
+      <div class="card">
+        <div class="source">
+          <div class="file-pick"><label class="button primary" for="demo-file">Escolher APK…</label><input id="demo-file" type="file" accept=".apk,application/vnd.android.package-archive" hidden><span id="demo-file-name" class="status-line" style="margin:0">Nenhum APK escolhido</span></div>
+          <div class="row" id="demo-catalog-row" hidden><label for="demo-catalog" class="status-line" style="margin:0">ou um exemplo:</label><select id="demo-catalog"></select><button id="demo-catalog-run" class="button" type="button">Abrir</button></div>
+        </div>
+        <div id="demo-slot" class="device-slot" aria-live="polite"><p>O aparelho aparece aqui depois que você escolher um APK.</p></div>
+        <p id="demo-status" class="status-line" role="status"></p>
+      </div>
+      <div class="controls" id="demo-controls">
+        <div class="group"><h4>Execução</h4><div class="row">
+          <button data-act="back" type="button">Voltar</button><button data-act="restart" type="button">Reiniciar</button><button data-act="stop" type="button">Parar VM</button><button data-act="clear" type="button">Limpar dados</button><button data-act="diagnostic" type="button">Copiar diagnóstico</button>
+        </div></div>
+        <div class="group"><h4>Dispositivo (ao vivo)</h4><div class="row">
+          <button data-act="orientation" type="button">Girar</button><button data-act="theme" type="button">Tema claro/escuro</button>
+          <select id="demo-locale" aria-label="Idioma"><option value="pt-BR">pt-BR</option><option value="en-US">en-US</option><option value="ar-SA">ar-SA (RTL)</option></select>
+          <select id="demo-connectivity" aria-label="Conexão"><option value="online">online</option><option value="offline">offline</option><option value="metered">limitada</option></select>
+          <label class="row" style="gap:4px"><input id="demo-bounds" type="checkbox"> limites de layout</label>
+        </div></div>
+        <div class="group"><h4>Rede</h4>
+          <div class="row"><input id="demo-hosts" type="text" value="*" aria-label="Hosts permitidos" spellcheck="false"><button data-act="hosts" type="button">Permitir hosts</button></div>
+          <div class="row" style="margin-top:8px"><input id="demo-redirect-from" type="text" placeholder="api.exemplo.com" aria-label="Redirecionar de" spellcheck="false"><span aria-hidden="true">→</span><input id="demo-redirect-to" type="text" placeholder="localhost:8080" aria-label="Redirecionar para" spellcheck="false"><button data-act="redirect" type="button" aria-pressed="false">Redirecionar</button></div>
+          <div class="row" style="margin-top:8px"><input id="demo-mock-url" type="text" placeholder="https://api.exemplo.com/v1/*  ou  /v1/*" aria-label="URL do mock" spellcheck="false"><input id="demo-mock-body" type="text" value='{"mock":true}' aria-label="Corpo do mock" spellcheck="false"><button data-act="mock" type="button">Adicionar mock</button><button data-act="mock-clear" type="button">Limpar mocks</button></div>
+          <div class="row" style="margin-top:8px"><button data-act="network" type="button" aria-pressed="false">Assinar log de rede</button></div>
+          <pre id="demo-network" class="log" data-empty="(log de rede: assine para ver as requisições)"></pre>
+        </div>
+        <div class="group"><h4>Abrir Intent</h4><div class="row"><input id="demo-intent" type="text" placeholder="meuapp://caminho?id=1" aria-label="Link ou URI" spellcheck="false"><input id="demo-component" type="text" placeholder="pacote/.Activity (opcional)" aria-label="Componente" spellcheck="false"><button data-act="intent" type="button">Abrir</button></div></div>
+        <div class="group"><h4>Permissões</h4><div class="row"><label for="demo-perm-mode">Diálogo:</label><select id="demo-perm-mode"><option value="frame">no aparelho (frame)</option><option value="host">nesta página (host)</option><option value="none">nenhum (nega)</option></select></div><div id="demo-perm-ask"></div></div>
+        <div class="group"><h4>Logcat</h4><div class="row"><button data-act="logcat" type="button" aria-pressed="false">Assinar Logcat</button></div><pre id="demo-logcat" class="log" data-empty="(Logcat: o Worker só transmite enquanto alguém assina)"></pre></div>
+        <div class="group"><h4>Inspeção</h4><div class="row"><button data-act="bounds" type="button">layoutBounds()</button><button data-act="shot" type="button">screenshot()</button><button data-act="compose" type="button">inspectCompose()</button><button data-act="state" type="button">screenState()</button></div><div id="demo-shot" class="shot"></div><pre id="demo-inspect" class="log" data-empty="(resultado da inspeção)"></pre></div>
+        <div class="group"><h4>Plugin</h4>
+          <textarea id="demo-plugin-code" aria-label="Código do plugin" spellcheck="false"></textarea>
+          <div class="row" style="margin-top:8px"><button data-act="plugin-run" type="button">Rodar plugin</button><button data-act="plugin-stop" type="button">Parar plugin</button></div>
+          <div id="demo-plugin-out" class="plugin-out" aria-live="polite"></div>
+        </div>
+        <div class="group"><h4>Eventos</h4><pre id="demo-events" class="log" data-empty="(eventos do player)"></pre></div>
+      </div>
+    </div>
 
-&lt;apk-player src="/apks/app-debug.apk" device="phone" locale="pt-BR"
-            theme="dark" font-scale="1.1" orientation="portrait"
-            style="height:640px"&gt;&lt;/apk-player&gt;
+    <h2 id="incorporar">Incorporar</h2>
+    <p>Publique a pasta <code>dist/</code> do laboratório (o build <code>node scripts/build-web.mjs</code>) como site estático, de preferência numa origem só para o runtime (por exemplo <code>https://apk-runtime.seu-site.com</code>). Na sua página:</p>
+    <div class="code"><pre><code>&lt;script type="module" src="https://SEU-RUNTIME/player/apk-player.js"&gt;&lt;/script&gt;
 
+&lt;apk-player src="/apks/app-debug.apk"
+            device="phone" locale="pt-BR" theme="dark" orientation="portrait"
+            allowed-hosts="api.exemplo.com"
+            style="height:720px"&gt;&lt;/apk-player&gt;</code></pre></div>
+    <ul>
+      <li><b>Tamanho.</b> O elemento é um bloco que ocupa a largura disponível; a altura padrão é 640 px (defina com CSS). O aparelho é escalado para caber no espaço (<code>scale="actual"</code> mantém 1 px CSS por dp, para comparação de pixels).</li>
+      <li><b>Origens.</b> <code>assetsBase</code> (atributo <code>assets-base</code>) é a pasta de onde vêm <code>player/frame.html</code>, o Worker, o framework e o WASM; o padrão é a pasta acima de <code>apk-player.js</code>. O frame recebe a origem da sua página em <code>?parent=</code> e só aceita mensagens dela.</li>
+      <li><b>Quem pode incorporar.</b> Uma página qualquer pode emoldurar <code>frame.html</code> declarando a própria origem. Restrinja no host do runtime com <code>Content-Security-Policy: frame-ancestors https://seu-site.com</code>.</li>
+      <li><b>Carregamento preguiçoso.</b> <code>loading="lazy"</code> (ou <code>lazy: true</code>) só cria o frame quando ele fica visível. Cada player tem o próprio Worker e a própria memória: mantenha poucos ao mesmo tempo.</li>
+      <li><b>Página de origem opaca.</b> Páginas <code>file://</code> ou em sandbox sem <code>allow-same-origin</code> são recusadas (<code>error</code> com <code>kind: "opaque-host-origin"</code>): sirva por http(s).</li>
+    </ul>
+    <h3>Pela classe</h3>
+    <div class="code"><pre><code>import { ApkPlayer } from 'https://SEU-RUNTIME/player/apk-player.js';
+
+const player = ApkPlayer.mount(document.querySelector('#slot'), {
+  apk: arquivo,                                 // File | Blob | ArrayBuffer | URL
+  config: { device: 'tablet', theme: 'dark', allowedHosts: ['*'] },
+  plugins: [],                                  // opcional: plugins desde o início
+});
+player.addEventListener('ready', e =&gt; console.log('rodando', e.detail.activity));
+// …
+player.destroy();</code></pre></div>
+
+    <h2 id="carregar">Carregar um APK</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Fonte</th><th>Como</th><th>Observações</th></tr></thead>
+      <tbody>
+        <tr><td>URL</td><td><code>&lt;apk-player src="app.apk"&gt;</code> ou <code>apk: 'https://…/app.apk'</code></td><td class="wrap">O frame baixa com <code>credentials: "omit"</code>; um APK de outra origem precisa de <code>Access-Control-Allow-Origin</code> para a origem do runtime.</td></tr>
+        <tr><td>File / Blob</td><td><code>el.load(input.files[0])</code> ou <code>apk: file</code></td><td class="wrap">Lido no navegador e transferido ao frame. Nada é enviado a servidor algum.</td></tr>
+        <tr><td>ArrayBuffer</td><td><code>apk: buffer</code></td><td class="wrap">Transferido (fica destacado na sua página); <code>transfer: false</code> envia uma cópia.</td></tr>
+      </tbody></table></div>
+    <div class="code"><pre><code>const el = document.querySelector('apk-player');
+input.addEventListener('change', () =&gt; el.load(input.files[0], { activity: 'com.exemplo.MainActivity' }));</code></pre></div>
+    <p>Limite: 1 GiB por APK (DEX somados até 768 MiB). <code>restart()</code> reabre a partir da cópia guardada no frame.</p>
+
+    <h2 id="opcoes">Opções e atributos de montagem</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Opção (<code>ApkPlayer.mount</code>)</th><th>Atributo</th><th>Tipo · padrão</th><th>Efeito</th></tr></thead>
+      <tbody>
+        <tr><td><code>apk</code></td><td><code>src</code></td><td>URL | File | Blob | ArrayBuffer</td><td class="wrap">O APK. Mudar <code>src</code> cria outro player (assinaturas e plugins do elemento são reaplicados).</td></tr>
+        <tr><td><code>config</code></td><td>(ver Configuração)</td><td>objeto · <code>{}</code></td><td class="wrap">Configuração inicial (chaves abaixo; também aceita <code>network: { allowedHosts, proxyUrl, hostMap }</code>).</td></tr>
+        <tr><td><code>activity</code></td><td><code>activity</code></td><td>string · launcher</td><td class="wrap">Activity a iniciar no lugar da de abertura.</td></tr>
+        <tr><td><code>assetsBase</code></td><td><code>assets-base</code></td><td>URL · pasta acima do script</td><td class="wrap">Onde ficam <code>player/frame.html</code> e o runtime.</td></tr>
+        <tr><td><code>keepData</code></td><td><code>keep-data</code></td><td>booleano · <code>false</code></td><td class="wrap">Guarda os dados privados do app (IndexedDB da origem do runtime, 64 MiB por app).</td></tr>
+        <tr><td><code>clearData</code></td><td><code>clear-data</code></td><td>booleano · <code>false</code></td><td class="wrap">Apaga os dados guardados antes de iniciar.</td></tr>
+        <tr><td><code>lazy</code></td><td><code>loading="lazy"</code></td><td>booleano · <code>false</code></td><td class="wrap">Cria o frame só quando visível.</td></tr>
+        <tr><td><code>scale</code></td><td><code>scale</code></td><td><code>fit</code> | <code>actual</code></td><td class="wrap">Ajustar ao espaço ou 1 px CSS por dp.</td></tr>
+        <tr><td><code>raster</code></td><td>—</td><td><code>null</code> | <code>'full'</code></td><td class="wrap">Raster progressivo (padrão) ou todo quadro em densidade total (medição; o mesmo que <code>?raster=full</code> no laboratório).</td></tr>
+        <tr><td><code>pointerClicks</code></td><td>—</td><td><code>'real'</code> | <code>'semantic'</code></td><td class="wrap">Toques como eventos de ponteiro ou como ações semânticas.</td></tr>
+        <tr><td><code>plugins</code></td><td>—</td><td>lista · <code>null</code></td><td class="wrap">Plugins iniciados quando o frame responde (igual a <code>plugins.set</code>).</td></tr>
+        <tr><td><code>title</code>, <code>name</code>, <code>transfer</code>, <code>eventTarget</code></td><td><code>title</code></td><td>—</td><td class="wrap">Título do iframe, nome do arquivo, transferir o buffer (padrão sim), alvo extra dos eventos.</td></tr>
+      </tbody></table></div>
+
+    <h2 id="configuracao">Configuração</h2>
+    <p>As mesmas chaves valem em <code>config</code>, <code>setConfig(patch)</code>, <code>configure(patch)</code> e no evento <code>config-applied</code>; as simples também como atributo (em kebab-case). Um patch mescla com a configuração atual (listas são substituídas por inteiro). Valores inválidos nunca são adivinhados: aparecem em <code>rejected</code>. <span class="pill">ao vivo</span> vale na hora, com a semântica do Android; <span class="pill next">próximo início</span> vale no próximo <code>restart()</code> (o player avisa em <code>rejected</code>).</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Chave</th><th>Atributo</th><th>Valores · padrão</th><th>Quando</th></tr></thead>
+      <tbody>
+        <tr><td><code>device</code></td><td><code>device</code></td><td><code>phone</code> (411×914 dp), <code>compact</code>, <code>large</code>, <code>small</code>, <code>tablet</code> · <code>phone</code></td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>orientation</code></td><td><code>orientation</code></td><td><code>portrait</code> | <code>landscape</code></td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>locale</code></td><td><code>locale</code></td><td><code>xx-XX</code> (ex.: <code>pt-BR</code>, <code>ar-SA</code> RTL) · <code>en-US</code></td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>theme</code></td><td><code>theme</code></td><td><code>light</code> | <code>dark</code> (uiMode night)</td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>fontScale</code>, <code>animatorScale</code></td><td><code>font-scale</code>, <code>animator-scale</code></td><td>0,85–2 · 1; 0–10 · 1</td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>hour24</code>, <code>timeZone</code></td><td><code>hour-24</code>, <code>time-zone</code></td><td>booleano · <code>true</code>; id IANA · o do navegador</td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>battery</code>, <code>charging</code></td><td><code>battery</code>, <code>charging</code></td><td>0–100 · 80; booleano</td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>connectivity</code>, <code>navigation</code></td><td><code>connectivity</code>, <code>navigation</code></td><td><code>online</code> | <code>offline</code> | <code>metered</code>; <code>gesture</code> | <code>buttons</code></td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>statusBarHeight</code></td><td><code>status-bar-height</code></td><td>16–64 dp · o do framework</td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>allowedHosts</code></td><td><code>allowed-hosts</code></td><td class="wrap">lista: <code>api.exemplo.com</code>, <code>*.cdn.exemplo.com</code>, <code>host:porta</code>, IP, <code>*</code> · <code>[]</code> (nenhum host)</td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>proxyUrl</code></td><td><code>proxy-url</code></td><td class="wrap">relay seu, <code>https://</code> (ou http em loopback); <code>{url}</code> marca o destino · vazio</td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>hostMap</code></td><td><code>host-map</code></td><td class="wrap"><code>[{ from, to, enabled }]</code>, até 50; atributo: <code>"api.exemplo.com -&gt; localhost:8080, …"</code> · <code>[]</code></td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>endpointMocks</code></td><td>—</td><td class="wrap"><code>[{ id, method, url, query, bodyContains, status, reason, headers, body | bodyBase64, delayMs, enabled }]</code>, até 50 · <code>[]</code></td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>methodOverrides</code></td><td>—</td><td class="wrap"><code>[{ method, value, enabled }]</code>, até 200; <code>method</code> em smali (<code>Lpkg/C;-&gt;m()Z</code>) ou Java (<code>pkg.C.m(int): boolean</code>; sem o retorno, o tipo único do APK é usado) · <code>[]</code></td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>ignoredActivities</code></td><td><code>ignored-activities</code></td><td class="wrap"><code>['pkg.Splash', { name: '.Promo', enabled }]</code>, até 100 · <code>[]</code></td><td><span class="pill">ao vivo</span> (próxima abertura)</td></tr>
+        <tr><td><code>permissions</code></td><td>—</td><td class="wrap"><code>{ 'android.permission.CAMERA': 'allow' | 'deny' | 'ask' }</code> (ou <code>{ states, denials }</code>) · tudo <code>ask</code></td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>location</code></td><td>—</td><td class="wrap"><code>{ enabled, latitude, longitude, accuracy }</code> ou <code>null</code> · sem localização</td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>permissionDialog</code></td><td><code>permission-dialog</code></td><td class="wrap"><code>none</code> (o pedido é dispensado: conta como negação) | <code>frame</code> (o diálogo do laboratório sobre a tela) | <code>host</code> (evento <code>permission-request</code> para sua página) · <code>none</code></td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>eventSeconds</code></td><td><code>event-seconds</code></td><td><code>0</code> (automático, 25 s) | <code>60</code> | <code>120</code> | <code>300</code></td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>layoutBounds</code></td><td><code>layout-bounds</code></td><td>booleano · <code>false</code> (Mostrar limites de layout)</td><td><span class="pill">ao vivo</span></td></tr>
+        <tr><td><code>memoryMiB</code></td><td><code>memory-mib</code></td><td><code>0</code> (automático) | 512 | 1024 | 2048 | 3072 | 4096</td><td><span class="pill next">próximo início</span></td></tr>
+        <tr><td><code>tolerateMissing</code></td><td><code>tolerate-missing</code></td><td class="wrap"><code>off</code> | <code>void</code> | <code>primitives</code> | <code>all</code> · <code>off</code> (para na primeira API ausente)</td><td><span class="pill next">próximo início</span></td></tr>
+        <tr><td><code>strictCrash</code></td><td><code>strict-crash</code></td><td>booleano · <code>false</code> (falha como no Android, sem continuar)</td><td><span class="pill next">próximo início</span></td></tr>
+        <tr><td><code>webview</code></td><td><code>webview</code></td><td class="wrap"><code>off</code> | <code>on</code> · <code>off</code> (conteúdo de <code>android.webkit.WebView</code> em iframes isolados)</td><td><span class="pill next">próximo início</span></td></tr>
+      </tbody></table></div>
+    <div class="code"><pre><code>const { config, rejected, live, outcome, statuses } = await player.configure({
+  orientation: 'landscape',
+  network: { allowedHosts: ['api.exemplo.com'] },
+  eventSeconds: 120,
+});
+// outcome: { changed, relaunched, delivered } (Activities recriadas, onConfigurationChanged)
+// statuses: o que a VM disse de cada override, Activity ignorada e mock</code></pre></div>
+
+    <h2 id="api">Métodos</h2>
+    <p>Valem no elemento e na instância de <code>ApkPlayer</code>. Os que devolvem <code>Promise</code> rejeitam com um <code>Error</code> que tem <code>code</code> (<code>bad-args</code>, <code>no-apk</code>, <code>not-found</code>, <code>unsupported</code>, <code>timeout</code>, <code>destroyed</code>, <code>vm</code>).</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Método</th><th>Devolve</th><th>O que faz</th></tr></thead>
+      <tbody>
+        <tr><td><code>setConfig(patch)</code></td><td>o player</td><td class="wrap">Mescla a configuração; o resultado chega no evento <code>config-applied</code>.</td></tr>
+        <tr><td><code>configure(patch)</code></td><td><code>Promise&lt;{ config, rejected, live, outcome, statuses }&gt;</code></td><td class="wrap">O mesmo, esperando a resposta deste patch.</td></tr>
+        <tr><td><code>openIntent({ data, action, component, type, category, extras })</code></td><td><code>Promise&lt;{ deepLink, state, message, detail }&gt;</code></td><td class="wrap">Deep link ou Intent explícito resolvido pelos filtros do manifesto, como <code>am start</code>. <code>action</code> padrão <code>android.intent.action.VIEW</code>; <code>extras</code> de string, número ou booleano.</td></tr>
+        <tr><td><code>back()</code>, <code>restart()</code></td><td>o player</td><td class="wrap">Voltar do sistema; reabrir o APK e iniciar de novo.</td></tr>
+        <tr><td><code>stop()</code></td><td><code>Promise&lt;{ stopped }&gt;</code></td><td class="wrap">Parar a VM (encerra o Worker); evento <code>stopped</code>.</td></tr>
+        <tr><td><code>clearData()</code></td><td>o player</td><td class="wrap">Configurações › Apps › Limpar armazenamento e reiniciar; evento <code>data-cleared</code>.</td></tr>
+        <tr><td><code>logcat.subscribe(fn)</code></td><td>função para cancelar</td><td class="wrap"><code>fn({ entries, reset, dropped, total })</code>, cada entrada <code>{ seq, uptime, wall, pid, tid, thread, level, tag, message }</code>. O Worker só transmite linhas enquanto houver assinante.</td></tr>
+        <tr><td><code>network.subscribe(fn)</code></td><td>função para cancelar</td><td class="wrap"><code>fn({ entries, reset, dropped, total })</code>, cada entrada uma requisição (método, URL, status, cabeçalhos, tamanhos, duração, <code>outcome</code>, redirecionamento e mock que respondeu). Corpos nunca.</td></tr>
+        <tr><td><code>inspectCompose({ maxNodes })</code></td><td><code>Promise&lt;inspeção&gt;</code></td><td class="wrap">A árvore de LayoutNodes do Compose na tela (o painel Compose), até 4000 nós.</td></tr>
+        <tr><td><code>layoutBounds({ names })</code></td><td><code>Promise&lt;elemento[]&gt;</code></td><td class="wrap">As caixas de “Mostrar limites de layout” como dados: <code>{ key, kind, name, bounds, size, texts, role, testTag, actions, modifiers, hasImage }</code>.</td></tr>
+        <tr><td><code>screenshot({ key, maxWidth, type })</code></td><td><code>Promise&lt;{ blob, width, height, notes }&gt;</code></td><td class="wrap">Imagem da tela inteira ou de uma caixa (<code>key</code> de <code>layoutBounds()</code>), cortada do quadro exibido. No máximo uma a cada 250 ms.</td></tr>
+        <tr><td><code>screenState()</code></td><td><code>Promise&lt;{ text, blank, reasons }&gt;</code></td><td class="wrap">“Estado da tela”: pilha de Activities, Views, Compose, quadros, fila, threads, memória.</td></tr>
+        <tr><td><code>diagnostic()</code></td><td><code>Promise&lt;string&gt;</code></td><td class="wrap">O texto de “Copiar diagnóstico”: causa, pilha, stubs, recursos de depuração ativos, log, estado da tela e estimativa de APIs.</td></tr>
+        <tr><td><code>diagnostics()</code></td><td><code>Promise&lt;{ stubs, tolerateMissing, packageName, report }&gt;</code></td><td class="wrap">As listas de stubs do app em execução (modo tolerante).</td></tr>
+        <tr><td><code>status()</code></td><td><code>Promise&lt;…&gt;</code></td><td class="wrap">Estado e contadores de overrides, Activities ignoradas, mocks e redirecionamentos; permissões; assinaturas.</td></tr>
+        <tr><td><code>answerPermission(id, answers)</code></td><td><code>Promise&lt;{ config }&gt;</code></td><td class="wrap">Responde um <code>permission-request</code>: <code>'allow'</code> | <code>'once'</code> | <code>'deny'</code> por diálogo (ou um para todos), <code>null</code> = dispensado.</td></tr>
+        <tr><td><code>plugins.set(list)</code>, <code>.stop(id)</code>, <code>.restart(id)</code>, <code>.list()</code>, <code>.subscribe(fn)</code>, <code>.outputs</code></td><td>—</td><td class="wrap">Plugins do laboratório dentro do player (ver <a href="#plugins">Plugins</a>).</td></tr>
+        <tr><td><code>destroy()</code></td><td>—</td><td class="wrap">Encerra o Worker e remove o frame (o elemento faz isso ao sair do DOM).</td></tr>
+      </tbody></table></div>
+
+    <h2 id="eventos">Eventos</h2>
+    <p>Disparados no elemento (ou na instância), com os dados em <code>event.detail</code>.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Evento</th><th><code>detail</code></th></tr></thead>
+      <tbody>
+        <tr><td><code>ready</code></td><td class="wrap"><code>{ activity, inventory: { packageName, activities }, statuses, rejected }</code></td></tr>
+        <tr><td><code>activity-changed</code></td><td class="wrap"><code>{ activity, canGoBack }</code></td></tr>
+        <tr><td><code>screen</code></td><td class="wrap"><code>{ screen: { activity, activityStack, tasks, windows, dialogs, canGoBack, closed, packageName, frame } }</code>, quando a tela muda (Activity, pilha, janela ou diálogo).</td></tr>
+        <tr><td><code>config-applied</code></td><td class="wrap"><code>{ config, rejected, live, outcome, statuses }</code></td></tr>
+        <tr><td><code>permission-request</code></td><td class="wrap"><code>{ request: { id, requestCode, appLabel, dialogs: [{ group, label, question, permissions, oneTime }] } }</code> (com <code>permissionDialog: 'host'</code>)</td></tr>
+        <tr><td><code>permission-config</code></td><td class="wrap"><code>{ config: { states, denials, once } }</code>, depois de cada resposta (guarde se quiser lembrar entre visitas).</td></tr>
+        <tr><td><code>logcat</code>, <code>network</code></td><td class="wrap">Os lotes das assinaturas.</td></tr>
+        <tr><td><code>plugin-output</code></td><td class="wrap"><code>{ plugin: { id, name, status, badge, blocks, console, errors, errorCount } }</code></td></tr>
+        <tr><td><code>closed</code>, <code>stopped</code></td><td class="wrap">A pilha de Activities esvaziou; a VM foi parada.</td></tr>
+        <tr><td><code>data-status</code>, <code>data-cleared</code></td><td class="wrap"><code>{ status: { enabled, bytes, files, limitBytes, overLimit, error } }</code></td></tr>
+        <tr><td><code>error</code></td><td class="wrap"><code>{ kind, message, cause, phase, frontier, report, stubs }</code>. <code>report</code> é o diagnóstico em texto; <code>frontier</code> a fronteira da VM (ex.: <code>{ kind: "jni-required", … }</code>).</td></tr>
+      </tbody></table></div>
+
+    <h2 id="recursos">Recursos do laboratório</h2>
+    <p>Cada recurso do painel <b>Controles</b> da página de testes, e como usá-lo no player. Todos passam pela mesma chamada do Worker que o painel usa e pelos mesmos validadores.</p>
+
+    <h3>Dispositivo virtual</h3>
+    <div class="code"><pre><code>&lt;apk-player src="app.apk" device="tablet" orientation="landscape" locale="ar-SA"
+            theme="dark" font-scale="1.3" time-zone="America/Sao_Paulo" battery="15"&gt;&lt;/apk-player&gt;
+&lt;script&gt; player.setConfig({ orientation: 'portrait' }); &lt;/script&gt;  &lt;!-- nova Configuration, como no Android --&gt;</code></pre></div>
+
+    <h3>Rede: hosts permitidos e relay</h3>
+    <p>O padrão do player é não alcançar host nenhum (o nome falha como num aparelho sem conexão). A requisição sai pelo <code>fetch</code> do navegador (CORS vale) ou pelo relay que você opera.</p>
+    <div class="code"><pre><code>await player.configure({ network: { allowedHosts: ['api.exemplo.com', '*.cdn.exemplo.com'], proxyUrl: 'https://relay.seu-site.com/?u={url}' } });</code></pre></div>
+
+    <h3>Redirecionar hosts</h3>
+    <p>O app pede a URL original; a troca vai para outro destino (por exemplo seu servidor local de desenvolvimento). O app continua vendo a URL que pediu.</p>
+    <div class="code"><pre><code>await player.configure({ hostMap: [{ from: 'api.exemplo.com', to: 'localhost:8080' }], allowedHosts: ['localhost:8080'] });
+// atributo: host-map="api.exemplo.com -&gt; localhost:8080"</code></pre></div>
+
+    <h3>Mock de endpoints</h3>
+    <div class="code"><pre><code>await player.configure({ endpointMocks: [{
+  id: 'perfil', method: 'GET', url: 'https://api.exemplo.com/v1/perfil', status: 200,
+  headers: [{ name: 'Content-Type', value: 'application/json' }], body: '{"nome":"Ana"}', delayMs: 300,
+}] });
+const { statuses } = await player.status();   // { endpointMocks: [{ id, state: 'active', hits }] }</code></pre></div>
+
+    <h3>Permissões, localização e o diálogo</h3>
+    <div class="code"><pre><code>&lt;apk-player src="app.apk" permission-dialog="host"&gt;&lt;/apk-player&gt;
 &lt;script type="module"&gt;
   const player = document.querySelector('apk-player');
-  player.addEventListener('ready', e =&gt; console.log('running', e.detail.activity));
-  player.addEventListener('error', e =&gt; console.warn(e.detail.report));   // cause, frames, stubbed APIs, log tail
-  // tolerate-missing="primitives" (attribute, off by default) stubs missing Android APIs; await player.diagnostics() lists them
-  player.setConfig({ theme: 'light', locale: 'en-US' });   // applied live (Android semantics)
-&lt;/script&gt;</code></pre>
-  <h2>Mount from a File or ArrayBuffer</h2>
-  <pre><code>import { ApkPlayer } from 'https://YOUR-HOST/player/apk-player.js';
-const player = ApkPlayer.mount(document.querySelector('#slot'), {
-  apk: fileInput.files[0],                 // File | Blob | ArrayBuffer (transferred) | URL string
-  config: { device: 'tablet', theme: 'dark' },
-  assetsBase: 'https://YOUR-HOST/'         // where player/frame.html and the runtime live
-});
-player.addEventListener('ready', e =&gt; console.log(e.detail));
-player.destroy();</code></pre>
-</main>
-<script type="module">
-  import './apk-player.js';
-  const log = (id, text) => { const el = document.getElementById(id); el.textContent = (text + '\n' + el.textContent).split('\n').slice(0, 6).join('\n'); };
-  for (const [id, logId] of [['p1', 'log1'], ['p2', 'log2']]) {
-    const player = document.getElementById(id);
-    for (const type of ['ready', 'activity-changed', 'config-applied', 'closed']) player.addEventListener(type, event => log(logId, `${type} ${event.detail.activity ?? ''} ${event.detail.live === undefined ? '' : event.detail.live ? '(live)' : '(next launch)'}`.trim()));
-    player.addEventListener('error', event => log(logId, `error ${event.detail.kind}: ${(event.detail.cause ?? event.detail.message).slice(0, 140)}`));
-  }
-  document.addEventListener('click', event => {
-    const button = event.target.closest('button[data-act]'); if (!button) return;
-    const player = document.getElementById(button.dataset.target), act = button.dataset.act;
-    if (act === 'back') player.back(); else if (act === 'restart') player.restart();
-    else if (act === 'large') player.setConfig({ fontScale: 1.3 }); else if (act === 'portrait') player.setConfig({ orientation: 'portrait' });
+  await player.configure({ permissions: { 'android.permission.ACCESS_FINE_LOCATION': 'allow' },
+                           location: { latitude: -23.55, longitude: -46.63, accuracy: 10 } });
+  player.addEventListener('permission-request', async ({ detail: { request } }) =&gt; {
+    const sim = confirm(request.dialogs.map(d =&gt; d.question).join('\n'));
+    await player.answerPermission(request.id, sim ? 'allow' : 'deny');
   });
+&lt;/script&gt;</code></pre></div>
+
+    <h3>Retornos de métodos e Activities ignoradas</h3>
+    <p>Ferramentas de depuração do seu próprio app: o método substituído não executa o código original, e a abertura de uma Activity ignorada não acontece. O diagnóstico marca as duas como ativas. Métodos nativos não são substituídos.</p>
+    <div class="code"><pre><code>await player.configure({
+  methodOverrides: [{ method: 'com.exemplo.Flags.novaTela()', value: 'true' }],
+  ignoredActivities: ['com.exemplo.SplashActivity'],
+});</code></pre></div>
+
+    <h3>Tempo por evento, memória, modo tolerante</h3>
+    <div class="code"><pre><code>&lt;apk-player src="app.apk" event-seconds="120" memory-mib="2048" tolerate-missing="primitives"&gt;&lt;/apk-player&gt;
+&lt;script&gt; const { stubs } = await player.diagnostics(); &lt;/script&gt;  &lt;!-- APIs que receberam stub --&gt;</code></pre></div>
+
+    <h3>Abrir um Intent (deep link)</h3>
+    <div class="code"><pre><code>const r = await player.openIntent({ data: 'meuapp://pedido?id=42', extras: { origem: 'site' } });
+console.log(r.state, r.message);   // 'ok', 'Activity iniciada: PedidoActivity'
+await player.openIntent({ component: 'com.exemplo/.AjudaActivity' });</code></pre></div>
+
+    <h3>Dados do app</h3>
+    <div class="code"><pre><code>&lt;apk-player src="notas.apk" keep-data&gt;&lt;/apk-player&gt;
+&lt;script&gt; player.clearData(); &lt;/script&gt;  &lt;!-- limpa e reinicia --&gt;</code></pre></div>
+
+    <h3>Logcat e log de rede</h3>
+    <div class="code"><pre><code>const parar = player.logcat.subscribe(({ entries }) =&gt; {
+  for (const linha of entries) console.log(linha.level, linha.tag, linha.message);
+});
+const pararRede = player.network.subscribe(({ entries }) =&gt; console.table(entries.map(e =&gt; [e.method, e.url, e.status, e.outcome])));
+// …
+parar(); pararRede();   // sem assinantes, o Worker volta a mandar só um contador</code></pre></div>
+
+    <h3>Compose, limites de layout e imagens</h3>
+    <div class="code"><pre><code>player.setConfig({ layoutBounds: true });              // desenha as caixas sobre a tela
+const caixas = await player.layoutBounds();            // [{ key, name: 'Button "Salvar"', bounds, … }]
+const { blob } = await player.screenshot({ key: caixas[0].key, maxWidth: 600 });
+img.src = URL.createObjectURL(blob);
+const arvore = await player.inspectCompose({ maxNodes: 2000 });</code></pre></div>
+
+    <h3>Diagnóstico e estado da tela</h3>
+    <div class="code"><pre><code>player.addEventListener('error', e =&gt; console.warn(e.detail.report));
+const texto = await player.diagnostic();      // o mesmo “Copiar diagnóstico” do laboratório
+const { text } = await player.screenState();</code></pre></div>
+
+    <h3>WebView e raster</h3>
+    <p><code>webview="on"</code> mostra o conteúdo de <code>android.webkit.WebView</code> em iframes isolados do frame (desligado por padrão: sem ele, o WebView falha de forma explícita). <code>raster: 'full'</code> desliga o raster progressivo (útil para medir).</p>
+
+    <h2 id="cors">CORS: quando a rede do app falha no navegador</h2>
+    <p>No aparelho virtual, cada requisição HTTP do app (<code>HttpURLConnection</code>, OkHttp e o que mais estiver por cima de <code>java.net</code>) vira um <code>fetch</code> do navegador, feito pelo Worker da VM na <b>origem do runtime</b> (a de <code>player/frame.html</code>, não a da sua página). O navegador só entrega a resposta de outro site se esse servidor autorizar essa origem com CORS. Os servidores com que um app fala quase nunca autorizam, porque foram feitos para apps, não para páginas.</p>
+    <ul>
+      <li><b>Resposta sem CORS.</b> Sem <code>Access-Control-Allow-Origin</code> com a origem do runtime (ou <code>*</code>), o navegador descarta a resposta.</li>
+      <li><b>Preflight.</b> Requisições “não simples” (métodos além de GET/HEAD/POST, cabeçalhos como <code>Authorization</code> ou <code>Content-Type: application/json</code>) primeiro mandam um <code>OPTIONS</code>; se o servidor não responder a ele com os cabeçalhos certos, a requisição nem sai.</li>
+      <li><b>Cabeçalhos da resposta.</b> Além dos básicos, o app só vê os cabeçalhos que o servidor lista em <code>Access-Control-Expose-Headers</code>.</li>
+      <li><b>Cookies e credenciais.</b> O lab faz todo <code>fetch</code> com <code>credentials: "omit"</code>: cookies do navegador nunca vão junto, e <code>Cookie</code>, <code>User-Agent</code> e <code>Set-Cookie</code> do app não passam pelo navegador (só por um relay). Por isso <code>Access-Control-Allow-Credentials</code> não é necessário.</li>
+      <li><b>Rede local a partir de uma página https.</b> Um destino em <code>localhost</code> ou na rede local, pedido por uma origem pública, passa pelas regras de acesso à rede privada do navegador: conforme o navegador e a versão, ele exige no preflight a resposta <code>Access-Control-Allow-Private-Network: true</code> ou pede a permissão de acesso à rede local ao visitante. (<code>http://localhost</code> não conta como conteúdo misto; outros destinos <code>http://</code> a partir de uma página https são bloqueados.)</li>
+    </ul>
+    <h3>Como a falha aparece</h3>
+    <p>O navegador não diz à página por que um <code>fetch</code> falhou: CORS recusado, host inacessível e bloqueio por extensão dão o mesmo erro. Por isso o app recebe o que um aparelho sem rota receberia, <code>java.net.ConnectException: failed to connect to host/host (port 443): the browser reports unreachable hosts, CORS rejections and blocked requests identically (…)</code>. No log de rede (painel <b>Rede</b> do laboratório, ou <code>player.network.subscribe</code>) a entrada fica com <code>outcome: "error"</code> e essa mensagem em <code>failure.message</code>; o painel acrescenta a dica de que só o console do navegador diz qual foi a causa. O console mostra “blocked by CORS policy” quando foi CORS.</p>
+    <h3>1. Relay CORS local</h3>
+    <p>Um programa pequeno que roda no seu computador e repete cada requisição a partir dali, como o aparelho faria, respondendo à página com CORS. Baixe <a href="https://madmax-dev-br.github.io/apk-browser-lab-site/tools/cors-relay.mjs" download>cors-relay.mjs</a> (publicado no site em <code>tools/cors-relay.mjs</code>; Node 18 ou mais novo) e rode:</p>
+    <div class="code"><pre><code>node cors-relay.mjs
+# APK Web Lab CORS relay on http://127.0.0.1:8787 (only this machine can reach it)
+# Allowed page origins: https://madmax-dev-br.github.io, http://127.0.0.1:8765, http://localhost:8765
+# Proxy field (Controles &gt; Dispositivo): http://127.0.0.1:8787/&lt;token&gt;/?url={url}</code></pre></div>
+    <p>Cole a URL “Proxy” impressa em <code>proxyUrl</code> do player (ou em <b>Controles › Dispositivo › Proxy</b> na página do laboratório). <code>{url}</code> é onde o lab põe o destino (codificado com <code>encodeURIComponent</code>; sem <code>{url}</code>, o destino é acrescentado ao fim). Os hosts continuam decididos por <code>allowedHosts</code>.</p>
+    <div class="code"><pre><code>&lt;apk-player src="app.apk" allowed-hosts="*" proxy-url="http://127.0.0.1:8787/SEU-TOKEN/?url={url}"&gt;&lt;/apk-player&gt;
+&lt;!-- ou --&gt;
+await player.configure({ network: { allowedHosts: ['*'], proxyUrl: 'http://127.0.0.1:8787/SEU-TOKEN/?url={url}' } });</code></pre></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Opção</th><th>Efeito</th></tr></thead>
+      <tbody>
+        <tr><td><code>--port 8787</code></td><td class="wrap">Porta (só em 127.0.0.1: nenhuma outra máquina alcança o relay).</td></tr>
+        <tr><td><code>--origin &lt;origem&gt;</code></td><td class="wrap">Origem de página aceita (repetível). O padrão é o site público e uma cópia local na porta 8765. No player, a origem que conta é a <b>do runtime</b> (onde está <code>player/frame.html</code>): se você hospeda o runtime, passe <code>--origin https://seu-runtime.exemplo.com</code>.</td></tr>
+        <tr><td><code>--token &lt;token&gt;</code></td><td class="wrap">Segredo no caminho da URL (por padrão, um aleatório a cada início): outro site aberto no mesmo navegador não consegue usar o relay.</td></tr>
+        <tr><td><code>--allow-private</code></td><td class="wrap">Permite destinos neste computador ou na rede local (loopback, faixas privadas, link-local). Sem ela o relay recusa, e o app recebe <code>ConnectException … the CORS relay refused the target</code>.</td></tr>
+      </tbody></table></div>
+    <p>O relay segue redirecionamentos, devolve <code>Set-Cookie</code> (que o navegador esconde) como <code>x-apkweb-set-cookie</code>, envia <code>Cookie</code>/<code>User-Agent</code> do app, responde ao preflight (inclusive com <code>Access-Control-Allow-Private-Network</code>) e transforma “host desconhecido”, “recusado”, “tempo esgotado” e erro de certificado na exceção que o Android lançaria. Não guarda nada. Não resolve bloqueios de extensões do navegador nem serviços que o aparelho virtual não tem.</p>
+    <h3>2. Mock de endpoints</h3>
+    <p>Respostas fixas servidas dentro do laboratório: a requisição nunca chega à rede, então não existe CORS. Bom para telas que só precisam de dados plausíveis.</p>
+    <div class="code"><pre><code>await player.configure({ endpointMocks: [{ method: 'GET', url: 'https://api.exemplo.com/v1/*', status: 200,
+  headers: [{ name: 'Content-Type', value: 'application/json' }], body: '{"itens":[]}' }] });</code></pre></div>
+    <h3>3. Redirecionar para um servidor seu que responda CORS</h3>
+    <p>Aponte o host do app para um servidor que você controla (por exemplo o backend de desenvolvimento) e faça esse servidor autorizar a origem do runtime. O app continua vendo a URL original. (Com relay ligado, o relay repete o destino já redirecionado.)</p>
+    <div class="code"><pre><code>await player.configure({ hostMap: [{ from: 'api.exemplo.com', to: 'localhost:8080' }], allowedHosts: ['api.exemplo.com', 'localhost:8080'] });</code></pre></div>
+    <p>Cabeçalhos que o servidor precisa enviar (troque a origem pela do seu runtime):</p>
+    <div class="code"><pre><code>// Node (http): CORS para a origem do runtime, preflight respondido
+const ORIGEM = 'https://madmax-dev-br.github.io';
+http.createServer((req, res) =&gt; {
+  if (req.headers.origin === ORIGEM) {
+    res.setHeader('Access-Control-Allow-Origin', ORIGEM);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Expose-Headers', 'ETag, Location, X-Request-Id');   // os que o app lê
+  }
+  if (req.method === 'OPTIONS') {                                     // preflight
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] ?? '');
+    if (req.headers['access-control-request-private-network']) res.setHeader('Access-Control-Allow-Private-Network', 'true');
+    res.setHeader('Access-Control-Max-Age', '600');
+    res.writeHead(204); return res.end();
+  }
+  // … a resposta normal
+}).listen(8080);</code></pre></div>
+    <p><code>Access-Control-Allow-Credentials</code> não é preciso: o lab nunca manda credenciais do navegador.</p>
+    <h3>4. Rodar a VM no servidor</h3>
+    <p>Fora do navegador não há CORS: os serviços Node do repositório público <code>apk-lab-node-service</code> rodam a mesma VM em Node, e lá as requisições do app saem direto do servidor, com cookies, <code>User-Agent</code> e redirecionamentos como num aparelho. É o caminho para automação ou para apps cujos servidores não podem ser alcançados de uma página.</p>
+
+    <h2 id="plugins">Plugins no player</h2>
+    <p>Os plugins do laboratório (<code>docs/PLUGINS.md</code>) também rodam no player, com a mesma API <code>lab</code>: <code>lab.on('screen' | 'log' | 'network')</code>, <code>lab.screen()</code>, <code>lab.composeTree()</code>, <code>lab.viewModels()</code>, <code>lab.layoutBounds()</code>, <code>lab.screenshot()</code> e <code>lab.ui.text/kv/table/json/image/badge/clear</code>. Cada plugin roda no próprio Web Worker, criado numa <b>origem opaca</b> (um iframe em sandbox dentro do frame): o código que sua página envia não ganha a origem do runtime (nem os dados guardados de outros apps). A saída chega à sua página no evento <code>plugin-output</code>, para você mostrar como quiser (use <code>textContent</code>; imagens chegam como <code>Blob</code>).</p>
+    <div class="code"><pre><code>const codigo = `
+lab.on('screen', async () =&gt; {
+  const caixas = (await lab.layoutBounds()).filter(c =&gt; c.kind === 'compose' &amp;&amp; c.hasImage);
+  lab.ui.badge(String(caixas.length));
+  lab.ui.table(caixas.slice(0, 20).map(c =&gt; ({ nome: c.name, largura: c.size?.width, altura: c.size?.height })), ['nome', 'largura', 'altura'], { id: 'lista' });
+  if (caixas[0]) lab.ui.image(await lab.screenshot({ key: caixas[0].key, maxWidth: 360 }), { id: 'primeiro', caption: caixas[0].name });
+  lab.ui.image(await lab.screenshot({ maxWidth: 360 }), { id: 'tela', caption: 'Tela inteira' });
+});`;
+
+const { plugins, rejected } = await player.plugins.set([{ id: 'componentes', name: 'Componentes da tela', code: codigo }]);
+player.plugins.subscribe(plugin =&gt; {
+  for (const bloco of plugin.blocks) {
+    if (bloco.kind === 'image') imagem.src = URL.createObjectURL(bloco.blob);   // revogue a URL anterior
+    if (bloco.kind === 'table') console.table(bloco.rows);
+  }
+});
+await player.plugins.stop('componentes');</code></pre></div>
+    <p>Limites (os mesmos do laboratório): até 32 plugins, 200 mil caracteres de código cada, 16 consultas pendentes, um <code>composeTree</code> por segundo e uma imagem a cada 500 ms por plugin, imagens até 8 MiB, 50 blocos de saída. <code>packageFilter</code> restringe um plugin a pacotes (<code>com.exemplo.*</code>). Plugins que ouvem <code>log</code> ligam a transmissão do Logcat enquanto rodam.</p>
+
+    <h2 id="seguranca">Segurança e privacidade</h2>
+    <ul>
+      <li><b>O APK fica no navegador.</b> Não há upload: os bytes vão da sua página para o frame e para o Worker. Nada do app é enviado a servidor algum pelo laboratório.</li>
+      <li><b>Rede só pelo navegador.</b> O app só alcança os hosts permitidos, por <code>fetch</code> (com as regras de CORS do navegador) ou pelo relay opcional que você opera. O laboratório não tem nem hospeda relay.</li>
+      <li><b>Isolamento.</b> O iframe é <code>sandbox="allow-scripts allow-same-origin"</code> sem permissões (<code>allow=""</code>). Sirva o runtime numa origem diferente da sua página: assim o app não tem acesso a cookies, armazenamento ou DOM dela. Com a mesma origem, o sandbox não isola.</li>
+      <li><b>Mensagens.</b> Sua página só aceita mensagens do próprio iframe e da origem do runtime; o frame só aceita a janela-mãe, da origem declarada em <code>?parent=</code>, e responde só para ela. Toda mensagem é versionada e validada (tamanhos limitados, os mesmos validadores da página de testes: <code>sanitizeHostMap</code>, <code>validateMock</code>, permissões, Intent).</li>
+      <li><b>Plugins em origem opaca.</b> O código de plugin enviado pela sua página roda num Worker de origem opaca, sem acesso ao IndexedDB do runtime.</li>
+      <li><b>Nada é falsificado.</b> Código nativo protegido não é substituído nem contornado; uma API que a VM não implementa falha com erro explícito (o modo tolerante, que você liga, é sempre relatado no diagnóstico e em <code>diagnostics()</code>). Overrides, mocks e Activities ignoradas são ferramentas de depuração do seu app e aparecem marcadas no diagnóstico.</li>
+      <li><b>Dados.</b> Só com <code>keep-data</code> os dados do app ficam no IndexedDB da origem do runtime, por pacote e certificado. Estados de permissão do player não são guardados: o evento <code>permission-config</code> entrega o estado para você guardar, se quiser.</li>
+      <li><b>CSP do runtime.</b> <code>script-src 'self' 'wasm-unsafe-eval'</code>, <code>worker-src 'self' blob:</code>, <code>img-src 'self' blob: data:</code>, <code>connect-src 'self'</code> mais os hosts dos APKs e do app, <code>frame-ancestors</code> com os seus sites (e <code>frame-src 'self' about:</code> se usar plugins). Não envie <code>X-Frame-Options: DENY</code>.</li>
+    </ul>
+
+    <h2 id="limites">Limitações</h2>
+    <ul>
+      <li>Roda o que a VM suporta; o resto termina com um <code>error</code> que diz a fronteira exata (<code>frontier.kind</code>). Bibliotecas nativas, Services em outros processos e muitas integrações do sistema não estão disponíveis.</li>
+      <li>A rede é a do navegador: CORS, cookies e cabeçalhos proibidos, redirecionamentos seguidos pelo navegador, TLS sem acesso aos certificados, sem sockets TCP/TLS crus.</li>
+      <li>Moldura fixa do aparelho (sem skins), presets em dp com densidade 160, sem recorte de câmera.</li>
+      <li><code>theme</code> muda o modo noturno do app, não a sua página.</li>
+      <li><code>memoryMiB</code>, <code>tolerateMissing</code>, <code>strictCrash</code> e <code>webview</code> valem no próximo início.</li>
+      <li>Imagens (<code>screenshot</code>) são cortadas dos rasters já desenhados: Views desenhadas pelo DOM da página não aparecem na imagem da tela inteira (o resultado diz quantas em <code>notes</code>).</li>
+      <li>Cada player é um Worker com a própria memória (dezenas a centenas de MB conforme o APK).</li>
+    </ul>
+
+    <h2 id="protocolo">Protocolo</h2>
+    <p>Mensagens <code>{ protocol: "apk-player", version: 1, type, … }</code>, validadas dos dois lados (<code>src/player/protocol.js</code>). A versão 1 continua aceita; a <b>revisão 2</b> é anunciada pelo frame no <code>hello</code> (<code>{ revision: 2, capabilities: [...] }</code>) e acrescenta, sem mudar as mensagens antigas:</p>
+    <ul>
+      <li>página → frame: <code>config</code> com <code>id</code> opcional (respondido no <code>config-applied</code> com o mesmo <code>id</code>) e as chaves dos recursos do laboratório; <code>call { id, method, args }</code> com <code>method</code> em <code>openIntent</code>, <code>inspectCompose</code>, <code>layoutBounds</code>, <code>screenshot</code>, <code>screenState</code>, <code>diagnostic</code>, <code>status</code>, <code>answerPermission</code>, <code>subscribe</code>, <code>pluginsSet</code>, <code>pluginsStop</code>, <code>pluginsRestart</code>, <code>pluginsList</code>, <code>stop</code>.</li>
+      <li>frame → página: <code>reply { id, ok, value | error { code, message } }</code>, <code>screen</code>, <code>logcat</code>, <code>network</code>, <code>plugin-output</code>, <code>permission-request</code>, <code>permission-config</code>, <code>stopped</code>.</li>
+    </ul>
+    <p>Um frame antigo (revisão 1) responde <code>hello</code> sem <code>capabilities</code>: os métodos novos rejeitam com <code>code: "unsupported"</code> e o resto funciona como antes. A referência em Markdown está em <code>docs/PLAYER.md</code>.</p>
+  </main>
+</div>
+<script type="module">
+  import { ApkPlayer } from './apk-player.js';
+  const $ = id => document.getElementById(id);
+  // Theme: the same per-viewer preference as the lab (localStorage key apkweb-theme), every access guarded.
+  $('theme-toggle').addEventListener('click', () => {
+    const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.dataset.theme = dark ? 'light' : 'dark';
+    try { localStorage.setItem('apkweb-theme', document.documentElement.dataset.theme); } catch { /* storage unavailable */ }
+  });
+  // Copy buttons on every code block.
+  for (const block of document.querySelectorAll('.code')) {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'copy'; button.textContent = 'Copiar'; button.setAttribute('aria-label', 'Copiar o código');
+    button.addEventListener('click', async () => {
+      const text = block.querySelector('code').textContent; let ok = false;
+      try { await navigator.clipboard.writeText(text); ok = true; } catch { const range = document.createRange(); range.selectNodeContents(block.querySelector('code')); const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range); try { ok = document.execCommand('copy'); } catch { ok = false; } }
+      button.textContent = ok ? 'Copiado' : 'Selecionado'; setTimeout(() => { button.textContent = 'Copiar'; }, 1800);
+    });
+    block.append(button);
+  }
+
+  // ---- live demo ----
+  const PLUGIN_CODE = `// Componentes da tela: as caixas de "Mostrar limites de layout", com imagens.
+lab.on('screen', mostrar);
+mostrar();
+async function mostrar() {
+  const caixas = await lab.layoutBounds();
+  const comImagem = caixas.filter(c => c.hasImage && c.kind === 'compose');
+  lab.ui.badge(String(caixas.length));
+  lab.ui.table(caixas.slice(0, 12).map(c => ({ tipo: c.kind, nome: c.name, w: c.size ? Math.round(c.size.width) : '' })), ['tipo', 'nome', 'w'], { id: 'lista' });
+  if (comImagem[0]) lab.ui.image(await lab.screenshot({ key: comImagem[0].key, maxWidth: 320 }), { id: 'primeiro', caption: comImagem[0].name });
+  lab.ui.image(await lab.screenshot({ maxWidth: 320 }), { id: 'tela', caption: 'Tela inteira' });
+}
+`;
+  $('demo-plugin-code').value = PLUGIN_CODE;
+  const state = { player: null, config: { locale: 'pt-BR', theme: 'light', orientation: 'portrait', allowedHosts: ['*'], permissionDialog: 'frame' }, mocks: [], redirect: null, offLogcat: null, offNetwork: null, urls: [], logLines: [], netLines: new Map() };
+  const log = text => { const element = $('demo-events'); element.textContent = (`${new Date().toLocaleTimeString('pt-BR')}  ${text}\n` + element.textContent).split('\n').slice(0, 60).join('\n'); };
+  const status = text => { $('demo-status').textContent = text; };
+  const controls = () => document.querySelectorAll('#demo-controls button, #demo-controls select, #demo-controls input');
+  const setEnabled = on => { for (const element of controls()) element.disabled = !on; };
+  setEnabled(false);
+  const guard = async (what, work) => { try { const result = await work(); return result; } catch (error) { log(`${what}: ${error.code ? `[${error.code}] ` : ''}${error.message}`); return null; } };
+
+  function mount(apk, name) {
+    state.player?.destroy(); state.offLogcat = null; state.offNetwork = null; for (const id of ['demo-logcat', 'demo-network', 'demo-inspect', 'demo-plugin-out', 'demo-shot', 'demo-perm-ask']) $(id).replaceChildren();
+    for (const [act, label] of [['logcat', 'Assinar Logcat'], ['network', 'Assinar log de rede']]) { const button = document.querySelector(`[data-act="${act}"]`); button.setAttribute('aria-pressed', 'false'); button.textContent = label; }   // a new player starts without subscriptions (the redirect and mocks are kept)
+    $('demo-slot').replaceChildren(); status(`Abrindo ${name}…`); setEnabled(false);
+    const player = ApkPlayer.mount($('demo-slot'), { apk, name, config: { ...state.config, endpointMocks: state.mocks, hostMap: state.redirect ? [state.redirect] : [] } });
+    state.player = player;
+    player.addEventListener('ready', event => { status(`Rodando ${event.detail.inventory.packageName} · ${event.detail.activity}`); setEnabled(true); log(`ready ${event.detail.activity}`); if (event.detail.rejected?.length) log(`rejeitado: ${event.detail.rejected.join('; ')}`); });
+    for (const type of ['activity-changed', 'closed', 'stopped', 'data-cleared']) player.addEventListener(type, event => log(`${type} ${event.detail?.activity ?? ''}`));
+    player.addEventListener('screen', event => log(`screen ${event.detail.screen.activity ?? '—'} · ${event.detail.screen.windows.length} janela(s)`));
+    player.addEventListener('config-applied', event => { const d = event.detail; log(`config-applied ${d.live ? 'ao vivo' : 'próximo início'}${d.outcome ? ` · ${d.outcome.relaunched} recriada(s), ${d.outcome.delivered} onConfigurationChanged` : ''}${d.rejected.length ? ` · rejeitado: ${d.rejected.join('; ')}` : ''}`); });
+    player.addEventListener('error', event => { log(`erro ${event.detail.kind}: ${(event.detail.cause ?? event.detail.message).slice(0, 200)}`); status(`Erro: ${event.detail.kind}`); if (event.detail.kind !== 'protocol') setEnabled(true); });
+    player.addEventListener('permission-request', event => askPermission(event.detail.request));
+    player.addEventListener('permission-config', event => log(`permissões: ${JSON.stringify(event.detail.config.states)}`));
+    player.plugins.subscribe(renderPlugin);
+  }
+  $('demo-file').addEventListener('change', () => { const file = $('demo-file').files?.[0]; if (!file) return; $('demo-file-name').textContent = `${file.name} · ${(file.size / 1048576).toFixed(1)} MiB · lido no navegador`; mount(file, file.name); });
+  // Bundled examples only exist in a local build (the public site ships no APKs; the lab page makes the same check).
+  fetch(new URL('../fixtures/catalog.json', import.meta.url), { cache: 'no-store' }).then(response => response.ok ? response.json() : null).then(catalog => {
+    const entries = (catalog?.scenarios ?? []).filter(entry => entry.available !== false && /^[a-z0-9-]+\.apk$/i.test(entry.file)); if (!entries.length) return;
+    $('demo-catalog').replaceChildren(...entries.map(entry => Object.assign(document.createElement('option'), { value: entry.file, textContent: `${entry.title} (${entry.file})` })));
+    const compose = entries.find(entry => /compose/i.test(entry.file)); if (compose) $('demo-catalog').value = compose.file;
+    $('demo-catalog-row').hidden = false;
+  }).catch(() => {});
+  $('demo-catalog-run').addEventListener('click', () => { const file = $('demo-catalog').value; if (file) { $('demo-file-name').textContent = `exemplo ${file}`; mount(new URL(`../fixtures/${encodeURIComponent(file)}`, import.meta.url).href, file); } });
+
+  const configure = patch => guard('configure', async () => { Object.assign(state.config, patch); return state.player?.configure(patch); });
+  $('demo-locale').addEventListener('change', () => configure({ locale: $('demo-locale').value }));
+  $('demo-connectivity').addEventListener('change', () => configure({ connectivity: $('demo-connectivity').value }));
+  $('demo-bounds').addEventListener('change', () => configure({ layoutBounds: $('demo-bounds').checked }));
+  $('demo-perm-mode').addEventListener('change', () => configure({ permissionDialog: $('demo-perm-mode').value }));
+  $('demo-perm-mode').value = state.config.permissionDialog; $('demo-locale').value = state.config.locale;
+
+  function askPermission(request) {
+    const box = document.createElement('div'); box.className = 'perm-ask';
+    const question = document.createElement('p'); question.style.margin = '0 0 6px'; question.textContent = request.dialogs.map(dialog => dialog.question).join(' · ');
+    const row = document.createElement('div'); row.className = 'row';
+    for (const [answer, label] of [['allow', 'Permitir'], ['once', 'Só desta vez'], ['deny', 'Não permitir']].filter(([answer]) => answer !== 'once' || request.dialogs.some(dialog => dialog.oneTime))) {
+      const button = document.createElement('button'); button.type = 'button'; button.textContent = label;
+      button.addEventListener('click', async () => { box.remove(); await guard('answerPermission', () => state.player.answerPermission(request.id, answer)); log(`permissão ${request.id}: ${answer}`); });
+      row.append(button);
+    }
+    box.append(question, row); $('demo-perm-ask').append(box);
+  }
+  function renderPlugin(plugin) {
+    if (plugin.id !== 'demo') return;
+    for (const url of state.urls.splice(0)) URL.revokeObjectURL(url);
+    const out = $('demo-plugin-out'); out.replaceChildren();
+    const head = document.createElement('div'); head.className = 'status-line'; head.textContent = `${plugin.name} · ${plugin.status}${plugin.badge ? ` · ${plugin.badge}` : ''}${plugin.errorCount ? ` · ${plugin.errorCount} erro(s): ${plugin.errors.at(-1)?.message ?? ''}` : ''}`; out.append(head);
+    for (const block of plugin.blocks) {
+      if (block.kind === 'image') { const figure = document.createElement('figure'), img = document.createElement('img'), caption = document.createElement('figcaption'); const url = URL.createObjectURL(block.blob); state.urls.push(url); img.src = url; img.alt = block.caption || 'Imagem do plugin'; caption.textContent = block.caption; figure.append(img, caption); out.append(figure); }
+      else if (block.kind === 'table') { const wrap = document.createElement('div'); wrap.className = 'table-wrap'; const table = document.createElement('table'), head = table.createTHead().insertRow(); for (const column of block.columns) head.append(Object.assign(document.createElement('th'), { textContent: column })); const body = table.createTBody(); for (const row of block.rows) { const tr = body.insertRow(); for (const cell of row) tr.insertCell().textContent = cell; } wrap.append(table); out.append(wrap); }
+      else if (block.kind === 'kv') { const pre = document.createElement('pre'); pre.className = 'log'; pre.textContent = block.entries.map(([key, value]) => `${key}: ${value}`).join('\n'); out.append(pre); }
+      else { const pre = document.createElement('pre'); pre.className = 'log'; pre.textContent = block.text; out.append(pre); }
+    }
+    for (const line of plugin.console.slice(-5)) { const p = document.createElement('div'); p.className = 'status-line'; p.textContent = `console.${line.level}: ${line.text}`; out.append(p); }
+  }
+  const actions = {
+    back: () => state.player.back(), restart: () => { state.player.restart(); log('restart'); }, clear: () => state.player.clearData(),
+    stop: () => guard('stop', () => state.player.stop()),
+    diagnostic: () => guard('diagnostic', async () => { const text = await state.player.diagnostic(); $('demo-inspect').textContent = text; try { await navigator.clipboard.writeText(text); log('diagnóstico copiado'); } catch { log('diagnóstico abaixo (copie manualmente)'); } }),
+    orientation: () => configure({ orientation: state.config.orientation === 'portrait' ? 'landscape' : 'portrait' }),
+    theme: () => configure({ theme: state.config.theme === 'dark' ? 'light' : 'dark' }),
+    hosts: () => configure({ allowedHosts: $('demo-hosts').value.split(/[\s,]+/).filter(Boolean) }),
+    redirect: button => { const on = button.getAttribute('aria-pressed') !== 'true'; const from = $('demo-redirect-from').value.trim(), to = $('demo-redirect-to').value.trim(); if (on && (!from || !to)) { log('redirecionar: informe origem e destino'); return; } state.redirect = on ? { from, to } : null; button.setAttribute('aria-pressed', String(on)); button.textContent = on ? 'Desfazer redirecionamento' : 'Redirecionar'; return configure({ hostMap: on ? [state.redirect] : [] }); },
+    mock: () => { const url = $('demo-mock-url').value.trim(); if (!url) { log('mock: informe a URL'); return; } state.mocks = [...state.mocks, { id: `demo-${state.mocks.length + 1}`, method: 'ANY', url, status: 200, headers: [{ name: 'Content-Type', value: 'application/json' }], body: $('demo-mock-body').value }]; return configure({ endpointMocks: state.mocks }).then(detail => detail && log(`mocks: ${detail.statuses.endpointMocks.map(item => `${item.id} ${item.state}`).join(', ')}`)); },
+    'mock-clear': () => { state.mocks = []; return configure({ endpointMocks: [] }); },
+    intent: () => guard('openIntent', async () => { const result = await state.player.openIntent({ data: $('demo-intent').value.trim() || undefined, component: $('demo-component').value.trim() || undefined }); log(`openIntent: ${result.message}${result.detail ? ` (${result.detail.replace(/\n/g, ' · ')})` : ''}`); }),
+    logcat: button => { if (state.offLogcat) { state.offLogcat(); state.offLogcat = null; button.setAttribute('aria-pressed', 'false'); button.textContent = 'Assinar Logcat'; return; }
+      state.logLines = []; state.offLogcat = state.player.logcat.subscribe(({ entries, reset }) => { if (reset) state.logLines = []; for (const entry of entries) state.logLines.push(`${entry.level} ${entry.tag}: ${entry.message}`); state.logLines = state.logLines.slice(-300); $('demo-logcat').textContent = state.logLines.join('\n'); $('demo-logcat').scrollTop = 1e9; });
+      button.setAttribute('aria-pressed', 'true'); button.textContent = 'Cancelar assinatura'; },
+    network: button => { if (state.offNetwork) { state.offNetwork(); state.offNetwork = null; button.setAttribute('aria-pressed', 'false'); button.textContent = 'Assinar log de rede'; return; }
+      state.netLines = new Map(); state.offNetwork = state.player.network.subscribe(({ entries, reset }) => { if (reset) state.netLines.clear(); for (const entry of entries) state.netLines.set(entry.seq, `${entry.method ?? entry.kind} ${entry.url} → ${entry.status ?? '…'} ${entry.outcome}${entry.mappedUrl ? ` (redirecionado: ${entry.mappedUrl})` : ''}${entry.mockId ? ` (mock ${entry.mockLabel ?? entry.mockId})` : ''}`); $('demo-network').textContent = [...state.netLines.values()].slice(-100).join('\n'); });
+      button.setAttribute('aria-pressed', 'true'); button.textContent = 'Cancelar assinatura'; },
+    bounds: () => guard('layoutBounds', async () => { const list = await state.player.layoutBounds(); $('demo-inspect').textContent = list.slice(0, 40).map(item => `${item.key}  ${item.kind}  ${item.name}  ${item.size ? `${Math.round(item.size.width)}×${Math.round(item.size.height)}` : ''}`).join('\n') || '(nenhuma caixa)'; }),
+    shot: () => guard('screenshot', async () => { const { blob, width, height, notes } = await state.player.screenshot({ maxWidth: 360 }); const img = document.createElement('img'); img.alt = 'Captura da tela do app'; img.src = URL.createObjectURL(blob); img.onload = () => URL.revokeObjectURL(img.src); $('demo-shot').replaceChildren(img); log(`screenshot ${width}×${height}${notes.length ? ` · ${notes.join('; ')}` : ''}`); }),
+    compose: () => guard('inspectCompose', async () => { const tree = await state.player.inspectCompose({ maxNodes: 500 }); $('demo-inspect').textContent = tree ? `${tree.totalNodes} nós em ${tree.owners?.length ?? 0} ComposeView(s)${tree.truncated ? ' (truncado)' : ''}\n` + (tree.owners ?? []).flatMap(owner => owner.nodes ?? []).slice(0, 30).map(node => `${'  '.repeat(Math.min(node.depth ?? 0, 12))}${node.name ?? node.id}`).join('\n') : '(sem Compose)'; }),
+    state: () => guard('screenState', async () => { const result = await state.player.screenState(); $('demo-inspect').textContent = result?.text ?? '(sem estado)'; }),
+    'plugin-run': () => guard('plugins.set', async () => { const { rejected } = await state.player.plugins.set([{ id: 'demo', name: 'Componentes da tela', code: $('demo-plugin-code').value }]); if (rejected.length) log(`plugin rejeitado: ${rejected.join('; ')}`); else log('plugin iniciado'); }),
+    'plugin-stop': () => guard('plugins.stop', () => state.player.plugins.stop('demo')),
+  };
+  $('demo-controls').addEventListener('click', event => { const button = event.target.closest('button[data-act]'); if (!button || !state.player) return; actions[button.dataset.act]?.(button); });
+  window.__demo = state;   // console access
 </script>
 </body>
 </html>

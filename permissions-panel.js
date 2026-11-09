@@ -1,10 +1,10 @@
 // The "Permissões" section of the Controles panel and the permission dialog shown over the phone screen. State per package lives in localStorage (key with the package name, every access
 // guarded); the simulated location lives in the device settings. The rules (what a request does, rationale, "don't ask again") are src/runtime-permissions.js, shared with the VM.
-import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=2f0501505dc8';
-export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=2f0501505dc8';
+import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=93d82df0437e';
+export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=93d82df0437e';
 
 const KEY_PREFIX = 'apkweb-permissions-v1:';
-const ICONS = {
+export const PERMISSION_ICONS = {
   LOCATION: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z',
   MICROPHONE: 'M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z',
   CAMERA: 'M9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z',
@@ -85,7 +85,7 @@ export function createPermissionsPanel({ $, vm, location }) {
     dialogEl.classList.toggle('dark', !!document.getElementById('dev-dark')?.checked);
     $('perm-question').textContent = dialog.question.replace('%s', request.appLabel);
     $('perm-detail').textContent = dialog.permissions.map(shortName).join(', ');
-    $('perm-icon').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[dialog.group] ?? ICONS.OTHER}"/></svg>`;
+    $('perm-icon').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${PERMISSION_ICONS[dialog.group] ?? PERMISSION_ICONS.OTHER}"/></svg>`;
     $('perm-allow').textContent = dialog.oneTime ? 'Enquanto o app está em uso' : 'Permitir'; $('perm-once').hidden = !dialog.oneTime;
     const answer = choice => { const taken = S.open; closeDialog(); finish(taken.item, choice); };
     $('perm-allow').onclick = () => answer('allow'); $('perm-once').onclick = () => answer('once'); $('perm-deny').onclick = () => answer('deny');
