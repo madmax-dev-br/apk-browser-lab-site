@@ -38,6 +38,9 @@
  *   Live objects of a class (subclasses and implementors included by default), found by scanning the heap in short pages. `next` continues an unfinished scan (`after`).
  * @property {(handle: string, options?: { limit?: number, after?: number, maxPages?: number }) => Promise<{ items: [{ kind: 'static', className, field } | { kind: 'object', handle, className, via }], done, next }>} referrers
  *   Who holds an object: static fields and objects whose field (`via`), array cell or host slot points to it.
+ * @property {(handle: string, options?: { only?: string[], depth?: number }) => Promise<{ handle, count, locals: [{ name, declaredIn, kind, value, key }], values: object }>} compositionLocals
+ *   The CompositionLocals of one Compose component (a node handle from composeTree): what LocalX.current answers there. `values.LocalX` is the value; kind 'static',
+ *   'dynamic' (a MutableState: its current value) or 'computed' (not evaluated). Only the Locals provided on the way to that node are listed (the others have their default).
  * @property {(handle: string|{ static: string }, path: string|string[], fn: (value: any, previous: any) => void, options?: { intervalMs?: number, depth?: number, onError?: Function }) => () => void} watch
  *   Polls `field(handle, path)` every intervalMs (>= 250) and calls fn only when the value changed; returns the stop function. A collected object stops the watch.
  * @property {{ text(s: string, o?: {id?: string}): void, kv(obj: object, o?: {id?: string}): void, table(rows: object[], columns?: string[], o?: {id?: string}): void,
@@ -138,6 +141,7 @@ export function pluginWorkerMain(scope) {
     classes: (match, options = {}) => call('classes', { match: String(match ?? ''), limit: options?.limit, initialized: !!options?.initialized }),
     instances: (className, options = {}) => pages('instances', { className: String(className ?? ''), subclasses: options?.subclasses !== false }, options),
     referrers: (handle, options = {}) => pages('referrers', { handle: String(handle ?? '') }, options),
+    compositionLocals: (handle, options = {}) => call('compositionLocals', { handle: String(handle ?? ''), only: Array.isArray(options?.only) ? options.only.map(String) : null, options: viewOptions(options) }),
     watch(handle, path, fn, options = {}) {   // handle: a handle, or { static: 'pacote.Classe' } to follow a static field
       if (typeof fn !== 'function') throw new TypeError('lab.watch(handle, caminho, função)');
       const interval = Math.max(250, Number(options?.intervalMs) || 500); let last, first = true, busy = false, stopped = false;

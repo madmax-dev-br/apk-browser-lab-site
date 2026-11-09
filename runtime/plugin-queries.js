@@ -15,7 +15,7 @@
 //   ConcurrentHashMap, the Collections wrappers), androidx ArrayMap / SimpleArrayMap, Kotlin's empty collections and ArrayDeque, Compose's persistent vectors, and the
 //   observable holders shown as their current value: kotlinx StateFlowImpl (`_state`), androidx LiveData (`mData`, `mVersion`), Compose snapshot state (the newest valid
 //   StateRecord of `next`: SnapshotMutableState, the Int/Long/Float/Double states, SnapshotStateList), and the java.util.concurrent atomics.
-import { isFreedId } from './heap-gc.js?v=5a658fe32fd7';
+import { isFreedId } from './heap-gc.js?v=2c4b98136b1e';
 
 export const QUERY_LIMITS = { depth: 2, maxDepth: 6, maxFields: 200, maxFieldsLimit: 2000, maxItems: 20, maxItemsLimit: 500, maxString: 1000, maxStringLimit: 20000, maxNodes: 4000, budgetMs: 25 };
 const VIEW_MODEL_STORE = 'Landroidx/lifecycle/ViewModelStore;', VIEW_MODEL = 'Landroidx/lifecycle/ViewModel;';
@@ -64,6 +64,15 @@ export function primitiveValue(type, value) {
   }
 }
 const isRef = value => value !== null && typeof value === 'object' && typeof value.ref === 'number';
+const COMPOSE_COLOR = 'Landroidx/compose/ui/graphics/Color;';
+/** A Compose Color (a value class over a packed ULong): sRGB colors keep ARGB in the high 32 bits (color space id 0 in the low 6 bits) -> { argb: '#AARRGGBB' }. */
+export function composeColor(packed) {
+  if (packed === undefined || packed === null) return null;
+  let bits; try { bits = BigInt.asUintN(64, BigInt(packed)); } catch { return null; }
+  if ((bits & 0x3fn) !== 0n) return { packed: String(BigInt.asIntN(64, bits)), colorSpace: Number(bits & 0x3fn) };
+  return { argb: '#' + Number(bits >> 32n).toString(16).padStart(8, '0').toUpperCase() };
+}
+const popCount = n => { let v = Number(n) >>> 0, c = 0; while (v) { v &= v - 1; c++; } return c; };
 const parseKey = key => { const arrow = key.indexOf('->'), colon = key.indexOf(':', arrow + 2); return { owner: key.slice(0, arrow), name: key.slice(arrow + 2, colon), type: key.slice(colon + 1) }; };
 
 /** The reader over one runtime. `deadline` (performance.now() ms) bounds a whole query; past it the values not read yet are marked `$truncated`. */
@@ -191,6 +200,22 @@ export function createHeapReader(runtime, { now = () => performance.now() } = {}
     if (/^Ljava\/util\/Collections\$(Unmodifiable|Synchronized|Checked)(Sorted|Navigable)?Map;$/.test(type)) { const inner = refOf(fieldValue(rec, 'm')); const innerRec = inner && record(inner.ref); return innerRec ? mapEntries(innerRec, limit, depthGuard + 1) : null; }
     if (type === 'Ljava/util/Collections$EmptyMap;' || type === 'Lkotlin/collections/EmptyMap;') return { size: 0, entries: [] };
     if (type === 'Ljava/util/Collections$SingletonMap;') return { size: 1, entries: [[fieldValue(rec, 'k'), fieldValue(rec, 'v')]] };
+    // Compose's persistent hash map (kotlinx.collections.immutable, repackaged by androidx.compose.runtime): a CHAMP trie; the map of CompositionLocals of a composition is one
+    if (/\/immutableMap\/PersistentHashMap;$|\/PersistentCompositionLocalHashMap;$/.test(type) || (fieldValue(rec, 'node') !== undefined && isRef(fieldValue(rec, 'node')) && /\/immutableMap\/TrieNode;$/.test(record(fieldValue(rec, 'node').ref)?.type ?? ''))) {
+      const entries = [], size = intField(rec, 'size'), stack = [refOf(fieldValue(rec, 'node'))];
+      for (let guard = 0; stack.length && entries.length < limit && guard < 20000; guard++) {
+        const ref = stack.pop(), node = ref && record(ref.ref); if (!node) continue;
+        const buffer = cellsOf(fieldValue(node, 'buffer')) ?? [], dataMap = intField(node, 'dataMap'), nodeMap = intField(node, 'nodeMap');
+        const pairs = dataMap === 0 && nodeMap === 0 ? buffer.length / 2 : popCount(dataMap);   // a collision node holds only key / value pairs
+        for (let i = 0; i < pairs && entries.length < limit; i++) entries.push([buffer[2 * i], buffer[2 * i + 1]]);
+        for (let i = buffer.length - 1; i >= 2 * pairs; i--) if (isRef(buffer[i])) stack.push(buffer[i]);
+      }
+      return { size: size || entries.length, entries };
+    }
+    if (/\/immutableMap\/PersistentOrderedMap;$/.test(type)) {   // insertion order is kept in LinkedValue wrappers of an inner PersistentHashMap
+      const inner = refOf(fieldValue(rec, 'hashMap')), innerRec = inner && record(inner.ref), map = innerRec ? mapEntries(innerRec, limit, depthGuard + 1) : null; if (!map) return null;
+      return { size: map.size, entries: map.entries.map(([key, value]) => { const linked = isRef(value) ? record(value.ref) : null; return [key, linked && /\/LinkedValue;$/.test(linked.type) ? fieldValue(linked, 'value') : value]; }) };
+    }
     if (subtype(type, 'Landroidx/collection/SimpleArrayMap;') || subtype(type, 'Landroid/util/ArrayMap;')) {
       let array = null, size = 0;
       for (const entry of fields(rec)) { if (entry.type === '[Ljava/lang/Object;' && !array) array = cellsOf(entry.value); if (entry.type === 'I' && /^m?[sS]ize$/.test(entry.name)) size = Number(entry.value ?? 0) | 0; }
@@ -281,6 +306,7 @@ export function createHeapReader(runtime, { now = () => performance.now() } = {}
       return { ...base, $kind: 'array', size: cells.length, items, ...(cells.length > count ? { $more: cells.length - count } : {}) };
     }
     const enumName = enumNameOf(rec); if (enumName !== null) return { ...base, $kind: 'enum', name: enumName };
+    if (rec.type === COMPOSE_COLOR) { const color = composeColor(fieldValue(rec, 'value')); if (color) return { ...base, $kind: 'color', ...color }; }
     const held = holder(rec);
     if (held) {
       const out = { ...base, $kind: held.kind, value: held.boolean ? !!Number(held.value ?? 0) : describe(held.value, held.valueType, depth, o, state) };
@@ -578,13 +604,51 @@ export function findReferrers(runtime, reader, handle, { limit, after = 0, budge
   return { items, scanned: result.scanned, next: result.next, done: result.next === null };
 }
 
+// ---- CompositionLocals of one component ---------------------------------------------------------------------------------------------------------------------------------
+// Every LayoutNode keeps the CompositionLocal map that was current where it was emitted (LayoutNode.compositionLocalMap, set by ComposeUiNode.SetResolvedCompositionLocals):
+// what LocalX.current answers for that component. Read from the fields like any query (no Composer, no method call). A Local is named by the static field that declares it
+// (top-level vals compile to static fields: LocalContentColor in ContentColorKt); a minified app shows its renamed field. Values: StaticValueHolder.value,
+// DynamicValueHolder.state (a MutableState: its current value), ComputedValueHolder (a lambda run by the composition: not computed here, reported as such).
+function staticNames(runtime) {
+  const size = runtime.staticFields?.size ?? 0, cached = runtime.pluginStaticNames;
+  if (cached && cached.size === size) return cached.map;
+  const map = new Map();
+  for (const [key, value] of runtime.staticFields ?? []) if (isRef(value) && !map.has(value.ref)) { const { owner, name } = parseKey(key); map.set(value.ref, { name, declaredIn: dotted(owner) }); }
+  runtime.pluginStaticNames = { size, map };
+  return map;
+}
+export function readCompositionLocals(runtime, reader, handle, { options = {}, only = null } = {}) {
+  const rec = liveRecord(runtime, handle);
+  let mapRef = reader.field(rec, 'compositionLocalMap')?.value ?? null, owner = 'node';
+  if (!isRef(mapRef)) { if (reader.mapEntries(rec, 0)) { mapRef = { ref: rec.id ?? parseHandle(runtime, handle) }; owner = 'map'; } else throw new PluginQueryError('bad-args', `${typeName(rec.type)} não tem CompositionLocalMap: passe o handle de um nó do Compose (lab.composeTree().owners[i].nodes[j].handle)`); }
+  const map = reader.record(mapRef.ref), decoded = map ? reader.mapEntries(map, 1000) : null;
+  if (!decoded) throw new PluginQueryError('failed', `CompositionLocalMap ilegível (${map ? typeName(map.type) : 'coletado'})`);
+  const names = staticNames(runtime), wanted = Array.isArray(only) && only.length ? new Set(only.map(String)) : null, view = { depth: 1, ...options }, locals = [], values = {};
+  for (const [key, holderRef] of decoded.entries) {
+    const keyRec = isRef(key) ? reader.record(key.ref) : null, known = isRef(key) ? names.get(key.ref) : null;
+    const name = known?.name ?? `${typeName(keyRec?.type ?? 'Ljava/lang/Object;').split('.').pop()}#${key?.ref ?? '?'}`;
+    if (wanted && !wanted.has(name)) continue;
+    const holder = isRef(holderRef) ? reader.record(holderRef.ref) : null, htype = holder?.type ?? '';
+    let kind = 'value', raw = holderRef, rawType = OBJECT, note = null;
+    if (/ComputedValueHolder;$/.test(htype)) { kind = 'computed'; raw = null; note = 'calculado pela composição a partir de outros Locals (compositionLocalWithComputedDefaultOf): não é avaliado aqui'; }
+    else if (/DynamicValueHolder;$/.test(htype)) { kind = 'dynamic'; const state = reader.fieldValue(holder, 'state'), held = isRef(state) ? reader.holder(reader.record(state.ref)) : null; raw = held ? held.value : state; rawType = held?.valueType ?? OBJECT; }
+    else if (/StaticValueHolder;$/.test(htype) || (holder && reader.field(holder, 'value') && !reader.holder(holder))) { kind = 'static'; const entry = reader.field(holder, 'value'); raw = entry?.value ?? null; rawType = entry?.type ?? OBJECT; }
+    else if (holder && reader.holder(holder)) { kind = 'state'; const held = reader.holder(holder); raw = held.value; rawType = held.valueType; }   // older Compose: the map holds a State
+    const result = raw === null && kind === 'computed' ? { value: null } : reader.view(raw, rawType, view);
+    const item = { name, declaredIn: known?.declaredIn ?? null, kind, value: result.value, key: isRef(key) ? handleOf(runtime, key.ref) : null, ...(note ? { note } : {}), ...(result.truncated ? { $truncated: true } : {}) };
+    locals.push(item); if (!(name in values)) values[name] = item.value;
+  }
+  locals.sort((a, b) => a.name.localeCompare(b.name));
+  return { handle: handleOf(runtime, rec.id ?? parseHandle(runtime, handle)), source: owner, count: locals.length, total: decoded.size, locals, values };
+}
+
 /** Compose layout tree of src/compose-inspector.js reduced to what a plugin needs (no thumbnails, no modifiers list). */
-export function compactComposeTree(inspection, { maxNodes = 2000 } = {}) {
+export function compactComposeTree(inspection, { maxNodes = 2000, handle = null } = {}) {
   if (!inspection) return { owners: [], totalNodes: 0, truncated: false, notes: [] };
   let budget = maxNodes, truncated = !!inspection.truncated;
   const owners = (inspection.owners ?? []).map(owner => {
     const nodes = []; for (const node of owner.nodes ?? []) { if (budget <= 0) { truncated = true; break; } budget--;
-      const s = node.semantics; nodes.push({ id: node.id, semanticsId: node.semanticsId ?? null, measurePolicy: node.measurePolicy ?? null, modifiers: (node.modifiers ?? []).slice(0, 40).map(m => ({ label: m.label, className: m.className })), zIndex: node.zIndex ?? 0, childCount: node.childCount ?? 0, parentId: node.parentId, depth: node.depth, name: node.name, nameSource: node.nameSource, bounds: node.boundsInWindow ?? node.visibleBounds ?? null, placed: node.placed,
+      const s = node.semantics; nodes.push({ id: node.id, handle: handle && Number.isSafeInteger(node.ref) ? handle(node.ref) : null, semanticsId: node.semanticsId ?? null, measurePolicy: node.measurePolicy ?? null, modifiers: (node.modifiers ?? []).slice(0, 40).map(m => ({ label: m.label, className: m.className })), zIndex: node.zIndex ?? 0, childCount: node.childCount ?? 0, parentId: node.parentId, depth: node.depth, name: node.name, nameSource: node.nameSource, bounds: node.boundsInWindow ?? node.visibleBounds ?? null, placed: node.placed,
         texts: s?.texts ?? [], editableText: s?.editableText ?? null, contentDescriptions: s?.contentDescriptions ?? [], role: s?.role ?? null, testTag: s?.testTag ?? null, actions: s?.actions ?? [], focused: !!s?.focused, enabled: s ? s.enabled !== false : true, selected: s?.selected ?? null, toggleState: s?.toggleState ?? null }); }
     return { ownerViewId: owner.ownerViewId, window: owner.window, width: owner.width, height: owner.height, source: owner.source ?? 'layout-nodes', nodes };
   });
@@ -606,6 +670,7 @@ export function runPluginQuery(runtime, query, args = {}) {
     case 'classes': return listClasses(runtime, args);
     case 'instances': return findInstances(runtime, reader, args.className, args);
     case 'referrers': return findReferrers(runtime, reader, args.handle, args);
+    case 'compositionLocals': return readCompositionLocals(runtime, reader, args.handle, { options: args.options ?? {}, only: args.only ?? null });
     default: throw new PluginQueryError('bad-query', `Consulta desconhecida: ${String(query).slice(0, 40)}`);
   }
 }

@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=5a658fe32fd7">
+  <link rel="stylesheet" href="./site-pages.css?v=2c4b98136b1e">
 </head>
 <body>
   <header class="topbar">
@@ -156,7 +156,7 @@
             <tr><td><code>await lab.screen()</code></td><td>A tela atual, no mesmo formato do evento, sem trabalho na VM. <code>screen.ready</code> é a “Tela pronta”: <code>{ ready, activity, readySince, waitingFor, fragments }</code>. Fica pronta quando a Activity está em onResume com o primeiro quadro desenhado, os fragments em RESUMED, e não há quadro, layout, mensagem da thread principal nem requisição de rede pendente por 300 ms.</td></tr>
             <tr><td><code>lab.on('ready', fn)</code></td><td>Chama <code>fn(tela)</code> cada vez que a tela fica pronta: uma Activity nova, um Recriar/Reabrir, uma navegação que assenta. Uma tela que anima sem parar (spinner, cursor piscando) não fica pronta; <code>waitingFor</code> diz por quê.</td></tr>
             <tr><td><code>await lab.waitReady({ timeoutMs })</code></td><td>Espera a tela ficar pronta (15 s por padrão); erro com <code>code: 'timeout'</code> e o motivo. Use antes de <code>lab.screenshot()</code>.</td></tr>
-            <tr><td><code>await lab.composeTree({ maxNodes })</code></td><td>A árvore de layout do Compose: <code>{ owners: [{ nodes: [{ id, parentId, depth, name, bounds, texts, editableText, role, testTag, actions, … }] }], totalNodes, truncated }</code>. Custa dezenas de milissegundos na VM: no máximo uma por segundo por plugin.</td></tr>
+            <tr><td><code>await lab.composeTree({ maxNodes })</code></td><td>A árvore de layout do Compose: <code>{ owners: [{ nodes: [{ id, handle, parentId, depth, name, bounds, texts, editableText, role, testTag, actions, … }] }], totalNodes, truncated }</code>. Custa dezenas de milissegundos na VM: no máximo uma por segundo por plugin.</td></tr>
             <tr><td><code>await lab.layoutBounds({ names })</code></td><td>As caixas que “Mostrar limites de layout” desenha (Views e nós semânticos do Compose), como no painel Compose: <code>[{ key, kind, name, nameSource, bounds, size, texts, editableText, role, testTag, contentDescriptions, actions, modifiers, measurePolicy, type, hasImage }]</code>, com <code>bounds</code> em pixels da janela. Os nomes vêm de uma <code>composeTree</code> (mesmo limite de uma por segundo); <code>names: false</code> não consulta a VM.</td></tr>
             <tr><td><code>await lab.screenshot({ key, maxWidth, type })</code></td><td>Imagem da tela inteira, ou de uma caixa (<code>key</code> de <code>layoutBounds</code>), cortada do quadro que a página mostra, sem trabalho na VM: <code>{ blob, width, height, type, notes }</code>. Padrões: <code>maxWidth</code> 1080, <code>type</code> <code>'image/png'</code>. No máximo uma a cada 500 ms por plugin. Views que a página desenha com elementos próprios (widgets XML simples) não têm raster: ficam de fora da tela inteira (<code>notes</code> diz quantas) e a caixa delas responde <code>no-image</code>.</td></tr>
             <tr><td><code>await lab.viewModels()</code></td><td>Os ViewModels da tela: da Activity, dos fragments na tela e os guardados pelas entradas da pilha do Navigation. <code>[{ handle, className, key, library, owner: { kind, label, className, handle } }]</code>.</td></tr>
@@ -170,6 +170,7 @@
             <tr><td><code>await lab.classes('parte do nome', { limit, initialized })</code></td><td>As classes do APK cujo nome contém o texto (ou casam com <code>'/regex/'</code>): <code>{ items: [{ className, status, staticFields }], matched }</code>. Para achar a classe que guarda um estático.</td></tr>
             <tr><td><code>await lab.instances('pacote.Classe', { subclasses, limit, after, maxPages })</code></td><td>Os objetos vivos de uma classe (subclasses e implementações incluídas, a menos que <code>subclasses: false</code>): <code>{ items: [{ handle, className }], scanned, done, next }</code>. Varre o heap em páginas curtas; <code>next</code> continua uma varredura que parou (<code>after</code>).</td></tr>
             <tr><td><code>await lab.referrers(handle, { limit, after })</code></td><td>Quem segura um objeto: campos estáticos (<code>{ kind: 'static', className, field }</code>) e objetos cujo campo, célula de array ou slot interno aponta para ele (<code>{ kind: 'object', handle, className, via }</code>). Para descobrir o caminho até um objeto achado com <code>instances</code>.</td></tr>
+            <tr><td><code>await lab.compositionLocals(nó.handle, { only, depth })</code></td><td>Os CompositionLocals de um componente do Compose: o que <code>LocalX.current</code> responde naquele nó. Pegue o <code>handle</code> do nó em <code>lab.composeTree()</code>. Devolve <code>{ count, locals: [{ name, declaredIn, kind, value }], values }</code>; <code>values.LocalContentColor</code> é o valor direto. <code>kind</code>: <code>static</code>, <code>dynamic</code> (o valor atual do estado) ou <code>computed</code> (calculado pela composição; não é avaliado aqui). Só aparecem os Locals fornecidos no caminho até o nó; os outros valem o padrão. Cores do Compose vêm como <code>{ $kind: 'color', argb: '#AARRGGBB' }</code>.</td></tr>
           </tbody>
         </table></div>
         <h3>Saída e utilidades</h3>
@@ -211,6 +212,11 @@ if (items[0]) lab.ui.table((await lab.referrers(items[0].handle)).items, ['kind'
 
 // Uma chave de mapa com pontos vai num array:
 const valor = await lab.staticField('com.exemplo.di.ContextoGlobal', ['registro', 'escopos', 'com.exemplo.Tela::id', 'valor']);
+
+// Os CompositionLocals de um componente (o que LocalX.current vale ali):
+const arvore = await lab.composeTree();
+const no = arvore.owners[0].nodes.find(n => n.testTag === 'salvar');
+if (no) lab.ui.kv((await lab.compositionLocals(no.handle, { only: ['LocalContentColor', 'LocalMeuTema'] })).values, { id: 'locals' });
 
 // Seguir um estático ao vivo:
 lab.watch({ static: 'com.exemplo.Sessao' }, 'atual.usuario', v =&gt; lab.ui.json(v, { id: 'sessao' }));</code></pre>
@@ -365,6 +371,6 @@ await mostrar();</code></pre></div>
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./arquitetura.html">Arquitetura da VM</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=5a658fe32fd7"></script>
+  <script type="module" src="./site-pages.js?v=2c4b98136b1e"></script>
 </body>
 </html>

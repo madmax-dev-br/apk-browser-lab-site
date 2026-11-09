@@ -7,7 +7,7 @@
 // asked for it (Layout Inspector's inspection tables, ComposerImpl.collectParameterInformation). The root composition's slot table is read through its public tooling API
 // (CompositionData / CompositionGroup.getSourceInfo / getNode); when it carries "C(Name)" markers the LayoutNode gets that name (source 'composable'). Otherwise the name is
 // built from what the node really has: the semantics Role, an editable text, the semantics text, and the measure policy class (source 'semantics' or 'layout'). Never invented.
-import { createComposeSemanticsDriver } from './compose-semantics.js?v=5a658fe32fd7';
+import { createComposeSemanticsDriver } from './compose-semantics.js?v=2c4b98136b1e';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;', NODE = 'Landroidx/compose/ui/node/LayoutNode;';
 const COORDS = 'Landroidx/compose/ui/layout/LayoutCoordinates;', COORDS_KT = 'Landroidx/compose/ui/layout/LayoutCoordinatesKt;', RECT = 'Landroidx/compose/ui/geometry/Rect;';
@@ -194,7 +194,7 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
       const semantics = semanticsById.get(id) ?? null, calls = callsByNode.get(ref.ref) ?? [];
       const measurePolicy = policy ? typeOf(policy).replace(/^L|;$/g, '').replaceAll('/', '.') : null;
       const children = childrenOf(ref);
-      const node = { id, semanticsId, parentId, depth, index, childCount: children.length, name: null, nameSource: null, calls, bounds, visibleBounds,
+      const node = { id, ref: ref.ref, semanticsId, parentId, depth, index, childCount: children.length, name: null, nameSource: null, calls, bounds, visibleBounds,
         boundsInWindow: visibleBounds && locationInWindow ? { left: round(visibleBounds.left + locationInWindow.x), top: round(visibleBounds.top + locationInWindow.y), right: round(visibleBounds.right + locationInWindow.x), bottom: round(visibleBounds.bottom + locationInWindow.y) } : null,
         width, height, attached, placed, zIndex: optional('LayoutNode.getZIndex', () => round(float(call(ref, NODE, 'getZIndex', '()F'))), 0), measurePolicy, modifiers,
         semantics: semantics ? { texts: semantics.texts, editableText: semantics.editableText, contentDescriptions: semantics.contentDescriptions, testTag: semantics.testTag, role: semantics.role,
