@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=7f18c4910ec1';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=7f18c4910ec1';
-import { isTrustedRasterURL } from './raster-cache.js?v=7f18c4910ec1';
+import { updateWebViewSlot } from './webview-slot.js?v=c0aca60d691b';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=c0aca60d691b';
+import { isTrustedRasterURL } from './raster-cache.js?v=c0aca60d691b';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -334,7 +334,10 @@ function queueComposeAction(ownerViewId, nodeId, action, args = []) {
   const last = state.pendingComposeActions.at(-1);
   // Coalesce only adjacent text replacements; a click remains ordered after
   // every preceding edit, including edits entered while an RPC is in flight.
+  const before = state.pendingComposeActions.at(-2);
   if (action === 'SetText' && last?.key === key && last.action === action) last.args = args;
+  else if (action === 'SetSelection' && last?.key === key && last.action === action) last.args = args;
+  else if (action === 'SetText' && last?.key === key && last.action === 'SetSelection' && before?.key === key && before.action === 'SetText') { before.args = args; return flushPendingInputs(); }   // the pair of an edit: the following selection is updated next
   else if (state.pendingComposeActions.length < 128) state.pendingComposeActions.push(entry);
   else { reportAPKError(new Error('A fila de ações Compose excedeu 128 eventos; reabra o APK.'), 'Fila de acessibilidade interrompida'); return; }
   flushPendingInputs();
@@ -409,7 +412,13 @@ function renderComposeSemantics(snapshot) {
         const session = state.viewSession;
         control.addEventListener('click', event => event.stopPropagation());
         if (editable) {
-          control.addEventListener('input', () => { if (session === state.viewSession) queueComposeAction(owner.ownerViewId, node.nodeId, 'SetText', [control.value]); });
+          // SetText places the cursor at the end of the new text (Compose's semantics setText): the textarea's own caret follows with SetSelection, so typing in the middle stays
+          // in the middle; moving the caret (arrows, Home/End, a click inside the field) sends it too.
+          const selection = () => { if (session === state.viewSession && control._actions?.has('SetSelection')) queueComposeAction(owner.ownerViewId, node.nodeId, 'SetSelection', [control.selectionStart ?? control.value.length, control.selectionEnd ?? control.value.length, false]); };
+          control.addEventListener('input', () => { if (session === state.viewSession) { queueComposeAction(owner.ownerViewId, node.nodeId, 'SetText', [control.value]); selection(); } });
+          control.addEventListener('keyup', event => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) || (event.shiftKey && event.key.startsWith('Arrow'))) selection(); });
+          control.addEventListener('mouseup', () => setTimeout(selection, 0));
+          control.addEventListener('select', selection);
           control.addEventListener('focus', () => { if (session === state.viewSession && control._actions.has('RequestFocus')) queueComposeAction(owner.ownerViewId, node.nodeId, 'RequestFocus'); });
         } else if (slider) {
           control.type = 'range';   // Slider / SetProgress: dragging or the arrow keys send the semantic SetProgress action
@@ -445,7 +454,12 @@ function renderComposeSemantics(snapshot) {
       control.setAttribute('aria-label', label); control.setAttribute('aria-disabled', String(!!node.disabled));
       if (editable) {
         const pending = state.composeInFlight === key || state.pendingComposeActions.some(action => action.key === key && action.action === 'SetText');
-        if (!(document.activeElement === control && pending) && control.value !== (node.editableText || '')) control.value = node.editableText || '';
+        if (!(document.activeElement === control && pending) && control.value !== (node.editableText || '')) {
+          // the app changed the text itself (a mask, a formatter, a reset): keep the caret where the app put it (TextSelectionRange), not at the end the browser would choose
+          const text = node.editableText || '', focused = document.activeElement === control, fromEnd = control.value.length - (control.selectionEnd ?? control.value.length);
+          control.value = text;
+          if (focused) { const [start, end] = Array.isArray(node.textSelection) ? node.textSelection : [Math.max(0, text.length - fromEnd), Math.max(0, text.length - fromEnd)]; try { control.setSelectionRange(Math.min(start, text.length), Math.min(end, text.length)); } catch { /* detached */ } }
+        }
         control.disabled = !!node.disabled;
       } else if (slider) {
         const info = node.rangeInfo; control.min = String(info.start); control.max = String(info.end); control.step = info.steps > 0 ? String((info.end - info.start) / (info.steps + 1)) : 'any';

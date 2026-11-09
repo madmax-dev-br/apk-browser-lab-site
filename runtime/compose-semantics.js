@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=7f18c4910ec1';
+import { APKError } from './apk-runtime.js?v=c0aca60d691b';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;';
 const OWNER = 'Landroidx/compose/ui/semantics/SemanticsOwner;', NODE = 'Landroidx/compose/ui/semantics/SemanticsNode;', CONFIG = 'Landroidx/compose/ui/semantics/SemanticsConfiguration;', KEY = 'Landroidx/compose/ui/semantics/SemanticsPropertyKey;';
 const ACTION = 'Landroidx/compose/ui/semantics/AccessibilityAction;', ANNOTATED = 'Landroidx/compose/ui/text/AnnotatedString;', RECT = 'Landroidx/compose/ui/geometry/Rect;';
@@ -61,6 +61,8 @@ export function createComposeSemanticsDriver(runtime) {
     }
     return values;
   };
+  /** TextSelectionRange (a text field's cursor or selection): the boxed androidx.compose.ui.text.TextRange packs start in the high and end in the low 32 bits. */
+  const textRange = value => { const packed = BigInt.asIntN(64, BigInt(call(value, 'Landroidx/compose/ui/text/TextRange;', 'unbox-impl', '()J'))); return [Number(BigInt.asIntN(32, packed >> 32n)), Number(BigInt.asIntN(32, packed))]; };
   /** ProgressBarRangeInfo (Slider, progress indicators): current value, [start, end] and the number of discrete steps. */
   const rangeInfo = value => {
     const RANGE_INFO = 'Landroidx/compose/ui/semantics/ProgressBarRangeInfo;', RANGE = 'Lkotlin/ranges/ClosedFloatingPointRange;', COMPARABLE = 'Ljava/lang/Comparable;';
@@ -81,6 +83,7 @@ export function createComposeSemanticsDriver(runtime) {
     return { nodeId, parentId, testTag: values.has('TestTag') ? string(values.get('TestTag')) : null,
       texts: values.has('Text') ? list(values.get('Text')).map(annotatedText) : [],
       editableText: values.has('EditableText') ? annotatedText(values.get('EditableText')) : null,
+      textSelection: values.has('TextSelectionRange') ? textRange(values.get('TextSelectionRange')) : null,
       contentDescriptions: values.has('ContentDescription') ? list(values.get('ContentDescription')).map(string) : [],
       disabled: values.has('Disabled'), invisibleToUser: values.has('InvisibleToUser'), focused: values.has('Focused') ? boolean(values.get('Focused')) : null,
       selected: values.has('Selected') ? boolean(values.get('Selected')) : null,

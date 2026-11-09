@@ -1,8 +1,8 @@
-import { isMemoryStep } from './memory-budget.js?v=7f18c4910ec1';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=7f18c4910ec1';
-import { sanitizeHostMap } from './host-map.js?v=7f18c4910ec1';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=7f18c4910ec1';
-import { sanitizeLocation } from './runtime-permissions.js?v=7f18c4910ec1';
+import { isMemoryStep } from './memory-budget.js?v=c0aca60d691b';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=c0aca60d691b';
+import { sanitizeHostMap } from './host-map.js?v=c0aca60d691b';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=c0aca60d691b';
+import { sanitizeLocation } from './runtime-permissions.js?v=c0aca60d691b';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: SCREEN_PRESETS.map(p => p.id), orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };

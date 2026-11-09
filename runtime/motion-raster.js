@@ -4,8 +4,10 @@
 // View's content raster is read, src/compose-canvas-host.js setContentRaster). This module is the policy, shared by the Worker (src/apk-worker.js) and its tests.
 //
 // Motion signal, taken from what the VM already knows when a snapshot is made:
-//  - a Choreographer frame is pending: an animation, transition, ripple, fling or scroll posts the next frame callback while the current frame runs, so the
-//    frame being shown is about to be replaced (the last frame of an animation has no pending frame: it is replayed at full density right away);
+//  - a Choreographer frame is pending AND the content is changing at an animation's cadence (the last two snapshots with new rasters less than MOTION_CADENCE_MS apart, the last one recent): an
+//    animation, transition, ripple, fling or scroll posts the next frame callback while the current frame runs, so the frame being shown is about to be replaced
+//    (the last frame of an animation has no pending frame: it is replayed at full density right away). A pending frame alone is not motion: a focused text field's
+//    cursor is an infinite animation that keeps a frame pending forever but changes the screen once per blink (every 500 ms); each blink is drawn at full density;
 //  - a pointer gesture is in progress (DOWN without UP/CANCEL, with a sample in the last GESTURE_STALE_MS): the finger moves the content;
 //  - the snapshot answers a pointer DOWN/MOVE or a wheel scroll step: input in flight.
 // Settle rule: a snapshot that carried a reduced raster owes a full-density one. It is due once REFINE_QUIET_MS passed since the reduced content last changed and
@@ -14,6 +16,7 @@
 export const MOTION_RASTER_SCALE = 0.5;   // replay at half the linear resolution (a quarter of the pixels); chosen by measurement, see docs/INTERACTION-PERFORMANCE.md
 export const REFINE_QUIET_MS = 100;       // quiet period after the last change of the reduced content before the full-density replay (about 6 frames)
 export const STILL_SNAPSHOTS = 2;         // snapshots in a row with the same reduced rasters while frames are pending: the screen is still
+export const MOTION_CADENCE_MS = 250;     // content that changed less than this before the previous change is moving (an animation draws every 16-60 ms; a cursor blinks every 500 ms)
 export const GESTURE_STALE_MS = 1500;     // a gesture whose last sample is older than this no longer counts as motion (a lost UP must not keep the screen reduced)
 
 export class MotionRasterPolicy {
@@ -23,10 +26,13 @@ export class MotionRasterPolicy {
     this.owed = false;      // the last snapshot carried a reduced raster: a full-density one is due once the screen is still
     this.served = '';       // identity of the reduced rasters the last snapshot carried (their raster ids: a cache hit keeps the id, so the same content has the same identity)
     this.changedAt = 0; this.unchanged = 0;
+    this.contentAt = -Infinity; this.previousContentAt = -Infinity;   // host times of the last two snapshots that carried new content (a raster replayed, not a cache hit): two changes within MOTION_CADENCE_MS are an animation
     this.stats = { reducedSnapshots: 0, fullSnapshots: 0, refinements: 0 };   // snapshots with a reduced raster / without / full snapshots posted by the settle rule
   }
   /** Whether the screen is moving for the snapshot about to be taken. */
-  moving({ pendingFrames = 0, gestureActive = false, inputMotion = false } = {}) { return pendingFrames > 0 || gestureActive || inputMotion; }
+  moving({ pendingFrames = 0, gestureActive = false, inputMotion = false } = {}) { return gestureActive || inputMotion || (pendingFrames > 0 && this.contentAt - this.previousContentAt < MOTION_CADENCE_MS && this.now() - this.contentAt < MOTION_CADENCE_MS); }
+  /** Records whether the snapshot just taken drew new content (a raster was replayed rather than served from the cache); two such snapshots within MOTION_CADENCE_MS make a pending frame motion (the first two frames of an animation are drawn at full density). */
+  noteContent(changed) { if (changed) { this.previousContentAt = this.contentAt; this.contentAt = this.now(); } }
   /** The display raster scale for the snapshot about to be taken (1 = full density): reduced while moving, full once the settle rule says the reduced frame is due for refinement. */
   scaleFor(signal) { return this.enabled && this.moving(signal) && !this.refinementDue(signal) ? this.scale : 1; }
   /** Records what the snapshot just taken carried: the ids of its reduced rasters (empty: everything at full density). */
@@ -47,5 +53,5 @@ export class MotionRasterPolicy {
     const left = this.changedAt + this.quietMs - this.now();
     return left > 0 ? left : this.refinementDue(signal) ? 0 : this.quietMs;
   }
-  reset() { this.owed = false; this.served = ''; this.unchanged = 0; }
+  reset() { this.owed = false; this.served = ''; this.unchanged = 0; this.contentAt = -Infinity; this.previousContentAt = -Infinity; }
 }

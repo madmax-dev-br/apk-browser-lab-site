@@ -1,6 +1,6 @@
-import { floatBits } from './host-contract.js?v=7f18c4910ec1';
-import { gcRoot } from './heap-gc.js?v=7f18c4910ec1';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=7f18c4910ec1';
+import { floatBits } from './host-contract.js?v=c0aca60d691b';
+import { gcRoot } from './heap-gc.js?v=c0aca60d691b';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=c0aca60d691b';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,
@@ -322,6 +322,11 @@ export function createSystemManagersHost(platform) {
     def(WALLPAPER, name, `(${parameters.join('')})${name === 'setResource' ? 'I' : 'V'}`, (r, _m, [, value]) => { enforce(r, 'android.permission.SET_WALLPAPER'); if (parameters[0].startsWith('L') && nullish(value)) npe(r); r.throwJava('Ljava/lang/UnsupportedOperationException;', 'The browser VM has no wallpaper surface to draw a new wallpaper on'); });
   }
   def(WALLPAPER, 'clear', '()V', r => enforce(r, 'android.permission.SET_WALLPAPER'));
+  // WallpaperManagerService.getWallpaperIdForUser (android-13.0.0_r1): exactly one of FLAG_SYSTEM / FLAG_LOCK; the system wallpaper of the lab device is the first one ever set (id 1, makeWallpaperIdLocked
+  // starts at 1); no separate lock-screen wallpaper is set, so FLAG_LOCK answers -1 (the lock screen shows the system one). No permission is needed.
+  const wallpaperId = (r, which) => { if (which !== 1 && which !== 2) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Must specify exactly one kind of wallpaper'); return which === 1 ? 1 : -1; };
+  def(WALLPAPER, 'getWallpaperId', '(I)I', (r, _m, [, which]) => wallpaperId(r, which | 0));
+  def(WALLPAPER, 'getWallpaperIdForUser', '(II)I', (r, _m, [, which]) => wallpaperId(r, which | 0));
   def(WALLPAPER, 'forgetLoadedWallpaper', '()V', () => {});
   def(WALLPAPER, 'addOnColorsChangedListener', '(Landroid/app/WallpaperManager$OnColorsChangedListener;Landroid/os/Handler;)V', (r, _m, [, listener]) => { if (nullish(listener)) npe(r); });
   def(WALLPAPER, 'removeOnColorsChangedListener', '(Landroid/app/WallpaperManager$OnColorsChangedListener;)V', (r, _m, [, listener]) => { if (nullish(listener)) npe(r); });
