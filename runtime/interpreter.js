@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=e4428398e646';
-import { BUCKET } from './time-breakdown.js?v=e4428398e646';
-import { Blocked, QUANTUM } from './scheduler.js?v=e4428398e646';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=e4428398e646';
+import { APKError } from './apk-error.js?v=79526b6931c6';
+import { BUCKET } from './time-breakdown.js?v=79526b6931c6';
+import { Blocked, QUANTUM } from './scheduler.js?v=79526b6931c6';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=79526b6931c6';
 
 // Frame-based DEX interpreter.
 //
