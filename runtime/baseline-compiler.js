@@ -1,11 +1,14 @@
 // Baseline compiler: turns a hot DEX method into a JavaScript function that executes the same instructions over the same frame (Frame.regs / pc / result), so the interpreter
 // loop and compiled code can hand a frame back and forth at any instruction boundary.
 //
-// What is compiled: everything that cannot call or leave the frame -- moves, constants, arithmetic, comparisons, branches and switches, array and field access, allocation,
-// casts. What is left to the interpreter loop: invoke*, return*, throw, monitor-enter/exit, filled-new-array, fill-array-data. The compiled function runs until it reaches one of
-// those instructions (it stores that pc in frame.pc and returns EXIT), or reaches a backward branch when the thread's instruction quantum is used up (YIELD, so another thread
-// can run). The interpreter then executes the one instruction and re-enters the compiled code at the next pc. Because invokes and returns stay in the interpreter, frames are
-// pushed and popped in exactly one place and a compiled method can block, be preempted, throw and unwind like an interpreted one.
+// What is compiled: everything that cannot leave the frame -- moves, constants, arithmetic (the 23x and 2addr binops, long arithmetic and float/double add/sub/mul/div inline),
+// comparisons, branches and switches, array and field access, allocation, casts -- and calls whose target the interpreter has resolved at that site: a cached DEX callee (the site's
+// first receiver class, or another one through its polymorphic cache) is entered directly, a SHIM/platform bridge is called (H.bridgeCall). What is left to the interpreter loop:
+// returns (the compiled function returns RET), calls it has not resolved, throw, monitor-enter/exit, filled-new-array, fill-array-data. The compiled function runs until it reaches
+// one of those instructions (it stores that pc in frame.pc and returns EXIT), or reaches a backward branch when the thread's instruction quantum is used up (YIELD, so another thread
+// can run). The interpreter then executes the one instruction and re-enters the compiled code at the next pc. A bridge that answers a frame to push, a wait or a host step hands that
+// outcome to the interpreter's invoke (frame.handoff), so frames are still pushed, parked and unwound by the loop and a compiled method can block, be preempted, throw and unwind like
+// an interpreted one.
 //
 // Exactness: instruction counts (rt.steps, executionByOrigin) are maintained per instruction; a throwing instruction records its pc (frame.cur) so exception tables apply as in
 // the interpreter. Operand checks the interpreter performs on every access (register initialised, int/wide type) are not repeated here: they guard against a malformed DEX or an
@@ -25,6 +28,7 @@ const UNITS = new Uint8Array(256).fill(0);
 for (const op of [0x00, 0x01, 0x04, 0x07, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x1d, 0x1e, 0x21, 0x27, 0x28]) UNITS[op] = 1;
 for (let op = 0x7b; op <= 0x8f; op++) UNITS[op] = 1;
 for (let op = 0xb0; op <= 0xcf; op++) UNITS[op] = 1;
+for (let op = 0x90; op <= 0xaf; op++) UNITS[op] = 2;   // binop vAA, vBB, vCC (format 23x)
 for (const op of [0x02, 0x05, 0x08, 0x13, 0x15, 0x16, 0x19, 0x1a, 0x1c, 0x1f, 0x20, 0x22, 0x23, 0x29]) UNITS[op] = 2;
 for (let op = 0x2d; op <= 0x3d; op++) UNITS[op] = 2;
 for (let op = 0x44; op <= 0x6d; op++) UNITS[op] = 2;
@@ -40,6 +44,19 @@ const THROWING = new Set([0x1c, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x44, 0x45, 0x46, 
 for (let op = 0x52; op <= 0x6d; op++) THROWING.add(op);
 
 const signed16 = n => (n << 16) >> 16, signed8 = n => (n << 24) >> 24;
+/** The record of the reference in register expression `reg`, as rt.vmObject(reg) (which also raises the NullPointerException or the invalid-reference report): the heap lookup inline. */
+const OBJECT = (name, reg) => `const ${name}r = ${reg}; let ${name} = ${name}r !== null && typeof ${name}r === 'object' ? rt.heap.get(${name}r.ref) : undefined; if (${name} === undefined) ${name} = rt.vmObject(${name}r);`;
+/** The array record for an access at `index`, as rt.vmArray(reg, index) (null, invalid reference, not an array, index out of bounds raise there): the in-bounds case inline. */
+const ARRAY = (name, reg, index) => `const ${name}r = ${reg}; let ${name} = ${name}r !== null && typeof ${name}r === 'object' ? rt.heap.get(${name}r.ref) : undefined; if (${name} === undefined || ${name}.cells === undefined || !(${index} >= 0 && ${index} < ${name}.cells.length)) ${name} = rt.vmArray(${name}r, ${index});`;
+/** Long (BigInt) arithmetic of the binop at `operation` (add, sub, mul, and, or, xor, shl, shr, ushr: as longArithmetic) inline; null for div/rem, which go through H.long (division by zero). */
+const longBinary = (operation, x, y) => {
+  switch (operation) {
+    case 0: return `BigInt.asIntN(64, ${x} + ${y})`; case 1: return `BigInt.asIntN(64, ${x} - ${y})`; case 2: return `BigInt.asIntN(64, ${x} * ${y})`;
+    case 5: return `(${x} & ${y})`; case 6: return `(${x} | ${y})`; case 7: return `(${x} ^ ${y})`;   // of two 64-bit values: 64-bit already
+    case 8: return `BigInt.asIntN(64, ${x} << BigInt(${y} & 63))`; case 9: return `(${x} >> BigInt(${y} & 63))`; case 10: return `BigInt.asIntN(64, BigInt.asUintN(64, ${x}) >> BigInt(${y} & 63))`;
+    default: return null;
+  }
+};
 /** The write barrier of a reference store into `target` (a record expression) of the value `val` (heap-gc.js, "Young generation"): an old record that now holds a young reference joins the remembered set. */
 const BARRIER = target => `if (${target}.id < rt.gcOldBound && val !== null && typeof val === 'object' && !(val.ref < rt.gcOldBound)) rt.remember(${target});`;
 
@@ -121,19 +138,27 @@ export function compileMethod(rt, method, code, prog, tries, support) {
       const target = site.target, intrinsic = target ? STRING_INTRINSICS[`${target.owner}->${target.name}${target.signature}`] : undefined;
       if (intrinsic) emit(`{ const a0 = r[${registers[0]}]${registers.length > 1 ? `, a1 = r[${registers[1]}]` : ''}; if (typeof a0 === 'string') { ${intrinsic.replaceAll('${PC_NEXT}', String(pc + 3))} } }`);
       const index = sites.length; sites.push(site);
-      const hit = site.virtual ? `H.receiverType(rt, a0) === s.type` : 'true';
-      // The callee's register file is allocated and filled here (its arguments are the last k registers), so the call builds no argument array.
+      const args = registers.map((x, j) => `a${j}`);
+      // The DEX callee the site cached (site.callee for the first receiver class, site.poly for the others, as the interpreter's polymorphic inline cache) is entered here. The callee's
+      // register file is allocated and filled here (its arguments are the last k registers), so the call builds no argument array.
+      const lookup = site.virtual ? `const t = H.receiverType(rt, a0); if (t !== s.type) { const pe = s.poly === null ? undefined : s.poly.get(t); if (pe === undefined) ce = null; else { ce = pe.callee; cp = pe.prog; rt.jitPolymorphic++; } }` : '';
       // A callee of up to two words may be a trivial getter, an identity, a parameter null check or a static getter: then its result is produced in place, as the interpreter's cached-call
       // path does (H.getterCall), and no frame is made.
-      const getter = k <= 2 ? `{ const gv = H.getterCall(rt, s, ${k === 0 ? 'undefined' : 'a0'}, n); if (gv !== H.NO_GETTER) { f.result = gv; pc = ${pc + 3}; continue; } }` : '';
-      emit(`{ const s = Z[${index}]; if (s.callee !== null) { ${registers.map((x, j) => `const a${j} = r[${x}];`).join(' ')} if (${hit}) {
-  n++; cur = ${pc}; ${getter}const cc = s.callee.code, nr = new Array(cc.registers), at = cc.registers - ${k}; ${registers.map((x, j) => `nr[at + ${j}] = a${j};`).join(' ')}
-  const fb = H.prepareCall(rt, f, s, nr, ${pc + 3}, ${pc}); const cf = fb.prog.fn;
+      const getter = k <= 2 ? `if (cp.getter !== null || cp.shape !== null) { const gv = H.getterCall(rt, s, ce, cp, ${k === 0 ? 'undefined' : 'a0'}, n); if (gv !== H.NO_GETTER) { f.result = gv; pc = ${pc + 3}; continue; } } ` : '';
+      // A call the site resolved to a SHIM/platform bridge is made here too (H.bridgeCall, the interpreter's bridged path): the instruction counts are published first, as the
+      // interpreter's are when a host runs; an outcome the run loop must handle (frame, wait, host step) is handed over and the invoke is counted again by the interpreter, which runs it.
+      const bridged = `if (s.bridge !== null) { n++; cur = ${pc}; rt.steps += n; f.prog.stats.instructions += n; rt.jitInstructions += n; n = 0; const bv = H.bridgeCall(rt, f, s, [${args.join(', ')}]);
+  if (bv !== H.NO_GETTER && bv !== H.HANDOFF) { f.result = bv; pc = ${pc + 3}; continue; } rt.steps--; f.prog.stats.instructions--; rt.jitInstructions--; }`;
+      emit(`{ const s = Z[${index}]; ${registers.map((x, j) => `const a${j} = r[${x}];`).join(' ')} let ce = s.callee; if (ce !== null) { let cp = s.calleeProg; ${lookup} if (ce !== null) {
+  n++; cur = ${pc}; ${getter}const cc = ce.code, nr = new Array(cc.registers), at = cc.registers - ${k}; ${registers.map((x, j) => `nr[at + ${j}] = a${j};`).join(' ')}
+  const fb = H.prepareCall(rt, f, s, ce, cp, nr, ${pc + 3}, ${pc}); const cf = cp.fn;
   if (cf !== null && rt.jitDepth < 80) {
     rt.jitDepth++; let st; try { st = cf(fb); } finally { rt.jitDepth--; }
     if (st === ${RET}) { rt.thread.frames.pop(); f.result = fb.rv; pc = ${pc + 3}; continue; }
   }
-  return ${CALL}; } } f.pc = ${pc}; return ${EXIT}; }`);
+  return ${CALL}; } }
+  ${bridged}
+  f.pc = ${pc}; return ${EXIT}; }`);
       continue;
     }
     const divides = (op >= 0x90 && op <= 0xcf && [3, 4, 14, 15].includes((op >= 0xb0 ? op - 0xb0 : op - 0x90))) || [0xd3, 0xd4, 0xdb, 0xdc].includes(op);
@@ -178,6 +203,7 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         case 0x2d: case 0x2e: case 0x2f: case 0x30: case 0x31: {
           const packed = u[pc + 1], left = packed & 255, right = packed >> 8;
           const kind = op === 0x31 ? 'long' : op <= 0x2e ? 'float' : 'double', gt = op === 0x2e || op === 0x30 ? 1 : -1;
+          if (kind === 'long') return `{ const x = r[${left}], y = r[${right}]; r[${a}] = x < y ? -1 : x > y ? 1 : 0; }`;
           return `r[${a}] = H.cmp('${kind}', ${gt}, r[${left}], r[${right}]);`;
         }
         case 0x32: case 0x33: case 0x34: case 0x35: case 0x36: case 0x37: {
@@ -192,17 +218,17 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         }
         case 0x44: case 0x45: case 0x46: case 0x47: case 0x48: case 0x49: case 0x4a: {
           const packed = u[pc + 1], variant = op - 0x44, array = R(packed & 255), index = R(packed >> 8);
-          return variant === 1 ? `{ const e = rt.vmArray(${array}, ${index}).cells[${index}]; r[${a}] = e; r[${a + 1}] = W; }` : `r[${a}] = rt.vmArray(${array}, ${index}).cells[${index}];`;
+          return variant === 1 ? `{ const i = ${index}; ${ARRAY('ar', array, 'i')} r[${a}] = ar.cells[i]; r[${a + 1}] = W; }` : `{ const i = ${index}; ${ARRAY('ar', array, 'i')} r[${a}] = ar.cells[i]; }`;
         }
         case 0x4b: case 0x4c: case 0x4d: case 0x4e: case 0x4f: case 0x50: case 0x51: {
           const packed = u[pc + 1], variant = op - 0x4b, array = R(packed & 255), index = R(packed >> 8), v = R(a);
           const value = variant === 1 ? v : variant === 3 ? `${v} & 1` : variant === 4 ? `(${v} << 24) >> 24` : variant === 5 ? `${v} & 65535` : variant === 6 ? `(${v} << 16) >> 16` : v;
-          return `{ const arr = rt.vmArray(${array}, ${index}); const val = ${value}; ${op === 0x4d ? `rt.checkArrayValue(arr, val); ${BARRIER('arr')} ` : ''}arr.cells[${index}] = val; }`;   // aput-object: write barrier (heap-gc.js, "Young generation")
+          return `{ const i = ${index}; ${ARRAY('arr', array, 'i')} const val = ${value}; ${op === 0x4d ? `rt.checkArrayValue(arr, val); ${BARRIER('arr')} ` : ''}arr.cells[i] = val; }`;   // aput-object: write barrier (heap-gc.js, "Young generation")
         }
         case 0x52: case 0x53: case 0x54: case 0x55: case 0x56: case 0x57: case 0x58:
         case 0x59: case 0x5a: case 0x5b: case 0x5c: case 0x5d: case 0x5e: case 0x5f: {
           const s = site({ field: null, key: null, type: null, def: undefined, more: null, slot: -1 }), store = op >= 0x59, variant = op - (store ? 0x59 : 0x52), ref = u[pc + 1]; dex.field(ref);   // FR is the lazy field-id cache: decode it now
-          const prelude = `const o = rt.vmObject(r[${hi}]); const s = Z[${s}]; if (o.type !== s.type) H.fieldSite(rt, s, FR[${ref}], o);`;
+          const prelude = `${OBJECT('o', `r[${hi}]`)} const s = Z[${s}]; if (o.type !== s.type) H.fieldSite(rt, s, FR[${ref}], o);`;
           if (!store) {
             const narrowed = variant === 3 ? 'v & 1' : variant === 4 ? '(v << 24) >> 24' : variant === 5 ? 'v & 65535' : variant === 6 ? '(v << 16) >> 16' : 'v';
             const load = 'const k = s.slot; let v = k >= 0 ? o.slots[k] : o.fields.get(s.key); if (v === undefined) v = s.def;';
@@ -253,7 +279,11 @@ export function compileMethod(rt, method, code, prog, tries, support) {
             const packed = two ? 0 : u[pc + 1], destination = two ? lo : a, left = two ? lo : packed & 255, right = two ? hi : packed >> 8;
             const x = R(left), y = R(right);
             if (group === 0) { const e = intBinary(operation, x, y, false); return put(destination, e); }
-            if (group === 1) { const shift = operation >= 8; return putWide(destination, `H.long(${operation}, ${x}, ${shift ? `${y} | 0` : y})`); }
+            if (group === 1) { const shift = operation >= 8, inline = longBinary(operation, x, shift ? `(${y} | 0)` : y); return putWide(destination, inline ?? `H.long(${operation}, ${x}, ${shift ? `${y} | 0` : y})`); }
+            if (operation <= 3) {   // float/double add, sub, mul, div inline (rem through numericBinary): the operation on the numbers, rounded by the bits conversion as numericBinary does
+              const sign = ['+', '-', '*', '/'][operation];
+              return group === 2 ? put(destination, `H.floatBits(H.floatNumber(${x}) ${sign} H.floatNumber(${y}))`) : putWide(destination, `H.doubleBits(H.doubleNumber(${x}) ${sign} H.doubleNumber(${y}))`);
+            }
             const kind = group === 2 ? 'float' : 'double';
             return group === 2 ? put(destination, `H.num('float', ${operation}, ${x}, ${y})`) : putWide(destination, `H.num('double', ${operation}, ${x}, ${y})`);
           }

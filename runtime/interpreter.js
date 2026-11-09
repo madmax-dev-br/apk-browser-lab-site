@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=4627c78ec476';
-import { BUCKET } from './time-breakdown.js?v=4627c78ec476';
-import { Blocked, QUANTUM } from './scheduler.js?v=4627c78ec476';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=4627c78ec476';
+import { APKError } from './apk-error.js?v=ecbd0c74b328';
+import { BUCKET } from './time-breakdown.js?v=ecbd0c74b328';
+import { Blocked, QUANTUM } from './scheduler.js?v=ecbd0c74b328';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=ecbd0c74b328';
 
 // Frame-based DEX interpreter.
 //
@@ -31,11 +31,12 @@ export class PendingCall { constructor(method, code, args, definition = null) { 
 export class Invoke { constructor(method, args, mode = 'virtual', then = null, onError = null) { this.method = method; this.args = args; this.mode = mode; this.then = then; this.onError = onError; } }
 /** Marker frame under the callee of an Invoke; holds the continuation. It has no registers or code. */
 class ContFrame { constructor(invoke) { this.cont = invoke; this.method = null; this.code = null; } }
-const OUT_FRAME = 1, OUT_BLOCKED = 2, DRIVE = { kind: 'drive' }, NO_GETTER = Symbol('no getter');
+const OUT_FRAME = 1, OUT_BLOCKED = 2, DRIVE = { kind: 'drive' }, NO_GETTER = Symbol('no getter'), HANDOFF = Symbol('bridge outcome handed to the run loop');
 
 export class Frame {
   constructor(method, code, regs, prog) {
     this.method = method; this.code = code; this.prog = prog; this.regs = regs; this.pc = 0; this.callPc = 0; this.cur = -1; this.rv = undefined; this.result = undefined; this.pendingException = null;
+    this.handoff = null; this.handoffArgs = null;   // a bridge outcome a compiled caller hands to the run loop (see H.bridgeCall): consumed by the invoke at this.pc
   }
 }
 
@@ -56,7 +57,7 @@ function prepareCore(rt, method, code) {
   // Code units are little-endian 16-bit words; a view avoids copying when the code item is 2-byte aligned (always, in a well-formed DEX, unless the input buffer is offset oddly).
   const units = (byteStart & 1) === 0 && LITTLE_ENDIAN ? new Uint16Array(reader.bytes.buffer, byteStart, code.units) : Uint16Array.from({ length: code.units }, (_, i) => reader.view.getUint16(code.offset + i * 2, true));
   const origin = rt.methodOrigin(method);
-  const prog = { dex, units, refs: new Array(code.units), tries: null, stats: rt.executionByOrigin[origin], key: method.key, filename: dex.filename ?? 'DEX', calls: 0, loops: 0, fn: null, method, code, getter: detectGetter(code, units), shape: detectShape(code, units) };
+  const prog = { dex, units, refs: new Array(code.units), tries: null, stats: rt.executionByOrigin[origin], key: method.key, filename: dex.filename ?? 'DEX', calls: 0, loops: 0, fn: null, info: undefined, method, code, getter: detectGetter(code, units), shape: detectShape(code, units) };
   progs.set(rt, prog); (rt.allProgs ??= []).push(prog); return prog;   // allProgs: applyMethodOverrides resets the call-site caches of every decoded method (src/method-overrides.js)
 }
 
@@ -156,12 +157,21 @@ function subtypeAt(rt, prog, pc, valueType, type) {
 }
 
 /** APKRuntime.recordMethod / record for a DEX callee, inlined for the steady state (counters known, trace ring past its fixed head): per-method counters, evidence row, ring entry. */
-function noteCall(rt, calleeMethod) {
-  const info = calleeMethod.recordInfo, ring = rt.traceRing;
+function noteCall(rt, calleeMethod, prog) {
+  const info = calleeInfo(calleeMethod, prog), ring = rt.traceRing;
   if (rt.fastCallPaths === false || info === undefined || info.exempt || rt.traceMuted || ring == null || ring.head.length < 128) { rt.recordMethod(calleeMethod); return; }
   info.stats.methods++; const evidence = info.evidence; if (evidence !== undefined && evidence.calls < Number.MAX_SAFE_INTEGER) evidence.calls++;
   if (ring.length === 384) { ring.tail[ring.start] = info.entry; ring.start = ring.start === 383 ? 0 : ring.start + 1; rt.traceDropped = (rt.traceDropped ?? 0) + 1; }
   else ring.tail[(ring.start + ring.length++) % 384] = info.entry;
+}
+/**
+ * The callee's APKRuntime.recordMethod cache (method.recordInfo, set on its first call and never changed), kept on its prog: method objects gain lazy properties (key, signature,
+ * recordInfo, plumbing ...) in any order, so a load of recordInfo across call sites sees many hidden classes; the prog of every method has one.
+ */
+function calleeInfo(calleeMethod, prog) {
+  let info = prog.info;
+  if (info === undefined) { info = calleeMethod.recordInfo; if (info !== undefined && prog.method === calleeMethod) prog.info = info; }
+  return info;
 }
 /** Compiles the method of `frame` now (a loop in it has run long enough in the interpreter). Always returns false. */
 function compileHot(rt, prog, frame = null) {
@@ -182,11 +192,14 @@ function jitSupport(rt) {
     const a = kind === 'float' ? floatNumber(x) : doubleNumber(x), b = kind === 'float' ? floatNumber(y) : doubleNumber(y);
     return Number.isNaN(a) || Number.isNaN(b) ? gt : a < b ? -1 : a > b ? 1 : 0;
   };
-  /** A compiled caller enters a cached callee: the callee frame is created over the register file the caller filled (`regs`, see the invoke emission) and pushed; the caller then runs the callee's compiled body directly or returns to the loop. */
-  const prepareCall = (rt, f, site, regs, returnPc, pcOfCall) => {
-    const callee = site.callee, prog = site.calleeProg; rt.callStats.cached++;
-    if (site.isStatic && rt.initialized.get(callee.method.owner)?.status !== 'initialized') rt.initialize(callee.method.owner);
-    noteCall(rt, callee.method);
+  /**
+   * A compiled caller enters a cached callee (`callee`, `prog`: site.callee or the entry of the site's polymorphic cache for the receiver's class): the callee frame is created over the
+   * register file the caller filled (`regs`, see the invoke emission) and pushed; the caller then runs the callee's compiled body directly or returns to the loop.
+   */
+  const prepareCall = (rt, f, site, callee, prog, regs, returnPc, pcOfCall) => {
+    rt.callStats.cached++;
+    if (site.isStatic && !site.initialized && rt.initialized.get(callee.method.owner)?.status !== 'initialized') rt.initialize(callee.method.owner);
+    noteCall(rt, callee.method, prog);
     const frames = rt.thread.frames;
     if (frames.length + rt.depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
     f.pc = returnPc; f.callPc = pcOfCall;
@@ -201,8 +214,8 @@ function jitSupport(rt) {
    * first argument word. NO_GETTER when the callee has no such body, its field site is not warm for the receiver's class, the owner of a static one is not initialized, a null check fails,
    * or the budget is short: the caller then makes the ordinary call. `pending` is the caller's instruction count not yet added to rt.steps.
    */
-  const getterCall = (rt, site, receiver, pending) => {
-    const prog = site.calleeProg, getter = prog.getter, shape = prog.shape;
+  const getterCall = (rt, site, callee, prog, receiver, pending) => {
+    const getter = prog.getter, shape = prog.shape;
     if ((getter === null && shape === null) || rt.fastCallPaths === false || rt.steps + pending + 2 > rt.maxInstructionsPerEvent) return NO_GETTER;
     let value, count = 2;
     if (getter !== null) {
@@ -218,9 +231,8 @@ function jitSupport(rt) {
       else if (shape.kind === IDENTITY) value = shape.op === 0x11 && (receiver === 0 || receiver === null) ? null : receiver;
       else if (receiver !== null && receiver !== 0) value = undefined; else return NO_GETTER;
     }
-    const callee = site.callee;
-    if (site.isStatic && rt.initialized.get(callee.method.owner)?.status !== 'initialized') return NO_GETTER;
-    rt.callStats.cached++; noteCall(rt, callee.method);
+    if (site.isStatic && !site.initialized && rt.initialized.get(callee.method.owner)?.status !== 'initialized') return NO_GETTER;
+    rt.callStats.cached++; noteCall(rt, callee.method, prog);
     const frames = rt.thread.frames;
     if (frames.length + rt.depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
     if (frames.length + rt.depth + 1 > rt.peakCallDepth) rt.peakCallDepth = frames.length + rt.depth + 1;
@@ -228,8 +240,44 @@ function jitSupport(rt) {
     rt.steps += count; prog.stats.instructions += count;
     return value;
   };
+  /**
+   * A compiled caller makes a call the interpreter resolved to a SHIM/platform bridge (the bridge cache of the invoke site: site.bridge, per receiver class site.bridgePoly), exactly as the
+   * interpreter's bridged path does: the same preconditions (resolution epoch, initialized static owner, a receiver that is not an annotation or reflection proxy), the same bookkeeping
+   * (call counters, profile, monitor, trace entry, host allocation scope) and the same call. `args` are the argument words. Returns the bridge's value; NO_GETTER when the site has no
+   * usable bridge for this receiver (the caller leaves the call to the interpreter, which dispatches it); HANDOFF when the bridge answered something the run loop must handle (a frame to
+   * push, a wait, a host step): the outcome is left on the frame (f.handoff) and the interpreter's invoke at f.pc takes it instead of calling again.
+   */
+  const bridgeCall = (rt, f, site, args) => {
+    let bridge = site.bridge;
+    if (bridge === null || site.bridgeEpoch !== rt.resolveEpoch || (site.isStatic && !site.initialized) || rt.fastCallPaths === false) return NO_GETTER;
+    if (site.virtual) {
+      const receiver = args[0];
+      if (typeof receiver === 'string') { if (site.bridgeType !== 'Ljava/lang/String;') return NO_GETTER; }
+      else {
+        if (receiver === null || receiver === 0 || typeof receiver !== 'object') return NO_GETTER;
+        const record = rt.heap.get(receiver.ref);
+        if (record === undefined || record.annotationValues !== undefined || record.proxyHandler !== undefined) return NO_GETTER;
+        if (record.type !== site.bridgeType) { const poly = site.bridgePoly, entry = poly === null ? undefined : poly.get(record.type); if (entry === undefined) return NO_GETTER; bridge = entry; }
+      }
+    }
+    rt.callStats.bridged++; rt.jitBridged++; if (rt.profile.active) rt.profile.host(bridge.key); rt.monitor.hostEnter(bridge.key, bridge);
+    {   // APKRuntime.record(bridge.text), as the interpreter's bridged path
+      const plumbing = f.method.plumbing, ring = rt.traceRing;
+      if (rt.fastCallPaths === false || plumbing === undefined || rt.traceMuted || ring == null || ring.head.length < 128) rt.record(bridge.text);
+      else if (plumbing === false) {
+        if (ring.length === 384) { ring.tail[ring.start] = bridge.text; ring.start = ring.start === 383 ? 0 : ring.start + 1; rt.traceDropped = (rt.traceDropped ?? 0) + 1; }
+        else ring.tail[(ring.start + ring.length++) % 384] = bridge.text;
+      }
+    }
+    const hostMark = rt.hostAllocs.length;
+    const outcome = rt.bridge(bridge.selected, args, site.mode, bridge.key, bridge); rt.hostCall = null;
+    if (outcome instanceof Blocked || outcome instanceof Invoke) { f.handoff = outcome; f.handoffArgs = args; return HANDOFF; }
+    if (rt.hostAllocs.length > hostMark) rt.releaseHostAllocs(hostMark);
+    if (outcome instanceof PendingCall) { f.handoff = outcome; f.handoffArgs = args; return HANDOFF; }
+    return outcome;
+  };
   return support = { QUANTUM, WIDE_HIGH, makeInvokeSite, helpers: {
-    prepareCall, getterCall, NO_GETTER, receiverType: (rt, receiver) => receiver !== null && typeof receiver === 'object' ? (rt.heap.get(receiver.ref)?.type ?? rt.typeOf(receiver)) : rt.typeOf(receiver),
+    prepareCall, getterCall, bridgeCall, NO_GETTER, HANDOFF, receiverType: (rt, receiver) => receiver !== null && typeof receiver === 'object' ? (rt.heap.get(receiver.ref)?.type ?? rt.typeOf(receiver)) : rt.typeOf(receiver),
     arith: arithmetic, long: (op, x, y) => longArithmetic(op, x, y), num: (kind, op, x, y) => numericBinary(kind === 'float' ? 2 : 3, op, x, y), cmp, same: equal,
     floatBits, floatNumber, doubleBits, doubleNumber, javaInt, javaLong,
     fuse(max, rt) { rt.budgetExceeded(`Instruction budget (${max}/event) exceeded`); },
@@ -650,6 +698,10 @@ function runLoop(rt, owner, base) {
           case 0x6e: case 0x6f: case 0x70: case 0x71: case 0x72:
           case 0x74: case 0x75: case 0x76: case 0x77: case 0x78: {
             let site = prog.refs[pc]; if (site === undefined) site = prog.refs[pc] = makeInvokeSite(dex, u, pc, op, a, hi);
+            let outcome, args;
+            const handoff = f.handoff;
+            if (handoff !== null) { f.handoff = null; outcome = handoff; args = f.handoffArgs; f.handoffArgs = null; }   // compiled code made this bridged call already (H.bridgeCall): only its outcome is handled here
+            else {
             // Inline cache: the DEX callee a call site resolved to is remembered (per receiver class for virtual calls) and entered without going through dispatch().
             // The callee's register file is filled straight from this frame's registers; no argument array is built on a hit.
             let cached = site.callee, calleeProg = site.calleeProg;
@@ -657,7 +709,7 @@ function runLoop(rt, owner, base) {
               let hit = true;
               if (site.virtual) {
                 const receiver = regs[site.first >= 0 ? site.first : u[pc + 2] & 15];
-                const receiverType = receiver !== null && typeof receiver === 'object' ? (rt.heap.get(receiver.ref)?.type ?? rt.typeOf(receiver)) : rt.typeOf(receiver);
+                let receiverType; if (receiver !== null && typeof receiver === 'object') { const record = heapList.get(receiver.ref); receiverType = record !== undefined ? record.type : rt.typeOf(receiver); } else receiverType = rt.typeOf(receiver);
                 if (receiverType !== site.type) {
                   // Polymorphic inline cache: the other receiver classes this site has resolved to a DEX body (the first one stays in site.callee, which compiled code reads).
                   hit = false; const poly = site.poly;
@@ -668,7 +720,7 @@ function runLoop(rt, owner, base) {
                 rt.callStats.cached++;
                 if (site.isStatic && !site.initialized) { { const gate = rt.initStep(cached.method.owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } site.initialized = rt.initialized.get(cached.method.owner)?.status === 'initialized'; }
                 // APKRuntime.recordMethod / record, inlined for the steady state (counters known, trace ring past its fixed head): per-method counters, evidence row, ring entry.
-                const calleeMethod = cached.method, info = calleeMethod.recordInfo, ring = rt.traceRing;
+                const calleeMethod = cached.method, info = calleeInfo(calleeMethod, calleeProg), ring = rt.traceRing;
                 if (!fastCalls || info === undefined || info.exempt || rt.traceMuted || ring == null || ring.head.length < 128) rt.recordMethod(calleeMethod);
                 else {
                   info.stats.methods++; const evidence = info.evidence; if (evidence !== undefined && evidence.calls < Number.MAX_SAFE_INTEGER) evidence.calls++;
@@ -711,12 +763,12 @@ function runLoop(rt, owner, base) {
               }
             }
             if (site.isStatic && !site.initialized) { const owner = rt.staticOwner(site.target); if (rt.initialized.get(owner)?.status !== 'initialized') { const gate = rt.initStep(owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } else site.initialized = true; }
-            const argc = site.argc, args = new Array(argc);
+            const argc = site.argc; args = new Array(argc);
             if (site.first >= 0) { const first = site.first; for (let j = 0; j < argc; j++) args[j] = regs[first + j]; }
             else { const packed = u[pc + 2]; switch (argc) { case 5: args[4] = regs[lo]; case 4: args[3] = regs[(packed >> 12) & 15]; case 3: args[2] = regs[(packed >> 8) & 15]; case 2: args[1] = regs[(packed >> 4) & 15]; case 1: args[0] = regs[packed & 15]; } }
             // Calls that resolve to a SHIM/platform bridge are cached too: the resolution is reused for the same call site without re-walking dispatch(). A virtual site remembers the resolution per
             // receiver class (the first in site.bridge/bridgeType, the others in site.bridgePoly; a String receiver is the class String); annotation and reflection proxies always dispatch.
-            let outcome, bridge = site.bridge, bridged = false;
+            let bridge = site.bridge, bridged = false;
             if (bridge !== null && site.bridgeEpoch === rt.resolveEpoch) {
               if (!site.virtual) bridged = true;
               else {
@@ -756,6 +808,7 @@ function runLoop(rt, owner, base) {
                 }
               }
               rt.lastBridge = null;
+            }
             }
             if (outcome instanceof PendingCall) {
               if (outcome.definition !== null && !(site.virtual && typeof args[0] !== 'string' && rt.vmObject(args[0]).annotationValues)) {
@@ -825,6 +878,7 @@ function runLoop(rt, owner, base) {
       // No frame is left to handle it (the failure happened after the last frame of this run returned, or in the host code that completes the run): the original error is the report, not a TypeError about a missing frame.
       if (frames.length === 0 || (thread === owner && frames.length <= base)) throw error;
       f = frames[frames.length - 1];                                // compiled code may have entered callees directly: the failing frame is the top one
+      if (f.handoff != null) { f.handoff = null; f.handoffArgs = null; }   // a bridge outcome compiled code left for an invoke that did not run (the budget ran out first)
       regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats;
       if (f.cur >= 0) { start = f.cur; f.cur = -1; }               // thrown by compiled code: the instruction it was executing
       if (error instanceof JavaException && error.message === 'null object reference') refineNullPointerMessage(rt, error, dex, u, start, regs);   // ART's wording: which method, field or array was dereferenced

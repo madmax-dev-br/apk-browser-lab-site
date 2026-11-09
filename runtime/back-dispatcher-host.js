@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=4627c78ec476';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=4627c78ec476';
+import { createHostRegistry } from './host-contract.js?v=ecbd0c74b328';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ecbd0c74b328';
 
 // android.window.OnBackInvokedDispatcher of an Activity window (WindowOnBackInvokedDispatcher): the registry of OnBackInvokedCallbacks a window keeps and the Back dispatch rule
 // of Android 13. AndroidX (AppCompat's Api33Impl, ComponentActivity / OnBackPressedDispatcher) registers its callbacks here when SDK_INT >= 33.

@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=4627c78ec476';
+import { APKError } from './apk-error.js?v=ecbd0c74b328';
 
 // Registry for "contract hosts": JS reimplementations of named platform methods, each registered with its exact JVM
 // signature. The registry answers the runtime's supports()/invoke()/parent()/reflection queries uniformly so that
@@ -14,6 +14,9 @@ export const bitsDouble = n => { bits.setBigInt64(0, BigInt(n), true); return bi
 export const floatBits = n => { bits.setFloat32(0, n, true); return bits.getInt32(0, true); };
 export const bitsFloat = n => { bits.setInt32(0, n, true); return bits.getFloat32(0, true); };
 
+/** Number of methods any host registry has defined so far: a memo of "no host serves this key" stays valid while it is unchanged (hosts define methods later, e.g. on first use). */
+let definedMethods = 0;
+export const hostDefinitions = () => definedMethods;
 export function createHostRegistry() {
   const defaultedParents = new Set(), reflectedFields = new Map(), instanceFields = new Map(), methods = new Map(), parents = new Map(), interfaces = new Map(), members = new Map(), fields = new Map(), allocatable = new Set();
   const callWith = (runtime, method, args, fn) => {
@@ -31,7 +34,7 @@ export function createHostRegistry() {
     },
     /** def(owner, name, signature, fn, {static}) fn(runtime, method, args) -- args[0] is the receiver unless static. */
     def(owner, name, signature, fn, { static: isStatic = false } = {}) {
-      methods.set(`${owner}->${name}${signature}`, fn);
+      methods.set(`${owner}->${name}${signature}`, fn); definedMethods++;
       if (!parents.has(owner)) { parents.set(owner, 'Ljava/lang/Object;'); defaultedParents.add(owner); } // implicit: yields to the VM's own hierarchy tables
       const byName = members.get(owner) ?? members.set(owner, new Map()).get(owner);
       (byName.get(name) ?? byName.set(name, []).get(name)).push({ ...parseSignature(signature), signature, static: isStatic });

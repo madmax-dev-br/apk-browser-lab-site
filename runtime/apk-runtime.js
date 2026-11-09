@@ -1,31 +1,31 @@
-import { VMClock } from './vm-clock.js?v=4627c78ec476';
-import { overrideHit } from './method-overrides.js?v=4627c78ec476';
-import { OperationMonitor } from './operation-monitor.js?v=4627c78ec476';
-import { ExecutionProfile } from './execution-profile.js?v=4627c78ec476';
-import { SamplingProfiler } from './sampling-profiler.js?v=4627c78ec476';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=4627c78ec476';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=4627c78ec476';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=4627c78ec476';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=4627c78ec476';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=4627c78ec476';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=4627c78ec476';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=4627c78ec476';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=4627c78ec476';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=4627c78ec476';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=4627c78ec476';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=4627c78ec476';
-import { APKError } from './apk-error.js?v=4627c78ec476';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=4627c78ec476';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=4627c78ec476';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=4627c78ec476';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=4627c78ec476';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=4627c78ec476';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=4627c78ec476';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=4627c78ec476';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=4627c78ec476';
-import { Scheduler, Blocked } from './scheduler.js?v=4627c78ec476';
-import { bootClassLacksMember } from './boot-class-members.js?v=4627c78ec476';
-export { APKError } from './apk-error.js?v=4627c78ec476';
+import { VMClock } from './vm-clock.js?v=ecbd0c74b328';
+import { overrideHit } from './method-overrides.js?v=ecbd0c74b328';
+import { OperationMonitor } from './operation-monitor.js?v=ecbd0c74b328';
+import { ExecutionProfile } from './execution-profile.js?v=ecbd0c74b328';
+import { SamplingProfiler } from './sampling-profiler.js?v=ecbd0c74b328';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=ecbd0c74b328';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=ecbd0c74b328';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=ecbd0c74b328';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=ecbd0c74b328';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=ecbd0c74b328';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=ecbd0c74b328';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=ecbd0c74b328';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=ecbd0c74b328';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=ecbd0c74b328';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=ecbd0c74b328';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=ecbd0c74b328';
+import { APKError } from './apk-error.js?v=ecbd0c74b328';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=ecbd0c74b328';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=ecbd0c74b328';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=ecbd0c74b328';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=ecbd0c74b328';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=ecbd0c74b328';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=ecbd0c74b328';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=ecbd0c74b328';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=ecbd0c74b328';
+import { Scheduler, Blocked } from './scheduler.js?v=ecbd0c74b328';
+import { bootClassLacksMember } from './boot-class-members.js?v=ecbd0c74b328';
+export { APKError } from './apk-error.js?v=ecbd0c74b328';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1131,6 +1131,21 @@ const LAB_HELPERS = new Map([
 ]);
 
 const LOOPER_PLUMBING = /^Landroid\/os\/(?:Looper|MessageQueue|Handler|Message|ThreadLocalWorkSource)(?:\$[^;]*)?;$/;
+// Properties other modules attach to the runtime after it is constructed (memos, collector state, host tables). They are declared here, in this order, by the constructor so the
+// runtime object keeps one hidden class from the start: every property the interpreter, the compiled code and the hosts read on it (steps, q, heap, gcOldBound, traceRing ...) is then a
+// monomorphic load. Added one by one while the app runs, each addition was a new hidden class, and the interpreter's loads on the runtime went megamorphic (about 14 % of the
+// interpreter's time on a Compose flow). tests/interpreter-fast-paths.test.mjs fails when a launch adds a property that is not listed. `key in runtime` is not used for any of them.
+export const LATE_RUNTIME_PROPERTIES = Object.freeze([
+  'subtypeEpoch', 'subtypeMemo', 'ancestorSets', 'ancestorEpoch', 'parentEpoch', 'parentMemo', 'overrideMemo', 'externalMemo', 'resolveEpoch', 'resolveCache', 'hostMethodRefs', 'methodEvidence',
+  'traceMuted', 'allProgs', 'lastHostCall', 'mainThread', 'objectInitIsPlain', 'targetSdkVersion', 'canvasCompatibilityVersion', 'frameworkRuntimeConfigured', 'resolvableMemo',
+  'dedupeHiddenApiWarnings', 'unicodeCaseBackend', 'traceDropped', 'constructedStringUnits', 'runtimeObject', 'internedStrings', 'nativeMemory', 'inheritableLocals', 'allocationSamples',
+  'caughtExceptions', 'boxCache', 'activityType', 'ephemeronMaps', 'lastResourceCall', 'timeUnits', 'applicationClassLoader', 'methodEvidenceTruncated', 'icuRegexMetadata', 'icuBreakMetadata',
+  'rasterStats', 'rasterCache', 'rasterCacheBytes', 'threadGroups', 'systemThreadGroup', 'mainThreadGroup', 'uncaughtHook', 'themeLightingCache', 'gcDeferral', 'gcDeferralStats', 'gcMarkChunks',
+  'gcHeavyPaths', 'gcTopRoots', 'gcFreedRing', 'gcPhases', 'gcNextAt', 'gcMinAlloc', 'gcOldSize', 'gcMinorMs', 'gcPressure', 'gcCellPressure', 'gcLastNextId', 'arrayBytes', 'gcStats', 'gcLastEnd',
+  'gcLastMs', 'gcTotalMs', 'gcMinorHeld', 'gcMinorStats', 'gcNurseryNow', 'gcSafepointTries', 'libcoreIo', 'hostStaticValues', 'rasterCacheDisabled', 'rasterCacheVerify', 'strictCrash',
+  'androidxVersions', 'reactNativeVersion', 'hermesBytecodeVersion', 'apkSigningCertificates', 'apkFileSource', 'gcExtraRoots', 'gcEnabled', 'propertyValuesHolderJni', 'pointerGesture',
+  'lastPointerTime',
+]);
 export class APKRuntime {
   constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off' } = {}) {
     if (!Number.isInteger(maxCallDepth) || maxCallDepth < 16 || maxCallDepth > 100000) fail('VM maxCallDepth must be an integer from 16 to 100000');
@@ -1174,9 +1189,11 @@ export class APKRuntime {
     this.depth = 0; this.steps = 0; this.trace = []; this.activity = null; this.root = null; this.clicks = 0;
     this.initialized = new Map(); this.staticFields = new Map(); this.classObjects = new Map(); this.arrayCells = 0; this.initDepth = 0;
     this.collectionCells = 0;
-    this.nativeArrays = new Map(); this.nextNativeArrayHandle = 0x100000000n; this.nativeRanges = []; this.nestedRuns = 0; this.maxNestedRuns = 160; this.scheduler = new Scheduler(this); this.callStats = { cached: 0, dispatched: 0, bridged: 0 }; this.lastBridge = null; this.lastBridgeDepth = -1; this.jit = true; this.fastCallPaths = true; this.jitThreshold = JIT_THRESHOLD; this.jitLoops = JIT_LOOPS; this.jitCompiled = 0; this.jitInstructions = 0; this.q = 20000; this.jitDepth = 0; this.thread = null; this.multiThreaded = false; this.monitors = new Map();
+    this.nativeArrays = new Map(); this.nextNativeArrayHandle = 0x100000000n; this.nativeRanges = []; this.nestedRuns = 0; this.maxNestedRuns = 160; this.scheduler = new Scheduler(this); this.callStats = { cached: 0, dispatched: 0, bridged: 0 }; this.lastBridge = null; this.lastBridgeDepth = -1; this.jit = true; this.fastCallPaths = true; this.jitThreshold = JIT_THRESHOLD; this.jitLoops = JIT_LOOPS; this.jitCompiled = 0; this.jitInstructions = 0; this.jitBridged = 0; this.jitPolymorphic = 0; this.q = 20000; this.jitDepth = 0; this.thread = null; this.multiThreaded = false; this.monitors = new Map();
     this.skia=skia;this.skiaHost=skia?.createHost?.(this)??null;
     this.icuBreakBackend=icuBreakBackend;this.sqliteBackend=sqliteBackend;this.tzdata=tzdata;this.zlibBackend=zlibBackend;this.icuConverterBackend=icuConverterBackend;
+
+    for (const key of LATE_RUNTIME_PROPERTIES) if (!(key in this)) this[key] = undefined;   // one hidden class from the start (see LATE_RUNTIME_PROPERTIES)
   }
   /** Superclass of `type` (DEX classes, then every host registry): memoised per class-graph epoch, since the lookup asks about thirty host registries and runs for every hashCode/equals/toString of a host object. */
   parent(type) {
