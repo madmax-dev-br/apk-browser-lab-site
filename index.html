@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=e4970e1ed8a9">
-  <meta name="apk-browser-build" content="e4970e1ed8a9">
+  <link rel="stylesheet" href="./styles.css?v=b2ddf4678f67">
+  <meta name="apk-browser-build" content="b2ddf4678f67">
 </head>
 <body>
   <header class="topbar">
@@ -131,6 +131,13 @@
               <p id="ia-status" class="cp-note" role="status" aria-live="polite">Nenhuma Activity ignorada.</p>
               <button id="ia-add" class="cp-button" type="button">+ Adicionar</button>
             </div></details>
+          <details class="cp-group" id="cp-sec-hostmap" data-section="hostmap">
+              <summary><h3 id="cp-hostmap-title">Redirecionar hosts</h3><span id="hm-summary" class="cp-badge">0 ativas</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p class="cp-note">Cada linha envia as requisições de um host para outro, como uma entrada de /etc/hosts que também pode trocar a porta e o esquema. O app continua vendo a URL original (e a lista de hosts permitidos vale para ela); só a requisição que o navegador faz vai para o destino. Origem: <code>host</code>, <code>*.dominio</code> ou <code>host:porta</code>. Destino: <code>host</code>, <code>host:porta</code> ou <code>http://host:porta</code>. Vale na hora e funciona junto com o Proxy.</p>
+              <ul id="hm-list" class="ov-list"></ul>
+              <p id="hm-status" class="cp-note" role="status" aria-live="polite">Nenhum host redirecionado.</p>
+              <button id="hm-add" class="cp-button" type="button">+ Adicionar</button>
+            </div></details>
           </details>
           <button id="run-button" class="run-button" disabled><span aria-hidden="true">▶</span> Executar APK <kbd>RUN</kbd></button>
           <p class="support-note"><span aria-hidden="true">ⓘ</span><span>VM experimental para Android Views e bytecode DEX. Multidex é inspecionado no Worker; Android, Compose e JNI ainda podem exigir APIs não implementadas. </span></p>
@@ -175,7 +182,7 @@
     </details>
     <footer><span><span class="footer-dot"></span> Sem instalação. Sem emulador. Sem upload.</span><a href="./hermes-proof/">Experimento Hermes no navegador ↗</a><span>APK Browser Lab <span class="footer-slash">/</span> protótipo técnico</span></footer>
   </main>
-  <script type="module" src="./app.js?v=e4970e1ed8a9"></script>
+  <script type="module" src="./app.js?v=b2ddf4678f67"></script>
 <div id="summary-overlay" class="summary-overlay" role="dialog" aria-label="Resumo" hidden><button id="summary-close" type="button">Fechar</button><pre id="summary-text"></pre></div>
 </body>
 </html>

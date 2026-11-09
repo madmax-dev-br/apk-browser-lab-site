@@ -1,11 +1,12 @@
-import { APKError } from './apk-error.js?v=e4970e1ed8a9';
-import { throwNew } from './java-throw.js?v=e4970e1ed8a9';
-import { Blocked } from './scheduler.js?v=e4970e1ed8a9';
-import { OS_CONSTANTS } from './os-constants-data.js?v=e4970e1ed8a9';
-import { openExchange, describeFailure } from './network-transport.js?v=e4970e1ed8a9';
-import { WorkerExecutor } from './network-worker-executor.js?v=e4970e1ed8a9';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=e4970e1ed8a9';
-import { TransportAuthority } from './transport-ca.js?v=e4970e1ed8a9';
+import { APKError } from './apk-error.js?v=b2ddf4678f67';
+import { throwNew } from './java-throw.js?v=b2ddf4678f67';
+import { mapUrl } from './host-map.js?v=b2ddf4678f67';
+import { Blocked } from './scheduler.js?v=b2ddf4678f67';
+import { OS_CONSTANTS } from './os-constants-data.js?v=b2ddf4678f67';
+import { openExchange, describeFailure } from './network-transport.js?v=b2ddf4678f67';
+import { WorkerExecutor } from './network-worker-executor.js?v=b2ddf4678f67';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=b2ddf4678f67';
+import { TransportAuthority } from './transport-ca.js?v=b2ddf4678f67';
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
 //
@@ -45,7 +46,7 @@ export class NetworkBridge {
   get policy() {
     if (this.platform.networkPolicy) return this.platform.networkPolicy;
     const network = this.platform.device?.network;
-    if (this.derived?.source !== network) this.derived = { source: network, value: { allowedHosts: network?.allowedHosts ?? [], proxyUrl: network?.proxyUrl ?? '', fetch: null, redirect: 'auto' } };
+    if (this.derived?.source !== network) this.derived = { source: network, value: { allowedHosts: network?.allowedHosts ?? [], proxyUrl: network?.proxyUrl ?? '', hostMap: network?.hostMap ?? [], fetch: null, redirect: 'auto' } };
     return this.derived.value;
   }
   /** The Worker's network log (src/netlog.js), or null (tests, hosts that attach none). */
@@ -109,8 +110,8 @@ export class NetworkBridge {
   start(request, reserved = null) {
     const op = reserved ?? new Operation(this.nextHandle++, request); op.request = request; this.ops.set(op.handle, op);
     this.stats.requests++; this.noteHost(new URL(request.url).hostname); this.stats.bytesOut += request.body?.length ?? 0;
-    op.executor = this.executorFor(); op.log = this.log?.begin(request, { api: request.api }) ?? null;
-    if (op.executor === 'worker') { try { (this.worker ??= new WorkerExecutor(this)).start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto' }); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
+    op.executor = this.executorFor(); const mapped = mapUrl(request.url, this.policy.hostMap); op.log = this.log?.begin(request, { api: request.api, mapped }) ?? null;
+    if (op.executor === 'worker') { try { (this.worker ??= new WorkerExecutor(this)).start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [] }); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
     else this.run(op).catch(error => { op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => { this.observe(op); this.signal(); });
     return op;
   }
@@ -135,7 +136,7 @@ export class NetworkBridge {
 
   async run(op) {
     const { request } = op, policy = this.policy;
-    const { head, reader } = await openExchange(request, { fetch: this.fetchFunction(), proxyUrl: policy.proxyUrl, redirect: policy.redirect ?? 'auto', signal: op.abortController?.signal, dropped: this.droppedRequestHeaders });
+    const { head, reader } = await openExchange(request, { fetch: this.fetchFunction(), proxyUrl: policy.proxyUrl, redirect: policy.redirect ?? 'auto', hostMap: policy.hostMap ?? [], signal: op.abortController?.signal, dropped: this.droppedRequestHeaders });
     if (op.closed || op.error !== null) { try { await reader?.cancel(); } catch { /* ignored */ } return; }
     if (head.status >= 300 && head.status < 400) this.stats.redirectsObserved++;
     op.head = head; this.observe(op); this.signal();

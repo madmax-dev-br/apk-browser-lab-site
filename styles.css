@@ -230,3 +230,11 @@
 .ia-available{display:block;max-height:180px}
 .ia-available li button:disabled{opacity:.55;cursor:default}
 .ia-available .ia-empty{padding:6px 8px;font-size:9px;color:#9aa0ae}
+/* Redirecionar hosts: origin, arrow, target and Remover on one line, the explanation below */
+.hm-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr) auto;gap:6px 6px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:6px}
+.hm-row input[type=checkbox]{accent-color:var(--accent)}
+.hm-row .hm-from,.hm-row .hm-to{width:100%;min-width:0;box-sizing:border-box;font:9px ui-monospace,monospace}
+.hm-row .hm-arrow{color:#9aa0ae;font-size:11px}
+.hm-row .hm-meta{grid-column:1/-1;font-size:9px;color:#9aa0ae;overflow-wrap:anywhere}.hm-row .hm-meta[data-state=error]{color:#d4504a}.hm-row .hm-meta[data-state=ok]{color:#3c9a64}
+:root[data-theme=dark] .hm-row .hm-meta[data-state=error]{color:#f08a84}:root[data-theme=dark] .hm-row .hm-meta[data-state=ok]{color:#7bd19b}
+@media (max-width:480px){.hm-row{grid-template-columns:auto minmax(0,1fr) auto}.hm-row .hm-arrow{display:none}.hm-row .hm-to{grid-column:2/3}}

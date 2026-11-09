@@ -61,7 +61,7 @@ export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: ()
     const entry = { seq: seq++, uptime: rounded(clock.now()), wall: Math.floor(clock.wall()), tid: Number(who.tid ?? 0), thread: who.thread ?? 'main', api: fields.api ?? 'java.net', kind: fields.kind ?? 'http',
       method: String(fields.method ?? 'GET'), url, scheme: fields.scheme ?? parts.scheme, host: fields.host ?? parts.host, port: fields.port ?? parts.port, path: fields.path ?? parts.path,
       requestHeaders: pairs(fields.headers), requestBytes: fields.bytes ?? 0, outcome: 'pending', complete: false, status: null, reason: '', responseHeaders: [], contentType: null, responseBytes: 0,
-      finalUrl: null, redirects: 0, closedEarly: false, durationMs: null, failure: null, refusedHost: null };
+      finalUrl: null, redirects: 0, closedEarly: false, durationMs: null, failure: null, refusedHost: null, mappedUrl: fields.mappedUrl ?? null, mappedRule: fields.mappedRule ?? null };   // mappedUrl: where "Redirecionar hosts" sent it (src/host-map.js)
     buffer.push(entry); total++;
     if (buffer.length > maxEntries + 256) trim();   // amortized: trim in chunks, never per entry
     return touch(entry);
@@ -72,7 +72,7 @@ export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: ()
   };
   const api = {
     /** A request that started: `request` is the network layer's { method, url, headers, body }. Returns the entry (kept by the caller to update it). */
-    begin(request, { api: via = 'java.net' } = {}) { return create({ api: via, method: request.method, url: request.url, headers: request.headers, bytes: request.body?.length ?? 0 }); },
+    begin(request, { api: via = 'java.net', mapped = null } = {}) { return create({ api: via, method: request.method, url: request.url, headers: request.headers, bytes: request.body?.length ?? 0, mappedUrl: mapped?.url ?? null, mappedRule: mapped?.rule ?? null }); },
     /** A request the policy refused before anything left the device: outcome 'offline' when the device is offline, else 'refused-by-allowlist' (with the host). */
     refuse({ api: via = 'java.net', kind = 'http', method = 'GET', url, host, port = null, headers = [], bytes = 0, offline = false }) {
       const entry = create({ api: via, kind, method, url, host, port, headers, bytes }); entry.refusedHost = offline ? null : (host ?? entry.host);

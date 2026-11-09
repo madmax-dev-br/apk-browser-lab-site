@@ -1,8 +1,8 @@
 // The "Rede" panel of the lab page: the app's network requests (src/netlog.js batches from the Worker) as a table coloured by outcome, with a text filter, an outcome filter, a detail
 // view per row (full URL, headers, timing, failure), "Permitir <host>" for a request the allowlist refused, "Limpar" and "Salvar" (HAR 1.2 or plain text, bodies omitted).
 // The formatting, filter and export functions are pure (tested without a DOM); createNetlogPanel() wires them to the page. Nothing here is persisted: the entries live in memory.
-import { MAX_ENTRIES } from './netlog.js?v=e4970e1ed8a9';
-import { sanitizeHosts } from './device-settings.js?v=e4970e1ed8a9';
+import { MAX_ENTRIES } from './netlog.js?v=b2ddf4678f67';
+import { sanitizeHosts } from './device-settings.js?v=b2ddf4678f67';
 
 export const RENDER_MAX = 500;   // rows kept in the DOM; "Salvar" still writes the whole buffer
 export const CATEGORIES = ['pending', 'ok', 'redirect', 'fail', 'refused', 'error', 'loopback'];
@@ -75,6 +75,7 @@ export function buildText(entries, { dropped = 0 } = {}) {
   const lines = []; if (dropped > 0) lines.push(`--------- ${dropped} requisições anteriores descartadas (buffer cheio) ---------`);
   for (const entry of entries) {
     lines.push(`#${entry.seq} ${formatEntry(entry)}  [${entry.api}, thread ${entry.thread}]`, `    ${entry.url}`);
+    if (entry.mappedUrl) lines.push(`    enviada para ${entry.mappedUrl} (Redirecionar hosts: ${entry.mappedRule})`);
     if (entry.finalUrl) lines.push(`    redirecionada para ${entry.finalUrl}`);
     const note = describeOutcome(entry); if (note) lines.push(`    ${note}`);
     for (const [name, value] of entry.requestHeaders) lines.push(`    > ${name}: ${value}`);
@@ -94,7 +95,7 @@ export function buildHar(entries, { dropped = 0, creator = { name: 'APK Web Lab'
       const location = entry.responseHeaders.find(([name]) => name.toLowerCase() === 'location')?.[1] ?? '', time = entry.durationMs ?? -1;
       return {
         startedDateTime: new Date(entry.wall).toISOString(), time,
-        request: { method: entry.method, url: entry.url, httpVersion: 'HTTP/1.1', cookies: [], headers: harHeaders(entry.requestHeaders), queryString: queryOf(entry.url), headersSize: -1, bodySize: entry.requestBytes },
+        request: { method: entry.method, url: entry.url, ...(entry.mappedUrl ? { _mappedUrl: entry.mappedUrl, _mappedRule: entry.mappedRule } : {}), httpVersion: 'HTTP/1.1', cookies: [], headers: harHeaders(entry.requestHeaders), queryString: queryOf(entry.url), headersSize: -1, bodySize: entry.requestBytes },
         response: { status: entry.status ?? 0, statusText: entry.status === null ? '' : entry.reason, httpVersion: 'HTTP/1.1', cookies: [], headers: harHeaders(entry.responseHeaders),
           content: { size: entry.responseBytes, mimeType: (entry.contentType ?? '').split(';')[0].trim() || 'x-unknown' }, redirectURL: location, headersSize: -1, bodySize: entry.responseBytes },
         cache: {}, timings: { send: 0, wait: Math.max(time, 0), receive: 0 },
@@ -152,6 +153,7 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
   const detail = entry => {
     const box = el('div', 'netlog-detail'), note = describeOutcome(entry);
     box.append(el('div', 'netlog-url', entry.url));
+    if (entry.mappedUrl) box.append(el('div', 'netlog-note', `Enviada para ${entry.mappedUrl} (Redirecionar hosts: ${entry.mappedRule}); o app vê a URL original`));
     if (entry.finalUrl) box.append(el('div', 'netlog-note', `Redirecionada pelo transporte para ${entry.finalUrl}`));
     if (note) box.append(el('div', `netlog-note netlog-note-${categoryOf(entry)}`, note));
     if (entry.outcome === 'refused-by-allowlist' && entry.refusedHost) {

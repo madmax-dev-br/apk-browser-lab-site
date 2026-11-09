@@ -1,7 +1,8 @@
-import { isMemoryStep } from './memory-budget.js?v=e4970e1ed8a9';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=e4970e1ed8a9';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=e4970e1ed8a9';
-import { sanitizeLocation } from './runtime-permissions.js?v=e4970e1ed8a9';
+import { isMemoryStep } from './memory-budget.js?v=b2ddf4678f67';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=b2ddf4678f67';
+import { sanitizeHostMap } from './host-map.js?v=b2ddf4678f67';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=b2ddf4678f67';
+import { sanitizeLocation } from './runtime-permissions.js?v=b2ddf4678f67';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: SCREEN_PRESETS.map(p => p.id), orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -19,8 +20,8 @@ export function sanitizeProxyUrl(value) {
   return '';
 }
 export function sanitizeSettings(input = {}) {
-  const out = { ...DEFAULT_DEVICE, battery: { ...DEFAULT_DEVICE.battery }, network: { allowedHosts: [], proxyUrl: '' }, memoryMiB: 0, eventSeconds: 0, location: sanitizeLocation(null) };   // memoryMiB: Java heap budget of the VM in MiB, 0 = automatic; applies at the next load
-  if (input.network && typeof input.network === 'object') { out.network.allowedHosts = sanitizeHosts(input.network.allowedHosts); out.network.proxyUrl = sanitizeProxyUrl(input.network.proxyUrl); }
+  const out = { ...DEFAULT_DEVICE, battery: { ...DEFAULT_DEVICE.battery }, network: { allowedHosts: [], proxyUrl: '', hostMap: [] }, memoryMiB: 0, eventSeconds: 0, location: sanitizeLocation(null) };   // memoryMiB: Java heap budget of the VM in MiB, 0 = automatic; applies at the next load
+  if (input.network && typeof input.network === 'object') { out.network.allowedHosts = sanitizeHosts(input.network.allowedHosts); out.network.proxyUrl = sanitizeProxyUrl(input.network.proxyUrl); out.network.hostMap = sanitizeHostMap(input.network.hostMap); }
   for (const [name, values] of Object.entries(ALLOWED)) if (values.includes(input[name])) out[name] = input[name];
   if (Number.isFinite(Number(input.fontScale))) out.fontScale = Math.min(2, Math.max(0.85, Number(input.fontScale)));
   if (Number.isFinite(Number(input.animatorScale))) out.animatorScale = Math.min(10, Math.max(0, Number(input.animatorScale)));

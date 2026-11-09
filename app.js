@@ -1,18 +1,19 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=e4970e1ed8a9';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=e4970e1ed8a9';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=e4970e1ed8a9';
-import { initCollapsibleSections } from './panel-sections.js?v=e4970e1ed8a9';
-import { createPermissionsPanel } from './permissions-panel.js?v=e4970e1ed8a9';
-import { createOverridesPanel } from './overrides-panel.js?v=e4970e1ed8a9';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=e4970e1ed8a9';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=e4970e1ed8a9';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=e4970e1ed8a9';
-import { createDeviceView, createViewState } from './device-view.js?v=e4970e1ed8a9';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=e4970e1ed8a9';
-import { formatApiGapReport } from './api-gap-scan.js?v=e4970e1ed8a9';
-import { createLogcatPanel } from './logcat-panel.js?v=e4970e1ed8a9';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=e4970e1ed8a9';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=e4970e1ed8a9';
+import { APKWorkerClient } from './apk-worker-client.js?v=b2ddf4678f67';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=b2ddf4678f67';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=b2ddf4678f67';
+import { initCollapsibleSections } from './panel-sections.js?v=b2ddf4678f67';
+import { createPermissionsPanel } from './permissions-panel.js?v=b2ddf4678f67';
+import { createOverridesPanel } from './overrides-panel.js?v=b2ddf4678f67';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=b2ddf4678f67';
+import { createHostMapPanel } from './host-map-panel.js?v=b2ddf4678f67';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=b2ddf4678f67';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=b2ddf4678f67';
+import { createDeviceView, createViewState } from './device-view.js?v=b2ddf4678f67';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=b2ddf4678f67';
+import { formatApiGapReport } from './api-gap-scan.js?v=b2ddf4678f67';
+import { createLogcatPanel } from './logcat-panel.js?v=b2ddf4678f67';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=b2ddf4678f67';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=b2ddf4678f67';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -407,6 +408,7 @@ const deviceState = { settings: loadDeviceSettings(), clockTimer: null };
 const permissionsPanel = createPermissionsPanel({ $, vm: apkVM, location: { get: () => deviceState.settings.location, set: block => { deviceState.settings = { ...deviceState.settings, location: block }; saveDeviceSettings(deviceState.settings); } } });
 const overridesPanel = createOverridesPanel({ $, vm: apkVM });
 const ignoredPanel = createIgnoredActivitiesPanel({ $, vm: apkVM });
+const hostMapPanel = createHostMapPanel({ $, get: () => deviceState.settings.network.hostMap ?? [], set: rules => applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, network: { ...deviceState.settings.network, hostMap: rules } })) });   // "Redirecionar hosts" (src/host-map.js): device settings, applied live
 const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, notifyParent, clickView: id => clickView(id), hooks: {
   navigationChanged(canGoBack) { $('back-button').disabled = state.busy || !canGoBack; $('back-button').hidden = state.mode !== 'apk' || !canGoBack; },
   closed() {
@@ -438,7 +440,7 @@ function writeDevicePanel(settings) {
 }
 function readDevicePanel() {
   return sanitizeSettings({ screen: $('dev-screen').value, orientation: $('dev-orientation').value, fontScale: Number($('dev-font').value), locale: $('dev-locale').value, darkTheme: $('dev-dark').checked, animatorScale: Number($('dev-animator').value),
-    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, eventSeconds: Number($('vm-event-time')?.value ?? 0), network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value }, memoryMiB: Number($('vm-memory')?.value ?? 0), location: deviceState.settings.location });
+    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, eventSeconds: Number($('vm-event-time')?.value ?? 0), network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value, hostMap: deviceState.settings.network?.hostMap ?? [] }, memoryMiB: Number($('vm-memory')?.value ?? 0), location: deviceState.settings.location });
 }
 // "Memória da VM": the Java heap budget (object limit) used at the next load; the VM limit of each step is memoryBudget({ override }).maxHeapObjects, the same rule the Worker applies (heapLimitFor).
 const vmMemoryLabel = mibValue => { const { maxHeapObjects } = memoryBudget({ override: mibValue }); return `${mibValue >= 1024 ? `${mibValue / 1024} GiB` : `${mibValue} MiB`} · ${maxHeapObjects.toLocaleString('pt-BR')} objetos`; };
@@ -477,7 +479,7 @@ function initDevicePanel() {
   fillSelect($('dev-screen'), DEVICE_SCREENS); fillSelect($('dev-locale'), DEVICE_LOCALES); fillSelect($('dev-tz'), DEVICE_ZONES); initVmMemory(); initVmEventTime(); writeDevicePanel(deviceState.settings);
   for (const id of ['dev-screen', 'dev-orientation', 'dev-font', 'dev-locale', 'dev-dark', 'dev-animator', 'dev-hour24', 'dev-tz', 'dev-battery', 'dev-charging', 'dev-network', 'dev-nav', 'dev-hosts-all', 'dev-layout-bounds', 'dev-hosts', 'dev-proxy', 'vm-memory', 'vm-event-time']) $(id).addEventListener('input', () => { applyDeviceSettings(readDevicePanel()); });
   document.querySelector('#trace .trace-actions')?.addEventListener('click', event => event.preventDefault());   // buttons in the <summary> must not toggle the panel
-  $('device-reset').addEventListener('click', () => { applyDeviceSettings(defaultDeviceSettings()); permissionsPanel.refreshLocation(); if (apkVM.worker) apkVM.setPermissions({ location: deviceState.settings.location }).catch(() => {}); });
+  $('device-reset').addEventListener('click', () => { applyDeviceSettings(defaultDeviceSettings()); hostMapPanel.refresh(); permissionsPanel.refreshLocation(); if (apkVM.worker) apkVM.setPermissions({ location: deviceState.settings.location }).catch(() => {}); });
 }
 // ---- "Abrir": a deep link / Intent resolved against the manifest's intent filters (src/deep-link-host.js) ----
 const deepLinkPanel = { history: [], busy: false };
@@ -567,7 +569,7 @@ async function clickView(id) {
   finally { finishOperation(token); }
 }
 async function runDemo() {
-  if (state.busy) return;
+  if (state.busy || state.noBundledApks) return;   // the published site carries no APKs: the demo is a local/test-build feature
   await importSource({ name: 'kotlin-counter.apk', url: new URL('./fixtures/kotlin-counter.apk', import.meta.url).href }, true);
 }
 async function inspectCatalogAPK(entry) {
@@ -579,6 +581,8 @@ async function loadScenarioCatalog() {
   const list = $('scenario-list');
   try {
     const response = await fetch(new URL('./fixtures/catalog.json', import.meta.url), { cache: 'no-store' });
+    // A build without bundled APKs (the public site: scripts/publish-site.mjs leaves them out) has no catalog: the page is only for the user's own APKs, so the library and the demo go away.
+    if (response.status === 404) { state.noBundledApks = true; $('scenario-catalog').hidden = true; document.querySelector('.demo-row')?.setAttribute('hidden', ''); return; }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const catalog = await response.json();
     if (!Array.isArray(catalog.scenarios)) throw new Error('Formato de catálogo inválido');
@@ -650,9 +654,9 @@ document.getElementById('theme-toggle')?.addEventListener('click', () => {
   document.documentElement.dataset.theme = theme;
   try { localStorage.setItem('apkweb-theme', theme); } catch {}
 });
-loadScenarioCatalog();
+const catalogReady = loadScenarioCatalog();
 notifyParent('apk-lab-ready');
-if (params.get('demo') === '1') runDemo();
+if (params.get('demo') === '1') catalogReady.then(() => runDemo());   // after the catalog check: a site without APKs has no demo
 initDevicePanel();
 initCollapsibleSections($('control-panel'));
 initDeepLinkPanel();
