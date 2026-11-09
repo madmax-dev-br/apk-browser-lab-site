@@ -442,3 +442,5 @@ main>.workspace:first-child{margin-top:28px}
 .pl-height-row select{flex:1 1 auto;min-width:0}
 .pl-height-row input{width:84px}
 .pl-height-row input[hidden]{display:none}
+.po-refresh.is-loading{display:inline-flex;align-items:center;gap:6px;opacity:.85;cursor:progress}
+.po-refresh.is-loading::before{content:'';width:9px;height:9px;border:1.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite}

@@ -2,8 +2,8 @@
 // Remover, order, export / import) and the dialog edits one (name, package filter, code); the list lives in localStorage (src/plugin-store.js) and is handed to the host
 // (src/plugin-host.js), which runs each enabled plugin in its own Worker. The output panel shows one card per running or failed plugin: its blocks (rendered with textContent
 // and DOM building only, never HTML), badge, console and errors, with Parar / Reiniciar. Renders are coalesced (at most every RENDER_MS) and skipped while the panel is closed.
-import { RENDER_MS } from './plugin-host.js?v=7d86f81b8b3c';
-import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, templates, fromTemplate } from './plugin-store.js?v=7d86f81b8b3c';
+import { RENDER_MS } from './plugin-host.js?v=8ac2070c6aa3';
+import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, templates, fromTemplate } from './plugin-store.js?v=8ac2070c6aa3';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const STATUS_LABEL = { rodando: 'rodando', iniciando: 'iniciando', parado: 'parado', erro: 'erro' };
@@ -165,6 +165,11 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
   // Each card is a <details>, collapsed on every page load (S.open: the ones the viewer opened since); a closed card only updates its header (status, badge, "novos dados").
   // Display settings live with the plugin (plugin-store.js): updates 'auto' (the blocks follow the plugin) or 'manual' (they hold until Atualizar), and the block height.
   // Display options come from the plugin (set when creating / editing it, plugin-store.js): updates 'auto' or 'manual' and the block height. The card stays simple.
+  const REFRESH_WAIT_MS = 5000, REFRESH_MIN_MS = 350;
+  function setLoading(entry, on) {
+    entry.refresh.classList.toggle('is-loading', on); entry.refresh.disabled = on || !host.get(entry.id)?.worker;
+    entry.refresh.textContent = on ? 'Atualizando…' : 'Atualizar'; entry.refresh.setAttribute('aria-busy', on ? 'true' : 'false');
+  }
   function applyDisplay(entry, plugin) {
     const fixed = typeof plugin.height === 'number';
     entry.root.dataset.height = fixed ? 'fixed' : plugin.height; entry.root.style.setProperty('--po-h', fixed ? `${plugin.height}px` : ''); entry.root.dataset.updates = plugin.updates;
@@ -189,9 +194,13 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
       fresh.hidden = true;
       const tools = el('div', 'po-tools');
       const refresh = button('Atualizar', 'po-refresh', `Atualizar a saída de ${plugin.name}`, () => {
-        const current = S.cards.get(plugin.id); if (!current) return;
-        current.force = true; current.acceptUntil = now() + 1500;   // manual mode: the output the refresh produces shows too
-        host.refresh?.(plugin.id); schedule(plugin.id);
+        const current = S.cards.get(plugin.id); if (!current || current.loading) return;
+        const listens = host.refresh?.(plugin.id) === true, started = now();
+        // loading until the plugin writes new output (a plugin with lab.on('refresh')), at most REFRESH_WAIT_MS; a plugin that does not listen just redraws (a short blink)
+        current.loading = { base: [...(host.get(plugin.id)?.output?.blocks ?? [])], until: started + (listens ? REFRESH_WAIT_MS : REFRESH_MIN_MS), minUntil: started + REFRESH_MIN_MS, listens };
+        current.force = true; current.acceptUntil = started + (listens ? REFRESH_WAIT_MS : 1500);   // manual mode: the output the refresh produces shows too
+        setLoading(current, true); schedule(plugin.id);
+        setTimer(() => { const entry = S.cards.get(plugin.id); if (entry?.loading) { entry.loading = null; setLoading(entry, false); } }, listens ? REFRESH_WAIT_MS : REFRESH_MIN_MS);
       });
       const stop = button('Parar', 'po-stop', `Parar o plugin ${plugin.name}`, () => { host.stop(plugin.id); schedule(plugin.id); }), restart = button('Reiniciar', 'po-restart', `Reiniciar o plugin ${plugin.name}`, () => { host.restart(plugin.id); schedule(plugin.id); });
       tools.append(refresh, stop, restart);
@@ -199,13 +208,13 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
       consoleBox.append(consoleSummary, consoleLines); head.append(name, status, badge, fresh); root.append(head, tools, errors, blocks, consoleBox);
       root.open = S.open.has(plugin.id);
       root.addEventListener('toggle', () => { if (root.open) { S.open.add(plugin.id); const current = S.cards.get(plugin.id); if (current) current.force = true; schedule(plugin.id); } else S.open.delete(plugin.id); });
-      entry = { root, name, status, badge, fresh, refresh, stop, restart, blocks, errors, consoleBox, consoleSummary, consoleLines, consoleCount: -1, errorCount: -1, force: true, acceptUntil: 0 };
+      entry = { id: plugin.id, root, name, status, badge, fresh, refresh, stop, restart, blocks, errors, consoleBox, consoleSummary, consoleLines, consoleCount: -1, errorCount: -1, force: true, acceptUntil: 0 };
       S.cards.set(plugin.id, entry);
     }
     const live = host.get(plugin.id), status = live?.status ?? 'parado';
     entry.name.textContent = plugin.name; entry.status.textContent = STATUS_LABEL[status] ?? status; entry.status.dataset.state = status; entry.root.dataset.state = status;
     entry.badge.textContent = live?.output?.badge ?? ''; entry.badge.hidden = !entry.badge.textContent;
-    entry.stop.disabled = !live?.worker; entry.restart.disabled = !plugin.enabled; entry.refresh.disabled = !live?.worker;
+    entry.stop.disabled = !live?.worker; entry.restart.disabled = !plugin.enabled; entry.refresh.disabled = !live?.worker || !!entry.loading;
     applyDisplay(entry, plugin);
     if (live) {
       const blocks = live.output.blocks, changedBlocks = entry.force || entry.lastStatus !== status || !entry.lastBlocks || blocks.length !== entry.lastBlocks.length || blocks.some((block, index) => entry.lastBlocks[index] !== block);
@@ -216,6 +225,10 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
         if (!blocks.length) entry.blocks.replaceChildren(el('p', 'po-empty', status === 'rodando' ? 'Sem saída ainda (use lab.ui.text, kv, table ou json).' : status === 'erro' ? 'O plugin parou com erro.' : 'Plugin parado.'));
       }
       entry.fresh.hidden = !(entry.pending && plugin.updates === 'manual'); entry.refresh.classList.toggle('has-news', !entry.fresh.hidden);
+      if (entry.loading?.listens) {   // the refresh produced new output: done (after a minimum so the state is seen)
+        const base = entry.loading.base, changed = blocks.length !== base.length || blocks.some((block, index) => base[index] !== block);
+        if (changed) { const wait = entry.loading.minUntil - now(); if (wait <= 0) { entry.loading = null; setLoading(entry, false); } else setTimer(() => schedule(plugin.id), wait); }
+      }
       if (entry.root.open && (entry.errorCount !== live.errors.length || entry.errorsRef !== live.errors[live.errors.length - 1])) {
         entry.errors.replaceChildren(...live.errors.slice(-5).map(error => { const item = el('pre', 'po-error', `${error.phase}: ${error.message}${error.stack ? '\n' + error.stack : ''}`); return item; }));
         entry.errorCount = live.errors.length; entry.errorsRef = live.errors[live.errors.length - 1];
