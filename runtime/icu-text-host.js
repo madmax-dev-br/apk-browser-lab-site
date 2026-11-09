@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=ecbd0c74b328';
-import { APKError } from './apk-error.js?v=ecbd0c74b328';
+import { createHostRegistry } from './host-contract.js?v=96c9de77f557';
+import { APKError } from './apk-error.js?v=96c9de77f557';
 
 // android.icu.text / android.icu.util classes mapped over the lab's java.text hosts and the engine's CLDR data (Intl). Android 13 ships ICU4J as android.icu.*; the lab does not carry ICU4J (hundreds
 // of classes plus its resource bundles), so each android.icu class below is a thin object holding the java.text / java.util object it maps to (`inner`) and forwarding the same-named API:
