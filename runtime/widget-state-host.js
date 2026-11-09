@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=79526b6931c6';
+import { APKError } from './apk-runtime.js?v=4627c78ec476';
 
 const TEXT = 'Landroid/widget/TextView;', EDIT = 'Landroid/widget/EditText;', CHECK = 'Landroid/widget/CompoundButton;', PROGRESS = 'Landroid/widget/ProgressBar;';
 const PARCELABLE = 'Landroid/os/Parcelable;', CHAR = 'Ljava/lang/CharSequence;', ABS = 'Landroid/view/AbsSavedState;';

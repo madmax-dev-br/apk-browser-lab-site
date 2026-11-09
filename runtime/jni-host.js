@@ -1,17 +1,17 @@
-import { APKError } from './apk-error.js?v=79526b6931c6';
-import { JavaException } from './apk-runtime.js?v=79526b6931c6';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=79526b6931c6';
-import { buildElfDescriptor } from './native-descriptor.js?v=79526b6931c6';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=79526b6931c6';
-import { NativeLinker, LinkError } from './native-linker.js?v=79526b6931c6';
-import { hostFunction } from './wasm-host-function.js?v=79526b6931c6';
-import { parseWasm } from './wasm-dylink.js?v=79526b6931c6';
-import { formatVersion } from './rn-version.js?v=79526b6931c6';
-import { registerWasmMemory } from './unsafe-native.js?v=79526b6931c6';
-import { writeSkPath } from './skia-path-layout.js?v=79526b6931c6';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=79526b6931c6';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=79526b6931c6';
-import { withVariants } from './native-provider-variants.js?v=79526b6931c6';
+import { APKError } from './apk-error.js?v=4627c78ec476';
+import { JavaException } from './apk-runtime.js?v=4627c78ec476';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=4627c78ec476';
+import { buildElfDescriptor } from './native-descriptor.js?v=4627c78ec476';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=4627c78ec476';
+import { NativeLinker, LinkError } from './native-linker.js?v=4627c78ec476';
+import { hostFunction } from './wasm-host-function.js?v=4627c78ec476';
+import { parseWasm } from './wasm-dylink.js?v=4627c78ec476';
+import { formatVersion } from './rn-version.js?v=4627c78ec476';
+import { registerWasmMemory } from './unsafe-native.js?v=4627c78ec476';
+import { writeSkPath } from './skia-path-layout.js?v=4627c78ec476';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=4627c78ec476';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=4627c78ec476';
+import { withVariants } from './native-provider-variants.js?v=4627c78ec476';
 
 // JNI -> WebAssembly bridge.
 //
