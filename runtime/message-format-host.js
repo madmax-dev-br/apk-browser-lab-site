@@ -1,4 +1,4 @@
-import { createHostRegistry, doubleBits, bitsDouble, bitsFloat } from './host-contract.js?v=93d82df0437e';
+import { createHostRegistry, doubleBits, bitsDouble, bitsFloat } from './host-contract.js?v=59a9b4dd227f';
 
 // java.text.MessageFormat and java.text.ChoiceFormat, ported method by method from libcore's originals (ojluni, android-13.0.0_r1): applyPattern / makeFormat / subformat / parse /
 // toPattern / copyAndFixQuotes of MessageFormat; applyPattern / toPattern / format / parse / nextDouble of ChoiceFormat, with the originals' exception messages. They extend the platform's

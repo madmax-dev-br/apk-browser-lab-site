@@ -1,8 +1,8 @@
 // The VM side of the runtime-permission model (src/runtime-permissions.js): the state the page sends, what checkSelfPermission sees (platform.grantedPermissions), the requests that wait
 // for the page's permission dialog and the rationale flag. The Worker posts `permission-request` to the page and takes the answer back with `respond`; nothing blocks in between, as on
 // Android (Activity.requestPermissions returns at once and the result is delivered later through onRequestPermissionsResult).
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=93d82df0437e';
-import { computeGranted, emptyConfig, sanitizeConfig, planRequest, answerDialog, settleRequest, rationale, sectionOf } from './runtime-permissions.js?v=93d82df0437e';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=59a9b4dd227f';
+import { computeGranted, emptyConfig, sanitizeConfig, planRequest, answerDialog, settleRequest, rationale, sectionOf } from './runtime-permissions.js?v=59a9b4dd227f';
 
 export function createPermissionHost(platform) {
   let config = emptyConfig(), sequence = 0;
