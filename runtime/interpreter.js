@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=346c3ee9a461';
-import { BUCKET } from './time-breakdown.js?v=346c3ee9a461';
-import { Blocked, QUANTUM } from './scheduler.js?v=346c3ee9a461';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=346c3ee9a461';
+import { APKError } from './apk-error.js?v=fed510f80b46';
+import { BUCKET } from './time-breakdown.js?v=fed510f80b46';
+import { Blocked, QUANTUM } from './scheduler.js?v=fed510f80b46';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=fed510f80b46';
 
 // Frame-based DEX interpreter.
 //
@@ -143,9 +143,9 @@ function fieldSiteAt(rt, prog, pc, reference, type) {
   const site = prog.refs[pc];
   if (site !== undefined) { const more = site.more; if (more !== null && more.has(type)) return site; }
   if (!reference || !rt.isSubtype(type, reference.owner)) invalidField(rt, reference, type, null);
-  if (site !== undefined) { (site.more ??= new Set()).add(type); return site; }
+  if (site !== undefined) { (site.more ??= new Set()).add(type); if (site.slot >= 0 && rt.shapeOf(type).slotOf(site.key) !== site.slot) site.slot = -1; return site; }
   const field = rt.resolveField(reference);
-  return prog.refs[pc] = { type, key: field.key, def: defaultValue(field.type), more: null };
+  return prog.refs[pc] = { type, key: field.key, def: defaultValue(field.type), more: null, slot: rt.shapeOf(type).slotOf(field.key) };
 }
 /** rt.isSubtype(valueType, type) for the checkcast/instanceof at `pc`, through a memo of the class that site saw last (most see one); like the runtime's memo it follows the class-graph epoch. */
 function subtypeAt(rt, prog, pc, valueType, type) {
@@ -209,7 +209,7 @@ function jitSupport(rt) {
       let target; if (receiver !== null && typeof receiver === 'object') target = rt.heap.get(receiver.ref);
       if (target === undefined) return NO_GETTER;
       const fieldSite = prog.refs[0]; if (fieldSite === undefined || fieldSite.type !== target.type) return NO_GETTER;
-      let v = target.fields.get(fieldSite.key); if (v === undefined) v = fieldSite.def;
+      const slot = fieldSite.slot; let v = slot >= 0 ? target.slots[slot] : target.fields.get(fieldSite.key); if (v === undefined) v = fieldSite.def;
       if (getter === 0x55) v &= 1; else if (getter === 0x56) v = (v << 24) >> 24; else if (getter === 0x57) v &= 65535; else if (getter === 0x58) v = (v << 16) >> 16;
       value = getter === 0x54 && (v === 0 || v === null) ? null : v;
     } else {   // detectShape
@@ -237,8 +237,8 @@ function jitSupport(rt) {
     fieldSite(rt, site, reference, object) {   // the compiled form of fieldSiteAt: the first receiver class stays in site.type, the others go to site.more
       const type = object.type, more = site.more; if (more !== null && more.has(type)) return;
       if (!reference || !rt.isSubtype(type, reference.owner)) invalidField(rt, reference, type, object);
-      if (site.key !== null) { (site.more ??= new Set()).add(type); return; }
-      const field = rt.resolveField(reference); site.key = field.key; site.def = defaultValue(field.type); site.type = type;
+      if (site.key !== null) { (site.more ??= new Set()).add(type); if (site.slot >= 0 && rt.shapeOf(type).slotOf(site.key) !== site.slot) site.slot = -1; return; }
+      const field = rt.resolveField(reference); site.key = field.key; site.def = defaultValue(field.type); site.slot = rt.shapeOf(type).slotOf(field.key); site.type = type;
     },
     subtype(rt, site, valueType, type) {   // the compiled form of subtypeAt
       const epoch = rt.dex.dynamicFiles?.length ?? 0;
@@ -617,7 +617,7 @@ function runLoop(rt, owner, base) {
           case 0x52: case 0x53: case 0x54: case 0x55: case 0x56: case 0x57: case 0x58: {
             const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.object(objectRef);
             let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = fieldSiteAt(rt, prog, pc, dex.field(u[pc + 1]), obj.type);
-            let v = obj.fields.get(site.key); if (v === undefined) v = site.def;
+            const slot = site.slot; let v = slot >= 0 ? obj.slots[slot] : obj.fields.get(site.key); if (v === undefined) v = site.def;
             const variant = op - 0x52;
             if (variant === 0 || variant === 2) regs[lo] = v;
             else if (variant === 1) { regs[lo] = v; regs[lo + 1] = WIDE_HIGH; } else regs[lo] = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : (v << 16) >> 16;
@@ -627,7 +627,9 @@ function runLoop(rt, owner, base) {
             const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.object(objectRef);
             let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = fieldSiteAt(rt, prog, pc, dex.field(u[pc + 1]), obj.type);
             const variant = op - 0x59, v = regs[lo], value = variant <= 2 ? v : variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : (v << 16) >> 16;
-            const fields = obj.fields; if (fields.has(site.key)) fields.set(site.key, value); else rt.storeField(fields, site.key, value);
+            const slot = site.slot;   // field store (write-barrier point): an already-stored slot directly, a first store through storeSlot (budget), a key outside the shape through the facade
+            if (slot >= 0) { const slots = obj.slots; if (slots[slot] !== undefined) slots[slot] = value; else rt.storeSlot(obj, slot, site.key, value); }
+            else { const fields = obj.fields; if (fields.has(site.key)) fields.set(site.key, value); else rt.storeField(fields, site.key, value); }
             pc += 2; break;
           }
           case 0x60: case 0x61: case 0x62: case 0x63: case 0x64: case 0x65: case 0x66: {
@@ -684,7 +686,7 @@ function runLoop(rt, owner, base) {
                   if (target !== undefined) {
                     const fieldSite = calleeProg.refs[0];
                     if (fieldSite !== undefined && fieldSite.type === target.type) {
-                      let v = target.fields.get(fieldSite.key); if (v === undefined) v = fieldSite.def;
+                      const slot = fieldSite.slot; let v = slot >= 0 ? target.slots[slot] : target.fields.get(fieldSite.key); if (v === undefined) v = fieldSite.def;
                       if (getter === 0x55) v &= 1; else if (getter === 0x56) v = (v << 24) >> 24; else if (getter === 0x57) v &= 65535; else if (getter === 0x58) v = (v << 16) >> 16;
                       rt.steps += 2; calleeProg.stats.instructions += 2; quantum--;
                       f.result = getter === 0x54 && (v === 0 || v === null) ? null : v; pc += 3; break;

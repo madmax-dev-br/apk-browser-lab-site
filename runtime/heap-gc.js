@@ -38,8 +38,9 @@
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=346c3ee9a461';
-import { cellBytes } from './java-arrays.js?v=346c3ee9a461';
+import { BUCKET } from './time-breakdown.js?v=fed510f80b46';
+import { cellBytes } from './java-arrays.js?v=fed510f80b46';
+import { storedFieldCount } from './object-shapes.js?v=fed510f80b46';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -48,7 +49,7 @@ const tracked = new Set();
 export function gcRoot(container) { tracked.add(new WeakRef(container)); return container; }
 
 const ID_KEY = /(^id$|Id$|Ids$|^ids$|^ref$|Ref$|Refs$|^view$|View$|^target$|Target$|^receiver$|Receiver$|^owner$|Owner$|^activity$|Activity$|^object$|Object$|^handle$)/;
-const SKIP_PROPS = new Set(['heap', 'dex', 'classes', 'resolvedClasses', 'resolveCache', 'hostMethodRefs', 'subtypeMemo', 'ancestorSets', 'methodEvidence', 'nativeBindings', 'apkEntries', 'traceRing', 'trace', 'scheduler', 'resources', 'gcStats', 'gcSkips', 'gcDeferral', 'gcDeferralStats', 'allocationSamples', 'nativeArrays', 'nativeRanges', 'profile', 'monitor', 'gcPhases', 'hostAllocs', 'allProgs', 'methodOverrides', 'methodOverridesAll']);   // nativeArrays/nativeRanges pin an array's address only while the array lives (pruned after marking)   // gcStats keeps past nextId values: counters that look like object ids and would pin whatever object had that id
+const SKIP_PROPS = new Set(['heap', 'dex', 'classes', 'resolvedClasses', 'resolveCache', 'hostMethodRefs', 'subtypeMemo', 'ancestorSets', 'methodEvidence', 'nativeBindings', 'apkEntries', 'traceRing', 'trace', 'scheduler', 'resources', 'gcStats', 'gcSkips', 'gcDeferral', 'gcDeferralStats', 'allocationSamples', 'nativeArrays', 'nativeRanges', 'profile', 'monitor', 'gcPhases', 'hostAllocs', 'allProgs', 'methodOverrides', 'methodOverridesAll', 'shapeMemo']);   // nativeArrays/nativeRanges pin an array's address only while the array lives (pruned after marking)   // gcStats keeps past nextId values: counters that look like object ids and would pin whatever object had that id
 const NUMERIC_ARRAY_LIMIT = 256;
 
 function tombstone(id, type) {
@@ -114,7 +115,7 @@ const weakTypeCache = runtime => weakTypeCaches.get(runtime) ?? weakTypeCaches.s
  * nested objects in its sample is walked in full. `markNoJavaRefs(object)` declares an object (and everything under it) reference-free explicitly.
  */
 /** Instances of these classes are code and metadata (DEX files, programs, compiled functions, frames, threads): never Java references, never walked. */
-const SKIP_CONSTRUCTORS = new Set(['DexFile', 'DexProgram', 'DexClassTable', 'ClassTable', 'CompiledFunction', 'Frame', 'ClassDefinition']);   // not VMThread: the threads the scheduler runs are skipped by identity above (enumerateRoots covers them), but the host record of a Thread that was created and not started yet (a ThreadFactory's product before start()) holds its Runnable target, group and handler only there
+const SKIP_CONSTRUCTORS = new Set(['DexFile', 'DexProgram', 'DexClassTable', 'ClassTable', 'CompiledFunction', 'Frame', 'ClassDefinition', 'Shape']);   // not VMThread: the threads the scheduler runs are skipped by identity above (enumerateRoots covers them), but the host record of a Thread that was created and not started yet (a ThreadFactory's product before start()) holds its Runnable target, group and handler only there
 const FLAT_CONTAINER_MIN = 2048, FLAT_SAMPLE = 48;
 const TOMBSTONE_COLLECTIONS = 64, TOMBSTONE_IDS = 3000000;
 const noRefs = new WeakSet();
@@ -224,8 +225,14 @@ export function createMarker(runtime, { full = false, clearSoft = false, private
     if (kind === REF_WEAK) weakIds.push(record.id); else if (kind === REF_SOFT) { if (clearSoft) softIds.push(record.id); } else if (kind === REF_PHANTOM) phantomIds.push(record.id);
     for (const key in record) {
       const item = record[key];
+      if (key === 'slots') {   // the instance fields (src/object-shapes.js); a weak/soft/phantom reference skips its referent slot
+        const skipSlot = weak ? record.fieldShape.referentSlot : -1;
+        for (let i = 0; i < item.length; i++) { const value = item[i]; if (value !== null && typeof value === 'object' && i !== skipSlot) stack.push(value); }
+        continue;
+      }
+      if (key === 'fieldShape') continue;   // layout metadata, no values
       if (weak && key === 'referent') continue;   // a host-side referent kept outside the field table
-      if (weak && key === 'fields' && item instanceof Map) { for (const [fieldKey, fieldValue] of item) { if (fieldKey === REFERENT_KEY) continue; if (fieldValue !== null && typeof fieldValue === 'object') stack.push(fieldValue); } continue; }
+      if (weak && (key === 'fieldExtra' || key === 'fields') && item instanceof Map) { for (const [fieldKey, fieldValue] of item) { if (fieldKey === REFERENT_KEY) continue; if (fieldValue !== null && typeof fieldValue === 'object') stack.push(fieldValue); } continue; }
       if (key === 'cells') { if (refArrayType(record.type)) { if (Array.isArray(item)) for (let i = 0; i < item.length; i++) { const element = item[i]; if (element !== null && typeof element === 'object') stack.push(element); } else scan(item); } }   // a primitive array's typed storage holds no references
       else if (item !== null && typeof item === 'object') stack.push(item);
       else if (typeof item === 'number' && idLike(key, item)) markId(item);
@@ -362,9 +369,9 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
     const records = heap.chunks[ci];
     for (let slot = 0; slot < 4096; slot++) {
       const record = records[slot]; if (record === undefined || record.freed === true) continue;
-      fieldSlots += record.fields?.size ?? 0; if (record.cells !== undefined) { arrayCells += cellsOf(record.type, record.cells.length); arrayBytes += cellBytes(record.cells); }
+      const stored = storedFieldCount(record); fieldSlots += stored; if (record.cells !== undefined) { arrayCells += cellsOf(record.type, record.cells.length); arrayBytes += cellBytes(record.cells); }
       { const type = record.type; let entry = survivors.get(type); if (entry === undefined) { const own = runtime.classes.get(type); survivors.set(type, entry = { n: 0, bytes: 0, cats: new Uint32Array(256), dex: own ? (runtime.dex.bootDexes?.has(own.dex) ? 'framework' : (own.dex?.filename ?? 'app')) : 'host' }); }
-        entry.cats[markBytes[ci][slot]]++; entry.n++; entry.bytes += 48 + (record.fields?.size ?? 0) * 8 + (record.cells !== undefined ? cellBytes(record.cells) : 0) + (typeof record.value === 'string' ? record.value.length * 2 : 0) + ((record.list?.length ?? 0) + (record.set?.length ?? 0)) * 8 + (record.map?.size ?? 0) * 48; }
+        entry.cats[markBytes[ci][slot]]++; entry.n++; entry.bytes += 48 + stored * 8 + (record.cells !== undefined ? cellBytes(record.cells) : 0) + (typeof record.value === 'string' ? record.value.length * 2 : 0) + ((record.list?.length ?? 0) + (record.set?.length ?? 0)) * 8 + (record.map?.size ?? 0) * 48; }
       collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
     }
   }
@@ -511,7 +518,7 @@ export function maybeCollect(runtime, options = {}) {
 // ---- Heap census: what was alive when the VM ran out of objects --------------------------------------------------------------------------------------------------------------------
 /** Rough host-memory cost of one heap record (JavaScript object + its field Map / element array / collection storage). Calibrated against measured heap growth (docs/MEMORY.md). */
 export function estimateRecordBytes(record) {
-  let bytes = 150 + (record.fields?.size ?? 0) * 56;
+  let bytes = record.slots !== undefined ? 120 + record.slots.length * 8 + (record.fieldExtra?.size ?? 0) * 56 : 150 + (record.fields?.size ?? 0) * 56;   // a shaped record: the object, its slot array, the extra Map's entries
   if (record.cells !== undefined) bytes += 16 + cellBytes(record.cells);   // exact for a primitive array's typed storage
   bytes += ((record.list?.length ?? 0) + (record.set?.length ?? 0)) * 24 + (record.map?.size ?? 0) * 72;
   if (typeof record.text === 'string') bytes += record.text.length * 2;
@@ -714,6 +721,9 @@ export function retentionPaths(runtime, { type = null, samples = 3, budgetMs = 1
       for (const key of Object.keys(record)) {
         const item = record[key];
         if (key === 'fields' && item instanceof Map) { for (const [k, v] of item) edge(node, v, fieldName(k)); continue; }
+        if (key === 'slots') { const keys = record.fieldShape.keys; for (let i = 0; i < item.length; i++) if (item[i] !== undefined) edge(node, item[i], fieldName(keys[i])); continue; }
+        if (key === 'fieldShape') continue;
+        if (key === 'fieldExtra' && item instanceof Map) { for (const [k, v] of item) edge(node, v, fieldName(k)); continue; }
         if (key === 'cells') { if (Array.isArray(item) && refArrayType(record.type)) for (let i = 0; i < item.length; i++) edge(node, item[i], `[${i}]`); continue; }
         if ((key === 'list' || key === 'set') && Array.isArray(item)) { for (let i = 0; i < item.length; i++) edge(node, item[i], `${key}[${i}]`); continue; }
         if (key === 'map' && item instanceof Map) { for (const v of item.values()) edge(node, v?.value ?? v, 'map'); for (const v of item.values()) edge(node, v?.key, 'map-key'); continue; }

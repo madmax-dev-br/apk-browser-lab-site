@@ -199,14 +199,16 @@ export function compileMethod(rt, method, code, prog, tries, support) {
         }
         case 0x52: case 0x53: case 0x54: case 0x55: case 0x56: case 0x57: case 0x58:
         case 0x59: case 0x5a: case 0x5b: case 0x5c: case 0x5d: case 0x5e: case 0x5f: {
-          const s = site({ field: null, key: null, type: null, def: undefined, more: null }), store = op >= 0x59, variant = op - (store ? 0x59 : 0x52), ref = u[pc + 1]; dex.field(ref);   // FR is the lazy field-id cache: decode it now
+          const s = site({ field: null, key: null, type: null, def: undefined, more: null, slot: -1 }), store = op >= 0x59, variant = op - (store ? 0x59 : 0x52), ref = u[pc + 1]; dex.field(ref);   // FR is the lazy field-id cache: decode it now
           const prelude = `const o = rt.object(r[${hi}]); const s = Z[${s}]; if (o.type !== s.type) H.fieldSite(rt, s, FR[${ref}], o);`;
           if (!store) {
             const narrowed = variant === 3 ? 'v & 1' : variant === 4 ? '(v << 24) >> 24' : variant === 5 ? 'v & 65535' : variant === 6 ? '(v << 16) >> 16' : 'v';
-            return variant === 1 ? `{ ${prelude} let v = o.fields.get(s.key); if (v === undefined) v = s.def; r[${lo}] = v; r[${lo + 1}] = W; }` : `{ ${prelude} let v = o.fields.get(s.key); if (v === undefined) v = s.def; r[${lo}] = ${narrowed}; }`;
+            const load = 'const k = s.slot; let v = k >= 0 ? o.slots[k] : o.fields.get(s.key); if (v === undefined) v = s.def;';
+            return variant === 1 ? `{ ${prelude} ${load} r[${lo}] = v; r[${lo + 1}] = W; }` : `{ ${prelude} ${load} r[${lo}] = ${narrowed}; }`;
           }
           const value = variant === 3 ? `${R(lo)} & 1` : variant === 4 ? `(${R(lo)} << 24) >> 24` : variant === 5 ? `${R(lo)} & 65535` : variant === 6 ? `(${R(lo)} << 16) >> 16` : R(lo);
-          return `{ ${prelude} const m = o.fields; if (m.has(s.key)) m.set(s.key, ${value}); else rt.storeField(m, s.key, ${value}); }`;
+          // field store (write-barrier point): an already-stored slot directly, a first store through rt.storeSlot (budget), a key outside the shape through the facade
+          return `{ ${prelude} const k = s.slot, val = ${value}; if (k >= 0) { const sl = o.slots; if (sl[k] !== undefined) sl[k] = val; else rt.storeSlot(o, k, s.key, val); } else { const m = o.fields; if (m.has(s.key)) m.set(s.key, val); else rt.storeField(m, s.key, val); } }`;
         }
         case 0x60: case 0x61: case 0x62: case 0x63: case 0x64: case 0x65: case 0x66:
         case 0x67: case 0x68: case 0x69: case 0x6a: case 0x6b: case 0x6c: case 0x6d: {

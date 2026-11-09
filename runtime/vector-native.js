@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=346c3ee9a461';
-import { getSolidPaint } from './paint-host.js?v=346c3ee9a461';
-import { getMatrixValues } from './matrix-native.js?v=346c3ee9a461';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=346c3ee9a461';
+import { APKError } from './apk-error.js?v=fed510f80b46';
+import { getSolidPaint } from './paint-host.js?v=fed510f80b46';
+import { getMatrixValues } from './matrix-native.js?v=fed510f80b46';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=fed510f80b46';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));

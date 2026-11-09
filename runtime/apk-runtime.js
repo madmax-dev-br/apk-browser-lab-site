@@ -1,30 +1,31 @@
-import { VMClock } from './vm-clock.js?v=346c3ee9a461';
-import { overrideHit } from './method-overrides.js?v=346c3ee9a461';
-import { OperationMonitor } from './operation-monitor.js?v=346c3ee9a461';
-import { ExecutionProfile } from './execution-profile.js?v=346c3ee9a461';
-import { SamplingProfiler } from './sampling-profiler.js?v=346c3ee9a461';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=346c3ee9a461';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=346c3ee9a461';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=346c3ee9a461';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=346c3ee9a461';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=346c3ee9a461';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=346c3ee9a461';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=346c3ee9a461';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=346c3ee9a461';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=346c3ee9a461';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=346c3ee9a461';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=346c3ee9a461';
-import { APKError } from './apk-error.js?v=346c3ee9a461';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=346c3ee9a461';
-import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=346c3ee9a461';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=346c3ee9a461';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=346c3ee9a461';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=346c3ee9a461';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=346c3ee9a461';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=346c3ee9a461';
-import { Scheduler, Blocked } from './scheduler.js?v=346c3ee9a461';
-import { bootClassLacksMember } from './boot-class-members.js?v=346c3ee9a461';
-export { APKError } from './apk-error.js?v=346c3ee9a461';
+import { VMClock } from './vm-clock.js?v=fed510f80b46';
+import { overrideHit } from './method-overrides.js?v=fed510f80b46';
+import { OperationMonitor } from './operation-monitor.js?v=fed510f80b46';
+import { ExecutionProfile } from './execution-profile.js?v=fed510f80b46';
+import { SamplingProfiler } from './sampling-profiler.js?v=fed510f80b46';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=fed510f80b46';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=fed510f80b46';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=fed510f80b46';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=fed510f80b46';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=fed510f80b46';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=fed510f80b46';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=fed510f80b46';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=fed510f80b46';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=fed510f80b46';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=fed510f80b46';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=fed510f80b46';
+import { APKError } from './apk-error.js?v=fed510f80b46';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=fed510f80b46';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=fed510f80b46';
+import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=fed510f80b46';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=fed510f80b46';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=fed510f80b46';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=fed510f80b46';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=fed510f80b46';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=fed510f80b46';
+import { Scheduler, Blocked } from './scheduler.js?v=fed510f80b46';
+import { bootClassLacksMember } from './boot-class-members.js?v=fed510f80b46';
+export { APKError } from './apk-error.js?v=fed510f80b46';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -919,6 +920,8 @@ const ref = id => ({ ref: id });
  *  `elements` is the same storage for host code: reading it answers the storage, assigning a plain or typed array converts it to the array's representation (ownership passes to the record). */
 class ArrayRecord {
   constructor(id, type, cells) { this.id = id; this.type = type; this.fields = NO_FIELDS; this.cells = cells; }
+  get slots() { return EMPTY_SLOTS; }   // no instance fields: a slot store falls back to `fields`, which refuses it
+  get fieldShape() { return EMPTY_SHAPE; }
   get elements() { return this.cells; }
   set elements(values) { this.cells = cellsFrom(this.type, values); }
 }
@@ -1155,7 +1158,7 @@ export class APKRuntime {
     this.platform = platform; this.resources = resources; this.clock = platform?.clock ?? new VMClock();
     this.nativeBindings = nativeBindings instanceof Map ? nativeBindings : new Map(Object.entries(nativeBindings));
     this.executionByOrigin = { apk: { methods: 0, instructions: 0 }, framework: { methods: 0, instructions: 0 }, host: { calls: 0 } };
-    this.heap = new Heap(); this.nextId = 1; this.fieldSlots = 0;
+    this.heap = new Heap(); this.nextId = 1; this.fieldSlots = 0; this.shapeMemo = undefined; this.shapeEpoch = -1;
     this.jni = null; // JniBridge, installed by loadAPK when the lab supplies a nativeLibraryProvider
     this.classOwners = new Map(); this.dynamicPlain = new Map(); // defining ClassLoader of run-time-loaded classes (table type -> loader ref); first definer per plain name
     this.nextThreadId = 1n;
@@ -1437,6 +1440,30 @@ export class APKRuntime {
     if (!storage.has(key) && ++this.fieldSlots > this.maxFieldSlots && (this.fieldSlots--, this.emergencyCollect('campos'), !storage.has(key) && ++this.fieldSlots > this.maxFieldSlots)) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
     storage.set(key, value);
   }
+  /** The first store into slot `slot` (of the field `key`) of an object record: the field-storage budget of storeField, then the slot. A record without that slot (an array) goes through
+   *  storeField, which refuses it. The interpreter and the compiled code store into an already-stored slot directly. */
+  storeSlot(record, slot, key, value) {
+    const slots = record.slots;
+    if (!(slot < slots.length)) { this.storeField(record.fields, key, value); return; }
+    if (slots[slot] === undefined && ++this.fieldSlots > this.maxFieldSlots && (this.fieldSlots--, this.emergencyCollect('campos'), slots[slot] === undefined && ++this.fieldSlots > this.maxFieldSlots)) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
+    slots[slot] = value;
+  }
+  /** The field layout of instances of `type` (src/object-shapes.js): the superclass's shape followed by the instance fields the class declares. Classes without own instance fields share
+   *  their superclass's shape. Memoized per class-graph epoch; a layout never changes, so a shape rebuilt after a new DEX file has the same slots. */
+  shapeOf(type) {
+    const epoch = this.dex.dynamicFiles?.length ?? 0;
+    let shapes = this.shapeMemo; if (shapes === undefined || this.shapeEpoch !== epoch) { shapes = this.shapeMemo = new Map(); this.shapeEpoch = epoch; }
+    const shape = shapes.get(type); return shape !== undefined ? shape : this.buildShape(type, 0);
+  }
+  buildShape(type, depth) {
+    const memo = this.shapeMemo.get(type); if (memo !== undefined) return memo;
+    let parent = EMPTY_SHAPE;
+    if (typeof type === 'string' && type !== 'Ljava/lang/Object;' && depth < 256) { const up = this.parent(type); if (typeof up === 'string' && up !== type) parent = this.buildShape(up, depth + 1); }
+    const cls = typeof type === 'string' && this.classes.has(type) ? this.classes.get(type) : undefined, own = [];
+    if (cls?.fields?.length) for (const entry of cls.fields) own.push(cls.dex.field(entry.index).key);
+    const shape = own.length === 0 ? parent : new Shape(parent, own);
+    this.shapeMemo.set(type, shape); return shape;
+  }
   resolveField(field) {
     const epoch = this.dex.dynamicFiles?.length ?? 0, cached = field.resolvedField;
     if (cached !== undefined && cached.epoch === epoch && cached.runtime === this) return cached.value;
@@ -1579,7 +1606,7 @@ export class APKRuntime {
   makeObject(type) {
     if (type.charCodeAt(0) === 91) return this.newArray(type, 0);   // an array made as a bare object (host code then assigns its elements) is still an array record
     const id = this.allocateId(type);
-    this.heap.set(id, { id, type, fields: new Map(), text: '', orientation: 0, textSize: 20, children: [], listener: null });
+    this.heap.set(id, new ObjectRecord(id, type, this.shapeOf(type)));
     if (!this.bytecodeAlloc) this.hostAllocs.push(id);   // allocated by host code (a native, the platform): its JavaScript locals may hold it where no Java frame does -- see hostAllocs in heap-gc.js
     return ref(id);
   }
@@ -3494,7 +3521,7 @@ export class APKRuntime {
         if (original.elements) { const value = this.newArray(original.type, original.elements.length); this.object(value).elements = original.elements.slice(); return value; }
         if (!this.isSubtype(original.type, 'Ljava/lang/Cloneable;')) this.throwJava('Ljava/lang/CloneNotSupportedException;', original.type);
         const value = this.makeObject(original.type), target = this.object(value);
-        Object.assign(target, original, { id: value.ref, fields: new Map(original.fields), children: [...original.children] }); return value;
+        Object.assign(target, original, { id: value.ref, slots: original.slots.length ? original.slots.slice() : original.slots, fieldExtra: original.fieldExtra === null ? null : new Map(original.fieldExtra) }); if (Object.hasOwn(original, 'children')) target.children = [...original.children]; return value;
       }
     }
     return BRIDGE_NEXT;
