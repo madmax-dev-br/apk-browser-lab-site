@@ -1,14 +1,15 @@
-import {APKError} from './apk-runtime.js?v=a76ada5ef6c6';
-import {getVectorGraphics} from './vector-native.js?v=a76ada5ef6c6';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=a76ada5ef6c6';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=a76ada5ef6c6';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=a76ada5ef6c6';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=a76ada5ef6c6';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=a76ada5ef6c6';
-import {createBitmapHost} from './bitmap-host.js?v=a76ada5ef6c6';
-import { gcRoot } from './heap-gc.js?v=a76ada5ef6c6';
-import {sha256Hex} from './sha256-sync.js?v=a76ada5ef6c6';
-import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=a76ada5ef6c6';
+import {APKError} from './apk-runtime.js?v=ba94ccb09d48';
+import {getVectorGraphics} from './vector-native.js?v=ba94ccb09d48';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=ba94ccb09d48';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=ba94ccb09d48';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=ba94ccb09d48';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=ba94ccb09d48';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=ba94ccb09d48';
+import {createBitmapHost} from './bitmap-host.js?v=ba94ccb09d48';
+import { gcRoot } from './heap-gc.js?v=ba94ccb09d48';
+import {sha256Hex} from './sha256-sync.js?v=ba94ccb09d48';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=ba94ccb09d48';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=ba94ccb09d48';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -199,6 +200,7 @@ function bitmapSurfaceSpec(CK,type){
  return {colorType:spec[0],bytes:spec[1],alphaType:spec[2]};
 }
 export function rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,options={}){
+ if(options?.transport==='gpu'||options?.transport==='gpu-png')return rasterizeSkiaCanvasGpu(runtime,backend,graphics,receiver,width,height,options);   // experimental GPU replay (src/gpu-raster.js); the CPU path below is unchanged
  const stats=runtime.rasterStats??={calls:0,rasterized:0,hits:0,keyMs:0,replayMs:0,encodeMs:0};stats.calls++;
  const state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas');
  const t0=performance.now();
@@ -221,13 +223,48 @@ export function rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,heig
  if(key!==null&&(result?.kind==='raster'||result?.kind==='rgba-raster'))cacheRaster(runtime,key,result);
  return result;
 }
+/**
+ * options.transport 'gpu' (src/gpu-raster.js, renderer "GPU (experimental)"): the same recording replayed by the same code on the session's WebGL surface; the result is
+ * a `bitmap-raster` (an ImageBitmap the Worker transfers to the page). 'gpu-png' (View Drawable layers): the same GPU replay read back and encoded as the PNG raster the
+ * CPU path makes (the page shows it the same way). The cache works as on the CPU (the transport is part of the key, so a CPU raster and a GPU raster of
+ * the same recording are separate entries; a reduced request is served the cached full GPU raster), except that an entry whose ImageBitmap already left the Worker is served
+ * only while the page still holds it. A GPU failure switches the session to CPU and the same raster is replayed on the CPU at once; a replay that fails on the CPU as well is
+ * the recording's own error and propagates as on the CPU path.
+ */
+function rasterizeSkiaCanvasGpu(runtime,backend,graphics,receiver,width,height,options){
+ const gpu=runtime.gpuRaster,png=options.transport==='gpu-png',cpuOptions=png?(({transport,...rest})=>Object.keys(rest).length?rest:undefined)(options):{...options,transport:'rgba'};   // the CPU request this one stands for (same key as on a CPU session)
+ if(gpu?.active!=='gpu'||!gpu.engine)return rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,cpuOptions);
+ const stats=runtime.rasterStats??={calls:0,rasterized:0,hits:0,keyMs:0,replayMs:0,encodeMs:0};stats.calls++;
+ const state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas');
+ const t0=performance.now();
+ const body=runtime.rasterCacheDisabled?null:rasterKeyBody(runtime,graphics,state,width);stats.keyMs+=performance.now()-t0;
+ const cache=runtime.rasterCache??=new Map(),usable=key=>cache.has(key)&&(png||bitmapRasterUsable(runtime,cache.get(key).result)),hit=key=>{const entry=cache.get(key);cache.delete(key);cache.set(key,entry);stats.hits++;return entry;};
+ if(body!==null&&(options.scale??1)<1){const {scale,...rest}=options,fullKey=rasterKeyPrefix(width,height,rest)+body;if(usable(fullKey)){stats.fullForReduced=(stats.fullForReduced??0)+1;return {...hit(fullKey).result};}}
+ const key=body===null?null:rasterKeyPrefix(width,height,options)+body;
+ if(key!==null&&usable(key))return {...hit(key).result};
+ if(key!==null&&cache.has(key)){const stale=cache.get(key);cache.delete(key);runtime.rasterCacheBytes-=stale.size;}   // its ImageBitmap left the Worker and the page dropped it: replay
+ stats.rasterized++;
+ let result;const g0=performance.now();
+ try{result=rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,height,options);}
+ catch(error){
+  if(error instanceof GpuRasterError){gpu.fallback(error.reason,runtime);return rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,cpuOptions);}
+  const cpu=rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,cpuOptions);   // throws when the recording itself fails: the GPU is not the cause
+  gpu.fallback(`erro na reprodução GPU: ${String(error?.message??error).slice(0,160)}`,runtime);return cpu;
+ }
+ gpu.noteFrame(performance.now()-g0,runtime);
+ if(result.kind==='bitmap-raster')result.rasterId='g'+(runtime.rasterUid=(runtime.rasterUid??0)+1);
+ else if(result.scale<1)result.rasterSerial='r'+(runtime.rasterUid=(runtime.rasterUid??0)+1);   // as the CPU path names a reduced PNG
+ if(key!==null)cacheRaster(runtime,key,result);
+ return result;
+}
 function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,height,options={}){
  if(!(Number.isInteger(width)&&Number.isInteger(height)&&width>0&&height>0&&width<=4096&&height<=4096&&width*height<=4*1024*1024))fail('Skia raster extent exceeds4096px/4Mpixel VM limit');
  // options.scale (0 < scale < 1): the same recording replayed on a surface of round(width*scale) x round(height*scale) pixels (progressive raster while the screen is moving, src/compose-canvas-host.js
  // setContentRaster); the page stretches the smaller bitmap over the View's box. Pixel read-backs (Bitmap.getPixel) and typed surfaces are never scaled: they are the bitmap's own memory.
  const scale=options?.scale??1;if(!(Number.isFinite(scale)&&scale>0&&scale<=1))fail('Skia raster scale must be in (0, 1]');if(scale!==1&&(options?.pixels||options?.surfaceType))fail('Skia raster scale applies to display rasters only');
  const pw=scale===1?width:Math.max(1,Math.round(width*scale)),ph=scale===1?height:Math.max(1,Math.round(height*scale));
- const CK=backend.CanvasKit,state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas'),typed=options?.surfaceType?bitmapSurfaceSpec(CK,options.surfaceType):null,memory=typed?CK.Malloc(Uint8Array,width*height*typed.bytes):null,surface=typed?CK.MakeRasterDirectSurface({width,height,colorType:typed.colorType,alphaType:typed.alphaType,colorSpace:CK.ColorSpace.SRGB},memory,width*typed.bytes):CK.MakeSurface(pw,ph);if(!surface){if(memory)CK.Free(memory);fail('Skia CPU surface allocation failed');}const canvas=surface.getCanvas();canvas.clear(CK.TRANSPARENT);if(scale!==1)canvas.scale(pw/width,ph/height);
+ const gpuTransport=options?.transport==='gpu'||options?.transport==='gpu-png',gpu=gpuTransport?runtime.gpuRaster?.engine:null;if(gpuTransport&&(!gpu||options.pixels||options.surfaceType))fail('Skia GPU raster needs an active GPU engine and a display raster');
+ const CK=backend.CanvasKit,state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas'),typed=options?.surfaceType?bitmapSurfaceSpec(CK,options.surfaceType):null,memory=typed?CK.Malloc(Uint8Array,width*height*typed.bytes):null,surface=typed?CK.MakeRasterDirectSurface({width,height,colorType:typed.colorType,alphaType:typed.alphaType,colorSpace:CK.ColorSpace.SRGB},memory,width*typed.bytes):gpu?gpu.begin(pw,ph,options.transport==='gpu-png'):CK.MakeSurface(pw,ph);if(!surface){if(memory)CK.Free(memory);fail('Skia CPU surface allocation failed');}const canvas=surface.getCanvas();canvas.clear(CK.TRANSPARENT);if(scale!==1)canvas.scale(pw/width,ph/height);
  const activeNodes=new Set();let replayCount=0;   // a reduced replay (scale < 1) also scales the shadow light geometry, which Skia takes in device pixels (drawNodeShadow)
  const drawNodeShadow=node=>{
    const z=renderNodeShadowCaster(node);if(!z)return;const outline=node.outline,casterAlpha=node.alpha*outline.alpha;let path;
@@ -318,17 +355,18 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
   flush();
  };
  const r0=performance.now();try{replay(state.draws);
+  if(gpu&&options.transport==='gpu'){const bitmap=gpu.finish(surface),stats=runtime.rasterStats;if(stats){const ms=performance.now()-r0;stats.replayMs+=ms;stats.gpu=(stats.gpu??0)+1;stats.gpuMs=(stats.gpuMs??0)+ms;if(scale!==1){stats.reduced=(stats.reduced??0)+1;stats.reducedMs=(stats.reducedMs??0)+ms;}}return {kind:'bitmap-raster',width:pw,height:ph,...(scale===1?{}:{scale}),bitmap,drawCalls:state.draws.length,source:'official-Skia-Wasm/WebGL'};}
   surface.flush();const image=surface.makeImageSnapshot();
   // options.pixels: the canvas as straight (unpremultiplied) sRGB RGBA8 bytes, for Bitmap.getPixel / compress.
   // options.surfaceType (RGB_565 / RGBA_F16 / RGBA_1010102): the canvas was rasterized on a Skia surface of that color type; options.halfFloats also returns the unpremultiplied RGBA_F16 words (little-endian bytes) for Bitmap.getColor.
   if(options?.pixels){try{const pixels=image.readPixels(0,0,{width,height,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Unpremul,colorSpace:CK.ColorSpace.SRGB});if(!pixels)fail('Skia pixel read-back failed');let raw=null;if(options.raw){   // the bitmap's memory: a typed surface is directly backed by it, the N32 surface is read as premultiplied RGBA8
    if(memory)raw=Uint8Array.from(memory.toTypedArray());else{raw=image.readPixels(0,0,{width,height,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Premul,colorSpace:CK.ColorSpace.SRGB});if(!raw)fail('Skia native pixel read-back failed');raw=Uint8Array.from(raw);}}let halfFloats=null;if(options.halfFloats){halfFloats=image.readPixels(0,0,{width,height,colorType:CK.ColorType.RGBA_F16,alphaType:CK.AlphaType.Unpremul,colorSpace:CK.ColorSpace.SRGB});if(!halfFloats)fail('Skia RGBA_F16 read-back failed');halfFloats=Uint8Array.from(halfFloats);}return {kind:'pixels',width,height,pixels:Uint8Array.from(pixels),raw,halfFloats};}finally{image.delete();}}
-  const stats=runtime.rasterStats;const e0=performance.now();if(stats){stats.replayMs+=e0-r0;if(scale!==1){stats.reduced=(stats.reduced??0)+1;stats.reducedMs=(stats.reducedMs??0)+(e0-r0);}}
+  const stats=runtime.rasterStats;const e0=performance.now();if(stats){stats.replayMs+=e0-r0;if(scale!==1){stats.reduced=(stats.reduced??0)+1;stats.reducedMs=(stats.reducedMs??0)+(e0-r0);}if(gpu){stats.gpuPng=(stats.gpuPng??0)+1;stats.gpuMs=(stats.gpuMs??0)+(e0-r0);}}
   const reduced=scale===1?{}:{scale};   // a full-density raster is byte-identical to one made without the option
   // options.transport 'rgba': straight (unpremultiplied) sRGB RGBA8 bytes for the page to put on a canvas (no PNG encode, no base64, no decode); the page keeps a PNG path for every other raster.
   if(options?.transport==='rgba'){try{const pixels=image.readPixels(0,0,{width:pw,height:ph,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Unpremul,colorSpace:CK.ColorSpace.SRGB});if(!pixels)fail('Skia pixel read-back failed');if(stats)stats.encodeMs+=performance.now()-e0;return {kind:'rgba-raster',width:pw,height:ph,...reduced,pixels,drawCalls:state.draws.length,source:'official-Skia-Wasm/CPU'};}finally{image.delete();}}
- try{const png=image.encodeToBytes(CK.ImageFormat.PNG);if(stats)stats.encodeMs+=performance.now()-e0;if(!png)fail('Skia PNG encoding failed');let binary='';for(let at=0;at<png.length;at+=32768)binary+=String.fromCharCode(...png.subarray(at,at+32768));return {kind:'raster',dataURL:'data:image/png;base64,'+btoa(binary),width:pw,height:ph,...reduced,drawCalls:state.draws.length,source:'official-Skia-Wasm/CPU',pngBytes:png.length};}finally{image.delete();}
- }finally{surface.dispose();if(memory)CK.Free(memory);}
+ try{const png=image.encodeToBytes(CK.ImageFormat.PNG);if(stats)stats.encodeMs+=performance.now()-e0;if(!png)fail('Skia PNG encoding failed');let binary='';for(let at=0;at<png.length;at+=32768)binary+=String.fromCharCode(...png.subarray(at,at+32768));return {kind:'raster',dataURL:'data:image/png;base64,'+btoa(binary),width:pw,height:ph,...reduced,drawCalls:state.draws.length,source:gpu?'official-Skia-Wasm/WebGL':'official-Skia-Wasm/CPU',pngBytes:png.length};}finally{image.delete();}
+ }finally{if(gpu)gpu.release(surface);else surface.dispose();if(memory)CK.Free(memory);}
 }
 export function createSkiaCanvasHost(runtime,backend){
  const matrixHost=createMatrixAllocationHost();

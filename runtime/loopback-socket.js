@@ -6,8 +6,8 @@
 // SocketOutputStream run unchanged above it). A connection is two directional in-memory byte queues (64 KiB each, like the pipe2 implementation in libcore-io-native.js:
 // partial writes, a writer parks while the queue is full, EOF when the peer closed or shut down its write side). connect() completes at once (Linux finishes the loopback handshake
 // in the kernel before accept) and parks the server end in the listener's backlog. Threads park through the scheduler's Blocked and re-check their condition when woken.
-import { Blocked } from './scheduler.js?v=a76ada5ef6c6';
-import { throwNew } from './java-throw.js?v=a76ada5ef6c6';
+import { Blocked } from './scheduler.js?v=ba94ccb09d48';
+import { throwNew } from './java-throw.js?v=ba94ccb09d48';
 
 export const CAPACITY = 65536;
 const SOCKET_EXCEPTION = 'Ljava/net/SocketException;', TIMEOUT_EXCEPTION = 'Ljava/net/SocketTimeoutException;';

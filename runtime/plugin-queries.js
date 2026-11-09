@@ -15,7 +15,7 @@
 //   ConcurrentHashMap, the Collections wrappers), androidx ArrayMap / SimpleArrayMap, Kotlin's empty collections and ArrayDeque, Compose's persistent vectors, and the
 //   observable holders shown as their current value: kotlinx StateFlowImpl (`_state`), androidx LiveData (`mData`, `mVersion`), Compose snapshot state (the newest valid
 //   StateRecord of `next`: SnapshotMutableState, the Int/Long/Float/Double states, SnapshotStateList), and the java.util.concurrent atomics.
-import { isFreedId } from './heap-gc.js?v=a76ada5ef6c6';
+import { isFreedId } from './heap-gc.js?v=ba94ccb09d48';
 
 export const QUERY_LIMITS = { depth: 2, maxDepth: 6, maxFields: 200, maxFieldsLimit: 2000, maxItems: 20, maxItemsLimit: 500, maxString: 1000, maxStringLimit: 20000, maxNodes: 4000, budgetMs: 25 };
 const VIEW_MODEL_STORE = 'Landroidx/lifecycle/ViewModelStore;', VIEW_MODEL = 'Landroidx/lifecycle/ViewModel;';
@@ -23,6 +23,9 @@ const FRAGMENT = 'Landroidx/fragment/app/Fragment;', FRAGMENT_MANAGER = 'Landroi
 const FRAGMENT_HOST = 'Landroidx/fragment/app/FragmentHostCallback;', FRAGMENT_STORE = 'Landroidx/fragment/app/FragmentStore;', FRAGMENT_NON_CONFIG = 'Landroidx/fragment/app/FragmentManagerViewModel;';
 const STATE_RECORD = 'Landroidx/compose/runtime/snapshots/StateRecord;', STATE_OBJECT = 'Landroidx/compose/runtime/snapshots/StateObject;', SNAPSHOT_LIST = 'Landroidx/compose/runtime/snapshots/SnapshotStateList;';
 const STATE_FLOW = 'Lkotlinx/coroutines/flow/StateFlowImpl;', LIVE_DATA = 'Landroidx/lifecycle/LiveData;', SYMBOL = 'Lkotlinx/coroutines/internal/Symbol;';
+const REFERENCE = 'Ljava/lang/ref/Reference;', REFERENT_KEY = 'Ljava/lang/ref/Reference;->referent:Ljava/lang/Object;', THREAD_LOCAL = 'Ljava/lang/ThreadLocal;', LAZY_UNSET = 'Lkotlin/UNINITIALIZED_VALUE;';
+const REFERENCE_TYPES = new Set([REFERENCE, 'Ljava/lang/ref/WeakReference;', 'Ljava/lang/ref/SoftReference;', 'Ljava/lang/ref/PhantomReference;']);   // a subclass keeps its own fields; its referent shows as the field `referent`
+const LAZY_TYPES = new Set(['Lkotlin/SynchronizedLazyImpl;', 'Lkotlin/SafePublicationLazyImpl;', 'Lkotlin/UnsafeLazyImpl;']);
 const MAP = 'Ljava/util/Map;', COLLECTION = 'Ljava/util/Collection;', OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', ENUM = 'Ljava/lang/Enum;';
 
 /** A query failure the plugin sees as `error.code` (src/plugin-runtime.js turns it into an Error). */
@@ -85,7 +88,7 @@ export function createHeapReader(runtime, { now = () => performance.now() } = {}
   function fields(rec) {
     if (!rec || rec.cells !== undefined) return [];
     const list = declared(rec.type), out = [], known = new Set();
-    for (const field of list) { known.add(field.key); out.push({ ...field, value: rec.fields?.has(field.key) ? rec.fields.get(field.key) : undefined }); }
+    for (const field of list) { known.add(field.key); out.push({ ...field, value: rec.fields?.has(field.key) ? rec.fields.get(field.key) : field.key === REFERENT_KEY && rec.referent !== undefined ? rec.referent : undefined }); }
     if (rec.fields) for (const [key, value] of rec.fields) if (!known.has(key) && key.includes('->')) out.push({ key, ...parseKey(key), value });
     return out;
   }
@@ -231,6 +234,19 @@ export function createHeapReader(runtime, { now = () => performance.now() } = {}
       const entry = field(rec, 'value'), prim = { 'Ljava/util/concurrent/atomic/AtomicInteger;': 'I', 'Ljava/util/concurrent/atomic/AtomicLong;': 'J', 'Ljava/util/concurrent/atomic/AtomicBoolean;': 'I' }[type];
       const raw = rec.atomicValue !== undefined ? rec.atomicValue : entry?.value;
       return { kind: 'Atomic', value: raw, valueType: entry?.type ?? prim ?? (typeof raw === 'object' ? OBJECT : 'I'), boolean: type.endsWith('AtomicBoolean;') };
+    }
+    if (REFERENCE_TYPES.has(type)) {   // java.lang.ref.Weak/Soft/PhantomReference: the referent (host slot or the libcore field), null once cleared
+      const value = rec.referent !== undefined ? rec.referent : rec.fields?.get?.(REFERENT_KEY);
+      return { kind: 'Reference', value: value ?? null, valueType: OBJECT, extra: { cleared: value === undefined || value === null } };
+    }
+    if (LAZY_TYPES.has(type)) {   // Kotlin `by lazy`: the computed value, or not computed yet (the UNINITIALIZED_VALUE marker); reading never computes it
+      const entry = field(rec, '_value'); if (!entry) return null;
+      const inner = isRef(entry.value) ? record(entry.value.ref) : null, unset = inner?.type === LAZY_UNSET;
+      return { kind: 'Lazy', value: unset ? null : entry.value, valueType: OBJECT, extra: { initialized: !unset } };
+    }
+    if (rec.threadLocalValues instanceof Map || subtype(type, THREAD_LOCAL)) {   // java.lang.ThreadLocal: the value of the first thread that set one (the main thread for state the UI reads)
+      const values = rec.threadLocalValues instanceof Map ? [...rec.threadLocalValues.values()] : [];
+      return { kind: 'ThreadLocal', value: values[0] ?? null, valueType: OBJECT, extra: { threads: values.length } };
     }
     return null;
   }
@@ -395,18 +411,27 @@ export function listViewModels(runtime, reader = createHeapReader(runtime), { ma
 /** Resolves `path` ('a.b.0.c'; '' = the object itself) from the object of `handle`: field names (a Kotlin delegate `x$delegate` answers to `x`), list / array indexes,
  * map keys, and observable holders are looked through when the segment is not one of their own fields. -> { value, type } (raw) */
 export function resolvePath(runtime, reader, handle, path) {
-  const rec = liveRecord(runtime, handle); let value = { ref: rec.id ?? parseHandle(runtime, handle) }, type = rec.type;
-  const segments = String(path ?? '').split('.').map(part => part.trim()).filter(Boolean);
+  const rec = liveRecord(runtime, handle);
+  return walkPath(reader, { value: { ref: rec.id ?? parseHandle(runtime, handle) }, type: rec.type }, path);
+}
+/** A path as segments: 'a.b.0' splits on dots; an array keeps each item whole (a map key that has dots: ['_instances', 'a.b.C::_root_', 'value']). */
+export function pathSegments(path) {
+  const segments = Array.isArray(path) ? path.map(part => String(part ?? '')).filter(part => part.length) : String(path ?? '').split('.').map(part => part.trim()).filter(Boolean);
   if (segments.length > 32) throw new PluginQueryError('bad-path', 'Caminho longo demais (máximo 32 partes).');
+  if (segments.some(part => part.length > 500)) throw new PluginQueryError('bad-path', 'Parte do caminho longa demais (máximo 500 caracteres).');
+  return segments;
+}
+function walkPath(reader, start, path) {
+  let { value, type } = start; const segments = pathSegments(path), label = Array.isArray(path) ? JSON.stringify(path).slice(0, 200) : String(path);
   for (const segment of segments) {
     let next;
     for (let guard = 0; guard < 5; guard++) {   // a field / index / key of the value, its size, or else look through a holder (StateFlow, LiveData, MutableState, atomic) to its current value
       next = step(reader, value, segment) ?? sizeOf(reader, value, segment); if (next !== undefined) break;
       const current = reader.isRef(value) ? reader.record(value.ref) : null, held = current && reader.holder(current); if (!held) break;
-      if (segment === 'value') { next = { value: held.value, type: held.valueType }; break; }   // 'x.value': the holder's current value itself
+      if (segment === 'value' || segment === 'get' || segment === 'get()') { next = { value: held.value, type: held.valueType }; break; }   // 'x.value' / 'ref.get': the holder's current value itself (StateFlow.value, Reference.get(), Lazy.value)
       value = held.value; type = held.valueType;
     }
-    if (next === undefined) throw new PluginQueryError('bad-path', `Campo não encontrado: "${segment}" em ${String(path)}`);
+    if (next === undefined) throw new PluginQueryError('bad-path', `Campo não encontrado: "${segment}" em ${label}`);
     ({ value, type } = next);
   }
   return { value, type };
@@ -429,6 +454,130 @@ function step(reader, value, segment) {
   return undefined;
 }
 
+// ---- static fields, classes, instances and referrers -----------------------------------------------------------------------------------------------------------------
+// The roots a screen-level query does not reach: state kept in a static field (a Kotlin `object`, a companion, a singleton holder, a dependency-injection container kept
+// globally) and objects that no ViewModel holds. Still read-only: a class that was never initialized is reported as such and never initialized by a query (its <clinit>
+// would run app code); the heap scans are bounded by a time budget and resume from a cursor, so a large heap costs several short queries, never a long pause of the VM.
+export const SCAN_LIMITS = { limit: 50, maxLimit: 500, budgetMs: 40, maxBudgetMs: 200, classLimit: 100, maxClassLimit: 1000 };
+/** 'a.b.C', 'a.b.C$Inner', 'a/b/C' or 'La/b/C;' -> the descriptor 'La/b/C;'. */
+export function classDescriptor(name) {
+  const text = String(name ?? '').trim();
+  if (!text || text.length > 400) throw new PluginQueryError('bad-class', 'Nome de classe inválido.');
+  if (text.startsWith('[')) throw new PluginQueryError('bad-class', 'Use o nome de uma classe, não de um array.');
+  return text.startsWith('L') && text.endsWith(';') ? text : `L${text.replaceAll('.', '/')};`;
+}
+const classStatus = (runtime, type) => runtime.initialized?.get?.(type)?.status ?? 'not-initialized';
+function classRecord(runtime, type) {
+  let cls = null; try { cls = runtime.classes?.get?.(type) ?? null; } catch { cls = null; }
+  if (!cls) throw new PluginQueryError('no-class', `Classe não encontrada nos DEX do app: ${dotted(type)}`);
+  return cls;
+}
+function staticDeclarations(cls) {
+  const out = []; for (const entry of cls.staticFields ?? []) { try { const field = cls.dex.field(entry.index); out.push({ key: field.key, owner: field.owner, name: field.name, type: field.type }); } catch { /* unreadable declaration */ } }
+  return out;
+}
+/** The static fields a class declares, read as JSON. A class not initialized yet answers status 'not-initialized' and no values (a query never runs <clinit>). */
+export function readStatics(runtime, reader, className, options = {}) {
+  const type = classDescriptor(className), cls = classRecord(runtime, type), status = classStatus(runtime, type), declared = staticDeclarations(cls);
+  const out = { className: dotted(type), status, fields: {} };
+  if (status !== 'initialized' && status !== 'initializing') { out.note = 'classe ainda não inicializada pelo app: os campos estáticos não existem ainda (uma consulta nunca roda o <clinit>)'; out.declared = declared.map(field => ({ name: field.name, type: typeName(field.type) })); return out; }
+  const o = { depth: 1, ...options };
+  for (const field of declared) {
+    if (!runtime.staticFields.has(field.key)) { out.fields[field.name] = null; continue; }
+    const result = reader.view(runtime.staticFields.get(field.key), field.type, o);
+    out.fields[field.name] = result.value; if (result.truncated) out.$truncated = true;
+  }
+  return out;
+}
+/** The raw value at `path` from a static field: the first segment is the field's name (declared by the class or one of its superclasses), the rest walks as in resolvePath. */
+export function resolveStaticPath(runtime, reader, className, path) {
+  const type = classDescriptor(className), segments = pathSegments(path); classRecord(runtime, type);
+  if (!segments.length) throw new PluginQueryError('bad-path', 'Informe o campo estático: lab.staticField(classe, "campo.caminho").');
+  const [name, ...rest] = segments;
+  for (let owner = type, guard = 0; owner && guard < 64; guard++) {
+    let cls = null; try { cls = runtime.classes?.get?.(owner) ?? null; } catch { cls = null; }
+    const field = cls ? staticDeclarations(cls).find(item => item.name === name || item.name === `${name}$delegate` || item.name === `_${name}`) : null;
+    if (field) {
+      const status = classStatus(runtime, field.owner);
+      if (status !== 'initialized' && status !== 'initializing') throw new PluginQueryError('not-initialized', `${dotted(field.owner)} ainda não foi inicializada pelo app: o campo estático ${name} não existe ainda (uma consulta nunca roda o <clinit>)`);
+      return walkPath(reader, { value: runtime.staticFields.has(field.key) ? runtime.staticFields.get(field.key) : null, type: field.type }, rest);
+    }
+    try { owner = runtime.parent(owner); } catch { owner = null; }
+    if (owner === OBJECT) break;
+  }
+  throw new PluginQueryError('bad-path', `Campo estático não encontrado: ${name} em ${dotted(type)}`);
+}
+/** Classes of the app's DEX files whose name matches `match` (a case-insensitive part of the name, or '/regex/flags'): [{ className, status, staticFields }]. */
+export function listClasses(runtime, { match = '', limit, initialized = false } = {}) {
+  const text = String(match ?? '').trim(); if (!text) throw new PluginQueryError('bad-args', 'Informe parte do nome da classe: lab.classes("Container").');
+  let test; const regex = /^\/(.+)\/([a-z]*)$/.exec(text);
+  if (regex) { let pattern; try { pattern = new RegExp(regex[1], regex[2].replace(/[gy]/g, '')); } catch (error) { throw new PluginQueryError('bad-args', `Expressão regular inválida: ${error.message}`); } test = name => pattern.test(name); }
+  else { const needle = text.toLowerCase(); test = name => name.toLowerCase().includes(needle); }
+  const max = boundedInt(limit, SCAN_LIMITS.classLimit, SCAN_LIMITS.maxClassLimit, 1), items = []; let matched = 0;
+  for (const type of runtime.classes?.keys?.() ?? []) {
+    const name = dotted(type); if (!test(name)) continue;
+    const status = classStatus(runtime, type); if (initialized && status !== 'initialized') continue;
+    matched++; if (items.length >= max) continue;
+    let statics = null; if (status === 'initialized') { try { statics = runtime.classes.get(type)?.staticFields?.length ?? 0; } catch { statics = null; } }
+    items.push({ className: name, status, staticFields: statics });
+  }
+  return { items, matched, ...(matched > items.length ? { $more: matched - items.length } : {}) };
+}
+const boundedInt = (value, fallback, max, min = 0) => { const n = Number(value); return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.floor(n))) : fallback; };
+/** Walks the heap records from id `after` (exclusive) for at most `budgetMs`; `visit(record, id)` returns false to stop. -> { scanned, next (cursor) | null when the heap ended } */
+function scanHeap(runtime, { after = 0, budgetMs, now }, visit) {
+  const heap = runtime.heap, deadline = now() + budgetMs, start = Math.max(0, Math.floor(Number(after) || 0)) + 1; let scanned = 0;
+  if (!heap?.chunks) throw new PluginQueryError('failed', 'Heap da VM indisponível para varredura.');
+  const shift = 12, size = 1 << shift;
+  for (let ci = start >>> shift; ci < heap.chunks.length; ci++) {
+    const chunk = heap.chunks[ci]; if (chunk === undefined) continue;
+    for (let i = ci === start >>> shift ? start & (size - 1) : 0; i < chunk.length; i++) {
+      const rec = chunk[i]; if (rec === undefined || rec.freed === true) continue;
+      const id = ci * size + i; scanned++;
+      if (visit(rec, id) === false) return { scanned, next: id };
+      if ((scanned & 1023) === 0 && now() > deadline) return { scanned, next: id };
+    }
+  }
+  return { scanned, next: null };
+}
+/** Live objects of a class (and its subclasses / implementors unless `subclasses: false`): { items: [{ handle, className }], scanned, next, done }. Pass `after: next` to go on. */
+export function findInstances(runtime, reader, className, { subclasses = true, limit, after = 0, budgetMs } = {}, now = () => performance.now()) {
+  const type = classDescriptor(className), max = boundedInt(limit, SCAN_LIMITS.limit, SCAN_LIMITS.maxLimit, 1), budget = boundedInt(budgetMs, SCAN_LIMITS.budgetMs, SCAN_LIMITS.maxBudgetMs, 1);
+  const verdicts = new Map(), items = [];
+  const matches = recType => { let hit = verdicts.get(recType); if (hit === undefined) { hit = recType === type || (subclasses !== false && reader.subtype(recType, type)); verdicts.set(recType, hit); } return hit; };
+  const result = scanHeap(runtime, { after, budgetMs: budget, now }, (rec, id) => {
+    if (typeof rec.type !== 'string' || !matches(rec.type)) return true;
+    items.push({ handle: handleOf(runtime, rec.id ?? id), className: dotted(rec.type) });
+    return items.length < max;
+  });
+  return { items, scanned: result.scanned, next: result.next, done: result.next === null };
+}
+/** Who holds the object of `handle`: static fields (first page only) and heap objects whose fields, array cells or host slots point to it.
+ * { items: [{ kind: 'static', className, field } | { kind: 'object', handle, className, via }], scanned, next, done } */
+export function findReferrers(runtime, reader, handle, { limit, after = 0, budgetMs } = {}, now = () => performance.now()) {
+  const target = liveRecord(runtime, handle), id = target.id ?? parseHandle(runtime, handle), max = boundedInt(limit, SCAN_LIMITS.limit, SCAN_LIMITS.maxLimit, 1), budget = boundedInt(budgetMs, SCAN_LIMITS.budgetMs, SCAN_LIMITS.maxBudgetMs, 1);
+  const items = [], points = value => value !== null && typeof value === 'object' && value.ref === id;
+  if (!(Number(after) > 0)) for (const [key, value] of runtime.staticFields ?? []) { if (items.length >= max) break; if (points(value)) { const { owner, name } = parseKey(key); items.push({ kind: 'static', className: dotted(owner), field: name }); } }
+  const via = rec => {
+    if (rec.fields) for (const [key, value] of rec.fields) if (points(value)) return key.includes('->') ? parseKey(key).name : key;
+    if (rec.cells !== undefined) { const cells = rec.cells; if (!ArrayBuffer.isView(cells)) for (let i = 0; i < cells.length; i++) if (points(cells[i])) return `[${i}]`; }
+    for (const key of Object.keys(rec)) {   // host slots (a reference's referent, a ThreadLocal's values, host-backed state)
+      if (key === 'fields' || key === 'cells' || key === 'type' || key === 'id') continue;
+      const value = rec[key]; if (points(value)) return key;
+      if (value instanceof Map) { for (const item of value.values()) if (points(item)) return key; }
+      else if (Array.isArray(value) && value.length <= 4096) { for (const item of value) if (points(item)) return key; }
+    }
+    return null;
+  };
+  const result = scanHeap(runtime, { after, budgetMs: budget, now }, (rec, recId) => {
+    if (recId === id) return true;
+    const path = via(rec); if (path === null) return true;
+    items.push({ kind: 'object', handle: handleOf(runtime, rec.id ?? recId), className: dotted(rec.type), via: path });
+    return items.length < max;
+  });
+  return { items, scanned: result.scanned, next: result.next, done: result.next === null };
+}
+
 /** Compose layout tree of src/compose-inspector.js reduced to what a plugin needs (no thumbnails, no modifiers list). */
 export function compactComposeTree(inspection, { maxNodes = 2000 } = {}) {
   if (!inspection) return { owners: [], totalNodes: 0, truncated: false, notes: [] };
@@ -442,7 +591,7 @@ export function compactComposeTree(inspection, { maxNodes = 2000 } = {}) {
   return { owners, totalNodes: inspection.totalNodes ?? 0, truncated, density: inspection.density ?? null, notes: inspection.notes ?? [] };
 }
 
-/** One plugin query: { query: 'viewModels' | 'fragments' | 'activity' | 'inspect' | 'field', args } -> JSON value. Throws PluginQueryError. `composeTree` is served by the Worker. */
+/** One plugin query: { query: 'viewModels' | 'fragments' | 'activity' | 'inspect' | 'field' | 'statics' | 'staticField' | 'classes' | 'instances' | 'referrers', args } -> JSON value. Throws PluginQueryError. `composeTree` is served by the Worker. */
 export function runPluginQuery(runtime, query, args = {}) {
   if (!runtime) throw new PluginQueryError('no-apk', 'Nenhum APK em execução.');
   const reader = createHeapReader(runtime);
@@ -452,6 +601,11 @@ export function runPluginQuery(runtime, query, args = {}) {
     case 'activity': { const rec = runtime.activity && reader.record(runtime.activity.ref); return rec ? { handle: handleOf(runtime, rec.id ?? runtime.activity.ref), className: dotted(rec.type) } : null; }
     case 'inspect': { const rec = liveRecord(runtime, args.handle); const result = reader.view({ ref: rec.id ?? parseHandle(runtime, args.handle) }, rec.type, args.options ?? {}); if (result.truncated && result.value && typeof result.value === 'object') result.value.$truncated = true; return result.value; }
     case 'field': { const target = resolvePath(runtime, reader, args.handle, args.path); const result = reader.view(target.value, target.type, { depth: 1, ...(args.options ?? {}) }); if (result.truncated && result.value && typeof result.value === 'object') result.value.$truncated = true; return result.value; }
+    case 'statics': return readStatics(runtime, reader, args.className, args.options ?? {});
+    case 'staticField': { const target = resolveStaticPath(runtime, reader, args.className, args.path); const result = reader.view(target.value, target.type, { depth: 1, ...(args.options ?? {}) }); if (result.truncated && result.value && typeof result.value === 'object') result.value.$truncated = true; return result.value; }
+    case 'classes': return listClasses(runtime, args);
+    case 'instances': return findInstances(runtime, reader, args.className, args);
+    case 'referrers': return findReferrers(runtime, reader, args.handle, args);
     default: throw new PluginQueryError('bad-query', `Consulta desconhecida: ${String(query).slice(0, 40)}`);
   }
 }

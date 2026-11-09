@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=a76ada5ef6c6';
-import { createRasterReceiver } from './raster-cache.js?v=a76ada5ef6c6';
+import { createWebAudioPlayer } from './web-audio-player.js?v=ba94ccb09d48';
+import { createRasterReceiver } from './raster-cache.js?v=ba94ccb09d48';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=a76ada5ef6c6', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=ba94ccb09d48', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -86,11 +86,11 @@ export class APKWorkerClient {
       catch (error) { this.cancel(error); }
     });
   }
-  async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], endpointMocks = [], eventSeconds = 0, permissions = null, motionRaster = true, rasterScale = undefined, rasterNavigation = true, logcatStreaming = false } = {}) {
+  async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], endpointMocks = [], eventSeconds = 0, permissions = null, motionRaster = true, rasterScale = undefined, rasterNavigation = true, logcatStreaming = false, renderer = 'cpu' } = {}) {
     this.cancel(); this.rasters.reset(); this.apiGaps = null;
-    const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, endpointMocks, eventSeconds, permissions, motionRaster, rasterScale, rasterNavigation, logcatStreaming }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
-    this.appData = response.appData ?? null;
-    return { inventory: response.inventory, appData: this.appData };
+    const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, endpointMocks, eventSeconds, permissions, motionRaster, rasterScale, rasterNavigation, logcatStreaming, renderer: renderer === 'gpu' ? 'gpu' : 'cpu' }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
+    this.appData = response.appData ?? null; this.renderer = response.renderer ?? null;
+    return { inventory: response.inventory, appData: this.appData, renderer: this.renderer };
   }
   /** Settings > Apps > Clear storage for the loaded app: wipes its stored data; the caller restarts the app. Resolves with the new usage status. */
   async clearAppData() { const response = await this.request('app-data-clear', {}, { timeoutMs: this.eventTimeoutMs }); this.appData = response.appData ?? null; return this.appData; }
@@ -119,6 +119,8 @@ export class APKWorkerClient {
   /** Debugging tool: installs the return-value overrides ([{ method, value, enabled }]) in the running VM; resolves with one status per entry. */
   async setMethodOverrides(overrides) { return (await this.sideCall('method-overrides', { overrides })).statuses; }
   /** "Resolução no movimento" (1 = always full density, or 0.75 / 0.5 / 0.35 / 0.25) and "Tela nova em baixa resolução", applied live. */
+  /** "Renderização" (src/gpu-raster.js): 'cpu' (default) or 'gpu' (experimental), applied live; resolves the renderer status (requested, active, fallback reason). */
+  async setRenderer(renderer) { const response = await this.sideCall('renderer', { renderer: renderer === 'gpu' ? 'gpu' : 'cpu' }); this.renderer = response.renderer ?? null; return response.renderer; }
   async setRasterSettings({ scale, navigation }) { return (await this.sideCall('raster-settings', { scale, navigation })).raster; }
   async setTimeLimits(seconds) { return (await this.sideCall('time-limits', { seconds })).limits; }
   /** The Logcat panel opened (the Worker posts its recent lines, then streams) or closed (only a counter, src/logcat.js). Without a Worker there is nothing to stream. */

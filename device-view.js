@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=a76ada5ef6c6';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=a76ada5ef6c6';
-import { isTrustedRasterURL } from './raster-cache.js?v=a76ada5ef6c6';
+import { updateWebViewSlot } from './webview-slot.js?v=ba94ccb09d48';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=ba94ccb09d48';
+import { isTrustedRasterURL } from './raster-cache.js?v=ba94ccb09d48';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -16,6 +16,19 @@ export function paintRgbaContentLayer(element, drawing, counters) {
   if (layer._image !== drawing.image) {
     if (layer.width !== drawing.width || layer.height !== drawing.height) { layer.width = drawing.width; layer.height = drawing.height; }
     const putStarted = Date.now(); layer.getContext('2d').putImageData(drawing.image, 0, 0); counters.putMs += Date.now() - putStarted; layer._image = drawing.image; layer.dataset.rasterId = drawing.rasterId;
+    if (drawing.scale !== undefined && drawing.scale < 1) { layer.dataset.rasterScale = String(drawing.scale); counters.reducedDrawn++; } else delete layer.dataset.rasterScale;
+    layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-canvas-content'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0';
+  }
+}
+/** A GPU frame (renderer "GPU (experimental)", src/gpu-raster.js): the ImageBitmap the Worker transferred is drawn on the content layer's canvas (a GPU copy, no pixel decode). */
+export function paintBitmapContentLayer(element, drawing, counters) {
+  if (!(drawing.image?.width === drawing.width && drawing.image?.height === drawing.height && drawing.width > 0 && drawing.height > 0)) throw new Error('Quadro GPU de conteúdo Canvas inválido recebido da VM.');
+  if (drawing.scale !== undefined && !(drawing.scale > 0 && drawing.scale <= 1)) throw new Error('Escala de raster inválida recebida da VM.');
+  let layer = element._contentLayer; if (!layer || layer.tagName !== 'CANVAS') { layer = element._contentLayer = document.createElement('canvas'); layer._image = null; }
+  if (layer._image !== drawing.image) {
+    if (layer.width !== drawing.width || layer.height !== drawing.height) { layer.width = drawing.width; layer.height = drawing.height; }
+    const putStarted = Date.now(), context = layer.getContext('2d'); context.clearRect(0, 0, drawing.width, drawing.height); context.drawImage(drawing.image, 0, 0); counters.putMs += Date.now() - putStarted; layer._image = drawing.image; layer.dataset.rasterId = drawing.rasterId;
+    counters.bitmapsDrawn = (counters.bitmapsDrawn ?? 0) + 1;
     if (drawing.scale !== undefined && drawing.scale < 1) { layer.dataset.rasterScale = String(drawing.scale); counters.reducedDrawn++; } else delete layer.dataset.rasterScale;
     layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-canvas-content'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0';
   }
@@ -305,6 +318,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
     if (kind === 'input' || kind === 'progress') throw new Error('Canvas sobre controle HTML exige um contêiner.');
     const drawing = view.contentRaster;
     if (drawing.kind === 'rgba-raster') paintRgbaContentLayer(element, drawing, runtimeFrames);   // raw pixels from the VM (src/raster-cache.js): put on a canvas, no PNG decode
+    else if (drawing.kind === 'bitmap-raster') paintBitmapContentLayer(element, drawing, runtimeFrames);   // GPU renderer (opt-in): an ImageBitmap drawn on the same canvas layer
     else {
       let layer = element._contentLayer; if (!layer || layer.tagName !== 'IMG') layer = element._contentLayer = document.createElement('img');
       if (drawing.kind !== 'raster' || !pngURLOk(drawing.dataURL) || !(drawing.width > 0 && drawing.height > 0)) throw new Error('PNG de conteúdo Canvas inválido recebido da VM.');

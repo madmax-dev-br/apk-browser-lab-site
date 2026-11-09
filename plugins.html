@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=a76ada5ef6c6">
+  <link rel="stylesheet" href="./site-pages.css?v=ba94ccb09d48">
 </head>
 <body>
   <header class="topbar">
@@ -31,6 +31,7 @@
         <li><a href="#pacote">Filtro de pacote</a></li>
         <li><a href="#json">Exportar e importar</a></li>
         <li><a href="#api">A API lab</a></li>
+        <li><a href="#estado-global">Estado fora da tela</a></li>
         <li><a href="#valores">Valores e handles</a></li>
         <li><a href="#custos">Custos e limites</a></li>
         <li><a href="#nao-permitido">O que não é permitido</a></li>
@@ -54,6 +55,7 @@
             <li><a href="#pacote">Filtro de pacote</a></li>
             <li><a href="#json">Exportar e importar</a></li>
             <li><a href="#api">A API lab</a></li>
+            <li><a href="#estado-global">Estado fora da tela</a></li>
             <li><a href="#valores">Valores e handles</a></li>
             <li><a href="#custos">Custos e limites</a></li>
             <li><a href="#nao-permitido">O que não é permitido</a></li>
@@ -156,8 +158,13 @@
             <tr><td><code>await lab.fragments()</code></td><td>Os fragments androidx na tela, com os filhos: <code>[{ handle, className, who, tag, id, hidden, state, children }]</code>.</td></tr>
             <tr><td><code>await lab.activity()</code></td><td><code>{ handle, className }</code> da Activity atual.</td></tr>
             <tr><td><code>await lab.inspect(handle, opções)</code></td><td>Os campos de um objeto em JSON. Opções: <code>depth</code> (2), <code>maxFields</code> (200), <code>maxItems</code> (20), <code>maxString</code> (1000).</td></tr>
-            <tr><td><code>await lab.field(handle, 'a.b.0.c', opções)</code></td><td>Um valor por caminho: nomes de campo (um delegate Kotlin <code>x$delegate</code> responde por <code>x</code>), índices de lista ou array, chaves de mapa, <code>size</code>. Um StateFlow, LiveData, MutableState ou atômico é atravessado; <code>x.value</code> é o valor atual.</td></tr>
-            <tr><td><code>lab.watch(handle, caminho, fn, opções)</code></td><td>Lê o campo a cada <code>intervalMs</code> (padrão 500, mínimo 250) e chama <code>fn(valor, anterior)</code> só quando muda. Se o objeto for coletado, o watch para e <code>onError</code> recebe o erro. Devolve a função que para.</td></tr>
+            <tr><td><code>await lab.field(handle, 'a.b.0.c', opções)</code></td><td>Um valor por caminho: nomes de campo (um delegate Kotlin <code>x$delegate</code> responde por <code>x</code>), índices de lista ou array, chaves de mapa, <code>size</code>. Um StateFlow, LiveData, MutableState ou atômico é atravessado; <code>x.value</code> é o valor atual. Um <code>WeakReference</code>/<code>SoftReference</code> (<code>ref.get</code>), um <code>by lazy</code> do Kotlin e um <code>ThreadLocal</code> também são atravessados. Uma parte com pontos (uma chave de mapa) vai num array: <code>['registro', 'a.b.Tipo::escopo', 'value']</code>.</td></tr>
+            <tr><td><code>lab.watch(handle, caminho, fn, opções)</code></td><td><code>handle</code> também pode ser <code>{ static: 'pacote.Classe' }</code> para seguir um campo estático. Lê o campo a cada <code>intervalMs</code> (padrão 500, mínimo 250) e chama <code>fn(valor, anterior)</code> só quando muda. Se o objeto for coletado, o watch para e <code>onError</code> recebe o erro. Devolve a função que para.</td></tr>
+            <tr><td><code>await lab.statics('pacote.Classe', opções)</code></td><td>Os campos estáticos de uma classe que o app já inicializou: <code>{ className, status, fields }</code>. Serve para um <code>object</code> Kotlin, um companion, um singleton ou um contêiner de injeção de dependências guardado num campo estático. Uma classe ainda não inicializada responde <code>status: 'not-initialized'</code> e a lista <code>declared</code>: a consulta nunca roda o <code>&lt;clinit&gt;</code>.</td></tr>
+            <tr><td><code>await lab.staticField('pacote.Classe', caminho, opções)</code></td><td>Um valor por caminho a partir de um campo estático, como <code>lab.field</code>: <code>lab.staticField('a.b.Registro', 'atual.estado.value')</code>. O primeiro nome é o campo estático (da classe ou de uma superclasse).</td></tr>
+            <tr><td><code>await lab.classes('parte do nome', { limit, initialized })</code></td><td>As classes do APK cujo nome contém o texto (ou casam com <code>'/regex/'</code>): <code>{ items: [{ className, status, staticFields }], matched }</code>. Para achar a classe que guarda um estático.</td></tr>
+            <tr><td><code>await lab.instances('pacote.Classe', { subclasses, limit, after, maxPages })</code></td><td>Os objetos vivos de uma classe (subclasses e implementações incluídas, a menos que <code>subclasses: false</code>): <code>{ items: [{ handle, className }], scanned, done, next }</code>. Varre o heap em páginas curtas; <code>next</code> continua uma varredura que parou (<code>after</code>).</td></tr>
+            <tr><td><code>await lab.referrers(handle, { limit, after })</code></td><td>Quem segura um objeto: campos estáticos (<code>{ kind: 'static', className, field }</code>) e objetos cujo campo, célula de array ou slot interno aponta para ele (<code>{ kind: 'object', handle, className, via }</code>). Para descobrir o caminho até um objeto achado com <code>instances</code>.</td></tr>
           </tbody>
         </table></div>
         <h3>Saída e utilidades</h3>
@@ -177,18 +184,47 @@
         <p>Cada chamada de <code>lab.ui</code> acrescenta um bloco. Um bloco com o mesmo <code>id</code> é substituído no lugar, o que permite atualizar um valor sem empilhar saída. Texto é sempre mostrado como texto, nunca como HTML.</p>
       </section>
 
+      <section id="estado-global" aria-labelledby="h-estado">
+        <h2 id="h-estado">Estado fora da tela</h2>
+        <p>Nem todo estado está num ViewModel da tela. Muitos apps guardam objetos num campo estático: um <code>object</code> Kotlin, um companion, um singleton ou o contêiner de injeção de dependências, que mantém escopos e as instâncias criadas em cada escopo. Esses objetos não aparecem em <code>lab.viewModels()</code>, mas estão no heap. Há três caminhos para chegar até eles, todos só de leitura:</p>
+        <ol>
+          <li><b>Pela classe que guarda o estático.</b> <code>lab.classes('Contexto')</code> acha o nome; <code>lab.statics(nome)</code> mostra os campos; <code>lab.staticField(nome, caminho)</code> desce até o valor.</li>
+          <li><b>Pela classe do objeto.</b> Quando você sabe o tipo, mas não o caminho: <code>lab.instances('pacote.Armazenamento')</code> devolve os objetos vivos desse tipo com seus handles, e <code>lab.inspect</code> / <code>lab.field</code> leem os campos.</li>
+          <li><b>De volta até a raiz.</b> <code>lab.referrers(handle)</code> mostra quem segura o objeto (um campo estático, um mapa de um escopo, um ViewModel). Repetindo, você descobre o caminho e depois usa o caminho direto, que é mais barato.</li>
+        </ol>
+        <pre><code>// Um contêiner de injeção de dependências num campo estático: escopos -&gt; instâncias.
+// Os nomes abaixo são de exemplo; use lab.classes / lab.statics para achar os do seu app.
+const raiz = await lab.statics('com.exemplo.di.ContextoGlobal');
+lab.ui.json(raiz.fields, { id: 'raiz' });                 // veja onde está o registro de escopos
+
+// Os objetos de um tipo, onde quer que estejam (escopo, ViewModel, singleton):
+const { items } = await lab.instances('com.exemplo.tela.Armazenamento', { limit: 5 });
+for (const item of items) lab.ui.json(await lab.field(item.handle, 'dados', { depth: 2 }), { id: item.handle });
+
+// Quem guarda o primeiro deles (para saber o caminho a partir do estático):
+if (items[0]) lab.ui.table((await lab.referrers(items[0].handle)).items, ['kind', 'className', 'via', 'field'], { id: 'quem' });
+
+// Uma chave de mapa com pontos vai num array:
+const valor = await lab.staticField('com.exemplo.di.ContextoGlobal', ['registro', 'escopos', 'com.exemplo.Tela::id', 'valor']);
+
+// Seguir um estático ao vivo:
+lab.watch({ static: 'com.exemplo.Sessao' }, 'atual.usuario', v =&gt; lab.ui.json(v, { id: 'sessao' }));</code></pre>
+        <p><b>O que não dá para fazer:</b> chamar métodos, como <code>escopo.get&lt;Tipo&gt;()</code>. Uma consulta lê os campos que o objeto já tem; um objeto que o app ainda não criou não existe para a consulta, e uma classe que o app ainda não inicializou mostra só os nomes dos campos. Uma referência fraca (<code>WeakReference</code>) mostra o objeto enquanto ele existir: <code>caminho.get</code> ou <code>caminho.value</code>.</p>
+        <p><b>Custo:</b> <code>statics</code>, <code>staticField</code> e <code>classes</code> custam como <code>field</code>. <code>instances</code> e <code>referrers</code> varrem o heap em páginas de no máximo 40 ms, uma por consulta, e o plugin junta as páginas sozinho; num app grande a resposta pode levar algumas centenas de milissegundos sem travar a tela. Use-as para descobrir o caminho e depois troque por <code>staticField</code> ou <code>field</code> no <code>watch</code>.</p>
+      </section>
+
       <section id="valores" aria-labelledby="h-valores">
         <h2 id="h-valores">Valores e handles</h2>
         <ul>
           <li><b>Primitivos</b> viram números e booleanos; <code>long</code> fora do intervalo seguro vira string; <code>char</code> e <code>String</code> viram string (cortada em <code>maxString</code>).</li>
           <li><b>Objetos</b> viram <code>{ $type, $handle, fields }</code> até a profundidade pedida; além dela, só <code>{ $type, $handle }</code>.</li>
           <li><b>Coleções conhecidas</b> viram <code>{ $kind: 'list' | 'set', size, items }</code>, mapas <code>{ $kind: 'map', size, entries }</code>, arrays <code>{ $kind: 'array', size, items }</code>, enums <code>{ $kind: 'enum', name }</code>.</li>
-          <li><b>Observáveis</b> mostram o valor atual: <code>{ $kind: 'StateFlow' | 'LiveData' | 'MutableState' | 'Atomic', value }</code>. Coleções e observáveis não gastam profundidade; ciclos viram <code>$seen</code>; um corte por tempo ou por número de campos marca <code>$truncated</code>.</li>
+          <li><b>Observáveis</b> mostram o valor atual: <code>{ $kind: 'StateFlow' | 'LiveData' | 'MutableState' | 'Atomic' | 'Reference' | 'Lazy' | 'ThreadLocal', value }</code> (<code>Reference</code> também <code>cleared</code>, <code>Lazy</code> também <code>initialized</code>). Coleções e observáveis não gastam profundidade; ciclos viram <code>$seen</code>; um corte por tempo ou por número de campos marca <code>$truncated</code>.</li>
         </ul>
         <h3>Handles e “objeto coletado”</h3>
         <p>Um handle tem a forma <code>"h&lt;id&gt;.&lt;época&gt;"</code>: o id do objeto na VM e a época da VM. Um handle de outra execução é recusado. Guardar um handle <b>não</b> mantém o objeto vivo: quando o app o solta, o coletor o libera e a consulta responde com o código <code>collected</code> (“objeto coletado”). Trate esse erro buscando o objeto de novo, como faz o modelo Observar ViewModel.</p>
         <h3>Códigos de erro</h3>
-        <p>Os erros de consulta têm <code>error.code</code>: <code>no-apk</code>, <code>collected</code>, <code>bad-handle</code>, <code>bad-path</code>, <code>bad-query</code>, <code>busy</code> (a fila estava cheia ou a VM ficou ocupada; tente depois), <code>failed</code>. <code>lab.screenshot</code> também usa <code>no-image</code>, <code>not-found</code> (a <code>key</code> não está mais na tela) e <code>unsupported</code>.</p>
+        <p>Os erros de consulta têm <code>error.code</code>: <code>no-apk</code>, <code>collected</code>, <code>bad-handle</code>, <code>bad-path</code>, <code>bad-query</code>, <code>no-class</code> (a classe não está nos DEX), <code>not-initialized</code> (o app ainda não inicializou a classe), <code>bad-class</code>, <code>bad-args</code>, <code>busy</code> (a fila estava cheia ou a VM ficou ocupada; tente depois), <code>failed</code>. <code>lab.screenshot</code> também usa <code>no-image</code>, <code>not-found</code> (a <code>key</code> não está mais na tela) e <code>unsupported</code>.</p>
       </section>
 
       <section id="custos" aria-labelledby="h-custos">
@@ -198,7 +234,7 @@
           <li><b>Eventos:</b> <code>screen</code> vem do quadro que a página já desenhou. Logcat e rede são os lotes que a página já recebe, entregues no máximo a cada 250 ms. A VM só envia linhas do Logcat enquanto algum plugin escuta <code>log</code> ou o painel Logcat está aberto.</li>
           <li><b>Consultas à VM:</b> uma por vez, no máximo uma a cada 25 ms, respondidas de um cache por quadro (a mesma pergunta no mesmo quadro não vai à VM). Até 16 consultas pendentes por plugin.</li>
           <li><b>Na VM:</b> as consultas esperam numa fila e rodam só entre eventos do app, nunca até 120 ms depois de uma entrada sua, com no máximo 40 ms de consulta por segundo.</li>
-          <li><b>Mais caras:</b> <code>composeTree</code> e <code>layoutBounds</code> com nomes, uma por segundo por plugin; <code>screenshot</code>, uma a cada 500 ms (uma chamada antes disso espera a vez).</li>
+          <li><b>Mais caras:</b> <code>composeTree</code> e <code>layoutBounds</code> com nomes, uma por segundo por plugin; <code>screenshot</code>, uma a cada 500 ms (uma chamada antes disso espera a vez). <code>instances</code> e <code>referrers</code> varrem o heap em páginas de até 40 ms (no máximo 200 ms com <code>budgetMs</code>), cada página uma consulta na fila.</li>
           <li><b>Saída:</b> o painel redesenha no máximo 10 vezes por segundo e só aberto; console, erros e blocos têm limite.</li>
         </ul>
       </section>
@@ -324,6 +360,6 @@ await mostrar();</code></pre></div>
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./arquitetura.html">Arquitetura da VM</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=a76ada5ef6c6"></script>
+  <script type="module" src="./site-pages.js?v=ba94ccb09d48"></script>
 </body>
 </html>

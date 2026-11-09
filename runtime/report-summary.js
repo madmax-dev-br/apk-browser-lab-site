@@ -1,11 +1,11 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=a76ada5ef6c6';
-import { staticRetentionLines } from './heap-gc.js?v=a76ada5ef6c6';
-import { overrideSummaryLines } from './method-overrides.js?v=a76ada5ef6c6';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=a76ada5ef6c6';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=a76ada5ef6c6';
-import { hostMapSummaryLines } from './host-map.js?v=a76ada5ef6c6';
+import { TimeBreakdown } from './time-breakdown.js?v=ba94ccb09d48';
+import { staticRetentionLines } from './heap-gc.js?v=ba94ccb09d48';
+import { overrideSummaryLines } from './method-overrides.js?v=ba94ccb09d48';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=ba94ccb09d48';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=ba94ccb09d48';
+import { hostMapSummaryLines } from './host-map.js?v=ba94ccb09d48';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -43,6 +43,10 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
   part(() => {   // (a) memory
     const live = runtime.heap.size, limit = runtime.maxHeapObjects, last = runtime.gcPhases?.[0];
     out.push(`Memória: ${live} de ${limit} objetos vivos (${Math.round(100 * live / limit)}%), ~${Math.round(live * BYTES_PER_OBJECT / MiB)} MiB estimados; ${last ? `última coleta liberou ${last.before - last.after} (${last.before} → ${last.after}); ${runtime.gcStats?.collections ?? 0} coletas` : 'nenhuma coleta ainda'}${runtime.gcDeferralStats ? `, ${runtime.gcDeferralStats.episodes} adiadas durante movimento (${runtime.gcDeferralStats.idle} em repouso, ${runtime.gcDeferralStats.forced} forçadas pelo teto)` : ''}${runtime.oomCount ? `; OutOfMemoryError ${runtime.oomCount}×` : ''}`);
+  });
+  part(() => {   // renderer (src/gpu-raster.js): only when the experimental GPU replay was selected in this session; a fallback to CPU is never silent
+    const gpu = runtime.gpuRaster; if (!gpu) return; const s = gpu.status();
+    out.push(s.active === 'gpu' ? `Renderização: GPU (experimental, ${s.api ?? 'WebGL'}${s.gpuRenderer ? `, ${s.gpuRenderer}` : ''}): ${s.frames} quadros, ${s.gpuMs} ms, máx. ${s.maxMs} ms` : s.requested === 'gpu' || s.reason ? `Renderização: CPU — GPU indisponível: ${s.reason ?? 'desconhecido'}` : 'Renderização: CPU (padrão)');
   });
   part(() => { const lines = overrideSummaryLines(runtime); if (lines) out.push(...lines); });   // debugging tool in use: never silent (src/method-overrides.js)
   part(() => { const line = ignoredActivitiesLine(runtime); if (line) out.push(line); });   // debugging tool in use: never silent (src/ignored-activities.js)

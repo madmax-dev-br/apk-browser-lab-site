@@ -5,20 +5,20 @@
 // device settings -> setDevice, "Tempo máximo por evento" -> setTimeLimits, "Retornos de métodos" -> setMethodOverrides, "Activities ignoradas" -> setIgnoredActivities,
 // "Mock de endpoints" -> setEndpointMocks, "Permissões" / location / dialog -> setPermissions + permissionResponse, "Abrir" -> startIntent, Logcat -> setLogcatStreaming,
 // Compose -> inspectCompose, plugins -> src/plugin-host.js. The host page is another origin: everything it sends is validated here before it reaches the VM.
-import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=a76ada5ef6c6';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=a76ada5ef6c6';
-import { formatApiGapReport } from '../api-gap-scan.js?v=a76ada5ef6c6';
-import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=a76ada5ef6c6';
-import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=a76ada5ef6c6';
-import { parseMethodSpec } from '../method-overrides.js?v=a76ada5ef6c6';
-import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=a76ada5ef6c6';
-import { normalizeIntentRequest } from '../intent-resolver.js?v=a76ada5ef6c6';
-import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=a76ada5ef6c6';
-import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=a76ada5ef6c6';
-import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=a76ada5ef6c6';
-import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=a76ada5ef6c6';
-import { rowToEntry } from '../logcat.js?v=a76ada5ef6c6';
-import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=a76ada5ef6c6';
+import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=ba94ccb09d48';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=ba94ccb09d48';
+import { formatApiGapReport } from '../api-gap-scan.js?v=ba94ccb09d48';
+import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=ba94ccb09d48';
+import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=ba94ccb09d48';
+import { parseMethodSpec } from '../method-overrides.js?v=ba94ccb09d48';
+import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=ba94ccb09d48';
+import { normalizeIntentRequest } from '../intent-resolver.js?v=ba94ccb09d48';
+import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=ba94ccb09d48';
+import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=ba94ccb09d48';
+import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=ba94ccb09d48';
+import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=ba94ccb09d48';
+import { rowToEntry } from '../logcat.js?v=ba94ccb09d48';
+import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=ba94ccb09d48';
 
 export const SCREENSHOT_GAP_MS = 250, PLUGIN_OUTPUT_MS = 100, MAX_STREAM_BATCH = MAX_LOG_BATCH;
 const LAB_LIVE = ['methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog'];
@@ -35,6 +35,9 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
   let view = null, source = null, config = {}, lastActivity = null, destroyed = false, chain = Promise.resolve(), inflight = 0, oomSeen = 0, lastStubs = { void: [], returns: [], classes: [] }, packageName = '', tolerateRunning = 'off'; const dropped = [];
   let lastSnapshot = null, lastScreenKey = null, frameCount = 0, inventory = null, permConfig = emptyConfig(), lastError = null, lastShotAt = -Infinity, loaded = { memoryMiB: 0, strictCrash: false };
   let statuses = { methodOverrides: [], ignoredActivities: [], endpointMocks: [] };
+  let rendererStatus = null;   // the Worker's renderer status at load / after a live switch; later frames carry it in vmHealth.renderer
+  /** status().renderer: the backend in use ('cpu' | 'gpu'), what the config asked, the fallback reason and the GPU's name when the browser exposes it. */
+  const rendererOut = status => ({ requested: status?.requested ?? deviceState.settings.renderer ?? 'cpu', active: status?.active ?? 'cpu', reason: status?.reason ?? null, api: status?.api ?? null, gpuRenderer: status?.gpuRenderer ?? null });
   const subscribed = { logcat: false, network: false, screen: false }; let logcatSent = false;
   let pluginHost = null, pluginTimer = null; const pluginChanged = new Set();
   const pendingPermissions = new Map();
@@ -219,7 +222,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     try {
       const keep = buffer.slice(0); source.bytes = keep;
       const settings = deviceState.settings; loaded = { memoryMiB: settings.memoryMiB ?? 0, strictCrash: config.strictCrash === true };
-      const result = await vm.load(buffer, { device: deviceForVM(settings), tolerateMissing: tolerateRunning, strictCrash: loaded.strictCrash, webview: config.webview === 'on', keepData: source.keepData, clearData: !!dataOptions.clearData, motionRaster: deviceState.motionRaster !== false, memoryMiB: loaded.memoryMiB, eventSeconds: settings.eventSeconds ?? 0, logcatStreaming: wantsLogcat() }); if (token !== state.operation) return;
+      const result = await vm.load(buffer, { device: deviceForVM(settings), tolerateMissing: tolerateRunning, strictCrash: loaded.strictCrash, webview: config.webview === 'on', keepData: source.keepData, clearData: !!dataOptions.clearData, motionRaster: deviceState.motionRaster !== false, memoryMiB: loaded.memoryMiB, eventSeconds: settings.eventSeconds ?? 0, logcatStreaming: wantsLogcat(), renderer: settings.renderer ?? 'cpu' }); if (token !== state.operation) return; rendererStatus = result.renderer ?? null;
       logcatSent = wantsLogcat(); dataKey = null; reportData(result.appData);
       state.runtime = vm; state.inventory = result.inventory; inventory = result.inventory; packageName = String(result.inventory?.packageName || '');
       const rejected = []; await pushLab(loadKeys(), rejected); if (token !== state.operation) return;   // before any app code runs, as the panels' attach() does on the test page
@@ -309,7 +312,8 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     /** The live state of the debugging features: the statuses the VM gave and the hit counters of the last frame. */
     status() {
       return { running: running(), activity: lastSnapshot?.activityName ?? null, packageName: packageName || null, statuses: copyStatuses(), hits: { methodOverrides: lastSnapshot?.methodOverrides ?? [], ignoredActivities: lastSnapshot?.ignoredActivities ?? [], endpointMocks: lastSnapshot?.endpointMocks ?? [], hostMap: lastSnapshot?.hostMap ?? [] },
-        permissions: { states: { ...permConfig.states }, denials: { ...permConfig.denials }, once: [...permConfig.once] }, pendingPermissionRequests: [...pendingPermissions.keys()], streams: { ...subscribed }, plugins: pluginHost ? pluginHost.list().length : 0 };
+        permissions: { states: { ...permConfig.states }, denials: { ...permConfig.denials }, once: [...permConfig.once] }, pendingPermissionRequests: [...pendingPermissions.keys()], streams: { ...subscribed }, plugins: pluginHost ? pluginHost.list().length : 0,
+        renderer: rendererOut(lastSnapshot?.vmHealth?.renderer ?? rendererStatus) };
     },
     answerPermission(args) {
       if (!Number.isSafeInteger(args.id)) throw callError('bad-args', 'id must be an integer');
@@ -377,6 +381,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
           const result = await vm.setDevice(deviceForVM(settings)); if (result.snapshot) view.renderSnapshot(result.snapshot);
           outcome = result.outcome ? { changed: result.outcome.changed | 0, relaunched: result.outcome.relaunched | 0, delivered: result.outcome.delivered | 0 } : null;
         }
+        if (keys.has('renderer') && typeof vm.setRenderer === 'function') { try { rendererStatus = await vm.setRenderer(settings.renderer ?? 'cpu'); } catch (error) { rejected.push(`renderer (the VM did not apply it: ${String(error?.message ?? error).slice(0, 200)})`); } }   // live: the next frame uses the new backend (src/gpu-raster.js)
         if (keys.has('eventSeconds') && typeof vm.setTimeLimits === 'function') { try { await vm.setTimeLimits(settings.eventSeconds ?? 0); } catch (error) { rejected.push(`eventSeconds (the VM did not apply it: ${String(error?.message ?? error).slice(0, 200)})`); } }
         await pushLab(new Set([...keys].filter(key => LAB_LIVE.includes(key))), rejected);
         reply({ live: true, outcome });

@@ -27,7 +27,18 @@
  * @property {(handle: string, options?: { depth?: number, maxFields?: number, maxItems?: number, maxString?: number }) => Promise<any>} inspect
  *   Read-only JSON view of an object's fields (depth 2, 200 fields by default). Nested objects carry `$handle`; StateFlow / LiveData / MutableState show `value`.
  * @property {(handle: string, path: string, options?: object) => Promise<any>} field   One value by path ('orders.0.title', 'reviewer', 'count.size').
- * @property {(handle: string, path: string, fn: (value: any, previous: any) => void, options?: { intervalMs?: number, depth?: number, onError?: Function }) => () => void} watch
+ *   `path` may be an array when a part has dots (a map key): ['registry', 'a.b.Tipo::escopo', 'value']. Holders are looked through: StateFlow / LiveData / MutableState
+ *   / atomics, Weak/SoftReference (`ref.get`), Kotlin `by lazy` and ThreadLocal.
+ * @property {(className: string, options?: object) => Promise<{ className, status, fields, note? }>} statics   The static fields of a class the app already initialized
+ *   (a Kotlin object, a companion, a singleton holder, a dependency-injection container kept globally). A class not initialized answers status 'not-initialized': a query never runs <clinit>.
+ * @property {(className: string, path: string|string[], options?: object) => Promise<any>} staticField   One value by path from a static field: staticField('a.b.Holder', 'instance.state.value').
+ * @property {(match: string, options?: { limit?: number, initialized?: boolean }) => Promise<{ items: [{ className, status, staticFields }], matched }>} classes
+ *   Classes of the APK whose name contains `match` (or matches '/regex/'), to find the holder of a static.
+ * @property {(className: string, options?: { subclasses?: boolean, limit?: number, after?: number, maxPages?: number }) => Promise<{ items: [{ handle, className }], scanned, done, next }>} instances
+ *   Live objects of a class (subclasses and implementors included by default), found by scanning the heap in short pages. `next` continues an unfinished scan (`after`).
+ * @property {(handle: string, options?: { limit?: number, after?: number, maxPages?: number }) => Promise<{ items: [{ kind: 'static', className, field } | { kind: 'object', handle, className, via }], done, next }>} referrers
+ *   Who holds an object: static fields and objects whose field (`via`), array cell or host slot points to it.
+ * @property {(handle: string|{ static: string }, path: string|string[], fn: (value: any, previous: any) => void, options?: { intervalMs?: number, depth?: number, onError?: Function }) => () => void} watch
  *   Polls `field(handle, path)` every intervalMs (>= 250) and calls fn only when the value changed; returns the stop function. A collected object stops the watch.
  * @property {{ text(s: string, o?: {id?: string}): void, kv(obj: object, o?: {id?: string}): void, table(rows: object[], columns?: string[], o?: {id?: string}): void,
  *   json(value: any, o?: {id?: string}): void, image(blobOrScreenshot: Blob|{blob: Blob}, o?: {id?: string, caption?: string}): void, clear(): void, badge(s: string): void }} ui   Output of the plugin's panel. Each call adds a block; a block with the same `id`
@@ -77,6 +88,19 @@ export function pluginWorkerMain(scope) {
   });
   const wrapError = error => Object.assign(new Error(error?.message ?? 'Falha na consulta.'), { code: error?.code ?? 'failed' });
   const watches = new Set(), readyWrappers = new Map();
+  const viewOptions = options => ({ depth: options?.depth, maxFields: options?.maxFields, maxItems: options?.maxItems, maxString: options?.maxString });
+  const pathArg = path => Array.isArray(path) ? path.map(part => String(part ?? '')) : String(path ?? '');
+  // A heap scan is served in short pages (each one a bounded query between two VM events); this walks the pages until `limit` items, the end of the heap or `maxPages`.
+  async function pages(query, args, options) {
+    const limit = Math.max(1, Math.min(500, Number(options?.limit) || 50)), maxPages = Math.max(1, Math.min(500, Number(options?.maxPages) || 100)), items = [];
+    let after = Number(options?.after) || 0, scanned = 0, done = false, page = 0;
+    for (; page < maxPages && items.length < limit && !done; page++) {
+      const result = await call(query, { ...args, limit: limit - items.length, after, budgetMs: options?.budgetMs });
+      items.push(...(result?.items ?? [])); scanned += result?.scanned ?? 0; done = !!result?.done; after = result?.next ?? after;
+      if (result?.next === null || result?.next === undefined) done = true;
+    }
+    return { items, scanned, done, next: done ? null : after, pages: page };
+  }
   const lab = {
     on(name, fn) {
       name = String(name); if (typeof fn !== 'function') throw new TypeError('lab.on(nome, função)');
@@ -108,14 +132,20 @@ export function pluginWorkerMain(scope) {
     fragments: () => call('fragments', {}),
     activity: () => call('activity', {}),
     inspect: (handle, options = {}) => call('inspect', { handle: String(handle ?? ''), options: { depth: options?.depth, maxFields: options?.maxFields, maxItems: options?.maxItems, maxString: options?.maxString } }),
-    field: (handle, path = '', options = {}) => call('field', { handle: String(handle ?? ''), path: String(path ?? ''), options: { depth: options?.depth, maxFields: options?.maxFields, maxItems: options?.maxItems, maxString: options?.maxString } }),
-    watch(handle, path, fn, options = {}) {
+    field: (handle, path = '', options = {}) => call('field', { handle: String(handle ?? ''), path: pathArg(path), options: viewOptions(options) }),
+    statics: (className, options = {}) => call('statics', { className: String(className ?? ''), options: viewOptions(options) }),
+    staticField: (className, path = '', options = {}) => call('staticField', { className: String(className ?? ''), path: pathArg(path), options: viewOptions(options) }),
+    classes: (match, options = {}) => call('classes', { match: String(match ?? ''), limit: options?.limit, initialized: !!options?.initialized }),
+    instances: (className, options = {}) => pages('instances', { className: String(className ?? ''), subclasses: options?.subclasses !== false }, options),
+    referrers: (handle, options = {}) => pages('referrers', { handle: String(handle ?? '') }, options),
+    watch(handle, path, fn, options = {}) {   // handle: a handle, or { static: 'pacote.Classe' } to follow a static field
       if (typeof fn !== 'function') throw new TypeError('lab.watch(handle, caminho, função)');
       const interval = Math.max(250, Number(options?.intervalMs) || 500); let last, first = true, busy = false, stopped = false;
       const tick = async () => {
         if (busy || stopped) return; busy = true;
         try {
-          const value = await lab.field(handle, path, { depth: options?.depth, maxItems: options?.maxItems, maxString: options?.maxString }), text = textOf(value);
+          const read = handle && typeof handle === 'object' && handle.static ? lab.staticField(handle.static, path, options) : lab.field(handle, path, options);
+          const value = await read, text = textOf(value);
           if (!stopped && (first || text !== last)) { const previous = first || last === undefined ? undefined : JSON.parse(last); first = false; last = text; await fn(value, previous); }
         } catch (error) {
           if (error?.code === 'collected' || error?.code === 'bad-handle') { stop(); }
