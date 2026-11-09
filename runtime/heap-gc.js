@@ -38,8 +38,8 @@
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=5c6c5cdda771';
-import { cellBytes } from './java-arrays.js?v=5c6c5cdda771';
+import { BUCKET } from './time-breakdown.js?v=7ad88626efdb';
+import { cellBytes } from './java-arrays.js?v=7ad88626efdb';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
