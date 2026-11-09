@@ -27,10 +27,19 @@
 //  - PhantomReference (and subclasses): get() never returns the referent and the marker never traces through it. When the referent is otherwise unreachable the reference is cleared and enqueued.
 //    ART enqueues phantom references after finalization; the lab runs no finalizers, so a phantom is enqueued in the same collection that finds its referent unreachable.
 //
+// Collections outside motion (deferral): a collection that becomes due only through the normal pacing (the threshold and gcMinAlloc rules of collectionDue) while the main thread is in motion --
+// a Choreographer frame running or pending, input delivered in the last GC_INPUT_SETTLE_MS, the main Looper with due work (AndroidPlatform.mainThreadMotion) -- waits for the first idle moment
+// of the main thread (MessageQueue.next about to block with no frame pending: the tail of AndroidPlatform.drainEvents), so a 50-95 ms pause does not land inside an animation. The wait has a
+// ceiling: the collection runs anyway, in motion, once the heap grew by GC_DEFER_MARGIN of the limit past the point where it became due (bounded by half the room left below NEAR_LIMIT) or after
+// GC_DEFER_MAX_MS of host time, whichever comes first. The safety rules are never deferred: NEAR_LIMIT, the array-cell pressure, gcPressure (a native resource, System.gc, the OOM headroom), the
+// emergency collection at an allocation site, and the soft-reference policy apply as before; audit and stress collections ignore the pacing altogether. gcStats.recent names the outcome: 'idle'
+// (deferred, ran at the idle moment), 'forced' (deferred, the ceiling ran it in motion; `deferral.forcedBy` says which), 'threshold' / 'safepoint' (not deferred) and every entry records `motion`,
+// the main thread's state when it ran (null = idle). gcStats.deferrals counts the episodes.
+//
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=b2ddf4678f67';
-import { cellBytes } from './java-arrays.js?v=b2ddf4678f67';
+import { BUCKET } from './time-breakdown.js?v=e96a854757f6';
+import { cellBytes } from './java-arrays.js?v=e96a854757f6';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -39,7 +48,7 @@ const tracked = new Set();
 export function gcRoot(container) { tracked.add(new WeakRef(container)); return container; }
 
 const ID_KEY = /(^id$|Id$|Ids$|^ids$|^ref$|Ref$|Refs$|^view$|View$|^target$|Target$|^receiver$|Receiver$|^owner$|Owner$|^activity$|Activity$|^object$|Object$|^handle$)/;
-const SKIP_PROPS = new Set(['heap', 'dex', 'classes', 'resolvedClasses', 'resolveCache', 'hostMethodRefs', 'subtypeMemo', 'ancestorSets', 'methodEvidence', 'nativeBindings', 'apkEntries', 'traceRing', 'trace', 'scheduler', 'resources', 'gcStats', 'gcSkips', 'allocationSamples', 'nativeArrays', 'nativeRanges', 'profile', 'monitor', 'gcPhases', 'hostAllocs', 'allProgs', 'methodOverrides', 'methodOverridesAll']);   // nativeArrays/nativeRanges pin an array's address only while the array lives (pruned after marking)   // gcStats keeps past nextId values: counters that look like object ids and would pin whatever object had that id
+const SKIP_PROPS = new Set(['heap', 'dex', 'classes', 'resolvedClasses', 'resolveCache', 'hostMethodRefs', 'subtypeMemo', 'ancestorSets', 'methodEvidence', 'nativeBindings', 'apkEntries', 'traceRing', 'trace', 'scheduler', 'resources', 'gcStats', 'gcSkips', 'gcDeferral', 'gcDeferralStats', 'allocationSamples', 'nativeArrays', 'nativeRanges', 'profile', 'monitor', 'gcPhases', 'hostAllocs', 'allProgs', 'methodOverrides', 'methodOverridesAll']);   // nativeArrays/nativeRanges pin an array's address only while the array lives (pruned after marking)   // gcStats keeps past nextId values: counters that look like object ids and would pin whatever object had that id
 const NUMERIC_ARRAY_LIMIT = 256;
 
 function tombstone(id, type) {
@@ -260,6 +269,8 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   const started = performance.now(), heap = runtime.heap, before = heap.size;
   const blocked = quiescent(runtime, safepoint) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null);
   if (blocked) { const skips = (runtime.gcSkips ??= {}); skips[blocked] = (skips[blocked] ?? 0) + 1; return { collected: false, reason: blocked, before, after: before, freed: 0, ms: 0 }; }
+  // The main thread's state as this collection starts (null = idle) and the deferral episode it closes, if one was pending: a paced collection becomes 'idle' or 'forced' (see the header).
+  const motion = runtime.platform?.mainThreadMotion?.() ?? null, closed = closeDeferral(runtime, reason, motion, started), deferral = closed.deferral; reason = closed.reason;
   const policy = clearSoft === false ? null : clearSoft === true ? 'forced' : softPolicy(runtime, { reason, emergency }), softMode = policy !== null;   // pressured collection: soft references are cleared (see the header)
   const { limit, markedHas, setCategory, markId, scan, drain, ephemerons, violations, idLike, weakIds, softIds, phantomIds, nodes, count, pruned, visited } = createMarker(runtime, { clearSoft: softMode });
   const t0 = performance.now(); let worstRoot = { key: '-', ms: 0, nodes: 0 };
@@ -357,7 +368,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
       collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
     }
   }
-  const phases = { reason, before, after: heap.size, rootsMs: Math.round(rootsMs), schedulerRootsMs: Math.round(tDrain - tRoots), markMs: Math.round(tSweep - tDrain), sweepMs: Math.round(tRebuild - tSweep), rebuildMs: Math.round(performance.now() - tRebuild), nodes: nodes(), marked: count(), worstRoot: { key: worstRoot.key, ms: Math.round(worstRoot.ms), nodes: worstRoot.nodes }, idRange: limit, blocksInUse: heap.usedChunks().length, pruned: pruned(), topByNodes: runtime.gcTopRoots.byNodes, topByMs: runtime.gcTopRoots.byMs, at: Math.round(performance.now()) };
+  const phases = { reason, motion, deferral, before, after: heap.size, rootsMs: Math.round(rootsMs), schedulerRootsMs: Math.round(tDrain - tRoots), markMs: Math.round(tSweep - tDrain), sweepMs: Math.round(tRebuild - tSweep), rebuildMs: Math.round(performance.now() - tRebuild), nodes: nodes(), marked: count(), worstRoot: { key: worstRoot.key, ms: Math.round(worstRoot.ms), nodes: worstRoot.nodes }, idRange: limit, blocksInUse: heap.usedChunks().length, pruned: pruned(), topByNodes: runtime.gcTopRoots.byNodes, topByMs: runtime.gcTopRoots.byMs, at: Math.round(performance.now()) };
   const name = type => String(type).replace(/^L|;$/g, '').replaceAll('/', '.');
   const top = field => [...survivors].sort((a, b) => b[1][field] - a[1][field]).slice(0, 12).map(([type, v]) => ({ type: name(type), n: v.n, bytes: v.bytes }));
   phases.survivorsByCount = top('n'); phases.survivorsByBytes = top('bytes');
@@ -397,7 +408,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
     runtime.platform.queueTask(() => { for (const reference of cleared) { try { runtime.dispatch({ owner: 'Ljava/lang/ref/Reference;', name: 'enqueue', parameters: [], result: 'Z', signature: '()Z' }, [reference], 'virtual'); } catch { /* the queue is gone with its owner */ } } }, 0, cleared, { deferred: true });
   }
   runtime.allocationSamples = null; runtime.gcPressure = false; runtime.gcCellPressure = false; runtime.gcLastNextId = runtime.nextId; runtime.fieldSlots = fieldSlots; runtime.arrayCells = arrayCells; runtime.arrayBytes = arrayBytes; runtime.collectionCells = collectionCells;
-  runtime.gcStats = { collections: (runtime.gcStats?.collections ?? 0) + 1, freed: (runtime.gcStats?.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(runtime.gcStats?.peakLiveAfterGc ?? 0, heap.size), lastReason: reason, softCleared: (runtime.gcStats?.softCleared ?? 0) + softCleared, softCollections: (runtime.gcStats?.softCollections ?? 0) + (softMode ? 1 : 0), weakCleared: (runtime.gcStats?.weakCleared ?? 0) + weakCleared, phantomCleared: (runtime.gcStats?.phantomCleared ?? 0) + phantomCleared, totalMs: (runtime.gcStats?.totalMs ?? 0) + (performance.now() - started), recent: [...(runtime.gcStats?.recent ?? []).slice(-15), { at: Math.round(started), ms: Math.round(performance.now() - started), markMs: Math.round(markMs), before, after: heap.size, nextId: runtime.nextId, reason, ...(softMode ? { soft: policy, softCleared } : {}) }] };
+  runtime.gcStats = { collections: (runtime.gcStats?.collections ?? 0) + 1, freed: (runtime.gcStats?.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(runtime.gcStats?.peakLiveAfterGc ?? 0, heap.size), lastReason: reason, softCleared: (runtime.gcStats?.softCleared ?? 0) + softCleared, softCollections: (runtime.gcStats?.softCollections ?? 0) + (softMode ? 1 : 0), weakCleared: (runtime.gcStats?.weakCleared ?? 0) + weakCleared, phantomCleared: (runtime.gcStats?.phantomCleared ?? 0) + phantomCleared, totalMs: (runtime.gcStats?.totalMs ?? 0) + (performance.now() - started), deferrals: runtime.gcDeferralStats ?? null, recent: [...(runtime.gcStats?.recent ?? []).slice(-15), { at: Math.round(started), ms: Math.round(performance.now() - started), markMs: Math.round(markMs), before, after: heap.size, nextId: runtime.nextId, reason, motion, ...(deferral ? { deferral } : {}), ...(softMode ? { soft: policy, softCleared } : {}) }] };
   return { collected: true, reason, before, after: heap.size, freed, ms: Math.round(performance.now() - started), markMs: Math.round(markMs), softPolicy: policy, softCleared };
 }
 
@@ -431,7 +442,51 @@ export function collectionDue(runtime, threshold = Math.floor(runtime.maxHeapObj
   if (runtime.gcLastEnd && (runtime.gcLastMs ?? 0) >= 20 && runtime.heap.size < runtime.maxHeapObjects * 0.85 && performance.now() - runtime.gcLastEnd < 8 * runtime.gcLastMs) return false;   // collections under 20 ms are cheap enough to run whenever they are due
   if (runtime.gcCellPressure) return true;   // half of the array-cell budget is in use (newArray)
   if (runtime.gcPressure) return allocated >= Math.min(wait, Math.max(1024, wait >> 2));   // a native resource count asked for it (regex handles are capped at 16384): wait less, but not for every quantum
-  return allocated >= wait && runtime.heap.size >= Math.max(threshold, runtime.gcNextAt ?? 0);
+  if (!(allocated >= wait && runtime.heap.size >= Math.max(threshold, runtime.gcNextAt ?? 0))) return false;
+  return !deferred(runtime);   // due by the normal pacing alone: it may wait for the main thread's idle moment (see the header)
+}
+
+/**
+ * Deferral ceilings, chosen on the two example flows (scripts/validation/bench-gc-motion.mjs, Node, 2026-11-08): a motion window (frames pending back to back) lasts a median 172-195 ms, p90
+ * 330-383 ms, at most 635-863 ms of host time in the Compose flow (63 / 83 / 121 ms in the XML one) and allocates a median 4950, p90 17676, at most 22695 objects (36-63 objects per host ms).
+ * GC_DEFER_MAX_MS = 500 ms lets more than nine windows in ten finish before the collector runs. GC_DEFER_MARGIN = 5% of the limit (13107 objects at the default 262144) covers 84% of whole windows
+ * (more of the part left once a collection is due, mid-window) and bounds how far a wait can raise the peak heap: a 10% margin let the Compose flow's peak grow 15% (145 k -> 167 k), 5% held it to
+ * 8-12% (157-162 k over two runs; 6 of 8 collections at idle, 2 forced by the heap ceiling). Whichever ceiling the app reaches first ends the wait. A runtime may override both (runtime.gcDeferMaxMs, runtime.gcDeferMargin: tests).
+ */
+export const GC_DEFER_MAX_MS = 500, GC_DEFER_MARGIN = 0.05;
+/**
+ * True when a collection that is due by the normal pacing must wait: the main thread is in motion (runtime.platform.mainThreadMotion() names why) and the deferral's ceilings are not reached.
+ * The first held check opens the episode (runtime.gcDeferral: when, at which heap size and allocation count, its ceilings); later checks count against it. An idle check does not close it --
+ * the collection that follows does (collectGarbage), so its reason can say 'idle'. A runtime without a platform (unit tests of the pacing) never defers.
+ */
+function deferred(runtime) {
+  const motion = runtime.platform?.mainThreadMotion?.() ?? null;
+  const state = runtime.gcDeferral;
+  if (motion === null) return false;
+  const now = performance.now();
+  if (!state) {
+    const limit = runtime.headroomBase || runtime.maxHeapObjects, size = runtime.heap.size, margin = runtime.gcDeferMargin ?? GC_DEFER_MARGIN;
+    const room = Math.max(0, Math.floor(Math.min(limit * margin, (limit * NEAR_LIMIT - size) / 2)));   // never past half the room left below NEAR_LIMIT
+    runtime.gcDeferral = { since: now, heap: size, allocatedAt: runtime.nextId, ceiling: size + room, until: now + (runtime.gcDeferMaxMs ?? GC_DEFER_MAX_MS), held: 1, reasons: { [motion]: 1 }, forcedBy: null };
+    return true;
+  }
+  state.held++; state.reasons[motion] = (state.reasons[motion] ?? 0) + 1;
+  if (runtime.heap.size >= state.ceiling) { state.forcedBy = 'heap'; return false; }
+  if (now >= state.until) { state.forcedBy = 'time'; return false; }
+  return true;
+}
+/** Closes the deferral episode (if any) for the collection that is running now: the outcome for its reason and gcStats.recent entry, and the running totals (gcStats.deferrals). */
+function closeDeferral(runtime, reason, motion, now) {
+  const state = runtime.gcDeferral; if (!state) return { reason, deferral: undefined };
+  runtime.gcDeferral = null;
+  const paced = reason === 'threshold' || reason === 'safepoint';
+  if (paced && motion !== null && state.forcedBy === null) state.forcedBy = runtime.heap.size >= (runtime.headroomBase || runtime.maxHeapObjects) * NEAR_LIMIT ? 'near-limit' : runtime.gcCellPressure ? 'cell-pressure' : runtime.gcPressure ? 'pressure' : 'unknown';   // a safety rule ran it, not the ceiling
+  const outcome = paced ? (motion === null ? 'idle' : 'forced') : reason;
+  const deferral = { ms: Math.round(now - state.since), allocated: runtime.nextId - state.allocatedAt, grown: runtime.heap.size - state.heap, held: state.held, reasons: state.reasons, forcedBy: outcome === 'forced' ? state.forcedBy : null };
+  const totals = runtime.gcDeferralStats ??= { episodes: 0, idle: 0, forced: 0, forcedBy: {}, absorbed: 0, maxMs: 0, totalMs: 0, maxAllocated: 0 };
+  totals.episodes++; totals.totalMs += deferral.ms; totals.maxMs = Math.max(totals.maxMs, deferral.ms); totals.maxAllocated = Math.max(totals.maxAllocated, deferral.allocated);
+  if (outcome === 'idle') totals.idle++; else if (outcome === 'forced') { totals.forced++; totals.forcedBy[deferral.forcedBy] = (totals.forcedBy[deferral.forcedBy] ?? 0) + 1; } else totals.absorbed++;   // an emergency, audit, stress or manual collection ran while a deferral was pending
+  return { reason: outcome, deferral };
 }
 
 /** Collects when the live heap passed `threshold` (default 40% of the limit) or in audit mode (every call). */
@@ -449,7 +504,7 @@ export function maybeCollect(runtime, options = {}) {
   if (audit && runtime.nextId - (runtime.gcLastNextId ?? 0) < Number(globalThis.process?.env?.APKWEB_GC_AUDIT_MIN ?? 200)) return { collected: false, reason: 'audit-small-event', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };
   if (!audit && !runtime.gcPressure && runtime.gcLastNextId === runtime.nextId) return { collected: false, reason: 'nothing-allocated', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // no allocation since the last collection: nothing new can be garbage
   // Hysteresis: after a collection the next one waits until the heap grew by 25% of the limit (a heap that is legitimately large must not be re-scanned on every event).
-  if (!audit && !collectionDue(runtime, threshold)) return { collected: false, reason: 'below-threshold', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };
+  if (!audit && !collectionDue(runtime, threshold)) return { collected: false, reason: runtime.gcDeferral ? 'deferred-in-motion' : 'below-threshold', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // a held collection says so (see collectionDue / deferred)
   return collectGarbage(runtime, { ...options, audit, reason: audit ? 'audit' : 'threshold' });
 }
 

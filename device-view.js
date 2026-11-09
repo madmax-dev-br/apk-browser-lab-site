@@ -1,11 +1,24 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=b2ddf4678f67';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=b2ddf4678f67';
-import { isTrustedRasterURL } from './raster-cache.js?v=b2ddf4678f67';
+import { updateWebViewSlot } from './webview-slot.js?v=e96a854757f6';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=e96a854757f6';
+import { isTrustedRasterURL } from './raster-cache.js?v=e96a854757f6';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
+}
+/** A View's raw-pixel content raster on its canvas layer. The canvas holds the raster's own pixels (a reduced-scale replay while the screen moves, src/motion-raster.js,
+ * has fewer); its CSS box is the View's, so the browser stretches it over the same size. `counters.putMs` / `counters.reducedDrawn` are the page's frame stats. */
+export function paintRgbaContentLayer(element, drawing, counters) {
+  if (!(drawing.image?.width === drawing.width && drawing.image?.height === drawing.height && drawing.width > 0 && drawing.height > 0)) throw new Error('Pixels de conteúdo Canvas inválidos recebidos da VM.');
+  if (drawing.scale !== undefined && !(drawing.scale > 0 && drawing.scale <= 1)) throw new Error('Escala de raster inválida recebida da VM.');
+  let layer = element._contentLayer; if (!layer || layer.tagName !== 'CANVAS') { layer = element._contentLayer = document.createElement('canvas'); layer._image = null; }
+  if (layer._image !== drawing.image) {
+    if (layer.width !== drawing.width || layer.height !== drawing.height) { layer.width = drawing.width; layer.height = drawing.height; }
+    const putStarted = Date.now(); layer.getContext('2d').putImageData(drawing.image, 0, 0); counters.putMs += Date.now() - putStarted; layer._image = drawing.image; layer.dataset.rasterId = drawing.rasterId;
+    if (drawing.scale !== undefined && drawing.scale < 1) { layer.dataset.rasterScale = String(drawing.scale); counters.reducedDrawn++; } else delete layer.dataset.rasterScale;
+    layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-canvas-content'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0';
+  }
 }
 /**
  * ctx: { $ (id lookup), state, deviceState ({settings, bars, clockTimer}), hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, clickView, notifyParent, hooks }
@@ -16,7 +29,7 @@ const { $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKErr
 // VM timer events (animations, handlers) can arrive faster than the display refreshes: only the newest is rendered, once per frame. An RPC result
 // (renderSnapshot called directly) is always newer than a queued event, so renderSnapshot clears the queue.
 let webviews = null;   // the page side of the WebViews of the bound VM (src/webview-frame.js); null when the host disables WebView
-const runtimeFrames = { pending: null, requested: false, vmBusy: false, coalesced: 0, rendered: 0, seq: 0, drawMs: 0, putMs: 0, log: [], drawn: [] };   // log: arrival of each runtime snapshot (page clock, frames the Worker had produced, snapshots drawn so far) for the produced-vs-displayed measurement
+const runtimeFrames = { pending: null, requested: false, vmBusy: false, coalesced: 0, rendered: 0, seq: 0, drawMs: 0, putMs: 0, reducedDrawn: 0, log: [], drawn: [] };   // reducedDrawn: reduced-scale rasters put on a canvas (src/motion-raster.js)   // log: arrival of each runtime snapshot (page clock, frames the Worker had produced, snapshots drawn so far) for the produced-vs-displayed measurement
 const nextFrame = globalThis.requestAnimationFrame ? callback => globalThis.requestAnimationFrame(callback) : callback => setTimeout(callback, 16);
 function flushRuntimeSnapshot(vm) {
   runtimeFrames.requested = false; const snapshot = runtimeFrames.pending; runtimeFrames.pending = null;
@@ -291,15 +304,8 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (view.contentRaster) {
     if (kind === 'input' || kind === 'progress') throw new Error('Canvas sobre controle HTML exige um contêiner.');
     const drawing = view.contentRaster;
-    if (drawing.kind === 'rgba-raster') {   // raw pixels from the VM (src/raster-cache.js): put on a canvas, no PNG decode
-      if (!(drawing.image?.width === drawing.width && drawing.image?.height === drawing.height && drawing.width > 0 && drawing.height > 0)) throw new Error('Pixels de conteúdo Canvas inválidos recebidos da VM.');
-      let layer = element._contentLayer; if (!layer || layer.tagName !== 'CANVAS') { layer = element._contentLayer = document.createElement('canvas'); layer._image = null; }
-      if (layer._image !== drawing.image) {
-        if (layer.width !== drawing.width || layer.height !== drawing.height) { layer.width = drawing.width; layer.height = drawing.height; }
-        const putStarted = Date.now(); layer.getContext('2d').putImageData(drawing.image, 0, 0); runtimeFrames.putMs += Date.now() - putStarted; layer._image = drawing.image; layer.dataset.rasterId = drawing.rasterId;
-        layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-canvas-content'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0';
-      }
-    } else {
+    if (drawing.kind === 'rgba-raster') paintRgbaContentLayer(element, drawing, runtimeFrames);   // raw pixels from the VM (src/raster-cache.js): put on a canvas, no PNG decode
+    else {
       let layer = element._contentLayer; if (!layer || layer.tagName !== 'IMG') layer = element._contentLayer = document.createElement('img');
       if (drawing.kind !== 'raster' || !pngURLOk(drawing.dataURL) || !(drawing.width > 0 && drawing.height > 0)) throw new Error('PNG de conteúdo Canvas inválido recebido da VM.');
       if (layer._url !== drawing.dataURL) { layer.src = drawing.dataURL; layer._url = drawing.dataURL; layer.alt = ''; layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-canvas-content'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0'; }

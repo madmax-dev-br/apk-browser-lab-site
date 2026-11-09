@@ -1,47 +1,49 @@
-import { buildScreenState } from './screen-state.js?v=b2ddf4678f67';
-import { createLogcat } from './logcat.js?v=b2ddf4678f67';
-import { createNetlog } from './netlog.js?v=b2ddf4678f67';
-import { reportSummary } from './report-summary.js?v=b2ddf4678f67';
-import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=b2ddf4678f67';
-import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=b2ddf4678f67';
-import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=b2ddf4678f67';
-import { TimeBreakdown } from './time-breakdown.js?v=b2ddf4678f67';
-import { createMessageSink } from './audio-native.js?v=b2ddf4678f67';
-import { loadAPK } from './apk-loader.js?v=b2ddf4678f67';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=b2ddf4678f67';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=b2ddf4678f67';
-import { createWebViewBackend } from './webview-backend.js?v=b2ddf4678f67';
-import { FrameworkProvider } from './framework-provider.js?v=b2ddf4678f67';
-import { createRasterSender } from './raster-cache.js?v=b2ddf4678f67';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=b2ddf4678f67';
-import { dispatchPointer } from './pointer-input-host.js?v=b2ddf4678f67';
-import { resolveDevice } from './device-profile.js?v=b2ddf4678f67';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=b2ddf4678f67';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=b2ddf4678f67';
-import { SkiaProvider } from './skia-provider.js?v=b2ddf4678f67';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=b2ddf4678f67';
-import { SemanticsPacer } from './semantics-pacing.js?v=b2ddf4678f67';
-import { disposeTextLayout } from './text-layout-native.js?v=b2ddf4678f67';
-import { IcuBreakProvider } from './icu-break-provider.js?v=b2ddf4678f67';
-import { SqliteProvider } from './sqlite-native.js?v=b2ddf4678f67';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=b2ddf4678f67';
-import { TzdataProvider } from './java-time-native.js?v=b2ddf4678f67';
-import { ZlibProvider } from './zip-native.js?v=b2ddf4678f67';
-import { IcuConverterProvider } from './icu-converter-native.js?v=b2ddf4678f67';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=b2ddf4678f67';
-import { JavacryptoProvider } from './javacrypto-native.js?v=b2ddf4678f67';
-import { disposeColorFilters } from './color-filter-native.js?v=b2ddf4678f67';
-import { disposeRegex } from './regex-native.js?v=b2ddf4678f67';
-import { disposeRenderNodes } from './rendernode-native.js?v=b2ddf4678f67';
-import { startDeepLink } from './deep-link-host.js?v=b2ddf4678f67';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=b2ddf4678f67';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=b2ddf4678f67';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=b2ddf4678f67';
+import { buildScreenState } from './screen-state.js?v=e96a854757f6';
+import { createLogcat } from './logcat.js?v=e96a854757f6';
+import { createNetlog } from './netlog.js?v=e96a854757f6';
+import { reportSummary } from './report-summary.js?v=e96a854757f6';
+import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=e96a854757f6';
+import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=e96a854757f6';
+import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=e96a854757f6';
+import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=e96a854757f6';
+import { TimeBreakdown } from './time-breakdown.js?v=e96a854757f6';
+import { createMessageSink } from './audio-native.js?v=e96a854757f6';
+import { loadAPK } from './apk-loader.js?v=e96a854757f6';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=e96a854757f6';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=e96a854757f6';
+import { createWebViewBackend } from './webview-backend.js?v=e96a854757f6';
+import { FrameworkProvider } from './framework-provider.js?v=e96a854757f6';
+import { createRasterSender } from './raster-cache.js?v=e96a854757f6';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=e96a854757f6';
+import { dispatchPointer } from './pointer-input-host.js?v=e96a854757f6';
+import { resolveDevice } from './device-profile.js?v=e96a854757f6';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=e96a854757f6';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=e96a854757f6';
+import { SkiaProvider } from './skia-provider.js?v=e96a854757f6';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=e96a854757f6';
+import { SemanticsPacer } from './semantics-pacing.js?v=e96a854757f6';
+import { MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=e96a854757f6';
+import { disposeTextLayout } from './text-layout-native.js?v=e96a854757f6';
+import { IcuBreakProvider } from './icu-break-provider.js?v=e96a854757f6';
+import { SqliteProvider } from './sqlite-native.js?v=e96a854757f6';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=e96a854757f6';
+import { TzdataProvider } from './java-time-native.js?v=e96a854757f6';
+import { ZlibProvider } from './zip-native.js?v=e96a854757f6';
+import { IcuConverterProvider } from './icu-converter-native.js?v=e96a854757f6';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=e96a854757f6';
+import { JavacryptoProvider } from './javacrypto-native.js?v=e96a854757f6';
+import { disposeColorFilters } from './color-filter-native.js?v=e96a854757f6';
+import { disposeRegex } from './regex-native.js?v=e96a854757f6';
+import { disposeRenderNodes } from './rendernode-native.js?v=e96a854757f6';
+import { startDeepLink } from './deep-link-host.js?v=e96a854757f6';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=e96a854757f6';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=e96a854757f6';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=e96a854757f6';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=b2ddf4678f67';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=b2ddf4678f67';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=b2ddf4678f67';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'b2ddf4678f67';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=e96a854757f6';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=e96a854757f6';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=e96a854757f6';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'e96a854757f6';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -62,12 +64,19 @@ const rasterSender = createRasterSender();
 const semanticsPacer = new SemanticsPacer();
 const workerTiming = { snapshots: 0, snapshotMs: 0, semanticsWalks: 0, semanticsReused: 0, semanticsMs: 0, scheduledBatches: 0, scheduledMs: 0 };   // cumulative host time of the Worker's own work per snapshot, reported in vmHealth for the page and the benchmarks
 let lastComposeSemantics = null;   // the tree of the last walk, reused by scheduled events inside the pacing gap (src/semantics-pacing.js)
-/** `paced`: a scheduled VM event may reuse the last semantics tree while the pacer says a fresh one is not due yet; replies to page requests are never paced. */
-function currentSnapshot({ paced = false } = {}) {
+// Progressive raster (src/motion-raster.js): display rasters are replayed at a reduced scale while the screen is moving and at full density once it is still. `load { motionRaster: false }` turns it off.
+let motionRaster = new MotionRasterPolicy(), lastPointerAt = 0;
+/** What the VM knows about motion when a snapshot is taken: a pending Choreographer frame, a live pointer gesture, the request being answered (`'pointer-motion'`, `'scrollby'`). */
+const motionSignal = (request = null) => ({ pendingFrames: runtime.platform.viewWindowHost?.frameState?.().pendingFrames ?? 0, gestureActive: !!runtime.pointerGesture && performance.now() - lastPointerAt < GESTURE_STALE_MS, inputMotion: request === 'pointer-motion' || request === 'scrollby' });
+/** `paced`: a scheduled VM event may reuse the last semantics tree while the pacer says a fresh one is not due yet; replies to page requests are never paced. `request`: the page request this snapshot answers, for the motion signal. */
+function currentSnapshot({ paced = false, request = null } = {}) {
   appData?.touch(); const snapshotStarted = performance.now();
   if (!paced) snapshotOwed = false;   // a reply to a page request carries the newest state: nothing is owed to the page anymore
   runtime.steps = 0; // A bounded inspection event, separate from the APK callback that just finished.
-  const snapshot = runtime.snapshot();
+  const signal = motionSignal(request); runtime.displayRasterScale = motionRaster.scaleFor(signal); runtime.displayRasterReducedServed = [];
+  let snapshot; try { snapshot = runtime.snapshot(); } finally { runtime.displayRasterScale = 1; }   // only the page's snapshot is ever replayed reduced
+  const reducedIds = runtime.displayRasterReducedServed; runtime.displayRasterReducedServed = null;
+  const rasterReduced = reducedIds.length > 0; motionRaster.noteSnapshot(reducedIds); snapshot.rasterReduced = rasterReduced;   // the page's idle rule waits for the full-density refinement
   if (!snapshot.closed && composeSemantics) {
     const reuse = paced && lastComposeSemantics && !semanticsPacer.take();
     if (!reuse) { const startedAt = performance.now(); try { lastComposeSemantics = composeSemantics.snapshot(); } finally { semanticsPacer.taken(startedAt); workerTiming.semanticsWalks++; workerTiming.semanticsMs += performance.now() - startedAt; } } else workerTiming.semanticsReused++;
@@ -75,10 +84,12 @@ function currentSnapshot({ paced = false } = {}) {
   }
   Object.assign(snapshot, runtime.executionSnapshot());
   if (runtime.methodOverridesAll?.size) snapshot.methodOverrides = describeMethodOverrides(runtime);
+  if (runtime.platform?.endpointMocksAll?.size) snapshot.endpointMocks = describeEndpointMocks(runtime);   // live hit counts for the "Mock de endpoints" section (src/endpoint-mocks.js)
   if (runtime.platform?.ignoredActivitiesAll?.size) snapshot.ignoredActivities = describeIgnoredActivities(runtime);   // live counts for the "Activities ignoradas" section (src/ignored-activities.js)   // live hit counts for the "Retornos de métodos" section (src/method-overrides.js)
   // VM health the page can show: live Java objects, collections, and any OutOfMemoryError the VM raised (even if the app caught it).
   snapshot.pendingEventDelay = runtime.platform.nextEventDelay?.() ?? null;   // ms until the VM's next scheduled event (frame, timer); null when nothing is scheduled
-  snapshot.vmHealth = { workerHeapBytes: self.performance?.memory?.usedJSHeapSize ?? null, raster: runtime.rasterStats ? { ...runtime.rasterStats, keyMs: Math.round(runtime.rasterStats.keyMs), replayMs: Math.round(runtime.rasterStats.replayMs), encodeMs: Math.round(runtime.rasterStats.encodeMs) } : null, framesProduced: runtime.platform.viewWindowHost?.frameState?.().framesRun ?? 0, liveObjects: runtime.heap.size, limit: runtime.maxHeapObjects, bytesPerObject: BYTES_PER_OBJECT, lastEventMs, workerTiming: { ...workerTiming, snapshotMs: Math.round(workerTiming.snapshotMs), semanticsMs: Math.round(workerTiming.semanticsMs), scheduledMs: Math.round(workerTiming.scheduledMs) }, collections: runtime.gcStats?.collections ?? 0, freedObjects: runtime.gcStats?.freed ?? 0, gcMs: Math.round(runtime.gcStats?.totalMs ?? 0), oomCount: runtime.oomCount ?? 0, lastOom: runtime.lastOom ? { ...runtime.lastOom, census: undefined } : null, heapCensus: runtime.lastOom?.census && runtime.lastOom.count !== reportedCensus ? (reportedCensus = runtime.lastOom.count, runtime.lastOom.census) : undefined };
+  if (rasterReduced) snapshot.pendingEventDelay = Math.min(snapshot.pendingEventDelay ?? Infinity, motionRaster.quietMs);   // the refinement is due within the quiet period
+  snapshot.vmHealth = { workerHeapBytes: self.performance?.memory?.usedJSHeapSize ?? null, raster: runtime.rasterStats ? { ...runtime.rasterStats, keyMs: Math.round(runtime.rasterStats.keyMs), replayMs: Math.round(runtime.rasterStats.replayMs), encodeMs: Math.round(runtime.rasterStats.encodeMs), reducedMs: Math.round(runtime.rasterStats.reducedMs ?? 0), refinedMs: Math.round(runtime.rasterStats.refinedMs ?? 0) } : null, motionRaster: { enabled: motionRaster.enabled, scale: motionRaster.scale, ...motionRaster.stats }, framesProduced: runtime.platform.viewWindowHost?.frameState?.().framesRun ?? 0, liveObjects: runtime.heap.size, limit: runtime.maxHeapObjects, bytesPerObject: BYTES_PER_OBJECT, lastEventMs, workerTiming: { ...workerTiming, snapshotMs: Math.round(workerTiming.snapshotMs), semanticsMs: Math.round(workerTiming.semanticsMs), scheduledMs: Math.round(workerTiming.scheduledMs) }, collections: runtime.gcStats?.collections ?? 0, freedObjects: runtime.gcStats?.freed ?? 0, gcMs: Math.round(runtime.gcStats?.totalMs ?? 0), oomCount: runtime.oomCount ?? 0, lastOom: runtime.lastOom ? { ...runtime.lastOom, census: undefined } : null, heapCensus: runtime.lastOom?.census && runtime.lastOom.count !== reportedCensus ? (reportedCensus = runtime.lastOom.count, runtime.lastOom.census) : undefined };
   workerTiming.snapshots++; workerTiming.snapshotMs += performance.now() - snapshotStarted;
   return rasterSender.intern(snapshot); // repeated PNGs travel once; the page resolves rasterId to a cached Blob URL
 }
@@ -137,6 +148,10 @@ function scheduleEvents() {
   let delay = eventDelay === null ? threadDelay : threadDelay === null ? eventDelay : Math.min(eventDelay, threadDelay);
   const owed = semanticsPacer.refreshDelay();   // a scheduled event reused the last semantics tree: a fresh one is owed even if no VM event is due (src/semantics-pacing.js)
   if (owed !== null) delay = delay == null ? owed : Math.min(delay, owed);
+  const gcWake = runtime.platform.gcIdleWakeDelay?.() ?? null;   // a collection deferred while input was arriving runs once the input window closes (heap-gc.js deferral)
+  if (gcWake !== null) delay = delay == null ? gcWake : Math.min(delay, gcWake);
+  const refine = motionRaster.refineDelay(motionSignal());   // the last snapshot carried a reduced raster: a full-density one is owed once the screen is still (src/motion-raster.js)
+  if (refine !== null) delay = delay == null ? refine : Math.min(delay, refine);
   if (delay == null) return;
   eventTimer = setTimeout(() => {
     if (busy) { scheduleEvents(); return; }
@@ -145,7 +160,8 @@ function scheduleEvents() {
     try {
       const started = performance.now(), drained = monitored('evento agendado', () => drainReadyEvents()); lastEventMs = Math.round(performance.now() - started); if (drained.processed) { workerTiming.scheduledBatches++; workerTiming.scheduledMs += performance.now() - started; }
       logcat.flush(); netlog.flush();
-      if (drained.processed || snapshotOwed || (semanticsPacer.stale && semanticsPacer.wait() <= 0)) { if (pageBehind()) holdSnapshot(); else postRuntimeEvent(); } else self.postMessage({ type: 'runtime-idle' });
+      const refining = !drained.processed && !snapshotOwed && motionRaster.refinementDue(motionSignal()); if (refining) motionRaster.noteRefinement();   // the quiet period passed with the screen still: replay the last frame at full density
+      if (drained.processed || snapshotOwed || refining || (semanticsPacer.stale && semanticsPacer.wait() <= 0)) { if (pageBehind()) holdSnapshot(); else postRuntimeEvent(); } else self.postMessage({ type: 'runtime-idle' });
       succeeded = true;
     } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); }
     finally { busy = false; if (succeeded) scheduleEvents(); }
@@ -196,6 +212,10 @@ self.onmessage = async ({ data }) => {
   }
   if (type === 'ignored-activities') {   // debugging tool (src/ignored-activities.js): the Activities whose starts are dropped; takes effect on the next start
     try { send({ type: 'result', statuses: runtime ? applyIgnoredActivities(runtime, data.entries) : [], loaded: !!runtime }); } catch (error) { send({ type: 'error', error: errorData(error) }); }
+    return;
+  }
+  if (type === 'endpoint-mocks') {   // debugging tool (src/endpoint-mocks.js): the mocked endpoints; takes effect on the next request
+    try { send({ type: 'result', statuses: runtime ? applyEndpointMocks(runtime, data.mocks) : [], loaded: !!runtime }); } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
   }
   if (type === 'method-overrides') {   // debugging tool (src/method-overrides.js): the set of overridden return values, applied between two VM events; takes effect on the next call
@@ -291,9 +311,10 @@ self.onmessage = async ({ data }) => {
       const nativeLibraryProvider = NATIVE_LIBS_URL ? (sharedNativeLibraryProvider ??= await LazyNativeLibraryProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
       const javacryptoProvider = NATIVE_LIBS_URL ? (sharedJavacryptoProvider ??= await JavacryptoProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
       const result = await loadAPK(data.buffer, { maxEventWallMs: timeLimitsFor(data.eventSeconds).eventWallMs ?? EVENT_WALL_LIMIT_MS, maxHeapObjects: heapLimitFor(data), nativeLibraryProvider, javacryptoProvider, device: resolveDevice(data.device || {}), tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', strictCrash: data.strictCrash === true, enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
-      runtime = result.runtime; archive = result.archive; if (Array.isArray(data.methodOverrides) && data.methodOverrides.length) applyMethodOverrides(result.runtime, data.methodOverrides); if (Array.isArray(data.ignoredActivities) && data.ignoredActivities.length) applyIgnoredActivities(result.runtime, data.ignoredActivities); /* before any app code runs */
+      runtime = result.runtime; archive = result.archive; if (Array.isArray(data.methodOverrides) && data.methodOverrides.length) applyMethodOverrides(result.runtime, data.methodOverrides); if (Array.isArray(data.ignoredActivities) && data.ignoredActivities.length) applyIgnoredActivities(result.runtime, data.ignoredActivities); if (Array.isArray(data.endpointMocks) && data.endpointMocks.length) applyEndpointMocks(result.runtime, data.endpointMocks); /* before any app code runs */
       inventory = result.inventory; logcat.clear(); logcat.attach(runtime); netlog.clear(); netlog.attach(runtime);
       runtime.contentRasterOptions = { transport: 'rgba' };   // Compose/Canvas content reaches the page as raw RGBA8 (src/raster-cache.js), not as a PNG
+      motionRaster = new MotionRasterPolicy({ enabled: data.motionRaster !== false }); lastPointerAt = 0;   // progressive raster while the screen moves (src/motion-raster.js); ?raster=full on the page turns it off
       runtime.monitor.configure({ sink: message => { logcat.flush(); self.postMessage({ ...message, requestId: activeRequestId }); snapshotScreenDuringOperation(message); }, budgetMs: OPERATION_WALL_LIMIT_MS });   // heartbeats to the page + the operation wall budget
       applyTimeLimits(runtime, data.eventSeconds);   // "Tempo máximo por evento" (src/time-limits.js): the per-event watchdog, the operation budget and the main-event caps
       runtime.platform.onPermissionRequest = request => self.postMessage({ type: 'permission-request', request });   // Activity.requestPermissions that needs the user: the page shows the dialog
@@ -328,7 +349,7 @@ self.onmessage = async ({ data }) => {
     } else if (type === 'launch' || type === 'intent' || type === 'click' || type === 'back' || type === 'input' || type === 'check' || type === 'focus' || type === 'press' || type === 'scroll' || type === 'compose-action' || type === 'pointer' || type === 'scrollby') {
       if (!runtime) throw new Error('Reabra um APK antes de executar a VM.');
       send({ type: 'progress', progress: { phase: type, completed: 0, total: 1 } });
-      runtime.monitor.begin(type);
+      runtime.monitor.begin(type); if (type !== 'launch' && type !== 'intent') runtime.platform.noteInput?.();   // scroll, focus, press and the rest reach the View directly below: the collector's input signal (heap-gc.js deferral)
       runtime.steps = 0; let droppedComposeAction = null, droppedEvent = null, deepLink = null;
       // An id the page took from an older snapshot can name a View that has since been collected (it was removed from the hierarchy): Android would not deliver the event either.
       const staleId = ['click', 'input', 'check', 'focus', 'press', 'scroll', 'scrollby'].includes(type) ? data.id : type === 'compose-action' || type === 'pointer' ? data.ownerViewId : null;
@@ -343,7 +364,7 @@ self.onmessage = async ({ data }) => {
         runtime.dispatch({owner:'Landroid/view/View;',name:'scrollTo',parameters:['I','I'],result:'V',signature:'(II)V'},[receiver,data.x,data.y],'virtual');
       }
       else if (type === 'scrollby') { if (![data.dx, data.dy].every(value => Number.isFinite(value) && Math.abs(value) < 100000)) throw new TypeError('Invalid scrollBy'); runtime.dispatch({ owner: 'Landroid/view/View;', name: 'scrollBy', signature: '(II)V', parameters: ['I', 'I'], result: 'V' }, [{ ref: data.id }, Math.round(data.dx), Math.round(data.dy)], 'virtual'); }
-      else if (type === 'pointer') { const outcome = dispatchPointer(runtime, data); if (outcome.dropped && outcome.dropped !== 'unchanged') { droppedEvent = { kind: 'pointer-' + outcome.dropped, type, id: data.ownerViewId }; runtime.record(`EVENT dropped (pointer ${data.action}: ${outcome.dropped})`); } }
+      else if (type === 'pointer') { lastPointerAt = performance.now(); const outcome = dispatchPointer(runtime, data); if (outcome.dropped && outcome.dropped !== 'unchanged') { droppedEvent = { kind: 'pointer-' + outcome.dropped, type, id: data.ownerViewId }; runtime.record(`EVENT dropped (pointer ${data.action}: ${outcome.dropped})`); } }
       else if (type === 'compose-action') {
         try { composeSemantics.performAction({ownerViewId:data.ownerViewId,nodeId:data.nodeId,action:data.action,args:data.args}); }
         catch (error) {
@@ -375,7 +396,8 @@ self.onmessage = async ({ data }) => {
       else await (type === 'launch' ? runtime.launch(data.activity) : type === 'back' ? runtime.back() : runtime.click(data.id));
       drainReadyEvents();
       if (deepLink && !deepLink.ok && !runtime.activity) { send({ type: 'result', deepLink }); succeeded = true; return; }   // nothing matched and no Activity runs yet: there is no screen to snapshot
-      const resultSnapshot = currentSnapshot(); if (deepLink) resultSnapshot.deepLink = deepLink; if (droppedComposeAction) resultSnapshot.droppedComposeAction = droppedComposeAction; if (droppedEvent) resultSnapshot.droppedEvent = droppedEvent;
+      const motionRequest = type === 'scrollby' ? 'scrollby' : type === 'pointer' && data.action !== 1 && data.action !== 3 ? 'pointer-motion' : null;   // input in flight: a wheel step, a pointer DOWN/MOVE (UP/CANCEL end the gesture)
+      const resultSnapshot = currentSnapshot({ request: motionRequest }); if (deepLink) resultSnapshot.deepLink = deepLink; if (droppedComposeAction) resultSnapshot.droppedComposeAction = droppedComposeAction; if (droppedEvent) resultSnapshot.droppedEvent = droppedEvent;
       send({ type: 'result', snapshot: resultSnapshot });
     } else throw new Error(`Operação de Worker desconhecida: ${type}`);
     succeeded = true;

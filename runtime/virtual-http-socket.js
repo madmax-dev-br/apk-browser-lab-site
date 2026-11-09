@@ -138,7 +138,7 @@ function parseHead(bytes) {
   return { method: match[1], target: match[2], version, headers, keepAlive, transferEncoding, contentLength, expectContinue };
 }
 
-const REASONS = { 200: 'OK', 201: 'Created', 202: 'Accepted', 203: 'Non-Authoritative Information', 204: 'No Content', 205: 'Reset Content', 206: 'Partial Content', 300: 'Multiple Choices', 301: 'Moved Permanently', 302: 'Found', 303: 'See Other', 304: 'Not Modified',
+export const REASONS = { 200: 'OK', 201: 'Created', 202: 'Accepted', 203: 'Non-Authoritative Information', 204: 'No Content', 205: 'Reset Content', 206: 'Partial Content', 300: 'Multiple Choices', 301: 'Moved Permanently', 302: 'Found', 303: 'See Other', 304: 'Not Modified',
   307: 'Temporary Redirect', 308: 'Permanent Redirect', 400: 'Bad Request', 401: 'Unauthorized', 402: 'Payment Required', 403: 'Forbidden', 404: 'Not Found', 405: 'Method Not Allowed', 406: 'Not Acceptable', 408: 'Request Timeout', 409: 'Conflict', 410: 'Gone',
   411: 'Length Required', 412: 'Precondition Failed', 413: 'Payload Too Large', 414: 'URI Too Long', 415: 'Unsupported Media Type', 416: 'Range Not Satisfiable', 418: "I'm a teapot", 422: 'Unprocessable Content', 429: 'Too Many Requests', 500: 'Internal Server Error', 501: 'Not Implemented',
   502: 'Bad Gateway', 503: 'Service Unavailable', 504: 'Gateway Timeout' };
@@ -296,14 +296,15 @@ export class VirtualHttpSocket {
     const url = targetUrl(request, this.peer, { https: this.https, sni: this.sni });
     const port = Number(url.port || (url.protocol === 'https:' ? 443 : 80)), host = url.hostname;
     const headers = request.headers.filter(([name]) => name.toLowerCase() !== 'host');
-    if (!net.online || !net.allowed(host, port)) {
+    const mock = net.matchMock?.({ method: request.method, url: url.href, body: request.body }) ?? null;   // "Mock de endpoints" (src/endpoint-mocks.js): answered by the lab, before the policy
+    if (!mock && (!net.online || !net.allowed(host, port))) {
       net.stats.denied++; if (!net.online) net.stats.offlineRejections++;
       net.logRefusal({ api: 'Socket', method: request.method, url: url.href, host, port, headers, bytes: request.body.length });
       throw new SocketFailure('Ljava/net/SocketException;', 'sendto failed: ENETUNREACH (Network is unreachable)');
     }
     net.noteHost(host);
     // redirect: 1 -- a Socket client applies its own redirect rules; where the transport can show 3xx responses (outside a browser) it does, and a browser follows them (it hides them).
-    const op = net.start({ method: request.method, url: url.href, headers, body: request.body.length || !['GET', 'HEAD'].includes(request.method) ? request.body : null, redirect: 1, connectTimeout: 0, readTimeout: 0, api: 'Socket' });
+    const op = net.start({ method: request.method, url: url.href, headers, body: request.body.length || !['GET', 'HEAD'].includes(request.method) ? request.body : null, redirect: 1, connectTimeout: 0, readTimeout: 0, api: 'Socket', mock });
     this.exchange = { op, request, headSent: false, framing: 'none', declared: null, delivered: 0, noBody: false, closing: false };
   }
 }

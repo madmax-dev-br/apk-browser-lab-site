@@ -24,6 +24,7 @@ const bits = value => { const view = new DataView(new ArrayBuffer(4)); view.setF
 
 /** Delivers one pointer sample. Returns { handled, dropped?: reason }. Samples outside a gesture (MOVE/UP without DOWN, a different owner) are dropped like Android's input dispatcher does. */
 export function dispatchPointer(runtime, { ownerViewId, action, x, y, t = 0, dx = 0, dy = 0 }) {
+  runtime.platform?.noteInput?.();   // the collector treats the main thread as in motion while input keeps arriving (heap-gc.js deferral)
   if (action === ACTION_SCROLL) return dispatchWheel(runtime, { ownerViewId, x, y, t, dx, dy });
   if (![ACTION_DOWN, ACTION_UP, ACTION_MOVE, ACTION_CANCEL].includes(action) || !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(t)) throw new TypeError('Invalid pointer sample');
   if (!runtime.heap.has(ownerViewId) || !runtime.isSubtype(runtime.object({ ref: ownerViewId }).type, OWNER)) return { handled: false, dropped: 'not-a-compose-view' };

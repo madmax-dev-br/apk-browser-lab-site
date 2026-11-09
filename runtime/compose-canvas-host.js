@@ -1,6 +1,7 @@
-import {APKError} from './apk-runtime.js?v=b2ddf4678f67';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=b2ddf4678f67';
-import {getVectorGraphics} from './vector-native.js?v=b2ddf4678f67';
+import {APKError} from './apk-runtime.js?v=e96a854757f6';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=e96a854757f6';
+import {getVectorGraphics} from './vector-native.js?v=e96a854757f6';
+import {deferRaster} from './deferred-raster.js?v=e96a854757f6';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -14,25 +15,10 @@ const fail=message=>{throw new APKError(message,{kind:'compose-canvas-boundary'}
  * layers and shapes execute the APK's original AndroidComposeView/ViewLayer
  * methods. A semantics tree is never used to fabricate the rendered screen.
  */
-/**
- * The Skia replay + PNG of a View's Canvas content is done when somebody reads `view.contentRaster` (the page snapshot, a test), not when the frame is drawn:
- * a frame that is replaced by the next one before any snapshot reads it (several Choreographer frames per page snapshot, or a page that is still drawing
- * the previous one) is never rasterized. The recorded display list stays in the View's own Canvas until the next draw of that View replaces it, and CanvasProperty
- * values / RenderNode properties are read at replay, as the RenderThread reads them when it draws. `runtime.rasterStats.deferred/superseded` count both.
- */
+/** The Skia replay of a View's Canvas content is deferred to the read of `view.contentRaster` and follows the progressive raster scale (src/deferred-raster.js). */
 export function setContentRaster(r,view,graphics,target,width,height){
- const stats=r.rasterStats??={calls:0,rasterized:0,hits:0,keyMs:0,replayMs:0,encodeMs:0};
- if(!Object.getOwnPropertyDescriptor(view,'contentRaster')?.get){
-  const held=view.contentRaster??null;
-  Object.defineProperty(view,'contentRaster',{configurable:true,enumerable:false,
-   get(){const make=this.contentRasterPending;if(make){this.contentRasterPending=null;this.contentRasterValue=make();}return this.contentRasterValue??null;},
-   set(value){this.contentRasterPending=null;this.contentRasterValue=value;}});
-  view.contentRasterValue=held;
- }
- if(view.contentRasterPending)stats.superseded=(stats.superseded??0)+1;stats.deferred=(stats.deferred??0)+1;
- // The deferred replay reads `target`, which is the View's own `contentCanvas` (see the callers): that record property keeps it alive for the collector; no second
- // root is kept here (a duplicate `{ref}` property on the View record broke the page's taps in the browser parity flows, cause not found: keep the record as it was).
- view.contentRasterPending=()=>graphics.snapshotCanvas(target,width,height,r.contentRasterOptions);
+ // The deferred replay reads `target`, which is the View's own `contentCanvas` (see the callers): that record property keeps it alive for the collector.
+ deferRaster(r,view,'contentRaster',scale=>graphics.snapshotCanvas(target,width,height,scale<1?{...r.contentRasterOptions,scale}:r.contentRasterOptions));
 }
 export function createComposeCanvasHost(platform){
   let drawingTime=0,cachedTextRasterBytes=0;const textRasterSizes=new Map();

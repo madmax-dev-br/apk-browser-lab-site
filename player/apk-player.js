@@ -1,6 +1,6 @@
 // Embeddable APK runner. Usage: <script type="module" src="…/player/apk-player.js"></script> then <apk-player src="app.apk" device="phone" locale="pt-BR" theme="dark">.
 // The APK runs inside an iframe (player/frame.html) served from the runtime's origin; this script only talks to it through versioned postMessage.
-import { ATTRIBUTES, configFromAttributes, parseConfig, envelope, validateFrameMessage } from './protocol.js?v=b2ddf4678f67';
+import { ATTRIBUTES, configFromAttributes, parseConfig, envelope, validateFrameMessage } from './protocol.js?v=e96a854757f6';
 
 const FRAME_TIMEOUT_MS = 20000;
 const DEFAULT_ASSETS_BASE = new URL('../', import.meta.url).href;
@@ -10,9 +10,9 @@ const sleepless = () => {};
 export class ApkPlayer extends EventTarget {
   /** ApkPlayer.mount(element, { apk: File|Blob|ArrayBuffer|URL string, config, assetsBase, name, activity, lazy, transfer }) */
   static mount(element, options = {}) { return new ApkPlayer(element, options); }
-  constructor(target, { apk = null, config = {}, assetsBase = DEFAULT_ASSETS_BASE, name = '', activity = '', lazy = false, transfer = true, title = 'Android app (APK player)', eventTarget = null, scale = 'fit', pointerClicks = null, keepData = false, clearData = false } = {}) {
+  constructor(target, { apk = null, config = {}, assetsBase = DEFAULT_ASSETS_BASE, name = '', activity = '', lazy = false, transfer = true, title = 'Android app (APK player)', eventTarget = null, scale = 'fit', pointerClicks = null, raster = null, keepData = false, clearData = false } = {}) {
     super();
-    this.target = target; this.eventTarget = eventTarget; this.options = { apk, name, activity, transfer, title, scale, pointerClicks, keepData: !!keepData, clearData: !!clearData }; this.config = {}; this.destroyed = false; this.helloReceived = false; this.ready = false; this.outbox = []; this.diagnosticRequests = new Map(); this.diagnosticId = 0;
+    this.target = target; this.eventTarget = eventTarget; this.options = { apk, name, activity, transfer, title, scale, pointerClicks, raster, keepData: !!keepData, clearData: !!clearData }; this.config = {}; this.destroyed = false; this.helloReceived = false; this.ready = false; this.outbox = []; this.diagnosticRequests = new Map(); this.diagnosticId = 0;
     const base = new URL(assetsBase, globalThis.location?.href); this.frameURL = new URL('player/frame.html', base.href.endsWith('/') ? base.href : base.href + '/');
     this.frameOrigin = this.frameURL.origin;
     this.onMessage = event => this.receive(event);
@@ -29,7 +29,7 @@ export class ApkPlayer extends EventTarget {
     if (this.destroyed || this.iframe) return;
     const hostOrigin = globalThis.location?.origin;
     if (!hostOrigin || hostOrigin === 'null') { this.emit('error', { kind: 'opaque-host-origin', message: 'The embedding page has an opaque origin (file:// or sandbox without allow-same-origin); serve it over http(s).', phase: 'mount', frontier: null }); return; }
-    const url = new URL(this.frameURL.href); url.searchParams.set('parent', hostOrigin); if (this.options.scale === 'actual') url.searchParams.set('scale', 'actual'); if (this.options.pointerClicks) url.searchParams.set('pointerClicks', this.options.pointerClicks);
+    const url = new URL(this.frameURL.href); url.searchParams.set('parent', hostOrigin); if (this.options.scale === 'actual') url.searchParams.set('scale', 'actual'); if (this.options.pointerClicks) url.searchParams.set('pointerClicks', this.options.pointerClicks); if (this.options.raster === 'full') url.searchParams.set('raster', 'full');   // measurement: every frame at full density
     const iframe = document.createElement('iframe');
     iframe.src = url.href; iframe.title = this.options.title; iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin'); iframe.setAttribute('allow', ''); iframe.setAttribute('referrerpolicy', 'no-referrer');
     iframe.style.cssText = 'border:0;width:100%;height:100%;display:block;background:transparent;color-scheme:normal';

@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=b2ddf4678f67">
-  <meta name="apk-browser-build" content="b2ddf4678f67">
+  <link rel="stylesheet" href="./styles.css?v=e96a854757f6">
+  <meta name="apk-browser-build" content="e96a854757f6">
 </head>
 <body>
   <header class="topbar">
@@ -138,6 +138,13 @@
               <p id="hm-status" class="cp-note" role="status" aria-live="polite">Nenhum host redirecionado.</p>
               <button id="hm-add" class="cp-button" type="button">+ Adicionar</button>
             </div></details>
+          <details class="cp-group" id="cp-sec-mocks" data-section="mocks">
+              <summary><h3 id="cp-mocks-title">Mock de endpoints</h3><span id="em-summary" class="cp-badge">0 ativos</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p class="cp-note ov-warning">Ferramenta de depuração: uma requisição do app que casa com um mock da lista é <b>respondida pelo lab</b> com a resposta configurada e não vai à rede. O primeiro mock ativo que casar, na ordem da lista, responde, antes da lista de hosts permitidos, do modo offline, de Redirecionar hosts e do Proxy. Vale para HttpURLConnection, OkHttp e outros clientes sobre java.net.Socket e DownloadManager; páginas de WebView são carregadas pelo navegador e não passam pelos mocks. Cada resposta é contada, marcada no painel Rede (e no HAR), citada no Resumo, e a primeira de cada mock gera um aviso no Logcat.</p>
+              <ul id="em-list" class="ov-list em-list" aria-label="Mocks de endpoint, em ordem de prioridade"></ul>
+              <p id="em-status" class="cp-note" role="status" aria-live="polite">Nenhum mock.</p>
+              <div class="em-actions"><button id="em-add" class="cp-button" type="button">+ Adicionar</button><button id="em-export" class="cp-button" type="button" disabled>Exportar</button><button id="em-import" class="cp-button" type="button">Importar</button><input id="em-import-file" type="file" accept="application/json,.json" hidden></div>
+            </div></details>
           </details>
           <button id="run-button" class="run-button" disabled><span aria-hidden="true">▶</span> Executar APK <kbd>RUN</kbd></button>
           <p class="support-note"><span aria-hidden="true">ⓘ</span><span>VM experimental para Android Views e bytecode DEX. Multidex é inspecionado no Worker; Android, Compose e JNI ainda podem exigir APIs não implementadas. </span></p>
@@ -168,7 +175,7 @@
           <div class="logcat-bar"><input class="logcat-filter" type="search" placeholder="Filtrar por tag ou texto" aria-label="Filtrar logcat por tag ou texto"><select class="logcat-level" aria-label="Nível mínimo"><option value="V">V Verbose</option><option value="D">D Debug</option><option value="I">I Info</option><option value="W">W Warning</option><option value="E">E Error</option></select><label class="logcat-auto"><input class="logcat-autoscroll" type="checkbox" checked> Rolar</label><button class="logcat-clear" type="button">Limpar</button><select class="logcat-scope" aria-label="O que salvar"><option value="all">Salvar tudo</option><option value="filtered">Salvar o filtrado</option></select><button class="logcat-save" type="button">Salvar</button></div>
           <div class="logcat-lines" role="log" aria-live="off"></div></details>
         <details id="netlog" class="trace logcat netlog"><summary><span>Rede</span><span class="netlog-count">0 requisições</span><span class="trace-chevron">⌄</span></summary>
-          <div class="logcat-bar"><input class="netlog-filter" type="search" placeholder="Filtrar por host, caminho ou método" aria-label="Filtrar requisições por host, caminho ou método"><select class="netlog-category" aria-label="Filtrar por resultado"><option value="all">Todas</option><option value="ok">2xx</option><option value="redirect">3xx</option><option value="fail">4xx / 5xx</option><option value="refused">Recusadas</option><option value="error">Erros</option><option value="pending">Em andamento</option></select><label class="logcat-auto"><input class="netlog-autoscroll" type="checkbox" checked> Rolar</label><button class="netlog-clear" type="button">Limpar</button><select class="netlog-scope" aria-label="O que salvar"><option value="all">Salvar tudo</option><option value="filtered">Salvar o filtrado</option></select><select class="netlog-format" aria-label="Formato"><option value="har">HAR 1.2</option><option value="text">Texto</option></select><button class="netlog-save" type="button">Salvar</button></div>
+          <div class="logcat-bar"><input class="netlog-filter" type="search" placeholder="Filtrar por host, caminho ou método" aria-label="Filtrar requisições por host, caminho ou método"><select class="netlog-category" aria-label="Filtrar por resultado"><option value="all">Todas</option><option value="ok">2xx</option><option value="redirect">3xx</option><option value="fail">4xx / 5xx</option><option value="refused">Recusadas</option><option value="error">Erros</option><option value="pending">Em andamento</option><option value="mocked">Mockadas</option></select><label class="logcat-auto"><input class="netlog-autoscroll" type="checkbox" checked> Rolar</label><button class="netlog-clear" type="button">Limpar</button><select class="netlog-scope" aria-label="O que salvar"><option value="all">Salvar tudo</option><option value="filtered">Salvar o filtrado</option></select><select class="netlog-format" aria-label="Formato"><option value="har">HAR 1.2</option><option value="text">Texto</option></select><button class="netlog-save" type="button">Salvar</button></div>
           <div class="netlog-rows" role="log" aria-live="off"></div></details>
       </section>
     </div>
@@ -182,7 +189,39 @@
     </details>
     <footer><span><span class="footer-dot"></span> Sem instalação. Sem emulador. Sem upload.</span><a href="./hermes-proof/">Experimento Hermes no navegador ↗</a><span>APK Browser Lab <span class="footer-slash">/</span> protótipo técnico</span></footer>
   </main>
-  <script type="module" src="./app.js?v=b2ddf4678f67"></script>
+  <script type="module" src="./app.js?v=e96a854757f6"></script>
+<div id="em-dialog" class="em-scrim" hidden>
+  <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
+    <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>
+    <p id="em-dialog-help" class="em-help">Quando uma requisição do app casar com este mock, o lab responde com o status, os cabeçalhos e o corpo abaixo, sem ir à rede.</p>
+    <form id="em-form" novalidate>
+      <fieldset class="em-fieldset"><legend>Requisição</legend>
+        <label class="em-field em-wide" for="em-name"><span>Nome <small>opcional; aparece no painel Rede e no Resumo</small></span><input id="em-name" type="text" autocomplete="off" spellcheck="false" maxlength="120"></label>
+        <label class="em-field" for="em-method"><span>Método</span><select id="em-method" aria-describedby="em-err-method"></select></label>
+        <label class="em-field" for="em-query"><span>Query</span><select id="em-query" aria-describedby="em-err-query"><option value="ignore">Ignorar</option><option value="exact">Exata</option></select></label>
+        <small id="em-err-method" class="em-error" hidden></small><small id="em-err-query" class="em-error" hidden></small>
+        <label class="em-field em-wide" for="em-url"><span>URL ou caminho</span><input id="em-url" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="https://api.exemplo.com/v1/usuarios/* ou /v1/usuarios/*" aria-describedby="em-url-help em-err-url" required></label>
+        <small id="em-url-help" class="em-help em-wide">URL completa (<code>https://host/caminho</code>) ou só o caminho (<code>/caminho</code>, qualquer host). <code>*</code> vale um segmento, <code>**</code> vários; <code>*.dominio</code> no host. Sem porta, qualquer porta. Query exata: os mesmos parâmetros em qualquer ordem (valor <code>*</code> aceita qualquer um).</small>
+        <small id="em-err-url" class="em-error em-wide" hidden></small>
+        <label class="em-field em-wide" for="em-body-contains"><span>Corpo da requisição contém <small>opcional; texto que o corpo enviado pelo app precisa ter</small></span><input id="em-body-contains" type="text" autocomplete="off" spellcheck="false"></label>
+      </fieldset>
+      <fieldset class="em-fieldset"><legend>Resposta</legend>
+        <label class="em-field" for="em-status-code"><span>Status</span><input id="em-status-code" type="number" inputmode="numeric" min="200" max="599" step="1" aria-describedby="em-err-status"></label>
+        <label class="em-field" for="em-reason"><span>Mensagem <small>vazio: a padrão do status</small></span><input id="em-reason" type="text" autocomplete="off" placeholder="OK" aria-describedby="em-err-status"></label>
+        <small id="em-err-status" class="em-error em-wide" hidden></small>
+        <div class="em-wide em-headers-box" role="group" aria-labelledby="em-headers-title"><span id="em-headers-title" class="em-label">Cabeçalhos</span><ul id="em-headers" class="em-headers"></ul><button id="em-header-add" type="button" class="cp-button">+ Cabeçalho</button><small id="em-err-headers" class="em-error" hidden></small></div>
+        <label class="em-field em-wide" for="em-body"><span>Corpo</span><textarea id="em-body" rows="8" spellcheck="false" autocomplete="off" aria-describedby="em-body-hint em-err-body"></textarea></label>
+        <div class="em-wide em-body-tools"><button id="em-body-file-button" type="button" class="cp-button">Carregar de arquivo…</button><input id="em-body-file" type="file" hidden><button id="em-body-file-clear" type="button" class="cp-button" hidden>Remover arquivo</button><button id="em-body-format" type="button" class="cp-button" hidden>Formatar JSON</button><span id="em-body-file-info" class="em-help" role="status"></span></div>
+        <small id="em-body-hint" class="em-hint em-wide" role="status" aria-live="polite"></small>
+        <small id="em-err-body" class="em-error em-wide" hidden></small>
+        <label class="em-field" for="em-delay"><span>Atraso (ms) <small>a resposta chega depois desse tempo</small></span><input id="em-delay" type="number" inputmode="numeric" min="0" max="600000" step="1" aria-describedby="em-err-delay"></label>
+        <small id="em-err-delay" class="em-error em-wide" hidden></small>
+      </fieldset>
+      <p id="em-err-form" class="em-error" role="alert" hidden></p>
+      <div class="em-buttons"><button id="em-cancel" type="button" class="cp-button">Cancelar</button><button id="em-save" type="submit" class="cp-button primary">Salvar</button></div>
+    </form>
+  </div>
+</div>
 <div id="summary-overlay" class="summary-overlay" role="dialog" aria-label="Resumo" hidden><button id="summary-close" type="button">Fechar</button><pre id="summary-text"></pre></div>
 </body>
 </html>

@@ -1,6 +1,6 @@
-import { TimeBreakdown } from './time-breakdown.js?v=b2ddf4678f67';
-import { APKError } from './apk-error.js?v=b2ddf4678f67';
-import { gcBlockReason } from './heap-gc.js?v=b2ddf4678f67';
+import { TimeBreakdown } from './time-breakdown.js?v=e96a854757f6';
+import { APKError } from './apk-error.js?v=e96a854757f6';
+import { gcBlockReason } from './heap-gc.js?v=e96a854757f6';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -181,15 +181,18 @@ export class OperationMonitor {
     const share = op && op.gcMs ? ` (${Math.round(100 * op.gcMs / Math.max(1, op.gcMs + performance.now() - op.start))}% do tempo da operação)` : '';
     const tries = rt.gcSafepointTries ?? { calls: 0, notDue: 0, disabled: 0 }, skips = Object.entries(rt.gcSkips ?? {}).map(([why, n]) => `${why} ${n}x`).join(', ') || 'nenhuma';
     let blocked = null; try { blocked = gcBlockReason(rt); } catch { blocked = '?'; }
-    const gate = `\n  coletor: ${rt.gcEnabled ? 'ligado' : 'DESLIGADO'}; safepoints que pediram coleta ${tries.calls} (não devida ${tries.notDue}, coletor desligado ${tries.disabled}); coletas puladas: ${skips}; agora ${blocked ? `bloqueado por "${blocked}"` : 'livre'}; alocados desde a última ${Math.max(0, (rt.nextId ?? 0) - (rt.gcLastNextId ?? 0))}, espera mínima ${rt.gcMinAlloc ?? 0}, próxima a partir de ${rt.gcNextAt ?? '?'} vivos, piso ${rt.gcSafepointFloor ?? '?'}, pressão ${rt.gcPressure ? 'sim' : 'não'}, última levou ${Math.round(rt.gcLastMs ?? 0)} ms`;
-    const head = `Coleta de lixo: ${op?.gcCount ?? 0} coletas / ${Math.round(op?.gcMs ?? 0)} ms nesta operação${share}; no total ${rt.gcStats?.collections ?? 0} coletas, ${Math.round(rt.gcTotalMs ?? 0)} ms${gate}`;
+    const gate = `\n  coletor: ${rt.gcEnabled ? 'ligado' : 'DESLIGADO'}; safepoints que pediram coleta ${tries.calls} (não devida ${tries.notDue}, adiada por movimento ${tries.deferred ?? 0}, coletor desligado ${tries.disabled}); coletas puladas: ${skips}; agora ${blocked ? `bloqueado por "${blocked}"` : 'livre'}; alocados desde a última ${Math.max(0, (rt.nextId ?? 0) - (rt.gcLastNextId ?? 0))}, espera mínima ${rt.gcMinAlloc ?? 0}, próxima a partir de ${rt.gcNextAt ?? '?'} vivos, piso ${rt.gcSafepointFloor ?? '?'}, pressão ${rt.gcPressure ? 'sim' : 'não'}, última levou ${Math.round(rt.gcLastMs ?? 0)} ms`;
+    // Collections deferred while the screen was in motion (heap-gc.js deferral): episodes closed at an idle moment or forced by a ceiling, and the one still open.
+    const d = rt.gcDeferralStats, open = rt.gcDeferral, motion = (() => { try { return rt.platform?.mainThreadMotion?.() ?? null; } catch { return '?'; } })();
+    const deferrals = `\n  adiamentos durante movimento: ${d ? `${d.episodes} (${d.idle} coletadas em repouso, ${d.forced} forçadas pelo teto${d.forced ? ': ' + Object.entries(d.forcedBy).map(([why, n]) => `${why} ${n}x`).join(', ') : ''}${d.absorbed ? `, ${d.absorbed} absorvidas por outra coleta` : ''}; espera máxima ${d.maxMs} ms, ${d.maxAllocated} objetos)` : 'nenhum'}; agora ${open ? `adiada há ${Math.round(performance.now() - open.since)} ms (${open.held} verificações: ${Object.entries(open.reasons).map(([why, n]) => `${why} ${n}x`).join(', ')}; teto ${open.ceiling} vivos ou ${Math.max(0, Math.round(open.until - performance.now()))} ms)` : `nenhuma adiada; thread principal ${motion ? `em movimento (${motion})` : 'ociosa'}`}`;
+    const head = `Coleta de lixo: ${op?.gcCount ?? 0} coletas / ${Math.round(op?.gcMs ?? 0)} ms nesta operação${share}; no total ${rt.gcStats?.collections ?? 0} coletas, ${Math.round(rt.gcTotalMs ?? 0)} ms${gate}${deferrals}`;
     const last = phases[0], census = last ? [
       last.survivorsByCount?.length ? `\n  sobreviventes (por quantidade): ${last.survivorsByCount.slice(0, 12).map(c => `${c.n} ${c.type}`).join(', ')}` : '',
       last.survivorsByBytes?.length ? `\n  sobreviventes (por bytes estimados): ${last.survivorsByBytes.slice(0, 12).map(c => `${Math.round(c.bytes / 1024)} KiB ${c.type}`).join(', ')}` : '',
       last.allocated ? `\n  alocados desde a última coleta: ${last.allocated.count}${last.allocated.sites?.length ? ', principais: ' + last.allocated.sites.join(' | ') : ''}` : '',
       rt.gcRetention?.paths?.length ? `\n  exemplo de retenção (${String(rt.gcRetention.type).replace(/^L|;$/g, '').replaceAll('/', '.')}):${rt.gcRetention.paths.map(path => '\n    ' + path).join('')}` : '',
     ].join('') : '';
-    return phases.length ? `${head}${census}\n  últimas: ${phases.map(p => `${p.before}→${p.after} vivos [raízes ${p.rootsMs} ms (${p.nodes} nós JS; maior: ${p.worstRoot.key} ${p.worstRoot.ms} ms/${p.worstRoot.nodes}; podados ${p.pruned ?? 0}; por nós: ${(p.topByNodes ?? []).map(r => `${r.key} ${r.nodes}${r.kind ? ' ' + r.kind : ''}${r.size !== undefined ? '[' + r.size + ']' : ''}`).join(', ') || '-'}; por tempo: ${(p.topByMs ?? []).map(r => `${r.key} ${r.ms} ms`).join(', ') || '-'}), marcação ${p.markMs} ms, varredura ${p.sweepMs} ms, recontagem ${p.rebuildMs} ms, ids ${p.idRange} em ${p.blocksInUse} blocos]`).join(' | ')}` : head;
+    return phases.length ? `${head}${census}\n  últimas: ${phases.map(p => `${p.reason}${p.motion ? ` em movimento (${p.motion})` : ' em repouso'}${p.deferral ? ` após adiar ${p.deferral.ms} ms / ${p.deferral.allocated} objetos` : ''}: ${p.before}→${p.after} vivos [raízes ${p.rootsMs} ms (${p.nodes} nós JS; maior: ${p.worstRoot.key} ${p.worstRoot.ms} ms/${p.worstRoot.nodes}; podados ${p.pruned ?? 0}; por nós: ${(p.topByNodes ?? []).map(r => `${r.key} ${r.nodes}${r.kind ? ' ' + r.kind : ''}${r.size !== undefined ? '[' + r.size + ']' : ''}`).join(', ') || '-'}; por tempo: ${(p.topByMs ?? []).map(r => `${r.key} ${r.ms} ms`).join(', ') || '-'}), marcação ${p.markMs} ms, varredura ${p.sweepMs} ms, recontagem ${p.rebuildMs} ms, ids ${p.idRange} em ${p.blocksInUse} blocos]`).join(' | ')}` : head;
   }
   schedulerLine() {
     const stats = this.rt.scheduler.stats, op = this.op, seconds = op ? Math.max(0.001, (performance.now() - op.start) / 1000) : 0;

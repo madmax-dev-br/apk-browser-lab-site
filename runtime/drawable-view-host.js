@@ -1,8 +1,9 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=b2ddf4678f67';
-import { APKError } from './apk-runtime.js?v=b2ddf4678f67';
-import { getVectorGraphics } from './vector-native.js?v=b2ddf4678f67';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=b2ddf4678f67';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=b2ddf4678f67';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=e96a854757f6';
+import { APKError } from './apk-runtime.js?v=e96a854757f6';
+import { getVectorGraphics } from './vector-native.js?v=e96a854757f6';
+import { deferRaster } from './deferred-raster.js?v=e96a854757f6';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=e96a854757f6';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=e96a854757f6';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -78,7 +79,9 @@ export function createDrawableViewHost(platform) {
       }
       if (view.switchState) switchHost.draw(runtime, receiver, canvas, width, height);
       });
-      view.drawableSVG = view.backgroundDrawable || view.imageDrawable || view.switchState || (runtime.isSubtype(view.type, TEXT) && platform.textViewApi.compoundList(runtime, receiver).length) ? graphics.snapshotCanvas(replay, width, height) : null;
+      // The layer's raster is replayed when it is read (src/deferred-raster.js: a frame superseded before a snapshot is never rasterized; reduced scale while the screen moves).
+      if (view.backgroundDrawable || view.imageDrawable || view.switchState || (runtime.isSubtype(view.type, TEXT) && platform.textViewApi.compoundList(runtime, receiver).length)) deferRaster(runtime, view, 'drawableSVG', scale => graphics.snapshotCanvas(replay, width, height, scale < 1 ? { scale } : undefined));
+      else view.drawableSVG = null;
       if(view.foregroundDrawable){
         if(!view.foregroundCanvas){view.foregroundCanvas=runtime.allocate(CANVAS);dispatch(runtime,CANVAS,'<init>',[],'V',view.foregroundCanvas);}
         const foreground=prepareCpuAnimatedVector(runtime,view.foregroundDrawable),rect='Landroid/graphics/Rect;',gravity='Landroid/view/Gravity;';
@@ -92,7 +95,7 @@ export function createDrawableViewHost(platform) {
         const read=name=>runtime.object(bounds[1]).fields.get(`${rect}->${name}:I`)??0;
         view.foregroundBounds=Object.fromEntries(['left','top','right','bottom'].map(name=>[name,read(name)]));
         recordLayer(runtime,receiver,'foregroundNode',view.foregroundCanvas,width,height,canvas=>dispatch(runtime,DRAWABLE,'draw',[CANVAS],'V',foreground,[canvas]));
-        view.foregroundSVG=graphics.snapshotCanvas(view.foregroundCanvas,width,height);view.foregroundBoundsChanged=false;
+        const foregroundCanvas=view.foregroundCanvas;deferRaster(runtime,view,'foregroundSVG',scale=>graphics.snapshotCanvas(foregroundCanvas,width,height,scale<1?{scale}:undefined));view.foregroundBoundsChanged=false;
       }else{view.foregroundSVG=null;view.foregroundBounds=null;}
       if(view.buttonDrawable){if(!view.buttonCanvas){view.buttonCanvas=runtime.allocate(CANVAS);dispatch(runtime,CANVAS,'<init>',[],'V',view.buttonCanvas);}const bounds=buttonBounds(runtime,receiver,width,height),iw=bounds.right-bounds.left,ih=bounds.bottom-bounds.top;if(iw<=0||ih<=0||iw>4096||ih>4096)fail('CompoundButton indicator needs bounded positive intrinsic dimensions');const raw=n=>{const d=new DataView(new ArrayBuffer(4));d.setFloat32(0,n,true);return d.getInt32(0,true);};recordLayer(runtime,receiver,'buttonNode',view.buttonCanvas,iw,ih,canvas=>{dispatch(runtime,CANVAS,'translate',['F','F'],'V',canvas,[raw(-bounds.left),raw(-bounds.top)]);drawButton(runtime,receiver,canvas,width,height);});view.buttonSVG=graphics.snapshotCanvas(view.buttonCanvas,iw,ih);view.compoundPadding=compoundPadding(runtime,receiver);}else{view.buttonSVG=null;view.buttonBounds=null;view.compoundPadding=null;}
       if (runtime.isSubtype(view.type, TEXT) && !view.buttonDrawable && !view.switchState) view.compoundPadding = platform.textViewApi.compoundPadding(runtime, receiver);   // the text raster starts inside the drawables' space

@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=b2ddf4678f67';
-import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=b2ddf4678f67';
+import { APKError } from './apk-runtime.js?v=e96a854757f6';
+import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=e96a854757f6';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -94,7 +94,7 @@ export function createViewWindowHost(platform){
  };
  /** A JS callback run in the next frame's traversal phase (RenderThread animators): `fn(runtime, frameTimeMs)`. */
  const planJsFrame=(runtime,fn,phase=3)=>{ if(pendingFrames.length>=1024)error('Frame callback limit exceeded'); const when=Math.ceil((Math.max(platform.clock.now(),lastFrameMs)+0.000001)/frameInterval)*frameInterval; pendingFrames.push({js:fn,callback:null,token:null,runnable:false,phase,when}); ensureFrameEvent(runtime,when); };
- return { planJsFrame, frameState: () => ({ framesRun, callbacksRun, pendingFrames: pendingFrames.length, nextFrameAt: pendingFrames.reduce((min, x) => Math.min(min, x.when), Infinity), lastFrameMs, detachedCallbacks: pendingViewCount }), [GC_ROOTS](visit) { visit(display); visit(choreographer); visit(handler); },
+ return { planJsFrame, framesPending: () => pendingFrames.length, frameState: () => ({ framesRun, callbacksRun, pendingFrames: pendingFrames.length, nextFrameAt: pendingFrames.reduce((min, x) => Math.min(min, x.when), Infinity), lastFrameMs, detachedCallbacks: pendingViewCount }), [GC_ROOTS](visit) { visit(display); visit(choreographer); visit(handler); },
   supports:key=>keys.has(key),
   interfaces:type=>type===TOKEN?['Landroid/os/IBinder;']:[],
   parent:type=>type===TOKEN||type===DISPLAY?'Ljava/lang/Object;':null,

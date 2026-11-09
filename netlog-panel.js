@@ -1,8 +1,8 @@
 // The "Rede" panel of the lab page: the app's network requests (src/netlog.js batches from the Worker) as a table coloured by outcome, with a text filter, an outcome filter, a detail
 // view per row (full URL, headers, timing, failure), "Permitir <host>" for a request the allowlist refused, "Limpar" and "Salvar" (HAR 1.2 or plain text, bodies omitted).
 // The formatting, filter and export functions are pure (tested without a DOM); createNetlogPanel() wires them to the page. Nothing here is persisted: the entries live in memory.
-import { MAX_ENTRIES } from './netlog.js?v=b2ddf4678f67';
-import { sanitizeHosts } from './device-settings.js?v=b2ddf4678f67';
+import { MAX_ENTRIES } from './netlog.js?v=e96a854757f6';
+import { sanitizeHosts } from './device-settings.js?v=e96a854757f6';
 
 export const RENDER_MAX = 500;   // rows kept in the DOM; "Salvar" still writes the whole buffer
 export const CATEGORIES = ['pending', 'ok', 'redirect', 'fail', 'refused', 'error', 'loopback'];
@@ -20,9 +20,10 @@ export function categoryOf(entry) {
 
 /** The entry passes when its category is `category` (or 'all') and `text` (case-insensitive) is part of its method, host, path or status. */
 export function matchesFilter(entry, { text = '', category = 'all' } = {}) {
-  if (category !== 'all' && categoryOf(entry) !== category) return false;
+  if (category === 'mocked') { if (!entry.mockId) return false; }   // "Mockadas": answered by a "Mock de endpoints" entry
+  else if (category !== 'all' && categoryOf(entry) !== category) return false;
   const needle = String(text).trim().toLowerCase(); if (!needle) return true;
-  return `${entry.method} ${entry.host}${entry.path} ${entry.status ?? ''} ${entry.outcome}`.toLowerCase().includes(needle) || entry.url.toLowerCase().includes(needle);
+  return `${entry.method} ${entry.host}${entry.path} ${entry.status ?? ''} ${entry.outcome}${entry.mockId ? ` mock ${entry.mockLabel ?? ''}` : ''}`.toLowerCase().includes(needle) || entry.url.toLowerCase().includes(needle);
 }
 
 const pad = (value, width = 2) => String(value).padStart(width, '0');
@@ -64,7 +65,9 @@ export function describeOutcome(entry) {
 }
 
 /** One table row's text, `HH:MM:SS.mmm METHOD host/path -> status  size  duration`. */
-export const formatEntry = entry => `${formatTime(entry.wall)} ${entry.method} ${entry.host}${entry.path} -> ${statusLabel(entry)}  ${formatSize(entry.responseBytes)}  ${formatDuration(entry.durationMs)}`;
+export const formatEntry = entry => `${formatTime(entry.wall)} ${entry.method} ${entry.host}${entry.path} -> ${statusLabel(entry)}${entry.mockId ? ' [MOCK]' : ''}  ${formatSize(entry.responseBytes)}  ${formatDuration(entry.durationMs)}`;
+/** The note of an entry a mock answered. */
+export const mockNote = entry => `Respondida pelo lab: mock "${entry.mockLabel}" (Mock de endpoints, painel Controles); a requisição não foi à rede.`;
 
 const stamp = date => `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
 /** netlog-<package>-<timestamp>.har (or .txt) */
@@ -76,6 +79,7 @@ export function buildText(entries, { dropped = 0 } = {}) {
   for (const entry of entries) {
     lines.push(`#${entry.seq} ${formatEntry(entry)}  [${entry.api}, thread ${entry.thread}]`, `    ${entry.url}`);
     if (entry.mappedUrl) lines.push(`    enviada para ${entry.mappedUrl} (Redirecionar hosts: ${entry.mappedRule})`);
+    if (entry.mockId) lines.push(`    ${mockNote(entry)}`);
     if (entry.finalUrl) lines.push(`    redirecionada para ${entry.finalUrl}`);
     const note = describeOutcome(entry); if (note) lines.push(`    ${note}`);
     for (const [name, value] of entry.requestHeaders) lines.push(`    > ${name}: ${value}`);
@@ -99,6 +103,7 @@ export function buildHar(entries, { dropped = 0, creator = { name: 'APK Web Lab'
         response: { status: entry.status ?? 0, statusText: entry.status === null ? '' : entry.reason, httpVersion: 'HTTP/1.1', cookies: [], headers: harHeaders(entry.responseHeaders),
           content: { size: entry.responseBytes, mimeType: (entry.contentType ?? '').split(';')[0].trim() || 'x-unknown' }, redirectURL: location, headersSize: -1, bodySize: entry.responseBytes },
         cache: {}, timings: { send: 0, wait: Math.max(time, 0), receive: 0 },
+        ...(entry.mockId ? { _mock: { id: entry.mockId, label: entry.mockLabel }, comment: mockNote(entry) } : {}),
         _seq: entry.seq, _api: entry.api, _thread: entry.thread, _outcome: entry.outcome, _failure: entry.failure?.message ?? null, _refusedHost: entry.refusedHost, _finalUrl: entry.finalUrl, _uptimeMs: entry.uptime,
       };
     }),
@@ -154,6 +159,7 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
     const box = el('div', 'netlog-detail'), note = describeOutcome(entry);
     box.append(el('div', 'netlog-url', entry.url));
     if (entry.mappedUrl) box.append(el('div', 'netlog-note', `Enviada para ${entry.mappedUrl} (Redirecionar hosts: ${entry.mappedRule}); o app vê a URL original`));
+    if (entry.mockId) box.append(el('div', 'netlog-note netlog-note-mock', mockNote(entry)));
     if (entry.finalUrl) box.append(el('div', 'netlog-note', `Redirecionada pelo transporte para ${entry.finalUrl}`));
     if (note) box.append(el('div', `netlog-note netlog-note-${categoryOf(entry)}`, note));
     if (entry.outcome === 'refused-by-allowlist' && entry.refusedHost) {
@@ -166,8 +172,9 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
     return box;
   };
   const row = entry => {
-    const wrap = el('div', `netlog-entry cat-${categoryOf(entry)}`), line = el('div', 'netlog-line');
-    line.append(el('span', 'netlog-time', formatTime(entry.wall)), el('span', 'netlog-method', entry.method), el('span', 'netlog-target', `${entry.host}${entry.path}`), el('span', 'netlog-status', statusLabel(entry)), el('span', 'netlog-size', formatSize(entry.responseBytes)), el('span', 'netlog-duration', formatDuration(entry.durationMs)));
+    const wrap = el('div', `netlog-entry cat-${categoryOf(entry)}${entry.mockId ? ' is-mocked' : ''}`), line = el('div', 'netlog-line');
+    const target = el('span', 'netlog-target', `${entry.host}${entry.path}`); if (entry.mockId) target.prepend(el('b', 'netlog-mock', 'MOCK'));
+    line.append(el('span', 'netlog-time', formatTime(entry.wall)), el('span', 'netlog-method', entry.method), target, el('span', 'netlog-status', statusLabel(entry)), el('span', 'netlog-size', formatSize(entry.responseBytes)), el('span', 'netlog-duration', formatDuration(entry.durationMs)));
     line.title = entry.url; line.tabIndex = 0; line.setAttribute('role', 'button'); line.setAttribute('aria-expanded', String(expanded.has(entry.seq)));
     const toggle = () => { if (expanded.has(entry.seq)) expanded.delete(entry.seq); else expanded.add(entry.seq); renderAll(); };
     line.addEventListener('click', toggle); line.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); } });
@@ -175,8 +182,8 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
     return wrap;
   };
   const updateCount = () => {
-    const refused = store.entries.filter(entry => categoryOf(entry) === 'refused').length;
-    count.textContent = `${store.entries.length} requisições${refused ? ` · ${refused} recusadas` : ''}${visibleCount !== store.entries.length ? ` · ${visibleCount} exibidas` : ''}${store.dropped ? ` · ${store.dropped} descartadas` : ''}`;
+    const refused = store.entries.filter(entry => categoryOf(entry) === 'refused').length, mocked = store.entries.filter(entry => entry.mockId).length;
+    count.textContent = `${store.entries.length} requisições${refused ? ` · ${refused} recusadas` : ''}${mocked ? ` · ${mocked} mockadas` : ''}${visibleCount !== store.entries.length ? ` · ${visibleCount} exibidas` : ''}${store.dropped ? ` · ${store.dropped} descartadas` : ''}`;
   };
   const renderAll = () => {
     timer = null;

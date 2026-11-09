@@ -1,30 +1,30 @@
-import { VMClock } from './vm-clock.js?v=b2ddf4678f67';
-import { overrideHit } from './method-overrides.js?v=b2ddf4678f67';
-import { OperationMonitor } from './operation-monitor.js?v=b2ddf4678f67';
-import { ExecutionProfile } from './execution-profile.js?v=b2ddf4678f67';
-import { SamplingProfiler } from './sampling-profiler.js?v=b2ddf4678f67';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=b2ddf4678f67';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=b2ddf4678f67';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=b2ddf4678f67';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=b2ddf4678f67';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=b2ddf4678f67';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=b2ddf4678f67';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=b2ddf4678f67';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=b2ddf4678f67';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=b2ddf4678f67';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=b2ddf4678f67';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=b2ddf4678f67';
-import { APKError } from './apk-error.js?v=b2ddf4678f67';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=b2ddf4678f67';
-import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=b2ddf4678f67';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=b2ddf4678f67';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=b2ddf4678f67';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=b2ddf4678f67';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=b2ddf4678f67';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=b2ddf4678f67';
-import { Scheduler, Blocked } from './scheduler.js?v=b2ddf4678f67';
-import { bootClassLacksMember } from './boot-class-members.js?v=b2ddf4678f67';
-export { APKError } from './apk-error.js?v=b2ddf4678f67';
+import { VMClock } from './vm-clock.js?v=e96a854757f6';
+import { overrideHit } from './method-overrides.js?v=e96a854757f6';
+import { OperationMonitor } from './operation-monitor.js?v=e96a854757f6';
+import { ExecutionProfile } from './execution-profile.js?v=e96a854757f6';
+import { SamplingProfiler } from './sampling-profiler.js?v=e96a854757f6';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=e96a854757f6';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=e96a854757f6';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=e96a854757f6';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=e96a854757f6';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e96a854757f6';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=e96a854757f6';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=e96a854757f6';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=e96a854757f6';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=e96a854757f6';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=e96a854757f6';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=e96a854757f6';
+import { APKError } from './apk-error.js?v=e96a854757f6';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=e96a854757f6';
+import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=e96a854757f6';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=e96a854757f6';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=e96a854757f6';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=e96a854757f6';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=e96a854757f6';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=e96a854757f6';
+import { Scheduler, Blocked } from './scheduler.js?v=e96a854757f6';
+import { bootClassLacksMember } from './boot-class-members.js?v=e96a854757f6';
+export { APKError } from './apk-error.js?v=e96a854757f6';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1724,7 +1724,7 @@ export class APKRuntime {
     return this.snapshot();
   }
   click(id) {
-    this.platform?.looperHost?.hostEventRan(this);
+    this.platform?.looperHost?.hostEventRan(this); this.platform?.noteInput?.();
     const view = this.object(ref(id));
     if (view.enabled === false) fail('Cannot click a disabled View');
     this.steps = 0;
@@ -1736,7 +1736,7 @@ export class APKRuntime {
     return this.snapshot();
   }
   back() {
-    this.platform?.looperHost?.hostEventRan(this);
+    this.platform?.looperHost?.hostEventRan(this); this.platform?.noteInput?.();
     if (!this.platform?.back) fail('Back navigation is not implemented for this runtime');
     this.steps = 0; this.platform.back(this); return this.snapshot();
   }
@@ -1919,9 +1919,10 @@ export class APKRuntime {
   /** Stress mode only: a collection at an event boundary (nothing in flight), before the next queued task runs. */
   stressCollect() { if (GC_STRESS && this.gcEnabled) collectGarbage(this, { reason: 'stress' }); }
   safepointCollect() {
-    const tries = this.gcSafepointTries ??= { calls: 0, notDue: 0, disabled: 0 }; tries.calls++;   // reported by OperationMonitor.gcLine: a heap that fills with no collection says whether safepoints were reached at all
+    const tries = this.gcSafepointTries ??= { calls: 0, notDue: 0, deferred: 0, disabled: 0 }; tries.calls++;   // reported by OperationMonitor.gcLine: a heap that fills with no collection says whether safepoints were reached at all
     if (!this.gcEnabled) { tries.disabled++; return; }
-    if (!GC_STRESS && !collectionDue(this)) { tries.notDue++; return; }
+    const held = this.gcDeferral?.held ?? 0;
+    if (!GC_STRESS && !collectionDue(this)) { if ((this.gcDeferral?.held ?? 0) > held) tries.deferred++; else tries.notDue++; return; }   // deferred: due, but the main thread is in motion (heap-gc.js deferral)
     collectGarbage(this, { reason: 'safepoint', safepoint: true });
   }
   /**

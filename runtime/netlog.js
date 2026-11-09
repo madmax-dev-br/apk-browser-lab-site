@@ -7,7 +7,8 @@
 //     method, url, scheme, host, port, path, requestHeaders [[name, value]], requestBytes,
 //     outcome, complete (the exchange has ended),
 //     status (null until a response head), reason, responseHeaders [[name, value]], contentType, responseBytes, finalUrl (a redirect the transport followed) or null, redirects (followed by the transport),
-//     closedEarly (the app closed the response before reading all of it), durationMs (null until it ends), failure { type, message } or null, refusedHost (host the allowlist refused) or null }
+//     closedEarly (the app closed the response before reading all of it), durationMs (null until it ends), failure { type, message } or null, refusedHost (host the allowlist refused) or null,
+//     mappedUrl / mappedRule ("Redirecionar hosts"), mockId / mockLabel (answered by a "Mock de endpoints" entry, never sent) }
 //   outcome: 'pending' (no head yet) | 'response' (a status arrived) | 'refused-by-allowlist' | 'offline' | 'unknown-host' | 'timeout' | 'aborted' | 'error' | 'unsupported'
 //            | 'connected' (a loopback connection; kind 'loopback': the device's own interface, never refused by policy; a loopback connect nobody listens for ends 'error' with ECONNREFUSED)
 // Wire format (Worker -> page):  { type: 'netlog', reset?: true, rows: [entry, ...] (new and changed entries, by seq), dropped, total }
@@ -61,7 +62,8 @@ export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: ()
     const entry = { seq: seq++, uptime: rounded(clock.now()), wall: Math.floor(clock.wall()), tid: Number(who.tid ?? 0), thread: who.thread ?? 'main', api: fields.api ?? 'java.net', kind: fields.kind ?? 'http',
       method: String(fields.method ?? 'GET'), url, scheme: fields.scheme ?? parts.scheme, host: fields.host ?? parts.host, port: fields.port ?? parts.port, path: fields.path ?? parts.path,
       requestHeaders: pairs(fields.headers), requestBytes: fields.bytes ?? 0, outcome: 'pending', complete: false, status: null, reason: '', responseHeaders: [], contentType: null, responseBytes: 0,
-      finalUrl: null, redirects: 0, closedEarly: false, durationMs: null, failure: null, refusedHost: null, mappedUrl: fields.mappedUrl ?? null, mappedRule: fields.mappedRule ?? null };   // mappedUrl: where "Redirecionar hosts" sent it (src/host-map.js)
+      finalUrl: null, redirects: 0, closedEarly: false, durationMs: null, failure: null, refusedHost: null, mappedUrl: fields.mappedUrl ?? null, mappedRule: fields.mappedRule ?? null,   // mappedUrl: where "Redirecionar hosts" sent it (src/host-map.js)
+      mockId: fields.mockId ?? null, mockLabel: fields.mockLabel ?? null };   // the "Mock de endpoints" entry that answered it in the lab (src/endpoint-mocks.js); it never went to the network
     buffer.push(entry); total++;
     if (buffer.length > maxEntries + 256) trim();   // amortized: trim in chunks, never per entry
     return touch(entry);
@@ -72,7 +74,7 @@ export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: ()
   };
   const api = {
     /** A request that started: `request` is the network layer's { method, url, headers, body }. Returns the entry (kept by the caller to update it). */
-    begin(request, { api: via = 'java.net', mapped = null } = {}) { return create({ api: via, method: request.method, url: request.url, headers: request.headers, bytes: request.body?.length ?? 0, mappedUrl: mapped?.url ?? null, mappedRule: mapped?.rule ?? null }); },
+    begin(request, { api: via = 'java.net', mapped = null, mock = null } = {}) { return create({ api: via, method: request.method, url: request.url, headers: request.headers, bytes: request.body?.length ?? 0, mappedUrl: mock ? null : mapped?.url ?? null, mappedRule: mock ? null : mapped?.rule ?? null, mockId: mock?.id ?? null, mockLabel: mock?.label ?? null }); },
     /** A request the policy refused before anything left the device: outcome 'offline' when the device is offline, else 'refused-by-allowlist' (with the host). */
     refuse({ api: via = 'java.net', kind = 'http', method = 'GET', url, host, port = null, headers = [], bytes = 0, offline = false }) {
       const entry = create({ api: via, kind, method, url, host, port, headers, bytes }); entry.refusedHost = offline ? null : (host ?? entry.host);

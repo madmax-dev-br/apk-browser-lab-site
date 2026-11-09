@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=b2ddf4678f67';
+import { APKError } from './apk-runtime.js?v=e96a854757f6';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;';
 const OWNER = 'Landroidx/compose/ui/semantics/SemanticsOwner;', NODE = 'Landroidx/compose/ui/semantics/SemanticsNode;', CONFIG = 'Landroidx/compose/ui/semantics/SemanticsConfiguration;', KEY = 'Landroidx/compose/ui/semantics/SemanticsPropertyKey;';
 const ACTION = 'Landroidx/compose/ui/semantics/AccessibilityAction;', ANNOTATED = 'Landroidx/compose/ui/text/AnnotatedString;', RECT = 'Landroidx/compose/ui/geometry/Rect;';
@@ -129,6 +129,7 @@ export function createComposeSemanticsDriver(runtime) {
     snapshot,
     performAction({ ownerViewId, nodeId, action, args = [] }) {
       if (!ACTION_TYPES.has(action)) fail('Unsupported standard semantics action', { action });
+      runtime.platform?.noteInput?.();   // an input for the collector's deferral (heap-gc.js)
       const current = snapshot({ roots: lastRoots ?? undefined, merged: lastMerged });
       const owner = current.owners.find(value => value.ownerViewId === ownerViewId);
       if (!owner) { const all = windowRoots(), hidden = all.find(value => !reachable(all).includes(value) && ownerViews([value.root]).some(view => view.ref === ownerViewId)); if (hidden) stale('Compose semantics owner belongs to a window blocked by a modal window', { ownerViewId }); }

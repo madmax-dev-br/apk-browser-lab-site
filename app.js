@@ -1,19 +1,20 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=b2ddf4678f67';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=b2ddf4678f67';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=b2ddf4678f67';
-import { initCollapsibleSections } from './panel-sections.js?v=b2ddf4678f67';
-import { createPermissionsPanel } from './permissions-panel.js?v=b2ddf4678f67';
-import { createOverridesPanel } from './overrides-panel.js?v=b2ddf4678f67';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=b2ddf4678f67';
-import { createHostMapPanel } from './host-map-panel.js?v=b2ddf4678f67';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=b2ddf4678f67';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=b2ddf4678f67';
-import { createDeviceView, createViewState } from './device-view.js?v=b2ddf4678f67';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=b2ddf4678f67';
-import { formatApiGapReport } from './api-gap-scan.js?v=b2ddf4678f67';
-import { createLogcatPanel } from './logcat-panel.js?v=b2ddf4678f67';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=b2ddf4678f67';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=b2ddf4678f67';
+import { APKWorkerClient } from './apk-worker-client.js?v=e96a854757f6';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=e96a854757f6';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=e96a854757f6';
+import { initCollapsibleSections } from './panel-sections.js?v=e96a854757f6';
+import { createPermissionsPanel } from './permissions-panel.js?v=e96a854757f6';
+import { createOverridesPanel } from './overrides-panel.js?v=e96a854757f6';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=e96a854757f6';
+import { createHostMapPanel } from './host-map-panel.js?v=e96a854757f6';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=e96a854757f6';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=e96a854757f6';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=e96a854757f6';
+import { createDeviceView, createViewState } from './device-view.js?v=e96a854757f6';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=e96a854757f6';
+import { formatApiGapReport } from './api-gap-scan.js?v=e96a854757f6';
+import { createLogcatPanel } from './logcat-panel.js?v=e96a854757f6';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=e96a854757f6';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=e96a854757f6';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -115,7 +116,7 @@ function showError(error, title = 'Tentativa de execução interrompida') {
   if (error.details) details.push(typeof error.details === 'string' ? error.details : JSON.stringify(error.details, null, 2));
   if (error.trace?.length) details.push('Últimas instruções da VM:\n' + error.trace.slice(-40).join('\n'));
   $('error-detail').textContent = [...new Set(details)].join('\n');
-  state.errorReport = buildDiagnosticReport({ error, packageName: inventory?.packageName ?? state.fileName ?? 'APK', tolerateMissing: $('tolerate-missing')?.value ?? 'off', methodOverrides: overridesPanel.activeCount(), ignoredActivities: ignoredPanel.activeCount(), build: document.querySelector?.('script[src*="app.js"]')?.src?.split('v=')[1] ?? '' }).text;
+  state.errorReport = buildDiagnosticReport({ error, packageName: inventory?.packageName ?? state.fileName ?? 'APK', tolerateMissing: $('tolerate-missing')?.value ?? 'off', methodOverrides: overridesPanel.activeCount(), ignoredActivities: ignoredPanel.activeCount(), endpointMocks: mocksPanel.activeCount(), build: document.querySelector?.('script[src*="app.js"]')?.src?.split('v=')[1] ?? '' }).text;
   $('error-detail').hidden = !details.length;
   $('error-diagnostics').hidden = !details.length;
   $('error-diagnostics').open = false;
@@ -335,7 +336,7 @@ async function inspectSelectedNative() {
 async function importSource(source, autoRun = false) {
   if (state.busy) return;
   state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
-  permissionsPanel?.detach(); overridesPanel?.detach(); ignoredPanel?.detach();
+  permissionsPanel?.detach(); overridesPanel?.detach(); ignoredPanel?.detach(); mocksPanel?.detach();
   // A new run (another APK, or Executar APK again) starts clean: the Worker of the previous run is terminated by apkVM.load, and what the page still shows of it goes too
   // (Logcat, network requests, memory meter, error report, last frame and heartbeat). App data follows the "Manter dados do app" option; the panel settings are kept.
   logcatPanel.reset(); netlogPanel.reset(); state.oomSeen = 0; state.lastVmHealth = null; state.lastSnapshot = null; state.errorReport = null; apkVM.lastHeartbeat = null; apkVM.lastScreenSnapshot = null; if ($('memory-meter')) $('memory-meter').hidden = true;
@@ -362,10 +363,10 @@ async function importSource(source, autoRun = false) {
     if (buffer.byteLength > 1024 * 1024 * 1024) throw new Error('O APK excede o limite de 1 GiB.');
     $('file-size').textContent = `${formatSize(buffer.byteLength)} · processado no navegador`;
     state.apiGaps = null;
-    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceForVM(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB, eventSeconds: deviceState.settings.eventSeconds }); state.loadedMemoryMiB = deviceState.settings.memoryMiB; updateVmMemoryHint(); // Ownership transfers to the Worker.
+    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceForVM(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB, eventSeconds: deviceState.settings.eventSeconds, motionRaster: params.get('raster') !== 'full' }); state.loadedMemoryMiB = deviceState.settings.memoryMiB; updateVmMemoryHint(); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
     state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);
-    await permissionsPanel.attach(result.inventory); await overridesPanel.attach(result.inventory); await ignoredPanel.attach(result.inventory);   // before any app code runs: permission state, simulated location, method return overrides, ignored Activities
+    await permissionsPanel.attach(result.inventory); await overridesPanel.attach(result.inventory); await ignoredPanel.attach(result.inventory); await mocksPanel.attach(result.inventory);   // before any app code runs: permission state, simulated location, method return overrides, ignored Activities, endpoint mocks
     showInventory(result.inventory);
     appendTrace(`Pacote: ${result.inventory.packageName || '(não identificado)'}`);
     if (state.mode === 'apk') {
@@ -408,6 +409,7 @@ const deviceState = { settings: loadDeviceSettings(), clockTimer: null };
 const permissionsPanel = createPermissionsPanel({ $, vm: apkVM, location: { get: () => deviceState.settings.location, set: block => { deviceState.settings = { ...deviceState.settings, location: block }; saveDeviceSettings(deviceState.settings); } } });
 const overridesPanel = createOverridesPanel({ $, vm: apkVM });
 const ignoredPanel = createIgnoredActivitiesPanel({ $, vm: apkVM });
+const mocksPanel = createEndpointMocksPanel({ $, vm: apkVM });   // "Mock de endpoints" (src/endpoint-mocks.js): per package, applied live
 const hostMapPanel = createHostMapPanel({ $, get: () => deviceState.settings.network.hostMap ?? [], set: rules => applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, network: { ...deviceState.settings.network, hostMap: rules } })) });   // "Redirecionar hosts" (src/host-map.js): device settings, applied live
 const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, notifyParent, clickView: id => clickView(id), hooks: {
   navigationChanged(canGoBack) { $('back-button').disabled = state.busy || !canGoBack; $('back-button').hidden = state.mode !== 'apk' || !canGoBack; },
@@ -417,7 +419,7 @@ const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTr
     if (state.mode === 'apk') { setStatus('Aplicativo encerrado · nenhuma Activity ativa'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENCERRADO'; }
   },
   rendered(snapshot, composeReady) {
-    overridesPanel.hits(snapshot.methodOverrides); ignoredPanel.hits(snapshot.ignoredActivities);
+    overridesPanel.hits(snapshot.methodOverrides); ignoredPanel.hits(snapshot.ignoredActivities); mocksPanel.hits(snapshot.endpointMocks);
     hideBoot({ force: true }); $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth); state.lastSnapshot = snapshot; redrawLayoutBounds(); if (snapshot.vmHealth) state.lastVmHealth = snapshot.vmHealth;
     if (snapshot.droppedEvent) appendTrace(`Evento descartado: a View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) já não existe na VM.`);
     // The VM raised java.lang.OutOfMemoryError (even if the app caught it): never silent.
