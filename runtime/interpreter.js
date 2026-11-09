@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=eed27b762f3e';
-import { BUCKET } from './time-breakdown.js?v=eed27b762f3e';
-import { Blocked, QUANTUM } from './scheduler.js?v=eed27b762f3e';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=eed27b762f3e';
+import { APKError } from './apk-error.js?v=e4428398e646';
+import { BUCKET } from './time-breakdown.js?v=e4428398e646';
+import { Blocked, QUANTUM } from './scheduler.js?v=e4428398e646';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS } from './baseline-compiler.js?v=e4428398e646';
 
 // Frame-based DEX interpreter.
 //
@@ -579,7 +579,7 @@ function runLoop(rt, owner, base) {
             pc += 2; break;
           }
           case 0x20: { const type = dex.types[u[pc + 1]], value = regs[hi]; if (!type) fail('Invalid instanceof type'); regs[lo] = !isNull(value) && subtypeAt(rt, prog, pc, rt.typeOf(value), type) ? 1 : (rt.assertResolvable(type), 0); pc += 2; break; }
-          case 0x21: regs[lo] = rt.array(regs[hi]).cells.length; pc++; break;
+          case 0x21: regs[lo] = rt.vmArray(regs[hi]).cells.length; pc++; break;
           case 0x22: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid allocation type'); if (rt.initialized.get(type)?.status !== 'initialized') { const gate = rt.initStep(type); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.bytecodeAlloc = true; try { regs[a] = rt.allocate(type); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
           case 0x23: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid array type'); rt.bytecodeAlloc = true; try { regs[lo] = rt.newArray(type, int(regs[hi])); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
           case 0x27: { const value = regs[a]; if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'throw with null exception'); throw new JavaException(value, rt.object(value).message ?? rt.typeOf(value), rt.object(value).exceptionDetails); }
@@ -600,22 +600,22 @@ function runLoop(rt, owner, base) {
           }
           case 0x44: case 0x45: case 0x46: case 0x47: case 0x48: case 0x49: case 0x4a: {
             const packed = u[pc + 1], index = regs[packed >> 8], arrayRef = regs[packed & 255]; let array; if (arrayRef !== null && typeof arrayRef === 'object') array = heapList.get(arrayRef.ref);
-            if (array === undefined || array.cells === undefined || !(index >= 0 && index < array.cells.length)) array = rt.array(arrayRef, index);
+            if (array === undefined || array.cells === undefined || !(index >= 0 && index < array.cells.length)) array = rt.vmArray(arrayRef, index);
             const variant = op - 0x44, e = array.cells[index];
             if (variant === 1) { regs[a] = e; regs[a + 1] = WIDE_HIGH; } else regs[a] = variant === 3 ? e & 1 : variant === 4 ? (e << 24) >> 24 : variant === 5 ? e & 65535 : variant === 6 ? (e << 16) >> 16 : e;
             pc += 2; break;
           }
           case 0x4b: case 0x4c: case 0x4d: case 0x4e: case 0x4f: case 0x50: case 0x51: {
             const packed = u[pc + 1], index = regs[packed >> 8], arrayRef = regs[packed & 255]; let array; if (arrayRef !== null && typeof arrayRef === 'object') array = heapList.get(arrayRef.ref);
-            if (array === undefined || array.cells === undefined || !(index >= 0 && index < array.cells.length)) array = rt.array(arrayRef, index);
+            if (array === undefined || array.cells === undefined || !(index >= 0 && index < array.cells.length)) array = rt.vmArray(arrayRef, index);
             const variant = op - 0x4b, v = regs[a];
             const value = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
-            if (variant === 2) rt.checkArrayValue(array, value);
+            if (variant === 2) { rt.checkArrayValue(array, value); if (array.id < rt.gcOldBound && value !== null && typeof value === 'object' && !(value.ref < rt.gcOldBound)) rt.remember(array); }   // write barrier (heap-gc.js, "Young generation")
             array.cells[index] = value;
             pc += 2; break;
           }
           case 0x52: case 0x53: case 0x54: case 0x55: case 0x56: case 0x57: case 0x58: {
-            const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.object(objectRef);
+            const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.vmObject(objectRef);
             let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = fieldSiteAt(rt, prog, pc, dex.field(u[pc + 1]), obj.type);
             const slot = site.slot; let v = slot >= 0 ? obj.slots[slot] : obj.fields.get(site.key); if (v === undefined) v = site.def;
             const variant = op - 0x52;
@@ -624,12 +624,12 @@ function runLoop(rt, owner, base) {
             pc += 2; break;
           }
           case 0x59: case 0x5a: case 0x5b: case 0x5c: case 0x5d: case 0x5e: case 0x5f: {
-            const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.object(objectRef);
+            const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.vmObject(objectRef);
             let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = fieldSiteAt(rt, prog, pc, dex.field(u[pc + 1]), obj.type);
             const variant = op - 0x59, v = regs[lo], value = variant <= 2 ? v : variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : (v << 16) >> 16;
             const slot = site.slot;   // field store (write-barrier point): an already-stored slot directly, a first store through storeSlot (budget), a key outside the shape through the facade
-            if (slot >= 0) { const slots = obj.slots; if (slots[slot] !== undefined) slots[slot] = value; else rt.storeSlot(obj, slot, site.key, value); }
-            else { const fields = obj.fields; if (fields.has(site.key)) fields.set(site.key, value); else rt.storeField(fields, site.key, value); }
+            if (slot >= 0) { const slots = obj.slots; if (slots[slot] !== undefined) { slots[slot] = value; if (variant === 2 && obj.id < rt.gcOldBound && value !== null && typeof value === 'object' && !(value.ref < rt.gcOldBound)) rt.remember(obj); } else rt.storeSlot(obj, slot, site.key, value); }   // write barrier: an old record that now holds a young reference
+            else { const fields = obj.fields; if (fields.has(site.key)) { fields.set(site.key, value); if (variant === 2 && obj.id < rt.gcOldBound && value !== null && typeof value === 'object' && !(value.ref < rt.gcOldBound)) rt.remember(obj); } else rt.storeField(fields, site.key, value); }
             pc += 2; break;
           }
           case 0x60: case 0x61: case 0x62: case 0x63: case 0x64: case 0x65: case 0x66: {
@@ -748,7 +748,7 @@ function runLoop(rt, owner, base) {
               rt.callStats.dispatched++; rt.lastBridge = null; const depthBefore = rt.depth;
               outcome = rt.dispatch(site.target, args, site.mode, f.method.owner, true);
               if (rt.lastBridge !== null && rt.lastBridgeDepth === depthBefore + 1) {
-                const receiver = args[0], record = site.virtual && typeof receiver !== 'string' ? rt.object(receiver) : null;
+                const receiver = args[0], record = site.virtual && typeof receiver !== 'string' ? rt.vmObject(receiver) : null;
                 if (record === null || (record.annotationValues === undefined && record.proxyHandler === undefined)) {
                   const type = site.virtual ? (record === null ? 'Ljava/lang/String;' : record.type) : null;
                   if (site.bridge === null || site.bridgeEpoch !== rt.resolveEpoch) { site.bridge = rt.lastBridge; site.bridgeEpoch = rt.resolveEpoch; site.bridgeType = type; site.bridgePoly = null; }
@@ -758,7 +758,7 @@ function runLoop(rt, owner, base) {
               rt.lastBridge = null;
             }
             if (outcome instanceof PendingCall) {
-              if (outcome.definition !== null && !(site.virtual && typeof args[0] !== 'string' && rt.object(args[0]).annotationValues)) {
+              if (outcome.definition !== null && !(site.virtual && typeof args[0] !== 'string' && rt.vmObject(args[0]).annotationValues)) {
                 if (fastCalls && site.callee !== null && site.virtual) {
                   const type = rt.typeOf(args[0]), poly = site.poly ??= new Map();
                   if (type !== site.type && poly.size < 128) poly.set(type, { callee: outcome.definition, prog: prepare(rt, outcome.method, outcome.code) });
@@ -877,7 +877,7 @@ function stepRare(rt, f, regs, u, dex, pc, op, a, lo, hi) {
         f.result = value; pc += 3; break;
       }
       case 0x26: {
-        const array = rt.array(regs[a]), payload = pc + (u[pc + 1] | (u[pc + 2] << 16)), tag = u[payload], width = u[payload + 1];
+        const array = rt.vmArray(regs[a]), payload = pc + (u[pc + 1] | (u[pc + 2] << 16)), tag = u[payload], width = u[payload + 1];
         const size = u[payload + 2] + u[payload + 3] * 65536;
         const expected = { Z: 1, B: 1, C: 2, S: 2, I: 4, F: 4, J: 8, D: 8 }[array.type.slice(1)];
         if (tag !== 0x0300 || !expected || size > array.cells.length || width !== expected || payload + 4 + Math.ceil(size * width / 2) > f.code.units) fail('Malformed fill-array-data payload');

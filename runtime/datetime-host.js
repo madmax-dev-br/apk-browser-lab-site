@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=eed27b762f3e';
-import { gcRoot } from './heap-gc.js?v=eed27b762f3e';
-import { createHostRegistry, parseSignature } from './host-contract.js?v=eed27b762f3e';
-import { JavaException } from './apk-runtime.js?v=eed27b762f3e';
+import { APKError } from './apk-error.js?v=e4428398e646';
+import { gcRoot } from './heap-gc.js?v=e4428398e646';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=e4428398e646';
+import { JavaException } from './apk-runtime.js?v=e4428398e646';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).

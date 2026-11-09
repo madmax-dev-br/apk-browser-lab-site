@@ -38,9 +38,34 @@
 //
 // Audit mode (APKWEB_GC_AUDIT=1, or collectGarbage(..., { audit: true })) replaces every freed record by a tombstone whose properties throw, so a root that was missed fails
 // loudly at its first use instead of corrupting state.
-import { BUCKET } from './time-breakdown.js?v=eed27b762f3e';
-import { cellBytes } from './java-arrays.js?v=eed27b762f3e';
-import { storedFieldCount } from './object-shapes.js?v=eed27b762f3e';
+//
+// Young generation (docs/INTERACTION-PERFORMANCE.md item 2; runtime.gcGenerational, on by default; APKWEB_GC_GENERATIONS=0 turns it off in Node tools). A heap with a large long-lived set and
+// short-lived frame garbage paid a whole-heap mark for every collection; a minor collection marks only the young objects.
+//  - Ids are allocated in order and never reused, so a generation is an id range: ids below runtime.gcOldBound are old, ids in [gcOldBound, gcAgeBound) survived one minor collection (aged), the
+//    rest are new. A major collection (everything above) promotes every survivor. A minor collection (collectMinor) treats every old id as marked and never traces it; aged survivors become old
+//    (an object is promoted after surviving two minor collections, so what the current frame or a host call still holds is not tenured at once), new survivors become aged.
+//  - Old records that may point to young ones are traced again by every minor collection: (1) the remembered set (gcRemList): the write barrier of every reference store into an old record --
+//    the interpreter's iput-object and aput-object, the compiled ones (baseline-compiler.js BARRIER), APKRuntime.storeSlot / storeField and FieldMap.set (object-shapes.js) -- adds the record;
+//    each minor collection recomputes the set exactly from what the traced records still point to; (2) the touched list (gcTouchList): every old record APKRuntime.object()/array() handed to host
+//    code, which writes into records without a barrier (array cells, System.arraycopy, slots, its own host properties); a collection with host code in flight keeps the list, a quiescent point
+//    (maybeCollect between events) moves it into the remembered set for one more rescan; the VM's own reads go through vmObject/vmArray and touch nothing; (3) the host-stateful records
+//    (gcHostful): old records with a property of their own outside fields and cells that holds or may come to hold a reference (host state a host may write through a record it cached), rebuilt by
+//    every major collection and extended by every minor one. Statics, threads, host tables and the other roots are scanned in full by every collection (statics need no barrier).
+//  - java.lang.ref: a minor collection clears and enqueues the weak and phantom references (young ones, and old ones the remembered set brings back: an old reference whose referent slot holds a
+//    young object stays remembered) whose young referent it did not mark; an old referent is cleared only by a major collection. Soft references are strong in a minor collection: only a
+//    pressured major collection clears them. Ephemerons, native-address pruning, tombstones (the freed-id ring marks minor entries), onFree cleaners and monitors work the same over the young
+//    range. The storage budgets drop by what a minor collection freed; a major collection recounts them.
+//  - Pacing (collectionKind): a major collection when collectionDue asks for one -- with generations its threshold is measured on the old generation (the heap right after the last collection),
+//    not on young garbage; the safety rules and the deferral in motion are unchanged -- else a minor one when the young generation is full (nurserySize: GC_NURSERY_FRACTION of the limit,
+//    adapted to the share that survives, up to a quarter of the limit, never more than half the room left below 85%). A minor collection runs in motion while recent ones were short
+//    (GC_MINOR_MOTION_MS); a slow one waits for the idle moment until another base-sized young generation was allocated. The first collection of a runtime, the emergency and soft-clearing ones
+//    and collectGarbage() without `generation: 'minor'` are major.
+//  - Audit: a minor collection in audit mode is cross-checked against a full conservative mark (anything it reaches must survive); audit and stress collections alternate three minor collections
+//    and a major one. What remains unchecked by construction: host code that keeps the record of an old object without host state in a JavaScript closure (a rooted host structure is traced) and
+//    later writes a young reference into its cells or slots directly, without object(), FieldMap or storeField; the tombstone diagnosis names a minor collection for such a case.
+import { BUCKET } from './time-breakdown.js?v=e4428398e646';
+import { cellBytes } from './java-arrays.js?v=e4428398e646';
+import { storedFieldCount } from './object-shapes.js?v=e4428398e646';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -49,7 +74,7 @@ const tracked = new Set();
 export function gcRoot(container) { tracked.add(new WeakRef(container)); return container; }
 
 const ID_KEY = /(^id$|Id$|Ids$|^ids$|^ref$|Ref$|Refs$|^view$|View$|^target$|Target$|^receiver$|Receiver$|^owner$|Owner$|^activity$|Activity$|^object$|Object$|^handle$)/;
-const SKIP_PROPS = new Set(['heap', 'dex', 'classes', 'resolvedClasses', 'resolveCache', 'hostMethodRefs', 'subtypeMemo', 'ancestorSets', 'methodEvidence', 'nativeBindings', 'apkEntries', 'traceRing', 'trace', 'scheduler', 'resources', 'gcStats', 'gcSkips', 'gcDeferral', 'gcDeferralStats', 'allocationSamples', 'nativeArrays', 'nativeRanges', 'profile', 'monitor', 'gcPhases', 'hostAllocs', 'allProgs', 'methodOverrides', 'methodOverridesAll', 'shapeMemo']);   // nativeArrays/nativeRanges pin an array's address only while the array lives (pruned after marking)   // gcStats keeps past nextId values: counters that look like object ids and would pin whatever object had that id
+const SKIP_PROPS = new Set(['heap', 'dex', 'classes', 'resolvedClasses', 'resolveCache', 'hostMethodRefs', 'subtypeMemo', 'ancestorSets', 'methodEvidence', 'nativeBindings', 'apkEntries', 'traceRing', 'trace', 'scheduler', 'resources', 'gcStats', 'gcSkips', 'gcDeferral', 'gcDeferralStats', 'allocationSamples', 'nativeArrays', 'nativeRanges', 'profile', 'monitor', 'gcPhases', 'hostAllocs', 'allProgs', 'methodOverrides', 'methodOverridesAll', 'shapeMemo', 'gcRemList', 'gcRemBits', 'gcTouchList', 'gcTouchBits', 'gcHostful', 'gcHostBits', 'gcMinorStats', 'gcMinorPhases']);   // nativeArrays/nativeRanges pin an array's address only while the array lives (pruned after marking)   // gcStats keeps past nextId values: counters that look like object ids and would pin whatever object had that id
 const NUMERIC_ARRAY_LIMIT = 256;
 
 function tombstone(id, type) {
@@ -158,17 +183,23 @@ function buildSkip(runtime) {
  * marker being created: the shared per-runtime chunks are zeroed by every marker), `epoch` (private 32-bit marks, `reset()` starts a new empty mark set without touching the chunks: used to measure
  * the reach of many roots one after the other), `order` (record the ids in the order they are marked: `marker.order`).
  */
-export function createMarker(runtime, { full = false, clearSoft = false, privateMarks = false, epoch = false, order = false } = {}) {
+export function createMarker(runtime, { full = false, clearSoft = false, privateMarks = false, epoch = false, order = false, minorBound = 0, promoteBound = Infinity } = {}) {
   const heap = runtime.heap, weakIds = [], softIds = [], phantomIds = [], weakTypes = weakTypeCache(runtime), markOrder = order ? [] : null;
+  // A minor collection (`minorBound` > 0): every id below the bound is old and counts as marked (it is never traced from here: old records that may point to young ones are rescanned
+  // explicitly, see `rescan`), so the marks, the worklist and the sweep cover the young ids only. `promoteBound`: the ids below it are old after this collection (Infinity: every survivor);
+  // `rememberIds` collects the traced records below it that hold a reference at or above it (the next remembered set), `hostfulIds` the newly old ones with host state of their own.
+  const bound = minorBound > 0 ? minorBound : 0, boundChunk = bound >>> 12, promote = promoteBound, hostfulIds = [], rememberIds = [];
   /** The kind of java.lang.ref.Reference a heap type is: WeakReference (WeakHashMap entries, ThreadLocal map entries ...) and PhantomReference never keep the referent alive; SoftReference does unless `clearSoft`. */
   const refKind = type => { let kind = weakTypes.get(type); if (kind === undefined) { kind = REF_NONE; if (type.charCodeAt(0) === 76) try { for (let at = type, depth = 0; at && depth < 64; at = runtime.parent(at), depth++) { const found = REF_SUPERS.get(at); if (found !== undefined) { kind = found; break; } } } catch { kind = REF_NONE; } /* walks the superclass chain: runtime.isSubtype would memoize every type the collector meets */ weakTypes.set(type, kind); } return kind; };
   const limit = runtime.nextId, worklist = []; let nodes = 0, pruned = 0;
   // Mark bits per 4096-id chunk, allocated only for the chunks that hold records and reused across collections.
   const markChunks = full || privateMarks || epoch ? [] : (runtime.gcMarkChunks ??= []);
   for (let ci = 0; ci < markChunks.length; ci++) if (markChunks[ci] !== undefined && heap.chunks[ci] === undefined) markChunks[ci] = undefined;
-  for (let ci = 0; ci < heap.chunks.length; ci++) if (heap.chunks[ci] !== undefined) { if (markChunks[ci] === undefined) markChunks[ci] = epoch ? new Uint32Array(4096) : new Uint8Array(4096); else markChunks[ci].fill(0); }
+  for (let ci = boundChunk; ci < heap.chunks.length; ci++) if (heap.chunks[ci] !== undefined) { if (markChunks[ci] === undefined) markChunks[ci] = epoch ? new Uint32Array(4096) : new Uint8Array(4096); else markChunks[ci].fill(0); }
   let epochValue = 1;
-  const isMarked = epoch ? (id => { const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] === epochValue; }) : (id => { const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] !== 0; });
+  const isMarked = epoch ? (id => { const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] === epochValue; })
+    : bound > 0 ? (id => { if (id < bound) return true; const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] !== 0; })
+    : (id => { const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] !== 0; });
   let category = 4; const setCategory = value => { category = value; };
   const setMarked = epoch ? (id => { markChunks[id >>> 12][id & 4095] = epochValue; }) : (id => { markChunks[id >>> 12][id & 4095] = category; });
   const marked = { has: isMarked };
@@ -223,20 +254,27 @@ export function createMarker(runtime, { full = false, clearSoft = false, private
     if (++sincePulse >= 2048) { sincePulse = 0; runtime.monitor?.pulse(`coleta de lixo (marcando ${count} objetos)`); }
     const record = heap.get(worklist.pop()), kind = refKind(record.type), weak = kind !== REF_NONE && (kind !== REF_SOFT || clearSoft);   // `weak`: this reference does not keep its referent alive in this mark
     if (kind === REF_WEAK) weakIds.push(record.id); else if (kind === REF_SOFT) { if (clearSoft) softIds.push(record.id); } else if (kind === REF_PHANTOM) phantomIds.push(record.id);
+    let host = false;   // host state of the record's own (a property outside the field and element storage that holds or may come to hold a reference): rescanned by every minor collection
+    const old = record.id < promote && promote !== Infinity; let young = false;   // old after this collection: does it still point into the young generation (then it is remembered)?
     for (const key in record) {
       const item = record[key];
-      if (key === 'slots') {   // the instance fields (src/object-shapes.js); a weak/soft/phantom reference skips its referent slot
+      if (key === 'slots') {   // the instance fields (src/object-shapes.js); a weak/soft/phantom reference skips its referent slot (still remembered: a minor collection must see it to clear it)
         const skipSlot = weak ? record.fieldShape.referentSlot : -1;
-        for (let i = 0; i < item.length; i++) { const value = item[i]; if (value !== null && typeof value === 'object' && i !== skipSlot) stack.push(value); }
+        for (let i = 0; i < item.length; i++) { const value = item[i]; if (value !== null && typeof value === 'object') { if (i !== skipSlot) stack.push(value); if (old && !(value.ref < promote)) young = true; } }
         continue;
       }
-      if (key === 'fieldShape') continue;   // layout metadata, no values
-      if (weak && key === 'referent') continue;   // a host-side referent kept outside the field table
+      if (key === 'fieldShape' || key === 'id' || key === 'type') continue;   // layout metadata, the record's own id and class name: no references
+      if (weak && key === 'referent') { host = true; continue; }   // a host-side referent kept outside the field table
       if (weak && (key === 'fieldExtra' || key === 'fields') && item instanceof Map) { for (const [fieldKey, fieldValue] of item) { if (fieldKey === REFERENT_KEY) continue; if (fieldValue !== null && typeof fieldValue === 'object') stack.push(fieldValue); } continue; }
-      if (key === 'cells') { if (refArrayType(record.type)) { if (Array.isArray(item)) for (let i = 0; i < item.length; i++) { const element = item[i]; if (element !== null && typeof element === 'object') stack.push(element); } else scan(item); } }   // a primitive array's typed storage holds no references
-      else if (item !== null && typeof item === 'object') stack.push(item);
-      else if (typeof item === 'number' && idLike(key, item)) markId(item);
+      if (key === 'cells') { if (refArrayType(record.type)) { if (Array.isArray(item)) for (let i = 0; i < item.length; i++) { const element = item[i]; if (element !== null && typeof element === 'object') { stack.push(element); if (old && !(element.ref < promote)) young = true; } } else { scan(item); if (old) young = true; } } }   // a primitive array's typed storage holds no references
+      else if (key === 'fieldExtra' || key === 'fields') { if (item !== null && typeof item === 'object') { stack.push(item); if (old && key === 'fieldExtra') young = true; } }   // the fields outside the shape (a Map: remembered conservatively), an array's NO_FIELDS
+      else {
+        if (item !== null && typeof item === 'object') { stack.push(item); host = true; }
+        else if (typeof item === 'number') { if (idLike(key, item)) { markId(item); host = true; } }
+        else if (item === null || item === undefined || typeof item === 'function') host = true;   // may be replaced by a reference later
+      }
     }
+    if (host) { if (record.id < promote) hostfulIds.push(record.id); } else if (young) rememberIds.push(record.id);   // a host-stateful old record is rescanned by every minor collection anyway
     scan();
   }
   };
@@ -249,38 +287,18 @@ export function createMarker(runtime, { full = false, clearSoft = false, private
   };
   /** Epoch markers only: forget every mark, the worklist and the visited JavaScript objects (the next root starts from an empty mark set). */
   const reset = () => { epochValue++; worklist.length = 0; stack.length = 0; count = 0; visited = new WeakSet(); };
-  return { limit, marked, markedHas: isMarked, setCategory, markId, scan, drain, ephemerons, violations, stack, idLike, weakIds, softIds, phantomIds, reset, order: markOrder, count: () => count, nodes: () => nodes, pruned: () => pruned, get visited() { return visited; } };
+  /** Minor collections: queue an old record (a remembered or host-stateful one) to be traced again; old records are never marked. */
+  const rescan = id => { const record = heap.get(id); if (record !== undefined && record.freed !== true) worklist.push(id); };
+  return { limit, bound, rescan, hostfulIds, rememberIds, marked, markedHas: isMarked, setCategory, markId, scan, drain, ephemerons, violations, stack, idLike, weakIds, softIds, phantomIds, reset, order: markOrder, count: () => count, nodes: () => nodes, pruned: () => pruned, get visited() { return visited; } };
 }
 
 /**
- * Collects unreachable objects. Returns { collected, reason?, before, after, freed, ms, markMs }.
- * options: { audit, extraRoots: () => iterable of values | values[], reason, requireQuiescence = true }
+ * Marks from every root (see the header) with `marker` and closes over the heap. In a minor collection (marker.bound > 0) the old records of the remembered set and the host-stateful ones are
+ * traced again first. Returns { t0, categories, worstRoot, quiet }: `quiet` is true when nothing host-side was in flight, so the host-allocation set was dropped.
  */
-export function collectGarbage(runtime, options = {}) {
-  const tbPrevious = runtime.tb?.enter(BUCKET.GC);
-  try { return collectGarbageTimed(runtime, options); } finally { runtime.tb?.leave(tbPrevious); }
-}
-function collectGarbageTimed(runtime, options) {
-  const saved = runtime.hostCall, started = performance.now(); runtime.hostCall = 'coleta de lixo';   // the page must see "garbage collection" (with progress pulses), never a stale host call, while the VM is busy here
-  try { return collectGarbageNow(runtime, options); } finally {
-    runtime.hostCall = saved ?? null;
-    const spent = performance.now() - started;
-    if (runtime.gcPhases?.[0] && runtime.gcPhases[0].at >= started - 1) {   // a collection happened: pace the next one and keep its time out of the mutator's watchdogs
-      runtime.gcLastEnd = performance.now(); runtime.gcLastMs = spent; runtime.gcTotalMs = (runtime.gcTotalMs ?? 0) + spent;
-      const op = runtime.monitor?.op; if (op) { op.gcMs = (op.gcMs ?? 0) + spent; op.gcCount = (op.gcCount ?? 0) + 1; op.start += spent; }
-      if (runtime.eventWallStart > 0) runtime.eventWallStart += spent;
-    }
-  }
-}
-function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC_AUDIT === '1', extraRoots = null, reason = 'manual', safepoint = false, emergency = false, clearSoft = undefined } = {}) {
-  const started = performance.now(), heap = runtime.heap, before = heap.size;
-  const blocked = quiescent(runtime, safepoint) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null);
-  if (blocked) { const skips = (runtime.gcSkips ??= {}); skips[blocked] = (skips[blocked] ?? 0) + 1; return { collected: false, reason: blocked, before, after: before, freed: 0, ms: 0 }; }
-  // The main thread's state as this collection starts (null = idle) and the deferral episode it closes, if one was pending: a paced collection becomes 'idle' or 'forced' (see the header).
-  const motion = runtime.platform?.mainThreadMotion?.() ?? null, closed = closeDeferral(runtime, reason, motion, started), deferral = closed.deferral; reason = closed.reason;
-  const policy = clearSoft === false ? null : clearSoft === true ? 'forced' : softPolicy(runtime, { reason, emergency }), softMode = policy !== null;   // pressured collection: soft references are cleared (see the header)
-  const { limit, markedHas, setCategory, markId, scan, drain, ephemerons, violations, idLike, weakIds, softIds, phantomIds, nodes, count, pruned, visited } = createMarker(runtime, { clearSoft: softMode });
+function markRoots(runtime, marker, { safepoint, emergency, extraRoots, report }) {
   const t0 = performance.now(); let worstRoot = { key: '-', ms: 0, nodes: 0 };
+  const { setCategory, markId, scan, drain, idLike, nodes, count, visited } = marker;
   // Runtime and platform: everything but the heap itself and the large immutable tables. Each root is timed and counted on its own; a root that turned out heavy (>50k JS nodes) is split into
   // its properties on the following collections (iterative deepening), so the report names the structure by path (platform.x.y).
   const heavy = runtime.gcHeavyPaths ??= new Set(), rows = [], plain = value => value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Map) && !(value instanceof Set) && !ArrayBuffer.isView(value);
@@ -297,6 +315,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   // Owner categories: roots are scanned and closed in a fixed order and every object keeps the category of the first group that reaches it (a dominator-lite attribution: where is the mass).
   const categories = new Map(); let counted = 0;
   const closeCategory = (id, name) => { drain(); const now = count(); if (now > counted) { const entry = categories.get(id) ?? categories.set(id, { id, name, n: 0 }).get(id); entry.n += now - counted; counted = now; } };
+  if (marker.bound > 0) { setCategory(6); for (const id of runtime.gcRemList) marker.rescan(id); for (const id of runtime.gcTouchList) marker.rescan(id); for (const id of runtime.gcHostful) marker.rescan(id); closeCategory(6, 'objetos antigos relidos (conjunto lembrado, estado de host)'); }
   setCategory(1); if (runtime.staticFields && typeof runtime.staticFields === 'object') scanRoot(runtime.staticFields, 'staticFields', 0); closeCategory(1, 'campos estáticos das classes');
   { const threads = runtime.scheduler?.threads ?? [];
     threads.forEach((thread, index) => { const id = 10 + Math.min(index, 200); setCategory(id); const view = Object.create(runtime.scheduler); view.threads = [thread]; runtime.scheduler.enumerateRoots.call(view, item => scan(item)); closeCategory(id, `thread ${thread.name ?? index}`); });
@@ -308,7 +327,8 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   setCategory(3);
   const stackQuiet = runtime.depth === 0 && runtime.nestedRuns <= 1 && !runtime.initDepth && !runtime.scheduler?.waitingNested?.size && !runtime.scheduler?.threads.some(thread => thread.nestedDepth > 0 || thread.nestedBlock);
   // An emergency collection (APKRuntime.emergencyCollect) runs inside an allocation: host code of the allocating thread may be mid-way through a native holding what it allocated, so hostAllocs is never dropped there.
-  if (!safepoint || (stackQuiet && !emergency)) runtime.hostAllocs.length = 0; else for (const id of runtime.hostAllocs) markId(id);
+  const quiet = !safepoint || (stackQuiet && !emergency);
+  if (quiet) runtime.hostAllocs.length = 0; else for (const id of runtime.hostAllocs) markId(id);
   graceRoots(runtime, markId);   // the last host allocations of finished calls (see APKRuntime.releaseHostAllocs)
   for (const weak of tracked) { const container = weak.deref(); if (container === undefined) tracked.delete(weak); else scan(container); }
   if (extraRoots) { const values = typeof extraRoots === 'function' ? extraRoots() : extraRoots; for (const item of values ?? []) scan(item); }
@@ -322,29 +342,51 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   closeCategory(4, 'tabelas da plataforma e do runtime');
   for (const row of rows) if (row.ms > worstRoot.ms) worstRoot = row;
   const topBy = field => [...rows].sort((a, b) => b[field] - a[field]).slice(0, 5).map(row => ({ key: row.key, ms: Math.round(row.ms), nodes: row.nodes, kind: row.kind, size: row.size }));
-  runtime.gcTopRoots = { byNodes: topBy('nodes'), byMs: topBy('ms') };
+  if (report) runtime.gcTopRoots = { byNodes: topBy('nodes'), byMs: topBy('ms') };
+  return { t0, categories, worstRoot, quiet };
+}
+
+/**
+ * Collects unreachable objects. Returns { collected, reason?, before, after, freed, ms, markMs }.
+ * options: { audit, extraRoots: () => iterable of values | values[], reason, requireQuiescence = true }
+ */
+export function collectGarbage(runtime, options = {}) {
+  const tbPrevious = runtime.tb?.enter(BUCKET.GC);
+  try { return collectGarbageTimed(runtime, options); } finally { runtime.tb?.leave(tbPrevious); }
+}
+function collectGarbageTimed(runtime, options) {
+  const saved = runtime.hostCall, started = performance.now(); runtime.hostCall = 'coleta de lixo';   // the page must see "garbage collection" (with progress pulses), never a stale host call, while the VM is busy here
+  try { return collectGarbageNow(runtime, options); } finally {
+    runtime.hostCall = saved ?? null;
+    const spent = performance.now() - started, major = runtime.gcPhases?.[0] && runtime.gcPhases[0].at >= started - 1, minor = (runtime.gcMinorStats?.recent.at(-1)?.at ?? -Infinity) >= started - 1;
+    if (major || minor) {   // a collection happened: pace the next one (a major collection) and keep its time out of the mutator's watchdogs
+      if (major) { runtime.gcLastEnd = performance.now(); runtime.gcLastMs = spent; }
+      runtime.gcTotalMs = (runtime.gcTotalMs ?? 0) + spent;
+      const op = runtime.monitor?.op; if (op) { op.gcMs = (op.gcMs ?? 0) + spent; op.gcCount = (op.gcCount ?? 0) + 1; op.start += spent; }
+      if (runtime.eventWallStart > 0) runtime.eventWallStart += spent;
+    }
+  }
+}
+function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC_AUDIT === '1', extraRoots = null, reason = 'manual', safepoint = false, emergency = false, clearSoft = undefined, generation = 'major' } = {}) {
+  const started = performance.now(), heap = runtime.heap, before = heap.size;
+  const blocked = quiescent(runtime, safepoint) ?? (unannotatedTask(runtime) ? 'unannotated-task' : null);
+  if (blocked) { const skips = (runtime.gcSkips ??= {}); skips[blocked] = (skips[blocked] ?? 0) + 1; return { collected: false, reason: blocked, before, after: before, freed: 0, ms: 0 }; }
+  if (generation === 'minor' && runtime.gcGenerational !== false && !emergency && clearSoft !== true) return collectMinor(runtime, { audit, extraRoots, reason, safepoint, started, before });
+  // The main thread's state as this collection starts (null = idle) and the deferral episode it closes, if one was pending: a paced collection becomes 'idle' or 'forced' (see the header).
+  const motion = runtime.platform?.mainThreadMotion?.() ?? null, closed = closeDeferral(runtime, reason, motion, started), deferral = closed.deferral; reason = closed.reason;
+  const policy = clearSoft === false ? null : clearSoft === true ? 'forced' : softPolicy(runtime, { reason, emergency }), softMode = policy !== null;   // pressured collection: soft references are cleared (see the header)
+  const marker = createMarker(runtime, { clearSoft: softMode }), { limit, markedHas, drain, ephemerons, violations, weakIds, softIds, phantomIds, nodes, count, pruned } = marker;
+  const { t0, categories, worstRoot, quiet } = markRoots(runtime, marker, { safepoint, emergency, extraRoots, report: true });
   const rootsMs = performance.now() - t0, tRoots = performance.now();
   // Heap closure: scan each reachable record's own state.
   const tDrain = performance.now(); drain(); ephemerons();
-  for (const map of runtime.ephemeronMaps ?? []) for (const key of [...map.keys()]) if (typeof key === 'number' && !markedHas(key)) map.delete(key);   // the key died: so does the entry
-  if (runtime.nativeArrays?.size) {   // an array's native address is valid only while the array is alive
-    for (const [handle, value] of [...runtime.nativeArrays]) if (value && !markedHas(value.ref)) runtime.nativeArrays.delete(handle);
-    runtime.nativeRanges = runtime.nativeRanges.filter(range => range.value && markedHas(range.value.ref));
-  }
+  pruneAfterMark(runtime, markedHas);
   const markMs = performance.now() - t0;
   if (violations.length && audit) throw new Error(`GC audit: live structures reference already-collected objects #${[...new Set(violations)].map(id => `${id} ${heap.get(id)?.type}`).join(', #')} (a Java value held outside the collector's roots, e.g. captured by a host closure)`);
   if (audit && heap.size <= 250000) auditAgainstFullWalk(runtime, { markedHas, extraRoots, clearSoft: softMode });
   // Weak references, phantom references and (in a pressured collection) soft references: a referent nothing else keeps alive is cleared (Reference.get() answers null from now on) and its reference
   // is queued on its ReferenceQueue after the collection. Soft references whose referent something else keeps alive are left alone.
-  const cleared = [];
-  const clearUnmarked = ids => {
-    let n = 0;
-    for (const id of ids) {
-      const record = heap.get(id), referent = record.fields.get(REFERENT_KEY);
-      if (referent && typeof referent.ref === 'number' && !markedHas(referent.ref)) { record.fields.set(REFERENT_KEY, null); n++; if (record.fields.get(QUEUE_KEY)) cleared.push({ ref: id }); }
-    }
-    return n;
-  };
+  const cleared = [], clearUnmarked = ids => clearReferences(heap, ids, markedHas, cleared);
   const weakCleared = clearUnmarked(weakIds), phantomCleared = clearUnmarked(phantomIds), softCleared = softMode ? clearUnmarked(softIds) : 0;
   // Sweep (only the blocks of ids that hold records).
   const tSweep = performance.now(); let freed = 0; const freedIds = [], freedTypes = [];
@@ -385,14 +427,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
     const byDex = new Map(); for (const v of survivors.values()) byDex.set(v.dex, (byDex.get(v.dex) ?? 0) + v.n);
     phases.byDex = [...byDex].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([dex, n]) => ({ dex, n })); }
   { const samples = [...(runtime.allocationSamples ?? [])].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([site]) => site); phases.allocated = { count: Math.max(0, limit - (runtime.gcLastNextId ?? 0)), sites: samples }; }
-  {   // the ids freed by the last collections (sorted, with their class), so that a use of a collected object is diagnosed as such (see APKRuntime.object)
-    const ring = runtime.gcFreedRing ??= [], kinds = [...new Set(freedTypes)], index = new Map(kinds.map((type, i) => [type, i]));
-    const order = Array.from(freedIds.keys()).sort((a, b) => freedIds[a] - freedIds[b]);
-    ring.unshift({ collection: (runtime.gcStats?.collections ?? 0) + 1, ids: Int32Array.from(order, i => freedIds[i]), types: Uint16Array.from(order, i => index.get(freedTypes[i])), kinds });
-    // Kept for the last TOMBSTONE_COLLECTIONS collections or TOMBSTONE_IDS freed ids, whichever is reached first (6 bytes per freed object): a Java value that host code held unseen by the collector is
-    // typically used many collections after it was freed, and the diagnosis needs the class of what was freed and the collection that freed it (APKRuntime.object).
-    let kept = 0, total = 0; for (const entry of ring) { total += entry.ids.length; if (kept > 0 && (kept >= TOMBSTONE_COLLECTIONS || total > TOMBSTONE_IDS)) break; kept++; } ring.length = kept;
-  }
+  recordFreed(runtime, freedIds, freedTypes, { collection: (runtime.gcStats?.collections ?? 0) + 1 });
   phases.soft = { policy, cleared: softCleared, softReferences: softIds.length, weakCleared, phantomCleared };
   if (softMode) runtime.gcSoftLast = { collection: (runtime.gcStats?.collections ?? 0) + 1, policy, cleared: softCleared, softReferences: softIds.length, freed: before - heap.size };   // what the report's OOM line quotes
   runtime.gcPhases = [phases, ...(runtime.gcPhases ?? [])].slice(0, 3);
@@ -411,12 +446,131 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   runtime.gcMinAlloc = Math.min(freed < before * 0.1 ? minAlloc * 4 : minAlloc, Math.max(1024, Math.floor(Math.min(runtime.maxHeapObjects * 0.25, (runtime.maxHeapObjects - heap.size) / 4))));
   // The cleared references are enqueued after the collection by a main-looper task (ART's ReferenceQueueDaemon also enqueues asynchronously). The task is deferred to the next pump: posting its
   // Message now would allocate while the collector is finishing (a WeakHashMap whose keys died clears its WeakReference entries in almost every collection of a real app).
-  if (cleared.length && runtime.platform?.queueTask) {
-    runtime.platform.queueTask(() => { for (const reference of cleared) { try { runtime.dispatch({ owner: 'Ljava/lang/ref/Reference;', name: 'enqueue', parameters: [], result: 'Z', signature: '()Z' }, [reference], 'virtual'); } catch { /* the queue is gone with its owner */ } } }, 0, cleared, { deferred: true });
-  }
+  enqueueCleared(runtime, cleared);
+  promote(runtime, marker, quiet, runtime.nextId, runtime.nextId);   // generations: every survivor is old now
+  runtime.gcOldSize = heap.size;
+  runtime.gcMinorMs ??= (performance.now() - started) / 2;   // before any minor collection, its pause is guessed at half this one's (minorDue's motion rule): a small heap whose minor collection would cost close to a major one does not run it in motion
   runtime.allocationSamples = null; runtime.gcPressure = false; runtime.gcCellPressure = false; runtime.gcLastNextId = runtime.nextId; runtime.fieldSlots = fieldSlots; runtime.arrayCells = arrayCells; runtime.arrayBytes = arrayBytes; runtime.collectionCells = collectionCells;
-  runtime.gcStats = { collections: (runtime.gcStats?.collections ?? 0) + 1, freed: (runtime.gcStats?.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(runtime.gcStats?.peakLiveAfterGc ?? 0, heap.size), lastReason: reason, softCleared: (runtime.gcStats?.softCleared ?? 0) + softCleared, softCollections: (runtime.gcStats?.softCollections ?? 0) + (softMode ? 1 : 0), weakCleared: (runtime.gcStats?.weakCleared ?? 0) + weakCleared, phantomCleared: (runtime.gcStats?.phantomCleared ?? 0) + phantomCleared, totalMs: (runtime.gcStats?.totalMs ?? 0) + (performance.now() - started), deferrals: runtime.gcDeferralStats ?? null, recent: [...(runtime.gcStats?.recent ?? []).slice(-15), { at: Math.round(started), ms: Math.round(performance.now() - started), markMs: Math.round(markMs), before, after: heap.size, nextId: runtime.nextId, reason, motion, ...(deferral ? { deferral } : {}), ...(softMode ? { soft: policy, softCleared } : {}) }] };
+  runtime.gcStats = { collections: (runtime.gcStats?.collections ?? 0) + 1, majors: (runtime.gcStats?.majors ?? 0) + 1, minors: runtime.gcMinorStats?.collections ?? 0, freed: (runtime.gcStats?.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(runtime.gcStats?.peakLiveAfterGc ?? 0, heap.size), lastReason: reason, softCleared: (runtime.gcStats?.softCleared ?? 0) + softCleared, softCollections: (runtime.gcStats?.softCollections ?? 0) + (softMode ? 1 : 0), weakCleared: (runtime.gcStats?.weakCleared ?? 0) + weakCleared, phantomCleared: (runtime.gcStats?.phantomCleared ?? 0) + phantomCleared, totalMs: (runtime.gcStats?.totalMs ?? 0) + (performance.now() - started), deferrals: runtime.gcDeferralStats ?? null, recent: [...(runtime.gcStats?.recent ?? []).slice(-15), { kind: 'major', at: Math.round(started), ms: Math.round(performance.now() - started), markMs: Math.round(markMs), before, after: heap.size, nextId: runtime.nextId, reason, motion, ...(deferral ? { deferral } : {}), ...(softMode ? { soft: policy, softCleared } : {}) }] };
   return { collected: true, reason, before, after: heap.size, freed, ms: Math.round(performance.now() - started), markMs: Math.round(markMs), softPolicy: policy, softCleared };
+}
+
+/**
+ * Minor collection (see the header, "Young generation"): marks from the roots, the remembered set and the host-stateful old records, treating every old id as live; frees the unreachable young
+ * records; promotes the survivors. Weak and phantom references (young ones, and old ones the remembered set brings back) whose young referent died are cleared and enqueued as in a major
+ * collection; soft references are strong here (only a pressured major collection clears them). The budgets drop by what the freed records held (a major collection recounts them).
+ */
+function collectMinor(runtime, { audit, extraRoots, reason, safepoint, started, before }) {
+  const heap = runtime.heap, bound = runtime.gcOldBound, aged = Math.max(bound, runtime.gcAgeBound ?? 0), young = runtime.nextId - bound, motion = runtime.platform?.mainThreadMotion?.() ?? null;
+  const remembered = runtime.gcRemList.length, touched = runtime.gcTouchList.length, hostful = runtime.gcHostful.length;
+  // Survivors below `aged` survived the previous minor collection too: they become old now; the younger ones survive once and stay young until the next one.
+  const marker = createMarker(runtime, { minorBound: bound, promoteBound: aged }), { markedHas, drain, ephemerons, violations, weakIds, phantomIds, nodes, count } = marker;
+  const { t0, quiet } = markRoots(runtime, marker, { safepoint, emergency: false, extraRoots, report: false });
+  drain(); ephemerons();
+  pruneAfterMark(runtime, markedHas);
+  const markMs = performance.now() - t0;
+  if (violations.length && audit) throw new Error(`GC audit: live structures reference already-collected objects #${[...new Set(violations)].map(id => `${id} ${heap.get(id)?.type}`).join(', #')} (a Java value held outside the collector's roots, e.g. captured by a host closure)`);
+  // Audit: what a full conservative mark reaches must not be freed here (old ids count as marked, so this checks the young ones: a missed barrier or remembered record fails here).
+  if (audit && heap.size <= 250000) auditAgainstFullWalk(runtime, { markedHas, extraRoots, clearSoft: false, minor: true });
+  const cleared = [], weakCleared = clearReferences(heap, weakIds, markedHas, cleared), phantomCleared = clearReferences(heap, phantomIds, markedHas, cleared);
+  const tSweep = performance.now(), firstChunk = bound >>> 12, freedIds = [], freedTypes = [];
+  let freed = 0, fresh = 0, fieldSlots = 0, arrayCells = 0, arrayBytes = 0, collectionCells = 0;   // fresh: survivors allocated since the last collection
+  for (const ci of heap.usedChunks()) {
+    if (ci < firstChunk) continue;
+    const chunk = heap.chunks[ci], base = ci << 12;
+    for (let slot = 0; slot < 4096; slot++) {
+      const record = chunk[slot]; if (record === undefined) continue;
+      const id = base + slot;
+      if (id < bound || id === 0 || record.freed === true) continue;
+      if (markedHas(id)) { if (id >= aged) fresh++; continue; }
+      freedIds.push(id); freedTypes.push(record.type);
+      fieldSlots += storedFieldCount(record); if (record.cells !== undefined) { arrayCells += cellsOf(record.type, record.cells.length); arrayBytes += cellBytes(record.cells); }
+      collectionCells += (record.list?.length ?? 0) + (record.set?.length ?? 0) + (record.map?.size ?? 0);
+      if (typeof record.onFree === 'function') { try { record.onFree(); } catch { /* the native resource is already gone */ } }
+      if (audit) { chunk[slot] = tombstone(id, record.type); heap.size--; } else heap.release(id);
+      freed++;
+      if (runtime.monitors?.has(id)) runtime.monitors.delete(id);
+    }
+  }
+  runtime.fieldSlots = Math.max(0, (runtime.fieldSlots ?? 0) - fieldSlots); runtime.arrayCells = Math.max(0, (runtime.arrayCells ?? 0) - arrayCells);
+  runtime.arrayBytes = Math.max(0, (runtime.arrayBytes ?? 0) - arrayBytes); runtime.collectionCells = Math.max(0, (runtime.collectionCells ?? 0) - collectionCells);
+  const stats = runtime.gcMinorStats ??= { collections: 0, freed: 0, promoted: 0, totalMs: 0, maxMs: 0, recent: [] };
+  recordFreed(runtime, freedIds, freedTypes, { collection: (runtime.gcStats?.collections ?? 0) + 1, minor: true });
+  enqueueCleared(runtime, cleared);
+  const nextAged = runtime.nextId, allocated = nextAged - aged; promote(runtime, marker, quiet, aged, nextAged);
+  adaptNursery(runtime, allocated > 0 ? fresh / allocated : 0);
+  runtime.gcOldSize = heap.size;
+  const ms = performance.now() - started, survivors = count();
+  runtime.gcMinorMs = runtime.gcMinorMs === undefined ? ms : (runtime.gcMinorMs + ms) / 2;   // recent pause, for the motion rule of minorDue
+  stats.collections++; stats.freed += freed; stats.promoted += survivors; stats.totalMs += ms; stats.maxMs = Math.max(stats.maxMs, ms); stats.weakCleared = (stats.weakCleared ?? 0) + weakCleared; stats.phantomCleared = (stats.phantomCleared ?? 0) + phantomCleared;
+  const entry = { at: Math.round(started), ms: Math.round(ms * 10) / 10, markMs: Math.round(markMs * 10) / 10, sweepMs: Math.round((performance.now() - tSweep) * 10) / 10, before, after: heap.size, young, allocated, survivors, fresh, nursery: nurserySize(runtime), remembered, touched, hostful, nodes: nodes(), reason, motion };
+  stats.recent.push(entry); if (stats.recent.length > 16) stats.recent.shift();
+  // gcStats counts every collection, minor ones included (`majors` the major ones); its recent list marks them kind 'minor'.
+  const g = runtime.gcStats ?? {};
+  runtime.gcStats = { ...g, collections: (g.collections ?? 0) + 1, majors: g.majors ?? 0, minors: stats.collections, freed: (g.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(g.peakLiveAfterGc ?? 0, heap.size), lastReason: reason, weakCleared: (g.weakCleared ?? 0) + weakCleared, phantomCleared: (g.phantomCleared ?? 0) + phantomCleared, totalMs: (g.totalMs ?? 0) + ms, deferrals: runtime.gcDeferralStats ?? null, recent: [...(g.recent ?? []).slice(-15), { kind: 'minor', at: entry.at, ms: Math.round(ms), markMs: Math.round(markMs), before, after: heap.size, nextId: runtime.nextId, reason, motion }] };
+  return { collected: true, minor: true, reason, before, after: heap.size, freed, survivors, ms: Math.round(ms), markMs: Math.round(markMs) };
+}
+/** After marking: ephemeron entries whose key died go, and so do the native addresses of dead arrays. */
+function pruneAfterMark(runtime, markedHas) {
+  for (const map of runtime.ephemeronMaps ?? []) for (const key of [...map.keys()]) if (typeof key === 'number' && !markedHas(key)) map.delete(key);   // the key died: so does the entry
+  if (runtime.nativeArrays?.size) {   // an array's native address is valid only while the array is alive
+    for (const [handle, value] of [...runtime.nativeArrays]) if (value && !markedHas(value.ref)) runtime.nativeArrays.delete(handle);
+    runtime.nativeRanges = runtime.nativeRanges.filter(range => range.value && markedHas(range.value.ref));
+  }
+}
+
+/** Clears the referent of every reference of `ids` whose referent is not marked; the ones registered with a queue go into `cleared` (enqueued after the collection). Returns how many were cleared. */
+function clearReferences(heap, ids, markedHas, cleared) {
+  let n = 0;
+  for (const id of ids) {
+    const record = heap.get(id), referent = record.fields.get(REFERENT_KEY);
+    if (referent && typeof referent.ref === 'number' && !markedHas(referent.ref)) { record.fields.set(REFERENT_KEY, null); n++; if (record.fields.get(QUEUE_KEY)) cleared.push({ ref: id }); }
+  }
+  return n;
+}
+/** The cleared references are enqueued after the collection by a main-looper task (ART's ReferenceQueueDaemon also enqueues asynchronously). The task is deferred to the next pump: posting its
+ *  Message now would allocate while the collector is finishing (a WeakHashMap whose keys died clears its WeakReference entries in almost every collection of a real app). */
+function enqueueCleared(runtime, cleared) {
+  if (!cleared.length || !runtime.platform?.queueTask) return;
+  runtime.platform.queueTask(() => { for (const reference of cleared) { try { runtime.dispatch({ owner: 'Ljava/lang/ref/Reference;', name: 'enqueue', parameters: [], result: 'Z', signature: '()Z' }, [reference], 'virtual'); } catch { /* the queue is gone with its owner */ } } }, 0, cleared, { deferred: true });
+}
+/**
+ * The ids freed by the last collections (sorted, with their class), so that a use of a collected object is diagnosed as such (see APKRuntime.object). Kept for the last TOMBSTONE_COLLECTIONS
+ * collections or TOMBSTONE_IDS freed ids, whichever is reached first (6 bytes per freed object): a Java value that host code held unseen by the collector is typically used many collections after
+ * it was freed, and the diagnosis needs the class of what was freed and the collection that freed it. `label`: { collection } for a major collection, { collection, minor } for a minor one
+ * (`collection` is then the number of major collections before it).
+ */
+function recordFreed(runtime, freedIds, freedTypes, label) {
+  if (!freedIds.length && label.minor !== undefined) return;   // an empty minor collection leaves no entry (minor collections are frequent)
+  const ring = runtime.gcFreedRing ??= [], kinds = [...new Set(freedTypes)], index = new Map(kinds.map((type, i) => [type, i]));
+  ring.unshift({ ...label, ids: Int32Array.from(freedIds), types: Uint16Array.from(freedTypes, type => index.get(type)), kinds });   // the sweeps walk the ids in ascending order: already sorted for freedBy's binary search
+  let kept = 0, total = 0; for (const entry of ring) { total += entry.ids.length; if (kept > 0 && (kept >= TOMBSTONE_COLLECTIONS || total > TOMBSTONE_IDS)) break; kept++; } ring.length = kept;
+}
+/**
+ * The generation bookkeeping after a collection. `oldBound`: the ids below it are old from now on (a major collection: every survivor; a minor one: the survivors that had already survived the
+ * previous minor collection); `agedBound`: the ids in [oldBound, agedBound) survived once and stay young. The remembered set becomes the traced records below oldBound that still point at or
+ * above it (marker.rememberIds: every remembered, touched and newly promoted record was traced, so this is exact). The touched records stay in their list while host code is in flight
+ * (`quiet` false: a native up the stack may still write into a record it obtained before the collection); otherwise the list is emptied. The host-stateful records below oldBound join the list
+ * every minor collection rescans (a major collection rebuilds it from scratch).
+ */
+function promote(runtime, marker, quiet, oldBound, agedBound) {
+  if (runtime.gcGenerational === false) { runtime.gcOldBound = 0; runtime.gcAgeBound = 0; runtime.gcRemList = []; runtime.gcRemBits = []; runtime.gcTouchList = []; runtime.gcTouchBits = []; runtime.gcHostful = []; runtime.gcHostBits = []; return; }
+  const major = marker.bound === 0, list = [], bits = [];
+  for (const id of marker.rememberIds) if (id < oldBound) addId(list, bits, id);
+  runtime.gcRemList = list; runtime.gcRemBits = bits;
+  if (quiet) { runtime.gcTouchList = []; runtime.gcTouchBits = []; } else if (major) runtime.gcTouchList = runtime.gcTouchList.filter(id => runtime.heap.get(id) !== undefined);
+  if (major) { runtime.gcHostful = []; runtime.gcHostBits = []; }
+  for (const id of marker.hostfulIds) if (id < oldBound) addId(runtime.gcHostful, runtime.gcHostBits ??= [], id);
+  runtime.gcOldBound = oldBound; runtime.gcAgeBound = agedBound;
+}
+/** Adds `id` to a list with a membership bitmap (Uint8Array per 4096-id chunk) unless it is in it already. */
+function addId(list, bits, id) { const ci = id >>> 12, chunk = bits[ci] ?? (bits[ci] = new Uint8Array(4096)), i = id & 4095; if (chunk[i] === 0) { chunk[i] = 1; list.push(id); } }
+/** A quiescent point (no host code in flight): the records host code obtained so far can no longer be written by a native that is still running, so they move from the touched list to the
+ *  remembered set, rescanned once more by the next minor collection (which keeps only those that still point into the young generation). */
+export function settleTouches(runtime) {
+  const touched = runtime.gcTouchList; if (!touched?.length) return;
+  for (const id of touched) addId(runtime.gcRemList, runtime.gcRemBits, id);
+  runtime.gcTouchList = []; runtime.gcTouchBits = [];
 }
 
 /** A collection that follows one which freed less than this share of the heap clears soft references (when the heap is at least SOFT_LOW_YIELD_FILL full: a small app that is simply all live keeps its caches). */
@@ -449,8 +603,57 @@ export function collectionDue(runtime, threshold = Math.floor(runtime.maxHeapObj
   if (runtime.gcLastEnd && (runtime.gcLastMs ?? 0) >= 20 && runtime.heap.size < runtime.maxHeapObjects * 0.85 && performance.now() - runtime.gcLastEnd < 8 * runtime.gcLastMs) return false;   // collections under 20 ms are cheap enough to run whenever they are due
   if (runtime.gcCellPressure) return true;   // half of the array-cell budget is in use (newArray)
   if (runtime.gcPressure) return allocated >= Math.min(wait, Math.max(1024, wait >> 2));   // a native resource count asked for it (regex handles are capped at 16384): wait less, but not for every quantum
-  if (!(allocated >= wait && runtime.heap.size >= Math.max(threshold, runtime.gcNextAt ?? 0))) return false;
+  // Generations: what a major collection is for is the old generation's growth (the heap right after the last collection, every survivor promoted); young garbage is the minor collections' business.
+  const live = runtime.gcOldBound > 0 && runtime.gcGenerational !== false ? (runtime.gcOldSize ?? runtime.heap.size) : runtime.heap.size;
+  if (!(allocated >= wait && live >= Math.max(threshold, runtime.gcNextAt ?? 0))) return false;
   return !deferred(runtime);   // due by the normal pacing alone: it may wait for the main thread's idle moment (see the header)
+}
+
+/** Young generation size: a minor collection is due once this share of the object limit was allocated since the last collection (at least GC_NURSERY_MIN objects; runtime.gcNursery overrides it). */
+export const GC_NURSERY_FRACTION = 1 / 16, GC_NURSERY_MIN = 4096;
+const baseNursery = runtime => Math.max(GC_NURSERY_MIN, Math.floor((runtime.headroomBase || runtime.maxHeapObjects) * GC_NURSERY_FRACTION));
+/** The young generation's size now: the adapted size (or runtime.gcNursery), never more than half the room left below 85% of the limit, so a minor collection comes before the heap nears it. */
+export const nurserySize = runtime => {
+  const size = runtime.gcNursery ?? runtime.gcNurseryNow ?? baseNursery(runtime), limit = runtime.headroomBase || runtime.maxHeapObjects;
+  return Math.min(size, Math.max(GC_NURSERY_MIN, Math.floor((limit * 0.85 - (runtime.gcOldSize ?? runtime.heap.size)) / 2)));
+};
+/** Survival rates that resize the young generation (see adaptNursery). */
+export const NURSERY_GROW_SURVIVAL = 0.3, NURSERY_SHRINK_SURVIVAL = 0.1;
+/**
+ * The young generation adapts to the share of it that survives a minor collection: a minor collection costs about what it marks, so when more than NURSERY_GROW_SURVIVAL of what was allocated
+ * since the last one is still alive (objects that live a few frames: recomposition state, a screen being built) the next one waits for 1.5x as many allocations (up to a quarter of the limit),
+ * letting more of them die first; below NURSERY_SHRINK_SURVIVAL it shrinks back towards the base size (shorter pauses).
+ */
+function adaptNursery(runtime, survival) {
+  const base = baseNursery(runtime), current = runtime.gcNurseryNow ?? base, cap = Math.max(base, Math.floor((runtime.headroomBase || runtime.maxHeapObjects) / 4));
+  runtime.gcNurseryNow = survival > NURSERY_GROW_SURVIVAL ? Math.min(cap, Math.floor(current * 1.5)) : survival < NURSERY_SHRINK_SURVIVAL ? Math.max(base, Math.floor(current / 1.5)) : current;
+}
+/** A minor collection runs while the main thread is in motion only if the recent ones were at most this long (an exponential average of their pauses); a longer one waits for the idle moment. */
+export const GC_MINOR_MOTION_MS = 12;
+/**
+ * True when a minor collection is due: generations are on, the heap passed the first-collection threshold (as for a major one) and the young generation is full (allocations since the last
+ * collection: the aged survivors of the last one do not count). In motion (AndroidPlatform.mainThreadMotion) a minor collection runs at once when they have been short (GC_MINOR_MOTION_MS: what
+ * a heap with a big long-lived set and short-lived frame garbage gets); when they have been long (a heap whose young objects live for several frames survives them, so they mark nearly as much as
+ * they free) it waits for the main thread's idle moment, as a major collection does, until another base-sized young generation (GC_NURSERY_FRACTION of the limit) was allocated.
+ */
+export function minorDue(runtime, threshold = Math.floor(runtime.maxHeapObjects * GC_START_FRACTION)) {
+  if (runtime.gcGenerational === false || runtime.gcOldBound === 0 || runtime.heap.size < threshold) return false;   // the first collection is a major one: it establishes the old generation
+  const allocated = runtime.nextId - Math.max(runtime.gcOldBound, runtime.gcAgeBound), nursery = nurserySize(runtime);
+  if (allocated < nursery) return false;
+  if (allocated < nursery + Math.min(nursery, baseNursery(runtime)) && (runtime.gcMinorMs ?? 0) > GC_MINOR_MOTION_MS && (runtime.platform?.mainThreadMotion?.() ?? null) !== null) { runtime.gcMinorHeld = (runtime.gcMinorHeld ?? 0) + 1; return false; }
+  return true;
+}
+/** Which collection the pacing asks for now: 'major' (collectionDue: the old generation grew past its threshold, or a safety rule), else 'minor' (minorDue), else null. A major collection held
+ *  back in motion (deferred) lets a minor one run meanwhile. */
+export function collectionKind(runtime, threshold = Math.floor(runtime.maxHeapObjects * GC_START_FRACTION)) {
+  if (collectionDue(runtime, threshold)) return 'major';
+  return minorDue(runtime, threshold) ? 'minor' : null;
+}
+/** Audit and stress collections (every event / every safepoint) alternate: three minor collections, then a major one, so both kinds are exercised and cross-checked. */
+export function auditGeneration(runtime) {
+  if (runtime.gcGenerational === false) return 'major';
+  runtime.gcAuditTurn = ((runtime.gcAuditTurn ?? 0) + 1) & 3;
+  return runtime.gcAuditTurn === 0 || runtime.gcOldBound === 0 ? 'major' : 'minor';
 }
 
 /**
@@ -503,16 +706,17 @@ export function maybeCollect(runtime, options = {}) {
   // collection is due -- a quiescent collection drops it the same way. The safepoint collections inside the next event must keep the set alive; left to grow across events (a driver reading the
   // semantics tree between steps hands thousands of entries to host code), they would retain an ever larger part of the heap and free almost nothing, while the quiescent collection that would
   // have dropped the set never comes due because the safepoint ones ran first.
-  if (runtime.hostAllocs && runtime.hostAllocs.length > 0 && quiescent(runtime) === null) runtime.hostAllocs.length = 0;
+  if (quiescent(runtime) === null) { if (runtime.hostAllocs && runtime.hostAllocs.length > 0) runtime.hostAllocs.length = 0; settleTouches(runtime); }
   if (!audit && !runtime.gcEnabled) return { collected: false, reason: 'disabled', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // opt-in until the audit suites are clean
   const threshold = options.threshold ?? Math.floor(runtime.maxHeapObjects * GC_START_FRACTION);
   // Audit mode collects after every event that allocated at least APKWEB_GC_AUDIT_MIN (default 200) objects: a collection scans the whole live graph (~100 ms), and an event that allocates fewer
   // objects cannot have dropped a root; skipping them keeps full-suite audits to minutes instead of hours.
-  if (audit && runtime.nextId - (runtime.gcLastNextId ?? 0) < Number(globalThis.process?.env?.APKWEB_GC_AUDIT_MIN ?? 200)) return { collected: false, reason: 'audit-small-event', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };
+  if (audit && runtime.nextId - Math.max(runtime.gcLastNextId ?? 0, runtime.gcOldBound ?? 0) < Number(globalThis.process?.env?.APKWEB_GC_AUDIT_MIN ?? 200)) return { collected: false, reason: 'audit-small-event', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };
   if (!audit && !runtime.gcPressure && runtime.gcLastNextId === runtime.nextId) return { collected: false, reason: 'nothing-allocated', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // no allocation since the last collection: nothing new can be garbage
   // Hysteresis: after a collection the next one waits until the heap grew by 25% of the limit (a heap that is legitimately large must not be re-scanned on every event).
-  if (!audit && !collectionDue(runtime, threshold)) return { collected: false, reason: runtime.gcDeferral ? 'deferred-in-motion' : 'below-threshold', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // a held collection says so (see collectionDue / deferred)
-  return collectGarbage(runtime, { ...options, audit, reason: audit ? 'audit' : 'threshold' });
+  const generation = audit ? auditGeneration(runtime) : collectionKind(runtime, threshold);
+  if (!generation) return { collected: false, reason: runtime.gcDeferral ? 'deferred-in-motion' : 'below-threshold', before: runtime.heap.size, after: runtime.heap.size, freed: 0, ms: 0 };   // a held collection says so (see collectionDue / deferred)
+  return collectGarbage(runtime, { ...options, audit, reason: audit ? 'audit' : 'threshold', generation });
 }
 
 // ---- Heap census: what was alive when the VM ran out of objects --------------------------------------------------------------------------------------------------------------------
@@ -673,7 +877,7 @@ export function heapCensus(runtime, { topClasses = 20, topRoots = 10 } = {}) {
 export function freedBy(runtime, id) {
   for (const entry of runtime.gcFreedRing ?? []) {
     let low = 0, high = entry.ids.length - 1;
-    while (low <= high) { const mid = (low + high) >> 1, value = entry.ids[mid]; if (value === id) return { collection: entry.collection, type: entry.kinds[entry.types[mid]] }; if (value < id) low = mid + 1; else high = mid - 1; }
+    while (low <= high) { const mid = (low + high) >> 1, value = entry.ids[mid]; if (value === id) return { collection: entry.collection, type: entry.kinds[entry.types[mid]], ...(entry.minor !== undefined ? { minor: entry.minor } : {}) }; if (value < id) low = mid + 1; else high = mid - 1; }
   }
   return null;
 }
@@ -747,7 +951,7 @@ export function retentionPaths(runtime, { type = null, samples = 3, budgetMs = 1
  * Audit mode: the collector's root pruning (structural frames, flat-table skipping, class skips) must not change what is alive. A second, fully conservative mark (no pruning of any kind,
  * every thread and frame walked generically) runs on small heaps and every object it reaches must also be marked by the real collection.
  */
-function auditAgainstFullWalk(runtime, { markedHas, extraRoots, clearSoft = false }) {
+function auditAgainstFullWalk(runtime, { markedHas, extraRoots, clearSoft = false, minor = false }) {
   const full = createMarker(runtime, { full: true, clearSoft }), { scan, drain, ephemerons, markId } = full;
   for (const key of Object.keys(runtime)) { if (SKIP_PROPS.has(key)) continue; const item = runtime[key]; if (item !== null && typeof item === 'object') scan(item); }
   runtime.scheduler?.enumerateRoots?.(item => scan(item));
@@ -773,7 +977,7 @@ function auditAgainstFullWalk(runtime, { markedHas, extraRoots, clearSoft = fals
       else for (const key of Object.keys(node)) push(node[key], node, key);
     }
     let path = ''; for (let at = found, guard = 0; at && parent.get(at) && guard < 400; guard++) { const [from, label] = parent.get(at); path = label + (path ? ' → ' + path : ''); at = from; }
-    throw new Error(`GC audit: the pruned root scan lost ${missed.length} object(s) a full conservative walk reaches: #${missed.slice(0, 12).join(', #')}; first reached through ${path || '?'}; ${missed.length ? `ids ${missed.slice(0, 12).map(m => { const id = Number(m.split(' ')[0]); return `${id}${id >= full.limit ? '>' : '<'}limit ${full.limit}`; }).join(' ')}` : ''}`);
+    throw new Error(`GC audit: ${minor ? 'a minor collection (old ids live, remembered set and host-stateful records rescanned)' : 'the pruned root scan'} lost ${missed.length} object(s) a full conservative walk reaches: #${missed.slice(0, 12).join(', #')}; first reached through ${path || '?'}; ${missed.length ? `ids ${missed.slice(0, 12).map(m => { const id = Number(m.split(' ')[0]); return `${id}${id >= full.limit ? '>' : '<'}limit ${full.limit}`; }).join(' ')}` : ''}`);
   }
   if (missed.length) throw new Error(`GC audit: the pruned root scan lost ${missed.length} object(s) a full conservative walk reaches: #${missed.slice(0, 12).join(', #')}`);
 }

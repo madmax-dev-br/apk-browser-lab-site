@@ -10,7 +10,9 @@
  * unchanged. The interpreter, the compiled code and the collector use the slots directly; the slot of a field reference is resolved once per call site (interpreter.js fieldSiteAt).
  *
  * Reference stores into fields go through: the interpreter's iput family (interpreter.js), the compiled iput (baseline-compiler.js), APKRuntime.storeSlot (a first store into a slot)
- * and APKRuntime.storeField / FieldMap.set (host code, reflection, Unsafe, atomic updaters). A write barrier belongs on those paths.
+ * and APKRuntime.storeField / FieldMap.set (host code, reflection, Unsafe, atomic updaters). Each has the generational write barrier (src/heap-gc.js, "Young generation"); FieldMap.set
+ * reaches the runtime through the record's shape (`owner`). A record of a class without instance fields (EMPTY_SHAPE) keeps host-stored keys in fieldExtra with no barrier of its own:
+ * host code obtains such a record through APKRuntime.object(), which puts an old one on the touched list.
  */
 export const REFERENT_KEY = 'Ljava/lang/ref/Reference;->referent:Ljava/lang/Object;';
 /** The slots of a shape without fields (shared: nothing is ever stored in them). */
@@ -25,6 +27,7 @@ export class Shape {
     for (let i = parent === null ? 0 : parent.size; i < keys.length; i++) if (!this.index.has(keys[i])) this.index.set(keys[i], i);
     this.template = keys.length === 0 ? EMPTY_SLOTS : new Array(keys.length).fill(undefined);
     const referent = this.index.get(REFERENT_KEY); this.referentSlot = referent === undefined ? -1 : referent;
+    this.owner = undefined;   // the runtime whose classes have this layout (set by APKRuntime.buildShape): FieldMap.set's write barrier
   }
   /** The slot of `key`, or -1 when the key is not a field of this shape. */
   slotOf(key) { const slot = this.index.get(key); return slot === undefined ? -1 : slot; }
@@ -74,8 +77,10 @@ export class FieldMap {
     const extra = r.fieldExtra; return extra !== null && extra.has(key);
   }
   set(key, value) {
-    const r = this.record, slot = r.fieldShape.index.get(key);
+    const r = this.record, shape = r.fieldShape, slot = shape.index.get(key);
     if (slot !== undefined) r.slots[slot] = value; else (r.fieldExtra ??= new Map()).set(key, value);
+    const owner = shape.owner;   // write barrier (src/heap-gc.js, "Young generation"): an old record that now holds a young reference joins the remembered set
+    if (owner !== undefined && r.id < owner.gcOldBound && value !== null && typeof value === 'object' && !(value.ref < owner.gcOldBound)) owner.remember(r);
     return this;
   }
   delete(key) {

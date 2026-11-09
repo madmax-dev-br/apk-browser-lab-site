@@ -1,6 +1,6 @@
-import { TimeBreakdown } from './time-breakdown.js?v=eed27b762f3e';
-import { APKError } from './apk-error.js?v=eed27b762f3e';
-import { gcBlockReason } from './heap-gc.js?v=eed27b762f3e';
+import { TimeBreakdown } from './time-breakdown.js?v=e4428398e646';
+import { APKError } from './apk-error.js?v=e4428398e646';
+import { gcBlockReason } from './heap-gc.js?v=e4428398e646';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -185,7 +185,9 @@ export class OperationMonitor {
     // Collections deferred while the screen was in motion (heap-gc.js deferral): episodes closed at an idle moment or forced by a ceiling, and the one still open.
     const d = rt.gcDeferralStats, open = rt.gcDeferral, motion = (() => { try { return rt.platform?.mainThreadMotion?.() ?? null; } catch { return '?'; } })();
     const deferrals = `\n  adiamentos durante movimento: ${d ? `${d.episodes} (${d.idle} coletadas em repouso, ${d.forced} forçadas pelo teto${d.forced ? ': ' + Object.entries(d.forcedBy).map(([why, n]) => `${why} ${n}x`).join(', ') : ''}${d.absorbed ? `, ${d.absorbed} absorvidas por outra coleta` : ''}; espera máxima ${d.maxMs} ms, ${d.maxAllocated} objetos)` : 'nenhum'}; agora ${open ? `adiada há ${Math.round(performance.now() - open.since)} ms (${open.held} verificações: ${Object.entries(open.reasons).map(([why, n]) => `${why} ${n}x`).join(', ')}; teto ${open.ceiling} vivos ou ${Math.max(0, Math.round(open.until - performance.now()))} ms)` : `nenhuma adiada; thread principal ${motion ? `em movimento (${motion})` : 'ociosa'}`}`;
-    const head = `Coleta de lixo: ${op?.gcCount ?? 0} coletas / ${Math.round(op?.gcMs ?? 0)} ms nesta operação${share}; no total ${rt.gcStats?.collections ?? 0} coletas, ${Math.round(rt.gcTotalMs ?? 0)} ms${gate}${deferrals}`;
+    // Generations (heap-gc.js, "Young generation"): how many collections were minor ones, their pauses and what they rescan.
+    const m = rt.gcMinorStats, gen = rt.gcGenerational === false ? '\n  gerações: desligadas (toda coleta marca o heap inteiro)' : m ? `\n  gerações: ${m.collections} coletas menores (${Math.round(m.totalMs)} ms, pausa máxima ${Math.round(m.maxMs)} ms; última ${m.recent.at(-1)?.ms ?? 0} ms ${m.recent.at(-1)?.motion ? 'em movimento' : 'em repouso'}), ${m.freed} liberados, geração jovem ${Math.round(rt.gcNurseryNow ?? 0) || '-'} objetos; antigos relidos: lembrados ${rt.gcRemList?.length ?? 0}, tocados pelo host ${rt.gcTouchList?.length ?? 0}, com estado de host ${rt.gcHostful?.length ?? 0}` : '';
+    const head = `Coleta de lixo: ${op?.gcCount ?? 0} coletas / ${Math.round(op?.gcMs ?? 0)} ms nesta operação${share}; no total ${rt.gcStats?.collections ?? 0} coletas, ${Math.round(rt.gcTotalMs ?? 0)} ms${gate}${deferrals}${gen}`;
     const last = phases[0], census = last ? [
       last.survivorsByCount?.length ? `\n  sobreviventes (por quantidade): ${last.survivorsByCount.slice(0, 12).map(c => `${c.n} ${c.type}`).join(', ')}` : '',
       last.survivorsByBytes?.length ? `\n  sobreviventes (por bytes estimados): ${last.survivorsByBytes.slice(0, 12).map(c => `${Math.round(c.bytes / 1024)} KiB ${c.type}`).join(', ')}` : '',

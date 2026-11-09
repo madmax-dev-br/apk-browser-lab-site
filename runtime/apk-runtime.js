@@ -1,31 +1,31 @@
-import { VMClock } from './vm-clock.js?v=eed27b762f3e';
-import { overrideHit } from './method-overrides.js?v=eed27b762f3e';
-import { OperationMonitor } from './operation-monitor.js?v=eed27b762f3e';
-import { ExecutionProfile } from './execution-profile.js?v=eed27b762f3e';
-import { SamplingProfiler } from './sampling-profiler.js?v=eed27b762f3e';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=eed27b762f3e';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=eed27b762f3e';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=eed27b762f3e';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=eed27b762f3e';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=eed27b762f3e';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=eed27b762f3e';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=eed27b762f3e';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=eed27b762f3e';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=eed27b762f3e';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=eed27b762f3e';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=eed27b762f3e';
-import { APKError } from './apk-error.js?v=eed27b762f3e';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=eed27b762f3e';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=eed27b762f3e';
-import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=eed27b762f3e';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=eed27b762f3e';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=eed27b762f3e';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=eed27b762f3e';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=eed27b762f3e';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=eed27b762f3e';
-import { Scheduler, Blocked } from './scheduler.js?v=eed27b762f3e';
-import { bootClassLacksMember } from './boot-class-members.js?v=eed27b762f3e';
-export { APKError } from './apk-error.js?v=eed27b762f3e';
+import { VMClock } from './vm-clock.js?v=e4428398e646';
+import { overrideHit } from './method-overrides.js?v=e4428398e646';
+import { OperationMonitor } from './operation-monitor.js?v=e4428398e646';
+import { ExecutionProfile } from './execution-profile.js?v=e4428398e646';
+import { SamplingProfiler } from './sampling-profiler.js?v=e4428398e646';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=e4428398e646';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=e4428398e646';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=e4428398e646';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=e4428398e646';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e4428398e646';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=e4428398e646';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=e4428398e646';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=e4428398e646';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=e4428398e646';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=e4428398e646';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=e4428398e646';
+import { APKError } from './apk-error.js?v=e4428398e646';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=e4428398e646';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=e4428398e646';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=e4428398e646';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=e4428398e646';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=e4428398e646';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=e4428398e646';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=e4428398e646';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=e4428398e646';
+import { Scheduler, Blocked } from './scheduler.js?v=e4428398e646';
+import { bootClassLacksMember } from './boot-class-members.js?v=e4428398e646';
+export { APKError } from './apk-error.js?v=e4428398e646';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1159,6 +1159,11 @@ export class APKRuntime {
     this.nativeBindings = nativeBindings instanceof Map ? nativeBindings : new Map(Object.entries(nativeBindings));
     this.executionByOrigin = { apk: { methods: 0, instructions: 0 }, framework: { methods: 0, instructions: 0 }, host: { calls: 0 } };
     this.heap = new Heap(); this.nextId = 1; this.fieldSlots = 0; this.shapeMemo = undefined; this.shapeEpoch = -1;
+    // Generations (heap-gc.js, "Young generation"): ids below gcOldBound are old, those in [gcOldBound, gcAgeBound) survived one minor collection; gcRemList/gcRemBits is the remembered set (old
+    // records a write barrier saw a reference store into), gcTouchList/gcTouchBits the old records handed to host code through object() since the last quiescent point, gcHostful the old records
+    // with host state of their own: the next minor collection rescans all three.
+    this.gcGenerational = globalThis.process?.env?.APKWEB_GC_GENERATIONS !== '0';   // APKWEB_GC_GENERATIONS=0 (Node tools): every collection is a major one, for comparisons
+    this.gcOldBound = 0; this.gcAgeBound = 0; this.gcRemList = []; this.gcRemBits = []; this.gcTouchList = []; this.gcTouchBits = []; this.gcHostful = []; this.gcHostBits = [];
     this.jni = null; // JniBridge, installed by loadAPK when the lab supplies a nativeLibraryProvider
     this.classOwners = new Map(); this.dynamicPlain = new Map(); // defining ClassLoader of run-time-loaded classes (table type -> loader ref); first definer per plain name
     this.nextThreadId = 1n;
@@ -1273,12 +1278,29 @@ export class APKRuntime {
     for (const type of method.parameters) { const word = words[position]; args.push(word === 0 && type.length > 1 ? null : word); position += type === 'J' || type === 'D' ? 2 : 1; }
     return args;
   }
+  /** The record of a Java object for host code. Host code may write into what it gets (fields, array cells, its own host state), so an old record handed out here joins the touched list: the
+   *  next minor collection rescans it (heap-gc.js, "Young generation"). The interpreter and the compiled code use vmObject, with explicit write barriers on their stores. */
   object(value) {
+    if (value !== null && typeof value === 'object') { const record = this.heap.get(value.ref); if (record !== undefined) { if (value.ref < this.gcOldBound) this.touch(record); return record; } }
+    return this.vmObject(value);
+  }
+  /** Write barrier: `record` (old) may now hold a reference to a young object; the next minor collection rescans it. */
+  remember(record) {
+    const id = record.id, ci = id >>> 12, bits = this.gcRemBits[ci] ?? (this.gcRemBits[ci] = new Uint8Array(4096)), i = id & 4095;
+    if (bits[i] === 0) { bits[i] = 1; this.gcRemList.push(id); }
+  }
+  /** An old record handed to host code, which may write into it (field, cell or host state) without a barrier: rescanned by every minor collection until host code is quiescent again. */
+  touch(record) {
+    const id = record.id, ci = id >>> 12, bits = this.gcTouchBits[ci] ?? (this.gcTouchBits[ci] = new Uint8Array(4096)), i = id & 4095;
+    if (bits[i] === 0) { bits[i] = 1; this.gcTouchList.push(id); }
+  }
+  /** object() without the remembered-set entry: for VM code that only reads the record or stores through a write barrier. */
+  vmObject(value) {
     if (value !== null && typeof value === 'object') { const record = this.heap.get(value.ref); if (record !== undefined) return record; }
     if (isNull(value)) this.throwJava('Ljava/lang/NullPointerException;', 'null object reference');
     const id = value !== null && typeof value === 'object' ? value.ref : value;
     const dead = typeof id === 'number' ? freedBy(this, id) : null, collected = typeof id === 'number' && id > 0 && id < this.nextId;
-    const message = dead ? `Use of a collected object: #${id} of class ${String(dead.type).replace(/^L|;$/g, '').replaceAll('/', '.')} was freed by collection ${dead.collection} (the last collection is ${this.gcStats?.collections ?? 0}): a root the collector did not see`
+    const message = dead ? `Use of a collected object: #${id} of class ${String(dead.type).replace(/^L|;$/g, '').replaceAll('/', '.')} was freed by ${dead.minor ? 'minor ' : ''}collection ${dead.collection} (the last collection is ${this.gcStats?.collections ?? 0}): a root the collector did not see${dead.minor ? ' or a store into an old object that no write barrier recorded' : ''}`
       : collected ? `Null or invalid object reference: #${id} was allocated (ids up to ${this.nextId - 1}) but is not on the heap now (freed by a collection older than the ${this.gcFreedRing?.length ?? 0} whose freed ids are kept, of ${this.gcStats?.collections ?? 0}, or released)` : `Null or invalid object reference: ${JSON.stringify(value)}`;
     throw new APKError(message, { kind: 'invalid-object-reference', ref: id, collectedBy: dead?.collection ?? null, type: dead?.type ?? null, jsStack: `Error: ${message}\n` + String(new Error().stack ?? '').split('\n').slice(2, 12).join('\n'), vmContext: this.monitor?.context?.() ?? null });
   }
@@ -1439,6 +1461,8 @@ export class APKRuntime {
   storeField(storage, key, value) {
     if (!storage.has(key) && ++this.fieldSlots > this.maxFieldSlots && (this.fieldSlots--, this.emergencyCollect('campos'), !storage.has(key) && ++this.fieldSlots > this.maxFieldSlots)) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
     storage.set(key, value);
+    const record = storage.record;   // a FieldMap (an object's fields; staticFields are roots)
+    if (record !== undefined && record.id < this.gcOldBound && value !== null && typeof value === 'object' && !(value.ref < this.gcOldBound)) this.remember(record);   // write barrier
   }
   /** The first store into slot `slot` (of the field `key`) of an object record: the field-storage budget of storeField, then the slot. A record without that slot (an array) goes through
    *  storeField, which refuses it. The interpreter and the compiled code store into an already-stored slot directly. */
@@ -1447,6 +1471,7 @@ export class APKRuntime {
     if (!(slot < slots.length)) { this.storeField(record.fields, key, value); return; }
     if (slots[slot] === undefined && ++this.fieldSlots > this.maxFieldSlots && (this.fieldSlots--, this.emergencyCollect('campos'), slots[slot] === undefined && ++this.fieldSlots > this.maxFieldSlots)) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
     slots[slot] = value;
+    if (record.id < this.gcOldBound && value !== null && typeof value === 'object' && !(value.ref < this.gcOldBound)) this.remember(record);   // write barrier
   }
   /** The field layout of instances of `type` (src/object-shapes.js): the superclass's shape followed by the instance fields the class declares. Classes without own instance fields share
    *  their superclass's shape. Memoized per class-graph epoch; a layout never changes, so a shape rebuilt after a new DEX file has the same slots. */
@@ -1462,6 +1487,7 @@ export class APKRuntime {
     const cls = typeof type === 'string' && this.classes.has(type) ? this.classes.get(type) : undefined, own = [];
     if (cls?.fields?.length) for (const entry of cls.fields) own.push(cls.dex.field(entry.index).key);
     const shape = own.length === 0 ? parent : new Shape(parent, own);
+    if (shape !== EMPTY_SHAPE) shape.owner = this;   // FieldMap.set's write barrier reaches the runtime through the shape
     this.shapeMemo.set(type, shape); return shape;
   }
   resolveField(field) {
@@ -1594,13 +1620,13 @@ export class APKRuntime {
     if (info.declaringClass) { const outer = this.className(info.declaringClass, 'canonical', depth + 1); return outer === null ? null : outer + '.' + info.simpleName; }
     return dottedName(type);
   }
-  typeOf(value) { return typeof value === 'string' ? 'Ljava/lang/String;' : this.object(value).type; }
+  typeOf(value) { return typeof value === 'string' ? 'Ljava/lang/String;' : this.vmObject(value).type; }
   /** The object-limit check (after an emergency collection when the limit is reached), the next id and the allocation-driven collection trigger shared by every heap allocation. */
   allocateId(type) {
     if (this.heap.size >= this.maxHeapObjects && !(this.emergencyCollect('objetos') && this.heap.size < this.maxHeapObjects) && !this.oomHeadroom()) this.outOfMemory(`Object limit (${this.maxHeapObjects}) exceeded`);
     if (ABSTRACT_GUARD && !this.bytecodeAlloc) this.assertConcreteHostType(type);
     const id = this.nextId++;
-    if ((id & 511) === 0) { this.sampleAllocation(); if (this.gcEnabled && this.heap.size > this.gcSafepointFloor && collectionDue(this)) this.q = 0; }   // allocation-driven: the next back-edge or call reaches the safepoint instead of waiting out the quantum (a loop that allocates 5 objects per iteration filled the heap inside one)
+    if ((id & 511) === 0) { this.sampleAllocation(); if (this.gcEnabled && this.heap.size > this.gcSafepointFloor && collectionKind(this) !== null) this.q = 0; }   // allocation-driven: the next back-edge or call reaches the safepoint instead of waiting out the quantum (a loop that allocates 5 objects per iteration filled the heap inside one)
     return id;
   }
   makeObject(type) {
@@ -1658,8 +1684,10 @@ export class APKRuntime {
   elementsOf(value) { return this.array(value).cells; }
   /** The bytes of a byte[] (or boolean[]) as an unsigned view over its storage, no copy; `from`/`to` bound the range (unchecked: the caller validated them as the Java API requires). */
   bytesOf(value, from, to) { const array = this.array(value); if (array.type !== '[B' && array.type !== '[Z') fail(`Expected a byte[] (got ${array.type})`); return unsignedBytes(array.cells, from, to); }
-  array(value, index) {
-    const obj = this.object(value);
+  array(value, index) { return this.checkedArray(this.object(value), index); }
+  /** array() for VM code (no remembered-set entry: the interpreter and the compiled code store through a write barrier). */
+  vmArray(value, index) { return this.checkedArray(this.vmObject(value), index); }
+  checkedArray(obj, index) {
     if (obj.cells === undefined) fail('Expected array reference');
     if (index !== undefined && (index < 0 || index >= obj.cells.length)) this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `array index ${index} outside length ${obj.cells.length}`);
     return obj;
@@ -1948,15 +1976,16 @@ export class APKRuntime {
     }
   }
   /** True when a collection is due and a long run should reach a safepoint for it (checked at every scheduling quantum, not only at thread switches). */
-  gcWanted() { return this.gcEnabled && (GC_STRESS || (this.heap.size > this.gcSafepointFloor && collectionDue(this))); }
+  gcWanted() { return this.gcEnabled && (GC_STRESS || (this.heap.size > this.gcSafepointFloor && collectionKind(this) !== null)); }
   /** Stress mode only: a collection at an event boundary (nothing in flight), before the next queued task runs. */
-  stressCollect() { if (GC_STRESS && this.gcEnabled) collectGarbage(this, { reason: 'stress' }); }
+  stressCollect() { if (GC_STRESS && this.gcEnabled) collectGarbage(this, { reason: 'stress', generation: auditGeneration(this) }); }
   safepointCollect() {
     const tries = this.gcSafepointTries ??= { calls: 0, notDue: 0, deferred: 0, disabled: 0 }; tries.calls++;   // reported by OperationMonitor.gcLine: a heap that fills with no collection says whether safepoints were reached at all
     if (!this.gcEnabled) { tries.disabled++; return; }
     const held = this.gcDeferral?.held ?? 0;
-    if (!GC_STRESS && !collectionDue(this)) { if ((this.gcDeferral?.held ?? 0) > held) tries.deferred++; else tries.notDue++; return; }   // deferred: due, but the main thread is in motion (heap-gc.js deferral)
-    collectGarbage(this, { reason: 'safepoint', safepoint: true });
+    const generation = GC_STRESS ? auditGeneration(this) : collectionKind(this);   // a major collection, or a minor one (heap-gc.js, "Young generation"); stress mode alternates them
+    if (!generation) { if ((this.gcDeferral?.held ?? 0) > held) tries.deferred++; else tries.notDue++; return; }   // deferred: due, but the main thread is in motion (heap-gc.js deferral)
+    collectGarbage(this, { reason: 'safepoint', safepoint: true, generation });
   }
   /**
    * Emergency collection at the allocation site: a budget (objects, field slots, array or collection cells) is exhausted, so before granting headroom or throwing OutOfMemoryError (ART collects
@@ -2001,7 +2030,7 @@ export class APKRuntime {
     this.depth++;
     try {
       if(mode==='virtual'&&!isNull(args[0])&&typeof args[0]!=='string'){
-        const proxy=this.object(args[0]);if(proxy.annotationValues){
+        const proxy=this.vmObject(args[0]);if(proxy.annotationValues){
           this.record(`ANNOTATION ${methodKey(method)} [DEX metadata]`);
           if(method.name==='annotationType'&&method.signature==='()Ljava/lang/Class;')return this.classObject(proxy.type);
           if(method.name==='hashCode'&&method.signature==='()I')return annotationHash(this,proxy);
