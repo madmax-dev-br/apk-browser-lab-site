@@ -15,7 +15,7 @@
 //   ConcurrentHashMap, the Collections wrappers), androidx ArrayMap / SimpleArrayMap, Kotlin's empty collections and ArrayDeque, Compose's persistent vectors, and the
 //   observable holders shown as their current value: kotlinx StateFlowImpl (`_state`), androidx LiveData (`mData`, `mVersion`), Compose snapshot state (the newest valid
 //   StateRecord of `next`: SnapshotMutableState, the Int/Long/Float/Double states, SnapshotStateList), and the java.util.concurrent atomics.
-import { isFreedId } from './heap-gc.js?v=76605c7a7c39';
+import { isFreedId } from './heap-gc.js?v=785d33ba3587';
 
 export const QUERY_LIMITS = { depth: 2, maxDepth: 6, maxFields: 200, maxFieldsLimit: 2000, maxItems: 20, maxItemsLimit: 500, maxString: 1000, maxStringLimit: 20000, maxNodes: 4000, budgetMs: 25 };
 const VIEW_MODEL_STORE = 'Landroidx/lifecycle/ViewModelStore;', VIEW_MODEL = 'Landroidx/lifecycle/ViewModel;';
@@ -435,7 +435,7 @@ export function compactComposeTree(inspection, { maxNodes = 2000 } = {}) {
   let budget = maxNodes, truncated = !!inspection.truncated;
   const owners = (inspection.owners ?? []).map(owner => {
     const nodes = []; for (const node of owner.nodes ?? []) { if (budget <= 0) { truncated = true; break; } budget--;
-      const s = node.semantics; nodes.push({ id: node.id, parentId: node.parentId, depth: node.depth, name: node.name, nameSource: node.nameSource, bounds: node.boundsInWindow ?? node.visibleBounds ?? null, placed: node.placed,
+      const s = node.semantics; nodes.push({ id: node.id, semanticsId: node.semanticsId ?? null, measurePolicy: node.measurePolicy ?? null, modifiers: (node.modifiers ?? []).slice(0, 40).map(m => ({ label: m.label, className: m.className })), zIndex: node.zIndex ?? 0, childCount: node.childCount ?? 0, parentId: node.parentId, depth: node.depth, name: node.name, nameSource: node.nameSource, bounds: node.boundsInWindow ?? node.visibleBounds ?? null, placed: node.placed,
         texts: s?.texts ?? [], editableText: s?.editableText ?? null, contentDescriptions: s?.contentDescriptions ?? [], role: s?.role ?? null, testTag: s?.testTag ?? null, actions: s?.actions ?? [], focused: !!s?.focused, enabled: s ? s.enabled !== false : true, selected: s?.selected ?? null, toggleState: s?.toggleState ?? null }); }
     return { ownerViewId: owner.ownerViewId, window: owner.window, width: owner.width, height: owner.height, nodes };
   });

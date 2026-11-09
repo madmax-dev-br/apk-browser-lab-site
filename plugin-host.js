@@ -7,9 +7,10 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=76605c7a7c39';
+import { pluginWorkerSource } from './plugin-runtime.js?v=785d33ba3587';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=785d33ba3587';
 
-export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
+export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
 const VM_METHODS = new Set(['viewModels', 'fragments', 'activity', 'inspect', 'field', 'composeTree']);
 
@@ -42,6 +43,10 @@ export function sanitizeBlock(op) {
       const columns = (Array.isArray(op.columns) ? op.columns : []).slice(0, MAX_TABLE_COLUMNS).map(column => clipText(column, 100));
       return { id, kind: 'table', columns, rows: (Array.isArray(op.rows) ? op.rows : []).slice(0, MAX_TABLE_ROWS).map(row => columns.map((_, index) => clipText(Array.isArray(row) ? row[index] : '', 500))) };
     }
+    case 'image': {   // a Blob from lab.screenshot (or any image Blob the plugin made); the panel shows it through an object URL it revokes
+      const blob = op.blob; if (typeof Blob === 'undefined' || !(blob instanceof Blob) || !/^image\//.test(blob.type) || blob.size > MAX_IMAGE_BYTES) return { id, kind: 'text', text: `imagem recusada: ${!(typeof Blob !== 'undefined' && blob instanceof Blob) ? 'não é um Blob' : blob.size > MAX_IMAGE_BYTES ? 'maior que 8 MiB' : 'tipo não é image/*'}` };
+      return { id, kind: 'image', blob, caption: clipText(op.caption ?? '', 300), width: Number.isFinite(op.width) ? op.width : null, height: Number.isFinite(op.height) ? op.height : null };
+    }
     case 'json': { let text; try { text = JSON.stringify(op.value, null, 2) ?? 'undefined'; } catch { text = String(op.value); } return { id, kind: 'json', text: clipText(text, MAX_JSON_CHARS) }; }
     default: return null;
   }
@@ -73,7 +78,7 @@ function defaultCreateWorker(name) {
  * @param onChange       (pluginId) -> void: a plugin's status or output changed (the panel coalesces renders)
  */
 export function createPluginHost({ vm = null, createWorker = defaultCreateWorker, now = () => performance.now(), setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = id => clearTimeout(id),
-  onLogStreaming = () => {}, onChange = () => {}, getPackage = () => null } = {}) {
+  onLogStreaming = () => {}, onChange = () => {}, getPackage = () => null, captureImage = null } = {}) {
   const plugins = new Map();   // id -> runtime record of a plugin the panel knows
   let lastSnapshot = null, frame = 0, screen = null, screenSig = null, wantsLogs = false, lastLogSeq = -1;
   let logBuffer = [], logDropped = 0, netPending = new Map(), eventTimer = null;
@@ -114,8 +119,28 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
   }
   // Without a running APK the questions about "the screen" have an empty answer (a plugin may start before any APK); questions about an object are an error.
   const EMPTY = { viewModels: () => [], fragments: () => [], activity: () => null, composeTree: () => ({ owners: [], totalNodes: 0, truncated: false, notes: ['nenhum APK em execução'] }) };
+  /** "Mostrar limites de layout" as data: the boxes the overlay draws (Views and Compose semantics nodes), named from the Compose tree (one composeTree, rate-limited) unless names: false. */
+  async function layoutBoundsFor(plugin, { names = true } = {}) {
+    if (!lastSnapshot) return [];
+    let tree = null; if (names) { try { tree = await ask(plugin, 'composeTree', {}); } catch { tree = null; } }
+    return buildLayoutBoundsElements(tree, lastSnapshot);
+  }
+  const elementOut = element => { const s = element.semantics ?? null, b = element.windowBounds ?? element.bounds ?? null;
+    return { key: element.key, kind: element.kind, name: element.name, nameSource: element.nameSource, id: element.id, bounds: b, size: b ? { width: b.right - b.left, height: b.bottom - b.top } : null,
+      texts: s?.texts ?? (element.text ? [element.text] : []), editableText: s?.editableText ?? null, role: s?.role ?? null, testTag: s?.testTag ?? null, contentDescriptions: s?.contentDescriptions ?? (element.contentDescription ? [element.contentDescription] : []),
+      actions: s?.actions ?? [], enabled: s ? s.enabled !== false : true, modifiers: (element.modifiers ?? []).map(m => m.label), measurePolicy: element.measurePolicy ?? null, type: element.type ?? null, hasImage: element.hostId !== null && element.hostId !== undefined }; };
   async function serve(plugin, method, args) {
     if (method === 'screen') return currentScreen();
+    if (method === 'layoutBounds') return (await layoutBoundsFor(plugin, { names: args?.names !== false })).map(elementOut);
+    if (method === 'screenshot') {
+      if (typeof captureImage !== 'function') throw Object.assign(new Error('Captura de imagem indisponível nesta página.'), { code: 'unsupported' });
+      const wait = (plugin.lastShotAt ?? -Infinity) + SCREENSHOT_MS - now(); if (wait > 0) await new Promise(resolve => setTimer(resolve, wait));
+      if (!plugin.worker) throw Object.assign(new Error('Plugin parado.'), { code: 'stopped' });
+      plugin.lastShotAt = now();
+      let element = null;
+      if (args?.key) { element = (await layoutBoundsFor(plugin, { names: false })).find(item => item.key === String(args.key)) ?? null; if (!element) throw Object.assign(new Error(`Elemento ${String(args.key).slice(0, 60)} não está na tela (use lab.layoutBounds() para as chaves atuais).`), { code: 'not-found' }); }
+      return captureImage({ snapshot: lastSnapshot, element, maxWidth: args?.maxWidth, type: args?.type });
+    }
     if (!VM_METHODS.has(method)) throw Object.assign(new Error(`Método desconhecido: ${String(method).slice(0, 40)}`), { code: 'bad-query' });
     try { return await ask(plugin, method, args); }
     catch (error) { if (error?.code === 'no-apk' && EMPTY[method]) return EMPTY[method](); throw error; }

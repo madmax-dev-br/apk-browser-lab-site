@@ -351,3 +351,5 @@
 :root[data-theme=dark] .po-json{background:#14161c;color:#d9dce4}:root[data-theme=dark] .po-table th{background:#1b1e26}:root[data-theme=dark] .po-table th,:root[data-theme=dark] .po-table td{border-bottom-color:#2c303b}
 :root[data-theme=dark] .po-status{background:#262a35;color:#a9aebb}:root[data-theme=dark] .po-error{background:#2a1716;color:#f0948f}
 @media (max-width:640px){.pl-fields{grid-template-columns:1fr}}
+
+.po-image{margin:6px 0;display:flex;flex-direction:column;gap:4px}.po-image img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:4px;background:repeating-conic-gradient(#0000 0 25%,#8881 0 50%) 0 0/12px 12px}.po-image figcaption{font-size:11px;color:var(--muted)}

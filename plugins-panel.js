@@ -2,8 +2,8 @@
 // Remover, order, export / import) and the dialog edits one (name, package filter, code); the list lives in localStorage (src/plugin-store.js) and is handed to the host
 // (src/plugin-host.js), which runs each enabled plugin in its own Worker. The output panel shows one card per running or failed plugin: its blocks (rendered with textContent
 // and DOM building only, never HTML), badge, console and errors, with Parar / Reiniciar. Renders are coalesced (at most every RENDER_MS) and skipped while the panel is closed.
-import { RENDER_MS } from './plugin-host.js?v=76605c7a7c39';
-import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, templates, fromTemplate } from './plugin-store.js?v=76605c7a7c39';
+import { RENDER_MS } from './plugin-host.js?v=785d33ba3587';
+import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, templates, fromTemplate } from './plugin-store.js?v=785d33ba3587';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const STATUS_LABEL = { rodando: 'rodando', iniciando: 'iniciando', parado: 'parado', erro: 'erro' };
@@ -36,8 +36,17 @@ export function renderBlock(doc, block) {
     if (!block.rows.length) { const tr = el('tr'), td = el('td', 'po-empty', 'Sem linhas.'); td.setAttribute('colspan', String(Math.max(1, block.columns.length))); tr.append(td); body.append(tr); }
     table.append(head, body); wrap.append(table); return wrap;
   }
+  if (block.kind === 'image') {
+    const figure = el('figure', 'po-image'), image = el('img'); image.alt = block.caption || 'Imagem do plugin'; image.decoding = 'async';
+    image.src = imageURL(block.blob); if (block.width) image.width = block.width; if (block.height) image.height = block.height;
+    figure.append(image); if (block.caption) figure.append(el('figcaption', '', block.caption)); return figure;
+  }
   return el('pre', 'po-text', '');
 }
+// One object URL per image Blob while a block shows it; releaseImages() revokes the URLs of Blobs no block holds anymore.
+const imageURLs = new Map();
+function imageURL(blob) { let url = imageURLs.get(blob); if (!url) { url = URL.createObjectURL(blob); imageURLs.set(blob, url); } return url; }
+export function releaseImages(liveBlobs) { for (const [blob, url] of imageURLs) if (!liveBlobs.has(blob)) { URL.revokeObjectURL(url); imageURLs.delete(blob); } }
 
 export function createPluginsPanel({ $, host, save = download, outputRoot = $('plugins-output'), setTimer = (fn, ms) => setTimeout(fn, ms), now = () => performance.now() }) {
   const S = { plugins: loadPlugins(), editing: null, opener: null, submitted: false, dirty: new Set(), timer: null, lastRender: -Infinity, cards: new Map() };
@@ -196,6 +205,7 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     const cards = shown.map(plugin => (all || S.dirty.has(plugin.id) || !S.cards.has(plugin.id)) ? card(plugin) : S.cards.get(plugin.id).root);
     S.dirty.clear();
     if (cards.length !== container.children.length || cards.some((node, index) => container.children[index] !== node)) container.replaceChildren(...cards);
+    if (typeof URL?.revokeObjectURL === 'function') releaseImages(new Set((host.list?.() ?? []).flatMap(plugin => plugin.output?.blocks ?? []).filter(block => block.kind === 'image').map(block => block.blob)));
     if (!cards.length) container.replaceChildren(el('p', 'po-empty', S.plugins.length ? 'Nenhum plugin ligado. Ligue um na seção Plugins dos Controles.' : 'Nenhum plugin.'));
   }
   function schedule(id) {

@@ -14,6 +14,10 @@
  * @property {() => Promise<object>} screen          The current screen (same shape as the 'screen' event); no VM work.
  * @property {(options?: { maxNodes?: number }) => Promise<object>} composeTree   The Compose layout tree: { owners: [{ nodes: [{ id, parentId, depth, name, bounds, texts,
  *   editableText, role, testTag, actions, ... }] }], totalNodes, truncated }. At most once per second per plugin; the same frame answers from a cache.
+ * @property {(options?: { names?: boolean }) => Promise<object[]>} layoutBounds   The boxes "Mostrar limites de layout" draws: [{ key, kind: 'compose'|'view', name, nameSource,
+ *   bounds (window px), size, texts, editableText, role, testTag, contentDescriptions, actions, modifiers, measurePolicy, type, hasImage }]. Names come from one composeTree (same rate limit).
+ * @property {(options?: { key?: string, maxWidth?: number, type?: string }) => Promise<{ blob: Blob, width: number, height: number, type: string, notes: string[] }>} screenshot
+ *   An image of the screen, or of one element (`key` from layoutBounds), cut from the frame the page shows. At most one every 500 ms per plugin.
  * @property {() => Promise<object[]>} viewModels    ViewModels of the active screen: [{ handle, className, key, library, owner: { kind, label, className, handle } }].
  * @property {() => Promise<object[]>} fragments     androidx fragments on the screen: [{ handle, className, who, tag, id, hidden, state, children }].
  * @property {() => Promise<{handle: string, className: string}|null>} activity   The current Activity object.
@@ -23,7 +27,7 @@
  * @property {(handle: string, path: string, fn: (value: any, previous: any) => void, options?: { intervalMs?: number, depth?: number, onError?: Function }) => () => void} watch
  *   Polls `field(handle, path)` every intervalMs (>= 250) and calls fn only when the value changed; returns the stop function. A collected object stops the watch.
  * @property {{ text(s: string, o?: {id?: string}): void, kv(obj: object, o?: {id?: string}): void, table(rows: object[], columns?: string[], o?: {id?: string}): void,
- *   json(value: any, o?: {id?: string}): void, clear(): void, badge(s: string): void }} ui   Output of the plugin's panel. Each call adds a block; a block with the same `id`
+ *   json(value: any, o?: {id?: string}): void, image(blobOrScreenshot: Blob|{blob: Blob}, o?: {id?: string, caption?: string}): void, clear(): void, badge(s: string): void }} ui   Output of the plugin's panel. Each call adds a block; a block with the same `id`
  *   is replaced in place. Rendered as text only (no HTML), at most ~10 times a second.
  * @property {(ms: number) => Promise<void>} sleep
  * @property {{ id: string, name: string, packageName: string|null }} info
@@ -64,6 +68,7 @@ export function pluginWorkerMain(scope) {
       pushUi({ op: 'table', id: blockId(options), columns: cols, rows: list.map(row => cols.map(col => { const value = Array.isArray(row) ? row[cols.indexOf(col)] : row?.[col]; return value === undefined || value === null ? '' : clip(typeof value === 'string' ? value : textOf(value)).slice(0, 500); })) });
     },
     json: (value, options) => pushUi({ op: 'json', id: blockId(options), value: plain(value) }),
+    image: (image, options) => { const blob = image && typeof image === 'object' && 'blob' in image ? image.blob : image; pushUi({ op: 'image', id: blockId(options), blob, caption: clip(textOf(options?.caption ?? '')), width: image?.width, height: image?.height }); },
     clear: () => pushUi({ op: 'clear' }),
     badge: text => pushUi({ op: 'badge', text: clip(textOf(text ?? '')).slice(0, 40) }),
   });
@@ -83,6 +88,8 @@ export function pluginWorkerMain(scope) {
     },
     screen: () => call('screen', {}),
     composeTree: (options = {}) => call('composeTree', { maxNodes: options?.maxNodes }),
+    layoutBounds: (options = {}) => call('layoutBounds', { names: options?.names !== false }),
+    screenshot: (options = {}) => call('screenshot', { key: options?.key ?? null, maxWidth: options?.maxWidth, type: options?.type }),
     viewModels: () => call('viewModels', {}),
     fragments: () => call('fragments', {}),
     activity: () => call('activity', {}),
@@ -195,6 +202,24 @@ async function conectar() {
 lab.on('screen', () => conectar().catch(erro => lab.ui.text(erro.message, { id: 'erro' })));
 setInterval(() => conectar().catch(() => {}), 2000);   // um destino do Navigation na mesma Activity traz os seus ViewModels
 await conectar();
+` },
+  { id: 'components', name: 'Componentes da tela', description: 'As caixas de "Mostrar limites de layout" com nome, posição e o recorte de cada uma.', code: `// Componentes da tela: as caixas de "Mostrar limites de layout", com o recorte de cada uma
+// (lab.screenshot corta do quadro que a página mostra; no máximo um recorte a cada 500 ms, então só os primeiros LIMITE ganham imagem).
+const LIMITE = 8;
+let rodada = 0;
+async function mostrar() {
+  const minha = ++rodada;
+  const caixas = (await lab.layoutBounds()).filter(caixa => caixa.kind === 'compose');
+  lab.ui.clear(); lab.ui.badge(String(caixas.length));
+  lab.ui.table(caixas.map(caixa => ({ nome: caixa.name, x: caixa.bounds.left, y: caixa.bounds.top, largura: caixa.size.width, altura: caixa.size.height, tag: caixa.testTag ?? '' })), ['nome', 'x', 'y', 'largura', 'altura', 'tag'], { id: 'lista' });
+  for (const caixa of caixas.slice(0, LIMITE)) {
+    if (minha !== rodada) return;   // a tela mudou: a próxima rodada recomeça
+    try { lab.ui.image(await lab.screenshot({ key: caixa.key, maxWidth: 360 }), { id: caixa.key, caption: caixa.name }); }
+    catch (erro) { lab.ui.text(caixa.name + ': ' + erro.message, { id: caixa.key }); }
+  }
+}
+lab.on('screen', () => mostrar().catch(erro => lab.ui.text(erro.message, { id: 'erro' })));
+await mostrar();
 ` },
   { id: 'compose', name: 'Árvore Compose resumida', description: 'Os elementos do Compose com texto, papel ou testTag.', code: `// Árvore Compose resumida: só os nós com texto, papel (Role) ou testTag. A árvore custa algumas dezenas de ms na VM: no máximo uma leitura por segundo.
 async function mostrar() {
