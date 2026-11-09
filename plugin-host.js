@@ -7,8 +7,8 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=308c7a12ce00';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=308c7a12ce00';
+import { pluginWorkerSource } from './plugin-runtime.js?v=5eb77725df72';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=5eb77725df72';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
@@ -179,7 +179,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       case 'console': record(plugin, plugin.console, { level: ['log', 'info', 'warn', 'error', 'debug'].includes(data.level) ? data.level : 'log', text: clipText(data.text, 2000), at: Date.now() }, MAX_CONSOLE); changed(plugin); return;
       case 'ui': applyUiOps(plugin.output, data.ops); changed(plugin); return;
       case 'sub': {
-        const name = String(data.name); if (!['screen', 'log', 'network'].includes(name)) return;
+        const name = String(data.name); if (!['screen', 'log', 'network', 'refresh'].includes(name)) return;
         if (data.on) plugin.subs.add(name); else plugin.subs.delete(name);
         if (name === 'log') updateLogWanted();
         return;
@@ -250,6 +250,8 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     },
     /** Parar on the card: stays stopped until Reiniciar (or the plugin is edited / toggled). */
     stop(id) { const plugin = plugins.get(id); if (!plugin) return; plugin.userStopped = true; stopWorker(plugin); plugin.reason = 'parado no painel'; changed(plugin); },
+    /** Atualizar on the card: the plugin's lab.on('refresh') handlers run (a plugin that reads on demand recomputes). Returns whether the plugin listens. */
+    refresh(id) { const plugin = plugins.get(id); if (!plugin?.worker || !plugin.subs.has('refresh')) return false; send(plugin, { t: 'event', name: 'refresh', data: { at: Date.now() } }); stats.events++; return true; },
     /** Reiniciar: a fresh Worker with empty output (also after an error). */
     restart(id) { const plugin = plugins.get(id); if (!plugin) return; stopWorker(plugin); plugin.userStopped = false; plugin.status = 'parado'; plugin.console = []; plugin.errors = []; plugin.errorCount = 0; reconcile(); },
     /** The page drew a snapshot (device-view `rendered`). Without running plugins this only keeps the reference. */

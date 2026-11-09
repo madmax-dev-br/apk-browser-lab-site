@@ -6,10 +6,10 @@
 //
 /**
  * @typedef {object} Lab  The `lab` global of a plugin.
- * @property {(name: 'screen'|'log'|'network', fn: Function) => () => void} on   Subscribes; returns the unsubscribe function. 'screen': the active screen changed
+ * @property {(name: 'screen'|'ready'|'log'|'network'|'refresh', fn: Function) => () => void} on   Subscribes; returns the unsubscribe function. 'screen': the active screen changed
  *   ({ activity, activityStack, windows: [{ id, kind, modal, visible, focused }], dialogs, canGoBack, closed, packageName, frame }). 'log': a batch (array) of Logcat
  *   entries { seq, uptime, wall, pid, tid, thread, level, tag, message }. 'network': a batch of network log entries (src/netlog.js), new or updated. Batches come at most
- *   every 250 ms, and Logcat lines reach the page only while some plugin listens to 'log' (or the Logcat panel is open).
+ *   every 250 ms, and Logcat lines reach the page only while some plugin listens to 'log' (or the Logcat panel is open). 'refresh': the user clicked Atualizar on the plugin's card.
  * @property {(name: string, fn?: Function) => void} off
  * @property {() => Promise<object>} screen          The current screen (same shape as the 'screen' event); no VM work. `screen.ready` is "Tela pronta" (src/screen-ready.js):
  *   { ready, activity, readySince, waitingFor: [motivos], fragments: [{ className, state, hidden, ready }] } — the Activity and its fragments loaded and the screen is still.
@@ -110,7 +110,7 @@ export function pluginWorkerMain(scope) {
         lab.screen().then(screen => { if (screen?.ready?.ready && !was) { was = true; fn(screen); } }).catch(() => {});
         return () => { readyWrappers.delete(fn); off(); };
       }
-      if (!['screen', 'log', 'network'].includes(name)) throw new TypeError(`Evento desconhecido: ${name} (use 'screen', 'ready', 'log' ou 'network')`);
+      if (!['screen', 'log', 'network', 'refresh'].includes(name)) throw new TypeError(`Evento desconhecido: ${name} (use 'screen', 'ready', 'log', 'network' ou 'refresh')`);
       let set = handlers.get(name); if (!set) { set = new Set(); handlers.set(name, set); post({ t: 'sub', name, on: true }); }
       set.add(fn); return () => lab.off(name, fn);
     },

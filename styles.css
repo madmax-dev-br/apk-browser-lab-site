@@ -421,3 +421,20 @@
 main>.workspace:first-child{margin-top:28px}
 @media(max-width:700px){main>.workspace:first-child{margin-top:18px}}
 .is-embedded main>.workspace:first-child{margin-top:0}
+/* Plugin output cards: collapsed <details> by default; toolbar (updates, height, Atualizar); block height modes */
+.po-card>summary.po-head{cursor:pointer;list-style:none;margin-bottom:0;user-select:none}
+.po-card>summary.po-head::-webkit-details-marker{display:none}
+.po-card>summary.po-head::before{content:'▸';font-size:10px;color:#8d93a3;transition:transform .15s}
+.po-card[open]>summary.po-head::before{transform:rotate(90deg)}
+.po-card[open]>summary.po-head{margin-bottom:4px}
+.po-fresh{font-size:9px;padding:1px 6px;border-radius:9px;background:#fff4dc;color:#8a5a00}
+.po-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 6px}
+.po-tools select,.po-tools input{width:auto;font:10px ui-monospace,monospace;padding:4px 6px;border:1px solid #dfe2ea;border-radius:5px;background:#fff;color:#4a5060}
+.po-tools .po-height-px{width:72px}
+.po-tools .po-height-px[hidden]{display:none}
+.po-refresh.has-news{border-color:var(--accent);color:var(--accent);font-weight:600}
+.po-card[data-height=auto] .po-json,.po-card[data-height=auto] .po-table-wrap,.po-card[data-height=auto] .po-text{max-height:none;overflow:visible}
+.po-card[data-height=fixed] .po-json,.po-card[data-height=fixed] .po-table-wrap{max-height:none;height:var(--po-h,240px);overflow:auto}
+.po-card[data-height=fixed] .po-text,.po-card[data-height=fixed] .po-kv{max-height:var(--po-h,240px);overflow:auto}
+:root[data-theme=dark] .po-fresh{background:#3a2c10;color:#f0c46a}
+:root[data-theme=dark] .po-tools select,:root[data-theme=dark] .po-tools input{background:#14161c;border-color:#2c303b;color:#c4c8d2}

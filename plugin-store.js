@@ -1,6 +1,6 @@
 // The list of page plugins of the "Plugins" section (src/plugins-panel.js): global (not per package; each plugin has an optional package filter), kept in localStorage with every
 // access guarded (without storage the list lasts for the page), exported and imported as JSON. Pure functions: tested without a DOM.
-import { PLUGIN_TEMPLATES } from './plugin-runtime.js?v=308c7a12ce00';
+import { PLUGIN_TEMPLATES } from './plugin-runtime.js?v=5eb77725df72';
 
 export const STORAGE_KEY = 'apkweb.plugins.v1', EXPORT_FORMAT = 'apk-web-lab-plugins', MAX_PLUGINS = 32, MAX_CODE_CHARS = 200000, MAX_NAME_CHARS = 120;
 let counter = 0;
@@ -8,7 +8,13 @@ export const newPluginId = () => `pl-${Date.now().toString(36)}-${(++counter).to
 export function normalizePlugin(raw = {}) {
   const item = raw && typeof raw === 'object' ? raw : {};
   return { id: typeof item.id === 'string' && /^[\w-]{1,64}$/.test(item.id) ? item.id : newPluginId(), name: String(item.name ?? '').trim().slice(0, MAX_NAME_CHARS) || 'Plugin sem nome',
-    code: String(item.code ?? '').slice(0, MAX_CODE_CHARS), enabled: item.enabled === true, packageFilter: String(item.packageFilter ?? '').trim().slice(0, 400) };
+    code: String(item.code ?? '').slice(0, MAX_CODE_CHARS), enabled: item.enabled === true, packageFilter: String(item.packageFilter ?? '').trim().slice(0, 400),
+    updates: item.updates === 'manual' ? 'manual' : 'auto', height: blockHeight(item.height) };
+}
+/** Height of the output blocks of a plugin's card: 'wrap' (up to 320 px, then a scroll: the default), 'auto' (whole content) or a number of px (80–2000, fixed with a scroll). */
+export function blockHeight(value) {
+  if (value === 'auto' || value === 'wrap') return value;
+  const n = Math.round(Number(value)); return Number.isFinite(n) && n > 0 ? Math.max(80, Math.min(2000, n)) : 'wrap';
 }
 export function validatePlugin(plugin) {
   const errors = [];

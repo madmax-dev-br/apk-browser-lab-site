@@ -2,8 +2,8 @@
 // Remover, order, export / import) and the dialog edits one (name, package filter, code); the list lives in localStorage (src/plugin-store.js) and is handed to the host
 // (src/plugin-host.js), which runs each enabled plugin in its own Worker. The output panel shows one card per running or failed plugin: its blocks (rendered with textContent
 // and DOM building only, never HTML), badge, console and errors, with Parar / Reiniciar. Renders are coalesced (at most every RENDER_MS) and skipped while the panel is closed.
-import { RENDER_MS } from './plugin-host.js?v=308c7a12ce00';
-import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, templates, fromTemplate } from './plugin-store.js?v=308c7a12ce00';
+import { RENDER_MS } from './plugin-host.js?v=5eb77725df72';
+import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, templates, fromTemplate } from './plugin-store.js?v=5eb77725df72';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const STATUS_LABEL = { rodando: 'rodando', iniciando: 'iniciando', parado: 'parado', erro: 'erro' };
@@ -49,7 +49,7 @@ function imageURL(blob) { let url = imageURLs.get(blob); if (!url) { url = URL.c
 export function releaseImages(liveBlobs) { for (const [blob, url] of imageURLs) if (!liveBlobs.has(blob)) { URL.revokeObjectURL(url); imageURLs.delete(blob); } }
 
 export function createPluginsPanel({ $, host, save = download, outputRoot = $('plugins-output'), setTimer = (fn, ms) => setTimeout(fn, ms), now = () => performance.now() }) {
-  const S = { plugins: loadPlugins(), editing: null, opener: null, submitted: false, dirty: new Set(), timer: null, lastRender: -Infinity, cards: new Map() };
+  const S = { plugins: loadPlugins(), editing: null, opener: null, submitted: false, dirty: new Set(), timer: null, lastRender: -Infinity, cards: new Map(), open: new Set() };
   const doc = outputRoot?.ownerDocument ?? globalThis.document;
   const el = (tag, className, text) => { const node = doc.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
   const button = (text, className, label, onClick) => { const node = el('button', `cp-button ${className}`, text); node.type = 'button'; if (label) node.setAttribute('aria-label', label); node.addEventListener('click', onClick); return node; };
@@ -158,31 +158,76 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
   });
 
   // ---- output cards ---------------------------------------------------------------------------------------------------------------------------------------------------
+  // Each card is a <details>, collapsed on every page load (S.open: the ones the viewer opened since); a closed card only updates its header (status, badge, "novos dados").
+  // Display settings live with the plugin (plugin-store.js): updates 'auto' (the blocks follow the plugin) or 'manual' (they hold until Atualizar), and the block height.
+  const HEIGHT_PRESETS = [['wrap', 'Limitada (320 px)'], ['auto', 'Conteúdo inteiro'], ['fixed', 'Fixa…']];
+  function saveDisplay(plugin, patch) {
+    const index = S.plugins.findIndex(item => item.id === plugin.id); if (index < 0) return;
+    S.plugins[index] = normalizePlugin({ ...S.plugins[index], ...patch }); savePlugins(S.plugins);   // display only: the host does not restart the plugin
+    const entry = S.cards.get(plugin.id); if (entry) { entry.force = true; applyDisplay(entry, S.plugins[index]); } schedule(plugin.id);
+  }
+  function applyDisplay(entry, plugin) {
+    const fixed = typeof plugin.height === 'number';
+    entry.root.dataset.height = fixed ? 'fixed' : plugin.height; entry.root.style.setProperty('--po-h', fixed ? `${plugin.height}px` : '');
+    entry.heightSelect.value = fixed ? 'fixed' : plugin.height; entry.heightInput.hidden = !fixed; if (fixed && doc.activeElement !== entry.heightInput) entry.heightInput.value = String(plugin.height);
+    entry.updatesSelect.value = plugin.updates; entry.root.dataset.updates = plugin.updates;
+  }
+  /** Replaces the block DOM keeping what the viewer did: a block with the same id is updated in place (text / JSON) or rebuilt with its scroll position restored. */
+  function patchBlocks(container, blocks) {
+    const old = new Map(), scroll = new Map();
+    for (const node of container.children) { if (node.dataset?.key) old.set(node.dataset.key, node); if (node.scrollTop || node.scrollLeft) scroll.set(node.dataset?.key ?? '', { top: node.scrollTop, left: node.scrollLeft }); }
+    const nodes = blocks.map((block, index) => {
+      const key = block.id !== null && block.id !== undefined ? `id:${block.id}` : `#${index}`, previous = old.get(key);
+      if (previous && previous.block === block) return previous;
+      if (previous && previous.block?.kind === block.kind && (block.kind === 'text' || block.kind === 'json')) { if (previous.textContent !== block.text) previous.textContent = block.text; previous.block = block; return previous; }
+      const node = renderBlock(doc, block); node.dataset.key = key; node.block = block; return node;
+    });
+    if (nodes.length !== container.children.length || nodes.some((node, index) => container.children[index] !== node)) container.replaceChildren(...nodes);
+    for (const node of nodes) { const at = scroll.get(node.dataset.key); if (at && (node.scrollTop !== at.top || node.scrollLeft !== at.left)) { node.scrollTop = at.top; node.scrollLeft = at.left; } }   // a node moved in the DOM lost its scroll
+  }
   function card(plugin) {
     let entry = S.cards.get(plugin.id);
     if (!entry) {
-      const root = el('article', 'po-card'), head = el('header', 'po-head'), name = el('b', 'po-name'), status = el('span', 'po-status'), badge = el('span', 'po-badge');
+      const root = el('details', 'po-card'), head = el('summary', 'po-head'), name = el('b', 'po-name'), status = el('span', 'po-status'), badge = el('span', 'po-badge'), fresh = el('span', 'po-fresh', 'novos dados');
+      fresh.hidden = true;
+      const tools = el('div', 'po-tools');
+      const updatesSelect = el('select', 'po-updates'); updatesSelect.setAttribute('aria-label', `Atualização da saída de ${plugin.name}`);
+      for (const [value, label] of [['auto', 'Atualização automática'], ['manual', 'Atualização manual']]) { const option = el('option', '', label); option.value = value; updatesSelect.append(option); }
+      updatesSelect.addEventListener('change', () => saveDisplay(plugin, { updates: updatesSelect.value }));
+      const heightSelect = el('select', 'po-height'); heightSelect.setAttribute('aria-label', `Altura dos blocos de ${plugin.name}`);
+      for (const [value, label] of HEIGHT_PRESETS) { const option = el('option', '', label); option.value = value; heightSelect.append(option); }
+      const heightInput = el('input', 'po-height-px'); heightInput.type = 'number'; heightInput.min = '80'; heightInput.max = '2000'; heightInput.step = '20'; heightInput.setAttribute('aria-label', 'Altura fixa em px');
+      heightSelect.addEventListener('change', () => saveDisplay(plugin, { height: heightSelect.value === 'fixed' ? Number(heightInput.value) || 240 : heightSelect.value }));
+      heightInput.addEventListener('change', () => saveDisplay(plugin, { height: Number(heightInput.value) || 240 }));
+      const refresh = button('Atualizar', 'po-refresh', `Atualizar a saída de ${plugin.name}`, () => {
+        const current = S.cards.get(plugin.id); if (!current) return;
+        current.force = true; current.acceptUntil = now() + 1500;   // manual mode: the output the refresh produces shows too
+        host.refresh?.(plugin.id); schedule(plugin.id);
+      });
       const stop = button('Parar', 'po-stop', `Parar o plugin ${plugin.name}`, () => { host.stop(plugin.id); schedule(plugin.id); }), restart = button('Reiniciar', 'po-restart', `Reiniciar o plugin ${plugin.name}`, () => { host.restart(plugin.id); schedule(plugin.id); });
+      tools.append(updatesSelect, heightSelect, heightInput, refresh, stop, restart);
       const blocks = el('div', 'po-blocks'), errors = el('div', 'po-errors'), consoleBox = el('details', 'po-console'), consoleSummary = el('summary', '', 'Console'), consoleLines = el('div', 'po-console-lines');
-      consoleBox.append(consoleSummary, consoleLines); head.append(name, status, badge, stop, restart); root.append(head, errors, blocks, consoleBox);
-      entry = { root, name, status, badge, stop, restart, blocks, errors, consoleBox, consoleSummary, consoleLines, outputRef: null, consoleCount: -1, errorCount: -1 };
+      consoleBox.append(consoleSummary, consoleLines); head.append(name, status, badge, fresh); root.append(head, tools, errors, blocks, consoleBox);
+      root.open = S.open.has(plugin.id);
+      root.addEventListener('toggle', () => { if (root.open) { S.open.add(plugin.id); const current = S.cards.get(plugin.id); if (current) current.force = true; schedule(plugin.id); } else S.open.delete(plugin.id); });
+      entry = { root, name, status, badge, fresh, updatesSelect, heightSelect, heightInput, refresh, stop, restart, blocks, errors, consoleBox, consoleSummary, consoleLines, consoleCount: -1, errorCount: -1, force: true, acceptUntil: 0 };
       S.cards.set(plugin.id, entry);
     }
     const live = host.get(plugin.id), status = live?.status ?? 'parado';
     entry.name.textContent = plugin.name; entry.status.textContent = STATUS_LABEL[status] ?? status; entry.status.dataset.state = status; entry.root.dataset.state = status;
     entry.badge.textContent = live?.output?.badge ?? ''; entry.badge.hidden = !entry.badge.textContent;
-    entry.stop.disabled = !live?.worker; entry.restart.disabled = !plugin.enabled;
+    entry.stop.disabled = !live?.worker; entry.restart.disabled = !plugin.enabled; entry.refresh.disabled = !live?.worker;
+    applyDisplay(entry, plugin);
     if (live) {
-      // blocks are re-rendered only when the model changed (applyUiOps replaces block objects), console and errors only when they grew
-      const blocks = live.output.blocks, last = entry.lastBlocks;
-      if (last && blocks.length && blocks.length === last.length && entry.blocks.children.length === blocks.length) {   // same layout: only the blocks that changed get new DOM
-        if (blocks.some((block, index) => last[index] !== block)) { const nodes = blocks.map((block, index) => last[index] === block ? entry.blocks.children[index] : renderBlock(doc, block)); entry.blocks.replaceChildren(...nodes); }
-        entry.lastBlocks = [...blocks]; entry.lastStatus = status;
-      } else if (!last || entry.lastStatus !== status || blocks.length !== last.length || blocks.some((block, index) => last[index] !== block)) {
-        entry.blocks.replaceChildren(...blocks.map(block => renderBlock(doc, block))); entry.lastBlocks = [...blocks]; entry.lastStatus = status;
-        if (!blocks.length) entry.blocks.append(el('p', 'po-empty', status === 'rodando' ? 'Sem saída ainda (use lab.ui.text, kv, table ou json).' : status === 'erro' ? 'O plugin parou com erro.' : 'Plugin parado.'));
+      const blocks = live.output.blocks, changedBlocks = entry.force || entry.lastStatus !== status || !entry.lastBlocks || blocks.length !== entry.lastBlocks.length || blocks.some((block, index) => entry.lastBlocks[index] !== block);
+      const hold = plugin.updates === 'manual' && entry.lastBlocks && !entry.force && now() > entry.acceptUntil && entry.lastStatus === status;
+      if (changedBlocks && (hold || !entry.root.open)) entry.pending = true;   // closed or manual: shown later (on open / Atualizar)
+      else if (changedBlocks && entry.root.open) {
+        patchBlocks(entry.blocks, blocks); entry.lastBlocks = [...blocks]; entry.lastStatus = status; entry.pending = false; entry.force = false;
+        if (!blocks.length) entry.blocks.replaceChildren(el('p', 'po-empty', status === 'rodando' ? 'Sem saída ainda (use lab.ui.text, kv, table ou json).' : status === 'erro' ? 'O plugin parou com erro.' : 'Plugin parado.'));
       }
-      if (entry.errorCount !== live.errors.length || entry.errorsRef !== live.errors[live.errors.length - 1]) {
+      entry.fresh.hidden = !(entry.pending && plugin.updates === 'manual'); entry.refresh.classList.toggle('has-news', !entry.fresh.hidden);
+      if (entry.root.open && (entry.errorCount !== live.errors.length || entry.errorsRef !== live.errors[live.errors.length - 1])) {
         entry.errors.replaceChildren(...live.errors.slice(-5).map(error => { const item = el('pre', 'po-error', `${error.phase}: ${error.message}${error.stack ? '\n' + error.stack : ''}`); return item; }));
         entry.errorCount = live.errors.length; entry.errorsRef = live.errors[live.errors.length - 1];
       }
