@@ -316,3 +316,38 @@
 :root[data-theme=dark] .em-row .em-meta[data-state=error],:root[data-theme=dark] .em-error{color:#f08a84}:root[data-theme=dark] .em-row .em-meta[data-state=ok]{color:#7bd19b}
 :root[data-theme=dark] .em-hint[data-state=warn],:root[data-theme=dark] .netlog-note-mock{color:#e0b04a}:root[data-theme=dark] .em-hint[data-state=ok]{color:#5fc283}
 @media (max-width:520px){.em-fieldset{grid-template-columns:minmax(0,1fr)}.em-header{grid-template-columns:minmax(0,1fr) auto}.em-header .em-header-value{grid-column:1/2}.em-scrim{padding:8px}}
+/* "Plugins" (src/plugins-panel.js): the Controles section, the editor dialog and the output cards under the device */
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.pl-row .pl-name{overflow:hidden;text-overflow:ellipsis}
+#pl-template{font:inherit;font-size:11px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:transparent;color:inherit;max-width:190px}
+.pl-card{max-width:860px}
+.pl-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 12px}
+.pl-code{width:100%;min-height:320px;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2;white-space:pre;overflow:auto}
+.po-cards{background:#f9fafc;border-top:1px solid #eceef3;font:10px/1.5 ui-monospace,monospace;color:#5d6473;padding:8px 12px;max-height:720px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.po-card{border:1px solid #dfe2ea;border-radius:7px;background:#fff;padding:6px 8px;min-width:0}
+.po-card[data-state=erro]{border-color:#e7b3b0}
+.po-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.po-name{font:600 11px ui-monospace,monospace;color:#252a35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;min-width:0}
+.po-status{font-size:9px;padding:1px 6px;border-radius:9px;background:#eef0f4;color:#6b7180}
+.po-status[data-state=rodando]{background:#e3f4ea;color:#2f7d51}.po-status[data-state=erro]{background:#fbe7e6;color:#b8403b}.po-status[data-state=iniciando]{background:#eeeafe;color:#5b52c9}
+.po-badge{font-size:9px;padding:1px 6px;border-radius:9px;background:var(--accent);color:#fff;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.po-head .cp-button{font-size:10px;padding:2px 8px}
+.po-blocks{display:flex;flex-direction:column;gap:6px;min-width:0}
+.po-text,.po-json{margin:0;white-space:pre-wrap;word-break:break-word;color:#30343f}
+.po-json{max-height:320px;overflow:auto;background:#f6f7fa;border-radius:4px;padding:4px 6px}
+.po-kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:1px 10px;margin:0}
+.po-kv dt{color:#8d93a3}.po-kv dd{margin:0;color:#30343f;word-break:break-word;white-space:pre-wrap}
+.po-table-wrap{overflow:auto;max-height:320px}
+.po-table{border-collapse:collapse;width:100%}
+.po-table th,.po-table td{text-align:left;padding:1px 6px;border-bottom:1px solid #eceef3;vertical-align:top;overflow-wrap:anywhere}
+.po-table th{position:sticky;top:0;background:#fff;color:#8d93a3;font-weight:600;white-space:nowrap}
+.po-empty{margin:0;color:#9aa0ae}
+.po-error{margin:0 0 4px;white-space:pre-wrap;word-break:break-word;color:#b8403b;background:#fdf1f0;border-radius:4px;padding:3px 6px;max-height:120px;overflow:auto}
+.po-console{margin-top:4px}.po-console summary{cursor:pointer;color:#8d93a3}
+.po-console-lines{max-height:160px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.po-console-line.level-warn{color:#a26b12}.po-console-line.level-error{color:#b8403b}
+:root[data-theme=dark] .po-cards{background:#15181e;border-top:1px solid #333740;color:#a9aebb}
+:root[data-theme=dark] .po-card{background:#1b1e26;border-color:#2c303b}:root[data-theme=dark] .po-name,:root[data-theme=dark] .po-text,:root[data-theme=dark] .po-kv dd{color:#d9dce4}
+:root[data-theme=dark] .po-json{background:#14161c;color:#d9dce4}:root[data-theme=dark] .po-table th{background:#1b1e26}:root[data-theme=dark] .po-table th,:root[data-theme=dark] .po-table td{border-bottom-color:#2c303b}
+:root[data-theme=dark] .po-status{background:#262a35;color:#a9aebb}:root[data-theme=dark] .po-error{background:#2a1716;color:#f0948f}
+@media (max-width:640px){.pl-fields{grid-template-columns:1fr}}

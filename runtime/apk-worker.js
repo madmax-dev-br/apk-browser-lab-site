@@ -1,51 +1,52 @@
-import { buildScreenState } from './screen-state.js?v=a65043f84501';
-import { createLogcat } from './logcat.js?v=a65043f84501';
-import { createNetlog } from './netlog.js?v=a65043f84501';
-import { reportSummary } from './report-summary.js?v=a65043f84501';
-import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=a65043f84501';
-import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=a65043f84501';
-import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=a65043f84501';
-import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=a65043f84501';
-import { describeRedirects } from './host-map.js?v=a65043f84501';
-import { TimeBreakdown } from './time-breakdown.js?v=a65043f84501';
-import { createMessageSink } from './audio-native.js?v=a65043f84501';
-import { loadAPK } from './apk-loader.js?v=a65043f84501';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=a65043f84501';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=a65043f84501';
-import { createWebViewBackend } from './webview-backend.js?v=a65043f84501';
-import { FrameworkProvider } from './framework-provider.js?v=a65043f84501';
-import { createRasterSender } from './raster-cache.js?v=a65043f84501';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=a65043f84501';
-import { dispatchPointer } from './pointer-input-host.js?v=a65043f84501';
-import { resolveDevice } from './device-profile.js?v=a65043f84501';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=a65043f84501';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=a65043f84501';
-import { SkiaProvider } from './skia-provider.js?v=a65043f84501';
-import { inspectCompose } from './compose-inspector.js?v=a65043f84501';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=a65043f84501';
-import { SemanticsPacer } from './semantics-pacing.js?v=a65043f84501';
-import { MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=a65043f84501';
-import { disposeTextLayout } from './text-layout-native.js?v=a65043f84501';
-import { IcuBreakProvider } from './icu-break-provider.js?v=a65043f84501';
-import { SqliteProvider } from './sqlite-native.js?v=a65043f84501';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=a65043f84501';
-import { TzdataProvider } from './java-time-native.js?v=a65043f84501';
-import { ZlibProvider } from './zip-native.js?v=a65043f84501';
-import { IcuConverterProvider } from './icu-converter-native.js?v=a65043f84501';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=a65043f84501';
-import { JavacryptoProvider } from './javacrypto-native.js?v=a65043f84501';
-import { disposeColorFilters } from './color-filter-native.js?v=a65043f84501';
-import { disposeRegex } from './regex-native.js?v=a65043f84501';
-import { disposeRenderNodes } from './rendernode-native.js?v=a65043f84501';
-import { startDeepLink } from './deep-link-host.js?v=a65043f84501';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=a65043f84501';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=a65043f84501';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=a65043f84501';
+import { buildScreenState } from './screen-state.js?v=6a95347ec7c1';
+import { createLogcat } from './logcat.js?v=6a95347ec7c1';
+import { createNetlog } from './netlog.js?v=6a95347ec7c1';
+import { reportSummary } from './report-summary.js?v=6a95347ec7c1';
+import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=6a95347ec7c1';
+import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=6a95347ec7c1';
+import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=6a95347ec7c1';
+import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=6a95347ec7c1';
+import { describeRedirects } from './host-map.js?v=6a95347ec7c1';
+import { TimeBreakdown } from './time-breakdown.js?v=6a95347ec7c1';
+import { createMessageSink } from './audio-native.js?v=6a95347ec7c1';
+import { loadAPK } from './apk-loader.js?v=6a95347ec7c1';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=6a95347ec7c1';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=6a95347ec7c1';
+import { createWebViewBackend } from './webview-backend.js?v=6a95347ec7c1';
+import { FrameworkProvider } from './framework-provider.js?v=6a95347ec7c1';
+import { createRasterSender } from './raster-cache.js?v=6a95347ec7c1';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=6a95347ec7c1';
+import { dispatchPointer } from './pointer-input-host.js?v=6a95347ec7c1';
+import { resolveDevice } from './device-profile.js?v=6a95347ec7c1';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=6a95347ec7c1';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=6a95347ec7c1';
+import { SkiaProvider } from './skia-provider.js?v=6a95347ec7c1';
+import { inspectCompose } from './compose-inspector.js?v=6a95347ec7c1';
+import { runPluginQuery, compactComposeTree, PluginQueryError } from './plugin-queries.js?v=6a95347ec7c1';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=6a95347ec7c1';
+import { SemanticsPacer } from './semantics-pacing.js?v=6a95347ec7c1';
+import { MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=6a95347ec7c1';
+import { disposeTextLayout } from './text-layout-native.js?v=6a95347ec7c1';
+import { IcuBreakProvider } from './icu-break-provider.js?v=6a95347ec7c1';
+import { SqliteProvider } from './sqlite-native.js?v=6a95347ec7c1';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=6a95347ec7c1';
+import { TzdataProvider } from './java-time-native.js?v=6a95347ec7c1';
+import { ZlibProvider } from './zip-native.js?v=6a95347ec7c1';
+import { IcuConverterProvider } from './icu-converter-native.js?v=6a95347ec7c1';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=6a95347ec7c1';
+import { JavacryptoProvider } from './javacrypto-native.js?v=6a95347ec7c1';
+import { disposeColorFilters } from './color-filter-native.js?v=6a95347ec7c1';
+import { disposeRegex } from './regex-native.js?v=6a95347ec7c1';
+import { disposeRenderNodes } from './rendernode-native.js?v=6a95347ec7c1';
+import { startDeepLink } from './deep-link-host.js?v=6a95347ec7c1';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=6a95347ec7c1';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=6a95347ec7c1';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=6a95347ec7c1';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=a65043f84501';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=a65043f84501';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=a65043f84501';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'a65043f84501';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=6a95347ec7c1';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=6a95347ec7c1';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=6a95347ec7c1';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '6a95347ec7c1';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -192,6 +193,50 @@ function snapshotScreenDuringOperation(message) {
   const now = performance.now(); if (now - lastScreenSnapshotAt < 4000) return; lastScreenSnapshotAt = now;
   try { self.postMessage({ type: 'screen-snapshot', text: buildScreenState(runtime, { semantics: null, heartbeat: null }).text, at: Date.now() }); } catch { /* best effort */ }
 }
+// Plugin queries (src/plugin-host.js -> src/plugin-queries.js). Nothing here runs unless a page plugin asks: no hook in the VM's paths. Each query waits in a FIFO and is served
+// alone in its own task, never while an operation or a scheduled VM event runs, never within PLUGIN_INPUT_QUIET_MS of the page's last input or operation, and with at most
+// PLUGIN_MS_PER_SECOND ms of query time per second (a Compose tree costs tens of ms: the next query then waits for the next window). A query that cannot be served within
+// PLUGIN_WAIT_MS answers 'busy'; the page retries later.
+const PLUGIN_MS_PER_SECOND = 40, PLUGIN_INPUT_QUIET_MS = 120, PLUGIN_RETRY_MS = 16, PLUGIN_WAIT_MS = 6000, PLUGIN_QUEUE_MAX = 64;
+const pluginJobs = []; let pluginTimer = null, pluginWindowAt = 0, pluginWindowMs = 0, lastOperationAt = 0;
+const pluginStats = { served: 0, ms: 0, deferred: 0, rejected: 0, maxMs: 0 };
+const pluginError = (requestId, code, message) => self.postMessage({ requestId, type: 'error', error: { name: 'PluginQueryError', code, message } });
+function queuePluginQuery(requestId, data) {
+  if (pluginJobs.length >= PLUGIN_QUEUE_MAX) { pluginStats.rejected++; pluginError(requestId, 'busy', 'Fila de consultas de plugins cheia; tente de novo.'); return; }
+  pluginJobs.push({ requestId, data, at: performance.now() }); armPluginTimer(0);
+}
+function armPluginTimer(delay) { if (pluginTimer === null) pluginTimer = setTimeout(servePluginQuery, delay); }
+function servePluginQuery() {
+  pluginTimer = null; if (!pluginJobs.length) return;
+  const now = performance.now(), job = pluginJobs[0];
+  if (now - job.at > PLUGIN_WAIT_MS) { pluginJobs.shift(); pluginStats.rejected++; pluginError(job.requestId, 'busy', 'A VM ficou ocupada; a consulta do plugin não foi atendida a tempo.'); armPluginTimer(0); return; }
+  if (now - pluginWindowAt >= 1000) { pluginWindowAt = now; pluginWindowMs = 0; }
+  const quietLeft = PLUGIN_INPUT_QUIET_MS - (now - Math.max(lastOperationAt, lastPointerAt)), spent = pluginWindowMs >= PLUGIN_MS_PER_SECOND;
+  if (busy || quietLeft > 0 || spent) { pluginStats.deferred++; armPluginTimer(busy ? PLUGIN_RETRY_MS : Math.max(PLUGIN_RETRY_MS, quietLeft, spent ? pluginWindowAt + 1000 - now : 0)); return; }
+  pluginJobs.shift();
+  const { requestId, data } = job, started = performance.now();
+  try {
+    if (!runtime) throw new PluginQueryError('no-apk', 'Nenhum APK em execução.');
+    const args = data.args && typeof data.args === 'object' ? data.args : {};
+    let value, failure = null;
+    if (data.query === 'composeTree') {
+      const notes = [], maxNodes = Math.min(4000, Math.max(1, Number(args.maxNodes) || 2000));
+      const inspection = runtime.runDiagnostic(() => inspectCompose(runtime, { maxNodes }), null, error => notes.push(`inspeção do Compose indisponível: ${String(error?.message ?? error).slice(0, 240)}`));
+      value = compactComposeTree(inspection, { maxNodes }); value.notes = [...value.notes, ...notes];
+      value.activityName = runtime.activityType ? runtime.activityType.slice(1, -1).replaceAll('/', '.') : null;
+    } else {
+      value = runtime.runDiagnostic(() => runPluginQuery(runtime, data.query, args), null, error => { failure = error; });
+      if (failure) throw failure;
+    }
+    self.postMessage({ requestId, type: 'result', value, ms: Math.round((performance.now() - started) * 100) / 100 });
+  } catch (error) {
+    const code = error?.name === 'PluginQueryError' ? error.code : error?.details?.kind === 'invalid-object-reference' ? 'collected' : 'failed';
+    pluginError(requestId, code, String(error?.message ?? error).slice(0, 400));
+  } finally {
+    const ms = performance.now() - started; pluginWindowMs += ms; pluginStats.served++; pluginStats.ms += ms; pluginStats.maxMs = Math.max(pluginStats.maxMs, ms);
+    if (pluginJobs.length) armPluginTimer(0);
+  }
+}
 self.onmessage = async ({ data }) => {
   if (data?.type === 'frame-ack') { frameAcked(data.seq); return; }
   if (!data || !Number.isSafeInteger(data.requestId)) return;
@@ -227,6 +272,7 @@ self.onmessage = async ({ data }) => {
     } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
   }
+  if (type === 'plugin-query') { queuePluginQuery(requestId, data); return; }   // a page plugin's read-only query (src/plugin-queries.js): low priority, served between VM events within a time budget
   if (type === 'time-limits') {   // "Tempo máximo por evento": applied between two events, takes effect at the next budget check
     try { send({ type: 'result', limits: runtime ? applyTimeLimits(runtime, data.seconds) : timeLimitsFor(data.seconds), loaded: !!runtime }); } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
@@ -370,7 +416,7 @@ self.onmessage = async ({ data }) => {
     } else if (type === 'launch' || type === 'intent' || type === 'click' || type === 'back' || type === 'input' || type === 'check' || type === 'focus' || type === 'press' || type === 'scroll' || type === 'compose-action' || type === 'pointer' || type === 'scrollby') {
       if (!runtime) throw new Error('Reabra um APK antes de executar a VM.');
       send({ type: 'progress', progress: { phase: type, completed: 0, total: 1 } });
-      runtime.monitor.begin(type); if (type !== 'launch' && type !== 'intent') runtime.platform.noteInput?.();   // scroll, focus, press and the rest reach the View directly below: the collector's input signal (heap-gc.js deferral)
+      lastOperationAt = performance.now(); runtime.monitor.begin(type); if (type !== 'launch' && type !== 'intent') runtime.platform.noteInput?.();   // scroll, focus, press and the rest reach the View directly below: the collector's input signal (heap-gc.js deferral)
       runtime.steps = 0; let droppedComposeAction = null, droppedEvent = null, deepLink = null;
       // An id the page took from an older snapshot can name a View that has since been collected (it was removed from the hierarchy): Android would not deliver the event either.
       const staleId = ['click', 'input', 'check', 'focus', 'press', 'scroll', 'scrollby'].includes(type) ? data.id : type === 'compose-action' || type === 'pointer' ? data.ownerViewId : null;

@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=a65043f84501">
-  <meta name="apk-browser-build" content="a65043f84501">
+  <link rel="stylesheet" href="./styles.css?v=6a95347ec7c1">
+  <meta name="apk-browser-build" content="6a95347ec7c1">
 </head>
 <body>
   <header class="topbar">
@@ -147,6 +147,14 @@
               <p id="em-status" class="cp-note" role="status" aria-live="polite">Nenhum mock.</p>
               <div class="em-actions"><button id="em-add" class="cp-button" type="button">+ Adicionar</button><button id="em-export" class="cp-button" type="button" disabled>Exportar</button><button id="em-import" class="cp-button" type="button">Importar</button><input id="em-import-file" type="file" accept="application/json,.json" hidden></div>
             </div></details>
+          <details class="cp-group" id="cp-sec-plugins" data-section="plugins">
+              <summary><h3 id="cp-plugins-title">Plugins</h3><span id="pl-summary" class="cp-badge">0 rodando</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p class="cp-note">Trechos de JavaScript seus que observam a tela atual, a árvore do Compose, os ViewModels, o Logcat e a rede, e mostram o resultado no painel <b>Plugins</b> abaixo do aparelho. Cada plugin ligado roda num Web Worker próprio e só lê: nada escreve no app nem chama código dele. Sem plugin ligado, nada roda. API em docs/PLUGINS.md.</p>
+              <p class="cp-note ov-warning">O código de um plugin roda com a origem desta página (pode usar fetch como qualquer script dela). Use só código seu ou que você revisou.</p>
+              <ul id="pl-list" class="ov-list pl-list" aria-label="Plugins, na ordem do painel"></ul>
+              <p id="pl-status" class="cp-note" role="status" aria-live="polite">Nenhum plugin.</p>
+              <div class="em-actions"><label class="pl-template-label" for="pl-template"><span class="sr-only">Modelo</span><select id="pl-template" aria-label="Modelo do novo plugin"></select></label><button id="pl-add" class="cp-button" type="button">+ Adicionar</button><button id="pl-export" class="cp-button" type="button" disabled>Exportar</button><button id="pl-import" class="cp-button" type="button">Importar</button><input id="pl-import-file" type="file" accept="application/json,.json" hidden></div>
+            </div></details>
           </details>
           <button id="run-button" class="run-button" disabled><span aria-hidden="true">▶</span> Executar APK <kbd>RUN</kbd></button>
           <p class="support-note"><span aria-hidden="true">ⓘ</span><span>VM experimental para Android Views e bytecode DEX. Multidex é inspecionado no Worker; Android, Compose e JNI ainda podem exigir APIs não implementadas. </span></p>
@@ -182,6 +190,8 @@
         <details id="compose-inspector" class="trace logcat compose-inspector"><summary><span>Compose</span><span class="ci-count">fechado</span><span class="trace-chevron">⌄</span></summary>
           <div class="logcat-bar"><button class="ci-capture" type="button" title="Inspeciona a tela agora: árvore de layout do Compose, Views e um recorte de cada elemento">Capturar</button><label class="logcat-auto" title="Captura de novo quando a tela navega (outra Activity ou outro destino)"><input class="ci-follow" type="checkbox"> Atualizar ao navegar</label><input class="ci-filter" type="search" placeholder="Filtrar por nome, texto, tag ou modificador" aria-label="Filtrar elementos por nome, texto, testTag ou modificador"><button class="ci-copy" type="button" title="Copia os dados da inspeção (sem imagens) em JSON">Copiar JSON</button></div>
           <div class="ci-body" aria-live="polite"></div></details>
+        <details id="plugins-output" class="trace logcat plugins-output" hidden><summary><span>Plugins</span><span class="po-count">0 rodando</span><span class="trace-chevron">⌄</span></summary>
+          <div class="po-cards" aria-live="off"></div></details>
       </section>
     </div>
     <details id="scenario-catalog" class="scenario-catalog">
@@ -194,7 +204,7 @@
     </details>
     <footer><span><span class="footer-dot"></span> Sem instalação. Sem emulador. Sem upload.</span><a href="./hermes-proof/">Experimento Hermes no navegador ↗</a><span>APK Browser Lab <span class="footer-slash">/</span> protótipo técnico</span></footer>
   </main>
-  <script type="module" src="./app.js?v=a65043f84501"></script>
+  <script type="module" src="./app.js?v=6a95347ec7c1"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>
@@ -224,6 +234,22 @@
       </fieldset>
       <p id="em-err-form" class="em-error" role="alert" hidden></p>
       <div class="em-buttons"><button id="em-cancel" type="button" class="cp-button">Cancelar</button><button id="em-save" type="submit" class="cp-button primary">Salvar</button></div>
+    </form>
+  </div>
+</div>
+<div id="pl-dialog" class="em-scrim" hidden>
+  <div class="em-card pl-card" role="dialog" aria-modal="true" aria-labelledby="pl-dialog-title" aria-describedby="pl-dialog-help">
+    <div class="em-card-head"><h2 id="pl-dialog-title">Adicionar plugin</h2><button id="pl-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>
+    <p id="pl-dialog-help" class="em-help">O código é o corpo de uma função assíncrona: use <code>await</code> à vontade e o objeto <code>lab</code>: <code>lab.on('screen' | 'log' | 'network', fn)</code>, <code>await lab.screen()</code>, <code>lab.viewModels()</code>, <code>lab.fragments()</code>, <code>lab.inspect(handle)</code>, <code>lab.field(handle, 'a.b')</code>, <code>lab.watch(handle, 'a.b', fn)</code>, <code>lab.composeTree()</code> e a saída <code>lab.ui.text / kv / table / json / clear / badge</code>. Tudo é só leitura.</p>
+    <form id="pl-form" novalidate>
+      <div class="pl-fields">
+        <label class="em-field" for="pl-name"><span>Nome</span><input id="pl-name" type="text" autocomplete="off" spellcheck="false" maxlength="120" required aria-describedby="pl-err-name"></label>
+        <label class="em-field" for="pl-package"><span>Pacote <small>opcional; vazio = qualquer app. Vários separados por vírgula, <code>*</code> como curinga</small></span><input id="pl-package" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="com.exemplo.app"></label>
+      </div>
+      <small id="pl-err-name" class="em-error" hidden></small>
+      <label class="em-field em-wide" for="pl-code"><span>Código <small>Tab insere espaços; Esc fecha</small></span><textarea id="pl-code" class="pl-code" rows="18" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" aria-describedby="pl-err-code"></textarea></label>
+      <small id="pl-err-code" class="em-error" hidden></small>
+      <div class="em-buttons"><button id="pl-cancel" type="button" class="cp-button">Cancelar</button><button id="pl-save" type="submit" class="cp-button primary">Salvar</button></div>
     </form>
   </div>
 </div>

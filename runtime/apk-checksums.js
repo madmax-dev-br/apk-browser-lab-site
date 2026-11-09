@@ -1,4 +1,4 @@
-import { HASHERS, Sha256 } from './fast-digests.js?v=a65043f84501';
+import { HASHERS, Sha256 } from './fast-digests.js?v=6a95347ec7c1';
 
 // APK checksums as PackageManager.requestChecksums reports them (android-13.0.0_r1 ApkChecksums): the file-level data, with no VM involved.
 export const TYPE = { WHOLE_MERKLE_ROOT_4K_SHA256: 1, WHOLE_MD5: 2, WHOLE_SHA1: 4, WHOLE_SHA256: 8, WHOLE_SHA512: 16, PARTIAL_MERKLE_ROOT_1M_SHA256: 32, PARTIAL_MERKLE_ROOT_1M_SHA512: 64 };
