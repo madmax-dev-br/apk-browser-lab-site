@@ -7,7 +7,7 @@
 // is still). A reduced raster that is read again at full density is replayed again from the same recording (`rasterStats.refined/refinedMs`), so a settled screen
 // ends at full density; a full raster is kept whatever the scale asked later (it is never worse). `r.displayRasterReducedServed` (an array, only while the Worker
 // takes a snapshot) collects the identity of the reduced rasters that went into it (the settle rule compares them between snapshots).
-import { bitmapRasterUsable } from './gpu-raster.js?v=ba94ccb09d48';
+import { bitmapRasterUsable } from './gpu-raster.js?v=308c7a12ce00';
 const reducedId = value => value.rasterId ?? value.rasterSerial ?? '?';
 // Only when the session ever selected the GPU renderer (r.gpuRaster exists): a content raster made by the other backend, or a GPU raster whose ImageBitmap left the
 // Worker and is no longer held by the page, is replayed again from the same recording. CPU-only sessions never reach this check.

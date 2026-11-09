@@ -1,13 +1,13 @@
-import { APKError } from './apk-error.js?v=ba94ccb09d48';
-import { throwNew } from './java-throw.js?v=ba94ccb09d48';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=ba94ccb09d48';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=ba94ccb09d48';
-import { Blocked } from './scheduler.js?v=ba94ccb09d48';
-import { OS_CONSTANTS } from './os-constants-data.js?v=ba94ccb09d48';
-import { openExchange, describeFailure } from './network-transport.js?v=ba94ccb09d48';
-import { WorkerExecutor } from './network-worker-executor.js?v=ba94ccb09d48';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=ba94ccb09d48';
-import { TransportAuthority } from './transport-ca.js?v=ba94ccb09d48';
+import { APKError } from './apk-error.js?v=308c7a12ce00';
+import { throwNew } from './java-throw.js?v=308c7a12ce00';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=308c7a12ce00';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=308c7a12ce00';
+import { Blocked } from './scheduler.js?v=308c7a12ce00';
+import { OS_CONSTANTS } from './os-constants-data.js?v=308c7a12ce00';
+import { openExchange, describeFailure } from './network-transport.js?v=308c7a12ce00';
+import { WorkerExecutor } from './network-worker-executor.js?v=308c7a12ce00';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=308c7a12ce00';
+import { TransportAuthority } from './transport-ca.js?v=308c7a12ce00';
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
 //
