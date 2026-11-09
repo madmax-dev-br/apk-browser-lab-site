@@ -16,13 +16,16 @@
 export const MOTION_RASTER_SCALE = 0.5;   // replay at half the linear resolution (a quarter of the pixels); chosen by measurement, see docs/INTERACTION-PERFORMANCE.md
 export const REFINE_QUIET_MS = 100;       // quiet period after the last change of the reduced content before the full-density replay (about 6 frames)
 export const STILL_SNAPSHOTS = 2;         // snapshots in a row with the same reduced rasters while frames are pending: the screen is still
+export const MOTION_SCALE_STEPS = Object.freeze([1, 0.75, 0.5, 0.35, 0.25]);   // "Resolução no movimento" (Controles): 1 = always full density
+export const NAVIGATION_REDUCED_MS = 400;   // "Tela nova em baixa resolução": a new Activity or window is drawn reduced this long after it appears, then refined once still
 export const MOTION_CADENCE_MS = 250;     // content that changed less than this before the previous change is moving (an animation draws every 16-60 ms; a cursor blinks every 500 ms)
 export const GESTURE_STALE_MS = 1500;     // a gesture whose last sample is older than this no longer counts as motion (a lost UP must not keep the screen reduced)
 
 export class MotionRasterPolicy {
-  constructor({ enabled = true, scale = MOTION_RASTER_SCALE, quietMs = REFINE_QUIET_MS, now = () => performance.now() } = {}) {
+  constructor({ enabled = true, scale = MOTION_RASTER_SCALE, quietMs = REFINE_QUIET_MS, navigation = true, now = () => performance.now() } = {}) {
     if (!(Number.isFinite(scale) && scale > 0 && scale <= 1)) throw new RangeError('Motion raster scale must be in (0, 1]');
-    this.enabled = enabled && scale < 1; this.scale = scale; this.quietMs = quietMs; this.now = now;
+    this.allowed = enabled; this.enabled = enabled && scale < 1; this.scale = scale; this.quietMs = quietMs; this.now = now;
+    this.navigation = !!navigation; this.screenKey = null; this.navigatedAt = -Infinity;
     this.owed = false;      // the last snapshot carried a reduced raster: a full-density one is due once the screen is still
     this.served = '';       // identity of the reduced rasters the last snapshot carried (their raster ids: a cache hit keeps the id, so the same content has the same identity)
     this.changedAt = 0; this.unchanged = 0;
@@ -30,7 +33,18 @@ export class MotionRasterPolicy {
     this.stats = { reducedSnapshots: 0, fullSnapshots: 0, refinements: 0 };   // snapshots with a reduced raster / without / full snapshots posted by the settle rule
   }
   /** Whether the screen is moving for the snapshot about to be taken. */
-  moving({ pendingFrames = 0, gestureActive = false, inputMotion = false } = {}) { return gestureActive || inputMotion || (pendingFrames > 0 && this.contentAt - this.previousContentAt < MOTION_CADENCE_MS && this.now() - this.contentAt < MOTION_CADENCE_MS); }
+  /** "Resolução no movimento" and "Tela nova em baixa resolução" (Controles), applied live: scale 1 turns the reduced replay off; a disabled policy (`load { motionRaster: false }`, ?raster=full) stays off. */
+  configure({ scale = this.scale, navigation = this.navigation } = {}) {
+    if (!MOTION_SCALE_STEPS.includes(scale)) throw new RangeError(`Motion raster scale must be one of ${MOTION_SCALE_STEPS.join(', ')}`);
+    this.scale = scale; this.enabled = this.allowed && scale < 1; this.navigation = !!navigation; if (!this.enabled) this.reset();
+    return { scale: this.scale, enabled: this.enabled, navigation: this.navigation };
+  }
+  /** The screen identity of the snapshot about to be taken (the Activity instance and its windows): a change starts the "tela nova" window. */
+  noteScreen(key) { if (key !== this.screenKey) { this.screenKey = key; this.navigatedAt = this.now(); } }
+  /** A new screen appeared less than NAVIGATION_REDUCED_MS ago and the option is on. */
+  navigating() { return this.navigation && this.now() - this.navigatedAt < NAVIGATION_REDUCED_MS; }
+  moving({ pendingFrames = 0, gestureActive = false, inputMotion = false, navigation = false } = {}) {
+    if (navigation) return true; return gestureActive || inputMotion || (pendingFrames > 0 && this.contentAt - this.previousContentAt < MOTION_CADENCE_MS && this.now() - this.contentAt < MOTION_CADENCE_MS); }
   /** Records whether the snapshot just taken drew new content (a raster was replayed rather than served from the cache); two such snapshots within MOTION_CADENCE_MS make a pending frame motion (the first two frames of an animation are drawn at full density). */
   noteContent(changed) { if (changed) { this.previousContentAt = this.contentAt; this.contentAt = this.now(); } }
   /** The display raster scale for the snapshot about to be taken (1 = full density): reduced while moving, full once the settle rule says the reduced frame is due for refinement. */

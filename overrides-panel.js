@@ -1,6 +1,6 @@
 // The "Retornos de métodos" section of the Controles panel: a debugging tool that replaces the return value of methods of the running VM (src/method-overrides.js). Rows are saved per package
 // in localStorage (key with the package name, every access guarded) and applied live to the Worker; hit counts come back with every snapshot.
-import { parseMethodSpec, parseReturnValue, smaliTypeToJava } from './method-overrides.js?v=fed510f80b46';
+import { parseMethodSpec, parseReturnValue, smaliTypeToJava } from './method-overrides.js?v=eed27b762f3e';
 
 const KEY_PREFIX = 'apkweb-overrides-v1:';
 const MAX_ROWS = 50;

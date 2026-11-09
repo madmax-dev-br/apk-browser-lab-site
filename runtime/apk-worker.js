@@ -1,53 +1,53 @@
-import { buildScreenState } from './screen-state.js?v=fed510f80b46';
-import { createLogcat } from './logcat.js?v=fed510f80b46';
-import { createNetlog } from './netlog.js?v=fed510f80b46';
-import { reportSummary } from './report-summary.js?v=fed510f80b46';
-import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=fed510f80b46';
-import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=fed510f80b46';
-import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=fed510f80b46';
-import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=fed510f80b46';
-import { describeRedirects } from './host-map.js?v=fed510f80b46';
-import { TimeBreakdown } from './time-breakdown.js?v=fed510f80b46';
-import { createMessageSink } from './audio-native.js?v=fed510f80b46';
-import { loadAPK } from './apk-loader.js?v=fed510f80b46';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=fed510f80b46';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=fed510f80b46';
-import { createWebViewBackend } from './webview-backend.js?v=fed510f80b46';
-import { FrameworkProvider } from './framework-provider.js?v=fed510f80b46';
-import { createRasterSender } from './raster-cache.js?v=fed510f80b46';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=fed510f80b46';
-import { dispatchPointer } from './pointer-input-host.js?v=fed510f80b46';
-import { resolveDevice } from './device-profile.js?v=fed510f80b46';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=fed510f80b46';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=fed510f80b46';
-import { SkiaProvider } from './skia-provider.js?v=fed510f80b46';
-import { inspectCompose } from './compose-inspector.js?v=fed510f80b46';
-import { runPluginQuery, compactComposeTree, PluginQueryError } from './plugin-queries.js?v=fed510f80b46';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=fed510f80b46';
-import { SemanticsPacer } from './semantics-pacing.js?v=fed510f80b46';
-import { MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=fed510f80b46';
-import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=fed510f80b46';
-import { disposeTextLayout } from './text-layout-native.js?v=fed510f80b46';
-import { IcuBreakProvider } from './icu-break-provider.js?v=fed510f80b46';
-import { SqliteProvider } from './sqlite-native.js?v=fed510f80b46';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=fed510f80b46';
-import { TzdataProvider } from './java-time-native.js?v=fed510f80b46';
-import { ZlibProvider } from './zip-native.js?v=fed510f80b46';
-import { IcuConverterProvider } from './icu-converter-native.js?v=fed510f80b46';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=fed510f80b46';
-import { JavacryptoProvider } from './javacrypto-native.js?v=fed510f80b46';
-import { disposeColorFilters } from './color-filter-native.js?v=fed510f80b46';
-import { disposeRegex } from './regex-native.js?v=fed510f80b46';
-import { disposeRenderNodes } from './rendernode-native.js?v=fed510f80b46';
-import { startDeepLink } from './deep-link-host.js?v=fed510f80b46';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=fed510f80b46';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=fed510f80b46';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=fed510f80b46';
+import { buildScreenState } from './screen-state.js?v=eed27b762f3e';
+import { createLogcat } from './logcat.js?v=eed27b762f3e';
+import { createNetlog } from './netlog.js?v=eed27b762f3e';
+import { reportSummary } from './report-summary.js?v=eed27b762f3e';
+import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=eed27b762f3e';
+import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=eed27b762f3e';
+import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=eed27b762f3e';
+import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=eed27b762f3e';
+import { describeRedirects } from './host-map.js?v=eed27b762f3e';
+import { TimeBreakdown } from './time-breakdown.js?v=eed27b762f3e';
+import { createMessageSink } from './audio-native.js?v=eed27b762f3e';
+import { loadAPK } from './apk-loader.js?v=eed27b762f3e';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=eed27b762f3e';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=eed27b762f3e';
+import { createWebViewBackend } from './webview-backend.js?v=eed27b762f3e';
+import { FrameworkProvider } from './framework-provider.js?v=eed27b762f3e';
+import { createRasterSender } from './raster-cache.js?v=eed27b762f3e';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=eed27b762f3e';
+import { dispatchPointer } from './pointer-input-host.js?v=eed27b762f3e';
+import { resolveDevice } from './device-profile.js?v=eed27b762f3e';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=eed27b762f3e';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=eed27b762f3e';
+import { SkiaProvider } from './skia-provider.js?v=eed27b762f3e';
+import { inspectCompose } from './compose-inspector.js?v=eed27b762f3e';
+import { runPluginQuery, compactComposeTree, PluginQueryError } from './plugin-queries.js?v=eed27b762f3e';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=eed27b762f3e';
+import { SemanticsPacer } from './semantics-pacing.js?v=eed27b762f3e';
+import { MOTION_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=eed27b762f3e';
+import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=eed27b762f3e';
+import { disposeTextLayout } from './text-layout-native.js?v=eed27b762f3e';
+import { IcuBreakProvider } from './icu-break-provider.js?v=eed27b762f3e';
+import { SqliteProvider } from './sqlite-native.js?v=eed27b762f3e';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=eed27b762f3e';
+import { TzdataProvider } from './java-time-native.js?v=eed27b762f3e';
+import { ZlibProvider } from './zip-native.js?v=eed27b762f3e';
+import { IcuConverterProvider } from './icu-converter-native.js?v=eed27b762f3e';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=eed27b762f3e';
+import { JavacryptoProvider } from './javacrypto-native.js?v=eed27b762f3e';
+import { disposeColorFilters } from './color-filter-native.js?v=eed27b762f3e';
+import { disposeRegex } from './regex-native.js?v=eed27b762f3e';
+import { disposeRenderNodes } from './rendernode-native.js?v=eed27b762f3e';
+import { startDeepLink } from './deep-link-host.js?v=eed27b762f3e';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=eed27b762f3e';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=eed27b762f3e';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=eed27b762f3e';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=fed510f80b46';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=fed510f80b46';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=fed510f80b46';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'fed510f80b46';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=eed27b762f3e';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=eed27b762f3e';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=eed27b762f3e';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'eed27b762f3e';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -72,12 +72,13 @@ let lastComposeSemantics = null;   // the tree of the last walk, reused by sched
 let motionRaster = new MotionRasterPolicy(), lastPointerAt = 0;
 let readyTracker = new ScreenReadyTracker();   // "Tela pronta" (src/screen-ready.js): snapshot.screenReady, and a wake when the quiet period ends
 /** What the VM knows about motion when a snapshot is taken: a pending Choreographer frame, a live pointer gesture, the request being answered (`'pointer-motion'`, `'scrollby'`). */
-const motionSignal = (request = null) => ({ pendingFrames: runtime.platform.viewWindowHost?.frameState?.().pendingFrames ?? 0, gestureActive: !!runtime.pointerGesture && performance.now() - lastPointerAt < GESTURE_STALE_MS, inputMotion: request === 'pointer-motion' || request === 'scrollby' });
+const motionSignal = (request = null) => ({ navigation: motionRaster.navigating(), pendingFrames: runtime.platform.viewWindowHost?.frameState?.().pendingFrames ?? 0, gestureActive: !!runtime.pointerGesture && performance.now() - lastPointerAt < GESTURE_STALE_MS, inputMotion: request === 'pointer-motion' || request === 'scrollby' });
 /** `paced`: a scheduled VM event may reuse the last semantics tree while the pacer says a fresh one is not due yet; replies to page requests are never paced. `request`: the page request this snapshot answers, for the motion signal. */
 function currentSnapshot({ paced = false, request = null } = {}) {
   appData?.touch(); const snapshotStarted = performance.now();
   if (!paced) snapshotOwed = false;   // a reply to a page request carries the newest state: nothing is owed to the page anymore
   runtime.steps = 0; // A bounded inspection event, separate from the APK callback that just finished.
+  try { motionRaster.noteScreen(`${runtime.activity?.ref ?? 0}:${runtime.platform.viewRoots?.(runtime)?.length ?? 0}`); } catch { /* no screen yet */ }   // "tela nova": a new Activity instance or window
   const signal = motionSignal(request); runtime.displayRasterScale = motionRaster.scaleFor(signal); runtime.displayRasterReducedServed = [];
   const rasterizedBefore = runtime.rasterStats?.rasterized ?? 0;
   let snapshot; try { snapshot = runtime.snapshot(); } finally { runtime.displayRasterScale = 1; }   // only the page's snapshot is ever replayed reduced
@@ -279,6 +280,10 @@ self.onmessage = async ({ data }) => {
     return;
   }
   if (type === 'plugin-query') { queuePluginQuery(requestId, data); return; }   // a page plugin's read-only query (src/plugin-queries.js): low priority, served between VM events within a time budget
+  if (type === 'raster-settings') {   // "Resolução no movimento" / "Tela nova em baixa resolução" (Controles): the next snapshot uses them
+    try { send({ type: 'result', raster: motionRaster.configure({ scale: Number(data.scale), navigation: data.navigation !== false }) }); } catch (error) { send({ type: 'error', error: errorData(error) }); }
+    return;
+  }
   if (type === 'time-limits') {   // "Tempo máximo por evento": applied between two events, takes effect at the next budget check
     try { send({ type: 'result', limits: runtime ? applyTimeLimits(runtime, data.seconds) : timeLimitsFor(data.seconds), loaded: !!runtime }); } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
@@ -387,7 +392,7 @@ self.onmessage = async ({ data }) => {
       runtime = result.runtime; archive = result.archive; if (Array.isArray(data.methodOverrides) && data.methodOverrides.length) applyMethodOverrides(result.runtime, data.methodOverrides); if (Array.isArray(data.ignoredActivities) && data.ignoredActivities.length) applyIgnoredActivities(result.runtime, data.ignoredActivities); if (Array.isArray(data.endpointMocks) && data.endpointMocks.length) applyEndpointMocks(result.runtime, data.endpointMocks); /* before any app code runs */
       inventory = result.inventory; logcat.clear(); logcat.setStreaming(data.logcatStreaming === true); logcat.attach(runtime); netlog.clear(); netlog.attach(runtime);
       runtime.contentRasterOptions = { transport: 'rgba' };   // Compose/Canvas content reaches the page as raw RGBA8 (src/raster-cache.js), not as a PNG
-      motionRaster = new MotionRasterPolicy({ enabled: data.motionRaster !== false }); lastPointerAt = 0; readyTracker = new ScreenReadyTracker();   // progressive raster while the screen moves (src/motion-raster.js); ?raster=full on the page turns it off
+      motionRaster = new MotionRasterPolicy({ enabled: data.motionRaster !== false, scale: MOTION_SCALE_STEPS.includes(data.rasterScale) && data.rasterScale < 1 ? data.rasterScale : undefined, navigation: data.rasterNavigation !== false }); if (data.rasterScale === 1) motionRaster.configure({ scale: 1 }); lastPointerAt = 0; readyTracker = new ScreenReadyTracker();   // progressive raster while the screen moves (src/motion-raster.js); ?raster=full on the page turns it off
       runtime.monitor.configure({ sink: message => { logcat.flush(); self.postMessage({ ...message, requestId: activeRequestId }); snapshotScreenDuringOperation(message); }, budgetMs: OPERATION_WALL_LIMIT_MS });   // heartbeats to the page + the operation wall budget
       applyTimeLimits(runtime, data.eventSeconds);   // "Tempo máximo por evento" (src/time-limits.js): the per-event watchdog, the operation budget and the main-event caps
       runtime.platform.onPermissionRequest = request => self.postMessage({ type: 'permission-request', request });   // Activity.requestPermissions that needs the user: the page shows the dialog

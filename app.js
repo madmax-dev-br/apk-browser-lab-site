@@ -1,24 +1,24 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=fed510f80b46';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=fed510f80b46';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=fed510f80b46';
-import { initCollapsibleSections } from './panel-sections.js?v=fed510f80b46';
-import { createPermissionsPanel } from './permissions-panel.js?v=fed510f80b46';
-import { createOverridesPanel } from './overrides-panel.js?v=fed510f80b46';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=fed510f80b46';
-import { createHostMapPanel } from './host-map-panel.js?v=fed510f80b46';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=fed510f80b46';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=fed510f80b46';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=fed510f80b46';
-import { createDeviceView, createViewState } from './device-view.js?v=fed510f80b46';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=fed510f80b46';
-import { formatApiGapReport } from './api-gap-scan.js?v=fed510f80b46';
-import { createLogcatPanel } from './logcat-panel.js?v=fed510f80b46';
-import { createComposeInspectorPanel } from './compose-inspector-panel.js?v=fed510f80b46';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=fed510f80b46';
-import { createPluginHost } from './plugin-host.js?v=fed510f80b46';
-import { captureImage } from './screen-capture.js?v=fed510f80b46';
-import { createPluginsPanel } from './plugins-panel.js?v=fed510f80b46';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=fed510f80b46';
+import { APKWorkerClient } from './apk-worker-client.js?v=eed27b762f3e';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=eed27b762f3e';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=eed27b762f3e';
+import { initCollapsibleSections } from './panel-sections.js?v=eed27b762f3e';
+import { createPermissionsPanel } from './permissions-panel.js?v=eed27b762f3e';
+import { createOverridesPanel } from './overrides-panel.js?v=eed27b762f3e';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=eed27b762f3e';
+import { createHostMapPanel } from './host-map-panel.js?v=eed27b762f3e';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=eed27b762f3e';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=eed27b762f3e';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=eed27b762f3e';
+import { createDeviceView, createViewState } from './device-view.js?v=eed27b762f3e';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=eed27b762f3e';
+import { formatApiGapReport } from './api-gap-scan.js?v=eed27b762f3e';
+import { createLogcatPanel } from './logcat-panel.js?v=eed27b762f3e';
+import { createComposeInspectorPanel } from './compose-inspector-panel.js?v=eed27b762f3e';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=eed27b762f3e';
+import { createPluginHost } from './plugin-host.js?v=eed27b762f3e';
+import { captureImage } from './screen-capture.js?v=eed27b762f3e';
+import { createPluginsPanel } from './plugins-panel.js?v=eed27b762f3e';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=eed27b762f3e';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -390,7 +390,7 @@ async function importSource(source, autoRun = false) {
     if (buffer.byteLength > 1024 * 1024 * 1024) throw new Error('O APK excede o limite de 1 GiB.');
     $('file-size').textContent = `${formatSize(buffer.byteLength)} · processado no navegador`;
     state.apiGaps = null;
-    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceForVM(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB, eventSeconds: deviceState.settings.eventSeconds, motionRaster: params.get('raster') !== 'full', logcatStreaming: logcatPanel.streaming }); state.loadedMemoryMiB = deviceState.settings.memoryMiB; updateVmMemoryHint(); // Ownership transfers to the Worker.
+    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceForVM(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB, eventSeconds: deviceState.settings.eventSeconds, motionRaster: params.get('raster') !== 'full', rasterScale: deviceState.settings.raster?.motionScale ?? 0.5, rasterNavigation: deviceState.settings.raster?.navigation !== false, logcatStreaming: logcatPanel.streaming }); state.loadedMemoryMiB = deviceState.settings.memoryMiB; updateVmMemoryHint(); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
     state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);
     await permissionsPanel.attach(result.inventory); await overridesPanel.attach(result.inventory); await ignoredPanel.attach(result.inventory); await mocksPanel.attach(result.inventory); pluginHost.vmChanged(); if (logcatPanelOpen || pluginHost.wantsLogs) syncLogcatStreaming(true).catch(() => {});   // before any app code runs: permission state, simulated location, method return overrides, ignored Activities, endpoint mocks
@@ -467,11 +467,12 @@ function writeDevicePanel(settings) {
   $('dev-locale').value = settings.locale; $('dev-dark').checked = settings.darkTheme; $('dev-animator').value = String(settings.animatorScale); $('dev-hour24').checked = settings.hour24; $('dev-tz').value = settings.timeZone;
   $('dev-battery').value = String(settings.battery.level); $('dev-battery-out').textContent = `${settings.battery.level}%`; $('dev-charging').checked = settings.battery.charging; $('dev-network').value = settings.connectivity; $('dev-nav').value = settings.navigation; { const all = settings.network.allowedHosts.includes('*'); $('dev-hosts-all').checked = all; $('dev-hosts').disabled = all; $('dev-hosts').value = all ? '*' : settings.network.allowedHosts.join(', '); } $('dev-layout-bounds').checked = !!settings.layoutBounds; $('dev-proxy').value = settings.network.proxyUrl; if ($('vm-memory')) $('vm-memory').value = String(settings.memoryMiB);
   if ($('vm-event-time')) $('vm-event-time').value = String(settings.eventSeconds ?? 0);
+  if ($('vm-raster-scale')) $('vm-raster-scale').value = String(settings.raster?.motionScale ?? 0.5); if ($('vm-raster-navigation')) $('vm-raster-navigation').checked = settings.raster?.navigation !== false;
   const device = resolveDevice(settings); $('device-summary').textContent = `${device.widthDp} × ${device.heightDp} · ${settings.orientation === 'landscape' ? 'paisagem' : 'retrato'}`;
 }
 function readDevicePanel() {
   return sanitizeSettings({ screen: $('dev-screen').value, orientation: $('dev-orientation').value, fontScale: Number($('dev-font').value), locale: $('dev-locale').value, darkTheme: $('dev-dark').checked, animatorScale: Number($('dev-animator').value),
-    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, eventSeconds: Number($('vm-event-time')?.value ?? 0), network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value, hostMap: deviceState.settings.network?.hostMap ?? [] }, memoryMiB: Number($('vm-memory')?.value ?? 0), location: deviceState.settings.location });
+    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, eventSeconds: Number($('vm-event-time')?.value ?? 0), raster: { motionScale: Number($('vm-raster-scale')?.value ?? 0.5), navigation: $('vm-raster-navigation')?.checked !== false }, network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value, hostMap: deviceState.settings.network?.hostMap ?? [] }, memoryMiB: Number($('vm-memory')?.value ?? 0), location: deviceState.settings.location });
 }
 // "Memória da VM": the Java heap budget (object limit) used at the next load; the VM limit of each step is memoryBudget({ override }).maxHeapObjects, the same rule the Worker applies (heapLimitFor).
 const vmMemoryLabel = mibValue => { const { maxHeapObjects } = memoryBudget({ override: mibValue }); return `${mibValue >= 1024 ? `${mibValue / 1024} GiB` : `${mibValue} MiB`} · ${maxHeapObjects.toLocaleString('pt-BR')} objetos`; };
@@ -489,9 +490,11 @@ function initVmMemory() {
 function updateVmMemoryHint() { const hint = $('vm-memory-hint'); if (hint) hint.hidden = !(apkVM.worker && state.loadedMemoryMiB !== undefined && state.loadedMemoryMiB !== deviceState.settings.memoryMiB); }
 let deviceApplying = Promise.resolve();
 function applyDeviceSettings(settings) {
-  const timeChanged = (deviceState.settings?.eventSeconds ?? 0) !== (settings.eventSeconds ?? 0);
+  const timeChanged = (deviceState.settings?.eventSeconds ?? 0) !== (settings.eventSeconds ?? 0), rasterChanged = JSON.stringify(deviceState.settings?.raster ?? null) !== JSON.stringify(settings.raster ?? null);
   deviceState.settings = settings; updateVmMemoryHint(); saveDeviceSettings(settings);
-  if (timeChanged && apkVM.worker) apkVM.setTimeLimits(settings.eventSeconds).catch(() => {});   // "Tempo máximo por evento" applies to the running VM at once (src/time-limits.js) writeDevicePanel(settings); updateSystemBarIcons(); redrawLayoutBounds();
+  if (rasterChanged && apkVM.worker && params.get('raster') !== 'full') apkVM.setRasterSettings({ scale: settings.raster.motionScale, navigation: settings.raster.navigation }).catch(() => {});   // "Resolução no movimento" / "Tela nova em baixa resolução" (src/motion-raster.js)
+  if (timeChanged && apkVM.worker) apkVM.setTimeLimits(settings.eventSeconds).catch(() => {});   // "Tempo máximo por evento" applies to the running VM at once (src/time-limits.js)
+  writeDevicePanel(settings); updateSystemBarIcons(); redrawLayoutBounds();
   const note = $('device-status');
   if (state.runtime !== apkVM || !state.apkRunning) { note.textContent = 'Nenhum app em execução: as configurações valem desde o próximo lançamento.'; return deviceApplying; }
   // One RPC at a time: wait for a VM operation in flight, then deliver the newest settings through ActivityThread semantics.
@@ -508,7 +511,7 @@ function applyDeviceSettings(settings) {
 }
 function initDevicePanel() {
   fillSelect($('dev-screen'), DEVICE_SCREENS); fillSelect($('dev-locale'), DEVICE_LOCALES); fillSelect($('dev-tz'), DEVICE_ZONES); initVmMemory(); initVmEventTime(); writeDevicePanel(deviceState.settings);
-  for (const id of ['dev-screen', 'dev-orientation', 'dev-font', 'dev-locale', 'dev-dark', 'dev-animator', 'dev-hour24', 'dev-tz', 'dev-battery', 'dev-charging', 'dev-network', 'dev-nav', 'dev-hosts-all', 'dev-layout-bounds', 'dev-hosts', 'dev-proxy', 'vm-memory', 'vm-event-time']) $(id).addEventListener('input', () => { applyDeviceSettings(readDevicePanel()); });
+  for (const id of ['dev-screen', 'dev-orientation', 'dev-font', 'dev-locale', 'dev-dark', 'dev-animator', 'dev-hour24', 'dev-tz', 'dev-battery', 'dev-charging', 'dev-network', 'dev-nav', 'dev-hosts-all', 'dev-layout-bounds', 'dev-hosts', 'dev-proxy', 'vm-memory', 'vm-event-time', 'vm-raster-scale', 'vm-raster-navigation']) $(id).addEventListener('input', () => { applyDeviceSettings(readDevicePanel()); });
   document.querySelector('#trace .trace-actions')?.addEventListener('click', event => event.preventDefault());   // buttons in the <summary> must not toggle the panel
   $('device-reset').addEventListener('click', () => { applyDeviceSettings(defaultDeviceSettings()); hostMapPanel.refresh(); permissionsPanel.refreshLocation(); if (apkVM.worker) apkVM.setPermissions({ location: deviceState.settings.location }).catch(() => {}); });
 }

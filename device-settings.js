@@ -1,8 +1,8 @@
-import { isMemoryStep } from './memory-budget.js?v=fed510f80b46';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=fed510f80b46';
-import { sanitizeHostMap } from './host-map.js?v=fed510f80b46';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=fed510f80b46';
-import { sanitizeLocation } from './runtime-permissions.js?v=fed510f80b46';
+import { isMemoryStep } from './memory-budget.js?v=eed27b762f3e';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=eed27b762f3e';
+import { sanitizeHostMap } from './host-map.js?v=eed27b762f3e';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=eed27b762f3e';
+import { sanitizeLocation } from './runtime-permissions.js?v=eed27b762f3e';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: SCREEN_PRESETS.map(p => p.id), orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -31,6 +31,7 @@ export function sanitizeSettings(input = {}) {
   if (typeof input.darkTheme === 'boolean') out.darkTheme = input.darkTheme;
   if (typeof input.hour24 === 'boolean') out.hour24 = input.hour24;
   out.location = sanitizeLocation(input.location);   // simulated device location ("Permissões" section): page-only, sent to the VM through the permission channel, never as part of the device model
+  out.raster = { motionScale: [1, 0.75, 0.5, 0.35, 0.25].includes(Number(input.raster?.motionScale)) ? Number(input.raster.motionScale) : 0.5, navigation: input.raster?.navigation !== false };   // "Resolução no movimento" / "Tela nova em baixa resolução" (src/motion-raster.js MOTION_SCALE_STEPS)
   out.layoutBounds = input.layoutBounds === true;   // page-only developer option ("Mostrar limites de layout"); the VM never sees it
   if (typeof input.locale === 'string' && /^[a-z]{2}-[A-Z]{2}$/.test(input.locale)) out.locale = input.locale;
   if (typeof input.timeZone === 'string' && input.timeZone.length < 64) { try { if (input.timeZone) new Intl.DateTimeFormat('en-US', { timeZone: input.timeZone }); out.timeZone = input.timeZone; } catch { /* unknown zone: keep default */ } }
