@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=59a9b4dd227f';
-import { createRasterReceiver } from './raster-cache.js?v=59a9b4dd227f';
+import { createWebAudioPlayer } from './web-audio-player.js?v=96a5b1f7f035';
+import { createRasterReceiver } from './raster-cache.js?v=96a5b1f7f035';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=59a9b4dd227f', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=96a5b1f7f035', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -165,6 +165,10 @@ export class APKWorkerClient {
   async check(id, checked) { return (await this.request('check', { id, checked }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async scroll(id, x, y) { return (await this.request('scroll', { id, x, y }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async composeAction(ownerViewId, nodeId, action, args = []) { return (await this.request('compose-action', {ownerViewId,nodeId,action,args}, {timeoutMs:this.eventTimeoutMs})).snapshot; }
+  /** "Recriar" (mode recreate: Activity.recreate(), state kept) or "Reabrir" (mode reopen: a fresh instance with the same Intent); answers the snapshot after the relaunch. */
+  async reloadActivity({ mode = 'recreate', onProgress } = {}) {
+    return (await this.request('reload-activity', { mode }, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot;
+  }
   async back({ onProgress } = {}) {
     return (await this.request('back', {}, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot;
   }

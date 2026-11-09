@@ -5,20 +5,20 @@
 // device settings -> setDevice, "Tempo máximo por evento" -> setTimeLimits, "Retornos de métodos" -> setMethodOverrides, "Activities ignoradas" -> setIgnoredActivities,
 // "Mock de endpoints" -> setEndpointMocks, "Permissões" / location / dialog -> setPermissions + permissionResponse, "Abrir" -> startIntent, Logcat -> setLogcatStreaming,
 // Compose -> inspectCompose, plugins -> src/plugin-host.js. The host page is another origin: everything it sends is validated here before it reaches the VM.
-import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=59a9b4dd227f';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=59a9b4dd227f';
-import { formatApiGapReport } from '../api-gap-scan.js?v=59a9b4dd227f';
-import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=59a9b4dd227f';
-import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=59a9b4dd227f';
-import { parseMethodSpec } from '../method-overrides.js?v=59a9b4dd227f';
-import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=59a9b4dd227f';
-import { normalizeIntentRequest } from '../intent-resolver.js?v=59a9b4dd227f';
-import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=59a9b4dd227f';
-import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=59a9b4dd227f';
-import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=59a9b4dd227f';
-import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=59a9b4dd227f';
-import { rowToEntry } from '../logcat.js?v=59a9b4dd227f';
-import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=59a9b4dd227f';
+import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=96a5b1f7f035';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=96a5b1f7f035';
+import { formatApiGapReport } from '../api-gap-scan.js?v=96a5b1f7f035';
+import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=96a5b1f7f035';
+import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=96a5b1f7f035';
+import { parseMethodSpec } from '../method-overrides.js?v=96a5b1f7f035';
+import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=96a5b1f7f035';
+import { normalizeIntentRequest } from '../intent-resolver.js?v=96a5b1f7f035';
+import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=96a5b1f7f035';
+import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=96a5b1f7f035';
+import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=96a5b1f7f035';
+import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=96a5b1f7f035';
+import { rowToEntry } from '../logcat.js?v=96a5b1f7f035';
+import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=96a5b1f7f035';
 
 export const SCREENSHOT_GAP_MS = 250, PLUGIN_OUTPUT_MS = 100, MAX_STREAM_BATCH = MAX_LOG_BATCH;
 const LAB_LIVE = ['methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog'];
@@ -245,6 +245,16 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     return (deviceState.settings.network.hostMap ?? []).filter(rule => rule.enabled !== false).map(rule => [rule, parseRule(rule)]).filter(([, parsed]) => !parsed.error && !parsed.empty).map(([rule, parsed]) => `${describeRule(parsed)} (${hitText(table.get(ruleKey(rule)))})`);
   }
   const calls = {
+    /** "Recriar" (mode recreate: Activity.recreate(), state and ViewModels kept) or "Reabrir" (mode reopen: a fresh instance with the same Intent); answers the activity now on screen. */
+    reloadActivity(args) {
+      const mode = args?.mode ?? 'recreate'; if (mode !== 'recreate' && mode !== 'reopen') throw callError('bad-args', 'mode must be "recreate" or "reopen"');
+      return serial(async () => {
+        requireRunning(); await waitIdle(); await view?.flushPendingInputs(); const token = operations.beginOperation();
+        try { const snapshot = await vm.reloadActivity({ mode }); if (token === state.operation && snapshot) view.renderSnapshot(snapshot); return { activity: snapshot?.activityName ?? null }; }
+        catch (error) { if (token === state.operation) operations.reportAPKError(error, 'reload'); throw callError('vm', String(error?.message ?? error).slice(0, 2000)); }
+        finally { operations.finishOperation(token); }
+      });
+    },
     /** "Abrir": a deep link or explicit Intent, checked as the test page checks it (buildDeepLinkRequest) and normalized by the Worker's own resolver rules. */
     openIntent(args) {
       const data = shortText(args.data ?? args.link, 4096, 'data'), action = shortText(args.action, 512, 'action'), component = shortText(args.component, 512, 'component'), type = shortText(args.type, 256, 'type');

@@ -11,7 +11,10 @@
  *   entries { seq, uptime, wall, pid, tid, thread, level, tag, message }. 'network': a batch of network log entries (src/netlog.js), new or updated. Batches come at most
  *   every 250 ms, and Logcat lines reach the page only while some plugin listens to 'log' (or the Logcat panel is open).
  * @property {(name: string, fn?: Function) => void} off
- * @property {() => Promise<object>} screen          The current screen (same shape as the 'screen' event); no VM work.
+ * @property {() => Promise<object>} screen          The current screen (same shape as the 'screen' event); no VM work. `screen.ready` is "Tela pronta" (src/screen-ready.js):
+ *   { ready, activity, readySince, waitingFor: [motivos], fragments: [{ className, state, hidden, ready }] } — the Activity and its fragments loaded and the screen is still.
+ *   lab.on('ready', fn) calls fn(screen) each time it turns ready (a new Activity, a reload, a navigation that settles).
+ * @property {(options?: { timeoutMs?: number }) => Promise<object>} waitReady   Resolves with the screen once it is ready (rejects with code 'timeout', 15 s by default).
  * @property {(options?: { maxNodes?: number }) => Promise<object>} composeTree   The Compose layout tree: { owners: [{ nodes: [{ id, parentId, depth, name, bounds, texts,
  *   editableText, role, testTag, actions, ... }] }], totalNodes, truncated }. At most once per second per plugin; the same frame answers from a cache.
  * @property {(options?: { names?: boolean }) => Promise<object[]>} layoutBounds   The boxes "Mostrar limites de layout" draws: [{ key, kind: 'compose'|'view', name, nameSource,
@@ -73,20 +76,31 @@ export function pluginWorkerMain(scope) {
     badge: text => pushUi({ op: 'badge', text: clip(textOf(text ?? '')).slice(0, 40) }),
   });
   const wrapError = error => Object.assign(new Error(error?.message ?? 'Falha na consulta.'), { code: error?.code ?? 'failed' });
-  const watches = new Set();
+  const watches = new Set(), readyWrappers = new Map();
   const lab = {
     on(name, fn) {
       name = String(name); if (typeof fn !== 'function') throw new TypeError('lab.on(nome, função)');
-      if (!['screen', 'log', 'network'].includes(name)) throw new TypeError(`Evento desconhecido: ${name} (use 'screen', 'log' ou 'network')`);
+      if (name === 'ready') {   // "Tela pronta": derived from 'screen' (screen.ready.ready turning true: the Activity and its fragments loaded and the screen is still)
+        let was = false; const wrapped = screen => { const now = !!screen?.ready?.ready; if (now && !was) fn(screen); was = now; };
+        readyWrappers.set(fn, wrapped); const off = lab.on('screen', wrapped);
+        lab.screen().then(screen => { if (screen?.ready?.ready && !was) { was = true; fn(screen); } }).catch(() => {});
+        return () => { readyWrappers.delete(fn); off(); };
+      }
+      if (!['screen', 'log', 'network'].includes(name)) throw new TypeError(`Evento desconhecido: ${name} (use 'screen', 'ready', 'log' ou 'network')`);
       let set = handlers.get(name); if (!set) { set = new Set(); handlers.set(name, set); post({ t: 'sub', name, on: true }); }
       set.add(fn); return () => lab.off(name, fn);
     },
     off(name, fn) {
+      if (String(name) === 'ready') { if (fn) { const wrapped = readyWrappers.get(fn); readyWrappers.delete(fn); if (wrapped) lab.off('screen', wrapped); } else { for (const wrapped of readyWrappers.values()) lab.off('screen', wrapped); readyWrappers.clear(); } return; }
       const set = handlers.get(String(name)); if (!set) return;
       if (fn) set.delete(fn); else set.clear();
       if (!set.size) { handlers.delete(String(name)); post({ t: 'sub', name: String(name), on: false }); }
     },
     screen: () => call('screen', {}),
+    async waitReady(options = {}) {   // resolves with the screen once "Tela pronta" holds; rejects with code 'timeout' (default 15 s)
+      const until = Date.now() + Math.max(100, Number(options?.timeoutMs) || 15000);
+      for (;;) { const screen = await lab.screen(); if (screen?.ready?.ready) return screen; if (Date.now() >= until) throw Object.assign(new Error(`A tela não ficou pronta: ${(screen?.ready?.waitingFor ?? ['sem informação']).join('; ')}`), { code: 'timeout', screen }); await new Promise(resolve => setTimeout(resolve, 100)); }
+    },
     composeTree: (options = {}) => call('composeTree', { maxNodes: options?.maxNodes }),
     layoutBounds: (options = {}) => call('layoutBounds', { names: options?.names !== false }),
     screenshot: (options = {}) => call('screenshot', { key: options?.key ?? null, maxWidth: options?.maxWidth, type: options?.type }),

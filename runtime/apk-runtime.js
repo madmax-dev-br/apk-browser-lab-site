@@ -1,30 +1,30 @@
-import { VMClock } from './vm-clock.js?v=59a9b4dd227f';
-import { overrideHit } from './method-overrides.js?v=59a9b4dd227f';
-import { OperationMonitor } from './operation-monitor.js?v=59a9b4dd227f';
-import { ExecutionProfile } from './execution-profile.js?v=59a9b4dd227f';
-import { SamplingProfiler } from './sampling-profiler.js?v=59a9b4dd227f';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=59a9b4dd227f';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=59a9b4dd227f';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=59a9b4dd227f';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=59a9b4dd227f';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=59a9b4dd227f';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=59a9b4dd227f';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=59a9b4dd227f';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=59a9b4dd227f';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=59a9b4dd227f';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=59a9b4dd227f';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=59a9b4dd227f';
-import { APKError } from './apk-error.js?v=59a9b4dd227f';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=59a9b4dd227f';
-import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=59a9b4dd227f';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=59a9b4dd227f';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=59a9b4dd227f';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=59a9b4dd227f';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=59a9b4dd227f';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=59a9b4dd227f';
-import { Scheduler, Blocked } from './scheduler.js?v=59a9b4dd227f';
-import { bootClassLacksMember } from './boot-class-members.js?v=59a9b4dd227f';
-export { APKError } from './apk-error.js?v=59a9b4dd227f';
+import { VMClock } from './vm-clock.js?v=96a5b1f7f035';
+import { overrideHit } from './method-overrides.js?v=96a5b1f7f035';
+import { OperationMonitor } from './operation-monitor.js?v=96a5b1f7f035';
+import { ExecutionProfile } from './execution-profile.js?v=96a5b1f7f035';
+import { SamplingProfiler } from './sampling-profiler.js?v=96a5b1f7f035';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=96a5b1f7f035';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=96a5b1f7f035';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=96a5b1f7f035';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=96a5b1f7f035';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=96a5b1f7f035';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=96a5b1f7f035';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=96a5b1f7f035';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=96a5b1f7f035';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=96a5b1f7f035';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=96a5b1f7f035';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=96a5b1f7f035';
+import { APKError } from './apk-error.js?v=96a5b1f7f035';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=96a5b1f7f035';
+import { collectGarbage, collectionDue, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=96a5b1f7f035';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=96a5b1f7f035';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=96a5b1f7f035';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=96a5b1f7f035';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=96a5b1f7f035';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=96a5b1f7f035';
+import { Scheduler, Blocked } from './scheduler.js?v=96a5b1f7f035';
+import { bootClassLacksMember } from './boot-class-members.js?v=96a5b1f7f035';
+export { APKError } from './apk-error.js?v=96a5b1f7f035';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1734,6 +1734,12 @@ export class APKRuntime {
     this.dispatch({ owner: target.type, name: 'onClick', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [view.listener, ref(id)], 'virtual');
     this.clicks++;
     return this.snapshot();
+  }
+  /** "Recarregar Activity": the current Activity is recreated like Activity.recreate() (src/android-platform.js reloadActivity); the queued relaunch runs with the next drain. */
+  reloadActivity({ mode = 'recreate' } = {}) {
+    this.platform?.looperHost?.hostEventRan(this); this.platform?.noteInput?.();
+    if (!this.platform?.reloadActivity) fail('Activity reload is not implemented for this runtime');
+    this.steps = 0; this.platform.reloadActivity(this, { mode }); return this.snapshot();
   }
   back() {
     this.platform?.looperHost?.hostEventRan(this); this.platform?.noteInput?.();

@@ -7,8 +7,8 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=59a9b4dd227f';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=59a9b4dd227f';
+import { pluginWorkerSource } from './plugin-runtime.js?v=96a5b1f7f035';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=96a5b1f7f035';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
@@ -16,14 +16,15 @@ const VM_METHODS = new Set(['viewModels', 'fragments', 'activity', 'inspect', 'f
 
 /** The screen as the 'screen' event and lab.screen() give it, from the snapshot the page drew. */
 export function screenFromSnapshot(snapshot, { packageName = null, frame = 0 } = {}) {
-  if (!snapshot) return { activity: null, activityStack: [], tasks: [], windows: [], dialogs: 0, canGoBack: false, closed: false, packageName, frame };
+  if (!snapshot) return { activity: null, activityStack: [], tasks: [], windows: [], dialogs: 0, canGoBack: false, closed: false, packageName, frame, ready: null };
   const windows = (snapshot.views ?? []).filter(view => view?.windowSurface).map(view => { const w = view.windowSurface; return { id: w.id ?? null, kind: String(w.kind ?? 'window'), modal: !!w.modal, visible: w.visible !== false, focused: !!w.focused }; });
   const navigation = snapshot.navigation ?? {};
   return { activity: snapshot.activityName ?? null, activityStack: Array.isArray(navigation.activityStack) ? [...navigation.activityStack] : [], tasks: Array.isArray(navigation.tasks) ? navigation.tasks.map(task => ({ id: task.id ?? null, activityStack: [...(task.activityStack ?? [])] })) : [],
-    windows, dialogs: windows.filter(w => w.kind === 'dialog').length, canGoBack: !!(snapshot.canGoBack ?? navigation.canGoBack), closed: !!snapshot.closed, packageName, frame };
+    windows, dialogs: windows.filter(w => w.kind === 'dialog').length, canGoBack: !!(snapshot.canGoBack ?? navigation.canGoBack), closed: !!snapshot.closed, packageName, frame,
+    ready: snapshot.screenReady ? { ready: !!snapshot.screenReady.ready, activity: snapshot.screenReady.activity ?? null, readySince: snapshot.screenReady.readySince ?? null, waitingFor: [...(snapshot.screenReady.waitingFor ?? [])], fragments: (snapshot.screenReady.fragments ?? []).map(f => ({ ...f })) } : null };
 }
 /** What makes two screens different (the frame counter does not). */
-export const screenKey = screen => JSON.stringify([screen.activity, screen.activityStack, screen.windows, screen.closed, screen.packageName]);
+export const screenKey = screen => JSON.stringify([screen.activity, screen.activityStack, screen.windows, screen.closed, screen.packageName, screen.ready?.ready ?? null]);   // the flip to "Tela pronta" is a screen change
 /** '' or '*' = every package; otherwise package ids separated by commas or spaces, `*` as a wildcard. */
 export function packageMatches(filter, packageName) {
   const patterns = String(filter ?? '').split(/[\s,]+/).map(item => item.trim()).filter(Boolean);

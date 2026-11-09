@@ -1,52 +1,53 @@
-import { buildScreenState } from './screen-state.js?v=59a9b4dd227f';
-import { createLogcat } from './logcat.js?v=59a9b4dd227f';
-import { createNetlog } from './netlog.js?v=59a9b4dd227f';
-import { reportSummary } from './report-summary.js?v=59a9b4dd227f';
-import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=59a9b4dd227f';
-import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=59a9b4dd227f';
-import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=59a9b4dd227f';
-import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=59a9b4dd227f';
-import { describeRedirects } from './host-map.js?v=59a9b4dd227f';
-import { TimeBreakdown } from './time-breakdown.js?v=59a9b4dd227f';
-import { createMessageSink } from './audio-native.js?v=59a9b4dd227f';
-import { loadAPK } from './apk-loader.js?v=59a9b4dd227f';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=59a9b4dd227f';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=59a9b4dd227f';
-import { createWebViewBackend } from './webview-backend.js?v=59a9b4dd227f';
-import { FrameworkProvider } from './framework-provider.js?v=59a9b4dd227f';
-import { createRasterSender } from './raster-cache.js?v=59a9b4dd227f';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=59a9b4dd227f';
-import { dispatchPointer } from './pointer-input-host.js?v=59a9b4dd227f';
-import { resolveDevice } from './device-profile.js?v=59a9b4dd227f';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=59a9b4dd227f';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=59a9b4dd227f';
-import { SkiaProvider } from './skia-provider.js?v=59a9b4dd227f';
-import { inspectCompose } from './compose-inspector.js?v=59a9b4dd227f';
-import { runPluginQuery, compactComposeTree, PluginQueryError } from './plugin-queries.js?v=59a9b4dd227f';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=59a9b4dd227f';
-import { SemanticsPacer } from './semantics-pacing.js?v=59a9b4dd227f';
-import { MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=59a9b4dd227f';
-import { disposeTextLayout } from './text-layout-native.js?v=59a9b4dd227f';
-import { IcuBreakProvider } from './icu-break-provider.js?v=59a9b4dd227f';
-import { SqliteProvider } from './sqlite-native.js?v=59a9b4dd227f';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=59a9b4dd227f';
-import { TzdataProvider } from './java-time-native.js?v=59a9b4dd227f';
-import { ZlibProvider } from './zip-native.js?v=59a9b4dd227f';
-import { IcuConverterProvider } from './icu-converter-native.js?v=59a9b4dd227f';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=59a9b4dd227f';
-import { JavacryptoProvider } from './javacrypto-native.js?v=59a9b4dd227f';
-import { disposeColorFilters } from './color-filter-native.js?v=59a9b4dd227f';
-import { disposeRegex } from './regex-native.js?v=59a9b4dd227f';
-import { disposeRenderNodes } from './rendernode-native.js?v=59a9b4dd227f';
-import { startDeepLink } from './deep-link-host.js?v=59a9b4dd227f';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=59a9b4dd227f';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=59a9b4dd227f';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=59a9b4dd227f';
+import { buildScreenState } from './screen-state.js?v=96a5b1f7f035';
+import { createLogcat } from './logcat.js?v=96a5b1f7f035';
+import { createNetlog } from './netlog.js?v=96a5b1f7f035';
+import { reportSummary } from './report-summary.js?v=96a5b1f7f035';
+import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=96a5b1f7f035';
+import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=96a5b1f7f035';
+import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=96a5b1f7f035';
+import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=96a5b1f7f035';
+import { describeRedirects } from './host-map.js?v=96a5b1f7f035';
+import { TimeBreakdown } from './time-breakdown.js?v=96a5b1f7f035';
+import { createMessageSink } from './audio-native.js?v=96a5b1f7f035';
+import { loadAPK } from './apk-loader.js?v=96a5b1f7f035';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=96a5b1f7f035';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=96a5b1f7f035';
+import { createWebViewBackend } from './webview-backend.js?v=96a5b1f7f035';
+import { FrameworkProvider } from './framework-provider.js?v=96a5b1f7f035';
+import { createRasterSender } from './raster-cache.js?v=96a5b1f7f035';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=96a5b1f7f035';
+import { dispatchPointer } from './pointer-input-host.js?v=96a5b1f7f035';
+import { resolveDevice } from './device-profile.js?v=96a5b1f7f035';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=96a5b1f7f035';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=96a5b1f7f035';
+import { SkiaProvider } from './skia-provider.js?v=96a5b1f7f035';
+import { inspectCompose } from './compose-inspector.js?v=96a5b1f7f035';
+import { runPluginQuery, compactComposeTree, PluginQueryError } from './plugin-queries.js?v=96a5b1f7f035';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=96a5b1f7f035';
+import { SemanticsPacer } from './semantics-pacing.js?v=96a5b1f7f035';
+import { MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=96a5b1f7f035';
+import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=96a5b1f7f035';
+import { disposeTextLayout } from './text-layout-native.js?v=96a5b1f7f035';
+import { IcuBreakProvider } from './icu-break-provider.js?v=96a5b1f7f035';
+import { SqliteProvider } from './sqlite-native.js?v=96a5b1f7f035';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=96a5b1f7f035';
+import { TzdataProvider } from './java-time-native.js?v=96a5b1f7f035';
+import { ZlibProvider } from './zip-native.js?v=96a5b1f7f035';
+import { IcuConverterProvider } from './icu-converter-native.js?v=96a5b1f7f035';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=96a5b1f7f035';
+import { JavacryptoProvider } from './javacrypto-native.js?v=96a5b1f7f035';
+import { disposeColorFilters } from './color-filter-native.js?v=96a5b1f7f035';
+import { disposeRegex } from './regex-native.js?v=96a5b1f7f035';
+import { disposeRenderNodes } from './rendernode-native.js?v=96a5b1f7f035';
+import { startDeepLink } from './deep-link-host.js?v=96a5b1f7f035';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=96a5b1f7f035';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=96a5b1f7f035';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=96a5b1f7f035';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=59a9b4dd227f';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=59a9b4dd227f';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=59a9b4dd227f';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '59a9b4dd227f';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=96a5b1f7f035';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=96a5b1f7f035';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=96a5b1f7f035';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '96a5b1f7f035';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -69,6 +70,7 @@ const workerTiming = { snapshots: 0, snapshotMs: 0, semanticsWalks: 0, semantics
 let lastComposeSemantics = null;   // the tree of the last walk, reused by scheduled events inside the pacing gap (src/semantics-pacing.js)
 // Progressive raster (src/motion-raster.js): display rasters are replayed at a reduced scale while the screen is moving and at full density once it is still. `load { motionRaster: false }` turns it off.
 let motionRaster = new MotionRasterPolicy(), lastPointerAt = 0;
+let readyTracker = new ScreenReadyTracker();   // "Tela pronta" (src/screen-ready.js): snapshot.screenReady, and a wake when the quiet period ends
 /** What the VM knows about motion when a snapshot is taken: a pending Choreographer frame, a live pointer gesture, the request being answered (`'pointer-motion'`, `'scrollby'`). */
 const motionSignal = (request = null) => ({ pendingFrames: runtime.platform.viewWindowHost?.frameState?.().pendingFrames ?? 0, gestureActive: !!runtime.pointerGesture && performance.now() - lastPointerAt < GESTURE_STALE_MS, inputMotion: request === 'pointer-motion' || request === 'scrollby' });
 /** `paced`: a scheduled VM event may reuse the last semantics tree while the pacer says a fresh one is not due yet; replies to page requests are never paced. `request`: the page request this snapshot answers, for the motion signal. */
@@ -88,6 +90,7 @@ function currentSnapshot({ paced = false, request = null } = {}) {
     snapshot.composeSemantics = lastComposeSemantics;
   }
   Object.assign(snapshot, runtime.executionSnapshot());
+  try { snapshot.screenReady = readyTracker.observe(readinessProbe(runtime), performance.now()); } catch { snapshot.screenReady = null; }   // read-only: field reads, no bytecode
   if (runtime.methodOverridesAll?.size) snapshot.methodOverrides = describeMethodOverrides(runtime);
   if (runtime.platform?.endpointMocksAll?.size) snapshot.endpointMocks = describeEndpointMocks(runtime);
   if (runtime.network?.redirectTable?.size) snapshot.hostMap = describeRedirects(runtime.network.redirectTable);   // live counts for the "Redirecionar hosts" rows (src/host-map.js)   // live hit counts for the "Mock de endpoints" section (src/endpoint-mocks.js)
@@ -156,6 +159,8 @@ function scheduleEvents() {
   if (owed !== null) delay = delay == null ? owed : Math.min(delay, owed);
   const gcWake = runtime.platform.gcIdleWakeDelay?.() ?? null;   // a collection deferred while input was arriving runs once the input window closes (heap-gc.js deferral)
   if (gcWake !== null) delay = delay == null ? gcWake : Math.min(delay, gcWake);
+  const readyWake = readyTracker.wakeDelay(performance.now());   // the screen is settled: post the flip to "Tela pronta" when the quiet period ends
+  if (readyWake !== null) delay = delay == null ? readyWake : Math.min(delay, readyWake);
   const refine = motionRaster.refineDelay(motionSignal());   // the last snapshot carried a reduced raster: a full-density one is owed once the screen is still (src/motion-raster.js)
   if (refine !== null) delay = delay == null ? refine : Math.min(delay, refine);
   if (delay == null) return;
@@ -167,7 +172,8 @@ function scheduleEvents() {
       const started = performance.now(), drained = monitored('evento agendado', () => drainReadyEvents()); lastEventMs = Math.round(performance.now() - started); if (drained.processed) { workerTiming.scheduledBatches++; workerTiming.scheduledMs += performance.now() - started; }
       logcat.flush(); netlog.flush();
       const refining = !drained.processed && !snapshotOwed && motionRaster.refinementDue(motionSignal()); if (refining) motionRaster.noteRefinement();   // the quiet period passed with the screen still: replay the last frame at full density
-      if (drained.processed || snapshotOwed || refining || (semanticsPacer.stale && semanticsPacer.wait() <= 0)) { if (pageBehind()) holdSnapshot(); else postRuntimeEvent(); } else self.postMessage({ type: 'runtime-idle' });
+      const readyFlip = !drained.processed && readyTracker.flipDue(performance.now());   // nothing ran and the quiet period passed: a fresh snapshot carries screenReady.ready = true
+      if (drained.processed || snapshotOwed || refining || readyFlip || (semanticsPacer.stale && semanticsPacer.wait() <= 0)) { if (pageBehind()) holdSnapshot(); else postRuntimeEvent(); } else self.postMessage({ type: 'runtime-idle' });
       succeeded = true;
     } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); }
     finally { busy = false; if (succeeded) scheduleEvents(); }
@@ -381,7 +387,7 @@ self.onmessage = async ({ data }) => {
       runtime = result.runtime; archive = result.archive; if (Array.isArray(data.methodOverrides) && data.methodOverrides.length) applyMethodOverrides(result.runtime, data.methodOverrides); if (Array.isArray(data.ignoredActivities) && data.ignoredActivities.length) applyIgnoredActivities(result.runtime, data.ignoredActivities); if (Array.isArray(data.endpointMocks) && data.endpointMocks.length) applyEndpointMocks(result.runtime, data.endpointMocks); /* before any app code runs */
       inventory = result.inventory; logcat.clear(); logcat.setStreaming(data.logcatStreaming === true); logcat.attach(runtime); netlog.clear(); netlog.attach(runtime);
       runtime.contentRasterOptions = { transport: 'rgba' };   // Compose/Canvas content reaches the page as raw RGBA8 (src/raster-cache.js), not as a PNG
-      motionRaster = new MotionRasterPolicy({ enabled: data.motionRaster !== false }); lastPointerAt = 0;   // progressive raster while the screen moves (src/motion-raster.js); ?raster=full on the page turns it off
+      motionRaster = new MotionRasterPolicy({ enabled: data.motionRaster !== false }); lastPointerAt = 0; readyTracker = new ScreenReadyTracker();   // progressive raster while the screen moves (src/motion-raster.js); ?raster=full on the page turns it off
       runtime.monitor.configure({ sink: message => { logcat.flush(); self.postMessage({ ...message, requestId: activeRequestId }); snapshotScreenDuringOperation(message); }, budgetMs: OPERATION_WALL_LIMIT_MS });   // heartbeats to the page + the operation wall budget
       applyTimeLimits(runtime, data.eventSeconds);   // "Tempo máximo por evento" (src/time-limits.js): the per-event watchdog, the operation budget and the main-event caps
       runtime.platform.onPermissionRequest = request => self.postMessage({ type: 'permission-request', request });   // Activity.requestPermissions that needs the user: the page shows the dialog
@@ -413,7 +419,7 @@ self.onmessage = async ({ data }) => {
       if (!runtime || typeof inspectNativeLibraries !== 'function') throw new Error('Reabra o APK para disponibilizar a inspeção ELF.');
       const libraries = await inspectNativeLibraries(data.paths, data.limits);
       send({ type: 'result', libraries, nativeInspection: inventory.nativeInspection });
-    } else if (type === 'launch' || type === 'intent' || type === 'click' || type === 'back' || type === 'input' || type === 'check' || type === 'focus' || type === 'press' || type === 'scroll' || type === 'compose-action' || type === 'pointer' || type === 'scrollby') {
+    } else if (type === 'launch' || type === 'intent' || type === 'click' || type === 'back' || type === 'reload-activity' || type === 'input' || type === 'check' || type === 'focus' || type === 'press' || type === 'scroll' || type === 'compose-action' || type === 'pointer' || type === 'scrollby') {
       if (!runtime) throw new Error('Reabra um APK antes de executar a VM.');
       send({ type: 'progress', progress: { phase: type, completed: 0, total: 1 } });
       lastOperationAt = performance.now(); runtime.monitor.begin(type); if (type !== 'launch' && type !== 'intent') runtime.platform.noteInput?.();   // scroll, focus, press and the rest reach the View directly below: the collector's input signal (heap-gc.js deferral)
@@ -460,7 +466,7 @@ self.onmessage = async ({ data }) => {
         // A deep link / Intent the page describes: resolved against the manifest's intent filters and started like `am start` (see src/deep-link-host.js).
         deepLink = startDeepLink(runtime, data.intent || {});
       }
-      else await (type === 'launch' ? runtime.launch(data.activity) : type === 'back' ? runtime.back() : runtime.click(data.id));
+      else await (type === 'launch' ? runtime.launch(data.activity) : type === 'back' ? runtime.back() : type === 'reload-activity' ? runtime.reloadActivity({ mode: data.mode === 'reopen' ? 'reopen' : 'recreate' }) : runtime.click(data.id));
       drainReadyEvents();
       if (deepLink && !deepLink.ok && !runtime.activity) { send({ type: 'result', deepLink }); succeeded = true; return; }   // nothing matched and no Activity runs yet: there is no screen to snapshot
       const motionRequest = type === 'scrollby' ? 'scrollby' : type === 'pointer' && data.action !== 1 && data.action !== 3 ? 'pointer-motion' : null;   // input in flight: a wheel step, a pointer DOWN/MOVE (UP/CANCEL end the gesture)

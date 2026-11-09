@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=59a9b4dd227f">
+  <link rel="stylesheet" href="./site-pages.css?v=96a5b1f7f035">
 </head>
 <body>
   <header class="topbar">
@@ -146,7 +146,9 @@
         <div class="table-scroll"><table>
           <thead><tr><th scope="col">Chamada</th><th scope="col">O que devolve</th></tr></thead>
           <tbody>
-            <tr><td><code>await lab.screen()</code></td><td>A tela atual, no mesmo formato do evento, sem trabalho na VM.</td></tr>
+            <tr><td><code>await lab.screen()</code></td><td>A tela atual, no mesmo formato do evento, sem trabalho na VM. <code>screen.ready</code> é a “Tela pronta”: <code>{ ready, activity, readySince, waitingFor, fragments }</code>. Fica pronta quando a Activity está em onResume com o primeiro quadro desenhado, os fragments em RESUMED, e não há quadro, layout, mensagem da thread principal nem requisição de rede pendente por 300 ms.</td></tr>
+            <tr><td><code>lab.on('ready', fn)</code></td><td>Chama <code>fn(tela)</code> cada vez que a tela fica pronta: uma Activity nova, um Recriar/Reabrir, uma navegação que assenta. Uma tela que anima sem parar (spinner, cursor piscando) não fica pronta; <code>waitingFor</code> diz por quê.</td></tr>
+            <tr><td><code>await lab.waitReady({ timeoutMs })</code></td><td>Espera a tela ficar pronta (15 s por padrão); erro com <code>code: 'timeout'</code> e o motivo. Use antes de <code>lab.screenshot()</code>.</td></tr>
             <tr><td><code>await lab.composeTree({ maxNodes })</code></td><td>A árvore de layout do Compose: <code>{ owners: [{ nodes: [{ id, parentId, depth, name, bounds, texts, editableText, role, testTag, actions, … }] }], totalNodes, truncated }</code>. Custa dezenas de milissegundos na VM: no máximo uma por segundo por plugin.</td></tr>
             <tr><td><code>await lab.layoutBounds({ names })</code></td><td>As caixas que “Mostrar limites de layout” desenha (Views e nós semânticos do Compose), como no painel Compose: <code>[{ key, kind, name, nameSource, bounds, size, texts, editableText, role, testTag, contentDescriptions, actions, modifiers, measurePolicy, type, hasImage }]</code>, com <code>bounds</code> em pixels da janela. Os nomes vêm de uma <code>composeTree</code> (mesmo limite de uma por segundo); <code>names: false</code> não consulta a VM.</td></tr>
             <tr><td><code>await lab.screenshot({ key, maxWidth, type })</code></td><td>Imagem da tela inteira, ou de uma caixa (<code>key</code> de <code>layoutBounds</code>), cortada do quadro que a página mostra, sem trabalho na VM: <code>{ blob, width, height, type, notes }</code>. Padrões: <code>maxWidth</code> 1080, <code>type</code> <code>'image/png'</code>. No máximo uma a cada 500 ms por plugin. Views que a página desenha com elementos próprios (widgets XML simples) não têm raster: ficam de fora da tela inteira (<code>notes</code> diz quantas) e a caixa delas responde <code>no-image</code>.</td></tr>
@@ -222,6 +224,15 @@
 
         <h3>Tela atual</h3>
         <p>Mostra a Activity, a pilha e as janelas a cada mudança de tela. Não custa nada na VM.</p>
+        <h3>Print quando a tela fica pronta</h3>
+        <p>Espera a Activity e os fragments terminarem de carregar e tira o print da tela inteira a cada tela nova.</p>
+        <div class="code" data-name="Print na tela pronta"><pre><code>lab.on('ready', async tela =&gt; {
+  const imagem = await lab.screenshot({ maxWidth: 360 });
+  lab.ui.image(imagem, { id: 'tela', caption: tela.activity + ' · pronta' });
+  lab.ui.badge(tela.activity.split('.').pop());
+});
+const tela = await lab.waitReady({ timeoutMs: 20000 }).catch(erro =&gt; { lab.ui.text(erro.message, { id: 'espera' }); return null; });
+if (tela) lab.ui.image(await lab.screenshot({ maxWidth: 360 }), { id: 'tela', caption: tela.activity + ' · pronta' });</code></pre></div>
         <div class="code" data-name="Tela atual"><pre><code>async function mostrar(tela) {
   lab.ui.badge(tela.activity ? tela.activity.split('.').pop() : '—');
   lab.ui.kv({
@@ -313,6 +324,6 @@ await mostrar();</code></pre></div>
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./arquitetura.html">Arquitetura da VM</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=59a9b4dd227f"></script>
+  <script type="module" src="./site-pages.js?v=96a5b1f7f035"></script>
 </body>
 </html>

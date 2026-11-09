@@ -1,4 +1,4 @@
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=59a9b4dd227f';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=96a5b1f7f035';
 
 // android.widget.Magnifier and Magnifier.Builder (android-13.0.0_r1 Magnifier.java): size, zoom, corner radius, elevation and source-to-magnifier offsets come from the builder or from
 // the framework's default_magnifier_* resources exactly as AOSP reads them; argument checks, getters and the show/update/dismiss lifecycle are AOSP's. The real class draws the

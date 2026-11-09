@@ -1,7 +1,7 @@
 // Embeddable APK runner. Usage: <script type="module" src="…/player/apk-player.js"></script> then <apk-player src="app.apk" device="phone" locale="pt-BR" theme="dark">.
 // The APK runs inside an iframe (player/frame.html) served from the runtime's origin; this script only talks to it through versioned postMessage.
 // Reference: docs/PLAYER.md (API) and player/example.html (the same reference, with a live demo).
-import { ATTRIBUTES, configFromAttributes, parseConfig, flattenConfig, envelope, validateFrameMessage, STREAMS } from './protocol.js?v=59a9b4dd227f';
+import { ATTRIBUTES, configFromAttributes, parseConfig, flattenConfig, envelope, validateFrameMessage, STREAMS } from './protocol.js?v=96a5b1f7f035';
 
 const FRAME_TIMEOUT_MS = 20000, CALL_TIMEOUT_MS = 60000, INTENT_TIMEOUT_MS = 120000, CONFIG_TIMEOUT_MS = 60000;
 const DEFAULT_ASSETS_BASE = new URL('../', import.meta.url).href;
@@ -153,6 +153,8 @@ export class ApkPlayer extends EventTarget {
   async diagnostic() { return (await this.call('diagnostic')).text; }
   /** A deep link or explicit Intent ({ data | link, action, component, type, category, extras }), resolved against the manifest like `am start`. Resolves { deepLink, state, message, detail }. */
   openIntent(intent = {}) { return this.call('openIntent', intent, INTENT_TIMEOUT_MS); }
+  /** The lab's "Recriar" ({ mode: 'recreate' }, default: Activity.recreate(), state and ViewModels kept) or "Reabrir" ({ mode: 'reopen' }: a fresh instance with the same Intent, content loaded again); resolves { activity }. */
+  reloadActivity({ mode = 'recreate' } = {}) { return this.call('reloadActivity', { mode }, INTENT_TIMEOUT_MS); }
   /** One inspection of the Compose layout tree on screen (the "Compose" panel). */
   inspectCompose({ maxNodes } = {}) { return this.call('inspectCompose', maxNodes === undefined ? {} : { maxNodes }); }
   /** The boxes "Mostrar limites de layout" draws, as data ([{ key, kind, name, bounds, texts, role, testTag, actions, … }]). */
@@ -232,7 +234,7 @@ export class ApkPlayerElement extends HTMLElement {
   /** Boolean attribute: present (or "true"/"") is on; "false"/"0" is off. */
   flag(name) { const value = this.getAttribute(name); return value !== null && value !== 'false' && value !== '0'; }
 }
-for (const method of ['diagnostic', 'openIntent', 'inspectCompose', 'layoutBounds', 'screenshot', 'screenState', 'status', 'answerPermission', 'stop']) {
+for (const method of ['reloadActivity', 'diagnostic', 'openIntent', 'inspectCompose', 'layoutBounds', 'screenshot', 'screenState', 'status', 'answerPermission', 'stop']) {
   ApkPlayerElement.prototype[method] = function (...args) { return this.player ? this.player[method](...args) : Promise.reject(new Error('The player is not mounted.')); };
 }
 if (globalThis.customElements && !customElements.get('apk-player')) customElements.define('apk-player', ApkPlayerElement);

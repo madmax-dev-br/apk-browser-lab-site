@@ -248,6 +248,7 @@ input.addEventListener('change', () =&gt; el.load(input.files[0], { activity: 'c
       <tbody>
         <tr><td><code>setConfig(patch)</code></td><td>o player</td><td class="wrap">Mescla a configuração; o resultado chega no evento <code>config-applied</code>.</td></tr>
         <tr><td><code>configure(patch)</code></td><td><code>Promise&lt;{ config, rejected, live, outcome, statuses }&gt;</code></td><td class="wrap">O mesmo, esperando a resposta deste patch.</td></tr>
+        <tr><td><code>reloadActivity({ mode })</code></td><td><code>Promise&lt;{ activity }&gt;</code></td><td class="wrap">“Recriar” (<code>mode: 'recreate'</code>, padrão: como <code>Activity.recreate()</code>, estado e ViewModels mantidos) ou “Reabrir” (<code>'reopen'</code>: nova instância com o mesmo Intent, conteúdo carregado de novo).</td></tr>
         <tr><td><code>openIntent({ data, action, component, type, category, extras })</code></td><td><code>Promise&lt;{ deepLink, state, message, detail }&gt;</code></td><td class="wrap">Deep link ou Intent explícito resolvido pelos filtros do manifesto, como <code>am start</code>. <code>action</code> padrão <code>android.intent.action.VIEW</code>; <code>extras</code> de string, número ou booleano.</td></tr>
         <tr><td><code>back()</code>, <code>restart()</code></td><td>o player</td><td class="wrap">Voltar do sistema; reabrir o APK e iniciar de novo.</td></tr>
         <tr><td><code>stop()</code></td><td><code>Promise&lt;{ stopped }&gt;</code></td><td class="wrap">Parar a VM (encerra o Worker); evento <code>stopped</code>.</td></tr>
@@ -273,7 +274,7 @@ input.addEventListener('change', () =&gt; el.load(input.files[0], { activity: 'c
       <tbody>
         <tr><td><code>ready</code></td><td class="wrap"><code>{ activity, inventory: { packageName, activities }, statuses, rejected }</code></td></tr>
         <tr><td><code>activity-changed</code></td><td class="wrap"><code>{ activity, canGoBack }</code></td></tr>
-        <tr><td><code>screen</code></td><td class="wrap"><code>{ screen: { activity, activityStack, tasks, windows, dialogs, canGoBack, closed, packageName, frame } }</code>, quando a tela muda (Activity, pilha, janela ou diálogo).</td></tr>
+        <tr><td><code>screen</code></td><td class="wrap"><code>{ screen: { activity, activityStack, tasks, windows, dialogs, canGoBack, closed, packageName, frame, ready } }</code> (<code>ready</code>: a “Tela pronta”, <code>{ ready, activity, readySince, waitingFor, fragments }</code>), quando a tela muda (Activity, pilha, janela ou diálogo).</td></tr>
         <tr><td><code>config-applied</code></td><td class="wrap"><code>{ config, rejected, live, outcome, statuses }</code></td></tr>
         <tr><td><code>permission-request</code></td><td class="wrap"><code>{ request: { id, requestCode, appLabel, dialogs: [{ group, label, question, permissions, oneTime }] } }</code> (com <code>permissionDialog: 'host'</code>)</td></tr>
         <tr><td><code>permission-config</code></td><td class="wrap"><code>{ config: { states, denials, once } }</code>, depois de cada resposta (guarde se quiser lembrar entre visitas).</td></tr>

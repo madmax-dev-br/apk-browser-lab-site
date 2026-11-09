@@ -1,24 +1,24 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=59a9b4dd227f';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=59a9b4dd227f';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=59a9b4dd227f';
-import { initCollapsibleSections } from './panel-sections.js?v=59a9b4dd227f';
-import { createPermissionsPanel } from './permissions-panel.js?v=59a9b4dd227f';
-import { createOverridesPanel } from './overrides-panel.js?v=59a9b4dd227f';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=59a9b4dd227f';
-import { createHostMapPanel } from './host-map-panel.js?v=59a9b4dd227f';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=59a9b4dd227f';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=59a9b4dd227f';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=59a9b4dd227f';
-import { createDeviceView, createViewState } from './device-view.js?v=59a9b4dd227f';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=59a9b4dd227f';
-import { formatApiGapReport } from './api-gap-scan.js?v=59a9b4dd227f';
-import { createLogcatPanel } from './logcat-panel.js?v=59a9b4dd227f';
-import { createComposeInspectorPanel } from './compose-inspector-panel.js?v=59a9b4dd227f';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=59a9b4dd227f';
-import { createPluginHost } from './plugin-host.js?v=59a9b4dd227f';
-import { captureImage } from './screen-capture.js?v=59a9b4dd227f';
-import { createPluginsPanel } from './plugins-panel.js?v=59a9b4dd227f';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=59a9b4dd227f';
+import { APKWorkerClient } from './apk-worker-client.js?v=96a5b1f7f035';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=96a5b1f7f035';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=96a5b1f7f035';
+import { initCollapsibleSections } from './panel-sections.js?v=96a5b1f7f035';
+import { createPermissionsPanel } from './permissions-panel.js?v=96a5b1f7f035';
+import { createOverridesPanel } from './overrides-panel.js?v=96a5b1f7f035';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=96a5b1f7f035';
+import { createHostMapPanel } from './host-map-panel.js?v=96a5b1f7f035';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=96a5b1f7f035';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=96a5b1f7f035';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=96a5b1f7f035';
+import { createDeviceView, createViewState } from './device-view.js?v=96a5b1f7f035';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=96a5b1f7f035';
+import { formatApiGapReport } from './api-gap-scan.js?v=96a5b1f7f035';
+import { createLogcatPanel } from './logcat-panel.js?v=96a5b1f7f035';
+import { createComposeInspectorPanel } from './compose-inspector-panel.js?v=96a5b1f7f035';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=96a5b1f7f035';
+import { createPluginHost } from './plugin-host.js?v=96a5b1f7f035';
+import { captureImage } from './screen-capture.js?v=96a5b1f7f035';
+import { createPluginsPanel } from './plugins-panel.js?v=96a5b1f7f035';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=96a5b1f7f035';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -33,8 +33,17 @@ function setStatus(message, kind = '') {
   $('status-dot').className = kind;
   notifyParent('apk-lab-state', { mode: state.mode, status: message, running: kind === 'ok' });
 }
+// "Recriar" / "Reabrir" the Activity: shown while an APK runs (an Activity is on screen), disabled while the VM is busy.
+function syncReloadButton() { for (const id of ['recreate-activity', 'reopen-activity']) { const button = $(id); if (!button) continue; button.hidden = state.mode !== 'apk' || !state.apkRunning || !state.runtime; button.disabled = state.busy || !state.runtime || !state.apkRunning; } }
+// "Tela pronta" (src/screen-ready.js): the Activity and its fragments loaded and the screen is still; the title says what it still waits for.
+function showScreenReady(ready) {
+  const chip = $('screen-ready'); if (!chip) return;
+  if (!ready || !state.apkRunning) { chip.hidden = true; return; }
+  chip.hidden = false; chip.dataset.ready = String(!!ready.ready); chip.textContent = ready.ready ? '● pronta' : '◌ carregando';
+  chip.title = ready.ready ? `Tela pronta: ${ready.activity ?? ''}${ready.fragments?.length ? ` com ${ready.fragments.length} fragment(s)` : ''}` : `Ainda carregando: ${(ready.waitingFor ?? []).join('; ')}`;
+}
 function setBusy(busy) {
-  state.busy = busy;
+  state.busy = busy; syncReloadButton();
   $('activity-select').disabled = busy;
   $('run-button').disabled = busy || !state.runtime || !!state.inventory?.unsupportedFeatures?.length;
   $('stop-vm').hidden = !busy && !apkVM.worker;
@@ -137,7 +146,7 @@ function reportAPKError(error, title) {
   if (error.navigation) state.canGoBack = !!error.navigation.canGoBack;
   if (!apkVM.worker) { state.runtime = null; state.apkRunning = false; $('android-device').hidden = true; }
   $('back-button').hidden = state.mode !== 'apk' || !state.canGoBack;
-  $('back-button').disabled = state.busy || !state.runtime || !state.canGoBack;
+  $('back-button').disabled = state.busy || !state.runtime || !state.canGoBack; syncReloadButton();
   if (state.mode === 'apk') showError(error, title);
   else appendTrace(`ERRO APK: ${error.message || error}`);
 }
@@ -185,7 +194,7 @@ function onWorkerProgress(progress = {}) {
 }
 function cancelOperation() {
   ++state.operation; state.abortController?.abort(); apkVM.cancel(); state.apiGaps = null; pluginHost.vmChanged();
-  state.viewSession++; resetWebViews(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear(); state.runtime = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true; state.lastAPKError = null;
+  state.viewSession++; resetWebViews(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear(); state.runtime = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true; syncReloadButton(); state.lastAPKError = null;
   clearInterval(state.operationTimer); $('operation-panel').hidden = true;
   $('android-device').hidden = true; $('empty-preview').hidden = state.mode !== 'apk';
   setBusy(false);
@@ -431,13 +440,14 @@ pluginsPanel = createPluginsPanel({ $, host: pluginHost });   // "Plugins" (src/
 const mocksPanel = createEndpointMocksPanel({ $, vm: apkVM });   // "Mock de endpoints" (src/endpoint-mocks.js): per package, applied live
 const hostMapPanel = createHostMapPanel({ $, get: () => deviceState.settings.network.hostMap ?? [], set: rules => applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, network: { ...deviceState.settings.network, hostMap: rules } })) });   // "Redirecionar hosts" (src/host-map.js): device settings, applied live
 const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, notifyParent, clickView: id => clickView(id), hooks: {
-  navigationChanged(canGoBack) { $('back-button').disabled = state.busy || !canGoBack; $('back-button').hidden = state.mode !== 'apk' || !canGoBack; },
+  navigationChanged(canGoBack) { $('back-button').disabled = state.busy || !canGoBack; $('back-button').hidden = state.mode !== 'apk' || !canGoBack; syncReloadButton(); },
   closed() {
     $('empty-preview').hidden = state.mode !== 'apk';
     $('empty-preview').querySelector('h2').textContent = 'Activity encerrada.'; $('empty-preview').querySelector('p').textContent = 'A pilha de Activities está vazia. Reabra o APK para iniciar uma nova execução.';
     if (state.mode === 'apk') { setStatus('Aplicativo encerrado · nenhuma Activity ativa'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENCERRADO'; }
   },
   rendered(snapshot, composeReady) {
+    syncReloadButton(); showScreenReady(snapshot.screenReady);
     overridesPanel.hits(snapshot.methodOverrides); ignoredPanel.hits(snapshot.ignoredActivities); mocksPanel.hits(snapshot.endpointMocks); hostMapPanel.hits(snapshot.hostMap);
     hideBoot({ force: true }); $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth); state.lastSnapshot = snapshot; redrawLayoutBounds(); if (snapshot.vmHealth) state.lastVmHealth = snapshot.vmHealth; composeInspector.rendered(snapshot); pluginHost.snapshot(snapshot);
     if (snapshot.droppedEvent) appendTrace(`Evento descartado: a View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) já não existe na VM.`);
@@ -567,6 +577,13 @@ async function runAPKOnce() {
   catch (error) { if (token === state.operation) reportAPKError(error); }
   finally { finishOperation(token); }
 }
+async function reloadActivity(mode = 'recreate') {
+  if (!state.runtime || state.busy || !state.apkRunning) return;
+  await flushPendingInputs(); hideError(); const token = beginOperation(mode === 'reopen' ? 'Reabrindo a Activity…' : 'Recriando a Activity…');
+  try { const snapshot = await state.runtime.reloadActivity({ mode, onProgress: onWorkerProgress }); if (token === state.operation) renderSnapshot(snapshot); }
+  catch (error) { if (token === state.operation) reportAPKError(error, 'Não foi possível recarregar a Activity'); }
+  finally { finishOperation(token); }
+}
 async function backAPK() {
   if (!state.runtime || state.busy || !state.canGoBack) return;
   await flushPendingInputs(); hideError(); const token = beginOperation('Retornando à Activity anterior…');
@@ -640,7 +657,7 @@ async function loadScenarioCatalog() {
 // The lab has a single mode (APK); switchMode('apk') resets the preview chrome to the APK's current state.
 function switchMode() {
   state.mode = 'apk';
-  $('back-button').hidden = !state.canGoBack;
+  $('back-button').hidden = !state.canGoBack; syncReloadButton();
   $('android-device').hidden = !state.apkRunning; $('android-device').inert = false;
   $('empty-preview').hidden = state.apkRunning;
   hideError();
@@ -658,6 +675,8 @@ $('drop-zone').addEventListener('dragleave', () => $('drop-zone').classList.remo
 $('drop-zone').addEventListener('drop', (event) => { event.preventDefault(); $('drop-zone').classList.remove('dragging'); chooseFile(event.dataTransfer.files?.[0]); });
 $('run-button').addEventListener('click', runAPK);
 $('back-button').addEventListener('click', backAPK);
+$('recreate-activity').addEventListener('click', () => reloadActivity('recreate'));
+$('reopen-activity').addEventListener('click', () => reloadActivity('reopen'));
 $('cancel-operation').addEventListener('click', cancelOperation);
 $('stop-vm').addEventListener('click', cancelOperation);
 $('native-abi').addEventListener('change', populateNativeLibraries);
