@@ -1,7 +1,7 @@
 // The "Permissões" section of the Controles panel and the permission dialog shown over the phone screen. State per package lives in localStorage (key with the package name, every access
 // guarded); the simulated location lives in the device settings. The rules (what a request does, rationale, "don't ask again") are src/runtime-permissions.js, shared with the VM.
-import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=7ad88626efdb';
-export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=7ad88626efdb';
+import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=17907d82f3e8';
+export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=17907d82f3e8';
 
 const KEY_PREFIX = 'apkweb-permissions-v1:';
 const ICONS = {
