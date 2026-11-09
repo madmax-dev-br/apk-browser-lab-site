@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=f863dd365e39';
-import { parseWasm, WASM_SYMBOL_BINDING_WEAK } from './wasm-dylink.js?v=f863dd365e39';
-import { hostFunction, indirectStub } from './wasm-host-function.js?v=f863dd365e39';
+import { APKError } from './apk-error.js?v=2f0501505dc8';
+import { parseWasm, WASM_SYMBOL_BINDING_WEAK } from './wasm-dylink.js?v=2f0501505dc8';
+import { hostFunction, indirectStub } from './wasm-host-function.js?v=2f0501505dc8';
 
 // The lab's dynamic linker for wasm32 native libraries: one linear memory, one function table, one stack pointer and one C++ exception tag per
 // process, shared by every library -- the same arrangement Android's linker gives a process, which is what lets libreactnative, libfbjni, libjsi

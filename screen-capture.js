@@ -1,7 +1,7 @@
 // Images of what the page shows, for plugins (lab.screenshot, docs/PLUGINS.md): the whole screen or one element of "Mostrar limites de layout", cut from the content
 // rasters the page already drew (the same frame the user sees; nothing is asked of the VM). Views that the page draws with its own DOM (plain XML widgets) have no
 // raster and do not appear in a whole-screen image: the result says how many were left out.
-import { flattenViews, cropRect } from './compose-inspector-panel.js?v=f863dd365e39';
+import { flattenViews, cropRect } from './compose-inspector-panel.js?v=2f0501505dc8';
 
 export const MAX_CAPTURE_WIDTH = 2048;
 const TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);

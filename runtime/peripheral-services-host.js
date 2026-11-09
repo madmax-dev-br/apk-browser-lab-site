@@ -1,6 +1,6 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=f863dd365e39';
-import { APKError } from './apk-error.js?v=f863dd365e39';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=f863dd365e39';
+import { bitsFloat, floatBits } from './host-contract.js?v=2f0501505dc8';
+import { APKError } from './apk-error.js?v=2f0501505dc8';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=2f0501505dc8';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB
