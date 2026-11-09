@@ -1,25 +1,26 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=27f6f95f2fc8';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=27f6f95f2fc8';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=27f6f95f2fc8';
-import { initCollapsibleSections } from './panel-sections.js?v=27f6f95f2fc8';
-import { initHelpTips } from './help-tips.js?v=27f6f95f2fc8';
-import { createPermissionsPanel } from './permissions-panel.js?v=27f6f95f2fc8';
-import { createOverridesPanel } from './overrides-panel.js?v=27f6f95f2fc8';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=27f6f95f2fc8';
-import { createHostMapPanel } from './host-map-panel.js?v=27f6f95f2fc8';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=27f6f95f2fc8';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=27f6f95f2fc8';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=27f6f95f2fc8';
-import { createDeviceView, createViewState } from './device-view.js?v=27f6f95f2fc8';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=27f6f95f2fc8';
-import { formatApiGapReport } from './api-gap-scan.js?v=27f6f95f2fc8';
-import { createLogcatPanel } from './logcat-panel.js?v=27f6f95f2fc8';
-import { createComposeInspectorPanel } from './compose-inspector-panel.js?v=27f6f95f2fc8';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=27f6f95f2fc8';
-import { createPluginHost } from './plugin-host.js?v=27f6f95f2fc8';
-import { captureImage } from './screen-capture.js?v=27f6f95f2fc8';
-import { createPluginsPanel } from './plugins-panel.js?v=27f6f95f2fc8';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=27f6f95f2fc8';
+import { APKWorkerClient } from './apk-worker-client.js?v=a76ada5ef6c6';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=a76ada5ef6c6';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=a76ada5ef6c6';
+import { initCollapsibleSections } from './panel-sections.js?v=a76ada5ef6c6';
+import { initHelpTips } from './help-tips.js?v=a76ada5ef6c6';
+import { createToolDock } from './tool-dock.js?v=a76ada5ef6c6';
+import { createPermissionsPanel } from './permissions-panel.js?v=a76ada5ef6c6';
+import { createOverridesPanel } from './overrides-panel.js?v=a76ada5ef6c6';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=a76ada5ef6c6';
+import { createHostMapPanel } from './host-map-panel.js?v=a76ada5ef6c6';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=a76ada5ef6c6';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=a76ada5ef6c6';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=a76ada5ef6c6';
+import { createDeviceView, createViewState } from './device-view.js?v=a76ada5ef6c6';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=a76ada5ef6c6';
+import { formatApiGapReport } from './api-gap-scan.js?v=a76ada5ef6c6';
+import { createLogcatPanel } from './logcat-panel.js?v=a76ada5ef6c6';
+import { createComposeInspectorPanel } from './compose-inspector-panel.js?v=a76ada5ef6c6';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=a76ada5ef6c6';
+import { createPluginHost } from './plugin-host.js?v=a76ada5ef6c6';
+import { captureImage } from './screen-capture.js?v=a76ada5ef6c6';
+import { createPluginsPanel } from './plugins-panel.js?v=a76ada5ef6c6';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=a76ada5ef6c6';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -438,6 +439,15 @@ const permissionsPanel = createPermissionsPanel({ $, vm: apkVM, location: { get:
 const overridesPanel = createOverridesPanel({ $, vm: apkVM });
 const ignoredPanel = createIgnoredActivitiesPanel({ $, vm: apkVM });
 pluginsPanel = createPluginsPanel({ $, host: pluginHost });   // "Plugins" (src/plugins-panel.js): global list, output cards under the device
+// Bottom tool dock (src/tool-dock.js): Log de execução, Logcat, Rede, Compose and Plugins as Android Studio-like tool windows, hidden until an icon is clicked
+const toolDock = createToolDock({ root: $('tool-dock'), tools: [
+  { id: 'trace', label: 'Log de execução', icon: '☰', details: $('trace'), count: $('trace-count') },
+  { id: 'logcat', label: 'Logcat', icon: '▤', details: $('logcat'), count: $('logcat')?.querySelector?.('.logcat-count') },
+  { id: 'netlog', label: 'Rede', icon: '⇅', details: $('netlog'), count: $('netlog')?.querySelector?.('.netlog-count') },
+  { id: 'compose', label: 'Compose', icon: '◫', details: $('compose-inspector'), count: $('compose-inspector')?.querySelector?.('.ci-count') },
+  { id: 'plugins', label: 'Plugins', icon: '⧉', details: $('plugins-output'), count: $('plugins-output')?.querySelector?.('.po-count') },
+] });
+window.apkLabToolDock = toolDock;   // test and console access
 const mocksPanel = createEndpointMocksPanel({ $, vm: apkVM });   // "Mock de endpoints" (src/endpoint-mocks.js): per package, applied live
 const hostMapPanel = createHostMapPanel({ $, get: () => deviceState.settings.network.hostMap ?? [], set: rules => applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, network: { ...deviceState.settings.network, hostMap: rules } })) });   // "Redirecionar hosts" (src/host-map.js): device settings, applied live
 const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, notifyParent, clickView: id => clickView(id), hooks: {

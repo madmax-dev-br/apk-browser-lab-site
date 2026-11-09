@@ -374,3 +374,50 @@
 :root[data-theme=dark] .help-tip.warning .help-tip-icon{border-color:#6b5320;background:#2a2414;color:#e3c46b}
 :root[data-theme=dark] .help-tip-bubble{background:#f2f3f7;color:#252a35;box-shadow:0 6px 20px #0008}
 :root[data-theme=dark] .help-tip-bubble code{color:#111}
+/* Bottom tool dock (Android Studio-like): icon bar fixed at the bottom; the open tool's panel sits above it with a draggable top edge; the body's padding-bottom (set by tool-dock.js) keeps the page scrollable above it */
+.tool-dock{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;flex-direction:column;font-family:Inter,-apple-system,sans-serif;pointer-events:none}
+.tool-dock>*{pointer-events:auto}
+.tool-dock-panel{position:relative;height:var(--tool-dock-height,50vh);display:flex;flex-direction:column;background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 18px #20205014;min-height:0}
+.tool-dock-panel[hidden]{display:none}
+.tool-dock-handle{position:absolute;left:0;right:0;top:-4px;height:8px;cursor:ns-resize;z-index:2;touch-action:none}
+.tool-dock-handle::after{content:'';position:absolute;left:50%;top:2px;width:36px;height:4px;margin-left:-18px;border-radius:3px;background:#d5d8e2;opacity:.7}
+.tool-dock-handle:hover::after,.tool-dock-handle:focus-visible::after,.tool-dock.resizing .tool-dock-handle::after{background:var(--accent);opacity:1}
+.tool-dock-handle:focus-visible{outline:none}
+.tool-dock.resizing,.tool-dock.resizing *{user-select:none;cursor:ns-resize}
+.tool-dock-hide{position:absolute;top:7px;right:10px;z-index:3;width:24px;height:24px;border:1px solid #e3e5ec;border-radius:5px;background:#fff;color:#7a8191;font-size:12px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.tool-dock-hide:hover{color:var(--accent);border-color:#cfcbf3}
+.tool-dock-slot{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
+.tool-dock-slot>.tool-dock-tool:not([open]){display:none}
+.tool-dock-slot>.tool-dock-tool[open]{flex:1;min-height:0;display:flex;flex-direction:column;border-top:0}
+.tool-dock-slot>.tool-dock-tool::details-content{display:contents}
+.tool-dock-slot>.tool-dock-tool>summary{cursor:default;padding:10px 46px 10px 15px;flex:none;position:sticky;top:0;z-index:1;background:#fff}
+:root[data-theme=dark] .tool-dock-slot>.tool-dock-tool>summary{background:#131419}
+.tool-dock-slot>.tool-dock-tool>summary .trace-chevron{display:none}
+.tool-dock-slot>.tool-dock-tool>summary .trace-actions{margin-left:auto}
+.tool-dock-slot>.tool-dock-tool>.logcat-bar{flex:none}
+.tool-dock-slot>.tool-dock-tool>pre,.tool-dock-slot>.tool-dock-tool>.logcat-lines,.tool-dock-slot>.tool-dock-tool>.netlog-rows,.tool-dock-slot>.tool-dock-tool>.ci-body,.tool-dock-slot>.tool-dock-tool>.po-cards{flex:1 1 auto;min-height:60px;height:auto;max-height:none}
+.tool-dock-bar{height:34px;display:flex;align-items:stretch;gap:2px;padding:0 8px;background:#f7f8fb;border-top:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tool-dock-bar::-webkit-scrollbar{display:none}
+.tool-dock-tab{display:flex;align-items:center;gap:6px;border:0;border-top:2px solid transparent;background:transparent;color:#6f7686;font-size:11px;padding:0 11px;white-space:nowrap;cursor:pointer}
+.tool-dock-tab[hidden]{display:none}
+.tool-dock-tab:hover{background:#eef0f6;color:#3f4554}
+.tool-dock-tab.active{border-top-color:var(--accent);background:#fff;color:#3f3a9c}
+.tool-dock-tab:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.tool-dock-icon{font-size:13px;line-height:1;width:14px;text-align:center}
+.tool-dock-badge{font:9px ui-monospace,monospace;color:#8d93a3;background:#eceef3;border-radius:3px;padding:2px 5px}
+.tool-dock-badge:empty{display:none}
+.tool-dock-tab.active .tool-dock-badge{background:#eeedfc;color:#6f68d6}
+:root[data-theme=dark] .tool-dock-panel{background:#131419;box-shadow:0 -6px 18px #00000055}
+:root[data-theme=dark] .tool-dock-handle::after{background:#3a3e4a}
+:root[data-theme=dark] .tool-dock-hide{background:#1a1c22;border-color:#333740;color:#a3a7b1}
+:root[data-theme=dark] .tool-dock-bar{background:#101116}
+:root[data-theme=dark] .tool-dock-tab{color:#a3a7b1}
+:root[data-theme=dark] .tool-dock-tab:hover{background:#1b1d24;color:#d0d3da}
+:root[data-theme=dark] .tool-dock-tab.active{background:#131419;color:#b3aeff}
+:root[data-theme=dark] .tool-dock-badge{background:#1d1f26;color:#9a9fab}
+:root[data-theme=dark] .tool-dock-tab.active .tool-dock-badge{background:#1d1a3a;color:#aaa5f0}
+@media(max-width:700px){.tool-dock-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.tool-dock-tab{padding:0 12px}.tool-dock-icon{font-size:15px}}
+/* the main page starts with the workspace (no intro banner): room below the top bar */
+main>.workspace:first-child{margin-top:28px}
+@media(max-width:700px){main>.workspace:first-child{margin-top:18px}}
+.is-embedded main>.workspace:first-child{margin-top:0}
