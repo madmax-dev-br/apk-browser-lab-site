@@ -1,8 +1,8 @@
-import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=2c4b98136b1e';
-import { APKError } from './apk-error.js?v=2c4b98136b1e';
-import { Blocked } from './scheduler.js?v=2c4b98136b1e';
-import { networkOf } from './network-native.js?v=2c4b98136b1e';
-import { installTlsSockets, TRUST_KEY } from './tls-socket-host.js?v=2c4b98136b1e';
+import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=7d86f81b8b3c';
+import { APKError } from './apk-error.js?v=7d86f81b8b3c';
+import { Blocked } from './scheduler.js?v=7d86f81b8b3c';
+import { networkOf } from './network-native.js?v=7d86f81b8b3c';
+import { installTlsSockets, TRUST_KEY } from './tls-socket-host.js?v=7d86f81b8b3c';
 
 // java.net.IDN and the javax.net.ssl surface (TrustManagerFactory, KeyManagerFactory, SSLContext) for libraries that probe the platform at launch (OkHttp's Platform.get(),
 // host name normalisation). java.security.Security / Provider / KeyStore and the providers (Conscrypt, the Android Keystore) are the original libcore and Conscrypt

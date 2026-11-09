@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=2c4b98136b1e">
+  <link rel="stylesheet" href="./site-pages.css?v=7d86f81b8b3c">
 </head>
 <body>
   <header class="topbar">
@@ -158,7 +158,7 @@
             <tr><td><code>await lab.waitReady({ timeoutMs })</code></td><td>Espera a tela ficar pronta (15 s por padrão); erro com <code>code: 'timeout'</code> e o motivo. Use antes de <code>lab.screenshot()</code>.</td></tr>
             <tr><td><code>await lab.composeTree({ maxNodes })</code></td><td>A árvore de layout do Compose: <code>{ owners: [{ nodes: [{ id, handle, parentId, depth, name, bounds, texts, editableText, role, testTag, actions, … }] }], totalNodes, truncated }</code>. Custa dezenas de milissegundos na VM: no máximo uma por segundo por plugin.</td></tr>
             <tr><td><code>await lab.layoutBounds({ names })</code></td><td>As caixas que “Mostrar limites de layout” desenha (Views e nós semânticos do Compose), como no painel Compose: <code>[{ key, kind, name, nameSource, bounds, size, texts, editableText, role, testTag, contentDescriptions, actions, modifiers, measurePolicy, type, hasImage }]</code>, com <code>bounds</code> em pixels da janela. Os nomes vêm de uma <code>composeTree</code> (mesmo limite de uma por segundo); <code>names: false</code> não consulta a VM.</td></tr>
-            <tr><td><code>await lab.screenshot({ key, maxWidth, type })</code></td><td>Imagem da tela inteira, ou de uma caixa (<code>key</code> de <code>layoutBounds</code>), cortada do quadro que a página mostra, sem trabalho na VM: <code>{ blob, width, height, type, notes }</code>. Padrões: <code>maxWidth</code> 1080, <code>type</code> <code>'image/png'</code>. No máximo uma a cada 500 ms por plugin. Views que a página desenha com elementos próprios (widgets XML simples) não têm raster: ficam de fora da tela inteira (<code>notes</code> diz quantas) e a caixa delas responde <code>no-image</code>.</td></tr>
+            <tr><td><code>await lab.screenshot({ key | bounds | element | node, maxWidth, type })</code></td><td>Imagem da tela inteira, ou de uma caixa (<code>key</code> de <code>layoutBounds</code>), cortada do quadro que a página mostra, sem trabalho na VM: <code>{ blob, width, height, type, notes }</code>. Padrões: <code>maxWidth</code> 1080, <code>type</code> <code>'image/png'</code>. No máximo uma a cada 500 ms por plugin. Views que a página desenha com elementos próprios (widgets XML simples) não têm raster: ficam de fora da tela inteira (<code>notes</code> diz quantas) e a caixa delas responde <code>no-image</code>.</td> Para recortar qualquer componente: <code>bounds</code> com um retângulo na janela, <code>element</code> com um item de <code>lab.layoutBounds()</code> ou <code>node</code> com um nó de <code>lab.composeTree()</code> (usa o <code>boundsInWindow</code> dele); o recorte vem de todos os rasters sob a área, na resolução deles.</tr>
             <tr><td><code>await lab.viewModels()</code></td><td>Os ViewModels da tela: da Activity, dos fragments na tela e os guardados pelas entradas da pilha do Navigation. <code>[{ handle, className, key, library, owner: { kind, label, className, handle } }]</code>.</td></tr>
             <tr><td><code>await lab.fragments()</code></td><td>Os fragments androidx na tela, com os filhos: <code>[{ handle, className, who, tag, id, hidden, state, children }]</code>.</td></tr>
             <tr><td><code>await lab.activity()</code></td><td><code>{ handle, className }</code> da Activity atual.</td></tr>
@@ -371,6 +371,6 @@ await mostrar();</code></pre></div>
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./arquitetura.html">Arquitetura da VM</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=2c4b98136b1e"></script>
+  <script type="module" src="./site-pages.js?v=7d86f81b8b3c"></script>
 </body>
 </html>

@@ -7,8 +7,8 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=2c4b98136b1e';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=2c4b98136b1e';
+import { pluginWorkerSource } from './plugin-runtime.js?v=7d86f81b8b3c';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=7d86f81b8b3c';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
@@ -144,7 +144,12 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       plugin.lastShotAt = now();
       let element = null;
       if (args?.key) { element = (await layoutBoundsFor(plugin, { names: false })).find(item => item.key === String(args.key)) ?? null; if (!element) throw Object.assign(new Error(`Elemento ${String(args.key).slice(0, 60)} não está na tela (use lab.layoutBounds() para as chaves atuais).`), { code: 'not-found' }); }
-      return captureImage({ snapshot: lastSnapshot, element, maxWidth: args?.maxWidth, type: args?.type });
+      let region = null;
+      if (args?.bounds !== undefined && args?.bounds !== null) {   // a box of the window: a layoutBounds element's bounds, a composeTree node's boundsInWindow, or a rectangle
+        const b = args.bounds; if (![b?.left, b?.top, b?.right, b?.bottom].every(Number.isFinite) || !(b.right > b.left && b.bottom > b.top)) throw Object.assign(new Error('bounds precisa de { left, top, right, bottom } com área (coordenadas da janela).'), { code: 'bad-args' });
+        region = { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
+      }
+      return captureImage({ snapshot: lastSnapshot, element, region, maxWidth: args?.maxWidth, type: args?.type });
     }
     if (!VM_METHODS.has(method)) throw Object.assign(new Error(`Método desconhecido: ${String(method).slice(0, 40)}`), { code: 'bad-query' });
     try { return await ask(plugin, method, args); }

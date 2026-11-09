@@ -19,8 +19,9 @@
  *   editableText, role, testTag, actions, ... }] }], totalNodes, truncated }. At most once per second per plugin; the same frame answers from a cache.
  * @property {(options?: { names?: boolean }) => Promise<object[]>} layoutBounds   The boxes "Mostrar limites de layout" draws: [{ key, kind: 'compose'|'view', name, nameSource,
  *   bounds (window px), size, texts, editableText, role, testTag, contentDescriptions, actions, modifiers, measurePolicy, type, hasImage }]. Names come from one composeTree (same rate limit).
- * @property {(options?: { key?: string, maxWidth?: number, type?: string }) => Promise<{ blob: Blob, width: number, height: number, type: string, notes: string[] }>} screenshot
- *   An image of the screen, or of one element (`key` from layoutBounds), cut from the frame the page shows. At most one every 500 ms per plugin.
+ * @property {(options?: { key?: string, bounds?: object, element?: object, node?: object, maxWidth?: number, type?: string }) => Promise<{ blob: Blob, width: number, height: number, type: string, notes: string[] }>} screenshot
+ *   An image of the screen, of one element (`key` from layoutBounds), or of any box: `bounds` (or `element` / `node`) takes a rectangle in window coordinates, a layoutBounds
+ *   element or a composeTree node (its boundsInWindow), cut from the frame the page shows at the rasters' own resolution. At most one every 500 ms per plugin.
  * @property {() => Promise<object[]>} viewModels    ViewModels of the active screen: [{ handle, className, key, library, owner: { kind, label, className, handle } }].
  * @property {() => Promise<object[]>} fragments     androidx fragments on the screen: [{ handle, className, who, tag, id, hidden, state, children }].
  * @property {() => Promise<{handle: string, className: string}|null>} activity   The current Activity object.
@@ -130,7 +131,11 @@ export function pluginWorkerMain(scope) {
     },
     composeTree: (options = {}) => call('composeTree', { maxNodes: options?.maxNodes }),
     layoutBounds: (options = {}) => call('layoutBounds', { names: options?.names !== false }),
-    screenshot: (options = {}) => call('screenshot', { key: options?.key ?? null, maxWidth: options?.maxWidth, type: options?.type }),
+    screenshot: (options = {}) => {
+      // bounds: a rectangle, a layoutBounds element ({ bounds }) or a composeTree node ({ boundsInWindow }); key: a layoutBounds element by its key
+      const source = options?.bounds ?? options?.element ?? options?.node ?? null, box = source ? (source.boundsInWindow ?? source.bounds ?? source) : null;
+      return call('screenshot', { key: options?.key ?? null, bounds: box ? { left: Number(box.left), top: Number(box.top), right: Number(box.right), bottom: Number(box.bottom) } : null, maxWidth: options?.maxWidth, type: options?.type });
+    },
     viewModels: () => call('viewModels', {}),
     fragments: () => call('fragments', {}),
     activity: () => call('activity', {}),

@@ -1,5 +1,5 @@
-import {APKError} from './apk-error.js?v=2c4b98136b1e';
-import {renderNodeProperties} from './rendernode-native.js?v=2c4b98136b1e';
+import {APKError} from './apk-error.js?v=7d86f81b8b3c';
+import {renderNodeProperties} from './rendernode-native.js?v=7d86f81b8b3c';
 const VIEW='Landroid/view/View;',VPA='Landroid/view/ViewPropertyAnimator;',NODE='Landroid/view/RenderNode;',INFO='Landroid/view/View$TransformationInfo;',PAINT='Landroid/graphics/Paint;',RUNNABLE='Ljava/lang/Runnable;';
 const bits=new DataView(new ArrayBuffer(4)),encode=v=>{bits.setFloat32(0,v,true);return bits.getInt32(0,true);},decode=v=>{bits.setInt32(0,v,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'view-property-animator-boundary'});};

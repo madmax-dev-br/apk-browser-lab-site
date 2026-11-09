@@ -1,7 +1,7 @@
 // Images of what the page shows, for plugins (lab.screenshot, docs/PLUGINS.md): the whole screen or one element of "Mostrar limites de layout", cut from the content
 // rasters the page already drew (the same frame the user sees; nothing is asked of the VM). Views that the page draws with its own DOM (plain XML widgets) have no
 // raster and do not appear in a whole-screen image: the result says how many were left out.
-import { flattenViews, cropRect } from './compose-inspector-panel.js?v=2c4b98136b1e';
+import { flattenViews, cropRect } from './compose-inspector-panel.js?v=7d86f81b8b3c';
 
 export const MAX_CAPTURE_WIDTH = 2048;
 const TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -21,11 +21,31 @@ function toBlob(canvas, type) {
  * element: an element of buildLayoutBoundsElements (hostId, hostSize, cropBounds), or null for the whole screen. getHost(viewId): the page element of a View (its
  * _contentLayer is the raster). Returns { blob, width, height, notes }.
  */
-export async function captureImage({ snapshot, getHost, element = null, maxWidth = 1080, type = 'image/png', doc = globalThis.document }) {
+/** A box in window coordinates from what a plugin passes: { left, top, right, bottom }, a layoutBounds element ({ bounds }) or a composeTree node ({ boundsInWindow }). */
+export function regionOf(value) {
+  const box = value && typeof value === 'object' ? (value.boundsInWindow ?? value.bounds ?? value) : null;
+  if (!box || ![box.left, box.top, box.right, box.bottom].every(Number.isFinite)) return null;
+  return box.right > box.left && box.bottom > box.top ? { left: box.left, top: box.top, right: box.right, bottom: box.bottom } : null;
+}
+export async function captureImage({ snapshot, getHost, element = null, region = null, maxWidth = 1080, type = 'image/png', doc = globalThis.document }) {
   if (!snapshot) throw failure('no-apk', 'Nenhuma tela exibida.');
   const format = TYPES.has(type) ? type : 'image/png', limit = Math.max(16, Math.min(MAX_CAPTURE_WIDTH, Number(maxWidth) || 1080)), notes = [];
   const canvas = doc.createElement('canvas');
-  if (element) {
+  if (region) {   // any box of the window (a layoutBounds element, a composeTree node, a rectangle): every raster under it, at the rasters' own resolution
+    const views = flattenViews(snapshot), layers = [];
+    for (const view of views) {
+      if (!view.visible || !view.bounds || view.rasterHostId !== view.id) continue;
+      const b = view.bounds; if (b.right <= region.left || b.left >= region.right || b.bottom <= region.top || b.top >= region.bottom) continue;
+      const layer = getHost(view.id)?._contentLayer, size = layerSize(layer); if (!(size.width > 0 && size.height > 0)) continue;
+      layers.push({ layer, size, b });
+    }
+    if (!layers.length) throw failure('no-image', 'Nenhum raster da tela cobre essa área (fora da tela, ou desenhada pelo DOM da página).');
+    const rw = region.right - region.left, rh = region.bottom - region.top;
+    const native = Math.max(1, ...layers.map(({ size, b }) => size.width / Math.max(1, b.right - b.left))), k = Math.min(native, limit / rw);
+    canvas.width = Math.max(1, Math.round(rw * k)); canvas.height = Math.max(1, Math.round(rh * k));
+    const ctx = canvas.getContext('2d');
+    for (const { layer, size, b } of layers) ctx.drawImage(layer, 0, 0, size.width, size.height, (b.left - region.left) * k, (b.top - region.top) * k, (b.right - b.left) * k, (b.bottom - b.top) * k);
+  } else if (element) {
     if (element.hostId === null || element.hostId === undefined) throw failure('no-image', 'Este elemento é desenhado pelo DOM da página: não há raster para cortar.');
     const layer = getHost(element.hostId)?._contentLayer, size = layerSize(layer);
     if (!(size.width > 0 && size.height > 0)) throw failure('no-image', 'O quadro exibido ainda não tem raster para este elemento (o app ainda não desenhou).');

@@ -1,4 +1,4 @@
-import { createHostRegistry, floatBits } from './host-contract.js?v=2c4b98136b1e';
+import { createHostRegistry, floatBits } from './host-contract.js?v=7d86f81b8b3c';
 
 // android.graphics.SurfaceTexture and the Surface made from it, as the in-memory objects they are before any producer or GL consumer exists
 // (frameworks/base/graphics/java/android/graphics/SurfaceTexture.java, core/jni/android_graphics_SurfaceTexture.cpp, core/java/android/view/Surface.java, android-13.0.0_r1).
