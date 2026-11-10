@@ -1,6 +1,6 @@
 // The list of page plugins of the "Plugins" section (src/plugins-panel.js): global (not per package; each plugin has an optional package filter), kept in localStorage with every
 // access guarded (without storage the list lasts for the page), exported and imported as JSON. Pure functions: tested without a DOM.
-import { PLUGIN_TEMPLATES } from './plugin-runtime.js?v=fc0742f95a72';
+import { PLUGIN_TEMPLATES } from './plugin-runtime.js?v=aaaa8db990e6';
 
 export const STORAGE_KEY = 'apkweb.plugins.v1', EXPORT_FORMAT = 'apk-web-lab-plugins', MAX_PLUGINS = 32, MAX_CODE_CHARS = 200000, MAX_NAME_CHARS = 120;
 let counter = 0;
