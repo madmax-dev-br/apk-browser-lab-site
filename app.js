@@ -1,29 +1,29 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=962c59289a0f';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=962c59289a0f';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=962c59289a0f';
-import { initCollapsibleSections } from './panel-sections.js?v=962c59289a0f';
-import { initHelpTips } from './help-tips.js?v=962c59289a0f';
-import { createToolDock } from './tool-dock.js?v=962c59289a0f';
-import { createPermissionsPanel } from './permissions-panel.js?v=962c59289a0f';
-import { createOverridesPanel } from './overrides-panel.js?v=962c59289a0f';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=962c59289a0f';
-import { createHostMapPanel } from './host-map-panel.js?v=962c59289a0f';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=962c59289a0f';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=962c59289a0f';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=962c59289a0f';
-import { createDeviceView, createViewState } from './device-view.js?v=962c59289a0f';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=962c59289a0f';
-import { formatApiGapReport } from './api-gap-scan.js?v=962c59289a0f';
-import { createLogcatPanel } from './logcat-panel.js?v=962c59289a0f';
-import { createComposeInspectorPanel } from './compose-inspector-panel.js?v=962c59289a0f';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=962c59289a0f';
-import { createPluginHost } from './plugin-host.js?v=962c59289a0f';
-import { captureImage } from './screen-capture.js?v=962c59289a0f';
-import { createPluginsPanel } from './plugins-panel.js?v=962c59289a0f';
-import { createMcpTools } from './mcp-tools.js?v=962c59289a0f';
-import { createMcpLink } from './mcp-link.js?v=962c59289a0f';
-import { createModalHost } from './lab-modal.js?v=962c59289a0f';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=962c59289a0f';
+import { APKWorkerClient } from './apk-worker-client.js?v=fe7b63165e52';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=fe7b63165e52';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=fe7b63165e52';
+import { initCollapsibleSections } from './panel-sections.js?v=fe7b63165e52';
+import { initHelpTips } from './help-tips.js?v=fe7b63165e52';
+import { createToolDock } from './tool-dock.js?v=fe7b63165e52';
+import { createPermissionsPanel } from './permissions-panel.js?v=fe7b63165e52';
+import { createOverridesPanel } from './overrides-panel.js?v=fe7b63165e52';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=fe7b63165e52';
+import { createHostMapPanel } from './host-map-panel.js?v=fe7b63165e52';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=fe7b63165e52';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=fe7b63165e52';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=fe7b63165e52';
+import { createDeviceView, createViewState } from './device-view.js?v=fe7b63165e52';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=fe7b63165e52';
+import { formatApiGapReport } from './api-gap-scan.js?v=fe7b63165e52';
+import { createLogcatPanel } from './logcat-panel.js?v=fe7b63165e52';
+import { createComposeInspectorPanel, flattenViews } from './compose-inspector-panel.js?v=fe7b63165e52';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=fe7b63165e52';
+import { createPluginHost } from './plugin-host.js?v=fe7b63165e52';
+import { captureImage } from './screen-capture.js?v=fe7b63165e52';
+import { createPluginsPanel } from './plugins-panel.js?v=fe7b63165e52';
+import { createMcpTools } from './mcp-tools.js?v=fe7b63165e52';
+import { createMcpLink } from './mcp-link.js?v=fe7b63165e52';
+import { createModalHost } from './lab-modal.js?v=fe7b63165e52';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=fe7b63165e52';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -514,7 +514,62 @@ pluginsPanel = createPluginsPanel({ $, host: pluginHost, modals: modalHost });
 // "MCP" (src/mcp-link.js, src/mcp-tools.js, scripts/lab-mcp.mjs): an MCP client on this machine uses this page through the local bridge; off until Conectar
 const MCP_KEY = 'apkweb-mcp-v1';
 const mcpCaller = { id: 'mcp', name: 'MCP' };
-const mcpTools = createMcpTools({ actions: { mock: spec => pluginActions.mock(mcpCaller, spec), unmock: id => pluginActions.unmock(mcpCaller, { id }), mocks: () => pluginActions.mocks(mcpCaller), reload: mode => pluginActions.reload(mcpCaller, { mode }) }, query: (method, args) => pluginHost.query(method, args), plugins: () => pluginHost.list?.() ?? [], logcat: () => logcatPanel.store.entries, network: () => netlogPanel.store.entries,
+/** Input for the MCP client through the page's own input paths (src/device-view.js): a tap on Compose content is a real touch (MotionEvents through the window), a View
+ * is clicked like a mouse click on it, text goes in by SetText (Compose) or the field's input (View), scrolling by the ScrollBy action (Compose) or the View's scroll. */
+const mcpInput = {
+  async target(args) {
+    if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('Nenhum app rodando: abra um APK e clique em Executar.'), { code: 'no-apk' });
+    const elements = await pluginHost.query('layoutBounds', { names: false }), wanted = args.text ? String(args.text).toLowerCase() : null;
+    const textOf = element => [...(element.texts ?? []), element.editableText ?? '', ...(element.contentDescriptions ?? [])].join(' ').toLowerCase();
+    let element = null;
+    if (args.element_key) element = elements.find(item => item.key === String(args.element_key)) ?? null;
+    else if (args.test_tag || wanted) {
+      const matches = elements.filter(item => (!args.test_tag || item.testTag === String(args.test_tag)) && (!wanted || textOf(item).includes(wanted)));
+      element = matches.find(item => item.actions?.includes('OnClick')) ?? matches[0] ?? null;   // the clickable one first (a Button and its inner Text share the text)
+    }
+    if ((args.element_key || args.test_tag || wanted) && !element) throw Object.assign(new Error(`Nenhum componente na tela com ${args.element_key ? `a chave ${args.element_key}` : [args.test_tag ? `testTag "${args.test_tag}"` : '', wanted ? `texto "${args.text}"` : ''].filter(Boolean).join(' e ')} (veja layout_bounds).`), { code: 'not-found' });
+    const point = element?.bounds ? { x: (element.bounds.left + element.bounds.right) / 2, y: (element.bounds.top + element.bounds.bottom) / 2 } : Number.isFinite(args.x) && Number.isFinite(args.y) ? { x: args.x, y: args.y } : null;
+    return { element, point, elements };
+  },
+  views() { return flattenViews(state.lastSnapshot).filter(view => view.visible && view.bounds); },
+  ownerAt(point) { return this.views().filter(view => view.compose && point.x >= view.bounds.left && point.x < view.bounds.right && point.y >= view.bounds.top && point.y < view.bounds.bottom).at(-1) ?? null; },
+  async tap(args) {
+    const { element, point } = await this.target(args); if (!point) throw Object.assign(new Error('Diga onde tocar: test_tag, text, element_key ou x e y.'), { code: 'bad-args' });
+    const owner = element?.kind === 'view' ? null : this.ownerAt(point);
+    if (owner) {   // a real touch: DOWN and UP at the point, in the Compose owner's coordinates (as the page's pointer handler sends them)
+      const x = point.x - owner.bounds.left, y = point.y - owner.bounds.top, t = performance.now();
+      state.pendingPointers.push({ ownerViewId: owner.id, action: 0, x, y, t }, { ownerViewId: owner.id, action: 1, x, y, t: t + 60 }); await flushPendingInputs();
+      return { via: 'toque', element: element?.name ?? null, x: Math.round(point.x), y: Math.round(point.y) };
+    }
+    const view = element?.kind === 'view' ? { id: element.id } : this.views().filter(item => item.clickable && point.x >= item.bounds.left && point.x < item.bounds.right && point.y >= item.bounds.top && point.y < item.bounds.bottom).sort((a, b) => b.depth - a.depth)[0];
+    if (!view) throw Object.assign(new Error('Nada clicável nesse ponto.'), { code: 'not-found' });
+    await clickView(view.id); return { via: 'clique na View', element: element?.name ?? null, id: view.id };
+  },
+  async type(args) {
+    const { element } = await this.target(args); if (!element) throw Object.assign(new Error('Diga em qual campo escrever: test_tag, text ou element_key.'), { code: 'bad-args' });
+    const text = String(args.value ?? '');
+    if (element.kind === 'compose') {
+      if (!element.actions?.includes('SetText')) throw Object.assign(new Error(`${element.name} não é um campo de texto (sem a ação SetText).`), { code: 'bad-args' });
+      const [, owner, node] = String(element.key).split(':'); deviceView.queueComposeAction(Number(owner), Number(node), 'SetText', [text]); await flushPendingInputs();
+    } else { state.pendingInputs.set(element.id, text); await flushPendingInputs(); }
+    return { element: element.name, value: text };
+  },
+  async scroll(args) {
+    const { element, point, elements } = await this.target(args), dx = Number(args.dx ?? 0), dy = Number(args.dy ?? 400);
+    const inside = (outer, p) => outer.bounds && p && p.x >= outer.bounds.left && p.x <= outer.bounds.right && p.y >= outer.bounds.top && p.y <= outer.bounds.bottom;
+    const area = item => item.bounds ? (item.bounds.right - item.bounds.left) * (item.bounds.bottom - item.bounds.top) : Infinity;
+    // the scrollable that holds the point (the smallest), or the largest one on screen when no target was given
+    const scrollables = elements.filter(item => item.kind === 'compose' && item.actions?.includes('ScrollBy'));
+    const composeTarget = (element?.actions?.includes('ScrollBy') ? element : null) ?? (point ? scrollables.filter(item => inside(item, point)).sort((a, b) => area(a) - area(b))[0] : scrollables.sort((a, b) => area(b) - area(a))[0]);
+    if (composeTarget) { const [, owner, node] = String(composeTarget.key).split(':'); deviceView.queueComposeAction(Number(owner), Number(node), 'ScrollBy', [dx, dy]); await flushPendingInputs(); return { via: 'ScrollBy', element: composeTarget.name, dx, dy }; }
+    const views = this.views().filter(view => /ScrollView|RecyclerView|ListView|NestedScrollView/.test(String(view.type)) && (!point || inside(view, point))).sort((a, b) => b.depth - a.depth);
+    if (!views.length) throw Object.assign(new Error('Nada rolável na tela.'), { code: 'not-found' });
+    const previous = state.pendingScrollBys.get(views[0].id) ?? { dx: 0, dy: 0 }; state.pendingScrollBys.set(views[0].id, { dx: previous.dx + dx, dy: previous.dy + dy }); await flushPendingInputs();
+    return { via: 'rolagem da View', id: views[0].id, dx, dy };
+  },
+  async back() { if (!state.canGoBack) throw Object.assign(new Error('Não há tela anterior para voltar.'), { code: 'bad-args' }); await backAPK(); return { back: true }; },
+};
+const mcpTools = createMcpTools({ input: mcpInput, actions: { mock: spec => pluginActions.mock(mcpCaller, spec), unmock: id => pluginActions.unmock(mcpCaller, { id }), mocks: () => pluginActions.mocks(mcpCaller), reload: mode => pluginActions.reload(mcpCaller, { mode }) }, query: (method, args) => pluginHost.query(method, args), plugins: () => pluginHost.list?.() ?? [], logcat: () => logcatPanel.store.entries, network: () => netlogPanel.store.entries,
   status: () => ({ running: !!apkVM.worker, packageName: state.inventory?.packageName ?? null, file: state.fileName ?? null }) });
 mcpLink = createMcpLink({ execute: (tool, args) => mcpTools.execute(tool, args), onState: ({ state: linkState, message, calls, lastTool }) => {
   const connected = linkState === 'conectado';

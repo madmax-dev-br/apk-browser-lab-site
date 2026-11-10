@@ -23,7 +23,7 @@ const fail = message => Object.assign(new Error(message), { code: 'bad-args' });
  * instances, referrers, compositionLocals, findCompositionLocal). plugins(): the host's read model of the plugins. logcat() / network(): the entries of the page stores.
  * status(): what the page knows about the loaded APK. sleep(ms).
  */
-export function createMcpTools({ query, plugins = () => [], logcat = () => [], network = () => [], status = () => ({}), actions = null, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
+export function createMcpTools({ query, plugins = () => [], logcat = () => [], network = () => [], status = () => ({}), actions = null, input = null, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
   async function waitReady(timeoutMs = 15000) {
     const until = now() + bounded(timeoutMs, 15000, 100, 120000);
     for (;;) {
@@ -53,6 +53,22 @@ export function createMcpTools({ query, plugins = () => [], logcat = () => [], n
       return { key: element.key };
     }
     return {};
+  }
+  /** The window of entries a call wants: start "now" (nothing yet, only the cursor to follow from here), after a cursor (since), from a moment (from_time: ISO or epoch ms),
+   * or the last N seconds (last_seconds); the device clock is the entries' `wall`. */
+  function windowOf(args) {
+    const since = Number.isFinite(Number(args.since)) ? Number(args.since) : null;
+    const fromTime = args.from_time !== undefined ? (Number.isFinite(Number(args.from_time)) ? Number(args.from_time) : Date.parse(String(args.from_time))) : Number.isFinite(Number(args.last_seconds)) ? Date.now() - Number(args.last_seconds) * 1000 : null;
+    if (args.from_time !== undefined && !Number.isFinite(fromTime)) throw fail(`from_time inválido: ${args.from_time} (use ISO 8601 ou milissegundos desde 1970).`);
+    return entry => (since === null || !(entry.seq <= since)) && (fromTime === null || !Number.isFinite(entry.wall) || entry.wall >= fromTime);
+  }
+  /** After an input: wait for the screen to settle (up to wait_ms), then the screen and, when asked, its image. */
+  async function afterInput(result, args) {
+    const wait = bounded(args.wait_ms, 2000, 0, 20000), until = now() + wait; let screen = await query('screen', {});
+    while (!screen?.ready?.ready && now() < until) { await sleep(150); screen = await query('screen', {}); }
+    const content = [text({ ...result, activity: screen?.activity ?? null, ready: !!screen?.ready?.ready, ...(screen?.ready?.ready ? {} : { waitingFor: screen?.ready?.waitingFor ?? [] }) })];
+    if (args.screenshot) { const shot = await query('screenshot', { maxWidth: args.max_width }); content.unshift(await image(shot)); }
+    return content;
   }
   const tools = {
     async lab_status() {
@@ -99,8 +115,9 @@ export function createMcpTools({ query, plugins = () => [], logcat = () => [], n
     async logcat(args) {
       // a cursor to follow the Logcat: `since` (the `next` of the previous answer) returns only newer lines; `wait_ms` waits up to that long for one to arrive
       const min = LEVEL_ORDER.indexOf(String(args.level ?? 'V').toUpperCase()), needle = args.contains ? String(args.contains).toLowerCase() : null, limit = bounded(args.limit, 200, 1, 5000);
-      const since = Number.isFinite(Number(args.since)) ? Number(args.since) : -1, wait = bounded(args.wait_ms, 0, 0, 30000);
-      const pick = () => logcat().filter(entry => !(entry.seq <= since) && LEVEL_ORDER.indexOf(entry.level) >= Math.max(0, min) && (!needle || `${entry.tag} ${entry.message}`.toLowerCase().includes(needle)));
+      const wait = bounded(args.wait_ms, 0, 0, 30000), inWindow = windowOf(args), since = Number.isFinite(Number(args.since)) ? Number(args.since) : -1;
+      if (args.start === 'now') { const all = logcat(); return [text('Acompanhando a partir de agora: passe since com o next abaixo nas próximas chamadas.'), text({ next: all.length ? all.at(-1).seq : -1, count: 0 })]; }
+      const pick = () => logcat().filter(entry => inWindow(entry) && LEVEL_ORDER.indexOf(entry.level) >= Math.max(0, min) && (!needle || `${entry.tag} ${entry.message}`.toLowerCase().includes(needle)));
       let rows = pick(); for (const until = now() + wait; !rows.length && now() < until;) { await sleep(200); rows = pick(); }
       rows = rows.slice(-limit);
       const all = logcat(), next = all.length ? all.at(-1).seq : since;
@@ -109,8 +126,9 @@ export function createMcpTools({ query, plugins = () => [], logcat = () => [], n
     },
     async network(args) {
       const needle = args.contains ? String(args.contains).toLowerCase() : null, limit = bounded(args.limit, 50, 1, 1000), withBody = args.include_body === true;
-      const since = Number.isFinite(Number(args.since)) ? Number(args.since) : -1, wait = bounded(args.wait_ms, 0, 0, 30000);
-      const pick = () => network().filter(entry => !(entry.seq <= since) && (!needle || `${entry.method} ${entry.url}`.toLowerCase().includes(needle)));
+      const wait = bounded(args.wait_ms, 0, 0, 30000), inWindow = windowOf(args), since = Number.isFinite(Number(args.since)) ? Number(args.since) : -1;
+      if (args.start === 'now') { const all = network(); return [text({ requests: [], next: all.length ? all.at(-1).seq : -1, note: 'Acompanhando a partir de agora: passe since com este next nas próximas chamadas.' })]; }
+      const pick = () => network().filter(entry => inWindow(entry) && (!needle || `${entry.method} ${entry.url}`.toLowerCase().includes(needle)));
       let rows = pick(); for (const until = now() + wait; !rows.length && now() < until;) { await sleep(200); rows = pick(); }
       const all = network(), next = all.length ? all.at(-1).seq : since;
       const out = rows.slice(-limit).map(entry => ({ seq: entry.seq, method: entry.method, url: entry.url, status: entry.status, outcome: entry.outcome, complete: entry.complete, durationMs: entry.durationMs, contentType: entry.contentType, responseBytes: entry.responseBytes,
@@ -127,6 +145,11 @@ export function createMcpTools({ query, plugins = () => [], logcat = () => [], n
     },
     async remove_mock(args) { if (!actions?.unmock) throw fail('Mocks não estão disponíveis nesta página.'); return [text(await actions.unmock(String(args.id ?? '')))]; },
     async list_mocks() { if (!actions?.mocks) throw fail('Mocks não estão disponíveis nesta página.'); return [text(await actions.mocks())]; },
+    // ---- input: the page's own input paths (a real touch on Compose, a click on a View, SetText, ScrollBy) ----
+    async tap(args) { if (!input?.tap) throw fail('Entrada não disponível nesta página.'); return afterInput(await input.tap(args), args); },
+    async type(args) { if (!input?.type) throw fail('Entrada não disponível nesta página.'); return afterInput(await input.type(args), args); },
+    async scroll(args) { if (!input?.scroll) throw fail('Entrada não disponível nesta página.'); return afterInput(await input.scroll(args), args); },
+    async back(args) { if (!input?.back) throw fail('Entrada não disponível nesta página.'); return afterInput(await input.back(args), args); },
     async reload(args) { if (!actions?.reload) throw fail('Recarregar não está disponível nesta página.'); return [text(await actions.reload(args.mode === 'reopen' ? 'reopen' : 'recreate'))]; },
     async wait_ready(args) { const result = await waitReady(args.timeout_ms); return [text({ ready: result.ready, activity: result.screen?.activity ?? null, waitingFor: result.screen?.ready?.waitingFor ?? [] })]; },
   };

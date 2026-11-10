@@ -1,7 +1,7 @@
 // "Estado da tela": a plain-text picture of what the VM shows and why it may be blank, for "Copiar diagnóstico" and for a button that works without any error. Read-only on the VM.
 // Pure data: no app or library names are written here; class names come from the running app and only reach the user's clipboard.
-import { reportSummary, collapseThreads } from './report-summary.js?v=962c59289a0f';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=962c59289a0f';
+import { reportSummary, collapseThreads } from './report-summary.js?v=fe7b63165e52';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=fe7b63165e52';
 const MiB = 1024 * 1024, BYTES_PER_OBJECT = 1600;
 const STAGES = { 0: 'destruída', 1: 'criada', 2: 'parada', 3: 'iniciada/pausada', 4: 'retomada (em primeiro plano)' };
 const dotted = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');
