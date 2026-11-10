@@ -4,7 +4,7 @@
  "abi": "wasm32",
  "base": {
   "soname": "libc++_shared.so",
-  "file": "../libc++_shared.wasm",
+  "file": "../libcxx_shared.wasm",
   "bytes": 3028054,
   "sha256": "d8d768e17df43fb4d20d15b19c0f735afc8a891b0d03e8482bcc4f0362a2ba1a"
  },
