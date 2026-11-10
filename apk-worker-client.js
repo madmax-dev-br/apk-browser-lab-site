@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=2378988610d3';
-import { createRasterReceiver } from './raster-cache.js?v=2378988610d3';
+import { createWebAudioPlayer } from './web-audio-player.js?v=125ce560ba52';
+import { createRasterReceiver } from './raster-cache.js?v=125ce560ba52';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=2378988610d3', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=125ce560ba52', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -170,6 +170,11 @@ export class APKWorkerClient {
   async input(id, text) { return (await this.request('input', { id, text }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async check(id, checked) { return (await this.request('check', { id, checked }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async scroll(id, x, y) { return (await this.request('scroll', { id, x, y }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
+  /** Keys of the page's keyboard for a Compose text field, sent through the served view's InputConnection (src/input-method-service-host.js imeEdit); each op may carry the
+   *  browser control's resulting text as `fallbackText`, used (and recorded) only when the view has no InputConnection. */
+  async ime(ownerViewId, nodeId, ops) { return (await this.request('ime', { ownerViewId, nodeId, ops }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
+  /** A click on an item of a floating action-mode toolbar (snapshot.actionModes): the VM performs MenuBuilder.performItemAction on it. */
+  async actionItem(modeId, itemId) { return (await this.request('action-item', { modeId, itemId }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async composeAction(ownerViewId, nodeId, action, args = []) { return (await this.request('compose-action', {ownerViewId,nodeId,action,args}, {timeoutMs:this.eventTimeoutMs})).snapshot; }
   /** "Recriar" (mode recreate: Activity.recreate(), state kept) or "Reabrir" (mode reopen: a fresh instance with the same Intent); answers the snapshot after the relaunch. */
   async reloadActivity({ mode = 'recreate', onProgress } = {}) {

@@ -1,29 +1,29 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=2378988610d3';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=2378988610d3';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=2378988610d3';
-import { initCollapsibleSections } from './panel-sections.js?v=2378988610d3';
-import { initHelpTips } from './help-tips.js?v=2378988610d3';
-import { createToolDock } from './tool-dock.js?v=2378988610d3';
-import { createPermissionsPanel } from './permissions-panel.js?v=2378988610d3';
-import { createOverridesPanel } from './overrides-panel.js?v=2378988610d3';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=2378988610d3';
-import { createHostMapPanel } from './host-map-panel.js?v=2378988610d3';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=2378988610d3';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=2378988610d3';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=2378988610d3';
-import { createDeviceView, createViewState } from './device-view.js?v=2378988610d3';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=2378988610d3';
-import { formatApiGapReport } from './api-gap-scan.js?v=2378988610d3';
-import { createLogcatPanel } from './logcat-panel.js?v=2378988610d3';
-import { createComposeInspectorPanel, flattenViews } from './compose-inspector-panel.js?v=2378988610d3';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=2378988610d3';
-import { createPluginHost } from './plugin-host.js?v=2378988610d3';
-import { captureImage } from './screen-capture.js?v=2378988610d3';
-import { createPluginsPanel } from './plugins-panel.js?v=2378988610d3';
-import { createMcpTools } from './mcp-tools.js?v=2378988610d3';
-import { createMcpLink } from './mcp-link.js?v=2378988610d3';
-import { createModalHost } from './lab-modal.js?v=2378988610d3';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=2378988610d3';
+import { APKWorkerClient } from './apk-worker-client.js?v=125ce560ba52';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=125ce560ba52';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=125ce560ba52';
+import { initCollapsibleSections } from './panel-sections.js?v=125ce560ba52';
+import { initHelpTips } from './help-tips.js?v=125ce560ba52';
+import { createToolDock } from './tool-dock.js?v=125ce560ba52';
+import { createPermissionsPanel } from './permissions-panel.js?v=125ce560ba52';
+import { createOverridesPanel } from './overrides-panel.js?v=125ce560ba52';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=125ce560ba52';
+import { createHostMapPanel } from './host-map-panel.js?v=125ce560ba52';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=125ce560ba52';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=125ce560ba52';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=125ce560ba52';
+import { createDeviceView, createViewState } from './device-view.js?v=125ce560ba52';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=125ce560ba52';
+import { formatApiGapReport } from './api-gap-scan.js?v=125ce560ba52';
+import { createLogcatPanel } from './logcat-panel.js?v=125ce560ba52';
+import { createComposeInspectorPanel, flattenViews } from './compose-inspector-panel.js?v=125ce560ba52';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=125ce560ba52';
+import { createPluginHost } from './plugin-host.js?v=125ce560ba52';
+import { captureImage } from './screen-capture.js?v=125ce560ba52';
+import { createPluginsPanel } from './plugins-panel.js?v=125ce560ba52';
+import { createMcpTools } from './mcp-tools.js?v=125ce560ba52';
+import { createMcpLink } from './mcp-link.js?v=125ce560ba52';
+import { createModalHost } from './lab-modal.js?v=125ce560ba52';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=125ce560ba52';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -432,7 +432,7 @@ async function inspectSelectedNative() {
 }
 async function importSource(source, autoRun = false) {
   if (state.busy) return;
-  state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
+  state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer', 'android-action-mode-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
   permissionsPanel?.detach(); overridesPanel?.detach(); ignoredPanel?.detach(); mocksPanel?.detach(); hostMapPanel?.resetHits(); pluginHost.vmChanged();
   // A new run (another APK, or Executar APK again) starts clean: the Worker of the previous run is terminated by apkVM.load, and what the page still shows of it goes too
   // (Logcat, network requests, memory meter, error report, last frame and heartbeat). App data follows the "Manter dados do app" option; the panel settings are kept.
@@ -515,7 +515,8 @@ pluginsPanel = createPluginsPanel({ $, host: pluginHost, modals: modalHost });
 const MCP_KEY = 'apkweb-mcp-v1';
 const mcpCaller = { id: 'mcp', name: 'MCP' };
 /** Input for the MCP client through the page's own input paths (src/device-view.js): a tap on Compose content is a real touch (MotionEvents through the window), a View
- * is clicked like a mouse click on it, text goes in by SetText (Compose) or the field's input (View), scrolling by the ScrollBy action (Compose) or the View's scroll. */
+ * is clicked like a mouse click on it, text goes in through the keyboard path (Compose: the field is focused, then select-all and one commitText per character on its
+ * InputConnection, like Android's soft keyboard; SetText only when the field has no InputConnection) or the field's input (View), scrolling by the ScrollBy action (Compose) or the View's scroll. */
 const mcpInput = {
   async target(args) {
     if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('Nenhum app rodando: abra um APK e clique em Executar.'), { code: 'no-apk' });
@@ -550,7 +551,12 @@ const mcpInput = {
     const text = String(args.value ?? '');
     if (element.kind === 'compose') {
       if (!element.actions?.includes('SetText')) throw Object.assign(new Error(`${element.name} não é um campo de texto (sem a ação SetText).`), { code: 'bad-args' });
-      const [, owner, node] = String(element.key).split(':'); deviceView.queueComposeAction(Number(owner), Number(node), 'SetText', [text]); await flushPendingInputs();
+      const [, owner, node] = String(element.key).split(':'), ownerId = Number(owner), nodeId = Number(node), fallbacks = state.imeFallbacks ?? 0;
+      if (element.actions.includes('RequestFocus')) deviceView.queueComposeAction(ownerId, nodeId, 'RequestFocus');   // the field gains focus first: that starts its input session
+      // replace the whole text as a person would: select all, then type character by character (each key carries the SetText fallback the field would get without a connection)
+      const characters = [...text], ops = [{ kind: 'selectAll', fallbackText: null }, ...(characters.length ? characters.map((character, index) => ({ kind: 'commit', text: character, fallbackText: characters.slice(0, index + 1).join('') })) : [{ kind: 'deleteBackward', fallbackText: '' }])];
+      deviceView.queueComposeAction(ownerId, nodeId, 'ime', ops); await flushPendingInputs();
+      return { element: element.name, value: text, via: (state.imeFallbacks ?? 0) > fallbacks ? 'SetText (o campo não tem InputConnection; veja o log de execução)' : 'teclado (InputConnection)' };
     } else { state.pendingInputs.set(element.id, text); await flushPendingInputs(); }
     return { element: element.name, value: text };
   },

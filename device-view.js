@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=2378988610d3';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=2378988610d3';
-import { isTrustedRasterURL } from './raster-cache.js?v=2378988610d3';
+import { updateWebViewSlot } from './webview-slot.js?v=125ce560ba52';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=125ce560ba52';
+import { isTrustedRasterURL } from './raster-cache.js?v=125ce560ba52';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -344,6 +344,16 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
 // Compose pixels come from the original Canvas callbacks captured by the VM.
 function queueComposeAction(ownerViewId, nodeId, action, args = []) {
   if (!state.runtime || state.lastAPKError) return;
+  if (action === 'ime') {   // keys of the page keyboard: consecutive keys for one field travel together (at most IME_OPS_PER_REQUEST per request), in order with everything else
+    const key = `${ownerViewId}:${nodeId}`;
+    for (const op of args) {
+      const last = state.pendingComposeActions.at(-1);
+      if (last?.key === key && last.action === 'ime' && last.args.length < IME_OPS_PER_REQUEST) last.args.push(op);
+      else if (state.pendingComposeActions.length < 128) state.pendingComposeActions.push({ key, ownerViewId, nodeId, action, args: [op], session: state.viewSession, control: state.composeElements.get(key) });
+      else { reportAPKError(new Error('A fila de ações Compose excedeu 128 eventos; reabra o APK.'), 'Fila de acessibilidade interrompida'); return; }
+    }
+    return flushPendingInputs();
+  }
   const key = `${ownerViewId}:${nodeId}`, entry = { key, ownerViewId, nodeId, action, args, session: state.viewSession, control: state.composeElements.get(key) };
   const last = state.pendingComposeActions.at(-1);
   // Coalesce only adjacent text replacements; a click remains ordered after
@@ -361,6 +371,45 @@ function queueComposeAction(ownerViewId, nodeId, action, args = []) {
 function insideComposeHost(target, stop) {
   for (let node = target; node && node !== stop; node = node.parentNode ?? node.parentElement) if (node._pointerBound) return true;
   return false;
+}
+// ---- The page keyboard (Compose text fields). Android key codes and meta states of android.view.KeyEvent.
+const IME_OPS_PER_REQUEST = 64, META_SHIFT = 0x41, META_ALT = 0x12, META_CTRL = 0x3000, KEYCODE_DEL = 67, KEYCODE_FORWARD_DEL = 112, KEYCODE_Z = 54;
+const CURSOR_KEYS = { ArrowLeft: 21, ArrowRight: 22, ArrowUp: 19, ArrowDown: 20, Home: 122, End: 123, PageUp: 92, PageDown: 93 };
+/** The served view of the VM's InputMethodManager is this Compose owner and it has an InputConnection (snapshot.ime, src/input-method-service-host.js imeState). */
+function imeServes(ownerViewId) { const ime = state.imeState; return !!ime?.connected && ime.servedViewId === ownerViewId; }
+/** What Android's keyboard sends for a textarea edit (InputEvent.inputType), or null for an edit it has no key for (that one reaches the app through SetText, as before).
+ * Text, deletions and Enter always go through the keyboard path (the Worker falls back to SetText when the field has no InputConnection); keys that only exist as key events
+ * (word deletion, undo/redo) do so only while the field has a connection, so without one the browser's edit still reaches the app. */
+function keyboardOperation(event, connected) {
+  const type = event.inputType, data = event.data ?? event.dataTransfer?.getData?.('text/plain') ?? '';
+  switch (type) {
+    case 'insertText': case 'insertReplacementText': case 'insertFromPaste': case 'insertFromDrop': case 'insertFromYank': return data ? { kind: 'commit', text: String(data) } : null;
+    case 'insertLineBreak': case 'insertParagraph': return { kind: 'enter' };
+    case 'deleteContentBackward': case 'deleteByCut': case 'deleteByDrag': case 'deleteContent': return { kind: 'deleteBackward' };
+    case 'deleteContentForward': return { kind: 'deleteForward' };
+  }
+  if (!connected) return null;
+  switch (type) {   // hardware-keyboard chords Compose's text field handles (KeyMapping): Ctrl+Backspace / Ctrl+Delete a word, Alt+Backspace / Alt+Delete to the line edge, Ctrl+Z / Ctrl+Shift+Z
+    case 'deleteWordBackward': return { kind: 'key', code: KEYCODE_DEL, meta: META_CTRL };
+    case 'deleteWordForward': return { kind: 'key', code: KEYCODE_FORWARD_DEL, meta: META_CTRL };
+    case 'deleteSoftLineBackward': case 'deleteHardLineBackward': return { kind: 'key', code: KEYCODE_DEL, meta: META_ALT };
+    case 'deleteSoftLineForward': case 'deleteHardLineForward': return { kind: 'key', code: KEYCODE_FORWARD_DEL, meta: META_ALT };
+    case 'historyUndo': return { kind: 'key', code: KEYCODE_Z, meta: META_CTRL };
+    case 'historyRedo': return { kind: 'key', code: KEYCODE_Z, meta: META_CTRL | META_SHIFT };
+  }
+  return null;
+}
+/** Applies a key to the textarea the way the browser would have (its value is invisible; the next snapshot replaces it with the app's) and returns that text: the SetText fallback. */
+function echoEdit(control, op) {
+  const value = control.value, start = Math.min(control.selectionStart ?? value.length, control.selectionEnd ?? value.length), end = Math.max(control.selectionStart ?? value.length, control.selectionEnd ?? value.length);
+  const low = at => { const c = value.charCodeAt(at); return c >= 0xdc00 && c <= 0xdfff; }, high = at => { const c = value.charCodeAt(at); return c >= 0xd800 && c <= 0xdbff; };
+  let next = value, caret = start;
+  if (op.kind === 'commit' || op.kind === 'enter') { const text = op.kind === 'enter' ? '\n' : op.text; next = value.slice(0, start) + text + value.slice(end); caret = start + text.length; }
+  else if (op.kind === 'deleteBackward') { if (start !== end) next = value.slice(0, start) + value.slice(end); else if (start > 0) { const n = start > 1 && low(start - 1) && high(start - 2) ? 2 : 1; next = value.slice(0, start - n) + value.slice(start); caret = start - n; } }
+  else if (op.kind === 'deleteForward') { if (start !== end) next = value.slice(0, start) + value.slice(end); else if (start < value.length) { const n = high(start) && low(start + 1) ? 2 : 1; next = value.slice(0, start) + value.slice(start + n); } }
+  else return null;
+  control.value = next; try { control.setSelectionRange(caret, caret); } catch { /* detached */ }
+  return next;
 }
 const POINTER_CLICKS_DEFAULT = true;   // taps reach the app as real MotionEvents (the press ripple animates under them); ?pointerClicks=semantic on the player frame selects the OnClick path
   const pointerClicks = () => deviceState.pointerClicks ?? POINTER_CLICKS_DEFAULT;   // ?pointerClicks=real|semantic on the player frame overrides it (validation runs both)
@@ -432,20 +481,41 @@ function renderComposeSemantics(snapshot) {
         const session = state.viewSession;
         control.addEventListener('click', event => event.stopPropagation());
         if (editable) {
-          // SetText places the cursor at the end of the new text (Compose's semantics setText): the textarea's own caret follows with SetSelection, so typing in the middle stays
-          // in the middle; moving the caret (arrows, Home/End, a click inside the field) sends it too.
-          // Only a collapsed caret is sent: a range (the browser's select-all, a drag) would put Compose in selection mode, whose floating text toolbar needs ActionMode, and a caret
-          // already where Compose has it (the end, after SetText) would be declined. `control._caret` is where the app's field has its caret (TextSelectionRange, or the end after SetText).
+          // The page's keyboard types like Android's soft keyboard: each edit of the textarea (beforeinput) becomes the InputConnection call an IME makes on the served
+          // AndroidComposeView (commitText, deleteSurroundingText, setComposingText, performEditorAction, sendKeyEvent; src/input-method-service-host.js imeEdit), the browser's own
+          // edit is cancelled and the textarea then mirrors what the app made of it (editableText, TextSelectionRange). The app's caret is the one that counts: a tap reaches Compose
+          // as a real touch, arrow keys go through the connection as key events. Each key carries the text the textarea would have held: a field with no InputConnection gets that
+          // through the semantics SetText action instead, and the Worker records why (snapshot.imeFallback).
+          control.spellcheck = false; control.setAttribute('autocomplete', 'off'); control.setAttribute('autocorrect', 'off'); control.setAttribute('autocapitalize', 'off');
+          const typing = () => imeServes(owner.ownerViewId);
+          const type = op => queueComposeAction(owner.ownerViewId, node.nodeId, 'ime', [op]);
+          // Without an input session (semantic pointer mode, or no InputConnection) the caret follows the textarea through SetSelection, as before: only a collapsed caret is sent
+          // (a range would put Compose in selection mode, whose floating toolbar needs ActionMode), and not one already where the app has it (`control._caret`).
           const selection = () => {
-            if (session !== state.viewSession || !control._actions?.has('SetSelection')) return;
+            if (session !== state.viewSession || !control._actions?.has('SetSelection') || typing()) return;
             const start = control.selectionStart ?? control.value.length, end = control.selectionEnd ?? control.value.length;
             if (start !== end || start === control._caret) return;
             control._caret = start; queueComposeAction(owner.ownerViewId, node.nodeId, 'SetSelection', [start, start, false]);
           };
-          control.addEventListener('input', () => { if (session === state.viewSession) { queueComposeAction(owner.ownerViewId, node.nodeId, 'SetText', [control.value]); control._caret = control.value.length; selection(); } });
+          control.addEventListener('beforeinput', event => {
+            if (session !== state.viewSession || event.isComposing || control._composing) return;
+            const op = keyboardOperation(event, typing()); if (!op) return;   // not a key the keyboard sends: the input event below takes the browser's edit
+            event.preventDefault(); op.fallbackText = echoEdit(control, op); type(op);
+          });
+          control.addEventListener('compositionstart', () => { control._composing = true; });
+          control.addEventListener('compositionupdate', event => { if (session === state.viewSession && typing()) type({ kind: 'composing', text: String(event.data ?? ''), fallbackText: null }); });
+          control.addEventListener('compositionend', event => { control._composing = false; if (session === state.viewSession) type({ kind: 'commit', text: String(event.data ?? ''), fallbackText: control.value }); });
+          control.addEventListener('input', event => { if (session === state.viewSession && !event.isComposing && !control._composing && !/Composition/.test(event.inputType ?? '')) { queueComposeAction(owner.ownerViewId, node.nodeId, 'SetText', [control.value]); control._caret = control.value.length; selection(); } });
+          control.addEventListener('keydown', event => {   // cursor keys of the keyboard: key events through the connection (Compose moves its caret with its own offset mapping)
+            if (session !== state.viewSession || event.isComposing || !typing()) return;
+            const code = CURSOR_KEYS[event.key], ctrl = event.ctrlKey || event.metaKey;
+            if (code) type({ kind: 'key', code, meta: (event.shiftKey ? META_SHIFT : 0) | (ctrl ? META_CTRL : 0) | (event.altKey ? META_ALT : 0), fallbackText: null });
+            else if (ctrl && !event.altKey && event.key.toLowerCase() === 'a') type({ kind: 'selectAll', fallbackText: null });
+          });
           control.addEventListener('keyup', event => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key) || (event.shiftKey && event.key.startsWith('Arrow'))) selection(); });
-          control.addEventListener('mouseup', () => setTimeout(selection, 0));
-          control.addEventListener('select', selection);
+          // A click inside the field: with real touches (the default) Compose placed its caret from the touch, on its own layout; only the semantic pointer mode needs SetSelection.
+          control.addEventListener('mouseup', () => { if (!pointerClicks()) setTimeout(selection, 0); });
+          control.addEventListener('select', () => { if (!pointerClicks()) selection(); });
           control.addEventListener('focus', () => { if (session === state.viewSession && control._actions.has('RequestFocus')) queueComposeAction(owner.ownerViewId, node.nodeId, 'RequestFocus'); });
         } else if (slider) {
           control.type = 'range';   // Slider / SetProgress: dragging or the arrow keys send the semantic SetProgress action
@@ -480,8 +550,11 @@ function renderComposeSemantics(snapshot) {
       const label = texts.join(' · ') || node.testTag || (editable ? 'Campo de texto do APK' : (node.actions || []).find(action => action.label)?.label) || 'Ação do APK';
       control.setAttribute('aria-label', label); control.setAttribute('aria-disabled', String(!!node.disabled));
       if (editable) {
-        const pending = state.composeInFlight === key || state.pendingComposeActions.some(action => action.key === key && action.action === 'SetText');
+        const pending = state.composeInFlight === key || state.pendingComposeActions.some(action => action.key === key && (action.action === 'SetText' || action.action === 'ime')) || !!control._composing;
         if (!pending && Array.isArray(node.textSelection)) control._caret = node.textSelection[0] === node.textSelection[1] ? node.textSelection[0] : null;
+        // the app moved its caret without changing the text (a key through the connection, a touch): the focused textarea follows it
+        if (!pending && document.activeElement === control && control.value === (node.editableText || '') && Array.isArray(node.textSelection) && imeServes(owner.ownerViewId)
+          && (control.selectionStart !== node.textSelection[0] || control.selectionEnd !== node.textSelection[1])) { try { control.setSelectionRange(Math.min(node.textSelection[0], control.value.length), Math.min(node.textSelection[1], control.value.length)); } catch { /* detached */ } }
         if (!(document.activeElement === control && pending) && control.value !== (node.editableText || '')) {
           // the app changed the text itself (a mask, a formatter, a reset): keep the caret where the app put it (TextSelectionRange), not at the end the browser would choose
           const text = node.editableText || '', focused = document.activeElement === control, fromEnd = control.value.length - (control.selectionEnd ?? control.value.length);
@@ -550,7 +623,7 @@ async function flushPendingInputs() {
         // Bound to the session and overlay element it was created from: a pruned/replaced control or an older session can no longer be targeted.
         if (action.session !== state.viewSession || action.control && state.composeElements.get(action.key) !== action.control) { appendTrace(`Ação Compose descartada: o nó ${action.key} não está mais na tela (${action.action}).`); continue; }
         state.composeInFlight = action.key;
-        try { const snapshot = await state.runtime.composeAction(action.ownerViewId, action.nodeId, action.action, action.args); if (token === state.operation) renderSnapshot(snapshot); }
+        try { const snapshot = action.kind === 'action-item' ? await state.runtime.actionItem(action.modeId, action.itemId) : action.action === 'ime' ? await state.runtime.ime(action.ownerViewId, action.nodeId, action.args) : await state.runtime.composeAction(action.ownerViewId, action.nodeId, action.action, action.args); state.composeInFlight = null; /* its own reply is no longer pending: the field mirrors it */ if (token === state.operation) renderSnapshot(snapshot); }
         catch (error) {
           if (error?.details?.kind === 'compose-semantics-stale-node') { appendTrace(`Ação Compose descartada pela VM: ${error.message}`); continue; }
           if (token === state.operation) reportAPKError(error, 'Ação de acessibilidade Compose interrompida'); state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); break; }
@@ -589,12 +662,99 @@ function renderWindowSurfaces(surfaces) {
   for (const id of [...state.windowSurfaceElements.keys()]) if (!seen.has(id)) state.windowSurfaceElements.delete(id);
   reconcileChildren(layer, ordered);
 }
+// Floating action-mode toolbars (ActionMode.TYPE_FLOATING): the VM decides when a toolbar shows, its items (visible and enabled, in FloatingToolbar order) and the content rect it
+// points at; the page lays it out the way LocalFloatingToolbarPopup does (main-panel items that fit, the rest behind the overflow button; above the content rect, else below)
+// over the originating View's element, and sends a click on an item back to the VM, which performs MenuBuilder.performItemAction. Nothing here finishes the mode: the app does.
+function actionModeLayer() {
+  let layer = $('android-action-mode-layer');
+  if (!layer?.isConnected) {   // the player frame's $ answers a detached stub for an id it does not have
+    const windows = $('android-window-layer'); if (!windows?.isConnected || !windows.parentNode) return null;
+    layer = document.createElement('div'); layer.id = 'android-action-mode-layer'; layer.className = 'android-action-mode-layer';
+    layer.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:5';
+    windows.parentNode.insertBefore(layer, windows.nextSibling);
+  }
+  return layer;
+}
+function queueActionItem(modeId, itemId) {
+  if (!state.runtime || state.lastAPKError) return;
+  if (state.pendingComposeActions.length >= 128) { reportAPKError(new Error('A fila de ações excedeu 128 eventos; reabra o APK.'), 'Fila de entrada interrompida'); return; }
+  state.pendingComposeActions.push({ kind: 'action-item', key: `action-mode:${modeId}:${itemId}`, modeId, itemId, session: state.viewSession, action: 'ActionItem' });
+  flushPendingInputs();
+}
+const TOOLBAR_STYLE = 'position:absolute;pointer-events:auto;background:#fff;border-radius:8px;box-shadow:0 2px 6px #0004;z-index:1';
+function toolbarButton(mode, item, metrics, padStart, padEnd, vertical, session) {
+  const element = document.createElement('button'); element.type = 'button'; element.textContent = item.title; element.dataset.itemId = String(item.itemId);
+  if (item.contentDescription) element.setAttribute('aria-label', item.contentDescription);
+  element.style.cssText = `display:block;box-sizing:border-box;margin:0;border:0;background:transparent;color:#1f1f1f;font:500 ${metrics.textSize}px AndroidRoboto,Roboto,sans-serif;white-space:nowrap;cursor:pointer;height:${metrics.lineHeight}px;min-width:${metrics.buttonMinimumWidth}px;padding:0 ${padEnd}px 0 ${padStart}px;${vertical ? 'width:100%;text-align:start' : ''}`;
+  element.addEventListener('pointerdown', event => { event.preventDefault(); event.stopPropagation(); });   // the focus (and the IME) stays where the app has it
+  element.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); if (session === state.viewSession) queueActionItem(mode.id, item.id); });
+  return element;
+}
+/** LocalFloatingToolbarPopup.layoutMainPanelItems: the first item always, later ones while they fit beside the overflow button (or fit outright as the last), never one that requires the overflow. */
+function layoutToolbar(toolbar, layer, mode, viewport) {
+  const m = mode.metrics, session = state.viewSession, panel = document.createElement('div'), overflow = document.createElement('div');
+  toolbar.replaceChildren(); toolbar._overflowOpen = false;
+  panel.className = 'android-floating-toolbar-main'; panel.style.cssText = 'display:flex;flex-direction:row;align-items:center';
+  toolbar.append(panel); if (toolbar.parentNode !== layer) layer.append(toolbar);
+  const toolbarWidth = Math.min(m.preferredWidth, Math.max(0, viewport.right - viewport.left - 2 * m.marginHorizontal)); let available = toolbarWidth, index = 0;
+  for (; index < mode.items.length; index++) {
+    const item = mode.items[index], first = index === 0, last = index === mode.items.length - 1;
+    if (!first && item.requiresOverflow) break;
+    const element = toolbarButton(mode, item, m, Math.trunc(first ? 1.5 * m.buttonSidePadding : m.buttonSidePadding), Math.trunc(last ? 1.5 * m.buttonSidePadding : m.buttonSidePadding), false, session); panel.append(element);
+    const itemWidth = Math.min(element.offsetWidth, toolbarWidth);
+    if (itemWidth <= available - m.overflowButtonWidth || (last && itemWidth <= available)) available -= itemWidth; else { element.remove(); break; }
+  }
+  if (index >= mode.items.length) return;
+  const more = document.createElement('button'); more.type = 'button'; more.textContent = '⋮'; more.setAttribute('aria-label', 'More options'); more.setAttribute('aria-expanded', 'false');
+  more.style.cssText = `display:block;box-sizing:border-box;margin:0;border:0;background:transparent;color:#1f1f1f;font:700 18px sans-serif;cursor:pointer;width:${m.overflowButtonWidth}px;height:${m.lineHeight}px;padding:0`;
+  more.addEventListener('pointerdown', event => { event.preventDefault(); event.stopPropagation(); });
+  more.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); toolbar._overflowOpen = !toolbar._overflowOpen; overflow.hidden = !toolbar._overflowOpen; more.setAttribute('aria-expanded', String(toolbar._overflowOpen)); toolbar._place?.(); });
+  panel.append(more);
+  overflow.className = 'android-floating-toolbar-overflow'; overflow.hidden = true;
+  overflow.style.cssText = `position:absolute;left:0;min-width:100%;background:#fff;border-radius:8px;box-shadow:0 2px 6px #0004;padding:4px 0;max-height:${Math.max(m.minimumOverflowHeight, viewport.bottom - viewport.top - 2 * m.marginVertical)}px;overflow:auto`;
+  for (const item of mode.items.slice(index)) overflow.append(toolbarButton(mode, item, m, 16, 16, true, session));
+  toolbar.append(overflow);
+}
+function renderActionModes(modes = []) {
+  const layer = actionModeLayer(); if (!layer) return;
+  const screen = layer.parentNode, screenRect = screen.getBoundingClientRect(), scale = screenRect.width / (screen.offsetWidth || screenRect.width) || 1;
+  const width = screen.offsetWidth || screenRect.width / scale, height = screen.offsetHeight || screenRect.height / scale, toolbars = [];
+  for (const mode of Array.isArray(modes) ? modes : []) {
+    const origin = state.viewElements.get(String(mode.originViewId));
+    if (mode.type !== 'floating' || !origin || !inAndroidWindow(origin) || !Array.isArray(mode.items) || !mode.items.length) continue;
+    if (![...mode.contentRect, ...mode.viewport, ...mode.viewLocation, ...mode.windowLocation].every(Number.isFinite)) throw new Error('A VM retornou uma barra de ação inválida.');
+    // VM screen pixels -> this screen element: the originating View's element is where the VM says the View is
+    const box = origin.getBoundingClientRect(), dx = (box.left - screenRect.left) / scale - mode.viewLocation[0], dy = (box.top - screenRect.top) / scale - mode.viewLocation[1];
+    const m = mode.metrics, content = { left: mode.contentRect[0] + dx, top: mode.contentRect[1] + dy, right: mode.contentRect[2] + dx, bottom: mode.contentRect[3] + dy };
+    const viewport = { left: Math.max(0, mode.viewport[0] + dx), top: Math.max(0, mode.viewport[1] + dy), right: Math.min(width, mode.viewport[2] + dx), bottom: Math.min(height, mode.viewport[3] + dy) };
+    let toolbar = [...layer.children].find(child => child.dataset.actionMode === String(mode.id));
+    if (!toolbar) { toolbar = document.createElement('div'); toolbar.dataset.actionMode = String(mode.id); toolbar.className = 'android-floating-toolbar'; toolbar.setAttribute('role', 'toolbar'); }
+    toolbar.style.cssText = TOOLBAR_STYLE;
+    const signature = JSON.stringify([mode.items, m, Math.round(viewport.right - viewport.left), state.viewSession]);
+    if (toolbar._signature !== signature) { toolbar._signature = signature; layoutToolbar(toolbar, layer, mode, viewport); }
+    else if (toolbar.parentNode !== layer) layer.append(toolbar);
+    // LocalFloatingToolbarPopup.refreshCoordinatesAndOverflowDirection (main panel): above the content rect when it fits with its margins, else below, else below without the margin, else as high as the view port allows
+    toolbar._place = () => {
+      const w = toolbar.firstElementChild?.offsetWidth || 0, lineWithMargin = m.lineHeight + 2 * m.marginVertical;
+      const above = content.top - viewport.top, below = viewport.bottom - content.bottom;
+      const y = above >= lineWithMargin ? content.top - lineWithMargin : below >= lineWithMargin ? content.bottom : below >= m.lineHeight ? content.bottom - m.marginVertical : Math.max(viewport.top, content.top - lineWithMargin);
+      const x = Math.min((content.left + content.right) / 2 - w / 2, viewport.right - w), left = Math.max(mode.windowLocation[0] + dx, x), top = Math.max(mode.windowLocation[1] + dy, y) + m.marginVertical;
+      toolbar.style.left = `${Math.round(left)}px`; toolbar.style.top = `${Math.round(top)}px`;
+      const overflow = toolbar.querySelector('.android-floating-toolbar-overflow');
+      if (overflow && !overflow.hidden) { const down = viewport.bottom - (top + m.lineHeight) >= Math.min(overflow.scrollHeight, m.minimumOverflowHeight) || top - viewport.top < viewport.bottom - top; overflow.style.top = down ? `${m.lineHeight}px` : ''; overflow.style.bottom = down ? '' : `${m.lineHeight}px`; }
+    };
+    toolbar._place(); toolbars.push(toolbar);
+  }
+  reconcileChildren(layer, toolbars);
+}
 function renderSnapshot(snapshot) {
   if (runtimeFrames.pending && state.runtime?.ackFrame) state.runtime.ackFrame(runtimeFrames.seq);   // an RPC reply replaces a queued scheduled-event snapshot: it counts as drawn
   runtimeFrames.pending = null; runtimeFrames.rendered++; if (runtimeFrames.drawn.length < 50000) runtimeFrames.drawn.push(Date.now());
+  if (snapshot && 'ime' in snapshot) state.imeState = snapshot.ime;
   if (snapshot?.droppedComposeAction) appendTrace(`Ação Compose descartada: nó ${snapshot.droppedComposeAction.ownerViewId}:${snapshot.droppedComposeAction.nodeId} não existe mais (${snapshot.droppedComposeAction.action}).`);
   state.lastAPKError = null; state.canGoBack = !!snapshot.canGoBack; hooks.navigationChanged?.(state.canGoBack);
   if (snapshot.closed) {
+    $('android-action-mode-layer')?.replaceChildren();
     state.apkRunning = false; $('android-device').hidden = true; hideError();
     updateTrace(snapshot); hooks.closed?.(snapshot); return;
   }
@@ -614,11 +774,14 @@ function renderSnapshot(snapshot) {
   renderNativeCanvasOverlays(snapshot.views);
   syncNativeScroll(snapshot.views);
   const composeReady = renderComposeSemantics(snapshot);
+  renderActionModes(snapshot.actionModes);
   $('android-content').inert = surfaces.some(view => view.windowSurface.modal && view.windowSurface.visible !== false); $('android-window-layer').inert = false;
   $('android-content').style.padding = '0';
   state.apkRunning = true; $('android-device').hidden = state.mode !== 'apk'; $('android-device').inert = state.mode !== 'apk'; hideError();
   hooks.rendered?.(snapshot, composeReady);
   updateTrace(snapshot);
+  // after the VM trace replaced the log: a key the Worker could not send through an InputConnection (its own trace has the WEB InputMethod line too)
+  if (snapshot.imeFallback) { const f = snapshot.imeFallback; state.imeFallbacks = (state.imeFallbacks ?? 0) + 1; appendTrace(`Teclado: ${f.keys} tecla(s) sem InputConnection (${f.reason}); ${f.via === 'SetText' ? 'usada a ação SetText com o texto do campo' : 'tecla descartada'}.`); }
   notifyParent('apk-lab-snapshot', { activityName: snapshot.activityName, texts: snapshot.texts, counters: snapshot.counters });
 }
 return { resetWebViews: () => webviews?.reset(), renderSnapshot, createView, queueComposeAction, flushPendingInputs, bindVM, runtimeFrames, renderSystemBars, updateSystemBarIcons, fitDevice, startClock };

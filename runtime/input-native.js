@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=2378988610d3';
-import { createHostRegistry } from './host-contract.js?v=2378988610d3';
+import { APKError } from './apk-error.js?v=125ce560ba52';
+import { createHostRegistry } from './host-contract.js?v=125ce560ba52';
 
 // Natives behind the ORIGINAL android.view.MotionEvent, KeyEvent, KeyCharacterMap and VelocityTracker (android-13.0.0_r1 Java in framework.dex):
 //   * MotionEvent  -- android_view_MotionEvent.cpp over libinput's MotionEvent: samples (current + history) of pointer coordinates per axis, pointer properties, an affine
@@ -261,6 +261,7 @@ export function createInputManagerHost(platform) {
   def(DEVICE, 'getDevice', `(I)${DEVICE}`, (r, _m, [id]) => id === -1 ? device(r) : null, { static: true });
   def(DEVICE, 'getDeviceIds', '()[I', r => { const a = r.newArray('[I', 1); r.object(a).elements = [-1]; return a; }, { static: true });
   def(DEVICE, 'getId', '()I', () => -1); def(DEVICE, 'getName', `()${STRING}`, () => 'Virtual'); def(DEVICE, 'isVirtual', '()Z', () => 1); def(DEVICE, 'getSources', '()I', () => 0x101);
+  def(DEVICE, 'supportsSource', '(I)Z', (_r, _m, [, source]) => (0x101 & source) === source ? 1 : 0);   // InputDevice.supportsSource: (mSources & source) == source
   def(DEVICE, 'getKeyboardType', '()I', () => 2);
   def(DEVICE, 'getKeyCharacterMap', `()${KCM}`, r => { const s = slot(r); return s.map ??= r.dispatch({ owner: KCM, name: 'nativeObtainEmptyKeyCharacterMap', parameters: ['I'], result: KCM, signature: `(I)${KCM}` }, [-1], 'static'); });
   return { ...registry };

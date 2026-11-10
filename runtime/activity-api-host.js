@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=2378988610d3';
-import { APKError } from './apk-error.js?v=2378988610d3';
-import { gcRoot } from './heap-gc.js?v=2378988610d3';
+import { createHostRegistry } from './host-contract.js?v=125ce560ba52';
+import { APKError } from './apk-error.js?v=125ce560ba52';
+import { gcRoot } from './heap-gc.js?v=125ce560ba52';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -15,6 +15,7 @@ import { gcRoot } from './heap-gc.js?v=2378988610d3';
 const ACTIVITY = 'Landroid/app/Activity;', CONTEXT = 'Landroid/content/Context;', WRAPPER = 'Landroid/content/ContextWrapper;', IMPL = 'Landroid/app/ContextImpl;', INTENT = 'Landroid/content/Intent;';
 const BUNDLE = 'Landroid/os/Bundle;', STRING = 'Ljava/lang/String;', CHARS = 'Ljava/lang/CharSequence;', VIEW = 'Landroid/view/View;', KEYEVENT = 'Landroid/view/KeyEvent;', MOTION = 'Landroid/view/MotionEvent;';
 const WINDOW = 'Landroid/view/Window;', DIALOG = 'Landroid/app/Dialog;', MENU = 'Landroid/view/Menu;', MENU_ITEM = 'Landroid/view/MenuItem;', PARAMS = 'Landroid/view/ViewGroup$LayoutParams;';
+const AM_CALLBACK = 'Landroid/view/ActionMode$Callback;', ACTION_MODE = 'Landroid/view/ActionMode;';
 const TASK_DESCRIPTION = 'Landroid/app/ActivityManager$TaskDescription;', COMPONENT = 'Landroid/content/ComponentName;', URI = 'Landroid/net/Uri;', PENDING = 'Landroid/app/PendingIntent;', OBJECT = 'Ljava/lang/Object;';
 const BITMAP = 'Landroid/graphics/Bitmap;', FRAGMENT = 'Landroid/app/Fragment;', SENDER = 'Landroid/content/IntentSender;', CONFIGURATION = 'Landroid/content/res/Configuration;';
 const nullish = v => v === null || v === undefined || v === 0;
@@ -205,7 +206,18 @@ export function createActivityApiHost(platform) {
   constant('onNavigateUpFromChild', `(${ACTIVITY})Z`, 0);
   constant('onCreateThumbnail', `(${BITMAP}Landroid/graphics/Canvas;)Z`, 0); constant('onCreateDescription', `()${CHARS}`, null); constant('onCreatePanelView', `(I)${VIEW}`, null);
   constant('onGenericMotionEvent', `(${MOTION})Z`, 0); constant('onTrackballEvent', `(${MOTION})Z`, 0); constant('onKeyShortcut', `(I${KEYEVENT})Z`, 0); constant('onKeyLongPress', `(I${KEYEVENT})Z`, 0); constant('onKeyMultiple', `(II${KEYEVENT})Z`, 0);
-  constant('onWindowStartingActionMode', '(Landroid/view/ActionMode$Callback;)Landroid/view/ActionMode;', null); constant('onWindowStartingActionMode', '(Landroid/view/ActionMode$Callback;I)Landroid/view/ActionMode;', null);
+  // Activity.onWindowStartingActionMode: only a primary mode goes to the Activity's action bar (initWindowDecorActionBar + ActionBar.startActionMode); the lab's windows inflate no decor
+  // action bar (getActionBar is null), so the decor creates the mode itself (src/action-mode-host.js). The typed form records the type and asks the untyped one, which an app may override.
+  def(ACTIVITY, 'onWindowStartingActionMode', `(${AM_CALLBACK}I)${ACTION_MODE}`, (r, _m, [self, callback, type]) => {
+    const state = own(r, self);
+    state.actionModeTypeStarting = type;
+    try { return call(r, self, ACTIVITY, 'onWindowStartingActionMode', [AM_CALLBACK], ACTION_MODE, [callback]); } finally { state.actionModeTypeStarting = 0; }   // back to TYPE_PRIMARY
+  });
+  def(ACTIVITY, 'onWindowStartingActionMode', `(${AM_CALLBACK})${ACTION_MODE}`, (r, _m, [self, callback]) => {
+    if ((own(r, self).actionModeTypeStarting ?? 0) !== 0) return null;
+    const bar = call(r, self, ACTIVITY, 'getActionBar', [], 'Landroid/app/ActionBar;');
+    return nullish(bar) ? null : call(r, bar, 'Landroid/app/ActionBar;', 'startActionMode', [AM_CALLBACK], ACTION_MODE, [callback]);
+  });
   constant('onCreateContextMenu', '(Landroid/view/ContextMenu;Landroid/view/View;Landroid/view/ContextMenu$ContextMenuInfo;)V', undefined);
   constant('onPreparePanel', `(I${VIEW}${MENU})Z`, 1);   // overridden below: feature 0 consults the options-menu callbacks
   def(ACTIVITY, 'onNavigateUp', '()Z', (r, _m, [self]) => {
@@ -290,15 +302,17 @@ export function createActivityApiHost(platform) {
     if (feature === 0) call(r, self, ACTIVITY, 'onOptionsMenuClosed', [MENU], 'V', [menu]); else if (feature === 6) call(r, self, ACTIVITY, 'onContextMenuClosed', [MENU], 'V', [menu]);
   });
 
-  // ---- Menus, action modes, search, assist: the virtual device draws none of these surfaces ---------------------------------------------------------------------------------------------------
-  def(ACTIVITY, 'getMenuInflater', '()Landroid/view/MenuInflater;', () => unsupported('Activity.getMenuInflater: the lab has no menu framework (no android.view.Menu / MenuInflater classes); inflate the menu in the app or use a custom view', 'menu-unsupported'));
+  // ---- Options / context menus, search, assist: the virtual device draws none of these surfaces (action modes: src/action-mode-host.js) ---------------------------------------------------------------------------------------------------
+  def(ACTIVITY, 'getMenuInflater', '()Landroid/view/MenuInflater;', () => unsupported('Activity.getMenuInflater: the lab has no android.view.MenuInflater (menu XML inflation) and no options-menu panel', 'menu-unsupported'));
   def(ACTIVITY, 'openOptionsMenu', '()V', () => unsupported('Activity.openOptionsMenu: the lab has no options-menu panel to show', 'menu-unsupported'));
   def(ACTIVITY, 'openContextMenu', `(${VIEW})V`, () => unsupported('Activity.openContextMenu: the lab has no context-menu panel to show', 'menu-unsupported'));
   noop('closeOptionsMenu', '()V'); noop('closeContextMenu', '()V'); noop('invalidateOptionsMenu', '()V');   // no panel is ever open; there is no menu to rebuild
   noop('registerForContextMenu', `(${VIEW})V`); noop('unregisterForContextMenu', `(${VIEW})V`);
   def(ACTIVITY, 'registerForContextMenu', `(${VIEW})V`, (r, _m, [self, view]) => { call(r, view, VIEW, 'setOnCreateContextMenuListener', ['Landroid/view/View$OnCreateContextMenuListener;'], 'V', [self]); });
   def(ACTIVITY, 'unregisterForContextMenu', `(${VIEW})V`, (r, _m, [, view]) => { call(r, view, VIEW, 'setOnCreateContextMenuListener', ['Landroid/view/View$OnCreateContextMenuListener;'], 'V', [null]); });
-  constant('startActionMode', '(Landroid/view/ActionMode$Callback;)Landroid/view/ActionMode;', null); constant('startActionMode', '(Landroid/view/ActionMode$Callback;I)Landroid/view/ActionMode;', null);   // ActionMode is null when the window cannot start one
+  // Activity.startActionMode: the window decor starts it (DecorView.startActionMode with the decor as the originating view)
+  def(ACTIVITY, 'startActionMode', `(${AM_CALLBACK})${ACTION_MODE}`, (r, _m, [self, callback]) => call(r, decorOf(r, self), VIEW, 'startActionMode', [AM_CALLBACK], ACTION_MODE, [callback]));
+  def(ACTIVITY, 'startActionMode', `(${AM_CALLBACK}I)${ACTION_MODE}`, (r, _m, [self, callback, type]) => call(r, decorOf(r, self), VIEW, 'startActionMode', [AM_CALLBACK, 'I'], ACTION_MODE, [callback, type]));
   constant('getActionBar', '()Landroid/app/ActionBar;', null);    // android:windowActionBar of the lab's themes is never inflated into a decor action bar
   def(ACTIVITY, 'setActionBar', '(Landroid/widget/Toolbar;)V', () => unsupported('Activity.setActionBar: the lab has no Toolbar/ActionBar framework classes', 'action-bar-unsupported'));
   def(ACTIVITY, 'startSearch', `(${STRING}Z${BUNDLE}Z)V`, () => unsupported('Activity.startSearch: the virtual device has no global search provider', 'search-unsupported'));

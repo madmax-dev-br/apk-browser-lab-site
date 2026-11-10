@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=2378988610d3';
-import { APKError } from './apk-error.js?v=2378988610d3';
+import { createHostRegistry } from './host-contract.js?v=125ce560ba52';
+import { APKError } from './apk-error.js?v=125ce560ba52';
 
 // Public android.view.View API (API 33) that the platform View model did not carry, with the semantics of android-13.0.0_r1 View.java. Grouped by topic below; state lives on the
 // View's host object (`r.object(view)`), the same place the other view hosts keep theirs.
@@ -53,12 +53,14 @@ export function createViewApiHost(platform) {
 
   // ================================================================================== resources, hierarchy lookup, visibility
   def(VIEW, 'getResources', `()${RESOURCES}`, (r, _m, [self]) => { const context = viewCall(r, self, 'getContext', [], CONTEXT); return call(r, context, CONTEXT, 'getResources', [], RESOURCES); });
-  // View.isShown: every ancestor up to the window root is VISIBLE, and the chain ends at the window (ViewRootImpl is not a View), not at a detached parent-less View
+  // View.isShown: every ancestor up to the window root is VISIBLE, and the chain ends at the window (ViewRootImpl is not a View), not at a detached parent-less View. The lab's
+  // window containers above the content (the decor and android.R.id.content) are not modelled as attached; on a device every View of an attached window is, so the chain ends at
+  // the window exactly when the View itself is attached.
   def(VIEW, 'isShown', '()Z', (r, _m, [self]) => {
     let current = self;
     for (let depth = 0; current && depth < 4096; depth++) {
       const view = r.object(current); if ((view.visibility ?? 0) !== 0) return 0;
-      const parent = view.parent; if (nullish(parent)) return view.attached ? 1 : 0;
+      const parent = view.parent; if (nullish(parent)) return r.object(self).attached ? 1 : 0;
       if (!isView(r, parent)) return 1;
       current = parent;
     }
@@ -112,7 +114,7 @@ export function createViewApiHost(platform) {
     rectSet(r, outRect, Math.round(m.left + d.left), Math.round(m.top + d.top), Math.round(m.right + d.left), Math.round(m.bottom + d.top));   // View.getHitRect: the transformed rect, then offset by (mLeft, mTop)
   });
   // ViewGroup.getChildVisibleRect (android-13.0.0_r1) for a chain of parents; `offset` is a Point or null
-  const childVisibleRect = (r, group, child, rect, offset) => {
+  const childVisibleRect = (r, group, child, rect, offset, force = false) => {
     const d = dimension(r, group), scrollX = viewCall(r, group, 'getScrollX', [], 'I'), scrollY = viewCall(r, group, 'getScrollY', [], 'I'), c = dimension(r, child);
     let box = { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
     if (!viewCall(r, child, 'hasIdentityMatrix', [], 'Z')) box = mapRectThroughMatrix(r, child, box.left, box.top, box.right, box.bottom);
@@ -123,13 +125,26 @@ export function createViewApiHost(platform) {
     let visible = true;
     const parent = r.object(group).parent;
     if (nullish(parent) || !isGroup(r, parent) || flag(call(r, parent, 'Landroid/view/ViewGroup;', 'getClipChildren', [], 'Z'))) visible = intersect(0, 0, d.width, d.height);
-    if (visible && flag(call(r, group, 'Landroid/view/ViewGroup;', 'getClipToPadding', [], 'Z'))) visible = intersect(viewCall(r, group, 'getPaddingLeft', [], 'I'), viewCall(r, group, 'getPaddingTop', [], 'I'), d.width - viewCall(r, group, 'getPaddingRight', [], 'I'), d.height - viewCall(r, group, 'getPaddingBottom', [], 'I'));
+    if ((force || visible) && flag(call(r, group, 'Landroid/view/ViewGroup;', 'getClipToPadding', [], 'Z'))) visible = intersect(viewCall(r, group, 'getPaddingLeft', [], 'I'), viewCall(r, group, 'getPaddingTop', [], 'I'), d.width - viewCall(r, group, 'getPaddingRight', [], 'I'), d.height - viewCall(r, group, 'getPaddingBottom', [], 'I'));
     const clip = r.object(group).clipBounds;
-    if (visible && clip) visible = intersect(clip.left, clip.top, clip.right, clip.bottom);
+    if ((force || visible) && clip) visible = intersect(clip.left, clip.top, clip.right, clip.bottom);
     rect.left = Math.floor(box.left); rect.top = Math.floor(box.top); rect.right = Math.ceil(box.right); rect.bottom = Math.ceil(box.bottom);
-    if (visible && isGroup(r, parent)) return childVisibleRect(r, parent, group, rect, offset);
+    if ((force || visible) && isGroup(r, parent)) return childVisibleRect(r, parent, group, rect, offset, force);
     return visible;
   };
+  // ViewGroup.getChildVisibleRect(child, r, offset[, forceParentCheck]): `r` in the child's coordinates becomes the visible part in the window's; forceParentCheck keeps clipping through
+  // every parent even once the rect is empty (FloatingActionMode positions its toolbar with it)
+  const POINT_FIELD = name => `${POINT}->${name}:I`;
+  const groupChildVisibleRect = (r, self, child, outRect, offsetPoint, force) => {
+    const [left, top, right, bottom] = ['left', 'top', 'right', 'bottom'].map(k => r.object(outRect).fields.get(`${RECT}->${k}:I`) ?? 0), rect = { left, top, right, bottom };
+    const offset = nullish(offsetPoint) ? null : { x: r.object(offsetPoint).fields.get(POINT_FIELD('x')) ?? 0, y: r.object(offsetPoint).fields.get(POINT_FIELD('y')) ?? 0 };
+    const visible = childVisibleRect(r, self, child, rect, offset, force);
+    rectSet(r, outRect, rect.left, rect.top, rect.right, rect.bottom);
+    if (offset) call(r, offsetPoint, POINT, 'set', ['I', 'I'], 'V', [Math.round(offset.x), Math.round(offset.y)]);
+    return visible ? 1 : 0;
+  };
+  def('Landroid/view/ViewGroup;', 'getChildVisibleRect', `(${VIEW}${RECT}${POINT})Z`, (r, _m, [self, child, outRect, offset]) => groupChildVisibleRect(r, self, child, outRect, offset, false));
+  def('Landroid/view/ViewGroup;', 'getChildVisibleRect', `(${VIEW}${RECT}${POINT}Z)Z`, (r, _m, [self, child, outRect, offset, force]) => groupChildVisibleRect(r, self, child, outRect, offset, flag(force)));
   def(VIEW, 'getGlobalVisibleRect', `(${RECT}${POINT})Z`, (r, _m, [self, outRect, globalOffset]) => {
     const d = dimension(r, self); if (!(d.width > 0 && d.height > 0)) return 0;
     const rect = { left: 0, top: 0, right: d.width, bottom: d.height }, offset = nullish(globalOffset) ? null : { x: -viewCall(r, self, 'getScrollX', [], 'I'), y: -viewCall(r, self, 'getScrollY', [], 'I') };
@@ -975,7 +990,7 @@ export function createViewApiHost(platform) {
   def(VIEW, 'isImportantForContentCapture', '()Z', (r, _m, [self]) => importantFor(r, self, 'getImportantForContentCapture', () => explicitAppResource(r, self)) ? 1 : 0);
   def(VIEW, 'setContentCaptureSession', '(Landroid/view/contentcapture/ContentCaptureSession;)V', (r, _m, [self, session]) => { r.object(self).contentCaptureSession = nullish(session) ? null : session; });
 
-  // ================================================================================== subsystems the virtual device does not have: structure dumps, translation, drag and drop, action modes, scroll capture, display hashes
+  // ================================================================================== subsystems the virtual device does not have: structure dumps, translation, drag and drop, scroll capture, display hashes
   const unsupported = (message, kind) => { throw new APKError(message, { kind }); };
   const STRUCTURE = 'Landroid/view/ViewStructure;';
   for (const [name, sig] of [['onProvideStructure', `(${STRUCTURE})V`], ['onProvideAutofillStructure', `(${STRUCTURE}I)V`], ['onProvideVirtualStructure', `(${STRUCTURE})V`], ['onProvideAutofillVirtualStructure', `(${STRUCTURE}I)V`], ['onProvideContentCaptureStructure', `(${STRUCTURE}I)V`], ['dispatchProvideStructure', `(${STRUCTURE})V`], ['dispatchProvideAutofillStructure', `(${STRUCTURE}I)V`]]) {
@@ -995,10 +1010,7 @@ export function createViewApiHost(platform) {
   });
   for (const name of ['startDrag', 'startDragAndDrop']) def(VIEW, name, `(Landroid/content/ClipData;Landroid/view/View$DragShadowBuilder;${OBJECT}I)Z`, () => unsupported(`View.${name} needs the system drag-and-drop window, which the virtual window does not have`, 'drag-and-drop-unsupported'));
   def(VIEW, 'cancelDragAndDrop', '()V', () => {}); def(VIEW, 'updateDragShadow', '(Landroid/view/View$DragShadowBuilder;)V', () => {});   // no drag is ever in progress
-  for (const sig of ['(Landroid/view/ActionMode$Callback;)', '(Landroid/view/ActionMode$Callback;I)']) def(VIEW, 'startActionMode', `${sig}Landroid/view/ActionMode;`, (r, _m, [self]) => {
-    if (nullish(r.object(self).parent)) return null;   // View.startActionMode without a parent returns null
-    return unsupported('View.startActionMode needs the window decor\'s action-mode surface (contextual action bar / floating toolbar), which the virtual window does not have', 'action-mode-unsupported');
-  });
+  // View.startActionMode / ViewGroup.startActionModeForChild: src/action-mode-host.js
   def(VIEW, 'setScrollCaptureCallback', '(Landroid/view/ScrollCaptureCallback;)V', (r, _m, [self, callback]) => { r.object(self).scrollCaptureCallback = nullish(callback) ? null : callback; });
   def(VIEW, 'onScrollCaptureSearch', '(Landroid/graphics/Rect;Landroid/graphics/Point;Ljava/util/function/Consumer;)V', (r, _m, [self]) => {
     if (!nullish(r.object(self).scrollCaptureCallback)) unsupported('Scroll capture targets need the system screenshot service', 'scroll-capture-unsupported');

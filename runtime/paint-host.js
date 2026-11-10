@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=2378988610d3';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=2378988610d3';
+import { APKError } from './apk-error.js?v=125ce560ba52';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=125ce560ba52';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -44,6 +44,7 @@ for (const signature of [
   `getFontMetricsInt()${METRICS_INT}`, `getFontMetricsInt(${METRICS_INT})I`,
   'getFontSpacing()F', 'ascent()F', 'descent()F', 'getUnderlinePosition()F', 'getUnderlineThickness()F',
   'getStrikeThruPosition()F', 'getStrikeThruThickness()F',
+  `getFontMetricsInt(Ljava/lang/CharSequence;IIIIZ${METRICS_INT})V`, `getFontMetricsInt([CIIIIZ${METRICS_INT})V`,
 ]) keys.add(PAINT + '->' + signature);
 const enums = [
   ['Style', 'Style', 'style', ['FILL', 'STROKE', 'FILL_AND_STROKE']],
@@ -191,6 +192,30 @@ export function createPaintHost() {
       }
       if (name === 'reset') { runtime.storeField(object.fields,`${PAINT}->mBidiFlags:I`,2); object.webPaint = initial(1); initializeTextLocales(runtime,object.webPaint); return; }
       if (name === 'set') { runtime.storeField(object.fields,`${PAINT}->mBidiFlags:I`,runtime.object(args[1]).fields.get(`${PAINT}->mBidiFlags:I`)??2); object.webPaint = { ...getPaintState(runtime, args[1]) }; return; }
+      if (name === 'getFontMetricsInt' && method.parameters.length === 7) {
+        // Paint.getFontMetricsInt(text, start, count, contextStart, contextCount, isRtl, outMetrics) (API 29, android-13.0.0_r1 Paint.java argument checks; Paint.cpp
+        // getFontMetricsIntForText): ascent/descent are the extent of every font the run uses (MinikinUtils::getFontExtent), top/bottom are the primary font's widened to them.
+        const [, text, start, count, contextStart, contextCount, , out] = args, isArray = method.parameters[0] === '[C', illegal = message => runtime.throwJava('Ljava/lang/IllegalArgumentException;', message);
+        if (nullish(text)) illegal('text must not be null');
+        const length = isArray ? runtime.array(text).elements.length : typeof text === 'string' ? text.length : runtime.dispatch({ owner: 'Ljava/lang/CharSequence;', name: 'length', parameters: [], result: 'I', signature: '()I' }, [text], 'virtual');
+        if (start < 0 || start >= length) illegal('start argument is out of bounds.');
+        if (count < 0 || start + count > length) illegal('count argument is out of bounds.');
+        if (contextStart < 0 || contextStart >= length) illegal('ctxStart argument is out of bounds.');
+        if (contextCount < 0 || contextStart + contextCount > length) illegal('ctxCount argument is out of bounds.');
+        if (nullish(out)) illegal('outmetrics must not be null.');
+        if (count > 65536) fail('Font metrics text exceeds 65536 UTF-16 units');
+        if (!runtime.skiaHost?.measureText) fail('Paint font metrics require the verified native Skia font backend');
+        let content = '';
+        if (typeof text === 'string') content = text.slice(start, start + count);
+        else { const units = isArray ? runtime.array(text).elements.slice(start, start + count) : (() => { const ref = runtime.newArray('[C', count); runtime.dispatch({ owner: 'Landroid/text/TextUtils;', name: 'getChars', parameters: ['Ljava/lang/CharSequence;', 'I', 'I', '[C', 'I'], result: 'V', signature: '(Ljava/lang/CharSequence;II[CI)V' }, [text, start, start + count, ref, 0], 'static'); return runtime.array(ref).elements; })(); for (let at = 0; at < units.length; at += 16384) content += String.fromCharCode(...units.slice(at, at + 16384)); }
+        const plain = { ...paint, letterSpacing: 0, wordSpacing: 0, hyphenEdit: 0 }, primary = runtime.skiaHost.measureText('', plain).metrics, extent = content ? runtime.skiaHost.measureText(content, plain).metrics : primary;
+        const ascent = extent.ascent, descent = extent.descent, top = Math.min(ascent, primary.bounds?.[1]), bottom = Math.max(descent, primary.bounds?.[3]);
+        for (const value of [ascent, descent, top, bottom, primary.leading]) if (!Number.isFinite(value)) fail('Skia returned incomplete font metrics for a text run');
+        if (!runtime.isSubtype(runtime.object(out).type, METRICS_INT)) runtime.throwJava('Ljava/lang/ClassCastException;', 'Paint font metrics output type');
+        const fields = runtime.object(out).fields, round = value => Math.floor(Math.fround(value + 0.5));   // GraphicsJNI::set_metrics_int
+        for (const [field, value] of [['top', Math.floor(top)], ['ascent', round(ascent)], ['descent', round(descent)], ['bottom', Math.ceil(bottom)], ['leading', round(primary.leading)]]) runtime.storeField(fields, `${METRICS_INT}->${field}:I`, value);
+        return;
+      }
       if (['getFontMetrics', 'getFontMetricsInt', 'getFontSpacing', 'ascent', 'descent', 'getUnderlinePosition', 'getUnderlineThickness', 'getStrikeThruPosition', 'getStrikeThruThickness'].includes(name)) {
         // Paint.cpp uses these constants for strike-through regardless of the font table.
         if (name === 'getStrikeThruPosition') return rawFloat(Math.fround(Math.fround(-6 / 21) - Math.fround(0.5 * Math.fround(1 / 18))) * paint.textSize);
