@@ -1,19 +1,23 @@
 // Real touch/mouse input for Compose content: the page's pointer events become original android.view.MotionEvent objects delivered to the AndroidComposeView
 // (original Compose DEX: hit testing, press/tap/drag/fling gesture detectors, Slider thumb dragging, scroll fling with the VelocityTracker).
-// The page sends coordinates relative to the Compose owner View it touched; one pointer, one gesture at a time (DOWN ... MOVE* ... UP/CANCEL).
+// The page sends coordinates relative to the Compose owner View it touched; one pointer, one gesture at a time (DOWN ... MOVE* ... UP/CANCEL). Each sample enters the
+// owner's window at its root View in window coordinates, as Android's input dispatcher delivers it (so parents intercept and clickable parents get unconsumed touches).
 export const ACTION_DOWN = 0, ACTION_UP = 1, ACTION_MOVE = 2, ACTION_CANCEL = 3, ACTION_SCROLL = 8;
 const MOTION = 'Landroid/view/MotionEvent;', OWNER = 'Landroidx/compose/ui/platform/AndroidComposeView;', P = ['J', 'J', 'I', 'F', 'F', 'I'];
+const VIEW = 'Landroid/view/View;';
+/** The root View of the owner's window (View.getRootView: the DecorView of an Activity or Dialog window), or null when the owner is not attached to a window. */
+function rootOf(runtime, ownerViewId) {
+  const dispatch = (name, signature, result) => runtime.dispatch({ owner: VIEW, name, parameters: [], result, signature }, [{ ref: ownerViewId }], 'virtual');
+  if (!dispatch('isAttachedToWindow', '()Z', 'Z')) return null;
+  const root = dispatch('getRootView', '()Landroid/view/View;', VIEW);
+  return root && root.ref !== undefined ? root : null;
+}
 const ACTIVITY = 'Landroid/app/Activity;';
-/**
- * Android delivers input to the window's callback first: ViewRootImpl -> DecorView.dispatchTouchEvent -> Activity.dispatchTouchEvent (onUserInteraction, the decor view's tree, onTouchEvent).
- * When the foreground Activity overrides any of those, the sample goes through the Activity in window coordinates (the page sends owner-relative ones); otherwise the Activity's own
- * default body would only forward it to the same view, so it is delivered to the owner directly.
- */
-function activityRoute(runtime, names) {
-  const activity = runtime.activity; if (!activity || !runtime.heap.has(activity.ref)) return null;
-  const type = runtime.object(activity).type;
-  if (!names.some(signature => runtime.objectOverride(type, signature))) return null;
-  return activity;
+/** The foreground Activity when `root` is the root of its window (the owner sits in the Activity's views), else null (a Dialog or popup window of its own). */
+function activityOf(runtime, root) {
+  const activity = runtime.activity; if (!activity || !runtime.heap.has(activity.ref) || !runtime.root) return null;
+  const activityRoot = rootOf(runtime, runtime.root.ref ?? runtime.root);
+  return activityRoot && activityRoot.ref === root.ref ? activity : null;
 }
 function windowOffset(runtime, ownerViewId) {
   const out = runtime.newArray('[I', 2);
@@ -36,11 +40,18 @@ export function dispatchPointer(runtime, { ownerViewId, action, x, y, t = 0, dx 
   gesture.last = { x, y };
   const eventTime = gesture.downTime + BigInt(Math.max(0, Math.round(t - gesture.pageStart))); runtime.lastPointerTime = Number(eventTime);
   const call = (owner, name, signature, parameters, result, values, mode = 'virtual') => runtime.dispatch({ owner, name, signature, parameters, result }, values, mode);
-  const activity = activityRoute(runtime, ['dispatchTouchEvent(Landroid/view/MotionEvent;)Z', 'onTouchEvent(Landroid/view/MotionEvent;)Z', 'onUserInteraction()V']);
-  const [ox, oy] = activity ? windowOffset(runtime, ownerViewId) : [0, 0];
+  // As the input dispatcher does: the sample enters the window at its root View, in window coordinates (DecorView -> Window.Callback, i.e. Activity.dispatchTouchEvent for an
+  // Activity window -> the view tree). The tree decides what a device decides: a parent may intercept (a list scrolling under the finger), the Compose content may consume the
+  // touch, or a clickable parent gets it when the content does not. Delivering to the AndroidComposeView directly would skip all of that.
+  const root = rootOf(runtime, ownerViewId), activity = root ? activityOf(runtime, root) : null;
+  const [ox, oy] = root ? windowOffset(runtime, ownerViewId) : [0, 0];
   const event = call(MOTION, 'obtain', '(JJIFFI)Landroid/view/MotionEvent;', P, MOTION, runtime.argumentWords(P, [gesture.downTime, eventTime, action, bits(x + ox), bits(y + oy), 0]), 'static');
   let handled;
-  try { handled = activity ? call(ACTIVITY, 'dispatchTouchEvent', `(${MOTION})Z`, [MOTION], 'Z', [activity, event]) : call(OWNER, 'dispatchTouchEvent', `(${MOTION})Z`, [MOTION], 'Z', [{ ref: ownerViewId }, event]); }
+  try {
+    handled = activity ? call(ACTIVITY, 'dispatchTouchEvent', `(${MOTION})Z`, [MOTION], 'Z', [activity, event])   // the Activity window's callback: onUserInteraction, the app's overrides, then the window's views
+      : root ? call(VIEW, 'dispatchTouchEvent', `(${MOTION})Z`, [MOTION], 'Z', [root, event])                          // another window (Dialog, popup): its root View
+      : call(OWNER, 'dispatchTouchEvent', `(${MOTION})Z`, [MOTION], 'Z', [{ ref: ownerViewId }, event]);
+  }
   finally { try { call(MOTION, 'recycle', '()V', [], 'V', [event]); } catch { /* the app may have recycled it */ } if (action === ACTION_UP || action === ACTION_CANCEL) runtime.pointerGesture = null; }
   return { handled: !!handled };
 }

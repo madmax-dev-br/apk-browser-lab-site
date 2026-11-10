@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=6b6d620243b7';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=6b6d620243b7';
-import { isTrustedRasterURL } from './raster-cache.js?v=6b6d620243b7';
+import { updateWebViewSlot } from './webview-slot.js?v=fc0742f95a72';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=fc0742f95a72';
+import { isTrustedRasterURL } from './raster-cache.js?v=fc0742f95a72';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -300,7 +300,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
     if (view.clickable) { element.setAttribute('role', 'button'); element.tabIndex = view.enabled !== false ? 0 : -1; } else { element.removeAttribute('role'); element.removeAttribute('tabindex'); }
     if (!element._groupClickInstalled) {
       element._groupClickInstalled = true;
-      element.addEventListener('click', event => { if (element.dataset.clickable !== 'true' || element._session !== state.viewSession) return; const control = event.target.closest('button,input,[data-kind="check"],[data-clickable="true"]'); if (control && control !== element) return; event.stopPropagation(); clickView(view.id); });
+      element.addEventListener('click', event => { if (element.dataset.clickable !== 'true' || element._session !== state.viewSession) return; const control = event.target.closest('button,input,[data-kind="check"],[data-clickable="true"]'); if (control && control !== element) return; if (insideComposeHost(event.target, element)) return; event.stopPropagation(); clickView(view.id); });
       element.addEventListener('keydown', event => { if (event.target === element && element._session === state.viewSession && element.dataset.clickable === 'true' && ['Enter', ' '].includes(event.key)) { event.preventDefault(); event.stopPropagation(); clickView(view.id); } });
     }
     // A child with Z>0 has its Skia shadow raster drawn by the parent, beneath the child and before its content (HWUI order).
@@ -355,6 +355,12 @@ function queueComposeAction(ownerViewId, nodeId, action, args = []) {
   else if (state.pendingComposeActions.length < 128) state.pendingComposeActions.push(entry);
   else { reportAPKError(new Error('A fila de ações Compose excedeu 128 eventos; reabra o APK.'), 'Fila de acessibilidade interrompida'); return; }
   flushPendingInputs();
+}
+/** A click whose press started on Compose content already reached the app as real MotionEvents through the window (src/pointer-input-host.js): Android decided there whether a
+ * clickable parent View gets it. The DOM click that bubbles out of the Compose host must not click the parent a second time. */
+function insideComposeHost(target, stop) {
+  for (let node = target; node && node !== stop; node = node.parentNode ?? node.parentElement) if (node._pointerBound) return true;
+  return false;
 }
 const POINTER_CLICKS_DEFAULT = true;   // taps reach the app as real MotionEvents (the press ripple animates under them); ?pointerClicks=semantic on the player frame selects the OnClick path
   const pointerClicks = () => deviceState.pointerClicks ?? POINTER_CLICKS_DEFAULT;   // ?pointerClicks=real|semantic on the player frame overrides it (validation runs both)
