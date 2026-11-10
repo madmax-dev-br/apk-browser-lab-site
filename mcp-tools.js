@@ -23,7 +23,7 @@ const fail = message => Object.assign(new Error(message), { code: 'bad-args' });
  * instances, referrers, compositionLocals, findCompositionLocal). plugins(): the host's read model of the plugins. logcat() / network(): the entries of the page stores.
  * status(): what the page knows about the loaded APK. sleep(ms).
  */
-export function createMcpTools({ query, plugins = () => [], logcat = () => [], network = () => [], status = () => ({}), sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
+export function createMcpTools({ query, plugins = () => [], logcat = () => [], network = () => [], status = () => ({}), actions = null, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
   async function waitReady(timeoutMs = 15000) {
     const until = now() + bounded(timeoutMs, 15000, 100, 120000);
     for (;;) {
@@ -97,18 +97,37 @@ export function createMcpTools({ query, plugins = () => [], logcat = () => [], n
       return content;
     },
     async logcat(args) {
+      // a cursor to follow the Logcat: `since` (the `next` of the previous answer) returns only newer lines; `wait_ms` waits up to that long for one to arrive
       const min = LEVEL_ORDER.indexOf(String(args.level ?? 'V').toUpperCase()), needle = args.contains ? String(args.contains).toLowerCase() : null, limit = bounded(args.limit, 200, 1, 5000);
-      const rows = logcat().filter(entry => LEVEL_ORDER.indexOf(entry.level) >= Math.max(0, min) && (!needle || `${entry.tag} ${entry.message}`.toLowerCase().includes(needle))).slice(-limit);
+      const since = Number.isFinite(Number(args.since)) ? Number(args.since) : -1, wait = bounded(args.wait_ms, 0, 0, 30000);
+      const pick = () => logcat().filter(entry => !(entry.seq <= since) && LEVEL_ORDER.indexOf(entry.level) >= Math.max(0, min) && (!needle || `${entry.tag} ${entry.message}`.toLowerCase().includes(needle)));
+      let rows = pick(); for (const until = now() + wait; !rows.length && now() < until;) { await sleep(200); rows = pick(); }
+      rows = rows.slice(-limit);
+      const all = logcat(), next = all.length ? all.at(-1).seq : since;
       const lines = rows.map(entry => `${(entry.uptime / 1000).toFixed(3)} ${entry.level}/${entry.tag} (${entry.thread}): ${entry.message}`);
-      return [text(lines.length ? lines.join('\n') : `Sem linhas${needle || min > 0 ? ' com esse filtro' : ''}. O Logcat é coletado enquanto o MCP está conectado (linhas de antes da conexão não existem).`)];
+      return [text(lines.length ? lines.join('\n') : `Sem linhas novas${needle || min > 0 ? ' com esse filtro' : ''}. O Logcat é coletado enquanto o MCP está conectado.`), text({ next, count: rows.length })];
     },
     async network(args) {
-      const needle = args.contains ? String(args.contains).toLowerCase() : null, limit = bounded(args.limit, 50, 1, 1000);
-      const rows = network().filter(entry => !needle || `${entry.method} ${entry.url}`.toLowerCase().includes(needle)).slice(-limit).map(entry => ({
-        method: entry.method, url: entry.url, status: entry.status, outcome: entry.outcome, durationMs: entry.durationMs, contentType: entry.contentType, responseBytes: entry.responseBytes,
-        ...(entry.mockId ? { mock: entry.mockLabel ?? entry.mockId } : {}), ...(entry.mappedUrl ? { redirectedTo: entry.mappedUrl } : {}), ...(entry.refusedHost ? { refusedHost: entry.refusedHost } : {}), ...(entry.failure ? { failure: entry.failure } : {}) }));
-      return [text(rows)];
+      const needle = args.contains ? String(args.contains).toLowerCase() : null, limit = bounded(args.limit, 50, 1, 1000), withBody = args.include_body === true;
+      const since = Number.isFinite(Number(args.since)) ? Number(args.since) : -1, wait = bounded(args.wait_ms, 0, 0, 30000);
+      const pick = () => network().filter(entry => !(entry.seq <= since) && (!needle || `${entry.method} ${entry.url}`.toLowerCase().includes(needle)));
+      let rows = pick(); for (const until = now() + wait; !rows.length && now() < until;) { await sleep(200); rows = pick(); }
+      const all = network(), next = all.length ? all.at(-1).seq : since;
+      const out = rows.slice(-limit).map(entry => ({ seq: entry.seq, method: entry.method, url: entry.url, status: entry.status, outcome: entry.outcome, complete: entry.complete, durationMs: entry.durationMs, contentType: entry.contentType, responseBytes: entry.responseBytes,
+        ...(entry.mockId ? { mock: entry.mockLabel ?? entry.mockId } : {}), ...(entry.mappedUrl ? { redirectedTo: entry.mappedUrl } : {}), ...(entry.refusedHost ? { refusedHost: entry.refusedHost } : {}), ...(entry.failure ? { failure: entry.failure } : {}),
+        ...(withBody && typeof entry.responseBody === 'string' ? { responseBody: entry.responseBody.length > 20000 ? entry.responseBody.slice(0, 20000) + '…' : entry.responseBody, responseHeaders: entry.responseHeaders } : {}) }));
+      return [text({ requests: out, next })];
     },
+    // ---- acting on the lab: the page's own controls (they show in Controles like the user's) ----
+    async set_mock(args) {
+      if (!actions?.mock) throw fail('Mocks não estão disponíveis nesta página.');
+      const headers = args.headers && typeof args.headers === 'object' ? args.headers : undefined, body = args.body === undefined ? '' : typeof args.body === 'string' ? args.body : JSON.stringify(args.body);
+      const result = await actions.mock({ id: args.id, name: args.name ?? `MCP ${args.method ?? 'ANY'} ${args.url ?? ''}`.slice(0, 120), method: args.method ?? 'ANY', url: args.url, status: args.status ?? 200, headers: headers ?? (typeof args.body === 'object' && args.body !== null ? { 'Content-Type': 'application/json' } : undefined), body, delayMs: args.delay_ms ?? 0, query: args.query });
+      return [text({ id: result.id, note: 'Ativo em Controles › Mock de endpoints: a próxima requisição que casar recebe esta resposta sem ir à rede. Use reload para o app buscar de novo.' })];
+    },
+    async remove_mock(args) { if (!actions?.unmock) throw fail('Mocks não estão disponíveis nesta página.'); return [text(await actions.unmock(String(args.id ?? '')))]; },
+    async list_mocks() { if (!actions?.mocks) throw fail('Mocks não estão disponíveis nesta página.'); return [text(await actions.mocks())]; },
+    async reload(args) { if (!actions?.reload) throw fail('Recarregar não está disponível nesta página.'); return [text(await actions.reload(args.mode === 'reopen' ? 'reopen' : 'recreate'))]; },
     async wait_ready(args) { const result = await waitReady(args.timeout_ms); return [text({ ready: result.ready, activity: result.screen?.activity ?? null, waitingFor: result.screen?.ready?.waitingFor ?? [] })]; },
   };
   return {

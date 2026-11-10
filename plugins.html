@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=1b00abcf6df4">
+  <link rel="stylesheet" href="./site-pages.css?v=962c59289a0f">
 </head>
 <body>
   <header class="topbar">
@@ -249,7 +249,7 @@ lab.watch({ static: 'com.exemplo.Sessao' }, 'atual.usuario', v =&gt; lab.ui.json
           <li><b>Baixe a ponte</b> (Node.js 22 ou mais novo, sem dependências): <code>curl -O https://madmax-dev-br.github.io/apk-browser-lab-site/tools/lab-mcp.mjs</code></li>
           <li><b>Registre no cliente.</b> Claude Code: <code>claude mcp add apk-web-lab -- node /caminho/lab-mcp.mjs</code>. Claude Desktop, em <code>claude_desktop_config.json</code>: <code>{ "mcpServers": { "apk-web-lab": { "command": "node", "args": ["/caminho/lab-mcp.mjs"] } } }</code>. O cliente inicia a ponte sozinho.</li>
           <li><b>Pareie a página:</b> no terminal, <code>node lab-mcp.mjs token</code> mostra o token (guardado em <code>~/.apk-web-lab-mcp-token</code>). Cole em <b>Controles › MCP › Token</b> e clique em <b>Conectar</b>. O navegador pode pedir permissão para a página acessar a rede local: permita.</li>
-          <li><b>Peça ao Claude:</b> “tire um print do botão Salvar”, “qual LocalContentColor cada texto da tela recebe?”, “o que o plugin X está mostrando?”, “quais requisições falharam?”.</li>
+          <li><b>Peça ao Claude:</b> “tire um print do botão Salvar”, “qual LocalContentColor cada texto da tela recebe?”, “o que o plugin X está mostrando?”, “quais requisições falharam?”, “faça /v1/perfil devolver um usuário premium e recarregue a tela”, “acompanhe o Logcat por erros enquanto eu navego”.</li>
         </ol>
         <div class="table-scroll"><table>
           <thead><tr><th scope="col">Ferramenta</th><th scope="col">O que faz</th></tr></thead>
@@ -260,10 +260,12 @@ lab.watch({ static: 'com.exemplo.Sessao' }, 'atual.usuario', v =&gt; lab.ui.json
             <tr><td><code>composition_locals</code>, <code>find_composition_local</code></td><td>Os Locals de um componente; onde um Local é fornecido na tela, por valor.</td></tr>
             <tr><td><code>view_models</code>, <code>inspect</code>, <code>field</code>, <code>statics</code>, <code>static_field</code>, <code>classes</code>, <code>instances</code>, <code>referrers</code></td><td>As mesmas leituras somente leitura dos plugins.</td></tr>
             <tr><td><code>plugins</code></td><td>A saída de cada plugin (texto, tabelas, JSON, imagens), estado e erros.</td></tr>
-            <tr><td><code>logcat</code>, <code>network</code></td><td>Logcat (coletado enquanto o MCP está conectado) e o log de rede, com filtros.</td></tr>
+            <tr><td><code>logcat</code>, <code>network</code></td><td>Logcat (coletado enquanto o MCP está conectado) e o log de rede, com filtros. Para acompanhar ao vivo, cada resposta traz <code>next</code>: passe <code>since: next</code> na chamada seguinte (só o que é novo) e <code>wait_ms</code> para esperar até chegar algo (até 30 s). <code>network</code> com <code>include_body</code> devolve o corpo das respostas (texto).</td></tr>
+            <tr><td><code>set_mock</code>, <code>remove_mock</code>, <code>list_mocks</code></td><td>Cria ou troca (mesmo <code>id</code>) um mock de endpoint (<code>url</code>, <code>method</code>, <code>status</code>, <code>body</code> texto ou objeto, <code>headers</code>, <code>delay_ms</code>), remove e lista. Os mocks ficam em <b>Controles › Mock de endpoints</b> do pacote aberto, como os seus.</td></tr>
+            <tr><td><code>reload</code></td><td>Recarrega a tela (<code>recreate</code> ou <code>reopen</code>), por exemplo depois de um <code>set_mock</code>, para o app buscar de novo.</td></tr>
           </tbody>
         </table></div>
-        <p><b>Segurança:</b> a ponte escuta só em 127.0.0.1, aceita só as origens do lab (esta página e uma cópia local; outras com <code>--origin</code>) e exige o token; não guarda nada. Tudo é leitura: o MCP não muda o app. Mantenha a aba do lab visível enquanto usa (abas em segundo plano ficam lentas). Opções: <code>--port</code>, <code>--origin</code>, <code>--token</code>, <code>--timeout-ms</code>.</p>
+        <p><b>Segurança:</b> a ponte escuta só em 127.0.0.1, aceita só as origens do lab (esta página e uma cópia local; outras com <code>--origin</code>) e exige o token; não guarda nada. O MCP não muda o app por dentro: além das leituras, só usa os controles do laboratório (mocks e recarregar a tela), que aparecem em Controles. Mantenha a aba do lab visível enquanto usa (abas em segundo plano ficam lentas). Opções: <code>--port</code>, <code>--origin</code>, <code>--token</code>, <code>--timeout-ms</code>.</p>
       </section>
 
       <section id="valores" aria-labelledby="h-valores">
@@ -457,6 +459,6 @@ lab.ui.kv({ mock: id, ativos: (await lab.mocks()).length });</code></pre></div>
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./arquitetura.html">Arquitetura da VM</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=1b00abcf6df4"></script>
+  <script type="module" src="./site-pages.js?v=962c59289a0f"></script>
 </body>
 </html>
