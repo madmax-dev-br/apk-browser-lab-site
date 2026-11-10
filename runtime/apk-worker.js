@@ -1,54 +1,55 @@
-import { buildScreenState } from './screen-state.js?v=2dd890abb01e';
-import { createLogcat } from './logcat.js?v=2dd890abb01e';
-import { createNetlog } from './netlog.js?v=2dd890abb01e';
-import { reportSummary } from './report-summary.js?v=2dd890abb01e';
-import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=2dd890abb01e';
-import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=2dd890abb01e';
-import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=2dd890abb01e';
-import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=2dd890abb01e';
-import { describeRedirects } from './host-map.js?v=2dd890abb01e';
-import { TimeBreakdown } from './time-breakdown.js?v=2dd890abb01e';
-import { createMessageSink } from './audio-native.js?v=2dd890abb01e';
-import { loadAPK } from './apk-loader.js?v=2dd890abb01e';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=2dd890abb01e';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=2dd890abb01e';
-import { createWebViewBackend } from './webview-backend.js?v=2dd890abb01e';
-import { FrameworkProvider } from './framework-provider.js?v=2dd890abb01e';
-import { createRasterSender } from './raster-cache.js?v=2dd890abb01e';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=2dd890abb01e';
-import { dispatchPointer } from './pointer-input-host.js?v=2dd890abb01e';
-import { resolveDevice } from './device-profile.js?v=2dd890abb01e';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=2dd890abb01e';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=2dd890abb01e';
-import { SkiaProvider } from './skia-provider.js?v=2dd890abb01e';
-import { inspectCompose } from './compose-inspector.js?v=2dd890abb01e';
-import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=2dd890abb01e';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=2dd890abb01e';
-import { SemanticsPacer } from './semantics-pacing.js?v=2dd890abb01e';
-import { MOTION_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=2dd890abb01e';
-import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=2dd890abb01e';
-import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=2dd890abb01e';
-import { disposeTextLayout } from './text-layout-native.js?v=2dd890abb01e';
-import { IcuBreakProvider } from './icu-break-provider.js?v=2dd890abb01e';
-import { SqliteProvider } from './sqlite-native.js?v=2dd890abb01e';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=2dd890abb01e';
-import { TzdataProvider } from './java-time-native.js?v=2dd890abb01e';
-import { ZlibProvider } from './zip-native.js?v=2dd890abb01e';
-import { IcuConverterProvider } from './icu-converter-native.js?v=2dd890abb01e';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=2dd890abb01e';
-import { JavacryptoProvider } from './javacrypto-native.js?v=2dd890abb01e';
-import { disposeColorFilters } from './color-filter-native.js?v=2dd890abb01e';
-import { disposeRegex } from './regex-native.js?v=2dd890abb01e';
-import { disposeRenderNodes } from './rendernode-native.js?v=2dd890abb01e';
-import { startDeepLink } from './deep-link-host.js?v=2dd890abb01e';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=2dd890abb01e';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=2dd890abb01e';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=2dd890abb01e';
+import { buildScreenState } from './screen-state.js?v=1b00abcf6df4';
+import { createLogcat } from './logcat.js?v=1b00abcf6df4';
+import { createNetlog } from './netlog.js?v=1b00abcf6df4';
+import { reportSummary } from './report-summary.js?v=1b00abcf6df4';
+import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=1b00abcf6df4';
+import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=1b00abcf6df4';
+import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=1b00abcf6df4';
+import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=1b00abcf6df4';
+import { describeRedirects } from './host-map.js?v=1b00abcf6df4';
+import { TimeBreakdown } from './time-breakdown.js?v=1b00abcf6df4';
+import { createMessageSink } from './audio-native.js?v=1b00abcf6df4';
+import { loadAPK } from './apk-loader.js?v=1b00abcf6df4';
+import { buildPreparedFile } from './apklab-file.js?v=1b00abcf6df4';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=1b00abcf6df4';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=1b00abcf6df4';
+import { createWebViewBackend } from './webview-backend.js?v=1b00abcf6df4';
+import { FrameworkProvider } from './framework-provider.js?v=1b00abcf6df4';
+import { createRasterSender } from './raster-cache.js?v=1b00abcf6df4';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=1b00abcf6df4';
+import { dispatchPointer } from './pointer-input-host.js?v=1b00abcf6df4';
+import { resolveDevice } from './device-profile.js?v=1b00abcf6df4';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=1b00abcf6df4';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=1b00abcf6df4';
+import { SkiaProvider } from './skia-provider.js?v=1b00abcf6df4';
+import { inspectCompose } from './compose-inspector.js?v=1b00abcf6df4';
+import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=1b00abcf6df4';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=1b00abcf6df4';
+import { SemanticsPacer } from './semantics-pacing.js?v=1b00abcf6df4';
+import { MOTION_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=1b00abcf6df4';
+import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=1b00abcf6df4';
+import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=1b00abcf6df4';
+import { disposeTextLayout } from './text-layout-native.js?v=1b00abcf6df4';
+import { IcuBreakProvider } from './icu-break-provider.js?v=1b00abcf6df4';
+import { SqliteProvider } from './sqlite-native.js?v=1b00abcf6df4';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=1b00abcf6df4';
+import { TzdataProvider } from './java-time-native.js?v=1b00abcf6df4';
+import { ZlibProvider } from './zip-native.js?v=1b00abcf6df4';
+import { IcuConverterProvider } from './icu-converter-native.js?v=1b00abcf6df4';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=1b00abcf6df4';
+import { JavacryptoProvider } from './javacrypto-native.js?v=1b00abcf6df4';
+import { disposeColorFilters } from './color-filter-native.js?v=1b00abcf6df4';
+import { disposeRegex } from './regex-native.js?v=1b00abcf6df4';
+import { disposeRenderNodes } from './rendernode-native.js?v=1b00abcf6df4';
+import { startDeepLink } from './deep-link-host.js?v=1b00abcf6df4';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=1b00abcf6df4';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=1b00abcf6df4';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=1b00abcf6df4';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=2dd890abb01e';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=2dd890abb01e';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=2dd890abb01e';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '2dd890abb01e';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=1b00abcf6df4';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=1b00abcf6df4';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=1b00abcf6df4';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '1b00abcf6df4';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -281,6 +282,15 @@ self.onmessage = async ({ data }) => {
       if (notes.length) result.text += '\nAvisos do relatório: ' + notes.join('; ');
       send({ type: 'result', screenState: result });
     } catch (error) { send({ type: 'result', screenState: { text: `Estado da tela\nNão foi possível montar o estado da tela: ${String(error?.message ?? error).slice(0, 300)}`, blank: false, reasons: [] } }); }
+    return;
+  }
+  if (type === 'prepare-file') {   // "Gerar arquivo preparado" (src/apklab-file.js): the .apklab of the loaded APK, made from its bytes; the app is not touched
+    try {
+      if (!archive) { send({ type: 'error', error: { name: 'ProtocolError', message: 'Nenhum APK carregado.' } }); return; }
+      if (archive.prepared) { send({ type: 'error', error: { name: 'ProtocolError', message: 'O arquivo aberto já é um arquivo preparado (.apklab).' } }); return; }
+      const built = await buildPreparedFile(archive.reader.bytes, { name: data.name ?? null, packageName: inventory?.packageName ?? null, runtimeRevision: data.revision ?? null });
+      self.postMessage({ requestId, type: 'result', bytes: built.bytes, descriptor: built.descriptor }, [built.bytes.buffer]);
+    } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
   }
   if (type === 'logcat-stream') {   // the page's Logcat panel opened (the ring's recent lines are posted first, then the rows stream) or closed (only a counter): src/logcat.js setStreaming

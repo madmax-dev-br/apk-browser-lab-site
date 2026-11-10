@@ -1,29 +1,29 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=2dd890abb01e';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=2dd890abb01e';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=2dd890abb01e';
-import { initCollapsibleSections } from './panel-sections.js?v=2dd890abb01e';
-import { initHelpTips } from './help-tips.js?v=2dd890abb01e';
-import { createToolDock } from './tool-dock.js?v=2dd890abb01e';
-import { createPermissionsPanel } from './permissions-panel.js?v=2dd890abb01e';
-import { createOverridesPanel } from './overrides-panel.js?v=2dd890abb01e';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=2dd890abb01e';
-import { createHostMapPanel } from './host-map-panel.js?v=2dd890abb01e';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=2dd890abb01e';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=2dd890abb01e';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=2dd890abb01e';
-import { createDeviceView, createViewState } from './device-view.js?v=2dd890abb01e';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=2dd890abb01e';
-import { formatApiGapReport } from './api-gap-scan.js?v=2dd890abb01e';
-import { createLogcatPanel } from './logcat-panel.js?v=2dd890abb01e';
-import { createComposeInspectorPanel } from './compose-inspector-panel.js?v=2dd890abb01e';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=2dd890abb01e';
-import { createPluginHost } from './plugin-host.js?v=2dd890abb01e';
-import { captureImage } from './screen-capture.js?v=2dd890abb01e';
-import { createPluginsPanel } from './plugins-panel.js?v=2dd890abb01e';
-import { createMcpTools } from './mcp-tools.js?v=2dd890abb01e';
-import { createMcpLink } from './mcp-link.js?v=2dd890abb01e';
-import { createModalHost } from './lab-modal.js?v=2dd890abb01e';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=2dd890abb01e';
+import { APKWorkerClient } from './apk-worker-client.js?v=1b00abcf6df4';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=1b00abcf6df4';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=1b00abcf6df4';
+import { initCollapsibleSections } from './panel-sections.js?v=1b00abcf6df4';
+import { initHelpTips } from './help-tips.js?v=1b00abcf6df4';
+import { createToolDock } from './tool-dock.js?v=1b00abcf6df4';
+import { createPermissionsPanel } from './permissions-panel.js?v=1b00abcf6df4';
+import { createOverridesPanel } from './overrides-panel.js?v=1b00abcf6df4';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=1b00abcf6df4';
+import { createHostMapPanel } from './host-map-panel.js?v=1b00abcf6df4';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=1b00abcf6df4';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=1b00abcf6df4';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=1b00abcf6df4';
+import { createDeviceView, createViewState } from './device-view.js?v=1b00abcf6df4';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=1b00abcf6df4';
+import { formatApiGapReport } from './api-gap-scan.js?v=1b00abcf6df4';
+import { createLogcatPanel } from './logcat-panel.js?v=1b00abcf6df4';
+import { createComposeInspectorPanel } from './compose-inspector-panel.js?v=1b00abcf6df4';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=1b00abcf6df4';
+import { createPluginHost } from './plugin-host.js?v=1b00abcf6df4';
+import { captureImage } from './screen-capture.js?v=1b00abcf6df4';
+import { createPluginsPanel } from './plugins-panel.js?v=1b00abcf6df4';
+import { createMcpTools } from './mcp-tools.js?v=1b00abcf6df4';
+import { createMcpLink } from './mcp-link.js?v=1b00abcf6df4';
+import { createModalHost } from './lab-modal.js?v=1b00abcf6df4';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=1b00abcf6df4';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -188,7 +188,25 @@ function finishOperation(token) {
   if (token !== state.operation) return;
   clearInterval(state.operationTimer); hideBoot(); $('operation-panel').hidden = true; state.abortController = null; setBusy(false); if (state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length || state.pendingScrollBys.size) flushPendingInputs();
 }
+/** Load timing per stage (shown under the inspection and in the execution log): the phases the Worker reports, from the first to the last. */
+function notePhase(phase) {
+  const times = state.loadTimes; if (!times || times.done || !phase) return;
+  const now = performance.now(), last = times.phases.at(-1);
+  if (last && last.phase === phase) return;
+  if (last) last.ms = Math.round(now - last.at);
+  times.phases.push({ phase, at: now, ms: 0 });
+}
+const PHASE_LABEL = { manifest: 'manifesto', dex: 'código (DEX)', framework: 'framework', 'framework-resources': 'estilos Android', resources: 'recursos', native: 'bibliotecas nativas' };
+function showLoadTimes() {
+  const times = state.loadTimes; if (!times) return;
+  const parts = [`leitura do arquivo ${times.readMs} ms`, ...times.phases.filter(item => item.ms > 0 && PHASE_LABEL[item.phase]).map(item => `${PHASE_LABEL[item.phase]} ${item.ms} ms`)];
+  if (times.launchMs !== undefined) parts.push(`abertura da Activity ${times.launchMs} ms`);
+  const total = times.loadMs + (times.launchMs ?? 0);
+  $('load-times').hidden = false;
+  $('load-times').textContent = `${times.prepared ? 'Arquivo preparado (.apklab) · ' : ''}${times.launchMs !== undefined ? 'Do arquivo à tela' : 'Carregado'} em ${(total / 1000).toFixed(2)} s · ${parts.join(' · ')}`;
+}
 function onWorkerProgress(progress = {}) {
+  notePhase(progress.phase);
   const phases = { 'framework-resources': 'Carregando dados originais de estilos Android', framework: 'Carregando código AOSP compilado', manifest: 'Lendo o manifesto', dex: 'Inspecionando DEX', native: 'Inventariando bibliotecas nativas', complete: 'Inspeção concluída', launch: 'Tentando iniciar a Activity', intent: 'Abrindo o link', click: 'Executando callback DEX', back: 'Retornando à Activity anterior', resources: 'Lendo recursos e layouts XML' };
   const message = `${phases[progress.phase] || 'Processando no Worker'}${progress.filename ? ` · ${progress.filename}` : ''}`;
   $('operation-message').textContent = message; if (state.bootVisible) setBootCaption(message);
@@ -426,7 +444,8 @@ async function importSource(source, autoRun = false) {
   state.trace = []; appendTrace(`Abrindo ${source.name} em Web Worker isolado. Sem upload.`);
   setStatus('Lendo o arquivo APK…');
   try {
-    let buffer;
+    let buffer; state.loadTimes = { startedAt: performance.now(), phases: [], readMs: 0, loadMs: 0, prepared: /\.apklab$/i.test(source.name ?? '') };
+    $('load-times').hidden = true; $('prepare-row').hidden = true;
     if (source.file) buffer = await source.file.arrayBuffer();
     else {
       state.abortController = new AbortController();
@@ -437,11 +456,14 @@ async function importSource(source, autoRun = false) {
     }
     if (token !== state.operation) return;
     if (buffer.byteLength > 1024 * 1024 * 1024) throw new Error('O APK excede o limite de 1 GiB.');
-    $('file-size').textContent = `${formatSize(buffer.byteLength)} · processado no navegador`;
+    $('file-size').textContent = `${formatSize(buffer.byteLength)} · processado no navegador`; state.loadTimes.readMs = Math.round(performance.now() - state.loadTimes.startedAt); state.loadTimes.loadStartedAt = performance.now();
     state.apiGaps = null;
     const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceForVM(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB, eventSeconds: deviceState.settings.eventSeconds, motionRaster: params.get('raster') !== 'full', rasterScale: deviceState.settings.raster?.motionScale ?? 0.5, rasterNavigation: deviceState.settings.raster?.navigation !== false, logcatStreaming: logcatPanel.streaming, renderer: deviceState.settings.renderer ?? 'cpu' }); showRendererStatus(result.renderer); state.loadedMemoryMiB = deviceState.settings.memoryMiB; updateVmMemoryHint(); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
     state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);
+    { const times = state.loadTimes, last = times.phases.at(-1); if (last && !last.ms) last.ms = Math.round(performance.now() - last.at); times.loadMs = Math.round(performance.now() - times.startedAt); times.done = true; times.prepared = !!result.inventory.prepared;
+      showLoadTimes(); appendTrace(`Carregado em ${times.loadMs} ms${times.prepared ? ' (arquivo preparado .apklab)' : ''}: ${times.phases.filter(item => item.ms > 0).map(item => `${item.phase} ${item.ms} ms`).join(', ')}`);
+      $('prepare-row').hidden = times.prepared || !!result.inventory.unsupportedFeatures?.length; }
     await permissionsPanel.attach(result.inventory); await overridesPanel.attach(result.inventory); await ignoredPanel.attach(result.inventory); await mocksPanel.attach(result.inventory); pluginHost.vmChanged(); if (logcatPanelOpen || pluginHost.wantsLogs) syncLogcatStreaming(true).catch(() => {});   // before any app code runs: permission state, simulated location, method return overrides, ignored Activities, endpoint mocks
     showInventory(result.inventory);
     appendTrace(`Pacote: ${result.inventory.packageName || '(não identificado)'}`);
@@ -458,7 +480,7 @@ async function importSource(source, autoRun = false) {
 async function chooseFile(file) {
   if (!file || state.busy) return;
   if (file.size > 1024 * 1024 * 1024) { switchMode('apk'); showError(new Error('O limite deste laboratório é 1 GiB por APK. Escolha um arquivo menor para continuar.'), 'APK acima do limite de tamanho'); return; }
-  if (!/\.apk$/i.test(file.name)) { switchMode('apk'); showError(new Error('Escolha um arquivo com a extensão .apk.'), 'Formato de arquivo inválido'); return; }
+  if (!/\.(apk|apklab)$/i.test(file.name)) { switchMode('apk'); showError(new Error('Escolha um arquivo .apk ou um arquivo preparado .apklab.'), 'Formato de arquivo inválido'); return; }
   await importSource({ file, name: file.name });
 }
 // Memory readout in the status bar: live VM objects against the object budget (the OutOfMemoryError threshold), an estimate of what they cost (bytesPerObject, sent by the Worker, is the measured
@@ -670,7 +692,8 @@ async function runAPKOnce() {
   }
   switchMode('apk'); hideError(); state.lastAPKError = null; state.launchAttempted = true;
   const token = beginOperation('Tentando iniciar a Activity…');
-  state.runStartedAt = Date.now(); try { const snapshot = await state.runtime.launch(activity, { onProgress: onWorkerProgress }); if (token === state.operation) renderSnapshot(snapshot); }
+  state.runStartedAt = Date.now(); const launchStarted = performance.now();
+  try { const snapshot = await state.runtime.launch(activity, { onProgress: onWorkerProgress }); if (token === state.operation) { renderSnapshot(snapshot); if (state.loadTimes) { state.loadTimes.launchMs = Math.round(performance.now() - launchStarted); showLoadTimes(); appendTrace(`Activity aberta em ${state.loadTimes.launchMs} ms`); } } }
   catch (error) { if (token === state.operation) reportAPKError(error); }
   finally { finishOperation(token); }
 }
@@ -771,6 +794,21 @@ $('drop-zone').addEventListener('dragover', (event) => { event.preventDefault();
 $('drop-zone').addEventListener('dragleave', () => $('drop-zone').classList.remove('dragging'));
 $('drop-zone').addEventListener('drop', (event) => { event.preventDefault(); $('drop-zone').classList.remove('dragging'); chooseFile(event.dataTransfer.files?.[0]); });
 $('run-button').addEventListener('click', runAPK);
+// "Gerar arquivo preparado (.apklab)": made in the Worker from the loaded APK's bytes (src/apklab-file.js) and saved by the browser; open it later in place of the APK
+$('prepare-file').addEventListener('click', async () => {
+  if (!apkVM.worker) return;
+  for (let waited = 0; state.busy && waited < 30000; waited += 50) await new Promise(resolve => setTimeout(resolve, 50));   // a click right as a load ends waits for it instead of being lost
+  if (state.busy || !apkVM.worker) return;
+  const button = $('prepare-file'), name = `${String(state.currentSource?.name ?? 'app').replace(/\.(apk|apklab)$/i, '')}.apklab`;
+  button.disabled = true; button.textContent = 'Gerando…';
+  try {
+    const started = performance.now(), { bytes, descriptor } = await apkVM.prepareFile({ name: state.currentSource?.name ?? null, revision: document.querySelector?.('script[src*="app.js"]')?.src?.split('v=')[1] ?? null });
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' })), link = document.createElement('a'); link.href = url; link.download = name; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+    appendTrace(`Arquivo preparado ${name}: ${formatSize(bytes.length)} (${descriptor.entries} arquivos do APK, já descompactados), gerado em ${Math.round(performance.now() - started)} ms`);
+    setStatus(`${name} gerado (${formatSize(bytes.length)}). Abra-o no lugar do APK.`, 'ok');
+  } catch (error) { setStatus(`Não foi possível gerar o arquivo preparado: ${error?.message ?? error}`, 'error'); }
+  finally { button.disabled = false; button.textContent = 'Gerar arquivo preparado (.apklab)'; }
+});
 $('back-button').addEventListener('click', backAPK);
 $('recreate-activity').addEventListener('click', () => reloadActivity('recreate'));
 $('reopen-activity').addEventListener('click', () => reloadActivity('reopen'));

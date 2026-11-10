@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Arquitetura da VM · APK Browser Lab</title>
   <meta name="description" content="Como o APK Browser Lab executa um APK Android no navegador: do arquivo à tela, threads e tempo, memória, renderização, rede, código nativo, ferramentas e limitações.">
-  <link rel="stylesheet" href="./site-pages.css?v=2dd890abb01e">
+  <link rel="stylesheet" href="./site-pages.css?v=1b00abcf6df4">
 </head>
 <body>
   <header class="topbar">
@@ -27,6 +27,7 @@
         <li><a href="#visao-geral">Visão geral</a></li>
         <li><a href="#do-apk-a-tela">Do APK à tela</a></li>
         <li><a href="#carregar-executar">Carregar e Executar</a></li>
+        <li><a href="#apklab">Arquivo preparado (.apklab)</a></li>
         <li><a href="#threads">Threads, eventos e tempo</a></li>
         <li><a href="#memoria">Memória</a></li>
         <li><a href="#renderizacao">Renderização</a></li>
@@ -131,6 +132,18 @@
           </div>
           <figcaption><strong>Figura 2.</strong> As duas fases lado a lado. Carregar inspeciona e prepara; Executar inicia o processo do app. Fontes: os casos <code>load</code> e <code>launch</code> de <code>src/apk-worker.js</code>, <code>importSource</code> e <code>runAPKOnce</code> de <code>src/app.js</code>.</figcaption>
         </figure>
+      </section>
+
+      <section id="apklab" aria-labelledby="h-apklab">
+        <h2 id="h-apklab">Arquivo preparado (.apklab)</h2>
+        <p>Depois de abrir um APK, <b>Gerar arquivo preparado (.apklab)</b> (sob a inspeção do pacote) salva um arquivo feito a partir dele. Abra esse arquivo no lugar do APK: ele contém tudo do APK, então o APK não é mais necessário.</p>
+        <ul>
+          <li><b>O que tem dentro:</b> cada arquivo do APK (DEX, recursos, assets, bibliotecas nativas) exatamente como o APK descompactado, sem compressão, mais um <code>apklab.json</code> com o nome, o tamanho e o SHA-256 do APK de origem.</li>
+          <li><b>O que ele economiza:</b> descompactar o APK e conferir o CRC de cada arquivo a cada carregamento (o CRC foi conferido uma vez, ao gerar). No exemplo híbrido, o estágio de código cai de cerca de 98 ms para 15 ms e o carregamento de 0,48 s para 0,40 s; quanto maior o APK, maior a diferença. Os tempos de cada estágio aparecem sob a inspeção e no Log de execução.</li>
+          <li><b>O que ele não muda:</b> o app. O código e os recursos são os mesmos bytes do APK, e a inicialização do app (Application, Activity, primeira tela) roda inteira como antes; é ela que domina o tempo até a primeira tela.</li>
+          <li><b>Tamanho:</b> maior que o APK, porque está descompactado (o exemplo híbrido: 9,9 MiB de APK, 24,6 MiB de .apklab).</li>
+          <li><b>Fora do navegador:</b> <code>node scripts/prepare-apk.mjs app.apk</code> gera o mesmo arquivo. Os serviços de backend aceitam o .apklab no lugar do APK, porque quem lê o arquivo é o mesmo carregador.</li>
+        </ul>
       </section>
 
       <section id="threads" aria-labelledby="h-threads">
@@ -312,6 +325,6 @@ Vary: Origin</code></pre></div>
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./plugins.html">Como configurar plugins</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=2dd890abb01e"></script>
+  <script type="module" src="./site-pages.js?v=1b00abcf6df4"></script>
 </body>
 </html>

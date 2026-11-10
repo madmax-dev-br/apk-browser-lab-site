@@ -476,3 +476,8 @@ body.lab-modal-open{overflow:hidden}
 :root[data-theme=dark] .netlog-menu-item{color:#d0d3da}
 :root[data-theme=dark] .netlog-menu-item:hover,:root[data-theme=dark] .netlog-menu-item:focus-visible{background:#26233f;color:#c9c5ff}
 :root[data-theme=dark] .netlog-body{background:#14161c;color:#c4c8d2}
+/* Load times and the prepared file (.apklab) */
+.load-times{font:10px/1.6 ui-monospace,monospace;color:#6f7686;margin:10px 0 0;word-break:break-word}
+.prepare-row{display:flex;flex-direction:column;gap:4px;margin:10px 0 0}
+.prepare-row .help-inline{font-size:9px;color:#9aa0ae}
+:root[data-theme=dark] .load-times{color:#a3a7b1}

@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=2dd890abb01e';
-import { createRasterReceiver } from './raster-cache.js?v=2dd890abb01e';
+import { createWebAudioPlayer } from './web-audio-player.js?v=1b00abcf6df4';
+import { createRasterReceiver } from './raster-cache.js?v=1b00abcf6df4';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=2dd890abb01e', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=1b00abcf6df4', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -126,6 +126,8 @@ export class APKWorkerClient {
   /** The Logcat panel opened (the Worker posts its recent lines, then streams) or closed (only a counter, src/logcat.js). Without a Worker there is nothing to stream. */
   async setLogcatStreaming(open) { if (!this.worker) return { streaming: false, total: 0 }; return this.sideCall('logcat-stream', { open: !!open }); }
   /** One inspection of the Compose layout tree on the screen (src/compose-inspector.js), answered between two VM events; null when no APK is loaded. */
+  /** The prepared file (.apklab) of the loaded APK: { bytes: Uint8Array, descriptor } (src/apklab-file.js). */
+  async prepareFile({ name = null, revision = null } = {}) { const reply = await this.sideCall('prepare-file', { name, revision }, 300000); return { bytes: reply.bytes, descriptor: reply.descriptor }; }
   async inspectCompose({ maxNodes = 2000 } = {}) { if (!this.worker) return null; return (await this.sideCall('compose-inspect', { maxNodes }, 15000)).inspection ?? null; }
   /** A page plugin's read-only query (src/plugin-queries.js; queued and served at low priority by the Worker). Rejects with `code` 'no-apk' when no APK is loaded. */
   async pluginQuery(query, args = {}) { if (!this.worker) throw Object.assign(new Error('Nenhum APK em execução.'), { code: 'no-apk' }); const reply = await this.sideCall('plugin-query', { query, args }, 10000); return { value: reply.value, ms: reply.ms }; }

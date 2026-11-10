@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=2dd890abb01e';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=2dd890abb01e';
-import { inspectELF } from './native-inspector.js?v=2dd890abb01e';
-import { inflateRaw } from './inflate.js?v=2dd890abb01e';
-import { resolveDevice } from './device-profile.js?v=2dd890abb01e';
-import { resourceProfileFor } from './device-configuration.js?v=2dd890abb01e';
-import { JniBridge } from './jni-host.js?v=2dd890abb01e';
-import { providerForApk } from './native-provider-variants.js?v=2dd890abb01e';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=2dd890abb01e';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=2dd890abb01e';
-import { AndroidResources } from './android-resources.js?v=2dd890abb01e';
-import { AndroidPlatform } from './android-platform.js?v=2dd890abb01e';
-import { FrameworkProvider } from './framework-provider.js?v=2dd890abb01e';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=1b00abcf6df4';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=1b00abcf6df4';
+import { inspectELF } from './native-inspector.js?v=1b00abcf6df4';
+import { inflateRaw } from './inflate.js?v=1b00abcf6df4';
+import { resolveDevice } from './device-profile.js?v=1b00abcf6df4';
+import { resourceProfileFor } from './device-configuration.js?v=1b00abcf6df4';
+import { JniBridge } from './jni-host.js?v=1b00abcf6df4';
+import { providerForApk } from './native-provider-variants.js?v=1b00abcf6df4';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=1b00abcf6df4';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=1b00abcf6df4';
+import { AndroidResources } from './android-resources.js?v=1b00abcf6df4';
+import { AndroidPlatform } from './android-platform.js?v=1b00abcf6df4';
+import { FrameworkProvider } from './framework-provider.js?v=1b00abcf6df4';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -74,6 +74,15 @@ export class APKArchive {
     }
     if (p !== start + directorySize) fail('Malformed APK central directory length');
     this.directoryStart = start;
+    // A prepared file (.apklab, src/apklab-file.js): the APK's entries, decompressed and CRC-checked when the file was made, under apk/. The archive then reads as that APK.
+    this.prepared = null;
+    if (this.entries.has('apklab.json') && [...this.entries.keys()].some(key => key.startsWith('apk/'))) {
+      let descriptor; try { descriptor = JSON.parse(utf8.decode(this.readEntrySync('apklab.json', 1024 * 1024))); } catch (error) { fail(`Arquivo preparado (.apklab) ilegível: ${error.message}`); }
+      if (descriptor?.format !== 'apk-web-lab-prepared' || descriptor.version !== 1) fail(`Arquivo preparado de formato desconhecido (${descriptor?.format ?? '?'} v${descriptor?.version ?? '?'})`);
+      const remapped = new Map();
+      for (const [key, entry] of this.entries) if (key.startsWith('apk/') && key.length > 4) remapped.set(key.slice(4), { ...entry, name: key.slice(4), localName: key, trusted: descriptor.crcVerified === true && entry.method === 0 });
+      this.entries = remapped; this.prepared = descriptor;
+    }
   }
   payload(name) {
     const e = this.entries.get(name), b = this.reader;
@@ -83,7 +92,7 @@ export class APKArchive {
     if (b.u32(e.offset) !== 0x04034b50 || b.u16(e.offset + 8) !== e.method || (b.u16(e.offset + 6) & 1))
       fail(`Malformed APK local entry: ${name}`);
     const nameSize = b.u16(e.offset + 26), extra = b.u16(e.offset + 28);
-    if (utf8.decode(b.slice(e.offset + 30, nameSize)) !== name) fail(`APK local filename mismatch: ${name}`);
+    if (utf8.decode(b.slice(e.offset + 30, nameSize)) !== (e.localName ?? name)) fail(`APK local filename mismatch: ${name}`);
     const start = e.offset + 30 + nameSize + extra;
     if (start + e.compressed > this.directoryStart) fail(`APK entry overlaps central directory: ${name}`);
     return { entry: e, compressed: b.slice(start, e.compressed) };
@@ -101,7 +110,7 @@ export class APKArchive {
     let data;
     if (e.method === 0) data = compressed.slice();
     else { try { data = inflateRaw(compressed, e.size); } catch (error) { fail(`Unable to decompress ${name}: ${error.message}`); } }
-    if (data.length !== e.size || crc32(data) !== e.crc) fail(`APK entry size/CRC mismatch: ${name}`);
+    if (data.length !== e.size || (!e.trusted && crc32(data) !== e.crc)) fail(`APK entry size/CRC mismatch: ${name}`);
     return data;
   }
   async extract(name, limit) {
@@ -132,7 +141,7 @@ export class APKArchive {
       let p = 0;
       for (const chunk of chunks) { data.set(chunk, p); p += chunk.length; }
     }
-    if (data.length !== e.size || crc32(data) !== e.crc) fail(`APK entry size/CRC mismatch: ${name}`);
+    if (data.length !== e.size || (!e.trusted && crc32(data) !== e.crc)) fail(`APK entry size/CRC mismatch: ${name}`);
     return data;
   }
   /** Header-only probe: bounded output, deliberately does not claim full-entry CRC validation. */
@@ -704,7 +713,8 @@ export async function loadAPK(arrayBuffer, options = {}) {
     dexFiles, dexSummaries, totalDexBytes, nativeLibraries, nativeLibraryDetails, nativeByABI, nativeSummary,
     resourceSummary: resources.summary,
     kotlin, compose, embeddedFrameworks, bundles, dependencies: dependencyOwners.map(dottedName),
-    unsupportedFeatures, warnings, nativeInspection: { requested: false, inspected: 0, skipped: nativeLibraries.length, bytes: 0 } };
+    unsupportedFeatures, warnings, nativeInspection: { requested: false, inspected: 0, skipped: nativeLibraries.length, bytes: 0 },
+    prepared: archive.prepared ? { source: archive.prepared.source ?? null, createdAt: archive.prepared.createdAt ?? null, entries: archive.prepared.entries ?? null } : null };
 
   /** Lazy ELF metadata inspection. Accept exact archive paths; never resolves or calls JNI. */
   const inspectNativeLibraries = async (paths = nativeLibraries, limits = {}) => {
