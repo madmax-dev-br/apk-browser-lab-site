@@ -15,7 +15,7 @@
 //   ConcurrentHashMap, the Collections wrappers), androidx ArrayMap / SimpleArrayMap, Kotlin's empty collections and ArrayDeque, Compose's persistent vectors, and the
 //   observable holders shown as their current value: kotlinx StateFlowImpl (`_state`), androidx LiveData (`mData`, `mVersion`), Compose snapshot state (the newest valid
 //   StateRecord of `next`: SnapshotMutableState, the Int/Long/Float/Double states, SnapshotStateList), and the java.util.concurrent atomics.
-import { isFreedId } from './heap-gc.js?v=8ac2070c6aa3';
+import { isFreedId } from './heap-gc.js?v=fa88a5e0684e';
 
 export const QUERY_LIMITS = { depth: 2, maxDepth: 6, maxFields: 200, maxFieldsLimit: 2000, maxItems: 20, maxItemsLimit: 500, maxString: 1000, maxStringLimit: 20000, maxNodes: 4000, budgetMs: 25 };
 const VIEW_MODEL_STORE = 'Landroidx/lifecycle/ViewModelStore;', VIEW_MODEL = 'Landroidx/lifecycle/ViewModel;';
@@ -617,29 +617,93 @@ function staticNames(runtime) {
   runtime.pluginStaticNames = { size, map };
   return map;
 }
+/** The name of a CompositionLocal key: the static field that declares it (a top-level val, an object or companion property), else the instance field that holds it
+ * (a Local kept in a class or an object instance), found by a short heap scan once per key; a minified app shows its renamed names. */
+function localName(runtime, reader, keyRef) {
+  const statics = staticNames(runtime).get(keyRef.ref); if (statics) return statics;
+  const cache = runtime.pluginLocalNames ??= new Map(); if (cache.has(keyRef.ref)) return cache.get(keyRef.ref);
+  let found = null;
+  try {
+    scanHeap(runtime, { after: 0, budgetMs: 30, now: () => performance.now() }, rec => {
+      if (!rec.fields || rec.cells !== undefined) return true;
+      for (const [key, value] of rec.fields) if (isRef(value) && value.ref === keyRef.ref && key.includes('->')) { const parsed = parseKey(key); if (/Local|local/.test(parsed.name) || !/\$|^this/.test(parsed.name)) { found = { name: parsed.name.replace(/\$delegate$/, ''), declaredIn: dotted(parsed.owner), holder: 'instance' }; return false; } }
+      return true;
+    });
+  } catch { found = null; }
+  if (cache.size < 5000) cache.set(keyRef.ref, found);
+  return found;
+}
+/** One provided Local: { kind, raw, rawType, note } from its value holder. */
+function unwrapLocal(reader, holderRef) {
+  const holder = isRef(holderRef) ? reader.record(holderRef.ref) : null, htype = holder?.type ?? '';
+  if (/ComputedValueHolder;$/.test(htype)) return { kind: 'computed', raw: null, rawType: OBJECT, note: 'calculado pela composição a partir de outros Locals (compositionLocalWithComputedDefaultOf): não é avaliado aqui' };
+  if (/DynamicValueHolder;$/.test(htype)) { const state = reader.fieldValue(holder, 'state'), held = isRef(state) ? reader.holder(reader.record(state.ref)) : null; return { kind: 'dynamic', raw: held ? held.value : state, rawType: held?.valueType ?? OBJECT }; }
+  if (/StaticValueHolder;$/.test(htype) || (holder && reader.field(holder, 'value') && !reader.holder(holder))) { const entry = reader.field(holder, 'value'); return { kind: 'static', raw: entry?.value ?? null, rawType: entry?.type ?? OBJECT }; }
+  if (holder && reader.holder(holder)) { const held = reader.holder(holder); return { kind: 'state', raw: held.value, rawType: held.valueType }; }   // older Compose: the map holds a State
+  return { kind: 'value', raw: holderRef, rawType: OBJECT };
+}
+/** `only`: names (exact or part, any case), 'Classe.campo', or a part of the value's class — so a Local is found also when its name is not the one expected. */
+const localMatcher = only => {
+  const wanted = (Array.isArray(only) ? only : only ? [only] : []).map(item => String(item).toLowerCase()).filter(Boolean);
+  return wanted.length ? item => wanted.some(w => item.name.toLowerCase() === w || item.name.toLowerCase().includes(w) || `${item.declaredIn ?? ''}.${item.name}`.toLowerCase().includes(w) || String(item.valueType ?? '').toLowerCase().includes(w)) : () => true;
+};
+function compositionLocalMapOf(runtime, reader, rec) {
+  const field = reader.field(rec, 'compositionLocalMap')?.value ?? null;
+  if (isRef(field)) return field;
+  if (reader.mapEntries(rec, 0)) return { ref: rec.id };
+  return null;
+}
 export function readCompositionLocals(runtime, reader, handle, { options = {}, only = null } = {}) {
-  const rec = liveRecord(runtime, handle);
-  let mapRef = reader.field(rec, 'compositionLocalMap')?.value ?? null, owner = 'node';
-  if (!isRef(mapRef)) { if (reader.mapEntries(rec, 0)) { mapRef = { ref: rec.id ?? parseHandle(runtime, handle) }; owner = 'map'; } else throw new PluginQueryError('bad-args', `${typeName(rec.type)} não tem CompositionLocalMap: passe o handle de um nó do Compose (lab.composeTree().owners[i].nodes[j].handle)`); }
+  if (!handle) throw new PluginQueryError('bad-handle', 'Sem handle: use o handle de um nó de lab.composeTree() (um nó da árvore de semântica, usada quando o LayoutNode não é legível, não tem handle).');
+  const rec = liveRecord(runtime, handle), mapRef = compositionLocalMapOf(runtime, reader, rec);
+  if (!mapRef) throw new PluginQueryError('bad-args', `${typeName(rec.type)} não tem CompositionLocalMap: passe o handle de um nó do Compose (lab.composeTree().owners[i].nodes[j].handle)`);
   const map = reader.record(mapRef.ref), decoded = map ? reader.mapEntries(map, 1000) : null;
   if (!decoded) throw new PluginQueryError('failed', `CompositionLocalMap ilegível (${map ? typeName(map.type) : 'coletado'})`);
-  const names = staticNames(runtime), wanted = Array.isArray(only) && only.length ? new Set(only.map(String)) : null, view = { depth: 1, ...options }, locals = [], values = {};
+  const view = { depth: 1, ...options }, matches = localMatcher(only), locals = [], values = {};
   for (const [key, holderRef] of decoded.entries) {
-    const keyRec = isRef(key) ? reader.record(key.ref) : null, known = isRef(key) ? names.get(key.ref) : null;
+    const keyRec = isRef(key) ? reader.record(key.ref) : null, known = isRef(key) ? localName(runtime, reader, key) : null;
     const name = known?.name ?? `${typeName(keyRec?.type ?? 'Ljava/lang/Object;').split('.').pop()}#${key?.ref ?? '?'}`;
-    if (wanted && !wanted.has(name)) continue;
-    const holder = isRef(holderRef) ? reader.record(holderRef.ref) : null, htype = holder?.type ?? '';
-    let kind = 'value', raw = holderRef, rawType = OBJECT, note = null;
-    if (/ComputedValueHolder;$/.test(htype)) { kind = 'computed'; raw = null; note = 'calculado pela composição a partir de outros Locals (compositionLocalWithComputedDefaultOf): não é avaliado aqui'; }
-    else if (/DynamicValueHolder;$/.test(htype)) { kind = 'dynamic'; const state = reader.fieldValue(holder, 'state'), held = isRef(state) ? reader.holder(reader.record(state.ref)) : null; raw = held ? held.value : state; rawType = held?.valueType ?? OBJECT; }
-    else if (/StaticValueHolder;$/.test(htype) || (holder && reader.field(holder, 'value') && !reader.holder(holder))) { kind = 'static'; const entry = reader.field(holder, 'value'); raw = entry?.value ?? null; rawType = entry?.type ?? OBJECT; }
-    else if (holder && reader.holder(holder)) { kind = 'state'; const held = reader.holder(holder); raw = held.value; rawType = held.valueType; }   // older Compose: the map holds a State
-    const result = raw === null && kind === 'computed' ? { value: null } : reader.view(raw, rawType, view);
-    const item = { name, declaredIn: known?.declaredIn ?? null, kind, value: result.value, key: isRef(key) ? handleOf(runtime, key.ref) : null, ...(note ? { note } : {}), ...(result.truncated ? { $truncated: true } : {}) };
+    const { kind, raw, rawType, note } = unwrapLocal(reader, holderRef), valueType = reader.typeOfValue(raw) ? typeName(reader.typeOfValue(raw)) : null;
+    const probe = { name, declaredIn: known?.declaredIn ?? null, valueType }; if (!matches(probe)) continue;
+    const result = kind === 'computed' ? { value: null } : reader.view(raw, rawType, view);
+    const item = { ...probe, kind, value: result.value, key: isRef(key) ? handleOf(runtime, key.ref) : null, ...(known?.holder === 'instance' ? { declaredAs: 'campo de instância' } : {}), ...(note ? { note } : {}), ...(result.truncated ? { $truncated: true } : {}) };
     locals.push(item); if (!(name in values)) values[name] = item.value;
   }
   locals.sort((a, b) => a.name.localeCompare(b.name));
-  return { handle: handleOf(runtime, rec.id ?? parseHandle(runtime, handle)), source: owner, count: locals.length, total: decoded.size, locals, values };
+  return { handle: handleOf(runtime, rec.id ?? parseHandle(runtime, handle)), count: locals.length, total: decoded.size, locals, values };
+}
+/** Where a Local is provided on the screen: every LayoutNode's map is read (siblings share one map, read once) and the matching Locals are grouped by provided value.
+ * { matches: [{ name, declaredIn, kind, valueType, value, nodes, node }], scannedNodes, maps, done }: `node` is the handle of one component that sees that value. */
+export function findCompositionLocal(runtime, reader, match, { options = {}, limit, budgetMs } = {}, now = () => performance.now()) {
+  const text = Array.isArray(match) ? match : String(match ?? '').trim(); if (!text || (Array.isArray(text) && !text.length)) throw new PluginQueryError('bad-args', 'Informe o nome do Local (ou parte dele, ou a classe do valor): lab.findCompositionLocal("LocalTema").');
+  const matches = localMatcher(text), max = boundedInt(limit, 50, 500, 1), budget = boundedInt(budgetMs, 150, 400, 10), seenMaps = new Map(), groups = new Map(), view = { depth: 1, ...options };
+  let nodes = 0;
+  const result = scanHeap(runtime, { after: 0, budgetMs: budget, now }, (rec, id) => {
+    if (rec.type !== 'Landroidx/compose/ui/node/LayoutNode;') return true;
+    const mapRef = compositionLocalMapOf(runtime, reader, rec); if (!mapRef) return true; nodes++;
+    let found = seenMaps.get(mapRef.ref);
+    if (found === undefined) {
+      found = []; const decoded = reader.mapEntries(reader.record(mapRef.ref) ?? {}, 1000);
+      for (const [key, holderRef] of decoded?.entries ?? []) {
+        if (!isRef(key)) continue; const known = localName(runtime, reader, key), keyRec = reader.record(key.ref);
+        const name = known?.name ?? `${typeName(keyRec?.type ?? 'Ljava/lang/Object;').split('.').pop()}#${key.ref}`, local = unwrapLocal(reader, holderRef), valueType = reader.typeOfValue(local.raw) ? typeName(reader.typeOfValue(local.raw)) : null;
+        if (!matches({ name, declaredIn: known?.declaredIn ?? null, valueType })) continue;
+        const viewed = local.kind === 'computed' ? { value: null } : reader.view(local.raw, local.rawType, view);
+        const sig = JSON.stringify(viewed.value, (field, value) => field === '$handle' ? undefined : value);   // the same value provided by different providers is one group
+        found.push({ key, name, declaredIn: known?.declaredIn ?? null, valueType, local, value: viewed.value, sig });
+      }
+      seenMaps.set(mapRef.ref, found);
+    }
+    for (const item of found) {
+      const group = `${item.key.ref}:${item.sig}`;
+      let entry = groups.get(group); if (!entry) { if (groups.size >= max) continue; entry = { item, nodes: 0, node: handleOf(runtime, rec.id ?? id) }; groups.set(group, entry); }
+      entry.nodes++;
+    }
+    return true;
+  });
+  const out = [...groups.values()].map(({ item, nodes: count, node }) => ({ name: item.name, declaredIn: item.declaredIn, kind: item.local.kind, valueType: item.valueType, value: item.value, nodes: count, node, key: handleOf(runtime, item.key.ref), ...(item.local.note ? { note: item.local.note } : {}) }));
+  out.sort((a, b) => a.name.localeCompare(b.name) || b.nodes - a.nodes);
+  return { matches: out, scannedNodes: nodes, maps: seenMaps.size, done: result.next === null, ...(result.next !== null ? { note: `varredura parou no limite de ${budget} ms: aumente budgetMs` } : {}) };
 }
 
 /** Compose layout tree of src/compose-inspector.js reduced to what a plugin needs (no thumbnails, no modifiers list). */
@@ -671,6 +735,7 @@ export function runPluginQuery(runtime, query, args = {}) {
     case 'instances': return findInstances(runtime, reader, args.className, args);
     case 'referrers': return findReferrers(runtime, reader, args.handle, args);
     case 'compositionLocals': return readCompositionLocals(runtime, reader, args.handle, { options: args.options ?? {}, only: args.only ?? null });
+    case 'findCompositionLocal': return findCompositionLocal(runtime, reader, args.match, { options: args.options ?? {}, limit: args.limit, budgetMs: args.budgetMs });
     default: throw new PluginQueryError('bad-query', `Consulta desconhecida: ${String(query).slice(0, 40)}`);
   }
 }

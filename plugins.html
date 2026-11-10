@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=8ac2070c6aa3">
+  <link rel="stylesheet" href="./site-pages.css?v=fa88a5e0684e">
 </head>
 <body>
   <header class="topbar">
@@ -170,7 +170,8 @@
             <tr><td><code>await lab.classes('parte do nome', { limit, initialized })</code></td><td>As classes do APK cujo nome contém o texto (ou casam com <code>'/regex/'</code>): <code>{ items: [{ className, status, staticFields }], matched }</code>. Para achar a classe que guarda um estático.</td></tr>
             <tr><td><code>await lab.instances('pacote.Classe', { subclasses, limit, after, maxPages })</code></td><td>Os objetos vivos de uma classe (subclasses e implementações incluídas, a menos que <code>subclasses: false</code>): <code>{ items: [{ handle, className }], scanned, done, next }</code>. Varre o heap em páginas curtas; <code>next</code> continua uma varredura que parou (<code>after</code>).</td></tr>
             <tr><td><code>await lab.referrers(handle, { limit, after })</code></td><td>Quem segura um objeto: campos estáticos (<code>{ kind: 'static', className, field }</code>) e objetos cujo campo, célula de array ou slot interno aponta para ele (<code>{ kind: 'object', handle, className, via }</code>). Para descobrir o caminho até um objeto achado com <code>instances</code>.</td></tr>
-            <tr><td><code>await lab.compositionLocals(nó.handle, { only, depth })</code></td><td>Os CompositionLocals de um componente do Compose: o que <code>LocalX.current</code> responde naquele nó. Pegue o <code>handle</code> do nó em <code>lab.composeTree()</code>. Devolve <code>{ count, locals: [{ name, declaredIn, kind, value }], values }</code>; <code>values.LocalContentColor</code> é o valor direto. <code>kind</code>: <code>static</code>, <code>dynamic</code> (o valor atual do estado) ou <code>computed</code> (calculado pela composição; não é avaliado aqui). Só aparecem os Locals fornecidos no caminho até o nó; os outros valem o padrão. Cores do Compose vêm como <code>{ $kind: 'color', argb: '#AARRGGBB' }</code>.</td></tr>
+            <tr><td><code>await lab.compositionLocals(nó.handle, { only, depth })</code></td><td>Os CompositionLocals de um componente do Compose: o que <code>LocalX.current</code> responde naquele nó. Pegue o <code>handle</code> do nó em <code>lab.composeTree()</code>. Devolve <code>{ count, locals: [{ name, declaredIn, kind, value }], values }</code>; <code>values.LocalContentColor</code> é o valor direto. <code>kind</code>: <code>static</code>, <code>dynamic</code> (o valor atual do estado) ou <code>computed</code> (calculado pela composição; não é avaliado aqui). Só aparecem os Locals fornecidos no caminho até o nó; os outros valem o padrão. <code>only</code> aceita o nome inteiro ou parte dele (sem diferenciar maiúsculas), <code>Classe.campo</code> ou parte da classe do valor. O nome vem do campo estático que declara o Local, ou do campo de instância que o guarda (um Local dentro de uma classe ou de um objeto); num app minificado, é o nome renomeado. Cores do Compose vêm como <code>{ $kind: 'color', argb: '#AARRGGBB' }</code>.</td></tr>
+            <tr><td><code>await lab.findCompositionLocal('LocalTema', { limit, budgetMs })</code></td><td>Onde um Local é fornecido na tela, sem escolher o nó: lê o mapa de cada componente e agrupa por valor. Devolve <code>{ matches: [{ name, declaredIn, kind, valueType, value, nodes, node }] }</code>: cada valor diferente, quantos componentes o veem e o <code>handle</code> de um deles. Bom para achar um Local seu e a instância que ele carrega.</td></tr>
           </tbody>
         </table></div>
         <h3>Saída e utilidades</h3>
@@ -371,6 +372,6 @@ await mostrar();</code></pre></div>
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./arquitetura.html">Arquitetura da VM</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=8ac2070c6aa3"></script>
+  <script type="module" src="./site-pages.js?v=fa88a5e0684e"></script>
 </body>
 </html>

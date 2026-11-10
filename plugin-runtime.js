@@ -42,6 +42,8 @@
  * @property {(handle: string, options?: { only?: string[], depth?: number }) => Promise<{ handle, count, locals: [{ name, declaredIn, kind, value, key }], values: object }>} compositionLocals
  *   The CompositionLocals of one Compose component (a node handle from composeTree): what LocalX.current answers there. `values.LocalX` is the value; kind 'static',
  *   'dynamic' (a MutableState: its current value) or 'computed' (not evaluated). Only the Locals provided on the way to that node are listed (the others have their default).
+ * @property {(match: string|string[], options?: { limit?: number, budgetMs?: number, depth?: number }) => Promise<{ matches: [{ name, declaredIn, kind, valueType, value, nodes, node }], scannedNodes, done }>} findCompositionLocal
+ *   Where a Local is provided on the screen, without choosing a node: each distinct provided value, how many components see it and the handle of one of them.
  * @property {(handle: string|{ static: string }, path: string|string[], fn: (value: any, previous: any) => void, options?: { intervalMs?: number, depth?: number, onError?: Function }) => () => void} watch
  *   Polls `field(handle, path)` every intervalMs (>= 250) and calls fn only when the value changed; returns the stop function. A collected object stops the watch.
  * @property {{ text(s: string, o?: {id?: string}): void, kv(obj: object, o?: {id?: string}): void, table(rows: object[], columns?: string[], o?: {id?: string}): void,
@@ -146,7 +148,8 @@ export function pluginWorkerMain(scope) {
     classes: (match, options = {}) => call('classes', { match: String(match ?? ''), limit: options?.limit, initialized: !!options?.initialized }),
     instances: (className, options = {}) => pages('instances', { className: String(className ?? ''), subclasses: options?.subclasses !== false }, options),
     referrers: (handle, options = {}) => pages('referrers', { handle: String(handle ?? '') }, options),
-    compositionLocals: (handle, options = {}) => call('compositionLocals', { handle: String(handle ?? ''), only: Array.isArray(options?.only) ? options.only.map(String) : null, options: viewOptions(options) }),
+    compositionLocals: (handle, options = {}) => call('compositionLocals', { handle: String(handle ?? ''), only: Array.isArray(options?.only) ? options.only.map(String) : options?.only ? [String(options.only)] : null, options: viewOptions(options) }),
+    findCompositionLocal: (match, options = {}) => call('findCompositionLocal', { match: Array.isArray(match) ? match.map(String) : String(match ?? ''), limit: options?.limit, budgetMs: options?.budgetMs, options: viewOptions(options) }),
     watch(handle, path, fn, options = {}) {   // handle: a handle, or { static: 'pacote.Classe' } to follow a static field
       if (typeof fn !== 'function') throw new TypeError('lab.watch(handle, caminho, função)');
       const interval = Math.max(250, Number(options?.intervalMs) || 500); let last, first = true, busy = false, stopped = false;

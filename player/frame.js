@@ -1,14 +1,14 @@
 // Entry of dist/player/frame.html: device frame + system bars + rendering, driven by postMessage from the embedding page.
-import { APKWorkerClient } from '../apk-worker-client.js?v=8ac2070c6aa3';
-import { createDeviceView, createViewState } from '../device-view.js?v=8ac2070c6aa3';
-import { sanitizeSettings } from '../device-settings.js?v=8ac2070c6aa3';
-import { createFrameController } from './frame-controller.js?v=8ac2070c6aa3';
-import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=8ac2070c6aa3';
-import { createPluginHost } from '../plugin-host.js?v=8ac2070c6aa3';
-import { captureImage } from '../screen-capture.js?v=8ac2070c6aa3';
-import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=8ac2070c6aa3';
-import { PERMISSION_ICONS } from '../permissions-panel.js?v=8ac2070c6aa3';
-import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=8ac2070c6aa3';
+import { APKWorkerClient } from '../apk-worker-client.js?v=fa88a5e0684e';
+import { createDeviceView, createViewState } from '../device-view.js?v=fa88a5e0684e';
+import { sanitizeSettings } from '../device-settings.js?v=fa88a5e0684e';
+import { createFrameController } from './frame-controller.js?v=fa88a5e0684e';
+import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=fa88a5e0684e';
+import { createPluginHost } from '../plugin-host.js?v=fa88a5e0684e';
+import { captureImage } from '../screen-capture.js?v=fa88a5e0684e';
+import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=fa88a5e0684e';
+import { PERMISSION_ICONS } from '../permissions-panel.js?v=fa88a5e0684e';
+import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=fa88a5e0684e';
 
 const parentOrigin = new URLSearchParams(location.search).get('parent');
 const $ = id => document.getElementById(id) ?? (frameStub[id] ??= Object.assign(document.createElement('div'), { id }));
