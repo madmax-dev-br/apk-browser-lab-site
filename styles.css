@@ -478,6 +478,10 @@ body.lab-modal-open{overflow:hidden}
 :root[data-theme=dark] .netlog-body{background:#14161c;color:#c4c8d2}
 /* Load times and the prepared file (.apklab) */
 .load-times{font:10px/1.6 ui-monospace,monospace;color:#6f7686;margin:10px 0 0;word-break:break-word}
-.prepare-row{display:flex;flex-direction:column;gap:4px;margin:10px 0 0}
-.prepare-row .help-inline{font-size:9px;color:#9aa0ae}
+.file-info:has(.prepare-file:not([hidden])){flex-wrap:wrap}
+.file-info:has(.prepare-file:not([hidden]))>div{flex:1 1 0}
+.prepare-file{order:99;flex:1 0 100%;font-size:9px;font-weight:600;background:#eef6f1;border:1px solid #d6eadc;color:#4f8a63;border-radius:5px;padding:6px;cursor:pointer}
+.prepare-file:hover{background:#e3f1e8}
+.prepare-file:disabled{opacity:.6;cursor:progress}
+:root[data-theme=dark] .prepare-file{background:#13261b;border-color:#2b4a36;color:#8fc9a2}
 :root[data-theme=dark] .load-times{color:#a3a7b1}

@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Arquitetura da VM · APK Browser Lab</title>
   <meta name="description" content="Como o APK Browser Lab executa um APK Android no navegador: do arquivo à tela, threads e tempo, memória, renderização, rede, código nativo, ferramentas e limitações.">
-  <link rel="stylesheet" href="./site-pages.css?v=fe7b63165e52">
+  <link rel="stylesheet" href="./site-pages.css?v=2378988610d3">
 </head>
 <body>
   <header class="topbar">
@@ -136,7 +136,7 @@
 
       <section id="apklab" aria-labelledby="h-apklab">
         <h2 id="h-apklab">Arquivo preparado (.apklab)</h2>
-        <p>Depois de abrir um APK, <b>Gerar arquivo preparado (.apklab)</b> (sob a inspeção do pacote) salva um arquivo feito a partir dele. Abra esse arquivo no lugar do APK: ele contém tudo do APK, então o APK não é mais necessário.</p>
+        <p>Depois de abrir um APK, o botão <b>⇩ Baixar arquivo preparado (.apklab)</b>, no cartão do arquivo, salva um arquivo feito a partir dele. Abra esse arquivo no lugar do APK: ele contém tudo do APK, então o APK não é mais necessário.</p>
         <ul>
           <li><b>O que tem dentro:</b> cada arquivo do APK (DEX, recursos, assets, bibliotecas nativas) exatamente como o APK descompactado, sem compressão, mais um <code>apklab.json</code> com o nome, o tamanho e o SHA-256 do APK de origem.</li>
           <li><b>O que ele economiza:</b> descompactar o APK e conferir o CRC de cada arquivo a cada carregamento (o CRC foi conferido uma vez, ao gerar). No exemplo híbrido, o estágio de código cai de cerca de 98 ms para 15 ms e o carregamento de 0,48 s para 0,40 s; quanto maior o APK, maior a diferença. Os tempos de cada estágio aparecem sob a inspeção e no Log de execução.</li>
@@ -325,6 +325,6 @@ Vary: Origin</code></pre></div>
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./plugins.html">Como configurar plugins</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=fe7b63165e52"></script>
+  <script type="module" src="./site-pages.js?v=2378988610d3"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
-import { createHostRegistry, floatBits } from './host-contract.js?v=fe7b63165e52';
-import { GC_ROOTS } from './heap-gc.js?v=fe7b63165e52';
+import { createHostRegistry, floatBits } from './host-contract.js?v=2378988610d3';
+import { GC_ROOTS } from './heap-gc.js?v=2378988610d3';
 
 // android.view.Display of the virtual device (android-13.0.0_r1 Display.java): the one built-in display, sized and oriented by the device profile (160 dpi, so dp == px) and
 // reporting the same metrics Resources and WindowManager report. The viewport has no system bars or cutout of its own (src/window-insets-host.js), so the real size and the

@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=fe7b63165e52">
-  <meta name="apk-browser-build" content="fe7b63165e52">
+  <link rel="stylesheet" href="./styles.css?v=2378988610d3">
+  <meta name="apk-browser-build" content="2378988610d3">
 </head>
 <body>
   <header class="topbar">
@@ -24,7 +24,7 @@
           </label>
           <input id="apk-file" type="file" accept=".apk,.apklab,application/vnd.android.package-archive" class="visually-hidden">
           <div class="demo-row"><span>Quer experimentar primeiro?</span><button id="demo-button">Rodar demo <span aria-hidden="true">↗</span></button></div>
-          <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div><button id="stop-vm" class="stop-vm" aria-label="Encerrar VM e cancelar callbacks" hidden>Encerrar</button><button id="reopen-file" class="reopen-file" hidden>Reabrir</button><span class="file-check">✓</span></div>
+          <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div><button id="stop-vm" class="stop-vm" aria-label="Encerrar VM e cancelar callbacks" hidden>Encerrar</button><button id="prepare-file" class="prepare-file" type="button" title="Baixar o arquivo preparado (.apklab) deste APK: abre mais rápido e pode ser enviado no lugar do APK" aria-label="Baixar arquivo preparado (.apklab)" hidden>⇩ Baixar arquivo preparado (.apklab)</button><button id="reopen-file" class="reopen-file" hidden>Reabrir</button><span class="file-check">✓</span></div>
           <div id="operation-panel" class="operation-panel" hidden><div><span class="spinner"></span><strong id="operation-message">Processando no Web Worker…</strong><button id="cancel-operation">Cancelar</button></div><progress id="operation-progress" max="1"></progress><small id="operation-detail">A interface permanece disponível · limite de 120 s para inspeção</small></div>
           <details id="inspection-panel" class="inspection-panel">
           <summary class="section-label inspection-label">02 <span>INSPEÇÃO DO PACOTE</span><span id="inspection-badge" class="quiet-badge">AGUARDANDO</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
@@ -33,7 +33,7 @@
             <div class="inventory-heading"><span class="tiny-label">PACOTE</span><strong id="package-name"></strong></div>
             <div class="stats"><div><strong id="class-count">0</strong><span>classes DEX</span></div><div><strong id="activity-count">0</strong><span>activities</span></div><div><strong id="dependency-count">0</strong><span>dependências</span></div></div>
             <label class="activity-label" for="activity-select">Activity inicial</label><select id="activity-select"></select>
-            <div id="load-times" class="load-times" role="status" hidden></div><div id="prepare-row" class="prepare-row" hidden><button id="prepare-file" class="cp-button" type="button">Gerar arquivo preparado (.apklab)</button><span class="help-inline">Um arquivo feito deste APK que abre mais rápido: suba ele no lugar do APK.</span></div><div id="archive-summary" class="archive-summary" hidden></div><details class="findings"><summary>Classes e dependências <span>+</span></summary><div id="inventory-details"></div></details>
+            <div id="load-times" class="load-times" role="status" hidden></div><div id="archive-summary" class="archive-summary" hidden></div><details class="findings"><summary>Classes e dependências <span>+</span></summary><div id="inventory-details"></div></details>
           </div>
           <details id="native-inspection" class="native-inspection" hidden><summary>Analisar bibliotecas nativas <span>ELF</span></summary><p>Inspeção de metadados de uma biblioteca por vez, até 32 MiB. Não executa código nativo nem implementa JNI.</p><label for="native-abi">ABI</label><select id="native-abi"></select><label for="native-library">Biblioteca</label><select id="native-library"></select><button id="inspect-native-button">Analisar ELF selecionado</button><pre id="native-result" hidden></pre></details>
           </details>
@@ -222,7 +222,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=fe7b63165e52"></script>
+  <script type="module" src="./app.js?v=2378988610d3"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>
