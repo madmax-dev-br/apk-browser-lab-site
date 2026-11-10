@@ -2,8 +2,8 @@
 // Remover, order, export / import) and the dialog edits one (name, package filter, code); the list lives in localStorage (src/plugin-store.js) and is handed to the host
 // (src/plugin-host.js), which runs each enabled plugin in its own Worker. The output panel shows one card per running or failed plugin: its blocks (rendered with textContent
 // and DOM building only, never HTML), badge, console and errors, with Parar / Reiniciar. Renders are coalesced (at most every RENDER_MS) and skipped while the panel is closed.
-import { RENDER_MS } from './plugin-host.js?v=aaaa8db990e6';
-import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, templates, fromTemplate } from './plugin-store.js?v=aaaa8db990e6';
+import { RENDER_MS } from './plugin-host.js?v=2dd890abb01e';
+import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=2dd890abb01e';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const STATUS_LABEL = { rodando: 'rodando', iniciando: 'iniciando', parado: 'parado', erro: 'erro' };
@@ -48,7 +48,7 @@ const imageURLs = new Map();
 function imageURL(blob) { let url = imageURLs.get(blob); if (!url) { url = URL.createObjectURL(blob); imageURLs.set(blob, url); } return url; }
 export function releaseImages(liveBlobs) { for (const [blob, url] of imageURLs) if (!liveBlobs.has(blob)) { URL.revokeObjectURL(url); imageURLs.delete(blob); } }
 
-export function createPluginsPanel({ $, host, save = download, outputRoot = $('plugins-output'), setTimer = (fn, ms) => setTimeout(fn, ms), now = () => performance.now() }) {
+export function createPluginsPanel({ $, host, save = download, outputRoot = $('plugins-output'), setTimer = (fn, ms) => setTimeout(fn, ms), now = () => performance.now(), modals = null }) {
   const S = { plugins: loadPlugins(), editing: null, opener: null, submitted: false, dirty: new Set(), timer: null, lastRender: -Infinity, cards: new Map(), open: new Set() };
   const doc = outputRoot?.ownerDocument ?? globalThis.document;
   const el = (tag, className, text) => { const node = doc.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
@@ -65,7 +65,7 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     [...$('pl-list').children].forEach((li, index) => { const plugin = S.plugins[index]; if (!plugin) return; const [text, state] = meta(plugin), info = li.querySelector('.em-meta'); if (info) { info.textContent = text; info.dataset.state = state; } });
     const runningCount = host.runningCount;
     $('pl-summary').textContent = `${runningCount} rodando`;
-    $('pl-status').textContent = !S.plugins.length ? 'Nenhum plugin. Escolha um modelo e clique em + Adicionar.' : `${S.plugins.length} ${S.plugins.length === 1 ? 'plugin' : 'plugins'}, ${runningCount} rodando.${runningCount ? ' A saída aparece no painel Plugins abaixo do aparelho.' : ''}`;
+    $('pl-status').textContent = !S.plugins.length ? 'Nenhum plugin. Clique em + Adicionar (veja os Exemplos).' : `${S.plugins.length} ${S.plugins.length === 1 ? 'plugin' : 'plugins'}, ${runningCount} rodando.${runningCount ? ' A saída aparece no painel Plugins abaixo do aparelho.' : ''}`;
     $('pl-export').disabled = !S.plugins.length;
     if (outputRoot) { outputRoot.hidden = !S.plugins.length; const count = outputRoot.querySelector('.po-count'); if (count) count.textContent = `${runningCount} rodando`; }
   }
@@ -100,7 +100,7 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
   }
   function openDialog(plugin, opener, draft = null) {
     S.editing = plugin ? plugin.id : null; S.opener = opener ?? doc.activeElement; S.submitted = false;
-    const data = plugin ?? draft ?? fromTemplate('blank');
+    const data = plugin ?? draft ?? blankPlugin();
     $('pl-dialog-title').textContent = plugin ? 'Editar plugin' : 'Adicionar plugin';
     $('pl-name').value = data.name; $('pl-package').value = data.packageFilter; $('pl-code').value = data.code; S.draft = data; showErrors();
     const fixed = typeof data.height === 'number';
@@ -145,11 +145,9 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
   for (const id of ['pl-name', 'pl-code']) $(id).addEventListener('input', showErrors);
 
   // ---- section buttons ------------------------------------------------------------------------------------------------------------------------------------------------
-  $('pl-template').replaceChildren(...templates().map(template => { const option = el('option', '', template.name); option.value = template.id; option.title = template.description; return option; }));
-  $('pl-template').value = 'viewmodel';
   $('pl-add').addEventListener('click', event => {
     if (S.plugins.length >= MAX_PLUGINS) { $('pl-status').textContent = `No máximo ${MAX_PLUGINS} plugins.`; return; }
-    openDialog(null, event.currentTarget, fromTemplate($('pl-template').value));
+    openDialog(null, event.currentTarget, blankPlugin());   // always blank: the examples are in plugins.html#exemplos
   });
   $('pl-export').addEventListener('click', () => { if (S.plugins.length) save(pluginsFileName(), exportPlugins(S.plugins), 'application/json'); });
   $('pl-import').addEventListener('click', () => $('pl-import-file').click());
@@ -203,7 +201,15 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
         setTimer(() => { const entry = S.cards.get(plugin.id); if (entry?.loading) { entry.loading = null; setLoading(entry, false); } }, listens ? REFRESH_WAIT_MS : REFRESH_MIN_MS);
       });
       const stop = button('Parar', 'po-stop', `Parar o plugin ${plugin.name}`, () => { host.stop(plugin.id); schedule(plugin.id); }), restart = button('Reiniciar', 'po-restart', `Reiniciar o plugin ${plugin.name}`, () => { host.restart(plugin.id); schedule(plugin.id); });
-      tools.append(refresh, stop, restart);
+      const expand = button('⤢ Expandir', 'po-expand', `Abrir a saída de ${plugin.name} numa janela grande`, () => {
+        const current = S.cards.get(plugin.id); if (!current || !modals) return;
+        if (current.expanded) { current.expanded.modal.close('code'); return; }
+        const container = el('div', 'po-blocks po-expanded'); container.dataset.height = 'auto';
+        const modal = modals.open({ title: plugin.name, size: 'full', content: container, label: 'saída do plugin', onClose: () => { const entry = S.cards.get(plugin.id); if (entry) entry.expanded = null; } });
+        current.expanded = { modal, container }; current.force = true; schedule(plugin.id);
+      });
+      expand.hidden = !modals;
+      tools.append(refresh, expand, stop, restart);
       const blocks = el('div', 'po-blocks'), errors = el('div', 'po-errors'), consoleBox = el('details', 'po-console'), consoleSummary = el('summary', '', 'Console'), consoleLines = el('div', 'po-console-lines');
       consoleBox.append(consoleSummary, consoleLines); head.append(name, status, badge, fresh); root.append(head, tools, errors, blocks, consoleBox);
       root.open = S.open.has(plugin.id);
@@ -219,9 +225,10 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     if (live) {
       const blocks = live.output.blocks, changedBlocks = entry.force || entry.lastStatus !== status || !entry.lastBlocks || blocks.length !== entry.lastBlocks.length || blocks.some((block, index) => entry.lastBlocks[index] !== block);
       const hold = plugin.updates === 'manual' && entry.lastBlocks && !entry.force && now() > entry.acceptUntil && entry.lastStatus === status;
-      if (changedBlocks && (hold || !entry.root.open)) entry.pending = true;   // closed or manual: shown later (on open / Atualizar)
-      else if (changedBlocks && entry.root.open) {
-        patchBlocks(entry.blocks, blocks); entry.lastBlocks = [...blocks]; entry.lastStatus = status; entry.pending = false; entry.force = false;
+      const visible = entry.root.open || !!entry.expanded;
+      if (changedBlocks && (hold || !visible)) entry.pending = true;   // closed or manual: shown later (on open / Atualizar)
+      else if (changedBlocks && visible) {
+        patchBlocks(entry.blocks, blocks); if (entry.expanded) patchBlocks(entry.expanded.container, blocks); entry.lastBlocks = [...blocks]; entry.lastStatus = status; entry.pending = false; entry.force = false;
         if (!blocks.length) entry.blocks.replaceChildren(el('p', 'po-empty', status === 'rodando' ? 'Sem saída ainda (use lab.ui.text, kv, table ou json).' : status === 'erro' ? 'O plugin parou com erro.' : 'Plugin parado.'));
       }
       entry.fresh.hidden = !(entry.pending && plugin.updates === 'manual'); entry.refresh.classList.toggle('has-news', !entry.fresh.hidden);
@@ -245,7 +252,10 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
   function renderOutput(all = false) {
     S.timer = null; S.lastRender = now();
     updateMeta();
-    if (!outputRoot || !outputRoot.open) return;   // closed: no DOM work
+    if (!outputRoot || !outputRoot.open) {   // closed: no DOM work, except a plugin opened large (Expandir), which keeps following its plugin
+      for (const plugin of S.plugins) { const entry = S.cards.get(plugin.id); if (entry?.expanded && (all || S.dirty.has(plugin.id))) card(plugin); }
+      S.dirty.clear(); return;
+    }
     const container = outputRoot.querySelector('.po-cards'); if (!container) return;
     const shown = S.plugins.filter(plugin => plugin.enabled || host.get(plugin.id)?.worker || host.get(plugin.id)?.status === 'erro');
     for (const id of [...S.cards.keys()]) if (!shown.some(plugin => plugin.id === id)) S.cards.delete(id);

@@ -1,6 +1,5 @@
 // The list of page plugins of the "Plugins" section (src/plugins-panel.js): global (not per package; each plugin has an optional package filter), kept in localStorage with every
 // access guarded (without storage the list lasts for the page), exported and imported as JSON. Pure functions: tested without a DOM.
-import { PLUGIN_TEMPLATES } from './plugin-runtime.js?v=aaaa8db990e6';
 
 export const STORAGE_KEY = 'apkweb.plugins.v1', EXPORT_FORMAT = 'apk-web-lab-plugins', MAX_PLUGINS = 32, MAX_CODE_CHARS = 200000, MAX_NAME_CHARS = 120;
 let counter = 0;
@@ -37,6 +36,6 @@ export function importPlugins(text) {
   if (!list) return { plugins: [], error: `O arquivo não tem uma lista de plugins (esperado {"format":"${EXPORT_FORMAT}","plugins":[...]}).` };
   return { plugins: list.slice(0, MAX_PLUGINS).filter(item => item && typeof item === 'object').map(item => ({ ...normalizePlugin({ ...item, id: undefined }), enabled: false })), ...(list.length > MAX_PLUGINS ? { error: `Só os primeiros ${MAX_PLUGINS} plugins foram importados.` } : {}) };
 }
-export const BLANK_TEMPLATE = { id: 'blank', name: 'Em branco', description: 'Um plugin vazio.', code: "// Escreva aqui. Exemplo:\nlab.on('screen', tela => lab.ui.text(tela.activity ?? '—', { id: 'tela' }));\n" };
-export const templates = () => [BLANK_TEMPLATE, ...PLUGIN_TEMPLATES];
-export function fromTemplate(id) { const template = templates().find(item => item.id === id) ?? BLANK_TEMPLATE; return normalizePlugin({ name: template.id === 'blank' ? 'Novo plugin' : template.name, code: template.code, enabled: true }); }
+export const BLANK_TEMPLATE = { id: 'blank', name: 'Em branco', description: 'Um plugin vazio.', code: "// Escreva aqui. Exemplos prontos: plugins.html#exemplos\nlab.on('screen', tela => lab.ui.text(tela.activity ?? '—', { id: 'tela' }));\n" };
+/** "+ Adicionar" always opens a blank plugin; the examples live in the documentation (plugins.html#exemplos). */
+export function blankPlugin() { return normalizePlugin({ name: 'Novo plugin', code: BLANK_TEMPLATE.code, enabled: true }); }

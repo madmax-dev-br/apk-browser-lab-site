@@ -1,8 +1,8 @@
 // The "Rede" panel of the lab page: the app's network requests (src/netlog.js batches from the Worker) as a table coloured by outcome, with a text filter, an outcome filter, a detail
 // view per row (full URL, headers, timing, failure), "Permitir <host>" for a request the allowlist refused, "Limpar" and "Salvar" (HAR 1.2 or plain text, bodies omitted).
 // The formatting, filter and export functions are pure (tested without a DOM); createNetlogPanel() wires them to the page. Nothing here is persisted: the entries live in memory.
-import { MAX_ENTRIES } from './netlog.js?v=aaaa8db990e6';
-import { sanitizeHosts } from './device-settings.js?v=aaaa8db990e6';
+import { MAX_ENTRIES } from './netlog.js?v=2dd890abb01e';
+import { sanitizeHosts } from './device-settings.js?v=2dd890abb01e';
 
 export const RENDER_MAX = 500;   // rows kept in the DOM; "Salvar" still writes the whole buffer
 export const CATEGORIES = ['pending', 'ok', 'redirect', 'fail', 'refused', 'error', 'loopback'];
@@ -162,7 +162,7 @@ function download(name, text, type) {
 }
 
 /** root: the <details id="netlog"> element (see index.html). allowHost(host) puts the host in the Dispositivo field. Returns { push(message), reset(), store }. */
-export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHosts = () => [], allowHost = () => {}, save = download } = {}) {
+export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHosts = () => [], allowHost = () => {}, save = download, createMock = null, redirectHost = null } = {}) {
   const q = selector => root.querySelector(selector), out = q('.netlog-rows'), count = q('.netlog-count'), filterInput = q('.netlog-filter'), categorySelect = q('.netlog-category'), scopeSelect = q('.netlog-scope'), formatSelect = q('.netlog-format'), auto = q('.netlog-autoscroll');
   const store = createNetlogStore(), expanded = new Set(); let timer = null, visibleCount = 0;
   const filter = () => ({ text: filterInput.value, category: categorySelect.value });
@@ -192,6 +192,11 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
     }
     box.append(el('div', 'netlog-timing', `Início ${formatTime(entry.wall)} (uptime ${entry.uptime} ms) · duração ${formatDuration(entry.durationMs)} · thread ${entry.thread} (${entry.tid}) · ${entry.api} · requisição ${formatSize(entry.requestBytes)} · resposta ${formatSize(entry.responseBytes)}${entry.contentType ? ` · ${entry.contentType}` : ''}`));
     box.append(headerTable('Cabeçalhos da requisição', entry.requestHeaders), headerTable('Cabeçalhos da resposta', entry.responseHeaders));
+    if (typeof entry.responseBody === 'string' && entry.responseBody) {
+      const block = el('div', 'netlog-block'); block.append(el('div', 'netlog-block-title', `Corpo da resposta${entry.responseBodyTruncated ? ' (primeiros 48 KB)' : ''}`));
+      block.append(el('pre', 'netlog-body', entry.responseBody.length > 4000 ? entry.responseBody.slice(0, 4000) + '\n…' : entry.responseBody)); box.append(block);
+    }
+    box.append(el('div', 'netlog-note', 'Botão direito na requisição: criar um mock dela ou redirecionar o host.'));
     return box;
   };
   const row = entry => {
@@ -201,10 +206,39 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
     line.append(el('span', 'netlog-time', formatTime(entry.wall)), el('span', 'netlog-method', entry.method), target, el('span', 'netlog-status', statusLabel(entry)), el('span', 'netlog-size', formatSize(entry.responseBytes)), el('span', 'netlog-duration', formatDuration(entry.durationMs)));
     line.title = entry.mappedUrl ? `${entry.url}\n→ ${entry.mappedUrl}` : entry.url; line.tabIndex = 0; line.setAttribute('role', 'button'); line.setAttribute('aria-expanded', String(expanded.has(entry.seq)));
     const toggle = () => { if (expanded.has(entry.seq)) expanded.delete(entry.seq); else expanded.add(entry.seq); renderAll(); };
-    line.addEventListener('click', toggle); line.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); } });
+    line.addEventListener('click', toggle); line.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); }
+      else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { event.preventDefault(); const r = line.getBoundingClientRect(); openMenu(entry, r.left + 24, r.bottom, line); }
+    });
+    line.addEventListener('contextmenu', event => { if (!createMock && !redirectHost) return; event.preventDefault(); openMenu(entry, event.clientX, event.clientY, line); });
     wrap.append(line); if (expanded.has(entry.seq)) wrap.append(detail(entry));
     return wrap;
   };
+  // ---- the context menu of a request (right click, the Menu key or Shift+F10): create a mock of it, redirect its host, copy the URL -------------------------------
+  let menu = null;
+  function closeMenu(restore = true) { if (!menu) return; const { node, opener, cleanup } = menu; menu = null; node.remove(); cleanup(); if (restore && opener?.isConnected) opener.focus?.(); }
+  function openMenu(entry, x, y, opener) {
+    closeMenu(false);
+    const doc = root.ownerDocument ?? document, node = doc.createElement('div'); node.className = 'netlog-menu'; node.setAttribute('role', 'menu'); node.setAttribute('aria-label', `Ações para ${entry.method} ${entry.host}${entry.path}`);
+    const items = [];
+    const item = (label, run, enabled = true) => { const button = doc.createElement('button'); button.type = 'button'; button.className = 'netlog-menu-item'; button.setAttribute('role', 'menuitem'); button.textContent = label; button.disabled = !enabled; button.addEventListener('click', () => { closeMenu(false); run(); }); node.append(button); items.push(button); };
+    if (createMock) item('Criar mock desta requisição…', () => createMock(entry));
+    if (redirectHost) item(`Redirecionar ${entry.host}${entry.port && ![80, 443].includes(Number(entry.port)) ? ':' + entry.port : ''}…`, () => redirectHost(entry), !!entry.host);
+    item('Copiar URL', () => { globalThis.navigator?.clipboard?.writeText?.(entry.url)?.catch?.(() => {}); });
+    doc.body.append(node);
+    const width = node.offsetWidth || 240, height = node.offsetHeight || 120, view = doc.defaultView ?? globalThis;
+    node.style.left = `${Math.max(4, Math.min(x, (view.innerWidth ?? 1024) - width - 4))}px`; node.style.top = `${Math.max(4, Math.min(y, (view.innerHeight ?? 768) - height - 4))}px`;
+    const onDown = event => { if (!node.contains(event.target)) closeMenu(false); };
+    const onKey = event => {
+      if (event.key === 'Escape') { event.preventDefault(); closeMenu(); return; }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); const enabled = items.filter(button => !button.disabled), at = enabled.indexOf(doc.activeElement); enabled[(at + (event.key === 'ArrowDown' ? 1 : -1) + enabled.length) % enabled.length]?.focus(); }
+      if (event.key === 'Tab') closeMenu(false);
+    };
+    const onScroll = () => closeMenu(false);
+    doc.addEventListener('mousedown', onDown, true); doc.addEventListener('keydown', onKey, true); view.addEventListener?.('resize', onScroll); out.addEventListener('scroll', onScroll);
+    menu = { node, opener, cleanup: () => { doc.removeEventListener('mousedown', onDown, true); doc.removeEventListener('keydown', onKey, true); view.removeEventListener?.('resize', onScroll); out.removeEventListener('scroll', onScroll); } };
+    items.find(button => !button.disabled)?.focus();
+  }
   const updateCount = () => {
     const refused = store.entries.filter(entry => categoryOf(entry) === 'refused').length, mocked = store.entries.filter(entry => entry.mockId).length, redirected = store.entries.filter(entry => entry.mappedUrl).length;
     count.textContent = `${store.entries.length} requisições${refused ? ` · ${refused} recusadas` : ''}${mocked ? ` · ${mocked} mockadas` : ''}${redirected ? ` · ${redirected} ${redirected === 1 ? 'redirecionada' : 'redirecionadas'}` : ''}${visibleCount !== store.entries.length ? ` · ${visibleCount} exibidas` : ''}${store.dropped ? ` · ${store.dropped} descartadas` : ''}`;

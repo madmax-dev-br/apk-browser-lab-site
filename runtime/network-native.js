@@ -1,13 +1,15 @@
-import { APKError } from './apk-error.js?v=aaaa8db990e6';
-import { throwNew } from './java-throw.js?v=aaaa8db990e6';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=aaaa8db990e6';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=aaaa8db990e6';
-import { Blocked } from './scheduler.js?v=aaaa8db990e6';
-import { OS_CONSTANTS } from './os-constants-data.js?v=aaaa8db990e6';
-import { openExchange, describeFailure } from './network-transport.js?v=aaaa8db990e6';
-import { WorkerExecutor } from './network-worker-executor.js?v=aaaa8db990e6';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=aaaa8db990e6';
-import { TransportAuthority } from './transport-ca.js?v=aaaa8db990e6';
+import { APKError } from './apk-error.js?v=2dd890abb01e';
+import { throwNew } from './java-throw.js?v=2dd890abb01e';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=2dd890abb01e';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=2dd890abb01e';
+import { Blocked } from './scheduler.js?v=2dd890abb01e';
+import { captureBody } from './network-capture.js?v=2dd890abb01e';
+import { OS_CONSTANTS } from './os-constants-data.js?v=2dd890abb01e';
+import { openExchange, describeFailure } from './network-transport.js?v=2dd890abb01e';
+import { WorkerExecutor } from './network-worker-executor.js?v=2dd890abb01e';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=2dd890abb01e';
+import { TransportAuthority } from './transport-ca.js?v=2dd890abb01e';
+
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
 //
@@ -173,7 +175,7 @@ export class NetworkBridge {
     const { response } = state, body = op.request.method === 'HEAD' ? null : response.body;
     op.head = { version: 'HTTP/1.1', status: response.status, reason: response.reason, url: op.request.url, headers: response.headers.map(([name, value]) => [name, value]) };
     if (response.status >= 300 && response.status < 400) this.stats.redirectsObserved++;
-    if (body?.length) for (let at = 0; at < body.length; at += CHUNK) { const piece = body.slice(at, at + CHUNK); op.queue.push(piece); op.queued += piece.length; op.received += piece.length; }
+    if (body?.length) { captureBody(op, body); for (let at = 0; at < body.length; at += CHUNK) { const piece = body.slice(at, at + CHUNK); op.queue.push(piece); op.queued += piece.length; op.received += piece.length; } }
     op.ended = true; this.observe(op); this.activity = true;
     return true;
   }
@@ -212,7 +214,7 @@ export class NetworkBridge {
       if (step.done) { op.ended = true; return; }
       const bytes = step.value instanceof Uint8Array ? step.value : new Uint8Array(step.value);
       for (let at = 0; at < bytes.length; at += CHUNK) { const piece = bytes.subarray(at, at + CHUNK); op.queue.push(piece); op.queued += piece.length; }
-      this.stats.bytesIn += bytes.length; op.received += bytes.length; this.observe(op);
+      captureBody(op, bytes); this.stats.bytesIn += bytes.length; op.received += bytes.length; this.observe(op);
       this.signal();
     }
   }

@@ -1,7 +1,7 @@
 // The "Redirecionar hosts" section of the Controles panel (src/host-map.js): N from -> to rows kept in the device settings (network.hostMap) and applied live through the same path as the
 // other device settings (the running VM gets them at once; the app keeps its URLs, only the exchange goes elsewhere). Each row shows the effective URL shape of its rule and, like the
 // "Mock de endpoints" rows, the live count of the requests it redirected (responses and failures), which come back with every snapshot (snapshot.hostMap).
-import { parseRule, describeRule, ruleKey, hitText } from './host-map.js?v=aaaa8db990e6';
+import { parseRule, describeRule, ruleKey, hitText } from './host-map.js?v=2dd890abb01e';
 
 export function createHostMapPanel({ $, get, set }) {
   const list = () => $('hm-list');
@@ -70,6 +70,13 @@ export function createHostMapPanel({ $, get, set }) {
   });
   render();
   return {
+    /** "Redirecionar" from a request of the Rede panel: a new rule with that origin; the destination field gets the focus (nothing applies until it is typed). */
+    addRule(from) {
+      if (current.length >= 50) { $('hm-status').textContent = 'No máximo 50 redirecionamentos.'; return false; }
+      const existing = current.findIndex(rule => rule.from.trim() === String(from).trim());
+      const index = existing >= 0 ? existing : current.push({ from: String(from), to: '', enabled: true }) - 1;
+      render(); const target = list().querySelectorAll('.hm-to')[index]; target?.scrollIntoView?.({ block: 'center' }); target?.focus?.(); return true;
+    },
     /** The device settings changed elsewhere (reset, another tab): show them. */
     refresh() { current = rows(); render(); },
     get rules() { return current; },

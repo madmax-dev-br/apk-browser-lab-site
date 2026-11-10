@@ -1,28 +1,29 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=aaaa8db990e6';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=aaaa8db990e6';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=aaaa8db990e6';
-import { initCollapsibleSections } from './panel-sections.js?v=aaaa8db990e6';
-import { initHelpTips } from './help-tips.js?v=aaaa8db990e6';
-import { createToolDock } from './tool-dock.js?v=aaaa8db990e6';
-import { createPermissionsPanel } from './permissions-panel.js?v=aaaa8db990e6';
-import { createOverridesPanel } from './overrides-panel.js?v=aaaa8db990e6';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=aaaa8db990e6';
-import { createHostMapPanel } from './host-map-panel.js?v=aaaa8db990e6';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=aaaa8db990e6';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=aaaa8db990e6';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=aaaa8db990e6';
-import { createDeviceView, createViewState } from './device-view.js?v=aaaa8db990e6';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=aaaa8db990e6';
-import { formatApiGapReport } from './api-gap-scan.js?v=aaaa8db990e6';
-import { createLogcatPanel } from './logcat-panel.js?v=aaaa8db990e6';
-import { createComposeInspectorPanel } from './compose-inspector-panel.js?v=aaaa8db990e6';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=aaaa8db990e6';
-import { createPluginHost } from './plugin-host.js?v=aaaa8db990e6';
-import { captureImage } from './screen-capture.js?v=aaaa8db990e6';
-import { createPluginsPanel } from './plugins-panel.js?v=aaaa8db990e6';
-import { createMcpTools } from './mcp-tools.js?v=aaaa8db990e6';
-import { createMcpLink } from './mcp-link.js?v=aaaa8db990e6';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=aaaa8db990e6';
+import { APKWorkerClient } from './apk-worker-client.js?v=2dd890abb01e';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=2dd890abb01e';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=2dd890abb01e';
+import { initCollapsibleSections } from './panel-sections.js?v=2dd890abb01e';
+import { initHelpTips } from './help-tips.js?v=2dd890abb01e';
+import { createToolDock } from './tool-dock.js?v=2dd890abb01e';
+import { createPermissionsPanel } from './permissions-panel.js?v=2dd890abb01e';
+import { createOverridesPanel } from './overrides-panel.js?v=2dd890abb01e';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=2dd890abb01e';
+import { createHostMapPanel } from './host-map-panel.js?v=2dd890abb01e';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=2dd890abb01e';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=2dd890abb01e';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=2dd890abb01e';
+import { createDeviceView, createViewState } from './device-view.js?v=2dd890abb01e';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=2dd890abb01e';
+import { formatApiGapReport } from './api-gap-scan.js?v=2dd890abb01e';
+import { createLogcatPanel } from './logcat-panel.js?v=2dd890abb01e';
+import { createComposeInspectorPanel } from './compose-inspector-panel.js?v=2dd890abb01e';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=2dd890abb01e';
+import { createPluginHost } from './plugin-host.js?v=2dd890abb01e';
+import { captureImage } from './screen-capture.js?v=2dd890abb01e';
+import { createPluginsPanel } from './plugins-panel.js?v=2dd890abb01e';
+import { createMcpTools } from './mcp-tools.js?v=2dd890abb01e';
+import { createMcpLink } from './mcp-link.js?v=2dd890abb01e';
+import { createModalHost } from './lab-modal.js?v=2dd890abb01e';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=2dd890abb01e';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -217,7 +218,38 @@ apkVM.onApiGaps = report => { state.apiGaps = report; };
 // Page plugins (docs/PLUGINS.md, src/plugin-host.js): each enabled plugin runs in its own Worker and only reads. With no plugin running nothing here does any work.
 let pluginsPanel = null;
 let mcpLink = null;
-const pluginHost = createPluginHost({ vm: apkVM, getPackage: () => state.inventory?.packageName ?? null, captureImage: request => captureImage({ ...request, getHost: id => state.viewElements.get(String(id)) ?? null }), onChange: id => pluginsPanel?.changed(id), onLogStreaming: () => { syncLogcatStreaming().catch(() => {}); } });
+const modalHost = createModalHost();   // src/lab-modal.js: plugin screens (lab.modal) and "Expandir" on a plugin card
+const pluginModals = new Map();   // modal id -> { modal, pluginId }
+/** What a plugin may do with the lab (src/plugin-host.js ACTION_METHODS): the page's own controls, which show in Controles and in the Logcat like the user's. */
+const pluginActions = {
+  async reload(plugin, { mode }) {
+    if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('Nenhum app rodando para recarregar.'), { code: 'no-apk' });
+    await reloadActivity(mode === 'reopen' ? 'reopen' : 'recreate'); return { mode: mode === 'reopen' ? 'reopen' : 'recreate', activity: state.lastSnapshot?.activity ?? null };
+  },
+  mock(plugin, spec) {
+    const key = String(spec.id ?? `${spec.method ?? 'ANY'}-${spec.url ?? ''}`).replace(/[^\w-]+/g, '-').slice(0, 24), owner = String(plugin.id).replace(/[^\w-]+/g, '').slice(-10);
+    const result = mocksPanel.upsert({ ...spec, id: `p${owner}-${key}`.slice(0, 40), name: spec.name ?? `plugin ${plugin.name}`, enabled: spec.enabled !== false });
+    if (result.errors.length) throw Object.assign(new Error(result.errors.map(error => error.message).join(' ')), { code: 'bad-args' });
+    return { id: result.id };
+  },
+  unmock(plugin, { id }) { return { removed: mocksPanel.remove(String(id)) }; },
+  mocks() { return mocksPanel.list(); },
+  modal(plugin, args) {
+    const entry = args.id ? pluginModals.get(String(args.id)) : null;
+    if (args.op === 'open') {
+      const modal = modalHost.open({ title: args.title || plugin.name, size: args.size, html: args.html ?? '', label: `plugin ${plugin.name}`,
+        onMessage: data => pluginHost.emit(plugin.id, 'modal', { id: modal.id, type: 'message', data }),
+        onClose: reason => { pluginModals.delete(modal.id); pluginHost.emit(plugin.id, 'modal', { id: modal.id, type: 'closed', reason }); } });
+      pluginModals.set(modal.id, { modal, pluginId: plugin.id }); return { id: modal.id };
+    }
+    if (!entry || entry.pluginId !== plugin.id) throw Object.assign(new Error('Modal fechado ou desconhecido.'), { code: 'not-found' });
+    if (args.op === 'update') { if (args.title !== undefined) entry.modal.setTitle(args.title); if (args.size !== undefined) entry.modal.setSize(args.size); if (args.html !== undefined) entry.modal.setHtml(args.html); return { id: entry.modal.id }; }
+    if (args.op === 'post') { entry.modal.post(args.data); return { id: entry.modal.id }; }
+    if (args.op === 'close') { entry.modal.close('code'); return { id: entry.modal.id }; }
+    throw Object.assign(new Error(`op desconhecida: ${args.op}`), { code: 'bad-args' });
+  },
+};
+const pluginHost = createPluginHost({ vm: apkVM, actions: pluginActions, getPackage: () => state.inventory?.packageName ?? null, captureImage: request => captureImage({ ...request, getHost: id => state.viewElements.get(String(id)) ?? null }), onChange: id => { pluginsPanel?.changed(id); if (!pluginHost?.get?.(id)?.worker) for (const [modalId, entry] of pluginModals) if (entry.pluginId === id) entry.modal.close('stopped'); }, onLogStreaming: () => { syncLogcatStreaming().catch(() => {}); } });
 window.apkLabPlugins = pluginHost;   // test and console access: .list(), .stats
 // The Worker streams Logcat lines while the Logcat panel is open or a running plugin listens to 'log'; opening the panel always asks again (it shows the ring's recent lines).
 let logcatPanelOpen = false, logcatStreamingSent = false;
@@ -230,7 +262,19 @@ const composeInspector = createComposeInspectorPanel({ root: $('compose-inspecto
 window.apkLabComposeInspector = composeInspector;   // test and console access: .state
 apkVM.onLogcat = message => { logcatPanel.push(message); pluginHost.logcat(message); };
 const netlogPanel = createNetlogPanel({ root: $('netlog'), getPackage: () => state.inventory?.packageName ?? state.fileName ?? 'app', getAllowedHosts: () => deviceState.settings.network.allowedHosts,
-  allowHost: host => { if ($('dev-hosts-all').checked) return; $('dev-hosts').value = addAllowedHost($('dev-hosts').value, host); $('dev-hosts').dispatchEvent(new Event('input')); } });   // src/netlog-panel.js; "Permitir" types the host into the Dispositivo field, the same path as typing it
+  allowHost: host => { if ($('dev-hosts-all').checked) return; $('dev-hosts').value = addAllowedHost($('dev-hosts').value, host); $('dev-hosts').dispatchEvent(new Event('input')); },
+  // right click on a request: a mock of it (the dialog opens filled; nothing is saved until Salvar) or a host redirect rule with that origin
+  createMock: entry => {
+    const skip = new Set(['content-length', 'content-encoding', 'transfer-encoding', 'connection', 'keep-alive', 'date', 'set-cookie', 'vary', 'age', 'server', 'alt-svc', 'strict-transport-security']);
+    let url = entry.url; try { const parsed = new URL(entry.url); url = `${parsed.origin}${parsed.pathname}`; } catch { /* kept as is */ }
+    const headers = (entry.responseHeaders ?? []).filter(([name]) => !skip.has(String(name).toLowerCase())).map(([name, value]) => ({ name, value }));
+    mocksPanel.openPrefilled({ name: `${entry.method} ${entry.host}${entry.path?.split('?')[0] ?? ''}${entry.responseBodyTruncated ? ' (corpo cortado em 48 KB)' : ''}`.slice(0, 120), method: entry.method,
+      url, status: entry.status ?? 200, reason: entry.reason ?? '', headers: headers.length ? headers : [{ name: 'Content-Type', value: entry.contentType ?? 'application/json' }], body: entry.responseBody ?? '' });
+  },
+  redirectHost: entry => {
+    for (const id of ['control-panel', 'cp-sec-hostmap']) { const section = $(id); if (section) section.open = true; }   // the Controles card and the section, so the destination field can take the focus
+    hostMapPanel.addRule(`${entry.scheme ? entry.scheme + '://' : ''}${entry.host}${entry.port && ![80, 443].includes(Number(entry.port)) ? ':' + entry.port : ''}`);
+  } });   // src/netlog-panel.js; "Permitir" types the host into the Dispositivo field, the same path as typing it
 apkVM.onNetlog = message => { netlogPanel.push(message); pluginHost.netlog(message); };
 window.apkLabNetlog = netlogPanel;   // test and console access: .store.entries
 window.apkLabLogcat = logcatPanel;   // test and console access: .store.entries
@@ -441,7 +485,7 @@ const deviceState = { settings: loadDeviceSettings(), clockTimer: null };
 const permissionsPanel = createPermissionsPanel({ $, vm: apkVM, location: { get: () => deviceState.settings.location, set: block => { deviceState.settings = { ...deviceState.settings, location: block }; saveDeviceSettings(deviceState.settings); } } });
 const overridesPanel = createOverridesPanel({ $, vm: apkVM });
 const ignoredPanel = createIgnoredActivitiesPanel({ $, vm: apkVM });
-pluginsPanel = createPluginsPanel({ $, host: pluginHost });
+pluginsPanel = createPluginsPanel({ $, host: pluginHost, modals: modalHost });
 // "MCP" (src/mcp-link.js, src/mcp-tools.js, scripts/lab-mcp.mjs): an MCP client on this machine uses this page through the local bridge; off until Conectar
 const MCP_KEY = 'apkweb-mcp-v1';
 const mcpTools = createMcpTools({ query: (method, args) => pluginHost.query(method, args), plugins: () => pluginHost.list?.() ?? [], logcat: () => logcatPanel.store.entries, network: () => netlogPanel.store.entries,

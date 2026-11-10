@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=aaaa8db990e6">
-  <meta name="apk-browser-build" content="aaaa8db990e6">
+  <link rel="stylesheet" href="./styles.css?v=2dd890abb01e">
+  <meta name="apk-browser-build" content="2dd890abb01e">
 </head>
 <body>
   <header class="topbar">
@@ -157,7 +157,7 @@
               <p class="cp-note ov-warning">O código de um plugin roda com a origem desta página (pode usar fetch como qualquer script dela). Use só código seu ou que você revisou.</p>
               <ul id="pl-list" class="ov-list pl-list" aria-label="Plugins, na ordem do painel"></ul>
               <p id="pl-status" class="cp-note" role="status" aria-live="polite">Nenhum plugin.</p>
-              <div class="em-actions"><label class="pl-template-label" for="pl-template"><span class="sr-only">Modelo</span><select id="pl-template" aria-label="Modelo do novo plugin"></select></label><button id="pl-add" class="cp-button" type="button">+ Adicionar</button><button id="pl-export" class="cp-button" type="button" disabled>Exportar</button><button id="pl-import" class="cp-button" type="button">Importar</button><input id="pl-import-file" type="file" accept="application/json,.json" hidden></div>
+              <div class="em-actions"><button id="pl-add" class="cp-button" type="button">+ Adicionar</button><a class="pl-examples-link" href="plugins.html#exemplos" target="_blank" rel="noopener">Exemplos</a><button id="pl-export" class="cp-button" type="button" disabled>Exportar</button><button id="pl-import" class="cp-button" type="button">Importar</button><input id="pl-import-file" type="file" accept="application/json,.json" hidden></div>
             </div></details>
           <details class="cp-group" id="cp-sec-mcp" data-section="mcp">
               <summary><h3 id="cp-mcp-title">MCP</h3><span id="mcp-summary" class="cp-badge">desligado</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
@@ -222,7 +222,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=aaaa8db990e6"></script>
+  <script type="module" src="./app.js?v=2dd890abb01e"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>

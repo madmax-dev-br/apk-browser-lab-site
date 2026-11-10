@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Arquitetura da VM · APK Browser Lab</title>
   <meta name="description" content="Como o APK Browser Lab executa um APK Android no navegador: do arquivo à tela, threads e tempo, memória, renderização, rede, código nativo, ferramentas e limitações.">
-  <link rel="stylesheet" href="./site-pages.css?v=aaaa8db990e6">
+  <link rel="stylesheet" href="./site-pages.css?v=2dd890abb01e">
 </head>
 <body>
   <header class="topbar">
@@ -280,8 +280,8 @@ Vary: Origin</code></pre></div>
           <li><b>Activities ignoradas</b>Descarta pedidos do app para abrir certas Activities.</li>
           <li><b>Redirecionar hosts</b>Manda as requisições de um host para outro destino, como <code>/etc/hosts</code>.</li>
           <li><b>Mock de endpoints</b>Responde requisições que casam com um padrão, sem ir à rede; exporta e importa JSON.</li>
-          <li><b>Plugins</b>Trechos de JavaScript seus que observam o app e recortam a tela, só leitura. <a href="./plugins.html">Como configurar</a>.</li>
-          <li><b>Logcat e Rede</b>As linhas do <code>android.util.Log</code> e cada requisição, recusa e mock.</li>
+          <li><b>Plugins</b>Trechos de JavaScript seus que observam o app, recortam a tela, recarregam a tela, criam mocks e abrem janelas com layouts próprios. <a href="./plugins.html">Como configurar</a>.</li>
+          <li><b>Logcat e Rede</b>As linhas do <code>android.util.Log</code> e cada requisição, recusa e mock. Botão direito numa requisição: criar um mock dela (já preenchido com método, URL, status, cabeçalhos e o corpo da resposta) ou redirecionar o host.</li>
           <li><b>Compose</b>Os elementos da tela recortados do quadro pelos limites de layout, com detalhes e a árvore completa.</li>
           <li><b>Resumo e diagnóstico</b>Memória, quem retém, exceções, thread principal e métodos mais ocupados; “Copiar diagnóstico” leva o relatório inteiro.</li>
           <li><b>Player</b>O elemento <code>&lt;apk-player&gt;</code> para embutir um APK em outra página (<code>docs/EMBED.md</code>).</li>
@@ -312,6 +312,6 @@ Vary: Origin</code></pre></div>
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./plugins.html">Como configurar plugins</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=aaaa8db990e6"></script>
+  <script type="module" src="./site-pages.js?v=2dd890abb01e"></script>
 </body>
 </html>

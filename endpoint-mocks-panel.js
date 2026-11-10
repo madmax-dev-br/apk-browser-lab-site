@@ -1,7 +1,7 @@
 // The "Mock de endpoints" section of the Controles panel (src/endpoint-mocks.js): the list of mocked endpoints of the open package (method, URL pattern, status, on/off, hits, edit,
 // remove, order), the dialog that configures one mock, and export / import as JSON. The list is kept per package in localStorage (every access guarded; without storage it lasts for
 // the page), and applied live to the Worker; hit counts come back with every snapshot.
-import { MOCK_METHODS, MAX_MOCKS, MAX_BODY_BYTES, defaultMock, normalizeMock, validateMock, loadMocks, saveMocks, exportMocks, importMocks, bytesToBase64, mockLabel } from './endpoint-mocks.js?v=aaaa8db990e6';
+import { MOCK_METHODS, MAX_MOCKS, MAX_BODY_BYTES, defaultMock, normalizeMock, validateMock, loadMocks, saveMocks, exportMocks, importMocks, bytesToBase64, mockLabel } from './endpoint-mocks.js?v=2dd890abb01e';
 
 const FIELD_ERROR = { method: 'em-err-method', url: 'em-err-url', query: 'em-err-query', status: 'em-err-status', reason: 'em-err-status', headers: 'em-err-headers', body: 'em-err-body', delayMs: 'em-err-delay' };
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -130,8 +130,8 @@ export function createEndpointMocksPanel({ $, vm, save = download }) {
     $('em-err-form').hidden = !$('em-err-form').textContent;
     return result;
   }
-  function openDialog(mock, opener) {
-    S.editing = mock ? mock.id : null; S.draft = normalizeMock(mock ?? defaultMock()); S.opener = opener ?? document.activeElement; S.touched = new Set(); S.submitted = false;
+  function openDialog(mock, opener, prefill = null) {
+    S.editing = mock ? mock.id : null; S.draft = normalizeMock(mock ?? (prefill ? { ...defaultMock(), ...prefill } : defaultMock())); S.opener = opener ?? document.activeElement; S.touched = new Set(); S.submitted = false;
     const draft = S.draft;
     $('em-dialog-title').textContent = mock ? 'Editar mock' : 'Adicionar mock';
     field('em-name').value = draft.name; field('em-method').value = MOCK_METHODS.includes(draft.method) ? draft.method : 'ANY'; field('em-url').value = draft.url; field('em-query').value = draft.query === 'exact' ? 'exact' : 'ignore';
@@ -218,6 +218,18 @@ export function createEndpointMocksPanel({ $, vm, save = download }) {
     hits(entries) { if (!Array.isArray(entries)) return; let changed = false; for (const entry of entries) if (S.hits.get(entry.id) !== entry.hits) { S.hits.set(entry.id, entry.hits); changed = true; } if (changed) updateMeta(); },
     activeCount() { return S.mocks.filter(mock => mock.enabled && !validateMock(mock).errors.length).length; },
     open: openDialog,
+    /** "Criar mock" from a request of the Rede panel: the dialog opens filled with that request's method, URL and response (nothing is saved until Salvar). */
+    openPrefilled(values, opener) { openDialog(null, opener, values); },
+    /** A plugin's lab.mock: adds or replaces (same id) a mock in this package's list, saved and applied like one typed in the dialog. -> { id, errors } */
+    upsert(raw) {
+      if (!S.pkg) return { id: null, errors: [{ field: 'pkg', message: 'Abra um APK: os mocks são guardados por pacote.' }] };
+      const mock = normalizeMock(raw), { errors } = validateMock(mock); if (errors.length) return { id: null, errors };
+      const at = S.mocks.findIndex(item => item.id === mock.id);
+      if (at >= 0) S.mocks[at] = mock; else { if (S.mocks.length >= MAX_MOCKS) return { id: null, errors: [{ field: 'list', message: `No máximo ${MAX_MOCKS} mocks.` }] }; S.mocks.push(mock); }
+      render(); changed(); return { id: mock.id, errors: [] };
+    },
+    remove(id) { const at = S.mocks.findIndex(item => item.id === id); if (at < 0) return false; S.mocks.splice(at, 1); render(); changed(); return true; },
+    list() { return S.mocks.map(mock => ({ id: mock.id, name: mock.name, enabled: mock.enabled, method: mock.method, url: mock.url, status: mock.status, hits: S.hits.get(mock.id) ?? 0 })); },
     get state() { return S; },
   };
 }

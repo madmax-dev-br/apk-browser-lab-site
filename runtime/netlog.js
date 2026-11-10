@@ -45,6 +45,7 @@ const rounded = ms => Math.round(ms * 1000) / 1000;
  * @param clock    { now(): VM uptime ms, wall(): epoch ms }
  * @param identity () => ({ tid, thread })   the running Java thread
  */
+const TEXT_TYPE = /json|text\/|xml|javascript|x-www-form-urlencoded|graphql/i;
 export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: () => Date.now() }, identity = () => ({ tid: 0, thread: 'main' }), maxEntries = MAX_ENTRIES, flushMs = FLUSH_MS,
   setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = id => clearTimeout(id) } = {}) {
   let buffer = [], pending = new Set(), dropped = 0, total = 0, seq = 0, timer = null, reset = true;
@@ -68,8 +69,11 @@ export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: ()
     if (buffer.length > maxEntries + 256) trim();   // amortized: trim in chunks, never per entry
     return touch(entry);
   };
-  const end = (entry, outcome, failure = null) => {
+  const end = (entry, outcome, failure = null, op = null) => {
     if (entry.complete) return entry;
+    if (op?.capture?.length && TEXT_TYPE.test(entry.contentType ?? '')) {   // a text body (JSON, text, XML, form) for "Criar mock"; a binary body is left out
+      try { entry.responseBody = new TextDecoder('utf-8', { fatal: false }).decode(op.capture); entry.responseBodyTruncated = !!op.captureTruncated; } catch { entry.responseBody = null; }
+    }
     entry.outcome = outcome; entry.complete = true; entry.failure = failure; entry.durationMs = Math.max(0, rounded(clock.now() - entry.uptime)); return touch(entry);
   };
   const api = {
@@ -100,9 +104,9 @@ export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: ()
       }
       if ((op.received ?? 0) !== entry.responseBytes) { entry.responseBytes = op.received ?? 0; changed = true; }
       if (op.error) { end(entry, entry.status !== null ? 'error' : outcomeOfFailure(op.error), { type: String(op.error.type ?? ''), message: String(op.error.message ?? '') }); return; }
-      if (op.ended) { end(entry, 'response'); return; }
+      if (op.ended) { end(entry, 'response', null, op); return; }
       if (op.closed) {
-        if (entry.status !== null) { entry.closedEarly = true; end(entry, 'response'); }
+        if (entry.status !== null) { entry.closedEarly = true; end(entry, 'response', null, op); }
         else end(entry, op.request?.timedOut ? 'timeout' : 'aborted', op.request?.timedOut ? { type: 'Ljava/net/SocketTimeoutException;', message: 'timeout' } : { type: 'Ljava/net/SocketException;', message: 'Socket closed' });
         return;
       }

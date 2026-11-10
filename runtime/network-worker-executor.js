@@ -1,4 +1,5 @@
-import { describeFailure } from './network-transport.js?v=aaaa8db990e6';
+import { captureBody } from './network-capture.js?v=2dd890abb01e';
+import { describeFailure } from './network-transport.js?v=2dd890abb01e';
 
 // Main-side half of the synchronous network bridge. The exchange runs in a dedicated worker (network-worker.js): it fetches, then hands the response to this side through
 // SharedArrayBuffers (head as JSON, body through a ring buffer, state words) and wakes it with Atomics.notify, so a VM frame that cannot yield to the event loop can wait for
@@ -51,7 +52,7 @@ export class WorkerExecutor {
     let write = Atomics.load(control, WRITE_POS) >>> 0, read = Atomics.load(control, READ_POS) >>> 0, moved = 0;
     while (write !== read && op.queued < 256 * 1024) {
       const available = (write - read) >>> 0, offset = HEAD_CAPACITY + (read % RING_CAPACITY), n = Math.min(available, RING_CAPACITY - (read % RING_CAPACITY), 64 * 1024);
-      op.queue.push(data.slice(offset, offset + n)); op.queued += n; read = (read + n) >>> 0; moved += n;
+      const piece = data.slice(offset, offset + n); captureBody(op, piece); op.queue.push(piece); op.queued += n; read = (read + n) >>> 0; moved += n;
     }
     if (moved) { Atomics.store(control, READ_POS, read | 0); this.bridge.stats.bytesIn += moved; op.received += moved; this.post({ type: 'drain', id: op.handle }); changed = true; }
     if (!op.ended && Atomics.load(control, ENDED) === 1 && ((Atomics.load(control, WRITE_POS) >>> 0) === read)) { op.ended = true; this.exchanges.delete(op.handle); changed = true; }

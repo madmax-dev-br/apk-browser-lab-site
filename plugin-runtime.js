@@ -93,7 +93,7 @@ export function pluginWorkerMain(scope) {
     badge: text => pushUi({ op: 'badge', text: clip(textOf(text ?? '')).slice(0, 40) }),
   });
   const wrapError = error => Object.assign(new Error(error?.message ?? 'Falha na consulta.'), { code: error?.code ?? 'failed' });
-  const watches = new Set(), readyWrappers = new Map();
+  const watches = new Set(), readyWrappers = new Map(), modals = new Map(); let modalSubscribed = false;
   const viewOptions = options => ({ depth: options?.depth, maxFields: options?.maxFields, maxItems: options?.maxItems, maxString: options?.maxString });
   const pathArg = path => Array.isArray(path) ? path.map(part => String(part ?? '')) : String(path ?? '');
   // A heap scan is served in short pages (each one a bounded query between two VM events); this walks the pages until `limit` items, the end of the heap or `maxPages`.
@@ -116,7 +116,7 @@ export function pluginWorkerMain(scope) {
         lab.screen().then(screen => { if (screen?.ready?.ready && !was) { was = true; fn(screen); } }).catch(() => {});
         return () => { readyWrappers.delete(fn); off(); };
       }
-      if (!['screen', 'log', 'network', 'refresh'].includes(name)) throw new TypeError(`Evento desconhecido: ${name} (use 'screen', 'ready', 'log', 'network' ou 'refresh')`);
+      if (!['screen', 'log', 'network', 'refresh', 'modal'].includes(name)) throw new TypeError(`Evento desconhecido: ${name} (use 'screen', 'ready', 'log', 'network' ou 'refresh')`);
       let set = handlers.get(name); if (!set) { set = new Set(); handlers.set(name, set); post({ t: 'sub', name, on: true }); }
       set.add(fn); return () => lab.off(name, fn);
     },
@@ -127,6 +127,27 @@ export function pluginWorkerMain(scope) {
       if (!set.size) { handlers.delete(String(name)); post({ t: 'sub', name: String(name), on: false }); }
     },
     screen: () => call('screen', {}),
+    // ---- actions on the lab (the page's own controls; they show in Controles and in the Logcat like the user's) ----
+    reload: (mode = 'recreate') => call('reload', { mode: mode === 'reopen' ? 'reopen' : 'recreate' }),
+    mock: (spec = {}) => call('mock', { ...spec, headers: spec?.headers, body: typeof spec?.body === 'string' || spec?.body === undefined ? spec?.body : JSON.stringify(spec.body) }),
+    unmock: id => call('unmock', { id: String(id ?? '') }),
+    mocks: () => call('mocks', {}),
+    /** A Blob (a screenshot) as a data: URL, to put in a modal's HTML. */
+    async dataUrl(image) { const blob = image && typeof image === 'object' && 'blob' in image ? image.blob : image; const bytes = new Uint8Array(await blob.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return `data:${blob.type || 'application/octet-stream'};base64,${btoa(binary)}`; },
+    modal: Object.freeze({
+      /** Opens a modal on the page with HTML of the plugin (any layout; it runs isolated in the modal). -> { id, update, post, close, onMessage, onClose } */
+      async open(options = {}) {
+        if (!modalSubscribed) { modalSubscribed = true; lab.on('modal', event => { const entry = modals.get(event?.id); if (!entry) return; if (event.type === 'closed') { modals.delete(event.id); for (const fn of entry.close) fn(event.reason); } else if (event.type === 'message') for (const fn of entry.message) fn(event.data); }); }
+        const { id } = await call('modal', { op: 'open', title: String(options?.title ?? ''), size: String(options?.size ?? 'medium'), html: String(options?.html ?? '') });
+        const entry = { message: new Set(), close: new Set() }; modals.set(id, entry);
+        return Object.freeze({ id,
+          update: (changes = {}) => call('modal', { op: 'update', id, ...(changes.title !== undefined ? { title: String(changes.title) } : {}), ...(changes.size !== undefined ? { size: String(changes.size) } : {}), ...(changes.html !== undefined ? { html: String(changes.html) } : {}) }),
+          post: data => call('modal', { op: 'post', id, data }),
+          close: () => call('modal', { op: 'close', id }),
+          onMessage: fn => { entry.message.add(fn); return () => entry.message.delete(fn); },
+          onClose: fn => { entry.close.add(fn); return () => entry.close.delete(fn); } });
+      },
+    }),
     async waitReady(options = {}) {   // resolves with the screen once "Tela pronta" holds; rejects with code 'timeout' (default 15 s)
       const until = Date.now() + Math.max(100, Number(options?.timeoutMs) || 15000);
       for (;;) { const screen = await lab.screen(); if (screen?.ready?.ready) return screen; if (Date.now() >= until) throw Object.assign(new Error(`A tela não ficou pronta: ${(screen?.ready?.waitingFor ?? ['sem informação']).join('; ')}`), { code: 'timeout', screen }); await new Promise(resolve => setTimeout(resolve, 100)); }
@@ -197,96 +218,3 @@ export function pluginWorkerMain(scope) {
 /** The source of a plugin Worker (a module): the runtime above, started on the Worker global. */
 export const pluginWorkerSource = () => `(${pluginWorkerMain.toString()})(self);\n`;
 
-/** Starting points of "+ Adicionar". The code is plain plugin code (the body of an async function with `lab` in scope). */
-export const PLUGIN_TEMPLATES = [
-  { id: 'screen', name: 'Tela atual', description: 'Mostra a Activity, as janelas e os fragments a cada mudança de tela.', code: `// Tela atual: mostra a tela ativa a cada mudança (sem custo na VM; os fragments são uma leitura de campos).
-async function mostrar(tela) {
-  lab.ui.badge(tela.activity ? tela.activity.split('.').pop() : '—');
-  lab.ui.kv({
-    Activity: tela.activity ?? '—',
-    Pilha: tela.activityStack.join(' › ') || '—',
-    Janelas: tela.windows.map(j => j.kind + (j.modal ? ' (modal)' : '')).join(', ') || 'só a Activity',
-    Voltar: tela.canGoBack ? 'sim' : 'não',
-  }, { id: 'tela' });
-  try {
-    const fragments = await lab.fragments(), linhas = [];
-    const percorrer = (lista, nivel) => { for (const f of lista) { linhas.push({ nível: nivel, classe: f.className.split('.').pop(), tag: f.tag ?? '', oculto: f.hidden ? 'sim' : '' }); percorrer(f.children, nivel + 1); } };
-    percorrer(fragments, 0);
-    if (linhas.length) lab.ui.table(linhas, ['nível', 'classe', 'tag', 'oculto'], { id: 'fragments' }); else lab.ui.text('Sem fragments androidx nesta tela.', { id: 'fragments' });
-  } catch (erro) { lab.ui.text('Fragments: ' + erro.message, { id: 'fragments' }); }
-}
-lab.on('screen', mostrar);
-mostrar(await lab.screen());
-` },
-  { id: 'logs', name: 'Logs filtrados', description: 'Linhas do Logcat que casam com uma expressão regular.', code: `// Logs filtrados: as linhas do Logcat cuja tag ou mensagem casam com FILTRO.
-const FILTRO = /erro|error|exception|warn/i;   // edite a expressão
-const MAXIMO = 100;
-const linhas = []; let total = 0;
-lab.on('log', lote => {
-  for (const linha of lote) {
-    if (!FILTRO.test(linha.tag + ' ' + linha.message)) continue;
-    total++; linhas.push({ hora: new Date(linha.wall).toLocaleTimeString(), nível: linha.level, tag: linha.tag, mensagem: linha.message });
-  }
-  if (linhas.length > MAXIMO) linhas.splice(0, linhas.length - MAXIMO);
-  lab.ui.badge(String(total));
-  lab.ui.table(linhas.slice().reverse(), ['hora', 'nível', 'tag', 'mensagem'], { id: 'linhas' });
-});
-lab.ui.text('Esperando linhas que casem com ' + FILTRO + '…', { id: 'linhas' });
-` },
-  { id: 'viewmodel', name: 'Observar ViewModel', description: 'O primeiro ViewModel do app na tela, com um campo (ou todos) ao vivo.', code: `// Observar ViewModel: o primeiro ViewModel do app na tela ativa (Activity, fragments, destinos de navegação) e um campo ao vivo.
-const CAMPO = '';          // vazio: todos os campos; ou um caminho, como 'contador', 'estado.value' ou 'itens.size'
-const INTERVALO_MS = 250;  // leitura a cada 250 ms (só o que mudou é mostrado)
-let parar = null, atual = null;
-const resumo = valor => valor === null || typeof valor !== 'object' ? valor
-  : valor.$kind === 'MutableState' || valor.$kind === 'StateFlow' || valor.$kind === 'LiveData' || valor.$kind === 'Atomic' ? resumo(valor.value)
-  : valor.$kind === 'list' || valor.$kind === 'set' || valor.$kind === 'array' ? \`[\${valor.size}] \` + valor.items.slice(0, 5).map(item => JSON.stringify(resumo(item))).join(', ')
-  : valor.$kind === 'map' ? \`{\${valor.size}}\` : valor.$kind === 'enum' ? valor.name
-  : valor.fields ? Object.fromEntries(Object.entries(valor.fields).map(([nome, item]) => [nome, resumo(item)])) : valor.$type;
-async function conectar() {
-  const lista = await lab.viewModels();
-  const escolhido = lista.find(vm => !vm.library) ?? lista[0];
-  if (escolhido?.handle === atual) return;
-  parar?.(); parar = null; atual = escolhido?.handle ?? null;
-  if (!escolhido) { lab.ui.clear(); lab.ui.text('Nenhum ViewModel na tela ativa.'); lab.ui.badge('—'); return; }
-  lab.ui.clear(); lab.ui.badge(escolhido.className.split('.').pop());
-  lab.ui.kv({ ViewModel: escolhido.className, Dono: escolhido.owner.label, Outros: lista.filter(vm => vm !== escolhido).map(vm => vm.className.split('.').pop()).join(', ') || '—' }, { id: 'cabecalho' });
-  parar = lab.watch(escolhido.handle, CAMPO, valor => {
-    if (CAMPO) lab.ui.json(resumo(valor), { id: 'valor' });
-    else lab.ui.kv(Object.fromEntries(Object.entries(valor.fields ?? {}).map(([nome, item]) => [nome.replace(/\\$delegate$/, ''), resumo(item)])), { id: 'valor' });
-  }, { intervalMs: INTERVALO_MS, depth: CAMPO ? 2 : 3, onError: erro => { if (erro.code === 'collected') { atual = null; conectar(); } } });
-}
-lab.on('screen', () => conectar().catch(erro => lab.ui.text(erro.message, { id: 'erro' })));
-setInterval(() => conectar().catch(() => {}), 2000);   // um destino do Navigation na mesma Activity traz os seus ViewModels
-await conectar();
-` },
-  { id: 'components', name: 'Componentes da tela', description: 'As caixas de "Mostrar limites de layout" com nome, posição e o recorte de cada uma.', code: `// Componentes da tela: as caixas de "Mostrar limites de layout", com o recorte de cada uma
-// (lab.screenshot corta do quadro que a página mostra; no máximo um recorte a cada 500 ms, então só os primeiros LIMITE ganham imagem).
-const LIMITE = 8;
-let rodada = 0;
-async function mostrar() {
-  const minha = ++rodada;
-  const caixas = (await lab.layoutBounds()).filter(caixa => caixa.kind === 'compose');
-  lab.ui.clear(); lab.ui.badge(String(caixas.length));
-  lab.ui.table(caixas.map(caixa => ({ nome: caixa.name, x: caixa.bounds.left, y: caixa.bounds.top, largura: caixa.size.width, altura: caixa.size.height, tag: caixa.testTag ?? '' })), ['nome', 'x', 'y', 'largura', 'altura', 'tag'], { id: 'lista' });
-  for (const caixa of caixas.slice(0, LIMITE)) {
-    if (minha !== rodada) return;   // a tela mudou: a próxima rodada recomeça
-    try { lab.ui.image(await lab.screenshot({ key: caixa.key, maxWidth: 360 }), { id: caixa.key, caption: caixa.name }); }
-    catch (erro) { lab.ui.text(caixa.name + ': ' + erro.message, { id: caixa.key }); }
-  }
-}
-lab.on('screen', () => mostrar().catch(erro => lab.ui.text(erro.message, { id: 'erro' })));
-await mostrar();
-` },
-  { id: 'compose', name: 'Árvore Compose resumida', description: 'Os elementos do Compose com texto, papel ou testTag.', code: `// Árvore Compose resumida: só os nós com texto, papel (Role) ou testTag. A árvore custa algumas dezenas de ms na VM: no máximo uma leitura por segundo.
-async function mostrar() {
-  const arvore = await lab.composeTree();
-  const nos = arvore.owners.flatMap(dono => dono.nodes).filter(no => no.texts.length || no.editableText !== null || no.role || no.testTag);
-  lab.ui.badge(\`\${nos.length}/\${arvore.totalNodes} nós\`);
-  if (!arvore.owners.length) { lab.ui.text('A tela não tem Compose.', { id: 'arvore' }); return; }
-  lab.ui.table(nos.slice(0, 150).map(no => ({ nível: no.depth, nome: no.name, texto: (no.editableText ?? no.texts.join(' ')).slice(0, 60), tag: no.testTag ?? '', ações: no.actions.join(' ') })), ['nível', 'nome', 'texto', 'tag', 'ações'], { id: 'arvore' });
-}
-lab.on('screen', () => mostrar().catch(() => {}));
-setInterval(() => mostrar().catch(() => {}), 2000);
-await mostrar();
-` },
-];
