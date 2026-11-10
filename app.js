@@ -1,26 +1,28 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=fa88a5e0684e';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=fa88a5e0684e';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=fa88a5e0684e';
-import { initCollapsibleSections } from './panel-sections.js?v=fa88a5e0684e';
-import { initHelpTips } from './help-tips.js?v=fa88a5e0684e';
-import { createToolDock } from './tool-dock.js?v=fa88a5e0684e';
-import { createPermissionsPanel } from './permissions-panel.js?v=fa88a5e0684e';
-import { createOverridesPanel } from './overrides-panel.js?v=fa88a5e0684e';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=fa88a5e0684e';
-import { createHostMapPanel } from './host-map-panel.js?v=fa88a5e0684e';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=fa88a5e0684e';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=fa88a5e0684e';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=fa88a5e0684e';
-import { createDeviceView, createViewState } from './device-view.js?v=fa88a5e0684e';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=fa88a5e0684e';
-import { formatApiGapReport } from './api-gap-scan.js?v=fa88a5e0684e';
-import { createLogcatPanel } from './logcat-panel.js?v=fa88a5e0684e';
-import { createComposeInspectorPanel } from './compose-inspector-panel.js?v=fa88a5e0684e';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=fa88a5e0684e';
-import { createPluginHost } from './plugin-host.js?v=fa88a5e0684e';
-import { captureImage } from './screen-capture.js?v=fa88a5e0684e';
-import { createPluginsPanel } from './plugins-panel.js?v=fa88a5e0684e';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=fa88a5e0684e';
+import { APKWorkerClient } from './apk-worker-client.js?v=6b6d620243b7';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=6b6d620243b7';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM } from './device-settings.js?v=6b6d620243b7';
+import { initCollapsibleSections } from './panel-sections.js?v=6b6d620243b7';
+import { initHelpTips } from './help-tips.js?v=6b6d620243b7';
+import { createToolDock } from './tool-dock.js?v=6b6d620243b7';
+import { createPermissionsPanel } from './permissions-panel.js?v=6b6d620243b7';
+import { createOverridesPanel } from './overrides-panel.js?v=6b6d620243b7';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=6b6d620243b7';
+import { createHostMapPanel } from './host-map-panel.js?v=6b6d620243b7';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=6b6d620243b7';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=6b6d620243b7';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=6b6d620243b7';
+import { createDeviceView, createViewState } from './device-view.js?v=6b6d620243b7';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=6b6d620243b7';
+import { formatApiGapReport } from './api-gap-scan.js?v=6b6d620243b7';
+import { createLogcatPanel } from './logcat-panel.js?v=6b6d620243b7';
+import { createComposeInspectorPanel } from './compose-inspector-panel.js?v=6b6d620243b7';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=6b6d620243b7';
+import { createPluginHost } from './plugin-host.js?v=6b6d620243b7';
+import { captureImage } from './screen-capture.js?v=6b6d620243b7';
+import { createPluginsPanel } from './plugins-panel.js?v=6b6d620243b7';
+import { createMcpTools } from './mcp-tools.js?v=6b6d620243b7';
+import { createMcpLink } from './mcp-link.js?v=6b6d620243b7';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=6b6d620243b7';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -214,12 +216,13 @@ apkVM.onAppData = showAppData;
 apkVM.onApiGaps = report => { state.apiGaps = report; };
 // Page plugins (docs/PLUGINS.md, src/plugin-host.js): each enabled plugin runs in its own Worker and only reads. With no plugin running nothing here does any work.
 let pluginsPanel = null;
+let mcpLink = null;
 const pluginHost = createPluginHost({ vm: apkVM, getPackage: () => state.inventory?.packageName ?? null, captureImage: request => captureImage({ ...request, getHost: id => state.viewElements.get(String(id)) ?? null }), onChange: id => pluginsPanel?.changed(id), onLogStreaming: () => { syncLogcatStreaming().catch(() => {}); } });
 window.apkLabPlugins = pluginHost;   // test and console access: .list(), .stats
 // The Worker streams Logcat lines while the Logcat panel is open or a running plugin listens to 'log'; opening the panel always asks again (it shows the ring's recent lines).
 let logcatPanelOpen = false, logcatStreamingSent = false;
 function syncLogcatStreaming(force = false) {
-  const wanted = logcatPanelOpen || pluginHost.wantsLogs; if (!force && wanted === logcatStreamingSent) return Promise.resolve();
+  const wanted = logcatPanelOpen || pluginHost.wantsLogs || !!mcpLink?.connected; if (!force && wanted === logcatStreamingSent) return Promise.resolve();
   logcatStreamingSent = wanted; return apkVM.setLogcatStreaming(wanted);
 }
 const logcatPanel = createLogcatPanel({ root: $('logcat'), getPackage: () => state.inventory?.packageName ?? state.fileName ?? 'app', setStreaming: open => { logcatPanelOpen = !!open; return syncLogcatStreaming(!!open); } });   // src/logcat-panel.js; closed, the Worker keeps the lines in its ring and posts only a counter
@@ -438,7 +441,26 @@ const deviceState = { settings: loadDeviceSettings(), clockTimer: null };
 const permissionsPanel = createPermissionsPanel({ $, vm: apkVM, location: { get: () => deviceState.settings.location, set: block => { deviceState.settings = { ...deviceState.settings, location: block }; saveDeviceSettings(deviceState.settings); } } });
 const overridesPanel = createOverridesPanel({ $, vm: apkVM });
 const ignoredPanel = createIgnoredActivitiesPanel({ $, vm: apkVM });
-pluginsPanel = createPluginsPanel({ $, host: pluginHost });   // "Plugins" (src/plugins-panel.js): global list, output cards under the device
+pluginsPanel = createPluginsPanel({ $, host: pluginHost });
+// "MCP" (src/mcp-link.js, src/mcp-tools.js, scripts/lab-mcp.mjs): an MCP client on this machine uses this page through the local bridge; off until Conectar
+const MCP_KEY = 'apkweb-mcp-v1';
+const mcpTools = createMcpTools({ query: (method, args) => pluginHost.query(method, args), plugins: () => pluginHost.list?.() ?? [], logcat: () => logcatPanel.store.entries, network: () => netlogPanel.store.entries,
+  status: () => ({ running: !!apkVM.worker, packageName: state.inventory?.packageName ?? null, file: state.fileName ?? null }) });
+mcpLink = createMcpLink({ execute: (tool, args) => mcpTools.execute(tool, args), onState: ({ state: linkState, message, calls, lastTool }) => {
+  const connected = linkState === 'conectado';
+  $('mcp-summary').textContent = connected ? 'conectado' : linkState === 'conectando' ? 'conectando' : linkState === 'erro' ? 'erro' : 'desligado';
+  $('mcp-status').textContent = connected ? `Conectado a ${message}. ${calls ? `${calls} ${calls === 1 ? 'chamada' : 'chamadas'} (última: ${lastTool}).` : 'Peça algo ao cliente MCP.'}` : message || 'Desconectado.';
+  $('mcp-status').dataset.state = connected ? 'ok' : linkState === 'erro' ? 'error' : '';
+  $('mcp-connect').textContent = connected || linkState === 'conectando' ? 'Desconectar' : 'Conectar';
+  syncLogcatStreaming().catch(() => {});   // Logcat lines reach the page while the MCP client may ask for them
+} });
+try { const saved = JSON.parse(globalThis.localStorage?.getItem(MCP_KEY) ?? 'null'); if (saved?.url) $('mcp-url').value = saved.url; if (saved?.token) $('mcp-token').value = saved.token; } catch { /* storage unavailable */ }
+$('mcp-connect').addEventListener('click', () => {
+  if (mcpLink.connected || mcpLink.state.state === 'conectando') { mcpLink.disconnect(); return; }
+  const url = $('mcp-url').value, token = $('mcp-token').value;
+  try { globalThis.localStorage?.setItem(MCP_KEY, JSON.stringify({ url, token })); } catch { /* the fields last for this page */ }
+  mcpLink.connect({ url, token });
+});   // "Plugins" (src/plugins-panel.js): global list, output cards under the device
 // Bottom tool dock (src/tool-dock.js): Log de execução, Logcat, Rede, Compose and Plugins as Android Studio-like tool windows, hidden until an icon is clicked
 const toolDock = createToolDock({ root: $('tool-dock'), tools: [
   { id: 'trace', label: 'Log de execução', icon: '☰', details: $('trace'), count: $('trace-count') },

@@ -7,8 +7,8 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=fa88a5e0684e';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=fa88a5e0684e';
+import { pluginWorkerSource } from './plugin-runtime.js?v=6b6d620243b7';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=6b6d620243b7';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
@@ -134,6 +134,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     return buildLayoutBoundsElements(tree, lastSnapshot);
   }
   const elementOut = layoutBoundsElementOut;
+  const pageCaller = { id: 'page', name: 'página (MCP)', worker: {}, stats: { queries: 0, logLines: 0, logDropped: 0, droppedMessages: 0 }, lastComposeAt: -Infinity, lastShotAt: -Infinity };
   async function serve(plugin, method, args) {
     if (method === 'screen') return currentScreen();
     if (method === 'layoutBounds') return (await layoutBoundsFor(plugin, { names: args?.names !== false })).map(elementOut);
@@ -160,7 +161,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     plugin.stats.queries++;
     const safeArgs = JSON.parse(JSON.stringify(args ?? {}));
     if (method === 'composeTree') {
-      const key = `composeTree:${safeArgs.maxNodes ?? ''}`;
+      const key = `composeTree:${safeArgs.maxNodes ?? ''}:${(safeArgs.locals ?? []).join(',')}`;
       if (cacheFrame === frame && cache.has(key)) { stats.cacheHits++; return cache.get(key); }
       const wait = plugin.lastComposeAt + COMPOSE_TREE_MS - now();
       if (wait > 0) await new Promise(resolve => setTimer(resolve, wait));
@@ -255,6 +256,8 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     },
     /** Parar on the card: stays stopped until Reiniciar (or the plugin is edited / toggled). */
     stop(id) { const plugin = plugins.get(id); if (!plugin) return; plugin.userStopped = true; stopWorker(plugin); plugin.reason = 'parado no painel'; changed(plugin); },
+    /** A query from the page itself (the MCP bridge, src/mcp-tools.js): the same broker, cache and limits as a plugin's lab.* calls, as a plugin of its own that never stops. */
+    query(method, args = {}) { return serve(pageCaller, String(method), args ?? {}); },
     /** Atualizar on the card: the plugin's lab.on('refresh') handlers run (a plugin that reads on demand recomputes). Returns whether the plugin listens. */
     refresh(id) { const plugin = plugins.get(id); if (!plugin?.worker || !plugin.subs.has('refresh')) return false; send(plugin, { t: 'event', name: 'refresh', data: { at: Date.now() } }); stats.events++; return true; },
     /** Reiniciar: a fresh Worker with empty output (also after an error). */

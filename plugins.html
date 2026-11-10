@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=fa88a5e0684e">
+  <link rel="stylesheet" href="./site-pages.css?v=6b6d620243b7">
 </head>
 <body>
   <header class="topbar">
@@ -32,6 +32,7 @@
         <li><a href="#json">Exportar e importar</a></li>
         <li><a href="#api">A API lab</a></li>
         <li><a href="#estado-global">Estado fora da tela</a></li>
+        <li><a href="#mcp">MCP (Claude)</a></li>
         <li><a href="#valores">Valores e handles</a></li>
         <li><a href="#custos">Custos e limites</a></li>
         <li><a href="#nao-permitido">O que não é permitido</a></li>
@@ -56,6 +57,7 @@
             <li><a href="#json">Exportar e importar</a></li>
             <li><a href="#api">A API lab</a></li>
             <li><a href="#estado-global">Estado fora da tela</a></li>
+            <li><a href="#mcp">MCP (Claude)</a></li>
             <li><a href="#valores">Valores e handles</a></li>
             <li><a href="#custos">Custos e limites</a></li>
             <li><a href="#nao-permitido">O que não é permitido</a></li>
@@ -156,7 +158,7 @@
             <tr><td><code>await lab.screen()</code></td><td>A tela atual, no mesmo formato do evento, sem trabalho na VM. <code>screen.ready</code> é a “Tela pronta”: <code>{ ready, activity, readySince, waitingFor, fragments }</code>. Fica pronta quando a Activity está em onResume com o primeiro quadro desenhado, os fragments em RESUMED, e não há quadro, layout, mensagem da thread principal nem requisição de rede pendente por 300 ms.</td></tr>
             <tr><td><code>lab.on('ready', fn)</code></td><td>Chama <code>fn(tela)</code> cada vez que a tela fica pronta: uma Activity nova, um Recriar/Reabrir, uma navegação que assenta. Uma tela que anima sem parar (spinner, cursor piscando) não fica pronta; <code>waitingFor</code> diz por quê.</td></tr>
             <tr><td><code>await lab.waitReady({ timeoutMs })</code></td><td>Espera a tela ficar pronta (15 s por padrão); erro com <code>code: 'timeout'</code> e o motivo. Use antes de <code>lab.screenshot()</code>.</td></tr>
-            <tr><td><code>await lab.composeTree({ maxNodes })</code></td><td>A árvore de layout do Compose: <code>{ owners: [{ nodes: [{ id, handle, parentId, depth, name, bounds, texts, editableText, role, testTag, actions, … }] }], totalNodes, truncated }</code>. Custa dezenas de milissegundos na VM: no máximo uma por segundo por plugin.</td></tr>
+            <tr><td><code>await lab.composeTree({ maxNodes, locals })</code></td><td>A árvore de layout do Compose: <code>{ owners: [{ nodes: [{ id, handle, parentId, depth, name, bounds, texts, editableText, role, testTag, actions, … }] }], totalNodes, truncated }</code>. Custa dezenas de milissegundos na VM: no máximo uma por segundo por plugin.</td> Com <code>locals: ['LocalContentColor', 'LocalMeuTema']</code>, cada nó traz <code>locals.LocalX</code>: o valor que aquele composable vê, para diferenciar componentes por um Local numa chamada só.</tr>
             <tr><td><code>await lab.layoutBounds({ names })</code></td><td>As caixas que “Mostrar limites de layout” desenha (Views e nós semânticos do Compose), como no painel Compose: <code>[{ key, kind, name, nameSource, bounds, size, texts, editableText, role, testTag, contentDescriptions, actions, modifiers, measurePolicy, type, hasImage }]</code>, com <code>bounds</code> em pixels da janela. Os nomes vêm de uma <code>composeTree</code> (mesmo limite de uma por segundo); <code>names: false</code> não consulta a VM.</td></tr>
             <tr><td><code>await lab.screenshot({ key | bounds | element | node, maxWidth, type })</code></td><td>Imagem da tela inteira, ou de uma caixa (<code>key</code> de <code>layoutBounds</code>), cortada do quadro que a página mostra, sem trabalho na VM: <code>{ blob, width, height, type, notes }</code>. Padrões: <code>maxWidth</code> 1080, <code>type</code> <code>'image/png'</code>. No máximo uma a cada 500 ms por plugin. Views que a página desenha com elementos próprios (widgets XML simples) não têm raster: ficam de fora da tela inteira (<code>notes</code> diz quantas) e a caixa delas responde <code>no-image</code>.</td> Para recortar qualquer componente: <code>bounds</code> com um retângulo na janela, <code>element</code> com um item de <code>lab.layoutBounds()</code> ou <code>node</code> com um nó de <code>lab.composeTree()</code> (usa o <code>boundsInWindow</code> dele); o recorte vem de todos os rasters sob a área, na resolução deles.</tr>
             <tr><td><code>await lab.viewModels()</code></td><td>Os ViewModels da tela: da Activity, dos fragments na tela e os guardados pelas entradas da pilha do Navigation. <code>[{ handle, className, key, library, owner: { kind, label, className, handle } }]</code>.</td></tr>
@@ -223,6 +225,31 @@ if (no) lab.ui.kv((await lab.compositionLocals(no.handle, { only: ['LocalContent
 lab.watch({ static: 'com.exemplo.Sessao' }, 'atual.usuario', v =&gt; lab.ui.json(v, { id: 'sessao' }));</code></pre>
         <p><b>O que não dá para fazer:</b> chamar métodos, como <code>escopo.get&lt;Tipo&gt;()</code>. Uma consulta lê os campos que o objeto já tem; um objeto que o app ainda não criou não existe para a consulta, e uma classe que o app ainda não inicializou mostra só os nomes dos campos. Uma referência fraca (<code>WeakReference</code>) mostra o objeto enquanto ele existir: <code>caminho.get</code> ou <code>caminho.value</code>.</p>
         <p><b>Custo:</b> <code>statics</code>, <code>staticField</code> e <code>classes</code> custam como <code>field</code>. <code>instances</code> e <code>referrers</code> varrem o heap em páginas de no máximo 40 ms, uma por consulta, e o plugin junta as páginas sozinho; num app grande a resposta pode levar algumas centenas de milissegundos sem travar a tela. Use-as para descobrir o caminho e depois troque por <code>staticField</code> ou <code>field</code> no <code>watch</code>.</p>
+      </section>
+
+      <section id="mcp" aria-labelledby="h-mcp">
+        <h2 id="h-mcp">MCP: o Claude usando esta página</h2>
+        <p>Um cliente MCP (Claude Code, Claude Desktop) pode usar a página do lab aberta no seu navegador: tirar print da tela ou de um componente, ler a saída dos plugins, a árvore do Compose com os CompositionLocals de cada composable, ViewModels e estado estático, o Logcat e a rede. Uma página web não aceita conexões, então uma ponte pequena roda no seu computador entre os dois:</p>
+        <pre><code>cliente MCP  --stdio-->  lab-mcp.mjs (127.0.0.1:8790)  <--  esta página (Controles › MCP › Conectar)</code></pre>
+        <ol>
+          <li><b>Baixe a ponte</b> (Node.js 22 ou mais novo, sem dependências): <code>curl -O https://madmax-dev-br.github.io/apk-browser-lab-site/tools/lab-mcp.mjs</code></li>
+          <li><b>Registre no cliente.</b> Claude Code: <code>claude mcp add apk-web-lab -- node /caminho/lab-mcp.mjs</code>. Claude Desktop, em <code>claude_desktop_config.json</code>: <code>{ "mcpServers": { "apk-web-lab": { "command": "node", "args": ["/caminho/lab-mcp.mjs"] } } }</code>. O cliente inicia a ponte sozinho.</li>
+          <li><b>Pareie a página:</b> no terminal, <code>node lab-mcp.mjs token</code> mostra o token (guardado em <code>~/.apk-web-lab-mcp-token</code>). Cole em <b>Controles › MCP › Token</b> e clique em <b>Conectar</b>. O navegador pode pedir permissão para a página acessar a rede local: permita.</li>
+          <li><b>Peça ao Claude:</b> “tire um print do botão Salvar”, “qual LocalContentColor cada texto da tela recebe?”, “o que o plugin X está mostrando?”, “quais requisições falharam?”.</li>
+        </ol>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Ferramenta</th><th scope="col">O que faz</th></tr></thead>
+          <tbody>
+            <tr><td><code>lab_status</code>, <code>wait_ready</code></td><td>A tela atual e a “Tela pronta”; espera a tela assentar.</td></tr>
+            <tr><td><code>screenshot</code></td><td>Imagem da tela, ou de um componente por <code>test_tag</code>, por texto visível, pela chave de <code>layout_bounds</code> ou por um retângulo; opcional <code>wait_ready</code>.</td></tr>
+            <tr><td><code>layout_bounds</code>, <code>compose_tree</code></td><td>Os componentes com limites, nomes, textos e ações; <code>compose_tree</code> aceita <code>locals</code> para anexar CompositionLocals a cada nó.</td></tr>
+            <tr><td><code>composition_locals</code>, <code>find_composition_local</code></td><td>Os Locals de um componente; onde um Local é fornecido na tela, por valor.</td></tr>
+            <tr><td><code>view_models</code>, <code>inspect</code>, <code>field</code>, <code>statics</code>, <code>static_field</code>, <code>classes</code>, <code>instances</code>, <code>referrers</code></td><td>As mesmas leituras somente leitura dos plugins.</td></tr>
+            <tr><td><code>plugins</code></td><td>A saída de cada plugin (texto, tabelas, JSON, imagens), estado e erros.</td></tr>
+            <tr><td><code>logcat</code>, <code>network</code></td><td>Logcat (coletado enquanto o MCP está conectado) e o log de rede, com filtros.</td></tr>
+          </tbody>
+        </table></div>
+        <p><b>Segurança:</b> a ponte escuta só em 127.0.0.1, aceita só as origens do lab (esta página e uma cópia local; outras com <code>--origin</code>) e exige o token; não guarda nada. Tudo é leitura: o MCP não muda o app. Mantenha a aba do lab visível enquanto usa (abas em segundo plano ficam lentas). Opções: <code>--port</code>, <code>--origin</code>, <code>--token</code>, <code>--timeout-ms</code>.</p>
       </section>
 
       <section id="valores" aria-labelledby="h-valores">
@@ -372,6 +399,6 @@ await mostrar();</code></pre></div>
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./arquitetura.html">Arquitetura da VM</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=fa88a5e0684e"></script>
+  <script type="module" src="./site-pages.js?v=6b6d620243b7"></script>
 </body>
 </html>

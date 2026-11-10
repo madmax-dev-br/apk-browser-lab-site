@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=fa88a5e0684e">
-  <meta name="apk-browser-build" content="fa88a5e0684e">
+  <link rel="stylesheet" href="./styles.css?v=6b6d620243b7">
+  <meta name="apk-browser-build" content="6b6d620243b7">
 </head>
 <body>
   <header class="topbar">
@@ -159,6 +159,14 @@
               <p id="pl-status" class="cp-note" role="status" aria-live="polite">Nenhum plugin.</p>
               <div class="em-actions"><label class="pl-template-label" for="pl-template"><span class="sr-only">Modelo</span><select id="pl-template" aria-label="Modelo do novo plugin"></select></label><button id="pl-add" class="cp-button" type="button">+ Adicionar</button><button id="pl-export" class="cp-button" type="button" disabled>Exportar</button><button id="pl-import" class="cp-button" type="button">Importar</button><input id="pl-import-file" type="file" accept="application/json,.json" hidden></div>
             </div></details>
+          <details class="cp-group" id="cp-sec-mcp" data-section="mcp">
+              <summary><h3 id="cp-mcp-title">MCP</h3><span id="mcp-summary" class="cp-badge">desligado</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p class="cp-note">Conecta esta página a um cliente MCP (Claude Desktop, Claude Code): ele pode tirar print da tela ou de um componente, ler a saída dos plugins, a árvore do Compose, os CompositionLocals, os ViewModels, o Logcat e a rede do app aberto aqui. Rode a ponte <a href="tools/lab-mcp.mjs" download>lab-mcp.mjs</a> no seu computador (veja <a href="plugins.html#mcp">como configurar</a>).</p>
+              <label class="cp-field" for="mcp-url"><span>Endereço da ponte<small>a ponte escuta só em 127.0.0.1; porta padrão 8790</small></span><input id="mcp-url" type="url" value="http://127.0.0.1:8790" autocomplete="off" spellcheck="false"></label>
+              <label class="cp-field" for="mcp-token"><span>Token<small>no terminal: node lab-mcp.mjs token</small></span><input id="mcp-token" type="password" autocomplete="off" spellcheck="false"></label>
+              <div class="em-actions"><button id="mcp-connect" type="button" class="cp-button primary">Conectar</button></div>
+              <p id="mcp-status" class="cp-note" role="status" aria-live="polite">Desconectado.</p>
+            </div></details>
           </details>
         </section>
       </aside>
@@ -214,7 +222,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=fa88a5e0684e"></script>
+  <script type="module" src="./app.js?v=6b6d620243b7"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>

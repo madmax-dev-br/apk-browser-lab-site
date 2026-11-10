@@ -15,7 +15,7 @@
 //   ConcurrentHashMap, the Collections wrappers), androidx ArrayMap / SimpleArrayMap, Kotlin's empty collections and ArrayDeque, Compose's persistent vectors, and the
 //   observable holders shown as their current value: kotlinx StateFlowImpl (`_state`), androidx LiveData (`mData`, `mVersion`), Compose snapshot state (the newest valid
 //   StateRecord of `next`: SnapshotMutableState, the Int/Long/Float/Double states, SnapshotStateList), and the java.util.concurrent atomics.
-import { isFreedId } from './heap-gc.js?v=fa88a5e0684e';
+import { isFreedId } from './heap-gc.js?v=6b6d620243b7';
 
 export const QUERY_LIMITS = { depth: 2, maxDepth: 6, maxFields: 200, maxFieldsLimit: 2000, maxItems: 20, maxItemsLimit: 500, maxString: 1000, maxStringLimit: 20000, maxNodes: 4000, budgetMs: 25 };
 const VIEW_MODEL_STORE = 'Landroidx/lifecycle/ViewModelStore;', VIEW_MODEL = 'Landroidx/lifecycle/ViewModel;';
@@ -704,6 +704,31 @@ export function findCompositionLocal(runtime, reader, match, { options = {}, lim
   const out = [...groups.values()].map(({ item, nodes: count, node }) => ({ name: item.name, declaredIn: item.declaredIn, kind: item.local.kind, valueType: item.valueType, value: item.value, nodes: count, node, key: handleOf(runtime, item.key.ref), ...(item.local.note ? { note: item.local.note } : {}) }));
   out.sort((a, b) => a.name.localeCompare(b.name) || b.nodes - a.nodes);
   return { matches: out, scannedNodes: nodes, maps: seenMaps.size, done: result.next === null, ...(result.next !== null ? { note: `varredura parou no limite de ${budget} ms: aumente budgetMs` } : {}) };
+}
+
+/** composeTree({ locals: ['LocalX', ...] }): each node of the tree gets `locals: { LocalX: value }`, what LocalX.current answers in that composable, so components can be
+ * told apart by a Local. Siblings share one map: each map is decoded once. Locals not provided on the way to a node are absent (they have their default there). */
+export function attachCompositionLocals(runtime, tree, only, { options = {} } = {}) {
+  const reader = createHeapReader(runtime), matches = localMatcher(only), view = { depth: 1, ...options }, byMap = new Map(); let nodes = 0;
+  for (const owner of tree?.owners ?? []) for (const node of owner.nodes ?? []) {
+    if (!node.handle) continue;
+    let rec; try { rec = liveRecord(runtime, node.handle); } catch { continue; }
+    const mapRef = compositionLocalMapOf(runtime, reader, rec); if (!mapRef) continue;
+    let values = byMap.get(mapRef.ref);
+    if (!values) {
+      values = {}; const decoded = reader.mapEntries(reader.record(mapRef.ref) ?? {}, 1000);
+      for (const [key, holderRef] of decoded?.entries ?? []) {
+        if (!isRef(key)) continue; const known = localName(runtime, reader, key), keyRec = reader.record(key.ref);
+        const name = known?.name ?? `${typeName(keyRec?.type ?? 'Ljava/lang/Object;').split('.').pop()}#${key.ref}`, local = unwrapLocal(reader, holderRef), valueType = reader.typeOfValue(local.raw) ? typeName(reader.typeOfValue(local.raw)) : null;
+        if (!matches({ name, declaredIn: known?.declaredIn ?? null, valueType }) || name in values) continue;
+        values[name] = local.kind === 'computed' ? { $computed: true } : reader.view(local.raw, local.rawType, view).value;
+      }
+      byMap.set(mapRef.ref, values);
+    }
+    node.locals = values; nodes++;
+  }
+  tree.localsRequested = Array.isArray(only) ? only : [only]; tree.localsMaps = byMap.size; tree.localsNodes = nodes;
+  return tree;
 }
 
 /** Compose layout tree of src/compose-inspector.js reduced to what a plugin needs (no thumbnails, no modifiers list). */

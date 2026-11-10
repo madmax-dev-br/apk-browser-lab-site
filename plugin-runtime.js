@@ -131,7 +131,7 @@ export function pluginWorkerMain(scope) {
       const until = Date.now() + Math.max(100, Number(options?.timeoutMs) || 15000);
       for (;;) { const screen = await lab.screen(); if (screen?.ready?.ready) return screen; if (Date.now() >= until) throw Object.assign(new Error(`A tela não ficou pronta: ${(screen?.ready?.waitingFor ?? ['sem informação']).join('; ')}`), { code: 'timeout', screen }); await new Promise(resolve => setTimeout(resolve, 100)); }
     },
-    composeTree: (options = {}) => call('composeTree', { maxNodes: options?.maxNodes }),
+    composeTree: (options = {}) => call('composeTree', { maxNodes: options?.maxNodes, locals: Array.isArray(options?.locals) ? options.locals.map(String) : options?.locals ? [String(options.locals)] : undefined }),
     layoutBounds: (options = {}) => call('layoutBounds', { names: options?.names !== false }),
     screenshot: (options = {}) => {
       // bounds: a rectangle, a layoutBounds element ({ bounds }) or a composeTree node ({ boundsInWindow }); key: a layoutBounds element by its key
