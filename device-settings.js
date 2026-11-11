@@ -1,10 +1,10 @@
-import { coreMemorySetting } from './core-memory.js?v=6e726a8066c8';
-import { isMemoryStep } from './memory-budget.js?v=6e726a8066c8';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=6e726a8066c8';
-import { sanitizeHostMap } from './host-map.js?v=6e726a8066c8';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=6e726a8066c8';
-import { sanitizeLocation } from './runtime-permissions.js?v=6e726a8066c8';
-import { sanitizeRenderer } from './gpu-raster.js?v=6e726a8066c8';
+import { coreMemorySetting } from './core-memory.js?v=b8911598aecd';
+import { isMemoryStep } from './memory-budget.js?v=b8911598aecd';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=b8911598aecd';
+import { sanitizeHostMap } from './host-map.js?v=b8911598aecd';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=b8911598aecd';
+import { sanitizeLocation } from './runtime-permissions.js?v=b8911598aecd';
+import { sanitizeRenderer } from './gpu-raster.js?v=b8911598aecd';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -21,8 +21,9 @@ export function sanitizeProxyUrl(value) {
   try { const url = new URL(value.trim().replace('{url}', 'TARGET')); const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname); if (url.protocol === 'https:' || (url.protocol === 'http:' && loopback)) return value.trim(); } catch { /* not a URL */ }
   return '';
 }
-// The engine a load uses when nothing names one. scripts/build-web.mjs rewrites the next line for APKWEB_DEFAULT_ENGINE=wasm: a build whose default is the experimental WebAssembly core.
-export const DEFAULT_ENGINE = 'js';
+// The engine a load uses when nothing names one: the WebAssembly core. `?engine=js` (the page) and `engine: 'js'` (the player) select the JavaScript VM;
+// scripts/build-web.mjs rewrites the next line for APKWEB_DEFAULT_ENGINE=js: a build whose default is the JavaScript VM.
+export const DEFAULT_ENGINE = 'wasm';
 export function sanitizeSettings(input = {}) {
   const out = { ...DEFAULT_DEVICE, battery: { ...DEFAULT_DEVICE.battery }, network: { allowedHosts: [], proxyUrl: '', hostMap: [] }, memoryMiB: 0, eventSeconds: 0, location: sanitizeLocation(null) };   // memoryMiB: Java heap budget of the VM in MiB, 0 = automatic; applies at the next load
   if (input.network && typeof input.network === 'object') { out.network.allowedHosts = sanitizeHosts(input.network.allowedHosts); out.network.proxyUrl = sanitizeProxyUrl(input.network.proxyUrl); out.network.hostMap = sanitizeHostMap(input.network.hostMap); }
@@ -38,7 +39,7 @@ export function sanitizeSettings(input = {}) {
   out.location = sanitizeLocation(input.location);   // simulated device location ("Permissões" section): page-only, sent to the VM through the permission channel, never as part of the device model
   out.raster = { motionScale: [1, 0.75, 0.5, 0.35, 0.25].includes(Number(input.raster?.motionScale)) ? Number(input.raster.motionScale) : 0.5, navigation: input.raster?.navigation !== false };   // "Resolução no movimento" / "Tela nova em baixa resolução" (src/motion-raster.js MOTION_SCALE_STEPS)
   out.renderer = sanitizeRenderer(input.renderer);   // "Renderização": 'cpu' (default) or 'gpu' (experimental, src/gpu-raster.js); applied live, never part of the device model the app sees
-  out.engine = input.engine === 'wasm' || input.engine === 'js' ? input.engine : DEFAULT_ENGINE;   // the VM engine: 'js' (default) or 'wasm' (experimental core, docs/WASM-CORE-PLANO.md); applies at the next load, never part of the device model the app sees
+  out.engine = input.engine === 'wasm' || input.engine === 'js' ? input.engine : DEFAULT_ENGINE;   // the VM engine: 'wasm' (default: the WebAssembly core, docs/WASM-CORE-PLANO.md) or 'js' (the JavaScript VM); applies at the next load, never part of the device model the app sees
   out.coreMemory = coreMemorySetting(input.coreMemory);   // "Memória do núcleo Wasm" { heapMiB, metaMiB, threads } (src/core-memory.js): the sizes of the WebAssembly core's memory; applies at the next load, only with engine 'wasm', never part of the device model the app sees
   out.layoutBounds = input.layoutBounds === true;   // page-only developer option ("Mostrar limites de layout"); the VM never sees it
   if (typeof input.locale === 'string' && /^[a-z]{2}-[A-Z]{2}$/.test(input.locale)) out.locale = input.locale;

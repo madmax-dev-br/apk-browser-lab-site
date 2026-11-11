@@ -1,11 +1,11 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=6e726a8066c8';
-import { staticRetentionLines } from './heap-gc.js?v=6e726a8066c8';
-import { overrideSummaryLines } from './method-overrides.js?v=6e726a8066c8';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=6e726a8066c8';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=6e726a8066c8';
-import { hostMapSummaryLines } from './host-map.js?v=6e726a8066c8';
+import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=b8911598aecd';
+import { staticRetentionLines } from './heap-gc.js?v=b8911598aecd';
+import { overrideSummaryLines } from './method-overrides.js?v=b8911598aecd';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=b8911598aecd';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=b8911598aecd';
+import { hostMapSummaryLines } from './host-map.js?v=b8911598aecd';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -40,6 +40,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     const frames = lines.slice(1).filter(line => /\bat\b/.test(line)).slice(0, 3).map(line => line.trim().replace(/file:\/\/\/[^ )]*\//g, '').replace(/^at /, ''));
     if (frames.length) out.push(`  em: ${frames.join(' ← ')}`);
   });
+  part(() => { if (runtime.loadTiming) out.push(loadTimingText(runtime.loadTiming)); });   // where the time of the load went, by phase
   part(() => {   // (a) memory
     if (runtime.engine === 'wasm' && runtime.wasm) {   // the core's heap is counted in bytes, not in records of the JavaScript VM
       const m = runtime.wasm.memoryInfo();

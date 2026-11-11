@@ -1,10 +1,10 @@
 // Versioned host <-> frame message schema and the <apk-player> configuration model. No DOM: shared by the host script, the frame and the tests.
-import { checkCoreMemory } from '../core-memory.js?v=6e726a8066c8';
-import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=6e726a8066c8';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=6e726a8066c8';
-import { parseRule } from '../host-map.js?v=6e726a8066c8';
-import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=6e726a8066c8';
-import { isMemoryStep } from '../memory-budget.js?v=6e726a8066c8';
+import { checkCoreMemory } from '../core-memory.js?v=b8911598aecd';
+import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=b8911598aecd';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=b8911598aecd';
+import { parseRule } from '../host-map.js?v=b8911598aecd';
+import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=b8911598aecd';
+import { isMemoryStep } from '../memory-budget.js?v=b8911598aecd';
 export const PROTOCOL = 'apk-player';
 /** Envelope version: every message carries it; a frame or host of another version is refused. Unchanged since the first release, so old hosts keep working. */
 export const VERSION = 1;
@@ -77,7 +77,7 @@ export function parseLabValue(key, raw) {
     case 'permissionDialog': return PERMISSION_DIALOG.includes(raw) ? raw : undefined;
     case 'renderer': return raw === 'cpu' || raw === 'gpu' ? raw : undefined;   // 'cpu' (default) or 'gpu' (experimental WebGL replay in the Worker, src/gpu-raster.js); applied live
     case 'coreMemory': { if (!raw || typeof raw !== 'object') return undefined; const checked = checkCoreMemory(raw); return checked.error ? undefined : checked.value; }   // { heapMiB, metaMiB, threads }: the sizes of the WebAssembly core's memory (src/core-memory.js); only with engine 'wasm', applies at the next launch
-    case 'engine': return raw === 'js' || raw === 'wasm' ? raw : undefined;   // 'js' (default) or 'wasm' (experimental: the Java heap, frames and interpreter in vmcore/core.wasm, docs/WASM-CORE-PLANO.md); applies at the next launch
+    case 'engine': return raw === 'js' || raw === 'wasm' ? raw : undefined;   // 'wasm' (default: the Java heap, frames and interpreter in vmcore/core.wasm, docs/WASM-CORE-PLANO.md) or 'js' (the JavaScript VM); applies at the next launch
     case 'hostMap': {   // [{ from, to, enabled }] or, as an attribute, "api.example.com -> localhost:8080, *.cdn.example.com -> 127.0.0.1:9000"
       const list = typeof raw === 'string' ? raw.split(/[,;\n]+/).map(item => item.trim()).filter(Boolean).map(item => { const at = item.indexOf('->'); return at < 0 ? { from: item, to: '' } : { from: item.slice(0, at).trim(), to: item.slice(at + 2).trim() }; }) : raw;
       if (!Array.isArray(list) || list.length > MAX_HOST_RULES || !list.every(rule => plain(rule) && shortString(rule.from ?? '', 300) !== undefined && shortString(rule.to ?? '', 300) !== undefined && (rule.enabled === undefined || typeof rule.enabled === 'boolean'))) return undefined;
