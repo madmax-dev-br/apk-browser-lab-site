@@ -59,19 +59,19 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=0f9135b5c65a';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=0f9135b5c65a';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=0f9135b5c65a';
-import { HandleTable } from './handles.js?v=0f9135b5c65a';
-import { Exceptions } from './exceptions.js?v=0f9135b5c65a';
-import { coreImports } from './boundary-imports.js?v=0f9135b5c65a';
-import { installHostLinking, methodReference } from './host-linking.js?v=0f9135b5c65a';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=0f9135b5c65a';
-import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=0f9135b5c65a';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=0f9135b5c65a';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=0f9135b5c65a';
-import { Blocked } from '../../runtime/scheduler.js?v=0f9135b5c65a';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=0f9135b5c65a';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=a9aeb2c97f5b';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=a9aeb2c97f5b';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=a9aeb2c97f5b';
+import { HandleTable } from './handles.js?v=a9aeb2c97f5b';
+import { Exceptions } from './exceptions.js?v=a9aeb2c97f5b';
+import { coreImports } from './boundary-imports.js?v=a9aeb2c97f5b';
+import { installHostLinking, methodReference } from './host-linking.js?v=a9aeb2c97f5b';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=a9aeb2c97f5b';
+import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=a9aeb2c97f5b';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=a9aeb2c97f5b';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=a9aeb2c97f5b';
+import { Blocked } from '../../runtime/scheduler.js?v=a9aeb2c97f5b';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=a9aeb2c97f5b';
 
 const MiB = 1 << 20;
 /** Memory map (bytes): low memory is the module's data; metaspace; the Thread records with their Java and native stacks; the collected heap. */
@@ -101,21 +101,22 @@ export class CoreStop extends APKError {
 /**
  * Attaches core.wasm to `runtime` (an APKRuntime created with engine 'wasm' that has run nothing yet). `module`: the compiled core.wasm (WebAssembly.Module). `pages`: memory
  * in 64 KiB pages (the heap is everything above LAYOUT.HEAP). `stress`: a collection before every allocation of the core; `stressHost`: one before every host allocation too.
+ * `shared`: false for an unshared memory (one Worker, green threads: the page; `module` is then compiled from unsharedCore's bytes).
  * `trigger`: a fixed pacing threshold in bytes. `maxDepth`: Thread.maxDepth. Returns the engine (also runtime.wasm, not enumerable).
  */
-export async function attachWasmEngine(runtime, { module, pages = 8192, stress = false, stressHost = false, trigger, maxDepth = (runtime.maxCallDepth ?? 2048) - 1, natives = CORE_NATIVES } = {}) {   // maxDepth: the JavaScript VM's maxCallDepth counts the frames below the call it refuses
+export async function attachWasmEngine(runtime, { module, shared = true, pages = 8192, stress = false, stressHost = false, trigger, maxDepth = (runtime.maxCallDepth ?? 2048) - 1, natives = CORE_NATIVES } = {}) {   // maxDepth: the JavaScript VM's maxCallDepth counts the frames below the call it refuses
   if (runtime.engine !== 'wasm') throw new Error(`vmcore: attachWasmEngine needs a runtime created with engine 'wasm' (this one has '${runtime.engine}')`);
   if (runtime.wasm) throw new Error('vmcore: a core is attached to this runtime already');
   if (runtime.heap.size !== 0) throw new Error(`vmcore: the runtime already has ${runtime.heap.size} objects on the JavaScript heap; attach the core before anything runs`);
-  const engine = new WasmEngine(runtime, { pages, stress, stressHost, trigger, maxDepth, natives });
+  const engine = new WasmEngine(runtime, { shared, pages, stress, stressHost, trigger, maxDepth, natives });
   await engine.instantiate(module);
   return engine;
 }
 
 export class WasmEngine {
-  constructor(runtime, { pages, stress, stressHost, trigger, maxDepth, natives }) {
+  constructor(runtime, { shared = true, pages, stress, stressHost, trigger, maxDepth, natives }) {
     this.runtime = runtime; this.stressHost = stressHost; this.fixedTrigger = trigger;
-    this.memory = new WebAssembly.Memory({ initial: Math.min(pages, 2048), maximum: 32768, shared: true }); if (pages > 2048) this.memory.grow(pages - 2048);
+    this.memory = new WebAssembly.Memory({ initial: Math.min(pages, 2048), maximum: 32768, shared });   // `shared: false` needs the module of vmcore/js/unshared.js; the memory only grows here, before any view of it exists if (pages > 2048) this.memory.grow(pages - 2048);
     this.pages = pages; this.maxDepth = maxDepth; this.stress = stress;
     this.linker = new Linker(runtime, { memory: this.memory, metaStart: LAYOUT.META, metaEnd: LAYOUT.META_END, natives });
     this.exceptions = new Exceptions(this.linker);
@@ -785,6 +786,8 @@ export class WasmEngine {
     this.lastCollection = { reason, live: this.r32(h + GC.liveObjects), freed: this.r32(h + GC.freedObjects), badRefs: this.r32(h + GC.badRefs), roots: addresses.size, markMs: t1 - t0, sweepMs: t2 - t1 };
     return this.lastCollection;
   }
+  /** The core's heap for reports: its size in bytes, what the last collection left alive, how many collections ran, and how many objects the hosts hold a handle of. */
+  memoryInfo() { const h = this.h; return { heapBytes: this.r32(h + GC.end) - this.r32(h + GC.base), liveBytes: this.stats.collections ? this.r32(h + GC.liveBytes) : null, liveObjects: this.stats.collections ? this.r32(h + GC.liveObjects) : null, collections: this.stats.collections, handles: Number(this.runtime.heap?.size ?? 0) }; }
   /** Drops the pins of top-level host code (between top-level calls of a test or a driver that keeps nothing in JavaScript locals). */
   unpinTopLevel() { if (this.hostDepth === 0) this.pins.length = 0; }
   /** 0, or the number of the first broken heap invariant (gc_verify). */

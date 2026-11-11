@@ -7,7 +7,7 @@
 // and all of that held for READY_QUIET_MS (a short quiet period, so a response that triggers the next request or a postDelayed of a few frames is not "ready" in between).
 // A screen that keeps animating forever (a progress spinner, a blinking cursor of a focused field) never becomes ready: `waitingFor` names why. The Worker attaches the result
 // to every snapshot (snapshot.screenReady) and wakes once the quiet period ends so the flip to ready is posted even when nothing else happens. DOM-free, no process.*.
-import { runPluginQuery } from './plugin-queries.js?v=0f9135b5c65a';
+import { runPluginQuery } from './plugin-queries.js?v=a9aeb2c97f5b';
 
 export const READY_QUIET_MS = 300;
 const FRAGMENT_RESUMED = 7;   // androidx.fragment.app.Fragment.RESUMED (INITIALIZING -1 … AWAITING_ENTER_EFFECTS 6, RESUMED 7)

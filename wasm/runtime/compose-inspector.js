@@ -7,7 +7,7 @@
 // asked for it (Layout Inspector's inspection tables, ComposerImpl.collectParameterInformation). The root composition's slot table is read through its public tooling API
 // (CompositionData / CompositionGroup.getSourceInfo / getNode); when it carries "C(Name)" markers the LayoutNode gets that name (source 'composable'). Otherwise the name is
 // built from what the node really has: the semantics Role, an editable text, the semantics text, and the measure policy class (source 'semantics' or 'layout'). Never invented.
-import { createComposeSemanticsDriver } from './compose-semantics.js?v=0f9135b5c65a';
+import { createComposeSemanticsDriver } from './compose-semantics.js?v=a9aeb2c97f5b';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;', NODE = 'Landroidx/compose/ui/node/LayoutNode;';
 const COORDS = 'Landroidx/compose/ui/layout/LayoutCoordinates;', COORDS_KT = 'Landroidx/compose/ui/layout/LayoutCoordinatesKt;', RECT = 'Landroidx/compose/ui/geometry/Rect;';

@@ -1,11 +1,11 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=0f9135b5c65a';
-import { staticRetentionLines } from './heap-gc.js?v=0f9135b5c65a';
-import { overrideSummaryLines } from './method-overrides.js?v=0f9135b5c65a';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=0f9135b5c65a';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=0f9135b5c65a';
-import { hostMapSummaryLines } from './host-map.js?v=0f9135b5c65a';
+import { TimeBreakdown } from './time-breakdown.js?v=a9aeb2c97f5b';
+import { staticRetentionLines } from './heap-gc.js?v=a9aeb2c97f5b';
+import { overrideSummaryLines } from './method-overrides.js?v=a9aeb2c97f5b';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=a9aeb2c97f5b';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=a9aeb2c97f5b';
+import { hostMapSummaryLines } from './host-map.js?v=a9aeb2c97f5b';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -41,6 +41,11 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     if (frames.length) out.push(`  em: ${frames.join(' ← ')}`);
   });
   part(() => {   // (a) memory
+    if (runtime.engine === 'wasm' && runtime.wasm) {   // the core's heap is counted in bytes, not in records of the JavaScript VM
+      const m = runtime.wasm.memoryInfo();
+      out.push(`Memória (núcleo Wasm): heap de ${Math.round(m.heapBytes / MiB)} MiB; ${m.handles} objetos com handle no host; ${m.collections ? `${m.collections} coletas, a última deixou ${m.liveObjects} objetos vivos (~${Math.round(m.liveBytes / MiB)} MiB)` : 'nenhuma coleta ainda'}`);
+      return;
+    }
     const live = runtime.heap.size, limit = runtime.maxHeapObjects, last = runtime.gcPhases?.[0];
     out.push(`Memória: ${live} de ${limit} objetos vivos (${Math.round(100 * live / limit)}%), ~${Math.round(live * BYTES_PER_OBJECT / MiB)} MiB estimados; ${last ? `última coleta liberou ${last.before - last.after} (${last.before} → ${last.after}); ${runtime.gcStats?.collections ?? 0} coletas` : 'nenhuma coleta ainda'}${runtime.gcDeferralStats ? `, ${runtime.gcDeferralStats.episodes} adiadas durante movimento (${runtime.gcDeferralStats.idle} em repouso, ${runtime.gcDeferralStats.forced} forçadas pelo teto)` : ''}${runtime.oomCount ? `; OutOfMemoryError ${runtime.oomCount}×` : ''}`);
   });
