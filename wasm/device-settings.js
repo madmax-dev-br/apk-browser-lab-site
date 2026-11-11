@@ -1,10 +1,10 @@
-import { coreMemorySetting } from './core-memory.js?v=b8911598aecd';
-import { isMemoryStep } from './memory-budget.js?v=b8911598aecd';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=b8911598aecd';
-import { sanitizeHostMap } from './host-map.js?v=b8911598aecd';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=b8911598aecd';
-import { sanitizeLocation } from './runtime-permissions.js?v=b8911598aecd';
-import { sanitizeRenderer } from './gpu-raster.js?v=b8911598aecd';
+import { coreMemorySetting } from './core-memory.js?v=5ce2bd9b7452';
+import { isMemoryStep } from './memory-budget.js?v=5ce2bd9b7452';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=5ce2bd9b7452';
+import { sanitizeHostMap } from './host-map.js?v=5ce2bd9b7452';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=5ce2bd9b7452';
+import { sanitizeLocation } from './runtime-permissions.js?v=5ce2bd9b7452';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=5ce2bd9b7452';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -38,7 +38,7 @@ export function sanitizeSettings(input = {}) {
   if (typeof input.hour24 === 'boolean') out.hour24 = input.hour24;
   out.location = sanitizeLocation(input.location);   // simulated device location ("Permissões" section): page-only, sent to the VM through the permission channel, never as part of the device model
   out.raster = { motionScale: [1, 0.75, 0.5, 0.35, 0.25].includes(Number(input.raster?.motionScale)) ? Number(input.raster.motionScale) : 0.5, navigation: input.raster?.navigation !== false };   // "Resolução no movimento" / "Tela nova em baixa resolução" (src/motion-raster.js MOTION_SCALE_STEPS)
-  out.renderer = sanitizeRenderer(input.renderer);   // "Renderização": 'cpu' (default) or 'gpu' (experimental, src/gpu-raster.js); applied live, never part of the device model the app sees
+  out.renderer = sanitizeRendererSetting(input.renderer);   // "Renderização": 'gpu' (default: WebGL replay in the Worker, src/gpu-raster.js, falling back to CPU by itself) or 'cpu'; applied live, never part of the device model the app sees
   out.engine = input.engine === 'wasm' || input.engine === 'js' ? input.engine : DEFAULT_ENGINE;   // the VM engine: 'wasm' (default: the WebAssembly core, docs/WASM-CORE-PLANO.md) or 'js' (the JavaScript VM); applies at the next load, never part of the device model the app sees
   out.coreMemory = coreMemorySetting(input.coreMemory);   // "Memória do núcleo Wasm" { heapMiB, metaMiB, threads } (src/core-memory.js): the sizes of the WebAssembly core's memory; applies at the next load, only with engine 'wasm', never part of the device model the app sees
   out.layoutBounds = input.layoutBounds === true;   // page-only developer option ("Mostrar limites de layout"); the VM never sees it
@@ -49,15 +49,17 @@ export function sanitizeSettings(input = {}) {
 }
 /** A new user's device reaches every host (allowedHosts = ['*']); sanitizeSettings({}) alone stays the closed policy so embedders that pass no network config keep it. */
 export function defaultDeviceSettings() { return sanitizeSettings({ network: { allowedHosts: ['*'] } }); }
-/** Stored-settings format: 2 since the "allow every host" option became the default; a record without the marker was saved by a page that only knew the closed allow list. */
-export const SETTINGS_VERSION = 2;
+/** Stored-settings format: 2 since the "allow every host" option became the default; a record without the marker was saved by a page that only knew the closed allow list.
+ * 3 since the engine and the renderer are choices of the Execução panel with new defaults (the WebAssembly core, the GPU): an older record held the old defaults, not a choice. */
+export const SETTINGS_VERSION = 3;
 export function loadDeviceSettings() {
   try {
     const text = globalThis.localStorage?.getItem(KEY); if (!text) return defaultDeviceSettings();
     const stored = JSON.parse(text);
     // A record saved before the allow-every-host default (no version marker) with no host of its own keeps that user on the closed policy for good ("16 requests, 16 refused" with the
     // option shown as the default): it takes the default, like a new user; a list the user typed is kept.
-    if (stored && typeof stored === 'object' && !(stored.version >= SETTINGS_VERSION) && !sanitizeHosts(stored.network?.allowedHosts).length) stored.network = { ...(stored.network ?? {}), allowedHosts: ['*'] };
+    if (stored && typeof stored === 'object' && !(stored.version >= 2) && !sanitizeHosts(stored.network?.allowedHosts).length) stored.network = { ...(stored.network ?? {}), allowedHosts: ['*'] };
+    if (stored && typeof stored === 'object' && !(stored.version >= 3)) { delete stored.engine; delete stored.renderer; }   // the old defaults were stored with every record: the new ones apply
     return sanitizeSettings(stored);
   } catch { return defaultDeviceSettings(); }
 }

@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=b8911598aecd">
-  <meta name="apk-browser-build" content="b8911598aecd">
+  <link rel="stylesheet" href="./styles.css?v=5ce2bd9b7452">
+  <meta name="apk-browser-build" content="5ce2bd9b7452">
 </head>
 <body>
   <header class="topbar">
@@ -102,6 +102,8 @@
             </div></details>
             <details class="cp-group" id="cp-sec-run" data-section="run">
               <summary><h3 id="cp-run-title">Execução</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <label class="cp-field" for="vm-engine"><span>Motor da VM <em id="vm-engine-hint" class="vm-memory-hint" role="status" hidden>reabra o APK para aplicar</em><small>Quem executa o código do app; vale quando o APK é aberto de novo</small></span><select id="vm-engine" aria-describedby="vm-engine-note"><option value="wasm">Núcleo WebAssembly (padrão)</option><option value="js">VM JavaScript</option></select></label>
+              <p id="vm-engine-note" class="cp-note" role="status"></p>
               <label class="cp-field" for="vm-memory"><span>Memória da VM <em id="vm-memory-hint" class="vm-memory-hint" role="status" hidden>reabra o APK para aplicar</em><small>Orçamento do heap Java; vale quando o APK é aberto de novo</small></span><select id="vm-memory" aria-describedby="vm-memory-note"></select></label>
               <p id="vm-memory-note" class="cp-note">Este número é o orçamento do heap Java (objetos e arrays da VM; os demais orçamentos crescem junto). O navegador gasta mais que isso: tabelas do DEX, CanvasKit, rasters e um objeto JavaScript por objeto Java. Uma aba acima de ~2–4 GiB pode ser encerrada pelo navegador. O limite do motor é 2 097 152 objetos (4 GiB é limitado a ele).</p>
               <p id="vm-memory-device" class="cp-note"></p>
@@ -114,14 +116,14 @@
                 </div>
                 <p id="vm-core-total" class="cp-note" role="status"></p>
                 <p id="vm-core-usage" class="cp-note" hidden></p>
-                <p id="vm-core-note" class="cp-note">Só vale com o núcleo WebAssembly (o padrão; não com <code>?engine=js</code>), quando o APK é aberto de novo. Heap: objetos e arrays do app. Metaspace: classes e métodos ligados (cresce com o tamanho do app). Threads: quantas threads Java podem estar vivas ao mesmo tempo. Os três dividem uma memória de no máximo 2048 MiB; o resumo do diagnóstico mostra quanto de cada um está em uso.</p>
+                <p id="vm-core-note" class="cp-note">Só vale com o motor "Núcleo WebAssembly" (o padrão), quando o APK é aberto de novo. Heap: objetos e arrays do app. Metaspace: classes e métodos ligados (cresce com o tamanho do app). Threads: quantas threads Java podem estar vivas ao mesmo tempo. Os três dividem uma memória de no máximo 2048 MiB; o resumo do diagnóstico mostra quanto de cada um está em uso.</p>
                 <button id="vm-core-reset" class="cp-button" type="button">Restaurar padrão do núcleo</button>
               </fieldset>
               <label class="cp-field" for="vm-event-time"><span>Tempo máximo por evento<small>Quanto a VM espera um evento terminar antes de encerrá-lo com o relatório; vale na hora</small></span><select id="vm-event-time" aria-describedby="vm-event-note"></select></label>
               <p id="vm-event-note" class="cp-note">A VM roda o código do app muitas vezes mais devagar que um aparelho. Uma inicialização com centenas de threads pode passar dos 25 s padrão sem estar travada: o relatório "Instruction budget exceeded" mostra as threads ainda avançando. Um tempo maior deixa terminar; um laço infinito de verdade continua sendo encerrado com relatório, só que mais tarde.</p>
               <label class="cp-field" for="vm-raster-scale"><span>Resolução no movimento<small>Enquanto a tela se mexe (animação, rolagem, transição), o quadro é desenhado nesta escala e refeito nítido quando para; vale na hora</small></span><select id="vm-raster-scale"><option value="1">100% (sempre nítido)</option><option value="0.75">75%</option><option value="0.5">50% (padrão)</option><option value="0.35">35%</option><option value="0.25">25%</option></select></label>
               <label class="cp-check" for="vm-raster-navigation"><input id="vm-raster-navigation" type="checkbox"><span>Tela nova começa em baixa resolução<small>O primeiro quadro de uma Activity ou janela nova sai na resolução de movimento e é refeito nítido quando a tela para; vale na hora</small></span></label>
-              <label class="cp-field" for="vm-renderer"><span>Renderização<small>Onde o conteúdo das telas (Compose, Canvas) é desenhado. GPU usa WebGL no Worker, é experimental e volta sozinha para CPU se falhar; vale na hora</small></span><select id="vm-renderer" aria-describedby="vm-renderer-status"><option value="cpu">CPU (padrão)</option><option value="gpu">GPU (experimental)</option></select></label>
+              <label class="cp-field" for="vm-renderer"><span>Renderização<small>Onde o conteúdo das telas (Compose, Canvas) é desenhado. GPU usa WebGL no Worker e volta sozinha para CPU se falhar; vale na hora</small></span><select id="vm-renderer" aria-describedby="vm-renderer-status"><option value="gpu">GPU (padrão)</option><option value="cpu">CPU</option></select></label>
               <p id="vm-renderer-status" class="cp-note" role="status">Em uso: CPU</p>
               <label class="cp-field" for="tolerate-missing"><span>Modo tolerante<small>APIs do Android que faltam viram <code>STUB-VOID</code>/<code>STUB-RETURN</code> no log em vez de parar o app</small></span><select id="tolerate-missing"><option value="off">Desligado (estrito)</option><option value="void">Só métodos void</option><option value="primitives" selected>void e primitivos (0, false)</option><option value="all">Todos os tipos (0, false, null)</option></select></label>
               <label class="cp-check" for="strict-crash"><input id="strict-crash" type="checkbox"><span>Modo estrito de falhas<small>Uma exceção fatal em qualquer thread encerra o app (como o Android). Desligado, ela é registrada como <code>FATAL (tolerada)</code> no resumo e só a thread que falhou termina</small></span></label>
@@ -239,7 +241,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=b8911598aecd"></script>
+  <script type="module" src="./app.js?v=5ce2bd9b7452"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>
