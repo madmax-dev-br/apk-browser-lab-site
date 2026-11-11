@@ -29,9 +29,10 @@
 //   - One flag and one set of monitors: Thread.interrupted of a VMThread is the record's word (thr_interrupt also takes the thread out of Object.wait); the runtime's monitor
 //     entry points used by host code (monitorTryEnter, monitorExit, monitorFree, monitorEnter, ownsMonitor) are the core's lock words; a thread that ends wakes whoever waits on
 //     its Thread object (ART's notifyAll at thread exit).
-import { Blocked } from '../../runtime/scheduler.js?v=27ff15f3244d';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=27ff15f3244d';
-import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=27ff15f3244d';
+import { Blocked } from '../../runtime/scheduler.js?v=5be31ba741dc';
+const MAX_LIVE_THREADS = 1000;   // threads.h: tids 1..1022, the collector's thread table holds 1024 (host-bridge.js)
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=5be31ba741dc';
+import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=5be31ba741dc';
 
 export const CORE_STATUS = Object.freeze({ OK: 0, OUT_OF_MEMORY: 5, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81, HOST_THROW: 0x7fff0110 });
 const S = CORE_STATUS;
@@ -88,8 +89,10 @@ export class CoreThreads {
   allocate() {
     let t = this.free.pop();
     if (t === undefined) {
-      if (this.nextGuest >= this.records.guestCount) throw new APKError(`vmcore: ${this.records.guestCount} threads are alive or parked in the core; no Thread record is left for another`, { kind: 'vmcore-threads' });
-      t = this.records.guestBase + this.records.guestSpan * this.nextGuest++;
+      // Past the region reserved for thread records, a record is carved from metaspace (it is recycled like the others); the limit left is the core's thread ids (threads.h THREAD_MAX_TID).
+      if (this.nextGuest >= MAX_LIVE_THREADS) throw new APKError(`vmcore: ${this.nextGuest} threads are alive or parked in the core; no thread id is left for another`, { kind: 'vmcore-threads' });
+      t = this.nextGuest < this.records.guestCount ? this.records.guestBase + this.records.guestSpan * this.nextGuest : this.engine.linker.alloc(this.records.guestSpan, 65536);
+      this.nextGuest++;
       this.engine.initRecord(t, t + this.records.javaStack, t + this.records.guestSpan);
     }
     return t;
@@ -149,7 +152,7 @@ export class CoreThreads {
       if (timedOut && this.u32[(t + T.waitPhase) >> 2] === WAIT_LISTED) x.thr_wait_timeout(t);
       return x.resume(t) >>> 0;
     }
-    return this.pump(thread, () => blocked.finish(timedOut));
+    return this.pump(thread, typeof blocked.coreRetry === 'function' ? blocked.coreRetry : () => blocked.finish(timedOut));
   }
   /**
    * The host steps of `thread`, as the JavaScript interpreter's pump takes them (interpreter.js pump): nothing here nests a run on the JavaScript stack, so the thread can park,
