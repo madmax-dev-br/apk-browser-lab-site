@@ -7,9 +7,10 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=5be31ba741dc';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=5be31ba741dc';
-import { encodeVariantImages } from './render-variant-image.js?v=5be31ba741dc';
+import { pluginWorkerSource } from './plugin-runtime.js?v=346cde125f88';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=346cde125f88';
+import { encodeVariantImages } from './render-variant-image.js?v=346cde125f88';
+import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=346cde125f88';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
@@ -139,8 +140,32 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
   }
   const elementOut = layoutBoundsElementOut;
   const pageCaller = { id: 'page', name: 'página (MCP)', worker: {}, stats: { queries: 0, logLines: 0, logDropped: 0, droppedMessages: 0 }, lastComposeAt: -Infinity, lastShotAt: -Infinity };
+  // ---- the plugin's own buttons (lab.button, src/plugin-buttons.js): state kept here, rendered by the panel (card, Controles row) and the preview bar --------------------
+  function buttonCall(plugin, args) {
+    const op = String(args?.op ?? ''), list = plugin.buttons;
+    const find = id => list.find(button => button.id === String(id ?? '')) ?? null;
+    if (op === 'add') {
+      const wanted = buttonId(args.config?.id), existing = wanted ? find(wanted) : null;
+      if (existing) { Object.assign(existing, sanitizeButtonConfig(args.config, existing)); changed(plugin); return { id: existing.id, replaced: true, button: buttonOut(existing) }; }
+      if (list.length >= BUTTON_LIMITS.perPlugin) throw Object.assign(new Error(`No máximo ${BUTTON_LIMITS.perPlugin} botões por plugin.`), { code: 'limit' });
+      let id = wanted; while (!id || find(id)) id = `b${++plugin.buttonSeq}`;
+      const button = { id, ...sanitizeButtonConfig(args.config), busy: false, clicks: 0 }; list.push(button); changed(plugin);
+      return { id, replaced: false, button: buttonOut(button) };
+    }
+    if (op === 'list') return list.map(buttonOut);
+    if (op === 'clear') { const removed = list.length; list.splice(0); finishClicks(plugin, null, { ok: false, reason: 'removed' }); changed(plugin); return { removed }; }
+    const button = find(args.id); if (!button) throw Object.assign(new Error('Botão removido ou desconhecido.'), { code: 'not-found' });
+    if (op === 'update') { Object.assign(button, sanitizeButtonConfig(args.config, button)); changed(plugin); return buttonOut(button); }
+    if (op === 'remove') { list.splice(list.indexOf(button), 1); finishClicks(plugin, button.id, { ok: false, reason: 'removed' }); changed(plugin); return { removed: 1 }; }
+    throw Object.assign(new Error(`Operação de botão desconhecida: ${op.slice(0, 20)}`), { code: 'bad-args' });
+  }
+  /** Resolves the waiters of a click (one button, or every one with id null). */
+  function finishClicks(plugin, id, result) {
+    for (const [key, waiters] of plugin.clickWaiters) { if (id !== null && key !== id) continue; plugin.clickWaiters.delete(key); for (const resolve of waiters) resolve(result); }
+  }
   async function serve(plugin, method, args) {
     if (method === 'screen') return currentScreen();
+    if (method === 'button') { if (plugin === pageCaller) throw Object.assign(new Error('Botões são de um plugin.'), { code: 'unsupported' }); return buttonCall(plugin, args ?? {}); }
     if (ACTION_METHODS.has(method)) {   // the lab's own controls (reload, endpoint mocks, modals): only where the page provides them (not in the embedded player or a backend)
       const action = actions?.[method]; if (typeof action !== 'function') throw Object.assign(new Error(`lab.${method} não está disponível aqui.`), { code: 'unsupported' });
       return action({ id: plugin.id, name: plugin.name }, args ?? {});
@@ -203,6 +228,11 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       case 'error': record(plugin, plugin.errors, { phase: clipText(data.phase, 40), message: clipText(data.message, 2000), stack: clipText(data.stack, 4000), at: Date.now() }, MAX_ERRORS); plugin.errorCount++; if (data.phase === 'compile' || data.phase === 'run') plugin.status = 'erro'; changed(plugin); return;
       case 'console': record(plugin, plugin.console, { level: ['log', 'info', 'warn', 'error', 'debug'].includes(data.level) ? data.level : 'log', text: clipText(data.text, 2000), at: Date.now() }, MAX_CONSOLE); changed(plugin); return;
       case 'ui': applyUiOps(plugin.output, data.ops); changed(plugin); return;
+      case 'clicked': {   // a button's handlers finished (errors were reported as 'error' messages before this)
+        const id = String(data.id ?? ''), button = plugin.buttons.find(item => item.id === id), started = plugin.clickStarted.get(id) ?? now(); plugin.clickStarted.delete(id);
+        if (button) button.busy = false;
+        finishClicks(plugin, id, { ok: data.ok !== false, handlers: Number(data.handlers) || 0, ms: Math.round(now() - started), ...(data.ok === false ? { error: clipText(data.error, 400) } : {}) }); changed(plugin); return;
+      }
       case 'sub': {
         const name = String(data.name); if (!['screen', 'log', 'network', 'refresh', 'modal', 'tab'].includes(name)) return;
         if (data.on) plugin.subs.add(name); else plugin.subs.delete(name);
@@ -225,7 +255,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     let created;
     try { created = createWorker(plugin.name); } catch (error) { plugin.status = 'erro'; record(plugin, plugin.errors, { phase: 'worker', message: clipText(error?.message ?? error, 2000), stack: '', at: Date.now() }, MAX_ERRORS); changed(plugin); return; }
     Object.assign(plugin, { worker: created.worker, release: created.release ?? null, status: 'iniciando', subs: new Set(), pendingCalls: 0, finished: false, lastComposeAt: -Infinity, startedAt: Date.now(), rate: { at: now(), count: 0 } });
-    plugin.output = { blocks: [], badge: '' }; stats.workersStarted++;
+    plugin.output = { blocks: [], badge: '' }; plugin.buttons = []; plugin.buttonSeq = 0; plugin.clickStarted = new Map(); stats.workersStarted++;
     const worker = created.worker;
     worker.onmessage = event => { if (plugin.worker === worker) onMessage(plugin, event.data); };
     worker.onerror = event => { if (plugin.worker !== worker) return; event?.preventDefault?.(); record(plugin, plugin.errors, { phase: 'worker', message: clipText(event?.message || 'O Worker do plugin falhou (erro de módulo ou de memória).', 2000), stack: '', at: Date.now() }, MAX_ERRORS); plugin.errorCount++; stopWorker(plugin, 'erro'); };
@@ -236,11 +266,12 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     const worker = plugin.worker;
     if (worker) { plugin.worker = null; try { worker.terminate(); } catch { /* already gone */ } plugin.release?.(); plugin.release = null; }
     plugin.subs = new Set(); plugin.pendingCalls = 0; plugin.status = status;
+    plugin.buttons = []; plugin.clickStarted = new Map(); finishClicks(plugin, null, { ok: false, reason: 'stopped' });   // a stopped plugin offers no button
     updateLogWanted(); changed(plugin);
   }
   const normalize = item => ({ id: String(item.id), name: String(item.name ?? 'Plugin').slice(0, 120), code: String(item.code ?? ''), enabled: !!item.enabled, packageFilter: String(item.packageFilter ?? '') });
   function blank(item) {
-    return { ...normalize(item), worker: null, release: null, status: 'parado', reason: '', subs: new Set(), output: { blocks: [], badge: '' }, console: [], errors: [], errorCount: 0, pendingCalls: 0, finished: false, userStopped: false,
+    return { ...normalize(item), worker: null, release: null, status: 'parado', reason: '', subs: new Set(), output: { blocks: [], badge: '' }, buttons: [], buttonSeq: 0, clickWaiters: new Map(), clickStarted: new Map(), console: [], errors: [], errorCount: 0, pendingCalls: 0, finished: false, userStopped: false,
       lastComposeAt: -Infinity, startedAt: null, rate: { at: 0, count: 0 }, stats: { queries: 0, logLines: 0, logDropped: 0, droppedMessages: 0 } };
   }
   /** Starts / stops the plugins so that exactly the enabled ones whose package filter matches the open package run (unless the user stopped one on its card). */
@@ -281,6 +312,21 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     refresh(id) { const plugin = plugins.get(id); if (!plugin?.worker || !plugin.subs.has('refresh')) return false; send(plugin, { t: 'event', name: 'refresh', data: { at: Date.now() } }); stats.events++; return true; },
     /** An event for one plugin (a modal's message or its closing): delivered only while the plugin listens. */
     emit(id, name, data) { const plugin = plugins.get(id); if (!plugin?.worker || !plugin.subs.has(name)) return false; send(plugin, { t: 'event', name, data }); stats.events++; return true; },
+    /**
+     * A click on a plugin's button (the panel, the preview bar, the MCP click_plugin_button tool): the plugin's handlers run in its Worker; the button is busy until they
+     * finish and a click on a busy, disabled or unknown button is ignored. -> Promise<{ ok, handlers, ms, error? } | { ok: false, reason: 'not-found'|'stopped'|'busy'|'disabled'|'removed' }>.
+     */
+    clickButton(id, buttonKey, { by = 'user' } = {}) {
+      const plugin = plugins.get(String(id)); if (!plugin) return Promise.resolve({ ok: false, reason: 'not-found' });
+      if (!plugin.worker) return Promise.resolve({ ok: false, reason: 'stopped' });
+      const button = plugin.buttons.find(item => item.id === String(buttonKey)); if (!button) return Promise.resolve({ ok: false, reason: 'not-found' });
+      if (button.disabled) return Promise.resolve({ ok: false, reason: 'disabled' });
+      if (button.busy) return Promise.resolve({ ok: false, reason: 'busy' });
+      button.busy = true; button.clicks = (button.clicks ?? 0) + 1; plugin.clickStarted.set(button.id, now());
+      const done = new Promise(resolve => { const list = plugin.clickWaiters.get(button.id) ?? []; list.push(resolve); plugin.clickWaiters.set(button.id, list); });
+      send(plugin, { t: 'click', id: button.id, by: by === 'mcp' ? 'mcp' : 'user' }); stats.events++; changed(plugin);
+      return done;
+    },
     /** Reiniciar: a fresh Worker with empty output (also after an error). */
     restart(id) { const plugin = plugins.get(id); if (!plugin) return; stopWorker(plugin); plugin.userStopped = false; plugin.status = 'parado'; plugin.console = []; plugin.errors = []; plugin.errorCount = 0; reconcile(); },
     /** The page drew a snapshot (device-view `rendered`). Without running plugins this only keeps the reference. */

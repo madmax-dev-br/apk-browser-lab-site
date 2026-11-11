@@ -31,9 +31,9 @@
 // Threads (vmcore/threads.h, vmcore/js/threads.js): the linker lives in one thread, its owner; Workers send their env.resolve requests to it through a slot in ThreadsState.
 // Whatever a reader tests to see a record as published (a constant's `a`, Method.kind, the class and string counts) is written last, with Atomics.store.
 
-import { CORE_NATIVES, HOST_VIRTUALS, HOST_INTERFACE_METHODS, STRING_CONSTRUCTORS } from './natives.js?v=5be31ba741dc';
-import { CLASS_STRING, STRING_LAYOUT, literalBytes, writeLiteral } from './strings.js?v=5be31ba741dc';
-import { WELL_KNOWN, RESOLVE_WELL_KNOWN } from './exceptions.js?v=5be31ba741dc';
+import { CORE_NATIVES, HOST_VIRTUALS, HOST_INTERFACE_METHODS, STRING_CONSTRUCTORS } from './natives.js?v=346cde125f88';
+import { CLASS_STRING, STRING_LAYOUT, literalBytes, writeLiteral } from './strings.js?v=346cde125f88';
+import { WELL_KNOWN, RESOLVE_WELL_KNOWN } from './exceptions.js?v=346cde125f88';
 
 export const CLASS = { super: 0, instanceSize: 4, refMap: 8, flags: 12, depth: 16, display: 20, vtable: 24, vtableLength: 28, itable: 32, itableLength: 36, statics: 40, staticRefMap: 44,
   initState: 48, initThread: 52, initList: 56, clinit: 60, component: 64, accessFlags: 68, id: 72, SIZE: 76 };
@@ -597,7 +597,12 @@ export class Linker {
   resolveSuper(reference, caller) {
     const nameSig = reference.name + reference.signature; this.requireClass(reference.owner);
     const named = this.classOf(reference.owner);
-    if (named.isInterface) { const mi = named.methods.get(nameSig); if (!mi) this.noMethod(reference, named, 'virtual', `no method ${reference.key}`); return mi; }
+    if (named.isInterface) {   // Interface.super.method(): the interface's own method, or the default it inherits (the first concrete one in findInterfaceDefault's order, as the JavaScript VM resolves it)
+      let mi = named.methods.get(nameSig);
+      if (!mi) for (const it of this.interfaceSearchOrder(named)) { const inherited = it.methods.get(nameSig); if (inherited && !(inherited.flags & 16)) { mi = inherited; break; } }
+      if (!mi) this.noMethod(reference, named, 'virtual', `no method ${reference.key}`);
+      return mi;
+    }
     const superInfo = caller.superInfo; if (!superInfo) throw new Error(`invoke-super in ${caller.type}, which has no superclass`);
     const slot = superInfo.vmap.get(nameSig); if (slot !== undefined) return superInfo.vtable[slot];
     for (let c = superInfo; c; c = c.superInfo) if (!c.cls) { if (c.type === OBJECT && c !== superInfo) break; return this.hostMethod(c, reference, false, reference.key); }
