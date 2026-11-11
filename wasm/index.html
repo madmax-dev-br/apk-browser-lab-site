@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark light">
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
+  <title>APK Browser Lab</title>
+  <link rel="stylesheet" href="./styles.css?v=37ef911634a5">
+  <meta name="apk-browser-build" content="37ef911634a5">
+</head>
+<body>
+  <header class="topbar">
+    <a href="./" class="brand" aria-label="APK Browser Lab"><span class="brand-icon">a<span>›</span></span><span>APK <b>Browser Lab</b></span><span class="beta">EXPERIMENTAL</span></a>
+    <a class="site-link" href="./arquitetura.html">Arquitetura</a><a class="site-link" href="./plugins.html">Plugins</a><a class="integration-link" href="./player/example.html">Exemplo de integração <span aria-hidden="true">↗</span></a><button type="button" id="theme-toggle" class="theme-toggle" aria-label="Alternar tema claro/escuro"><span aria-hidden="true">◐</span></button>
+  </header>
+  <main>
+    <div class="workspace">
+      <aside class="controls-column">
+        <section id="apk-panel" class="controls">
+          <div class="section-label">01 <span>SELECIONE O APLICATIVO</span></div>
+          <label id="drop-zone" class="drop-zone" for="apk-file">
+            <span class="upload-icon" aria-hidden="true">↥</span><strong>Solte seu APK aqui</strong><span>ou <u>escolha um arquivo</u> no computador</span><small>.apk ou .apklab (preparado) · processamento 100% local</small>
+          </label>
+          <input id="apk-file" type="file" accept=".apk,.apklab,application/vnd.android.package-archive" class="visually-hidden">
+          <div class="demo-row"><span>Quer experimentar primeiro?</span><button id="demo-button">Rodar demo <span aria-hidden="true">↗</span></button></div>
+          <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div><button id="stop-vm" class="stop-vm" aria-label="Encerrar VM e cancelar callbacks" hidden>Encerrar</button><button id="prepare-file" class="prepare-file" type="button" title="Baixar o arquivo preparado (.apklab) deste APK: abre mais rápido e pode ser enviado no lugar do APK" aria-label="Baixar arquivo preparado (.apklab)" hidden>⇩ Baixar arquivo preparado (.apklab)</button><button id="reopen-file" class="reopen-file" hidden>Reabrir</button><span class="file-check">✓</span></div>
+          <div id="operation-panel" class="operation-panel" hidden><div><span class="spinner"></span><strong id="operation-message">Processando no Web Worker…</strong><button id="cancel-operation">Cancelar</button></div><progress id="operation-progress" max="1"></progress><small id="operation-detail">A interface permanece disponível · limite de 120 s para inspeção</small></div>
+          <details id="inspection-panel" class="inspection-panel">
+          <summary class="section-label inspection-label">02 <span>INSPEÇÃO DO PACOTE</span><span id="inspection-badge" class="quiet-badge">AGUARDANDO</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
+          <div id="inventory-empty" class="inventory-empty"><span aria-hidden="true">⌘</span><p>Pacote, classes e dependências<br>aparecerão aqui.</p></div>
+          <div id="inventory" class="inventory" hidden>
+            <div class="inventory-heading"><span class="tiny-label">PACOTE</span><strong id="package-name"></strong></div>
+            <div class="stats"><div><strong id="class-count">0</strong><span>classes DEX</span></div><div><strong id="activity-count">0</strong><span>activities</span></div><div><strong id="dependency-count">0</strong><span>dependências</span></div></div>
+            <label class="activity-label" for="activity-select">Activity inicial</label><select id="activity-select"></select>
+            <div id="load-times" class="load-times" role="status" hidden></div><div id="archive-summary" class="archive-summary" hidden></div><details class="findings"><summary>Classes e dependências <span>+</span></summary><div id="inventory-details"></div></details>
+          </div>
+          <details id="native-inspection" class="native-inspection" hidden><summary>Analisar bibliotecas nativas <span>ELF</span></summary><p>Inspeção de metadados de uma biblioteca por vez, até 32 MiB. Não executa código nativo nem implementa JNI.</p><label for="native-abi">ABI</label><select id="native-abi"></select><label for="native-library">Biblioteca</label><select id="native-library"></select><button id="inspect-native-button">Analisar ELF selecionado</button><pre id="native-result" hidden></pre></details>
+          </details>
+          <div id="unsupported-notice" class="unsupported-notice" role="status" hidden><strong>Este APK ainda não pode ser executado</strong><p>O relatório indica limites de arquivo que impedem a tentativa. Veja os detalhes abaixo; uma inspeção parcial não comprova compatibilidade.</p><ul id="unsupported-list"></ul></div>
+          <button id="run-button" class="run-button" disabled><span aria-hidden="true">▶</span> Executar APK <kbd>RUN</kbd></button>
+          <p class="support-note"><span aria-hidden="true">ⓘ</span><span>VM experimental para Android Views e bytecode DEX. Multidex é inspecionado no Worker; Android, Compose e JNI ainda podem exigir APIs não implementadas. </span></p>
+        </section>
+        <section class="controls controls-card" aria-label="Controles">
+          <details id="control-panel" class="device-panel control-panel">
+            <summary><span>Controles</span><span id="device-summary" class="quiet-badge" title="Tela e orientação do dispositivo virtual">411 × 914 · retrato</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
+            <details class="cp-group" id="cp-sec-open" data-section="open">
+              <summary><h3 id="cp-open-title">Abrir</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <form id="deeplink-form" class="deeplink-form" autocomplete="off">
+                <label for="deeplink-input">Link ou URI</label>
+                <div class="deeplink-row"><input id="deeplink-input" type="text" spellcheck="false" autocapitalize="off" placeholder="meuapp://caminho?id=1 ou https://exemplo.com/p/1"><button id="deeplink-open" class="cp-button primary" type="submit">Abrir</button></div>
+                <div class="cp-grid">
+                  <label for="deeplink-action">Ação</label><select id="deeplink-action"><option value="android.intent.action.VIEW" selected>VIEW (padrão)</option><option value="android.intent.action.SEND">SEND</option><option value="android.intent.action.EDIT">EDIT</option><option value="">Sem ação</option></select>
+                  <label for="deeplink-component">Componente (opcional)</label><input id="deeplink-component" type="text" spellcheck="false" autocapitalize="off" placeholder="pacote/.MinhaActivity">
+                </div>
+              </form>
+              <p id="deeplink-result" class="cp-note deeplink-result" role="status" aria-live="polite">Resolvido pelos intent-filters do manifesto, como <code>am start -a VIEW -d</code>. Sem app em execução, a Activity encontrada é iniciada com esse Intent.</p>
+              <div id="deeplink-history" class="deeplink-history" hidden><span class="cp-subtitle">Recentes</span><ul id="deeplink-history-list"></ul><button id="deeplink-history-clear" class="cp-link" type="button">Limpar histórico</button></div>
+            </div></details>
+            <details class="cp-group" id="cp-sec-look" data-section="look">
+              <summary><h3 id="cp-look-title">Aparência</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <div class="cp-grid">
+                <label for="dev-dark">Tema escuro</label><input id="dev-dark" type="checkbox">
+                <label for="dev-layout-bounds" title="Opção de desenvolvedor do Android: contorna os limites de cada View e nó do Compose (azul), margens (magenta) e padding (verde)">Mostrar limites de layout</label><input id="dev-layout-bounds" type="checkbox">
+                <label for="dev-font">Escala da fonte <output id="dev-font-out">1,00×</output></label><input id="dev-font" type="range" min="0.85" max="2" step="0.05">
+                <label for="dev-locale">Idioma e região</label><select id="dev-locale"></select>
+                <label for="dev-orientation">Orientação</label><select id="dev-orientation"><option value="portrait">Retrato</option><option value="landscape">Paisagem</option></select>
+                <label for="dev-screen">Tela</label><select id="dev-screen"></select>
+                <label for="dev-nav">Navegação</label><select id="dev-nav"><option value="gesture">Gestos</option><option value="buttons">3 botões</option></select>
+                <label for="dev-animator">Escala de animação</label><select id="dev-animator"><option value="0">Desligada</option><option value="0.5">0,5×</option><option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select>
+              </div>
+            </div></details>
+            <details class="cp-group" id="cp-sec-device" data-section="device">
+              <summary><h3 id="cp-device-title">Dispositivo</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <div class="cp-grid">
+                <label for="dev-hour24">Relógio de 24 horas</label><input id="dev-hour24" type="checkbox">
+                <label for="dev-tz">Fuso horário</label><select id="dev-tz"></select>
+                <label for="dev-battery">Bateria <output id="dev-battery-out">80%</output></label><input id="dev-battery" type="range" min="0" max="100" step="1">
+                <label for="dev-charging">Carregando</label><input id="dev-charging" type="checkbox">
+                <label for="dev-network">Conectividade</label><select id="dev-network"><option value="online">Wi‑Fi (sem tarifação)</option><option value="metered">Dados móveis (tarifado)</option><option value="offline">Sem conexão</option></select>
+                <label for="dev-hosts-all">Permitir todos os hosts</label><input id="dev-hosts-all" type="checkbox" aria-describedby="dev-hosts-note">
+                <label for="dev-hosts">Hosts permitidos na rede</label><input id="dev-hosts" type="text" spellcheck="false" autocomplete="off" placeholder="api.exemplo.com, *.cdn.exemplo.com" aria-describedby="dev-hosts-note">
+                <label for="dev-proxy">Proxy (opcional)</label><input id="dev-proxy" type="text" spellcheck="false" autocomplete="off" placeholder="https://relay.exemplo.com/?url={url}">
+              </div>
+              <p id="dev-hosts-note" class="cp-note">Com "Permitir todos os hosts" ligado (padrão) qualquer nome pode ser acessado, ainda sujeito a CORS no servidor (ou a um proxy seu). Desligado, só os hosts da lista são acessíveis e, sem hosts na lista, todo nome falha como em um telefone offline.</p>
+            </div></details>
+            <details class="cp-group" id="cp-sec-perms" data-section="perms">
+              <summary><h3 id="cp-perms-title">Permissões</h3><span id="perms-summary" class="cp-badge">sem app</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p id="perms-empty" class="cp-note">Abra um APK para ver as permissões de execução (perigosas) que o app pede no manifesto.</p>
+              <div id="perms-list" class="perms-list"></div>
+              <p id="perms-note" class="cp-note" role="status" aria-live="polite">"Perguntar" é o padrão do Android: a permissão não é concedida e requestPermissions mostra o diálogo sobre o telefone. No Android, revogar uma permissão com o app aberto encerra o processo do app; aqui a revogação vale na hora e o app continua rodando (reabra o APK para vê-lo recomeçar sem a permissão).</p>
+              <span class="cp-subtitle perms-loc-title">Localização simulada</span>
+              <div class="cp-grid">
+                <label for="loc-enabled">Localização do dispositivo ligada</label><input id="loc-enabled" type="checkbox">
+                <label for="loc-lat">Latitude</label><input id="loc-lat" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="-23.5505">
+                <label for="loc-lon">Longitude</label><input id="loc-lon" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="-46.6333">
+                <label for="loc-acc">Precisão (m)</label><input id="loc-acc" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="10">
+              </div>
+              <p id="loc-note" class="cp-note" role="status" aria-live="polite">Com a permissão concedida e a localização ligada, LocationManager entrega esta posição (getLastKnownLocation e requestLocationUpdates). O cliente de localização do Google Play services não existe neste dispositivo virtual e continua falhando de forma explícita.</p>
+              <button id="perms-reset" class="cp-button" type="button" disabled>Restaurar permissões deste app</button>
+            </div></details>
+            <details class="cp-group" id="cp-sec-run" data-section="run">
+              <summary><h3 id="cp-run-title">Execução</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <label class="cp-field" for="vm-memory"><span>Memória da VM <em id="vm-memory-hint" class="vm-memory-hint" role="status" hidden>reabra o APK para aplicar</em><small>Orçamento do heap Java; vale quando o APK é aberto de novo</small></span><select id="vm-memory" aria-describedby="vm-memory-note"></select></label>
+              <p id="vm-memory-note" class="cp-note">Este número é o orçamento do heap Java (objetos e arrays da VM; os demais orçamentos crescem junto). O navegador gasta mais que isso: tabelas do DEX, CanvasKit, rasters e um objeto JavaScript por objeto Java. Uma aba acima de ~2–4 GiB pode ser encerrada pelo navegador. O limite do motor é 2 097 152 objetos (4 GiB é limitado a ele).</p>
+              <p id="vm-memory-device" class="cp-note"></p>
+              <label class="cp-field" for="vm-event-time"><span>Tempo máximo por evento<small>Quanto a VM espera um evento terminar antes de encerrá-lo com o relatório; vale na hora</small></span><select id="vm-event-time" aria-describedby="vm-event-note"></select></label>
+              <p id="vm-event-note" class="cp-note">A VM roda o código do app muitas vezes mais devagar que um aparelho. Uma inicialização com centenas de threads pode passar dos 25 s padrão sem estar travada: o relatório "Instruction budget exceeded" mostra as threads ainda avançando. Um tempo maior deixa terminar; um laço infinito de verdade continua sendo encerrado com relatório, só que mais tarde.</p>
+              <label class="cp-field" for="vm-raster-scale"><span>Resolução no movimento<small>Enquanto a tela se mexe (animação, rolagem, transição), o quadro é desenhado nesta escala e refeito nítido quando para; vale na hora</small></span><select id="vm-raster-scale"><option value="1">100% (sempre nítido)</option><option value="0.75">75%</option><option value="0.5">50% (padrão)</option><option value="0.35">35%</option><option value="0.25">25%</option></select></label>
+              <label class="cp-check" for="vm-raster-navigation"><input id="vm-raster-navigation" type="checkbox"><span>Tela nova começa em baixa resolução<small>O primeiro quadro de uma Activity ou janela nova sai na resolução de movimento e é refeito nítido quando a tela para; vale na hora</small></span></label>
+              <label class="cp-field" for="vm-renderer"><span>Renderização<small>Onde o conteúdo das telas (Compose, Canvas) é desenhado. GPU usa WebGL no Worker, é experimental e volta sozinha para CPU se falhar; vale na hora</small></span><select id="vm-renderer" aria-describedby="vm-renderer-status"><option value="cpu">CPU (padrão)</option><option value="gpu">GPU (experimental)</option></select></label>
+              <p id="vm-renderer-status" class="cp-note" role="status">Em uso: CPU</p>
+              <label class="cp-field" for="tolerate-missing"><span>Modo tolerante<small>APIs do Android que faltam viram <code>STUB-VOID</code>/<code>STUB-RETURN</code> no log em vez de parar o app</small></span><select id="tolerate-missing"><option value="off">Desligado (estrito)</option><option value="void">Só métodos void</option><option value="primitives" selected>void e primitivos (0, false)</option><option value="all">Todos os tipos (0, false, null)</option></select></label>
+              <label class="cp-check" for="strict-crash"><input id="strict-crash" type="checkbox"><span>Modo estrito de falhas<small>Uma exceção fatal em qualquer thread encerra o app (como o Android). Desligado, ela é registrada como <code>FATAL (tolerada)</code> no resumo e só a thread que falhou termina</small></span></label>
+              <div id="app-data-row" class="app-data-row">
+                <label class="cp-check" for="keep-app-data"><input id="keep-app-data" type="checkbox" checked><span>Manter dados do app entre recargas<small>SharedPreferences, bancos SQLite, arquivos e cache do app, por pacote e certificado</small></span></label>
+                <p id="app-data-usage" class="cp-note" role="status" aria-live="polite">Dados do app: abra um APK para ver o uso.</p>
+                <button id="clear-app-data" class="cp-button" type="button" disabled>Limpar dados do app</button>
+              </div>
+              <p id="device-status" class="cp-note" role="status" aria-live="polite">As mudanças chegam ao app como no Android: Configuration, recursos reselecionados e Activity recriada ou onConfigurationChanged.</p>
+              <button id="device-reset" class="cp-button" type="button">Restaurar padrão</button>
+            </div></details>
+          <details class="cp-group" id="cp-sec-overrides" data-section="overrides">
+              <summary><h3 id="cp-overrides-title">Retornos de métodos</h3><span id="ov-summary" class="cp-badge">0 ativos</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p class="cp-note ov-warning">Ferramenta de depuração: enquanto ativo, o corpo do método escolhido <b>não executa</b> e a chamada devolve o valor digitado. Vale nas próximas chamadas, sem recarregar. Cada chamada substituída é contada, registrada no Logcat (aviso, tag <code>APKWebLab</code>) e listada no Resumo.</p>
+              <div class="ov-search"><label for="ov-search">Buscar método nas classes do APK</label><input id="ov-search" type="search" spellcheck="false" autocomplete="off" placeholder="parte da classe ou do método" aria-controls="ov-results"><ul id="ov-results" class="ov-results" hidden></ul></div>
+              <ul id="ov-list" class="ov-list"></ul>
+              <p id="ov-status" class="cp-note" role="status" aria-live="polite">Nenhum retorno substituído.</p>
+              <button id="ov-add" class="cp-button" type="button">+ Adicionar</button>
+            </div></details>
+          <details class="cp-group" id="cp-sec-ignored" data-section="ignored">
+              <summary><h3 id="cp-ignored-title">Activities ignoradas</h3><span id="ia-summary" class="cp-badge">0 ativas</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p class="cp-note ov-warning">Ferramenta de depuração: quando o app pede para abrir uma Activity da lista, o pedido é validado e então <b>descartado</b> (nenhuma tela abre, quem pediu um resultado não recebe nenhum). Vale para startActivity, startActivityForResult, startActivities e PendingIntent; o lançamento do app e os deep links deste painel não são afetados. Cada abertura descartada é contada, registrada no Logcat e citada no Resumo.</p>
+              <div class="ov-search"><label for="ia-filter">Activities do manifesto (clique para adicionar)</label><input id="ia-filter" type="search" spellcheck="false" autocomplete="off" placeholder="filtrar por nome" aria-controls="ia-available"><ul id="ia-available" class="ov-results ia-available" aria-label="Activities declaradas no manifesto"></ul></div>
+              <datalist id="ia-options"></datalist>
+              <ul id="ia-list" class="ov-list"></ul>
+              <p id="ia-status" class="cp-note" role="status" aria-live="polite">Nenhuma Activity ignorada.</p>
+              <button id="ia-add" class="cp-button" type="button">+ Adicionar</button>
+            </div></details>
+          <details class="cp-group" id="cp-sec-hostmap" data-section="hostmap">
+              <summary><h3 id="cp-hostmap-title">Redirecionar hosts</h3><span id="hm-summary" class="cp-badge">0 ativas</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p class="cp-note">Cada regra envia as requisições do app para um host a outro destino, como uma entrada de /etc/hosts que também pode trocar a porta e o esquema. O app continua vendo a URL original; só a requisição que o navegador faz vai para o destino, e ela não precisa estar em “Hosts permitidos” (o modo offline continua valendo). Origem: <code>https://api.exemplo.com</code>, <code>api.exemplo.com</code>, <code>host:porta</code> ou <code>*.dominio</code>. Destino: <code>host</code>, <code>host:porta</code> ou <code>http(s)://host:porta</code>; sem esquema, <code>localhost</code> e <code>127.0.0.1</code> usam http. Um servidor local precisa responder CORS para a página do lab (ou use o relay CORS com <code>--allow-private</code>). Vale na hora, conta as respostas de cada regra e marca as requisições no painel Rede.</p>
+              <ul id="hm-list" class="ov-list hm-list" aria-label="Redirecionamentos de host, o primeiro que casar vale"></ul>
+              <p id="hm-status" class="cp-note" role="status" aria-live="polite">Nenhum host redirecionado.</p>
+              <button id="hm-add" class="cp-button" type="button">+ Adicionar</button>
+            </div></details>
+          <details class="cp-group" id="cp-sec-mocks" data-section="mocks">
+              <summary><h3 id="cp-mocks-title">Mock de endpoints</h3><span id="em-summary" class="cp-badge">0 ativos</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p class="cp-note ov-warning">Ferramenta de depuração: uma requisição do app que casa com um mock da lista é <b>respondida pelo lab</b> com a resposta configurada e não vai à rede. O primeiro mock ativo que casar, na ordem da lista, responde, antes da lista de hosts permitidos, do modo offline, de Redirecionar hosts e do Proxy. Vale para HttpURLConnection, OkHttp e outros clientes sobre java.net.Socket e DownloadManager; páginas de WebView são carregadas pelo navegador e não passam pelos mocks. Cada resposta é contada, marcada no painel Rede (e no HAR), citada no Resumo, e a primeira de cada mock gera um aviso no Logcat.</p>
+              <ul id="em-list" class="ov-list em-list" aria-label="Mocks de endpoint, em ordem de prioridade"></ul>
+              <p id="em-status" class="cp-note" role="status" aria-live="polite">Nenhum mock.</p>
+              <div class="em-actions"><button id="em-add" class="cp-button" type="button">+ Adicionar</button><button id="em-export" class="cp-button" type="button" disabled>Exportar</button><button id="em-import" class="cp-button" type="button">Importar</button><input id="em-import-file" type="file" accept="application/json,.json" hidden></div>
+            </div></details>
+          <details class="cp-group" id="cp-sec-plugins" data-section="plugins">
+              <summary><h3 id="cp-plugins-title">Plugins</h3><span id="pl-summary" class="cp-badge">0 rodando</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p class="cp-note">Trechos de JavaScript seus que observam a tela atual, a árvore do Compose, os ViewModels, o Logcat e a rede, e mostram o resultado no painel <b>Plugins</b> abaixo do aparelho. Cada plugin ligado roda num Web Worker próprio e só lê: nada escreve no app nem chama código dele. Sem plugin ligado, nada roda. API em docs/PLUGINS.md.</p>
+              <p class="cp-note ov-warning">O código de um plugin roda com a origem desta página (pode usar fetch como qualquer script dela). Use só código seu ou que você revisou.</p>
+              <ul id="pl-list" class="ov-list pl-list" aria-label="Plugins, na ordem do painel"></ul>
+              <p id="pl-status" class="cp-note" role="status" aria-live="polite">Nenhum plugin.</p>
+              <div class="em-actions"><button id="pl-add" class="cp-button" type="button">+ Adicionar</button><a class="pl-examples-link" href="plugins.html#exemplos" target="_blank" rel="noopener">Exemplos</a><button id="pl-export" class="cp-button" type="button" disabled>Exportar</button><button id="pl-import" class="cp-button" type="button">Importar</button><input id="pl-import-file" type="file" accept="application/json,.json" hidden></div>
+            </div></details>
+          <details class="cp-group" id="cp-sec-mcp" data-section="mcp">
+              <summary><h3 id="cp-mcp-title">MCP</h3><span id="mcp-summary" class="cp-badge">desligado</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p class="cp-note">Conecta esta página a um cliente MCP (Claude Desktop, Claude Code): ele pode tirar print da tela ou de um componente, ler a saída dos plugins, a árvore do Compose, os CompositionLocals, os ViewModels, o Logcat e a rede do app aberto aqui. Rode a ponte <a href="tools/lab-mcp.mjs" download>lab-mcp.mjs</a> no seu computador (veja <a href="plugins.html#mcp">como configurar</a>).</p>
+              <label class="cp-field" for="mcp-url"><span>Endereço da ponte<small>a ponte escuta só em 127.0.0.1; porta padrão 8790</small></span><input id="mcp-url" type="url" value="http://127.0.0.1:8790" autocomplete="off" spellcheck="false"></label>
+              <label class="cp-field" for="mcp-token"><span>Token<small>no terminal: node lab-mcp.mjs token</small></span><input id="mcp-token" type="password" autocomplete="off" spellcheck="false"></label>
+              <div class="em-actions"><button id="mcp-connect" type="button" class="cp-button primary">Conectar</button></div>
+              <p id="mcp-status" class="cp-note" role="status" aria-live="polite">Desconectado.</p>
+            </div></details>
+          </details>
+        </section>
+      </aside>
+      <section class="preview" aria-label="Aplicativo em execução">
+        <div class="preview-bar"><div class="preview-title"><span class="window-dots"><i></i><i></i><i></i></span><span id="preview-name">Prévia do aplicativo</span></div><button id="recreate-activity" class="back-button reload-activity" type="button" hidden title="Recriar: como Activity.recreate() ou uma rotação. onPause, onStop, onSaveInstanceState e onDestroy, depois uma nova instância com o estado salvo; os ViewModels continuam">↻ Recriar</button><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reabrir: como fechar e abrir de novo a mesma tela. Nova instância com o mesmo Intent, sem estado salvo e com ViewModels novos: o conteúdo é carregado de novo">⟲ Reabrir</button><button id="back-button" class="back-button" hidden>← Voltar</button><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> INATIVO</span></div>
+        <div class="preview-stage" id="preview-stage">
+          <div id="empty-preview" class="empty-preview"><div class="empty-device"><span></span><div>▶</div><i></i></div><h2>Seu aplicativo começa aqui.</h2><p>Selecione um APK e clique em Executar.<br>Ou rode a demonstração para testar.</p><span class="browser-chip"><span>◉</span> Tudo acontece neste navegador</span></div>
+          <div id="boot-overlay" class="boot-overlay" hidden role="status" aria-live="polite"><div class="boot-screen"><svg class="boot-logo" viewBox="0 0 64 64" width="84" height="84" aria-hidden="true"><path class="boot-antenna" d="M20 8l6 9M44 8l-6 9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M10 40a22 22 0 0 1 44 0z" fill="currentColor"/><circle cx="24" cy="32" r="2.6" class="boot-eye"/><circle cx="40" cy="32" r="2.6" class="boot-eye"/><rect x="10" y="44" width="44" height="12" rx="6" fill="currentColor" opacity=".35"/></svg><div class="boot-bar"><i></i></div><p id="boot-caption" class="boot-caption">Iniciando…</p></div></div>
+          <div id="android-device" class="android-device" hidden>
+            <div id="android-screen" class="android-screen">
+              <div id="android-content" class="android-content"></div>
+              <div id="android-window-layer" class="android-window-layer"></div>
+              <canvas id="layout-bounds-canvas" class="layout-bounds-canvas" aria-hidden="true" hidden></canvas>
+              <div id="permission-dialog" class="perm-scrim" hidden><div class="perm-card" role="alertdialog" aria-modal="true" aria-labelledby="perm-question" aria-describedby="perm-detail" tabindex="-1"><div class="perm-icon" id="perm-icon" aria-hidden="true"></div><p id="perm-question" class="perm-question"></p><p id="perm-detail" class="perm-detail"></p><div class="perm-actions"><button id="perm-allow" type="button" class="perm-button"></button><button id="perm-once" type="button" class="perm-button" hidden>Só desta vez</button><button id="perm-deny" type="button" class="perm-button">Não permitir</button></div></div></div>
+              <div class="system-bars" aria-hidden="true">
+                <div id="sysbar-status" class="sysbar-status"><span id="sysbar-clock" class="sysbar-clock">9:41</span><span class="sysbar-cutout"></span><span class="sysbar-icons"><svg id="sysbar-wifi" viewBox="0 0 24 24" width="14" height="14"><path d="M12 18.5a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM2.4 9.2l1.9 1.9a10.8 10.8 0 0 1 15.4 0l1.9-1.9a13.5 13.5 0 0 0-19.2 0zM6.2 13l1.9 1.9a5.4 5.4 0 0 1 7.8 0l1.9-1.9a8.1 8.1 0 0 0-11.6 0z" fill="currentColor"/></svg><svg id="sysbar-cell" viewBox="0 0 24 24" width="14" height="14"><path d="M2 22h20V2z" fill="currentColor"/></svg><span class="sysbar-battery"><span id="sysbar-battery-level" class="sysbar-battery-level"></span><b id="sysbar-bolt" hidden>⚡</b></span></span></div>
+                <div id="sysbar-nav" class="sysbar-nav"><span class="sysbar-handle"></span><span class="sysbar-buttons"><i class="sysbar-back"></i><i class="sysbar-home"></i><i class="sysbar-recents"></i></span></div>
+              </div>
+            </div>
+          </div>
+          <div id="error-panel" class="error-panel" role="alert" hidden><span class="error-icon">!</span><h2 id="error-title">Não foi possível executar</h2><p id="error-message"></p><details id="error-diagnostics" hidden><summary>Detalhes técnicos da execução</summary><pre id="error-detail" hidden></pre></details><button id="error-copy" type="button">Copiar diagnóstico</button> <button id="error-summary" type="button" title="Mostra só o resumo (memória, quem retém, exceções, thread principal) em letras grandes: uma foto basta">Mostrar resumo</button></div>
+        </div>
+        <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Aguardando um aplicativo</span></span><span id="memory-meter" class="memory-meter" role="status" hidden><i></i><span></span></span><span id="execution-engine">411 × 914 dp · DENSIDADE 1</span></div>
+        <details id="trace" class="trace"><summary><span>Log de execução</span><span id="trace-count">0 eventos</span><span class="trace-actions"><button id="screen-state-summary" type="button" title="Mostra só o resumo (memória, quem retém, exceções, thread principal) em letras grandes: uma foto basta">Resumo</button><button id="screen-state-copy" type="button" title="Copia um resumo do que a VM mostra (Activities, árvore de views, Compose, quadros, fila, threads, memória) mesmo sem erro">Estado</button></span><span class="trace-chevron">⌄</span></summary><pre id="trace-output">O log aparecerá após a execução.</pre></details>
+        <details id="logcat" class="trace logcat"><summary><span>Logcat</span><span class="logcat-count">0 linhas</span><span class="trace-chevron">⌄</span></summary>
+          <div class="logcat-bar"><input class="logcat-filter" type="search" placeholder="Filtrar por tag ou texto" aria-label="Filtrar logcat por tag ou texto"><select class="logcat-level" aria-label="Nível mínimo"><option value="V">V Verbose</option><option value="D">D Debug</option><option value="I">I Info</option><option value="W">W Warning</option><option value="E">E Error</option></select><label class="logcat-auto"><input class="logcat-autoscroll" type="checkbox" checked> Rolar</label><button class="logcat-clear" type="button">Limpar</button><select class="logcat-scope" aria-label="O que salvar"><option value="all">Salvar tudo</option><option value="filtered">Salvar o filtrado</option></select><button class="logcat-save" type="button">Salvar</button></div>
+          <div class="logcat-lines" role="log" aria-live="off"></div></details>
+        <details id="netlog" class="trace logcat netlog"><summary><span>Rede</span><span class="netlog-count">0 requisições</span><span class="trace-chevron">⌄</span></summary>
+          <div class="logcat-bar"><input class="netlog-filter" type="search" placeholder="Filtrar por host, caminho ou método" aria-label="Filtrar requisições por host, caminho ou método"><select class="netlog-category" aria-label="Filtrar por resultado"><option value="all">Todas</option><option value="ok">2xx</option><option value="redirect">3xx</option><option value="fail">4xx / 5xx</option><option value="refused">Recusadas</option><option value="error">Erros</option><option value="pending">Em andamento</option><option value="mocked">Mockadas</option><option value="redirected">Redirecionadas</option></select><label class="logcat-auto"><input class="netlog-autoscroll" type="checkbox" checked> Rolar</label><button class="netlog-clear" type="button">Limpar</button><select class="netlog-scope" aria-label="O que salvar"><option value="all">Salvar tudo</option><option value="filtered">Salvar o filtrado</option></select><select class="netlog-format" aria-label="Formato"><option value="har">HAR 1.2</option><option value="text">Texto</option></select><button class="netlog-save" type="button">Salvar</button></div>
+          <div class="netlog-rows" role="log" aria-live="off"></div></details>
+        <details id="compose-inspector" class="trace logcat compose-inspector"><summary><span>Compose</span><span class="ci-count">fechado</span><span class="trace-chevron">⌄</span></summary>
+          <div class="logcat-bar"><button class="ci-capture" type="button" title="Inspeciona a tela agora: árvore de layout do Compose, Views e um recorte de cada elemento">Capturar</button><label class="logcat-auto" title="Captura de novo quando a tela navega (outra Activity ou outro destino)"><input class="ci-follow" type="checkbox"> Atualizar ao navegar</label><label class="logcat-auto" title="Mostra cada LayoutNode da árvore do Compose; desligado, mostra as caixas de &quot;Mostrar limites de layout&quot;"><input class="ci-tree" type="checkbox"> Árvore completa</label><input class="ci-filter" type="search" placeholder="Filtrar por nome, texto, tag ou modificador" aria-label="Filtrar elementos por nome, texto, testTag ou modificador"><button class="ci-copy" type="button" title="Copia os dados da inspeção (sem imagens) em JSON">Copiar JSON</button></div>
+          <div class="ci-body" aria-live="polite"></div></details>
+        <details id="plugins-output" class="trace logcat plugins-output" hidden><summary><span>Plugins</span><span class="po-count">0 rodando</span><span class="trace-chevron">⌄</span></summary>
+          <div class="po-cards" aria-live="off"></div></details>
+      </section>
+    </div>
+    <details id="scenario-catalog" class="scenario-catalog">
+      <summary><span class="catalog-icon" aria-hidden="true">▦</span><span>Biblioteca de APKs <small>Cenários de teste</small></span><span class="catalog-toggle" aria-hidden="true">+</span></summary>
+      <div class="catalog-body">
+        <div class="catalog-intro"><div><h2>Aplicativos reais para explorar os limites da VM.</h2><p>Baixe um APK ou inspecione seu pacote, Activities e dependências no próprio navegador.</p></div><span class="catalog-local">ARQUIVOS LOCAIS · SEM UPLOAD</span></div>
+        <p class="catalog-boundary"><span aria-hidden="true">ⓘ</span> Os casos avançados são APKs Android reais para tentativas experimentais e diagnóstico. Inspecionar lê os DEX reais; Executar tenta iniciar a Activity e informa o primeiro limite encontrado. Bibliotecas nativas empacotadas não garantem suporte JNI. O exemplo Compose Web permanece separado.</p>
+        <div id="scenario-list" class="scenario-list" aria-live="polite"><p class="catalog-loading">Carregando catálogo…</p></div>
+      </div>
+    </details>
+    <footer><span><span class="footer-dot"></span> Sem instalação. Sem emulador. Sem upload.</span><a href="./hermes-proof/">Experimento Hermes no navegador ↗</a><span>APK Browser Lab <span class="footer-slash">/</span> protótipo técnico</span></footer>
+  </main>
+  <div id="tool-dock" class="tool-dock" role="region" aria-label="Ferramentas">
+    <div class="tool-dock-panel" hidden>
+      <div class="tool-dock-handle" role="separator" aria-orientation="horizontal" aria-label="Altura do painel de ferramentas (setas para ajustar)" aria-valuemin="140" tabindex="0"></div>
+      <button class="tool-dock-hide" type="button" aria-label="Esconder o painel" title="Esconder (Esc)">▾</button>
+      <div class="tool-dock-slot"></div>
+    </div>
+    <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
+  </div>
+  <script type="module" src="./app.js?v=37ef911634a5"></script>
+<div id="em-dialog" class="em-scrim" hidden>
+  <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
+    <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>
+    <p id="em-dialog-help" class="em-help">Quando uma requisição do app casar com este mock, o lab responde com o status, os cabeçalhos e o corpo abaixo, sem ir à rede.</p>
+    <form id="em-form" novalidate>
+      <fieldset class="em-fieldset"><legend>Requisição</legend>
+        <label class="em-field em-wide" for="em-name"><span>Nome <small>opcional; aparece no painel Rede e no Resumo</small></span><input id="em-name" type="text" autocomplete="off" spellcheck="false" maxlength="120"></label>
+        <label class="em-field" for="em-method"><span>Método</span><select id="em-method" aria-describedby="em-err-method"></select></label>
+        <label class="em-field" for="em-query"><span>Query</span><select id="em-query" aria-describedby="em-err-query"><option value="ignore">Ignorar</option><option value="exact">Exata</option></select></label>
+        <small id="em-err-method" class="em-error" hidden></small><small id="em-err-query" class="em-error" hidden></small>
+        <label class="em-field em-wide" for="em-url"><span>URL ou caminho</span><input id="em-url" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="https://api.exemplo.com/v1/usuarios/* ou /v1/usuarios/*" aria-describedby="em-url-help em-err-url" required></label>
+        <small id="em-url-help" class="em-help em-wide">URL completa (<code>https://host/caminho</code>) ou só o caminho (<code>/caminho</code>, qualquer host). <code>*</code> vale um segmento, <code>**</code> vários; <code>*.dominio</code> no host. Sem porta, qualquer porta. Query exata: os mesmos parâmetros em qualquer ordem (valor <code>*</code> aceita qualquer um).</small>
+        <small id="em-err-url" class="em-error em-wide" hidden></small>
+        <label class="em-field em-wide" for="em-body-contains"><span>Corpo da requisição contém <small>opcional; texto que o corpo enviado pelo app precisa ter</small></span><input id="em-body-contains" type="text" autocomplete="off" spellcheck="false"></label>
+      </fieldset>
+      <fieldset class="em-fieldset"><legend>Resposta</legend>
+        <label class="em-field" for="em-status-code"><span>Status</span><input id="em-status-code" type="number" inputmode="numeric" min="200" max="599" step="1" aria-describedby="em-err-status"></label>
+        <label class="em-field" for="em-reason"><span>Mensagem <small>vazio: a padrão do status</small></span><input id="em-reason" type="text" autocomplete="off" placeholder="OK" aria-describedby="em-err-status"></label>
+        <small id="em-err-status" class="em-error em-wide" hidden></small>
+        <div class="em-wide em-headers-box" role="group" aria-labelledby="em-headers-title"><span id="em-headers-title" class="em-label">Cabeçalhos</span><ul id="em-headers" class="em-headers"></ul><button id="em-header-add" type="button" class="cp-button">+ Cabeçalho</button><small id="em-err-headers" class="em-error" hidden></small></div>
+        <label class="em-field em-wide" for="em-body"><span>Corpo</span><textarea id="em-body" rows="8" spellcheck="false" autocomplete="off" aria-describedby="em-body-hint em-err-body"></textarea></label>
+        <div class="em-wide em-body-tools"><button id="em-body-file-button" type="button" class="cp-button">Carregar de arquivo…</button><input id="em-body-file" type="file" hidden><button id="em-body-file-clear" type="button" class="cp-button" hidden>Remover arquivo</button><button id="em-body-format" type="button" class="cp-button" hidden>Formatar JSON</button><span id="em-body-file-info" class="em-help" role="status"></span></div>
+        <small id="em-body-hint" class="em-hint em-wide" role="status" aria-live="polite"></small>
+        <small id="em-err-body" class="em-error em-wide" hidden></small>
+        <label class="em-field" for="em-delay"><span>Atraso (ms) <small>a resposta chega depois desse tempo</small></span><input id="em-delay" type="number" inputmode="numeric" min="0" max="600000" step="1" aria-describedby="em-err-delay"></label>
+        <small id="em-err-delay" class="em-error em-wide" hidden></small>
+      </fieldset>
+      <p id="em-err-form" class="em-error" role="alert" hidden></p>
+      <div class="em-buttons"><button id="em-cancel" type="button" class="cp-button">Cancelar</button><button id="em-save" type="submit" class="cp-button primary">Salvar</button></div>
+    </form>
+  </div>
+</div>
+<div id="pl-dialog" class="em-scrim" hidden>
+  <div class="em-card pl-card" role="dialog" aria-modal="true" aria-labelledby="pl-dialog-title" aria-describedby="pl-dialog-help">
+    <div class="em-card-head"><h2 id="pl-dialog-title">Adicionar plugin</h2><button id="pl-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>
+    <p id="pl-dialog-help" class="em-help">O código é o corpo de uma função assíncrona: use <code>await</code> à vontade e o objeto <code>lab</code>: <code>lab.on('screen' | 'log' | 'network', fn)</code>, <code>await lab.screen()</code>, <code>lab.viewModels()</code>, <code>lab.fragments()</code>, <code>lab.inspect(handle)</code>, <code>lab.field(handle, 'a.b')</code>, <code>lab.watch(handle, 'a.b', fn)</code>, <code>lab.composeTree()</code> e a saída <code>lab.ui.text / kv / table / json / clear / badge</code>. Tudo é só leitura.</p>
+    <form id="pl-form" novalidate>
+      <div class="pl-fields">
+        <label class="em-field" for="pl-name"><span>Nome</span><input id="pl-name" type="text" autocomplete="off" spellcheck="false" maxlength="120" required aria-describedby="pl-err-name"></label>
+        <label class="em-field" for="pl-package"><span>Pacote <small>opcional; vazio = qualquer app. Vários separados por vírgula, <code>*</code> como curinga</small></span><input id="pl-package" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="com.exemplo.app"></label>
+      </div>
+      <div class="pl-fields">
+        <label class="em-field" for="pl-updates"><span>Atualização da saída <small>automática: os blocos seguem o plugin; manual: ficam parados até Atualizar no cartão</small></span><select id="pl-updates"><option value="auto">Automática</option><option value="manual">Manual</option></select></label>
+        <label class="em-field" for="pl-height"><span>Altura dos blocos <small>limitada rola acima de 320 px; fixa usa a altura em px</small></span><span class="pl-height-row"><select id="pl-height"><option value="wrap">Limitada (320 px)</option><option value="auto">Conteúdo inteiro</option><option value="fixed">Fixa</option></select><input id="pl-height-px" type="number" min="80" max="2000" step="20" value="240" aria-label="Altura fixa dos blocos em px" hidden></span></label>
+      </div>
+      <small id="pl-err-name" class="em-error" hidden></small>
+      <label class="em-field em-wide" for="pl-code"><span>Código <small>Tab insere espaços; Esc fecha</small></span><textarea id="pl-code" class="pl-code" rows="18" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" aria-describedby="pl-err-code"></textarea></label>
+      <small id="pl-err-code" class="em-error" hidden></small>
+      <div class="em-buttons"><button id="pl-cancel" type="button" class="cp-button">Cancelar</button><button id="pl-save" type="submit" class="cp-button primary">Salvar</button></div>
+    </form>
+  </div>
+</div>
+<div id="summary-overlay" class="summary-overlay" role="dialog" aria-label="Resumo" hidden><button id="summary-close" type="button">Fechar</button><pre id="summary-text"></pre></div>
+</body>
+</html>

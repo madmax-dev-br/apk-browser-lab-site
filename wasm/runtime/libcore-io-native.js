@@ -1,0 +1,811 @@
+import { APKError } from './apk-error.js?v=37ef911634a5';
+import { throwNew } from './java-throw.js?v=37ef911634a5';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=37ef911634a5';
+import { networkOf, isIpLiteral } from './network-native.js?v=37ef911634a5';
+import { Blocked } from './scheduler.js?v=37ef911634a5';
+import { installUdp } from './udp-native.js?v=37ef911634a5';
+import { createLoopback } from './loopback-socket.js?v=37ef911634a5';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=37ef911634a5';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=37ef911634a5';
+
+// Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
+// java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
+// UnixFileSystem_md.c / FileInputStream.c wrappers are followed for argument handling and errno values; the "kernel" below is the app's VirtualFileSystem
+// (src/virtual-fs.js) plus a per-process descriptor table. What the browser VM does not have fails with an explicit Java error: the Linux methods that are not
+// bound here (sockets, signals, process control, xattrs, ...) have no native binding and raise the VM's "Unsupported native" failure when reached.
+const FILE_DISPATCHER = 'Lsun/nio/ch/FileDispatcherImpl;', IOUTIL = 'Lsun/nio/ch/IOUtil;', NATIVE_THREAD = 'Lsun/nio/ch/NativeThread;', FILE_KEY = 'Lsun/nio/ch/FileKey;', FILE_CHANNEL = 'Lsun/nio/ch/FileChannelImpl;', MAPPED = 'Ljava/nio/MappedByteBuffer;';
+const LINUX = 'Llibcore/io/Linux;', FD = 'Ljava/io/FileDescriptor;', FILE = 'Ljava/io/File;', UFS = 'Ljava/io/UnixFileSystem;', FIS = 'Ljava/io/FileInputStream;', OSCONST = 'Landroid/system/OsConstants;', CLOSE_MONITOR = 'Llibcore/io/AsynchronousCloseMonitor;';
+const C = OS_CONSTANTS, STRING = 'Ljava/lang/String;';
+const BOUNDARY = 'libcore-io-boundary';
+const fail = (message) => { throw new APKError(message, { kind: BOUNDARY, backend: 'android13-libcore-io/VirtualFileSystem' }); };
+const ERRNO_BY_NAME = name => { const value = C[name]; if (typeof value !== 'number') fail(`Unknown errno name ${name}`); return value; };
+const FD_KEY = `${FD}->descriptor:I`;
+const decoder = new TextDecoder('utf-8');
+let inodeCounter = 0x4000;
+
+/** Per-runtime process state: descriptor table, umask, stdio line buffers. Descriptors 0-2 exist as on every Android process. */
+export function state(runtime) {
+  if (runtime.libcoreIo) return runtime.libcoreIo;
+  const std = (name, acc) => ({ kind: 'std', name, acc, offset: 0, append: false, ownerTag: 0n, refs: 1 });
+  return runtime.libcoreIo = { table: new Map([[0, { desc: std('stdin', C.O_RDONLY), cloexec: false }], [1, { desc: std('stdout', C.O_WRONLY), cloexec: false }], [2, { desc: std('stderr', C.O_WRONLY), cloexec: false }]]), umask: 0o077, lines: new Map() };
+}
+const files = runtime => runtime.platform.javaIo.fs();
+
+/** Constructs an original framework object through one of its constructors (wide arguments are packed into register pairs the way bytecode passes them). */
+function construct(runtime, owner, parameters, args) {
+  const reference = runtime.allocate(owner);
+  runtime.dispatch({ owner, name: '<init>', parameters, result: 'V', signature: `(${parameters.join('')})V` }, runtime.argumentWords(parameters, args, { receiver: reference }), 'direct');
+  return reference;
+}
+
+// ---- error helpers ----------------------------------------------------------------------------------------------------------------------------
+function throwErrno(runtime, functionName, errno) {
+  const reference = construct(runtime, 'Landroid/system/ErrnoException;', [STRING, 'I'], [functionName, errno]);
+  runtime.throwJavaReference(reference, `${functionName} failed: errno ${errno}`);
+}
+const err = (runtime, functionName, name) => throwErrno(runtime, functionName, ERRNO_BY_NAME(name));
+const text = (runtime, value) => runtime.stringCharacters(value);
+const loopback = createLoopback({ C, err }), loopbackOf = () => loopback;   // the device's loopback TCP (src/loopback-socket.js); its listeners live per runtime
+const requireString = (runtime, value) => { if (value === null) runtime.throwJava('Ljava/lang/NullPointerException;', null); return text(runtime, value); };
+
+// ---- path / node helpers ----------------------------------------------------------------------------------------------------------------------
+/** Resolves a path against the VFS: the node, or the errno name a lookup would fail with (ENOENT, or ENOTDIR when a parent component is a regular file). */
+export function lookup(fs, path) {
+  const canonical = fs.canonical(path.startsWith('/') ? path : '/' + path), node = fs.nodes.get(canonical);
+  if (node) return { node, path: canonical };
+  for (let cursor = fs.parentOf(canonical); ; cursor = fs.parentOf(cursor)) {
+    const ancestor = fs.nodes.get(cursor);
+    if (ancestor) return { error: ancestor.type === 'dir' ? 'ENOENT' : 'ENOTDIR', path: canonical };
+    if (cursor === '/') return { error: 'ENOENT', path: canonical };
+  }
+}
+const modeOf = (runtime, node) => (node.type === 'dir' ? C.S_IFDIR : node.type === 'fifo' ? C.S_IFIFO : C.S_IFREG) | (node.mode & 0o7777);
+export const inode = node => node.ino ??= ++inodeCounter;
+function makeStat(runtime, node, std = false) {
+  const uid = runtime.platform.virtualProcess.uid, sec = Math.floor(node.mtime / 1000), ns = (node.mtime % 1000) * 1_000_000;
+  const TS = 'Landroid/system/StructTimespec;', spec = () => construct(runtime, TS, ['J', 'J'], [BigInt(sec), BigInt(ns)]);
+  const size = node.type === 'file' ? node.size : 0, mode = std ? C.S_IFCHR | 0o620 : modeOf(runtime, node);
+  return construct(runtime, 'Landroid/system/StructStat;', ['J', 'J', 'I', 'J', 'I', 'I', 'J', 'J', TS, TS, TS, 'J', 'J'],
+    [std ? 0xfn : 0xfd00n, std ? 3n : BigInt(inode(node)), mode, node.type === 'dir' ? 2n : 1n, uid, uid, std ? 0x103n : 0n, BigInt(size), spec(), spec(), spec(), 4096n, BigInt(Math.ceil(size / 512))]);
+}
+
+// ---- file descriptors -------------------------------------------------------------------------------------------------------------------------
+function fdNumber(runtime, reference) {
+  if (reference === null) runtime.throwJava('Ljava/lang/NullPointerException;', 'fd == null');
+  return runtime.object(reference).fields.get(FD_KEY) | 0;
+}
+function setFdNumber(runtime, reference, value) { runtime.storeField(runtime.object(reference).fields, FD_KEY, value); }
+function newFileDescriptor(runtime, number) {
+  const reference = construct(runtime, FD, [], []);
+  setFdNumber(runtime, reference, number); return reference;
+}
+export function allocateFd(runtime, desc, minimum = 0, cloexec = false) {
+  const table = state(runtime).table; let number = minimum;
+  while (table.has(number)) number++;
+  if (number >= 1024) return -1;
+  table.set(number, { desc, cloexec }); desc.refs++;
+  if (desc.node && (desc.kind === 'file' || desc.kind === 'dir')) files(runtime).notify(0x20, desc.node);   // IN_OPEN
+  return number;
+}
+function entryOf(runtime, functionName, reference) {
+  const number = fdNumber(runtime, reference), entry = state(runtime).table.get(number);
+  if (!entry) err(runtime, functionName, 'EBADF');
+  return { number, ...entry };
+}
+const readable = desc => (desc.acc & C.O_ACCMODE) !== C.O_WRONLY, writable = desc => (desc.acc & C.O_ACCMODE) !== C.O_RDONLY;
+
+// ---- buffers (byte[] or direct ByteBuffer) ----------------------------------------------------------------------------------------------------
+function bufferAccess(runtime, buffer, offset, count) {
+  if (buffer === null) runtime.throwJava('Ljava/lang/NullPointerException;', null);
+  const object = runtime.object(buffer);
+  if (object.type === '[B') {
+    if (offset < 0 || count < 0 || offset > object.elements.length - count) runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `length=${object.elements.length}; regionStart=${offset}; regionLength=${count}`);
+    return { get: () => Uint8Array.from(object.elements.slice(offset, offset + count), v => v & 255), put: bytes => { for (let i = 0; i < bytes.length; i++) object.elements[offset + i] = (bytes[i] << 24) >> 24; } };
+  }
+  const address = BigInt.asIntN(64, object.fields.get('Ljava/nio/Buffer;->address:J') ?? 0n) + BigInt(offset);   // direct ByteBuffer: libcore reads it through GetDirectBufferAddress
+  return { get: () => readNativeBytes(runtime, address, count), put: bytes => writeNativeBytes(runtime, address, bytes) };
+}
+const stdLog = (runtime, desc, bytes) => {
+  const st = state(runtime), previous = st.lines.get(desc.name) ?? '', combined = previous + decoder.decode(bytes, { stream: true }), parts = combined.split('\n');
+  st.lines.set(desc.name, parts.pop());
+  for (const line of parts) runtime.record(`LOG ${desc.name === 'stderr' ? 'W' : 'I'} System.${desc.name === 'stderr' ? 'err' : 'out'}: ${line}`);   // Android's AndroidPrintStream: one log line per newline
+};
+
+const timevalMillis = value => Number(value.sec * 1000n + value.usec / 1000n);
+// ---- stream sockets (virtual HTTP sockets, src/virtual-http-socket.js) ---------------------------------------------------------------------------------------------------
+/** Turns what the virtual socket reports into what the VM throws: a Java exception for network failures, the lab's explicit unsupported error (also logged) for a conversation it cannot serve. */
+function raiseSocketFailure(runtime, desc, failure) {
+  if (failure instanceof SocketFailure) throwNew(runtime, failure.javaType, failure.message);
+  const unserved = failure instanceof NotServed ? failure : failure?.notServed;
+  if (unserved) {
+    const peer = desc.http.peer, message = `Socket to ${peer.host}:${peer.port}: ${unserved.message}. Only HTTP/1.1 requests over java.net.Socket reach the network in the browser (src/virtual-http-socket.js)`;
+    networkOf(runtime).log?.unsupported({ api: 'Socket', kind: 'socket', method: 'CONNECT', url: `tcp://${peer.host.includes(':') ? `[${peer.host}]` : peer.host}:${peer.port}`, host: peer.host, port: peer.port, message });
+    throw new APKError(message, { kind: 'raw-socket-unsupported' });
+  }
+  if (failure?.type) throwNew(runtime, failure.type, failure.message);
+  throw failure;
+}
+/**
+ * read(2) on a connected stream socket: the bytes the app has not read, -1 at the end of the conversation, or a wait for the exchange in flight (SO_RCVTIMEO: `timeoutMs`).
+ * `deliver(bytes)` stores them in the caller's buffer and returns the count.
+ */
+/** The virtual HTTP socket behind a java.net.Socket (through its SocketImpl's FileDescriptor), or null when it is not connected to one. */
+export function httpSocketOf(runtime, socket) {
+  const impl = runtime.object(socket).fields.get('Ljava/net/Socket;->impl:Ljava/net/SocketImpl;'); if (!impl) return null;
+  const fd = runtime.object(impl).fields.get('Ljava/net/SocketImpl;->fd:Ljava/io/FileDescriptor;'); if (!fd) return null;
+  return state(runtime).table.get(runtime.object(fd).fields.get(FD_KEY) | 0)?.desc.http ?? null;
+}
+export function readSocket(runtime, desc, length, timeoutMs, deliver, roots = [], posix = false) {
+  if (desc.loop) return loopbackOf(runtime).read(runtime, desc, length, timeoutMs, deliver, roots, posix);
+  const http = desc.http; if (!http) { if (desc.pair) return -1; throwNew(runtime, 'Ljava/net/SocketException;', 'Socket is not connected'); }
+  const attempt = () => {
+    http.pump();
+    if (http.closed) throwNew(runtime, 'Ljava/net/SocketException;', 'Socket closed');
+    if (http.available > 0) return deliver(http.take(length));
+    const failure = http.takeError(); if (failure) raiseSocketFailure(runtime, desc, failure);
+    if (http.eof || http.readShut) return -1;
+    return null;
+  };
+  const now = attempt(); if (now !== null) return now;
+  const clock = runtime.platform.clock;
+  return new Blocked({
+    ready: () => http.readable(), deadline: timeoutMs > 0 ? clock.now() + timeoutMs : Infinity, reason: `socket read: ${http.label}`, interruptible: false, roots,
+    finish: timedOut => { const value = attempt(); if (value !== null) return value; if (timedOut) throwNew(runtime, 'Ljava/net/SocketTimeoutException;', 'Read timed out'); throw new APKError('socket read woke without data', { kind: 'network-boundary' }); },
+  });
+}
+export function writeSocket(runtime, desc, bytes, options = {}) {
+  if (desc.loop) return loopbackOf(runtime).write(runtime, desc, bytes, options);
+  const http = desc.http; if (!http) { if (desc.pair) throwNew(runtime, 'Ljava/net/SocketException;', 'sendto failed: EPIPE (Broken pipe)'); throwNew(runtime, 'Ljava/net/SocketException;', 'Socket is not connected'); }
+  try { http.write(bytes); } catch (failure) { raiseSocketFailure(runtime, desc, failure); }
+  return bytes.length;
+}
+
+// ---- the syscalls -----------------------------------------------------------------------------------------------------------------------------
+function open(runtime, path, flags, mode) {
+  const fs = files(runtime), name = requireString(runtime, path), found = lookup(fs, name), acc = flags & C.O_ACCMODE;
+  let node = found.node, created = false;
+  if (!node) {
+    if (!(flags & C.O_CREAT)) err(runtime, 'open', found.error); created = true;
+    const code = fs.createFile(found.path); if (code !== 'ok') err(runtime, 'open', code);
+    node = fs.nodes.get(found.path); node.mode = mode & ~state(runtime).umask & 0o7777;
+  } else if ((flags & C.O_CREAT) && (flags & C.O_EXCL)) err(runtime, 'open', 'EEXIST');
+  if (node.type === 'dir') {
+    if (acc !== C.O_RDONLY) err(runtime, 'open', 'EISDIR');
+    return allocateFd(runtime, { kind: 'dir', node, path: found.path, acc, offset: 0, append: false, ownerTag: 0n, refs: 0 }, 0, !!(flags & C.O_CLOEXEC));
+  }
+  if ((acc !== C.O_RDONLY && (fs.isReadOnly(found.path) || !(node.mode & 0o200))) || (acc !== C.O_WRONLY && !(node.mode & 0o400))) err(runtime, 'open', 'EACCES');
+  if ((flags & C.O_TRUNC) && acc !== C.O_RDONLY) { node.size = 0; node.mtime = fs.now(); if (!created) fs.notify(0x2, node); }   // a file the open just created is not truncated (O_TRUNC is dropped for FMODE_CREATED)
+  const number = allocateFd(runtime, { kind: 'file', node, path: found.path, acc, offset: 0, append: !!(flags & C.O_APPEND), ownerTag: 0n, refs: 0 }, 0, !!(flags & C.O_CLOEXEC));
+  if (number < 0) err(runtime, 'open', 'EMFILE');
+  return number;
+}
+export function release(runtime, number) {
+  const table = state(runtime).table, entry = table.get(number);
+  table.delete(number); entry.desc.refs--;
+  if (entry.desc.refs === 0) {
+    entry.desc.onLastClose?.();
+    const desc = entry.desc; if (desc.node && (desc.kind === 'file' || desc.kind === 'dir')) files(runtime).notify(desc.kind === 'file' && desc.acc !== C.O_RDONLY ? 0x8 : 0x10, desc.node);   // IN_CLOSE_WRITE / IN_CLOSE_NOWRITE
+  }
+}
+function readInto(runtime, fn, fdRef, buffer, offset, count, position) {
+  const entry = entryOf(runtime, fn, fdRef), desc = entry.desc;
+  if (desc.kind === 'dir') err(runtime, fn, 'EISDIR');
+  if (!readable(desc) || (desc.kind === 'std' && desc.name !== 'stdin')) err(runtime, fn, 'EBADF');
+  const target = bufferAccess(runtime, buffer, offset, count);
+  if (desc.kind === 'socket') { if (position !== null) err(runtime, fn, 'ESPIPE'); return count === 0 ? 0 : readSocket(runtime, desc, count, desc.options?.get(`${C.SOL_SOCKET}:${C.SO_RCVTIMEO}`) ? timevalMillis(desc.options.get(`${C.SOL_SOCKET}:${C.SO_RCVTIMEO}`)) : 0, bytes => { target.put(bytes); return bytes.length; }, [buffer], true); }
+  if (desc.kind === 'pipe') {   // a pipe end: data written so far, EOF once every write end is closed, EAGAIN for O_NONBLOCK; a blocking read with nothing to read cannot wait on this scheduler
+    if (position !== null) err(runtime, fn, 'ESPIPE');
+    const pipe = desc.pipe; if (count === 0) return 0;
+    if (pipe.chunks.length === 0) { if (pipe.writers === 0) return 0; if (desc.nonblock) err(runtime, fn, 'EAGAIN'); return new Blocked({ ready: () => pipe.chunks.length > 0 || pipe.writers === 0, retry: true, interruptible: true, reason: `read(pipe): empty pipe, write end open` }); }   // the reading thread parks until a writer writes or closes; the scheduler reports a deadlock when no thread could
+    const taken = []; let need = Math.min(count, pipe.size);
+    while (need > 0) { const chunk = pipe.chunks[0]; if (chunk.length <= need) { taken.push(chunk); need -= chunk.length; pipe.chunks.shift(); } else { taken.push(chunk.subarray(0, need)); pipe.chunks[0] = chunk.subarray(need); need = 0; } }
+    const bytes = new Uint8Array(taken.reduce((n, c) => n + c.length, 0)); let at = 0; for (const c of taken) { bytes.set(c, at); at += c.length; }
+    pipe.size -= bytes.length; target.put(bytes); return bytes.length;
+  }
+  if (count === 0 || desc.kind === 'std') return 0;                       // stdin is an empty stream: end of file
+  const at = position ?? desc.offset, node = desc.node;
+  runtime.fileMappings?.flushNode(node);   // shared file mappings in native memory reach the file before it is read (src/file-mapping.js)
+  if (at >= node.size) return 0;
+  const length = Math.min(count, node.size - at), chunk = new Uint8Array(length); files(runtime).readAt(node, at, chunk, 0, length);
+  target.put(chunk); if (position === null) desc.offset += length; return length;
+}
+function writeFrom(runtime, fn, fdRef, buffer, offset, count, position) {
+  const entry = entryOf(runtime, fn, fdRef), desc = entry.desc;
+  if (desc.kind === 'dir') err(runtime, fn, 'EBADF');
+  if (!writable(desc)) err(runtime, fn, 'EBADF');
+  const source = bufferAccess(runtime, buffer, offset, count), bytes = source.get();
+  if (desc.kind === 'socket') { if (position !== null) err(runtime, fn, 'ESPIPE'); return writeSocket(runtime, desc, bytes, { posix: true }); }
+  if (desc.kind === 'pipe') {
+    if (position !== null) err(runtime, fn, 'ESPIPE');
+    const pipe = desc.pipe; if (pipe.readers === 0) err(runtime, fn, 'EPIPE');
+    if (bytes.length === 0) return 0;
+    if (pipe.size >= 65536) { if (desc.nonblock) err(runtime, fn, 'EAGAIN'); return new Blocked({ ready: () => pipe.readers === 0 || pipe.size < 65536, retry: true, interruptible: true, reason: 'write(pipe): pipe buffer full (64 KiB)' }); }
+    const accepted = Math.min(bytes.length, 65536 - pipe.size);   // a write that does not fit is partial, like write(2) on a pipe; the caller (IoBridge.write) loops
+    pipe.chunks.push(accepted === bytes.length ? bytes : bytes.slice(0, accepted)); pipe.size += accepted; return accepted;
+  }
+  if (desc.kind === 'std') { stdLog(runtime, desc, bytes); return count; }
+  const fs = files(runtime), node = desc.node, at = position ?? (desc.append ? node.size : desc.offset);
+  runtime.fileMappings?.flushNode(node);
+  try { fs.writeAt(node, at, bytes, 0, count); } catch (error) { if (error instanceof RangeError) err(runtime, fn, 'EFBIG'); throw error; }
+  if (position === null) desc.offset = at + count; runtime.fileMappings?.refreshNode(node); return count;
+}
+const sizeOf = desc => desc.kind === 'file' ? desc.node.size : 0;
+function seek(runtime, fn, fdRef, offset, whence) {
+  const desc = entryOf(runtime, fn, fdRef).desc;
+  if (desc.kind === 'std' || desc.kind === 'pipe') err(runtime, fn, 'ESPIPE');
+  const base = whence === C.SEEK_SET ? 0 : whence === C.SEEK_CUR ? desc.offset : whence === C.SEEK_END ? sizeOf(desc) : -1;
+  if (base < 0) err(runtime, fn, 'EINVAL');
+  const target = BigInt(base) + offset; if (target < 0n) err(runtime, fn, 'EINVAL');
+  desc.offset = Number(target); return target;
+}
+const mutate = (runtime, fn, path) => {
+  const fs = files(runtime), name = requireString(runtime, path), found = lookup(fs, name);
+  if (!found.node) err(runtime, fn, found.error);
+  return { fs, ...found };
+};
+
+export function createLibcoreIoNativeBindings() {
+  const bindings = new Map(), add = (owner, signature, callback) => bindings.set(`${owner}->${signature}`, callback);
+  const L = (signature, callback) => add(LINUX, signature, callback);
+
+  // ---- android.system.OsConstants
+  // writeStatic, not the static table: OsConstants is a DEX class, and on the WebAssembly core its statics live in the core's metaspace
+  add(OSCONST, 'initConstants()V', runtime => { for (const [name, value] of Object.entries(C)) runtime.writeStatic({ owner: OSCONST, name, type: 'I', key: `${OSCONST}->${name}:I` }, value | 0); });
+
+  // ---- descriptors and I/O
+  // pipe2: an in-process byte queue shared by a read end and a write end (64 KiB capacity like the kernel's default); the ends report EOF / EPIPE when the other side is closed
+  L('pipe2(I)[Ljava/io/FileDescriptor;', (runtime, [, flags]) => {
+    const pipe = { chunks: [], size: 0, readers: 1, writers: 1 }, nonblock = !!(flags & C.O_NONBLOCK), cloexec = !!(flags & C.O_CLOEXEC);
+    const read = { kind: 'pipe', pipe, acc: C.O_RDONLY, offset: 0, append: false, ownerTag: 0n, refs: 0, nonblock, onLastClose: () => { pipe.readers = 0; } };
+    const write = { kind: 'pipe', pipe, acc: C.O_WRONLY, offset: 0, append: false, ownerTag: 0n, refs: 0, nonblock, onLastClose: () => { pipe.writers = 0; } };
+    const readNumber = allocateFd(runtime, read, 0, cloexec); if (readNumber < 0) err(runtime, 'pipe2', 'EMFILE');
+    const writeNumber = allocateFd(runtime, write, 0, cloexec); if (writeNumber < 0) { release(runtime, readNumber); err(runtime, 'pipe2', 'EMFILE'); }
+    const array = runtime.newArray(`[${FD}`, 2); runtime.array(array).elements = [newFileDescriptor(runtime, readNumber), newFileDescriptor(runtime, writeNumber)]; return array;
+  });
+  L('open(Ljava/lang/String;II)Ljava/io/FileDescriptor;', (runtime, [, path, flags, mode]) => newFileDescriptor(runtime, open(runtime, path, flags, mode)));
+  // ---- sockets. The browser cannot open raw TCP: a stream socket that connects to a host the device network policy permits becomes a *virtual HTTP socket* (src/virtual-http-socket.js):
+  // the descriptor serves HTTP/1.1 to the app over its byte streams while the real exchanges go through the same path as HttpURLConnection (fetch). A conversation that is not HTTP fails
+  // explicitly at its first bytes. connect() obeys the policy and fails with the errno an Android device reports (ENETUNREACH offline or for a host the policy does not allow).
+  const INET = 'Ljava/net/InetAddress;', SOCKADDR = 'Ljava/net/SocketAddress;';
+  L('socket(III)Ljava/io/FileDescriptor;', (runtime, [, domain, type, protocol]) => {
+    if (!runtime.platform.holdsPermission?.(runtime, 'android.permission.INTERNET')) err(runtime, 'socket', 'EACCES');
+    if (domain !== C.AF_INET && domain !== C.AF_INET6) err(runtime, 'socket', 'EAFNOSUPPORT');
+    const base = type & 0xff; if (base !== C.SOCK_STREAM && base !== C.SOCK_DGRAM) err(runtime, 'socket', 'EPROTONOSUPPORT');
+    const number = allocateFd(runtime, { kind: 'socket', domain, type: base, acc: C.O_RDWR, offset: 0, append: false, ownerTag: 0n, refs: 0, connected: false }, 0, !!(type & C.SOCK_CLOEXEC));
+    if (number < 0) err(runtime, 'socket', 'EMFILE');
+    return newFileDescriptor(runtime, number);
+  });
+  L('socketpair(IIILjava/io/FileDescriptor;Ljava/io/FileDescriptor;)V', (runtime, [, domain, type, protocol, first, second]) => {   // PlainSocketImpl's "marker" descriptors (dup2'ed over a closing socket); both ends are inert
+    for (const target of [first, second]) {
+      const number = allocateFd(runtime, { kind: 'socket', domain, type: type & 0xff, acc: C.O_RDWR, offset: 0, append: false, ownerTag: 0n, refs: 0, connected: true, pair: true }, 0, false);
+      if (number < 0) err(runtime, 'socketpair', 'EMFILE'); setFdNumber(runtime, target, number);
+    }
+  });
+  L('shutdown(Ljava/io/FileDescriptor;I)V', (runtime, [, fdRef, how]) => {
+    const entry = entryOf(runtime, 'shutdown', fdRef); if (entry.desc.kind !== 'socket') err(runtime, 'shutdown', 'ENOTSOCK'); if (!entry.desc.connected) err(runtime, 'shutdown', 'ENOTCONN');
+    entry.desc.http?.shutdown(how, C.SHUT_RD, C.SHUT_WR); loopback.shutdown(runtime, entry.desc, how);
+  });
+  const udp = installUdp({ loopback, L, C, err, entryOf, state, construct, byteArray: (runtime, bytes) => byteArray(runtime, bytes), interfaces: runtime => interfaces(runtime), INET, SOCKADDR });
+  L(`getsockname(Ljava/io/FileDescriptor;)${SOCKADDR}`, (runtime, [, fdRef]) => {   // bound sockets answer their address and port; one that never bound or connected is on the wildcard address, port 0
+    const desc = entryOf(runtime, 'getsockname', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'getsockname', 'ENOTSOCK');
+    return udp.boundAddress(runtime, desc);
+  });
+  // ---- network interfaces (libcore_io_Linux.cpp getifaddrs / if_nametoindex / ioctlFlags / ioctlMTU, under java.net.NetworkInterface). The virtual device has the loopback
+  // interface and one Wi-Fi interface, wlan0, which is up with the 10.0.2.15/24 address WifiManager and ConnectivityManager report while connectivity is online and
+  // down without an address while it is offline. Per interface the kernel lists an AF_PACKET entry (the hardware address) and one entry per IP address.
+  const IFF_UP = 0x1, IFF_BROADCAST = 0x2, IFF_LOOPBACK = 0x8, IFF_RUNNING = 0x40, IFF_MULTICAST = 0x1000;
+  const interfaces = runtime => {
+    const online = runtime.platform.device?.connectivity !== 'offline';
+    return [
+      { name: 'lo', index: 1, flags: IFF_UP | IFF_LOOPBACK | IFF_RUNNING, mtu: 65536, mac: [0, 0, 0, 0, 0, 0], addresses: [{ addr: [127, 0, 0, 1], mask: [255, 0, 0, 0], broadcast: null }, { addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], mask: [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], broadcast: null }] },
+      { name: 'wlan0', index: 2, flags: online ? IFF_UP | IFF_BROADCAST | IFF_RUNNING | IFF_MULTICAST : IFF_BROADCAST | IFF_MULTICAST, mtu: 1500, mac: [2, 0, 0, 0, 0, 0], addresses: online ? [{ addr: [10, 0, 2, 15], mask: [255, 255, 255, 0], broadcast: [10, 0, 2, 255] }] : [] },
+    ];
+  };
+  const address = (runtime, bytes) => bytes === null ? null : runtime.dispatch({ owner: INET, name: 'getByAddress', parameters: ['[B'], result: INET, signature: `([B)${INET}` }, [byteArray(runtime, bytes)], 'static');
+  const IFADDRS = 'Landroid/system/StructIfaddrs;';
+  L(`getifaddrs()[${IFADDRS}`, runtime => {
+    const entries = [];
+    for (const face of interfaces(runtime)) {
+      entries.push(construct(runtime, IFADDRS, [STRING, 'I', INET, INET, INET, '[B'], [face.name, face.flags, null, null, null, byteArray(runtime, face.mac)]));
+      for (const a of face.addresses) entries.push(construct(runtime, IFADDRS, [STRING, 'I', INET, INET, INET, '[B'], [face.name, face.flags, address(runtime, a.addr), address(runtime, a.mask), address(runtime, a.broadcast), null]));
+    }
+    const array = runtime.newArray(`[${IFADDRS}`, entries.length); runtime.object(array).elements = entries; return array;
+  });
+  L('if_nametoindex(Ljava/lang/String;)I', (runtime, [, name]) => { if (name === null || name === 0) throwNew(runtime, 'Ljava/lang/NullPointerException;', 'name == null'); return interfaces(runtime).find(face => face.name === text(runtime, name))?.index ?? 0; });
+  L('if_indextoname(I)Ljava/lang/String;', (runtime, [, index]) => interfaces(runtime).find(face => face.index === index)?.name ?? null);
+  const interfaceOf = (runtime, functionName, fdRef, name) => {
+    const desc = entryOf(runtime, functionName, fdRef).desc; if (desc.kind !== 'socket') err(runtime, functionName, 'ENOTSOCK');
+    const face = interfaces(runtime).find(value => value.name === text(runtime, name)); if (!face) err(runtime, functionName, 'ENODEV'); return face;
+  };
+  L('ioctlFlags(Ljava/io/FileDescriptor;Ljava/lang/String;)I', (runtime, [, fdRef, name]) => interfaceOf(runtime, 'ioctlFlags', fdRef, name).flags);
+  L('ioctlMTU(Ljava/io/FileDescriptor;Ljava/lang/String;)I', (runtime, [, fdRef, name]) => interfaceOf(runtime, 'ioctlMTU', fdRef, name).mtu);
+  L(`getnameinfo(${INET}I)Ljava/lang/String;`, (runtime, [, address, flags]) => {   // numeric form only: the VM has no reverse DNS (NI_NUMERICHOST is what libcore asks for)
+    const raw = runtime.object(runtime.dispatch({ owner: INET, name: 'getAddress', parameters: [], result: '[B', signature: '()[B' }, [address], 'virtual')).elements.map(v => v & 255);
+    if (raw.length === 4) return raw.join('.');
+    const groups = []; for (let i = 0; i < 16; i += 2) groups.push((raw[i] << 8) | raw[i + 1]);
+    if (groups.slice(0, 5).every(g => g === 0) && groups[5] === 0xffff) return `::ffff:${raw.slice(12).join('.')}`;
+    let bestStart = -1, bestLength = 0;
+    for (let i = 0; i < 8;) { if (groups[i] !== 0) { i++; continue; } let j = i; while (j < 8 && groups[j] === 0) j++; if (j - i > bestLength) { bestStart = i; bestLength = j - i; } i = j; }
+    if (bestLength < 2) return groups.map(g => g.toString(16)).join(':');
+    const left = groups.slice(0, bestStart).map(g => g.toString(16)).join(':'), right = groups.slice(bestStart + bestLength).map(g => g.toString(16)).join(':');
+    return `${left}::${right}`;
+  });
+  const connectLoopback = (runtime, desc, bytes, port) => {
+    const net = networkOf(runtime), shown = bytes.length === 4 ? bytes.join('.') : '::1', url = `tcp://${shown}:${port}`;
+    try { loopback.connect(runtime, desc, bytes, port, target => udp.bindEphemeral(runtime, 'connect', desc, target)); }
+    catch (failure) {
+      if (failure?.name === 'JavaException') { const code = (runtime.object(failure.value).fields.get('Landroid/system/ErrnoException;->errno:I')) ?? 0; if (code === C.ECONNREFUSED) net.stats.loopbackRefused++; net.log?.loopback({ url, host: shown, port, refused: code === C.ECONNREFUSED }); }
+      throw failure;
+    }
+    net.stats.loopbackConnects++; net.log?.loopback({ url, host: shown, port });
+  };
+  const connectSocket = (runtime, fdRef, host, port, address = null) => {
+    const entry = entryOf(runtime, 'connect', fdRef); if (entry.desc.kind !== 'socket') err(runtime, 'connect', 'ENOTSOCK');
+    if (udp.isDatagram(entry.desc)) return udp.connectDatagram(runtime, fdRef, udp.bytesOf(runtime, address), port);
+    const desc = entry.desc; if (desc.connected) err(runtime, 'connect', 'EISCONN'); if (desc.listener) err(runtime, 'connect', 'EISCONN');
+    host ??= hostOf(runtime, address);
+    const peerBytes = address === null ? null : udp.bytesOf(runtime, address);
+    const net = networkOf(runtime), name = net.resolvedName(host) ?? host;   // a connect by the address a lookup returned is a connect to the name that was looked up
+    // Loopback (127.0.0.0/8, ::1, the any-address) is the device's own interface: a socket of this process listening there is connected at once, offline or not, whatever the allow-list says,
+    // and never through a virtual HTTP socket. With nothing listening the connect is refused (ECONNREFUSED) -- unless the user listed that loopback host in the allow-list on purpose, which
+    // designates a server on the machine that runs the browser and keeps the virtual HTTP socket path below.
+    if (peerBytes && loopback.isLoopback(peerBytes) && (loopback.listening(runtime, peerBytes, port) || !((net.online && net.allowed(name, port)) || net.mockServesHost(name, port, { hostless: false }) || net.redirectServesHost(name, port)))) return connectLoopback(runtime, desc, peerBytes, port);   // a mock or a "Redirecionar hosts" rule naming this loopback host explicitly keeps the virtual HTTP socket
+    net.noteHost(name);
+    const target = { api: 'Socket', kind: 'socket', method: 'CONNECT', url: `tcp://${name.includes(':') ? `[${name}]` : name}:${port}`, host: name, port };
+    if ((!net.online || !net.allowed(name, port)) && !net.mockServesHost(name, port) && !net.redirectServesHost(name, port)) { net.stats.denied++;   // a host a mock serves (src/endpoint-mocks.js) connects: its requests are answered by the lab; a host a redirect rule serves (src/host-map.js) connects: its exchanges go to the rule's target
+      if (!net.online) net.stats.offlineRejections++; net.logRefusal(target); err(runtime, 'connect', 'ENETUNREACH'); }
+    const isLoopbackName = /^127\./.test(host) || host === '::1' || host === 'localhost';
+    if (!desc.bound) udp.bindEphemeral(runtime, 'connect', desc, isLoopbackName ? [127, 0, 0, 1] : [10, 0, 2, 15]);   // the source address a connected socket reports: the Wi-Fi address (loopback for a loopback peer)
+    if (peerBytes) desc.peerAddr = { bytes: peerBytes, port };
+    desc.http = new VirtualHttpSocket({ net, peer: { host: name, literal: host, port } }); desc.connected = true;
+    desc.onLastClose = () => desc.http.dispose();
+  };
+  const hostOf = (runtime, address) => runtime.stringCharacters(runtime.dispatch({ owner: INET, name: 'getHostAddress', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [address], 'virtual'));
+  // java.net.SocketInputStream.socketRead0 / SocketOutputStream.socketWrite0 (libcore's OpenJdk natives): the streams of Socket.getInputStream/getOutputStream; `timeout` is SO_TIMEOUT in ms (0 = none)
+  const SIS = 'Ljava/net/SocketInputStream;', SOS = 'Ljava/net/SocketOutputStream;';
+  add(SIS, 'socketRead0(Ljava/io/FileDescriptor;[BIII)I', (runtime, [, fdRef, buffer, offset, length, timeout]) => {
+    const desc = entryOf(runtime, 'read', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'read', 'ENOTSOCK');
+    const cells = runtime.object(buffer).elements;
+    if (offset < 0 || length < 0 || offset > cells.length - length) runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `length=${cells.length}; regionStart=${offset}; regionLength=${length}`);
+    return readSocket(runtime, desc, length, timeout, bytes => { for (let i = 0; i < bytes.length; i++) cells[offset + i] = (bytes[i] << 24) >> 24; return bytes.length; }, [buffer]);
+  });
+  add(SOS, 'socketWrite0(Ljava/io/FileDescriptor;[BII)V', (runtime, [, fdRef, buffer, offset, length]) => {
+    const desc = entryOf(runtime, 'write', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'write', 'ENOTSOCK');
+    const cells = runtime.object(buffer).elements;
+    if (offset < 0 || length < 0 || offset > cells.length - length) runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `length=${cells.length}; regionStart=${offset}; regionLength=${length}`);
+    const result = writeSocket(runtime, desc, Uint8Array.from(cells.slice(offset, offset + length), v => v & 255), { all: true });
+    if (result instanceof Blocked) return result;
+  });
+  // ---- listen / accept over the loopback stack (src/loopback-socket.js). Nothing outside the device ever connects: only sockets of this process reach a listener.
+  L('listen(Ljava/io/FileDescriptor;I)V', (runtime, [, fdRef, backlog]) => {
+    const desc = entryOf(runtime, 'listen', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'listen', 'ENOTSOCK');
+    if (desc.type !== C.SOCK_STREAM) err(runtime, 'listen', 'EOPNOTSUPP');
+    if (!desc.bound && !desc.listener && !desc.connected) udp.bindEphemeral(runtime, 'listen', desc, new Array(desc.domain === C.AF_INET6 ? 16 : 4).fill(0));   // an unbound socket listens on a kernel-chosen port, like autobind
+    loopback.listen(runtime, 'listen', desc, backlog);
+  });
+  L(`accept(Ljava/io/FileDescriptor;${SOCKADDR})Ljava/io/FileDescriptor;`, (runtime, [, fdRef, peer]) => {
+    const desc = entryOf(runtime, 'accept', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'accept', 'ENOTSOCK');
+    const taken = loopback.accept(runtime, 'accept', desc); if (taken instanceof Blocked) return taken;
+    const number = allocateFd(runtime, taken, 0, false);
+    if (number < 0) { taken.loop.close(); err(runtime, 'accept', 'EMFILE'); }
+    if (peer !== null && peer !== 0) {   // the peer's address goes into the caller's InetSocketAddress (the way recvfrom fills its source)
+      const fresh = construct(runtime, 'Ljava/net/InetSocketAddress;', [INET, 'I'], [address(runtime, taken.peerAddr.bytes), taken.peerAddr.port]), holder = 'Ljava/net/InetSocketAddress;->holder:Ljava/net/InetSocketAddress$InetSocketAddressHolder;';
+      runtime.storeField(runtime.object(peer).fields, holder, runtime.object(fresh).fields.get(holder));
+    }
+    return newFileDescriptor(runtime, number);
+  });
+  L(`getpeername(Ljava/io/FileDescriptor;)${SOCKADDR}`, (runtime, [, fdRef]) => {
+    const desc = entryOf(runtime, 'getpeername', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'getpeername', 'ENOTSOCK');
+    if (!desc.connected || !desc.peerAddr) err(runtime, 'getpeername', 'ENOTCONN');
+    return construct(runtime, 'Ljava/net/InetSocketAddress;', [INET, 'I'], [address(runtime, desc.peerAddr.bytes), desc.peerAddr.port]);
+  });
+  L(`connect(Ljava/io/FileDescriptor;${INET}I)V`, (runtime, [, fdRef, address, port]) => connectSocket(runtime, fdRef, null, port, address));
+  L(`connect(Ljava/io/FileDescriptor;${SOCKADDR})V`, (runtime, [, fdRef, socketAddress]) => {
+    const address = runtime.dispatch({ owner: 'Ljava/net/InetSocketAddress;', name: 'getAddress', parameters: [], result: INET, signature: `()${INET}` }, [socketAddress], 'virtual');
+    const port = runtime.dispatch({ owner: 'Ljava/net/InetSocketAddress;', name: 'getPort', parameters: [], result: 'I', signature: '()I' }, [socketAddress], 'virtual');
+    connectSocket(runtime, fdRef, null, port, address);
+  });
+  L('close(Ljava/io/FileDescriptor;)V', (runtime, [, fdRef]) => {
+    const number = fdNumber(runtime, fdRef); if (!state(runtime).table.has(number)) err(runtime, 'close', 'EBADF');
+    release(runtime, number); setFdNumber(runtime, fdRef, -1);                    // libcore_io_Linux.cpp marks the Java descriptor invalid after closing it
+  });
+  L('dup(Ljava/io/FileDescriptor;)Ljava/io/FileDescriptor;', (runtime, [, fdRef]) => newFileDescriptor(runtime, allocateFd(runtime, entryOf(runtime, 'dup', fdRef).desc)));
+  L('dup2(Ljava/io/FileDescriptor;I)Ljava/io/FileDescriptor;', (runtime, [, fdRef, target]) => {
+    const entry = entryOf(runtime, 'dup2', fdRef), table = state(runtime).table;
+    if (target < 0 || target >= 1024) err(runtime, 'dup2', 'EBADF');
+    if (target !== entry.number) { if (table.has(target)) release(runtime, target); table.set(target, { desc: entry.desc, cloexec: false }); entry.desc.refs++; }
+    return newFileDescriptor(runtime, target);
+  });
+  L('fcntlInt(Ljava/io/FileDescriptor;II)I', (runtime, [, fdRef, command, argument]) => {
+    const entry = entryOf(runtime, 'fcntl', fdRef);
+    if (command === C.F_DUPFD || command === C.F_DUPFD_CLOEXEC) { const number = allocateFd(runtime, entry.desc, argument, command === C.F_DUPFD_CLOEXEC); if (number < 0) err(runtime, 'fcntl', 'EMFILE'); return number; }
+    if (command === C.F_SETFD) { entry.cloexec = !!(argument & C.FD_CLOEXEC); state(runtime).table.get(entry.number).cloexec = entry.cloexec; return 0; }
+    if (command === C.F_SETFL) { entry.desc.append = !!(argument & C.O_APPEND); entry.desc.nonblock = !!(argument & C.O_NONBLOCK); return 0; }
+    err(runtime, 'fcntl', 'EINVAL');
+  });
+  L('fcntlVoid(Ljava/io/FileDescriptor;I)I', (runtime, [, fdRef, command]) => {
+    const entry = entryOf(runtime, 'fcntl', fdRef);
+    if (command === C.F_GETFD) return entry.cloexec ? C.FD_CLOEXEC : 0;
+    if (command === C.F_GETFL) return entry.desc.acc | (entry.desc.append ? C.O_APPEND : 0) | (entry.desc.nonblock ? C.O_NONBLOCK : 0);
+    err(runtime, 'fcntl', 'EINVAL');
+  });
+  L('readBytes(Ljava/io/FileDescriptor;Ljava/lang/Object;II)I', (runtime, [, fdRef, buffer, offset, count]) => readInto(runtime, 'read', fdRef, buffer, offset, count, null));
+  L('preadBytes(Ljava/io/FileDescriptor;Ljava/lang/Object;IIJ)I', (runtime, [, fdRef, buffer, offset, count, position]) => {
+    if (entryOf(runtime, 'pread', fdRef).desc.kind === 'std') err(runtime, 'pread', 'ESPIPE');
+    return readInto(runtime, 'pread', fdRef, buffer, offset, count, Number(position));
+  });
+  L('writeBytes(Ljava/io/FileDescriptor;Ljava/lang/Object;II)I', (runtime, [, fdRef, buffer, offset, count]) => writeFrom(runtime, 'write', fdRef, buffer, offset, count, null));
+  L('pwriteBytes(Ljava/io/FileDescriptor;Ljava/lang/Object;IIJ)I', (runtime, [, fdRef, buffer, offset, count, position]) => {
+    if (entryOf(runtime, 'pwrite', fdRef).desc.kind === 'std') err(runtime, 'pwrite', 'ESPIPE');
+    return writeFrom(runtime, 'pwrite', fdRef, buffer, offset, count, Number(position));
+  });
+  L('lseek(Ljava/io/FileDescriptor;JI)J', (runtime, [, fdRef, offset, whence]) => seek(runtime, 'lseek', fdRef, offset, whence));
+  L('fstat(Ljava/io/FileDescriptor;)Landroid/system/StructStat;', (runtime, [, fdRef]) => {
+    const desc = entryOf(runtime, 'fstat', fdRef).desc;
+    return makeStat(runtime, desc.kind === 'std' ? { type: 'file', size: 0, mtime: 0, mode: 0 } : desc.kind === 'pipe' ? { type: 'fifo', size: desc.pipe.size, mtime: files(runtime).now(), mode: 0o600 } : desc.node, desc.kind === 'std');
+  });
+  L('ftruncate(Ljava/io/FileDescriptor;J)V', (runtime, [, fdRef, length]) => {
+    const desc = entryOf(runtime, 'ftruncate', fdRef).desc;
+    if (desc.kind !== 'file' || !writable(desc) || length < 0n) err(runtime, 'ftruncate', 'EINVAL');
+    const node = desc.node, target = Number(length);
+    runtime.fileMappings?.flushNode(node);
+    if (target < node.size) { node.size = target; node.mtime = files(runtime).now(); } else if (target > node.size) files(runtime).writeAt(node, target, new Uint8Array(0), 0, 0);
+    runtime.fileMappings?.refreshNode(node);
+  });
+  for (const name of ['fsync', 'fdatasync']) L(`${name}(Ljava/io/FileDescriptor;)V`, (runtime, [, fdRef]) => { const desc = entryOf(runtime, name, fdRef).desc; if (desc.kind !== 'file' && desc.kind !== 'dir') err(runtime, name, 'EINVAL'); });   // the filesystem is memory: every write is already stable
+  L('isatty(Ljava/io/FileDescriptor;)Z', (runtime, [, fdRef]) => { entryOf(runtime, 'isatty', fdRef); return 0; });
+  L('posix_fallocate(Ljava/io/FileDescriptor;JJ)V', (runtime, [, fdRef, offset, length]) => {
+    const desc = entryOf(runtime, 'posix_fallocate', fdRef).desc; if (desc.kind !== 'file' || !writable(desc)) err(runtime, 'posix_fallocate', 'EBADF');
+    const end = Number(offset + length); if (end > desc.node.size) files(runtime).writeAt(desc.node, end, new Uint8Array(0), 0, 0);
+  });
+  L('android_fdsan_exchange_owner_tag(Ljava/io/FileDescriptor;JJ)V', (runtime, [, fdRef, previous, next]) => {
+    const desc = entryOf(runtime, 'android_fdsan_exchange_owner_tag', fdRef).desc;
+    if (desc.ownerTag !== previous) runtime.record(`LOG E libc: fdsan: failed to exchange ownership of file descriptor: fd ${fdNumber(runtime, fdRef)} is owned by 0x${desc.ownerTag.toString(16)}, was expected to be 0x${previous.toString(16)}`);
+    desc.ownerTag = next;
+  });
+  L('android_fdsan_get_owner_tag(Ljava/io/FileDescriptor;)J', (runtime, [, fdRef]) => entryOf(runtime, 'android_fdsan_get_owner_tag', fdRef).desc.ownerTag);
+
+  // ---- paths
+  L('access(Ljava/lang/String;I)Z', (runtime, [, path, mode]) => {
+    const { fs, node, path: resolved } = mutate(runtime, 'access', path);
+    // the caller is the file's owner (every file in the app's world belongs to the app uid), so the owner permission bits decide
+    if (((mode & C.W_OK) && (fs.isReadOnly(resolved) || !(node.mode & 0o200))) || ((mode & C.R_OK) && !(node.mode & 0o400)) || ((mode & C.X_OK) && !(node.mode & 0o100))) err(runtime, 'access', 'EACCES');
+    return 1;
+  });
+  const statPath = name => (runtime, [, path]) => makeStat(runtime, mutate(runtime, name, path).node);
+  L('stat(Ljava/lang/String;)Landroid/system/StructStat;', statPath('stat')); L('lstat(Ljava/lang/String;)Landroid/system/StructStat;', statPath('lstat'));   // the virtual filesystem has no symbolic links
+  L('mkdir(Ljava/lang/String;I)V', (runtime, [, path, mode]) => {
+    const fs = files(runtime), name = requireString(runtime, path), found = lookup(fs, name);
+    if (found.node) err(runtime, 'mkdir', 'EEXIST');
+    if (found.error === 'ENOTDIR') err(runtime, 'mkdir', 'ENOTDIR');
+    const code = fs.mkdir(found.path); if (code !== 'ok') err(runtime, 'mkdir', code);
+    fs.nodes.get(found.path).mode = mode & ~state(runtime).umask & 0o7777;
+  });
+  L('remove(Ljava/lang/String;)V', (runtime, [, path]) => { const { fs, path: resolved } = mutate(runtime, 'remove', path), code = fs.delete(resolved); if (code !== 'ok') err(runtime, 'remove', code); });
+  L('unlink(Ljava/lang/String;)V', (runtime, [, path]) => {
+    const { fs, node, path: resolved } = mutate(runtime, 'unlink', path);
+    if (node.type === 'dir') err(runtime, 'unlink', 'EISDIR');
+    const code = fs.delete(resolved); if (code !== 'ok') err(runtime, 'unlink', code);
+  });
+  L('rename(Ljava/lang/String;Ljava/lang/String;)V', (runtime, [, from, to]) => {
+    const { fs, path: source } = mutate(runtime, 'rename', from), target = lookup(fs, requireString(runtime, to));
+    if (target.error === 'ENOTDIR') err(runtime, 'rename', 'ENOTDIR');
+    const code = fs.rename(source, target.path); if (code !== 'ok') err(runtime, 'rename', code);
+  });
+  L('chmod(Ljava/lang/String;I)V', (runtime, [, path, mode]) => { const { fs, node, path: resolved } = mutate(runtime, 'chmod', path); if (fs.isReadOnly(resolved)) err(runtime, 'chmod', 'EPERM'); node.mode = mode & 0o7777; fs.notify(0x4, node); });   // IN_ATTRIB
+  L('fchmod(Ljava/io/FileDescriptor;I)V', (runtime, [, fdRef, mode]) => { const desc = entryOf(runtime, 'fchmod', fdRef).desc; if (desc.kind === 'std') err(runtime, 'fchmod', 'EINVAL'); desc.node.mode = mode & 0o7777; });
+  L('realpath(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, path]) => mutate(runtime, 'realpath', path).path);
+  L('readlink(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, path]) => { mutate(runtime, 'readlink', path); err(runtime, 'readlink', 'EINVAL'); });   // exists, but no path is a symbolic link here
+  L('umaskImpl(I)I', (runtime, [, mask]) => { const st = state(runtime), old = st.umask; st.umask = mask & 0o777; return old; });
+  L('strerror(I)Ljava/lang/String;', (runtime, [, errno]) => STRERROR[errno] ?? `Unknown error ${errno}`);
+
+  // ---- process identity and environment: the single virtual process of the platform
+  const ids = name => L(`${name}()I`, runtime => runtime.platform.virtualProcess.uid);
+  ['getuid', 'geteuid', 'getgid', 'getegid'].forEach(ids);
+  for (const name of ['getpid', 'gettid']) L(`${name}()I`, runtime => runtime.platform.virtualProcess.pid);
+  L('getppid()I', () => 1);                                                   // zygote's pid on a booted device
+  L('getenv(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, name]) => runtime.platform.environment[requireString(runtime, name)] ?? null);
+  L('environ()[Ljava/lang/String;', runtime => { const entries = Object.entries(runtime.platform.environment).map(([k, v]) => `${k}=${v}`), array = runtime.newArray('[Ljava/lang/String;', entries.length); runtime.array(array).elements = entries; return array; });
+  L('sysconf(I)J', (runtime, [, name]) => {
+    const table = { [C._SC_PAGESIZE]: 4096n, [C._SC_PAGE_SIZE]: 4096n, [C._SC_NPROCESSORS_CONF]: 8n, [C._SC_NPROCESSORS_ONLN]: 8n, [C._SC_CLK_TCK]: 100n, [C._SC_OPEN_MAX]: 1024n, [C._SC_ARG_MAX]: 131072n, [C._SC_IOV_MAX]: 1024n, [C._SC_NGROUPS_MAX]: 65536n };
+    return table[name] ?? -1n;                                                // sysconf returns -1 for a name the kernel does not report
+  });
+  L('uname()Landroid/system/StructUtsname;', runtime => {
+    return construct(runtime, 'Landroid/system/StructUtsname;', Array(5).fill(STRING), ['Linux', 'localhost', '5.10.43-android12-9', '#1 SMP PREEMPT', 'aarch64']);
+  });
+
+  // ---- java.io.FileDescriptor / AsynchronousCloseMonitor
+  add(FD, 'sync()V', (runtime, [self]) => {
+    const entry = state(runtime).table.get(runtime.object(self).fields.get(FD_KEY) | 0);
+    if (!entry || (entry.desc.kind !== 'file' && entry.desc.kind !== 'dir')) throwNew(runtime, 'Ljava/io/SyncFailedException;', 'sync failed');
+  });
+  add(FD, 'isSocket(I)Z', (runtime, [number]) => state(runtime).table.get(number)?.desc.kind === 'socket' ? 1 : 0);
+  add(CLOSE_MONITOR, 'signalBlockedThreads(Ljava/io/FileDescriptor;)V', () => undefined);       // file reads and writes complete synchronously, so no thread is ever blocked in a descriptor operation
+
+  // ---- java.io.FileInputStream (the descriptor-based natives Android keeps)
+  add(FIS, 'initIDs()V', () => undefined);                                                       // caches JNI field ids in OpenJDK; the VM resolves fields by name
+  add(FIS, 'available0()I', (runtime, [self]) => {
+    const fdRef = runtime.object(self).fields.get(`${FIS}->fd:${FD}`), number = fdNumber(runtime, fdRef), entry = state(runtime).table.get(number);
+    if (!entry) throwNew(runtime, 'Ljava/io/IOException;', 'Stream Closed');
+    const desc = entry.desc; if (desc.kind !== 'file') return 0;
+    return Math.max(0, Math.min(0x7fffffff, desc.node.size - desc.offset));
+  });
+  add(FIS, 'skip0(J)J', (runtime, [self, n]) => {
+    const fdRef = runtime.object(self).fields.get(`${FIS}->fd:${FD}`), number = fdNumber(runtime, fdRef), entry = state(runtime).table.get(number);
+    if (!entry) throwNew(runtime, 'Ljava/io/IOException;', 'Stream Closed');
+    const desc = entry.desc; if (desc.kind !== 'file') throwNew(runtime, 'Ljava/io/FileInputStream$UseManualSkipException;');   // lseek fails with ESPIPE
+    const start = desc.offset, end = start + Number(n); if (end < 0) throwNew(runtime, 'Ljava/io/IOException;', 'Seek error');
+    desc.offset = end; return BigInt(end - start);
+  });
+
+  // ---- java.io.UnixFileSystem (UnixFileSystem_md.c)
+  const BA_EXISTS = 1, BA_REGULAR = 2, BA_DIRECTORY = 4;
+  const fileOf = (runtime, file) => runtime.stringCharacters(runtime.object(file).fields.get(`${FILE}->path:${STRING}`));
+  const find = (runtime, path) => lookup(files(runtime), path);
+  add(UFS, 'initIDs()V', () => undefined);
+  add(UFS, 'canonicalize0(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, path]) => files(runtime).canonical(requireString(runtime, path)));
+  add(UFS, 'getBooleanAttributes0(Ljava/lang/String;)I', (runtime, [, path]) => { const { node } = find(runtime, requireString(runtime, path)); return node ? BA_EXISTS | (node.type === 'dir' ? BA_DIRECTORY : BA_REGULAR) : 0; });
+  add(UFS, 'getLastModifiedTime0(Ljava/io/File;)J', (runtime, [, file]) => { const { node } = find(runtime, fileOf(runtime, file)); return node ? BigInt(Math.trunc(node.mtime)) : 0n; });
+  add(UFS, 'setLastModifiedTime0(Ljava/io/File;J)Z', (runtime, [, file, time]) => { const { node, path } = find(runtime, fileOf(runtime, file)); if (!node || files(runtime).isReadOnly(path)) return 0; node.mtime = Number(time); files(runtime).notify(0x4, node); return 1; });   // IN_ATTRIB
+  add(UFS, 'setPermission0(Ljava/io/File;IZZ)Z', (runtime, [, file, access, enable, ownerOnly]) => {
+    const { node, path } = find(runtime, fileOf(runtime, file)); if (!node || files(runtime).isReadOnly(path)) return 0;
+    let bits = 0; if (access & 4) bits |= ownerOnly ? 0o400 : 0o444; if (access & 2) bits |= ownerOnly ? 0o200 : 0o222; if (access & 1) bits |= ownerOnly ? 0o100 : 0o111;
+    node.mode = enable ? node.mode | bits : node.mode & ~bits; return 1;
+  });
+  add(UFS, 'setReadOnly0(Ljava/io/File;)Z', (runtime, [, file]) => { const { node, path } = find(runtime, fileOf(runtime, file)); if (!node || files(runtime).isReadOnly(path)) return 0; node.mode &= ~0o222; return 1; });
+  add(UFS, 'createFileExclusively0(Ljava/lang/String;)Z', (runtime, [, path]) => {
+    const fs = files(runtime), found = find(runtime, requireString(runtime, path));
+    if (found.node) return 0;                                                  // EEXIST
+    const code = found.error === 'ENOTDIR' ? 'ENOTDIR' : fs.createFile(found.path);
+    if (code === 'ok') { fs.nodes.get(found.path).mode = 0o666 & ~state(runtime).umask; return 1; }
+    throwNew(runtime, 'Ljava/io/IOException;', STRERROR[ERRNO_BY_NAME(code)]);   // JNU_ThrowIOExceptionWithLastError: just the strerror text
+  });
+  add(UFS, 'list0(Ljava/io/File;)[Ljava/lang/String;', (runtime, [, file]) => {
+    const { node, path } = find(runtime, fileOf(runtime, file)); if (!node || node.type !== 'dir') return null;
+    const names = files(runtime).list(path), array = runtime.newArray('[Ljava/lang/String;', names.length); runtime.array(array).elements = names; return array;
+  });
+  add(UFS, 'createDirectory0(Ljava/io/File;)Z', (runtime, [, file]) => {
+    const fs = files(runtime), found = find(runtime, fileOf(runtime, file)); if (found.node || found.error === 'ENOTDIR') return 0;
+    if (fs.mkdir(found.path) !== 'ok') return 0; fs.nodes.get(found.path).mode = 0o777 & ~state(runtime).umask; return 1;
+  });
+
+  // ---- sun.nio.ch (FileChannelImpl and its dispatcher): FileDispatcherImpl.c, IOUtil.c, FileKey.c, FileChannelImpl.c over the same descriptor table
+  const IOS_EOF = -1, IOS_UNSUPPORTED_CASE = -6;
+  const ioError = (runtime, name) => throwNew(runtime, 'Ljava/io/IOException;', STRERROR[ERRNO_BY_NAME(name)]);   // JNU_ThrowIOExceptionWithLastError
+  const descOf = (runtime, fdRef, forWrite) => {
+    const entry = state(runtime).table.get(fdNumber(runtime, fdRef)); if (!entry) ioError(runtime, 'EBADF');
+    const desc = entry.desc;
+    if (desc.kind === 'dir') ioError(runtime, 'EISDIR');
+    if (desc.kind === 'closed' || (forWrite ? !writable(desc) : !readable(desc))) ioError(runtime, 'EBADF');
+    return desc;
+  };
+  const pull = (runtime, desc, at, address, length) => {      // file bytes -> native memory
+    if (desc.kind === 'std' || at >= desc.node.size || length === 0) return 0;
+    const count = Math.min(length, desc.node.size - at), chunk = new Uint8Array(count); files(runtime).readAt(desc.node, at, chunk, 0, count);
+    writeNativeBytes(runtime, address, chunk); return count;
+  };
+  const push = (runtime, desc, at, address, length) => {      // native memory -> file bytes
+    const bytes = readNativeBytes(runtime, address, length);
+    if (desc.kind === 'std') { stdLog(runtime, desc, bytes); return length; }
+    try { files(runtime).writeAt(desc.node, at, bytes, 0, length); } catch (error) { if (error instanceof RangeError) ioError(runtime, 'EFBIG'); throw error; }
+    return length;
+  };
+  const readOp = (runtime, fdRef, address, length, position) => {
+    const desc = descOf(runtime, fdRef, false), at = position ?? desc.offset, count = pull(runtime, desc, at, BigInt(address), length);
+    if (position === null) desc.offset += count; return count === 0 && length > 0 ? IOS_EOF : count;
+  };
+  const writeOp = (runtime, fdRef, address, length, position) => {
+    const desc = descOf(runtime, fdRef, true), at = position ?? (desc.append && desc.kind === 'file' ? desc.node.size : desc.offset);
+    const count = push(runtime, desc, at, BigInt(address), length); if (position === null) desc.offset = at + count; return count;
+  };
+  const vector = (runtime, address, count) => { const raw = readNativeBytes(runtime, address, count * 16), view = new DataView(raw.buffer, raw.byteOffset, raw.byteLength); return Array.from({ length: count }, (_, i) => ({ base: view.getBigInt64(i * 16, true), length: Number(view.getBigInt64(i * 16 + 8, true)) })); };
+  add(FILE_DISPATCHER, 'read0(Ljava/io/FileDescriptor;JI)I', (runtime, [fdRef, address, length]) => readOp(runtime, fdRef, address, length, null));
+  add(FILE_DISPATCHER, 'pread0(Ljava/io/FileDescriptor;JIJ)I', (runtime, [fdRef, address, length, position]) => readOp(runtime, fdRef, address, length, Number(position)));
+  add(FILE_DISPATCHER, 'write0(Ljava/io/FileDescriptor;JI)I', (runtime, [fdRef, address, length]) => writeOp(runtime, fdRef, address, length, null));
+  add(FILE_DISPATCHER, 'pwrite0(Ljava/io/FileDescriptor;JIJ)I', (runtime, [fdRef, address, length, position]) => writeOp(runtime, fdRef, address, length, Number(position)));
+  add(FILE_DISPATCHER, 'readv0(Ljava/io/FileDescriptor;JI)J', (runtime, [fdRef, address, count]) => {
+    let total = 0;
+    for (const { base, length } of vector(runtime, address, count)) { const n = readOp(runtime, fdRef, base, length, null); if (n === IOS_EOF) return total === 0 ? BigInt(IOS_EOF) : BigInt(total); total += n; if (n < length) break; }
+    return BigInt(total);
+  });
+  add(FILE_DISPATCHER, 'writev0(Ljava/io/FileDescriptor;JI)J', (runtime, [fdRef, address, count]) => { let total = 0; for (const { base, length } of vector(runtime, address, count)) total += writeOp(runtime, fdRef, base, length, null); return BigInt(total); });
+  add(FILE_DISPATCHER, 'force0(Ljava/io/FileDescriptor;Z)I', (runtime, [fdRef]) => { descOf(runtime, fdRef, false); return 0; });
+  add(FILE_DISPATCHER, 'truncate0(Ljava/io/FileDescriptor;J)I', (runtime, [fdRef, size]) => {
+    const desc = descOf(runtime, fdRef, true); if (desc.kind !== 'file') ioError(runtime, 'EINVAL');
+    const target = Number(size), node = desc.node; if (target < node.size) { node.size = target; node.mtime = files(runtime).now(); } else if (target > node.size) files(runtime).writeAt(node, target, new Uint8Array(0), 0, 0);
+    return 0;
+  });
+  add(FILE_DISPATCHER, 'size0(Ljava/io/FileDescriptor;)J', (runtime, [fdRef]) => { const entry = state(runtime).table.get(fdNumber(runtime, fdRef)); if (!entry || entry.desc.kind === 'closed') ioError(runtime, 'EBADF'); return BigInt(sizeOf(entry.desc)); });
+  add(FILE_DISPATCHER, 'lock0(Ljava/io/FileDescriptor;ZJJZ)I', (runtime, [fdRef, , , , shared]) => { descOf(runtime, fdRef, !shared); return 0; });      // LOCKED: fcntl record locks never conflict inside one process, and the VM is one process
+  add(FILE_DISPATCHER, 'release0(Ljava/io/FileDescriptor;JJ)V', (runtime, [fdRef]) => { if (!state(runtime).table.has(fdNumber(runtime, fdRef))) ioError(runtime, 'EBADF'); });   // unlocking needs no access mode
+  add(FILE_DISPATCHER, 'closeIntFD(I)V', (runtime, [number]) => { if (!state(runtime).table.has(number)) ioError(runtime, 'EBADF'); release(runtime, number); });
+  add(FILE_DISPATCHER, 'close0(Ljava/io/FileDescriptor;)V', (runtime, [fdRef]) => { const number = fdNumber(runtime, fdRef); if (number >= 0) { if (!state(runtime).table.has(number)) ioError(runtime, 'EBADF'); release(runtime, number); } });
+  add(FILE_DISPATCHER, 'preClose0(Ljava/io/FileDescriptor;)V', (runtime, [fdRef]) => {      // FileDispatcherImpl.c dup2()s a closed socket over the descriptor so that blocked I/O fails; nothing blocks here, but later I/O must fail with EBADF
+    const table = state(runtime).table, number = fdNumber(runtime, fdRef), entry = table.get(number); if (!entry) ioError(runtime, 'EBADF');
+    entry.desc.refs--; table.set(number, { desc: { kind: 'closed', acc: 0, offset: 0, refs: 1 }, cloexec: false });
+  });
+  add(IOUTIL, 'initIDs()V', () => undefined);
+  add(IOUTIL, 'fdVal(Ljava/io/FileDescriptor;)I', (runtime, [fdRef]) => fdNumber(runtime, fdRef));
+  add(IOUTIL, 'setfdVal(Ljava/io/FileDescriptor;I)V', (runtime, [fdRef, value]) => setFdNumber(runtime, fdRef, value));
+  add(IOUTIL, 'configureBlocking(Ljava/io/FileDescriptor;Z)V', (runtime, [fdRef]) => { descOf(runtime, fdRef, false); });   // regular files are always in blocking mode and never block
+  add(IOUTIL, 'fdLimit()I', () => 1024);
+  add(IOUTIL, 'iovMax()I', () => 1024);
+  add(IOUTIL, 'randomBytes([B)Z', (runtime, [array]) => { const target = runtime.array(array), bytes = new Uint8Array(target.elements.length); globalThis.crypto.getRandomValues(bytes); for (let i = 0; i < bytes.length; i++) target.elements[i] = (bytes[i] << 24) >> 24; return 1; });
+  add(NATIVE_THREAD, 'init()V', () => undefined);
+  add(NATIVE_THREAD, 'current()J', () => 1n);    // a thread token for NativeThreadSet; signal() has nothing to interrupt because nothing blocks
+  add(NATIVE_THREAD, 'signal(J)V', () => undefined);
+  add(FILE_KEY, 'initIDs()V', () => undefined);
+  add(FILE_KEY, 'init(Ljava/io/FileDescriptor;)V', (runtime, [self, fdRef]) => {
+    const desc = entryOf(runtime, 'fstat', fdRef).desc, node = desc.kind === 'std' ? null : desc.node, fields = runtime.object(self).fields;
+    runtime.storeField(fields, `${FILE_KEY}->st_dev:J`, node ? 0xfd00n : 0xfn); runtime.storeField(fields, `${FILE_KEY}->st_ino:J`, node ? BigInt(inode(node)) : 3n);
+  });
+
+  // ---- FileChannelImpl.c: mapping, positioning and sendfile. A mapping is a block of the VM's native arena filled from the file; MAP_SHARED writes reach the file at
+  // force()/unmap time (the VirtualFileSystem cannot alias its byte buffer into arena memory), so unlike a kernel mapping it is not coherent with concurrent read()/write() calls.
+  const maps = runtime => state(runtime).maps ??= new Map();
+  const writeBack = (runtime, mapping, from = 0, to = mapping.length) => {
+    if (mapping.prot !== 1) return;                                          // only MAP_RW (MAP_SHARED) mappings update the file
+    const bytes = readNativeBytes(runtime, mapping.address + BigInt(from), to - from), size = mapping.node.size;
+    if (mapping.position + from >= size) return;
+    files(runtime).writeAt(mapping.node, mapping.position + from, bytes, 0, Math.min(bytes.length, size - mapping.position - from));
+  };
+  add(FILE_CHANNEL, 'initIDs()J', () => 4096n);                                // the page size: allocationGranularity
+  add(FILE_CHANNEL, 'position0(Ljava/io/FileDescriptor;J)J', (runtime, [, fdRef, offset]) => {
+    const desc = entryOf(runtime, 'lseek', fdRef).desc; if (desc.kind === 'std' || desc.kind === 'closed') ioError(runtime, 'ESPIPE');
+    if (offset >= 0n) desc.offset = Number(offset); return BigInt(desc.offset);
+  });
+  add(FILE_CHANNEL, 'map0(IJJ)J', (runtime, [self, prot, position, length]) => {
+    const fdRef = runtime.object(self).fields.get(`${FILE_CHANNEL}->fd:${FD}`), desc = descOf(runtime, fdRef, false);
+    if (desc.kind !== 'file') ioError(runtime, 'ENODEV');
+    const address = allocateNativeBlock(runtime, Number(length)), at = Number(position);
+    pull(runtime, desc, at, address, Number(length)); maps(runtime).set(address, { address, node: desc.node, position: at, length: Number(length), prot });
+    return address;
+  });
+  add(FILE_CHANNEL, 'unmap0(JJ)I', (runtime, [address]) => {
+    const mapping = maps(runtime).get(address); if (!mapping) return -1;
+    writeBack(runtime, mapping); maps(runtime).delete(address); freeNativeBlock(runtime, address); return 0;
+  });
+  add(FILE_CHANNEL, 'transferTo0(Ljava/io/FileDescriptor;JJLjava/io/FileDescriptor;)J', () => BigInt(IOS_UNSUPPORTED_CASE));   // sendfile(2) unavailable: FileChannelImpl falls back to its read/write copy loop
+  add(MAPPED, 'isLoaded0(JJI)Z', () => 1);                                     // arena memory is always resident
+  add(MAPPED, 'load0(JJ)V', () => undefined);
+  add(MAPPED, 'force0(Ljava/io/FileDescriptor;JJ)V', (runtime, [, , address, length]) => {
+    for (const mapping of maps(runtime).values()) {
+      const from = Number(address - mapping.address); if (from < -mapping.length || from >= mapping.length) continue;
+      const start = Math.max(0, from), end = Math.min(mapping.length, from + Number(length)); if (start < end) writeBack(runtime, mapping, start, end);
+    }
+  });
+
+  // ---- sun.nio.fs (java.nio.file's Unix provider: UnixNativeDispatcher, LinuxNativeDispatcher, UnixCopyFile) over the same VirtualFileSystem and descriptor table.
+  // Paths arrive as NUL-terminated byte strings in the VM's native arena (NativeBuffer); failures are sun.nio.fs.UnixException(errno) like UnixNativeDispatcher.c. The virtual
+  // filesystem has no symbolic or hard links, no openat family, no extended attributes and no mount table: those report the errno a kernel without them reports.
+  const UND = 'Lsun/nio/fs/UnixNativeDispatcher;', LND = 'Lsun/nio/fs/LinuxNativeDispatcher;', UFA = 'Lsun/nio/fs/UnixFileAttributes;', UFSA = 'Lsun/nio/fs/UnixFileStoreAttributes;', UEX = 'Lsun/nio/fs/UnixException;', UCF = 'Lsun/nio/fs/UnixCopyFile;';
+  const nioFail = (runtime, name) => runtime.throwJavaReference(construct(runtime, UEX, ['I'], [ERRNO_BY_NAME(name)]), `UnixException ${name}`);
+  /** Runs a libcore-style operation (which raises android.system.ErrnoException) and re-raises its errno as a UnixException. */
+  const unixOp = (runtime, operation) => {
+    try { return operation(); }
+    catch (error) {
+      if (error?.name === 'JavaException' && runtime.typeOf(error.value) === 'Landroid/system/ErrnoException;') {
+        const errno = runtime.object(error.value).fields.get('Landroid/system/ErrnoException;->errno:I');
+        runtime.throwJavaReference(construct(runtime, UEX, ['I'], [errno]), `UnixException ${errno}`);
+      }
+      throw error;
+    }
+  };
+  const cstring = (runtime, address) => {
+    let at = BigInt(address); const bytes = [];
+    for (;;) { const [byte] = readNativeBytes(runtime, at++, 1); if (byte === 0) break; bytes.push(byte); if (bytes.length > 4096) nioFail(runtime, 'ENAMETOOLONG'); }
+    return decoder.decode(Uint8Array.from(bytes));
+  };
+  const byteArray = (runtime, bytes) => { const array = runtime.newArray('[B', bytes.length); runtime.object(array).elements = Array.from(bytes, v => (v << 24) >> 24); return array; };
+  const nioFind = (runtime, address) => { const fs = files(runtime), found = lookup(fs, cstring(runtime, address)); if (!found.node) nioFail(runtime, found.error); return { fs, ...found }; };
+  const setAttributes = (runtime, attrs, node, std = false) => {
+    const uid = runtime.platform.virtualProcess.uid, object = runtime.object(attrs), set = (name, type, value) => runtime.storeField(object.fields, `${UFA}->${name}:${type}`, value);
+    const seconds = BigInt(Math.floor(node.mtime / 1000)), nanos = BigInt((node.mtime % 1000) * 1_000_000), size = node.type === 'file' ? node.size : 0;
+    set('st_mode', 'I', std ? C.S_IFCHR | 0o620 : modeOf(runtime, node)); set('st_ino', 'J', BigInt(inode(node))); set('st_dev', 'J', 0xfd00n); set('st_rdev', 'J', 0n);
+    set('st_nlink', 'I', node.type === 'dir' ? 2 : 1); set('st_uid', 'I', uid); set('st_gid', 'I', uid); set('st_size', 'J', BigInt(size));
+    for (const kind of ['atime', 'mtime', 'ctime']) { set(`st_${kind}_sec`, 'J', seconds); set(`st_${kind}_nsec`, 'J', nanos); }
+  };
+  const statInto = (runtime, address, attrs) => { const { node } = nioFind(runtime, address); setAttributes(runtime, attrs, node); };
+  const nioTable = runtime => state(runtime).nio ??= { dirs: new Map(), next: 1n };
+  const dirEntry = (runtime, handle) => nioTable(runtime).dirs.get(BigInt(handle)) ?? nioFail(runtime, 'EBADF');
+  const descriptor = (runtime, number) => state(runtime).table.get(number)?.desc ?? nioFail(runtime, 'EBADF');
+  const nativeIo = (runtime, number, address, count, reading) => {
+    const desc = descriptor(runtime, number), fs = files(runtime);
+    if (desc.kind === 'dir') nioFail(runtime, 'EISDIR');
+    if (reading ? !readable(desc) : !writable(desc)) nioFail(runtime, 'EBADF');
+    if (desc.kind === 'std') { if (reading) return 0; stdLog(runtime, desc, readNativeBytes(runtime, address, count)); return count; }
+    const node = desc.node;
+    if (reading) {
+      if (desc.offset >= node.size || count === 0) return 0;
+      const length = Math.min(count, node.size - desc.offset), chunk = new Uint8Array(length); fs.readAt(node, desc.offset, chunk, 0, length);
+      writeNativeBytes(runtime, address, chunk); desc.offset += length; return length;
+    }
+    const bytes = readNativeBytes(runtime, address, count), at = desc.append ? node.size : desc.offset;
+    try { fs.writeAt(node, at, bytes, 0, count); } catch (error) { if (error instanceof RangeError) nioFail(runtime, 'EFBIG'); throw error; }
+    desc.offset = at + count; return count;
+  };
+  add(UND, 'init()I', () => 0);                                          // no openat / futimes / birthtime: the provider takes its path-based fallbacks
+  add(UND, 'getcwd()[B', runtime => byteArray(runtime, new TextEncoder().encode('/')));
+  add(UND, 'strerror(I)[B', (runtime, [errno]) => byteArray(runtime, new TextEncoder().encode(STRERROR[errno] ?? `Unknown error ${errno}`)));
+  add(UND, 'dup(I)I', (runtime, [number]) => { const number2 = allocateFd(runtime, descriptor(runtime, number)); if (number2 < 0) nioFail(runtime, 'EMFILE'); return number2; });
+  add(UND, 'open0(JII)I', (runtime, [address, flags, mode]) => unixOp(runtime, () => open(runtime, cstring(runtime, address), flags, mode)));
+  add(UND, 'openat0(IJII)I', runtime => nioFail(runtime, 'ENOSYS'));
+  add(UND, 'close(I)V', (runtime, [number]) => { if (state(runtime).table.has(number)) release(runtime, number); });
+  add(UND, 'fopen0(JJ)J', runtime => nioFail(runtime, 'ENOENT'));
+  add(UND, 'fclose(J)V', () => undefined);
+  add(UND, 'link0(JJ)V', runtime => nioFail(runtime, 'EPERM'));
+  add(UND, 'symlink0(JJ)V', runtime => nioFail(runtime, 'EPERM'));
+  add(UND, 'mknod0(JIJ)V', runtime => nioFail(runtime, 'EPERM'));
+  add(UND, 'unlink0(J)V', (runtime, [address]) => { const { fs, node, path } = nioFind(runtime, address); if (node.type === 'dir') nioFail(runtime, 'EISDIR'); const code = fs.delete(path); if (code !== 'ok') nioFail(runtime, code); });
+  add(UND, 'unlinkat0(IJI)V', runtime => nioFail(runtime, 'ENOSYS'));
+  add(UND, 'rmdir0(J)V', (runtime, [address]) => { const { fs, node, path } = nioFind(runtime, address); if (node.type !== 'dir') nioFail(runtime, 'ENOTDIR'); const code = fs.delete(path); if (code !== 'ok') nioFail(runtime, code); });
+  add(UND, 'rename0(JJ)V', (runtime, [from, to]) => {
+    const { fs, node, path } = nioFind(runtime, from), target = lookup(fs, cstring(runtime, to));
+    if (target.node && target.node.type === 'dir' && node.type !== 'dir') nioFail(runtime, 'EISDIR');
+    if (target.node && target.node.type !== 'dir' && node.type === 'dir') nioFail(runtime, 'ENOTDIR');
+    if (target.error === 'ENOTDIR') nioFail(runtime, 'ENOTDIR');
+    const code = fs.rename(path, target.path); if (code !== 'ok') nioFail(runtime, code);
+  });
+  add(UND, 'renameat0(IJIJ)V', runtime => nioFail(runtime, 'ENOSYS'));
+  add(UND, 'mkdir0(JI)V', (runtime, [address, mode]) => {
+    const fs = files(runtime), found = lookup(fs, cstring(runtime, address));
+    if (found.node) nioFail(runtime, 'EEXIST'); if (found.error === 'ENOTDIR') nioFail(runtime, 'ENOTDIR');
+    const code = fs.mkdir(found.path); if (code !== 'ok') nioFail(runtime, code);
+    fs.nodes.get(found.path).mode = mode & ~state(runtime).umask & 0o7777;
+  });
+  add(UND, 'readlink0(J)[B', (runtime, [address]) => { nioFind(runtime, address); nioFail(runtime, 'EINVAL'); });          // exists, but no path is a symbolic link
+  add(UND, 'realpath0(J)[B', (runtime, [address]) => byteArray(runtime, new TextEncoder().encode(nioFind(runtime, address).path)));
+  add(UND, 'stat0(JLsun/nio/fs/UnixFileAttributes;)V', (runtime, [address, attrs]) => statInto(runtime, address, attrs));
+  add(UND, 'lstat0(JLsun/nio/fs/UnixFileAttributes;)V', (runtime, [address, attrs]) => statInto(runtime, address, attrs));
+  add(UND, 'fstat(ILsun/nio/fs/UnixFileAttributes;)V', (runtime, [number, attrs]) => { const desc = descriptor(runtime, number); setAttributes(runtime, attrs, desc.kind === 'std' ? { type: 'file', size: 0, mtime: runtime.platform.clock.wall?.() ?? 0, mode: 0o620 } : desc.node, desc.kind === 'std'); });
+  add(UND, 'fstatat0(IJILsun/nio/fs/UnixFileAttributes;)V', runtime => nioFail(runtime, 'ENOSYS'));
+  for (const name of ['chown0', 'lchown0']) add(UND, `${name}(JII)V`, (runtime, [address]) => { nioFind(runtime, address); });
+  add(UND, 'fchown(III)V', (runtime, [number]) => { descriptor(runtime, number); });
+  add(UND, 'chmod0(JI)V', (runtime, [address, mode]) => { const { fs, node, path } = nioFind(runtime, address); if (fs.isReadOnly(path)) nioFail(runtime, 'EPERM'); node.mode = mode & 0o7777; });
+  add(UND, 'fchmod(II)V', (runtime, [number, mode]) => { const desc = descriptor(runtime, number); if (desc.kind === 'std') nioFail(runtime, 'EINVAL'); desc.node.mode = mode & 0o7777; });
+  add(UND, 'utimes0(JJJ)V', (runtime, [address, , modified]) => { const { fs, node, path } = nioFind(runtime, address); if (fs.isReadOnly(path)) nioFail(runtime, 'EPERM'); node.mtime = Number(modified) / 1000; });
+  add(UND, 'futimes(IJJ)V', (runtime, [number, , modified]) => { const desc = descriptor(runtime, number); if (desc.kind === 'std') nioFail(runtime, 'EINVAL'); desc.node.mtime = Number(modified) / 1000; });
+  add(UND, 'opendir0(J)J', (runtime, [address]) => {
+    const { fs, node, path } = nioFind(runtime, address); if (node.type !== 'dir') nioFail(runtime, 'ENOTDIR');
+    const table = nioTable(runtime), handle = table.next++; table.dirs.set(handle, { names: fs.list(path) ?? [], index: 0 }); return handle;
+  });
+  add(UND, 'fdopendir(I)J', runtime => nioFail(runtime, 'ENOSYS'));
+  add(UND, 'closedir(J)V', (runtime, [handle]) => { if (!nioTable(runtime).dirs.delete(BigInt(handle))) nioFail(runtime, 'EBADF'); });
+  add(UND, 'readdir(J)[B', (runtime, [handle]) => { const dir = dirEntry(runtime, handle); return dir.index < dir.names.length ? byteArray(runtime, new TextEncoder().encode(dir.names[dir.index++])) : null; });
+  add(UND, 'read(IJI)I', (runtime, [number, address, count]) => nativeIo(runtime, number, address, count, true));
+  add(UND, 'write(IJI)I', (runtime, [number, address, count]) => nativeIo(runtime, number, address, count, false));
+  add(UND, 'access0(JI)V', (runtime, [address, mode]) => {
+    const { fs, node, path } = nioFind(runtime, address), owner = node.mode >> 6;
+    if (((mode & 4) && !(owner & 4)) || ((mode & 2) && (!(owner & 2) || fs.isReadOnly(path))) || ((mode & 1) && !(owner & 1))) nioFail(runtime, 'EACCES');
+  });
+  const principal = (runtime, id) => new TextEncoder().encode(id >= 10000 ? `u0_a${id - 10000}` : id === 0 ? 'root' : id === 1000 ? 'system' : String(id));
+  add(UND, 'getpwuid(I)[B', (runtime, [id]) => byteArray(runtime, principal(runtime, id)));
+  add(UND, 'getgrgid(I)[B', (runtime, [id]) => byteArray(runtime, principal(runtime, id)));
+  const idOf = (runtime, address) => { const name = cstring(runtime, address), uid = runtime.platform.virtualProcess.uid; return name === decoder.decode(principal(runtime, uid)) ? uid : name === 'root' ? 0 : name === 'system' ? 1000 : -1; };
+  add(UND, 'getpwnam0(J)I', (runtime, [address]) => idOf(runtime, address));
+  add(UND, 'getgrnam0(J)I', (runtime, [address]) => idOf(runtime, address));
+  add(UND, 'statvfs0(JLsun/nio/fs/UnixFileStoreAttributes;)V', (runtime, [address, attrs]) => {
+    nioFind(runtime, address);
+    const object = runtime.object(attrs), set = (name, value) => runtime.storeField(object.fields, `${UFSA}->${name}:J`, value);   // the emulated 8 GiB data volume of StatFs (~70 % free)
+    set('f_frsize', 4096n); set('f_blocks', 2097152n); set('f_bfree', 1468006n); set('f_bavail', 1468006n);
+  });
+  const pathconf = (runtime, name) => name === 3 ? 255n : name === 4 ? 4096n : name === 5 ? 4096n : nioFail(runtime, 'EINVAL');   // _PC_NAME_MAX, _PC_PATH_MAX, _PC_PIPE_BUF
+  add(UND, 'pathconf0(JI)J', (runtime, [address, name]) => { nioFind(runtime, address); return pathconf(runtime, name); });
+  add(UND, 'fpathconf(II)J', (runtime, [number, name]) => { descriptor(runtime, number); return pathconf(runtime, name); });
+  add(LND, 'init()V', () => undefined);
+  add(LND, 'setmntent0(JJ)J', () => 1n);                                // an empty mount table: FileSystem.getFileStores() has nothing to list
+  add(LND, 'getmntent(JLsun/nio/fs/UnixMountEntry;)I', () => 0);
+  add(LND, 'endmntent(J)V', () => undefined);
+  add(LND, 'fgetxattr0(IJJI)I', runtime => nioFail(runtime, 'EOPNOTSUPP'));
+  add(LND, 'fsetxattr0(IJJI)V', runtime => nioFail(runtime, 'EOPNOTSUPP'));
+  add(LND, 'fremovexattr0(IJ)V', runtime => nioFail(runtime, 'EOPNOTSUPP'));
+  add(LND, 'flistxattr(IJI)I', runtime => nioFail(runtime, 'EOPNOTSUPP'));
+  add(UCF, 'transfer(IIJ)V', (runtime, [to, from]) => {                // UnixCopyFile.transfer: copy the rest of `from` into `to`
+    const source = descriptor(runtime, from), target = descriptor(runtime, to), fs = files(runtime);
+    if (source.kind !== 'file' || target.kind !== 'file') nioFail(runtime, 'EBADF');
+    const length = Math.max(0, source.node.size - source.offset), chunk = new Uint8Array(length); fs.readAt(source.node, source.offset, chunk, 0, length);
+    try { fs.writeAt(target.node, target.append ? target.node.size : target.offset, chunk, 0, length); } catch (error) { if (error instanceof RangeError) nioFail(runtime, 'EFBIG'); throw error; }
+    source.offset += length; target.offset += length;
+  });
+  return bindings;
+}

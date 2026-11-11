@@ -1,0 +1,1204 @@
+import { APKError } from './apk-error.js?v=37ef911634a5';
+import { BUCKET } from './time-breakdown.js?v=37ef911634a5';
+import { Blocked, QUANTUM } from './scheduler.js?v=37ef911634a5';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=37ef911634a5';
+
+// Frame-based DEX interpreter.
+//
+// A Java thread owns an explicit stack of Frames (method, registers, pc). invoke instructions that resolve to DEX code push a frame and keep running in the same
+// JS loop instead of recursing, so a thread's whole Java state lives in heap objects and can be parked and resumed by the scheduler. Calls that go through the
+// host (natives, SHIM/platform bridges, reflection, class initializers, JNI callbacks) are ordinary JS calls; when they call back into Java they start a nested
+// run loop on the same thread (runNested), which returns before the host call does. Only a thread whose frames all belong to the outermost run loop can be
+// switched out; blocking inside a nested run is reported by the scheduler (see scheduler.js).
+// The value helpers live in apk-runtime.js (which imports this module); it hands them over once through bindSupport() so the two modules need no import cycle.
+let fail, isNull, int, wide, narrow, narrowVariant, equal, signed8, signed16, floatNumber, floatBits, doubleNumber, doubleBits, javaInt, javaLong, defaultValue, wordCount, methodKey, WIDE_HIGH, longArithmetic, arithmetic, JavaException;
+export function bindSupport(support) {
+  ({ fail, isNull, int, wide, narrow, narrowVariant, equal, signed8, signed16, floatNumber, floatBits, doubleNumber, doubleBits, javaInt, javaLong, defaultValue, wordCount, methodKey, WIDE_HIGH, longArithmetic, arithmetic, JavaException } = support);
+}
+const H = {
+  getWide(regs, n) { if (regs[n + 1] !== WIDE_HIGH) fail(`Invalid wide high register v${n + 1}`); return wide(regs[n]); },
+  putWide(regs, n, value) { regs[n] = BigInt.asIntN(64, value); regs[n + 1] = WIDE_HIGH; },
+};
+
+/** A resolved DEX body that dispatch() hands back to the run loop instead of executing recursively. */
+export class PendingCall { constructor(method, code, args, definition = null) { this.method = method; this.code = code; this.args = args; this.definition = definition; } }
+
+/**
+ * A host step that needs Java code to run and then continues: a native returns `new Invoke(method, args, mode, then, onError)`. The interpreter runs the call as ordinary
+ * frames (so it can park and resume) and feeds the result to then(value); then() may return a value (the native's result), another Invoke, or a Blocked. onError(error)
+ * may handle an exception thrown by the callee. This is how host code orchestrates Java without nesting a run loop.
+ */
+export class Invoke { constructor(method, args, mode = 'virtual', then = null, onError = null) { this.method = method; this.args = args; this.mode = mode; this.then = then; this.onError = onError; } }
+/** Marker frame under the callee of an Invoke; holds the continuation. It has no registers or code. */
+class ContFrame { constructor(invoke) { this.cont = invoke; this.method = null; this.code = null; } }
+const OUT_FRAME = 1, OUT_BLOCKED = 2, DRIVE = { kind: 'drive' }, NO_GETTER = Symbol('no getter'), HANDOFF = Symbol('bridge outcome handed to the run loop');
+
+export class Frame {
+  constructor(method, code, regs, prog) {
+    this.method = method; this.code = code; this.prog = prog; this.regs = regs; this.pc = 0; this.callPc = 0; this.cur = -1; this.rv = undefined; this.result = undefined; this.pendingException = null;
+    this.handoff = null; this.handoffArgs = null;   // a bridge outcome a compiled caller hands to the run loop (see H.bridgeCall): consumed by the invoke at this.pc
+    this.busy = false;                              // true on the ghost of a direct form (see "Direct form" below): a frame with no registers that stands for a running direct activation
+  }
+}
+
+// Direct form (tier 2). A method that is called often also gets a second compiled form (baseline-compiler.js, `direct`): a JavaScript function over the method's argument words whose
+// DEX registers are JavaScript locals and whose calls to other direct forms are JavaScript calls. The activation keeps a *ghost* on the thread's frame stack -- a Frame of the method
+// with no registers (prog.ghost, one per method: a recursive method has it on the stack several times) -- so the stack depth, stack traces, the profile sampler and the unwinding of exceptions see the same stack as
+// before. What a direct activation cannot do in place, it does by becoming frames again:
+//   - DEOPT (a signal, thrown like an exception): every direct activation it passes replaces its ghost by a real Frame (registers from its locals, pc at the instruction to run next
+//     or after the call it was in) and rethrows; the run loop that entered the direct code catches it and goes on with the frames, which finish in the interpreter or the frame form.
+//     Thrown when the thread must stop running here (a quantum boundary with a collection due or another thread to run, H.poll; a wait the callee reached), when the chain of
+//     JavaScript frames is too deep, for an instruction the interpreter has to run (a bridge outcome handed over, a contended monitor) and before a call that re-enters Java through
+//     host code (below).
+//   - A call the direct code cannot make itself (an unresolved site, a callee without a direct form, a class initializer to run first) is run by the interpreter on a real frame of the
+//     activation, placed where its ghost was, in a run loop of its own that returns when that one invoke is done (slowInvoke, `single`). That loop never switches threads: when the thread
+//     must stop it throws DEOPT, and the outer loop takes the frames over.
+// The collector: the registers of a direct activation are not in a frame, so no collection runs while a ghost is on any thread stack (heap-gc.js quiescent, 'direct-frames'); a
+// collection that is due makes the next poll rebuild the frames instead. Host code that runs Java again (runNested, runSlice) with direct activations beneath it would keep the
+// collector out for as long as it runs, so the call site that led there is remembered (site.reentries) and its direct code rebuilds the frames before making that call the next
+// times; a method that does so often loses its direct form (prog.noDirect): the spine of an app (event dispatch, draw traversal) runs as frames, the leaves run direct.
+const DEOPT = { deopt: true }, NO_REGS = Object.freeze([]), REENTRANT = 2;
+export const T2_THRESHOLD = Number(globalThis.process?.env?.APKWEB_T2_THRESHOLD || 5000);   // calls before a method gets its direct form, when the direct form is on (runtime.tier2)
+
+const LITTLE_ENDIAN = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
+/** Per-method decoded state: the code units as a Uint16Array, lazily resolved operands per pc, and the decoded exception table. */
+function prepare(rt, method, code) {
+  const known = code.progs?.get(rt); if (known !== undefined) return known;
+  const tb = rt.tb, previous = tb.enter(BUCKET.DECODE);
+  try { return prepareCore(rt, method, code); } finally { tb.leave(previous); }
+}
+function prepareCore(rt, method, code) {
+  let progs = code.progs; if (progs === undefined) progs = code.progs = new WeakMap();   // DEX code objects can be shared by several runtimes: decoded state is per runtime
+  const existing = progs.get(rt); if (existing !== undefined) return existing;
+  const dex = method.dex ?? rt.dex;
+  if (!dex.reader) fail(`Method has no originating DEX reader: ${methodKey(method)}`);
+  const reader = dex.reader, byteStart = reader.bytes.byteOffset + code.offset;
+  reader.check(code.offset, code.units * 2);
+  // Code units are little-endian 16-bit words; a view avoids copying when the code item is 2-byte aligned (always, in a well-formed DEX, unless the input buffer is offset oddly).
+  const units = (byteStart & 1) === 0 && LITTLE_ENDIAN ? new Uint16Array(reader.bytes.buffer, byteStart, code.units) : Uint16Array.from({ length: code.units }, (_, i) => reader.view.getUint16(code.offset + i * 2, true));
+  const origin = rt.methodOrigin(method);
+  const prog = { dex, units, refs: new Array(code.units), tries: null, stats: rt.executionByOrigin[origin], key: method.key, filename: dex.filename ?? 'DEX', calls: 0, loops: 0, fn: null, d: null, ghost: null, deopts: 0, noDirect: false, dc: 0, dn: 0, info: undefined, method, code, getter: detectGetter(code, units), shape: detectShape(code, units) };
+  progs.set(rt, prog); (rt.allProgs ??= []).push(prog); return prog;   // allProgs: applyMethodOverrides resets the call-site caches of every decoded method (src/method-overrides.js)
+}
+
+/**
+ * Other bodies the invoke instruction can run without a frame (see the cached-call path in runLoop and getterCall), each with the instruction count it stands for, or null:
+ *   IDENTITY     `return p0` / `return-object p0` of a method taking one word (an inline-class constructor, an unboxing accessor): the argument, 1 instruction.
+ *   NULL_GUARD   `if-eqz p0, +n; return-void; ...` or `if-nez p0, L; ...; L: return-void`, p0 the first argument (a parameter null check): nothing, 2 instructions, when p0 is not null;
+ *                a null argument takes the ordinary call, which runs the branch that throws.
+ *   STATIC_GET   `sget* vA, field; return* vA` of a method taking nothing (a constant or singleton accessor): the static's value, 2 instructions, once the field site is warm.
+ */
+const IDENTITY = 1, NULL_GUARD = 2, STATIC_GET = 3;
+function detectShape(code, units) {
+  if (code.tries) return null;
+  const w0 = units[0], op0 = w0 & 255, a0 = w0 >> 8, first = code.registers - code.incoming;
+  if (code.units === 1 && code.incoming === 1 && (op0 === 0x0f || op0 === 0x11) && a0 === first) return { kind: IDENTITY, op: op0, count: 1 };
+  if ((op0 === 0x38 || op0 === 0x39) && code.incoming >= 1 && a0 === first && code.units >= 3) {
+    const target = ((units[1] << 16) >> 16);
+    if (op0 === 0x38 && (units[2] & 255) === 0x0e) return { kind: NULL_GUARD, op: op0, count: 2 };
+    if (op0 === 0x39 && target > 0 && target < code.units && (units[target] & 255) === 0x0e) return { kind: NULL_GUARD, op: op0, count: 2 };
+    return null;
+  }
+  if (code.units === 3 && code.incoming === 0 && op0 >= 0x60 && op0 <= 0x66) {
+    const w2 = units[2], op2 = w2 & 255, expected = op0 === 0x61 ? 0x10 : op0 === 0x62 ? 0x11 : 0x0f;
+    if (op2 === expected && (w2 >> 8) === a0) return { kind: STATIC_GET, op: op0, count: 2 };
+  }
+  return null;
+}
+/** The value of a STATIC_GET body whose field site is warm (the class initialized, the static present), or NO_GETTER. */
+function staticGetValue(rt, prog) {
+  const site = prog.refs[0]; if (site === undefined || !site.ready) return NO_GETTER;
+  const v = rt.staticFields.get(site.key); if (v === undefined) return NO_GETTER;
+  const variant = prog.shape.op - 0x60;
+  return variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
+}
+
+/**
+ * A trivial getter -- `iget* vA, p0, field; return* vA` on a method taking only the receiver -- is described by its iget opcode (and null otherwise). The invoke instruction runs such a callee
+ * without creating a frame (see the cached-call path in runLoop) when every precondition of the ordinary path holds, and keeps all of its bookkeeping.
+ */
+function detectGetter(code, units) {
+  if (code.units !== 3 || code.incoming !== 1 || code.tries) return null;
+  const w0 = units[0], op0 = w0 & 255, destination = (w0 >> 8) & 15, objectRegister = w0 >> 12, w2 = units[2], op2 = w2 & 255;
+  if (op0 < 0x52 || op0 > 0x58 || op0 === 0x53 || (op2 !== 0x0f && op2 !== 0x11) || (op0 === 0x54) !== (op2 === 0x11)) return null;
+  if (objectRegister !== code.registers - 1 || destination !== (w2 >> 8)) return null;
+  return op0;
+}
+
+/** Creates the frame for a call and, when the method has been called twice, compiles it (see baseline-compiler.js). */
+export const JIT_THRESHOLD = Number((typeof process !== 'undefined' && process.env?.APKWEB_JIT_THRESHOLD) || 5000);   // calls before a method is compiled; V8 runs fresh generated code in its slow tiers, so only really hot methods pay off
+export const JIT_LOOPS = Number((typeof process !== 'undefined' && process.env?.APKWEB_JIT_LOOPS) || 50000);           // backward branches executed by the interpreter before a loop-heavy method is compiled
+/** Counts a call of the method and compiles it when it reaches a threshold: the direct form (compileDirect) and the frame form (compileHot). */
+function tick(rt, prog) { const calls = ++prog.calls; if (calls === rt.t2Threshold) compileDirect(rt, prog); if (calls === rt.jitThreshold) compileHot(rt, prog); }
+function makeFrame(rt, method, code, args, known = null) {
+  const prog = known ?? prepare(rt, method, code);
+  tick(rt, prog);
+  const regs = new Array(code.registers), base = code.registers - code.incoming;
+  for (let i = 0; i < args.length; i++) regs[base + i] = args[i];
+  return new Frame(method, code, regs, prog);
+}
+/** Static description of an invoke instruction, built on first execution: the callee reference, the invoke mode and where its arguments live. */
+function makeInvokeSite(dex, u, pc, op, a, hi) {
+  if (!(u[pc + 1] < dex.methods.length)) fail('Invalid method index'); const target = dex.method(u[pc + 1]);
+  const range = op >= 0x74, mode = op === 0x71 || op === 0x77 ? 'static' : op === 0x6f || op === 0x75 ? 'super' : op === 0x6e || op === 0x72 || op === 0x74 || op === 0x78 ? 'virtual' : 'direct';
+  const argc = range ? a : hi;
+  if (!range && hi > 5) fail('Invalid invoke register count');
+  if (argc !== wordCount(target.parameters) + (mode === 'static' ? 0 : 1)) fail('Invalid invoke argument shape');
+  return { target, mode, virtual: mode === 'virtual', isStatic: mode === 'static', argc, first: range ? u[pc + 2] : -1, definition: null, type: null, callee: null, calleeProg: null, poly: null, initialized: false, bridge: null, bridgeEpoch: -1, bridgeType: null, bridgePoly: null, reentries: 0 };
+}
+/** What kind of value a receiver is, for the "Invalid field/receiver" report: a DEX class instance, a host-modelled object, an array, a class object, a boxed primitive. */
+function receiverKind(rt, type, object) {
+  if (typeof type !== 'string') return 'not an object';
+  if (type.startsWith('[')) return 'array';
+  if (type === 'Ljava/lang/Class;') return 'class object';
+  if (object?.boxed !== undefined) return 'boxed primitive';
+  return rt.classes.has(type) ? 'instance of a DEX class' : 'host-modelled object';
+}
+function invalidField(rt, reference, type, object) {
+  const field = reference ? `${reference.owner}->${reference.name}:${reference.type}` : '(no field reference)';
+  fail(`Invalid field/receiver: the field ${field} (declared by ${reference?.owner ?? '?'}) was accessed on a ${receiverKind(rt, type, object)} of class ${type}, which is not a ${reference?.owner ?? 'subclass'}; thread ${rt.thread?.name ?? '?'}`);
+}
+/**
+ * The field site at `pc` for a receiver of class `type`. What the reference resolves to depends on the reference alone, so a site that already resolved it (for the class in site.type, the fast
+ * check of the access) only validates another receiver class -- a subclass of the field's declaring class, as before -- and remembers it in site.more; the key and default stay.
+ */
+function fieldSiteAt(rt, prog, pc, reference, type) {
+  const site = prog.refs[pc];
+  if (site !== undefined) { const more = site.more; if (more !== null && more.has(type)) return site; }
+  if (!reference || !rt.isSubtype(type, reference.owner)) invalidField(rt, reference, type, null);
+  if (site !== undefined) { (site.more ??= new Set()).add(type); if (site.slot >= 0 && rt.shapeOf(type).slotOf(site.key) !== site.slot) site.slot = -1; return site; }
+  const field = rt.resolveField(reference);
+  return prog.refs[pc] = { type, key: field.key, def: defaultValue(field.type), more: null, slot: rt.shapeOf(type).slotOf(field.key) };
+}
+/** rt.isSubtype(valueType, type) for the checkcast/instanceof at `pc`, through a memo of the class that site saw last (most see one); like the runtime's memo it follows the class-graph epoch. */
+function subtypeAt(rt, prog, pc, valueType, type) {
+  let site = prog.refs[pc]; if (site === undefined) site = prog.refs[pc] = { type: null, epoch: -1, answer: false };
+  const epoch = rt.dex.dynamicFiles?.length ?? 0;
+  if (site.type !== valueType || site.epoch !== epoch) { site.answer = rt.isSubtype(valueType, type); site.type = valueType; site.epoch = epoch; }
+  return site.answer;
+}
+
+/** APKRuntime.recordMethod / record for a DEX callee, inlined for the steady state (counters known, trace ring past its fixed head): per-method counters, evidence row, ring entry. */
+function noteCall(rt, calleeMethod, prog) {
+  const info = calleeInfo(calleeMethod, prog), ring = rt.traceRing;
+  if (rt.fastCallPaths === false || info === undefined || info.exempt || rt.traceMuted || ring == null || ring.head.length < 128) { rt.recordMethod(calleeMethod); return; }
+  info.stats.methods++; const evidence = info.evidence; if (evidence !== undefined && evidence.calls < Number.MAX_SAFE_INTEGER) evidence.calls++;
+  if (ring.length === 384) { ring.tail[ring.start] = info.entry; ring.start = ring.start === 383 ? 0 : ring.start + 1; rt.traceDropped = (rt.traceDropped ?? 0) + 1; }
+  else ring.tail[(ring.start + ring.length++) % 384] = info.entry;
+}
+/**
+ * The callee's APKRuntime.recordMethod cache (method.recordInfo, set on its first call and never changed), kept on its prog: method objects gain lazy properties (key, signature,
+ * recordInfo, plumbing ...) in any order, so a load of recordInfo across call sites sees many hidden classes; the prog of every method has one.
+ */
+function calleeInfo(calleeMethod, prog) {
+  let info = prog.info;
+  if (info === undefined) { info = calleeMethod.recordInfo; if (info !== undefined && prog.method === calleeMethod) prog.info = info; }
+  return info;
+}
+/** Compiles the method of `frame` now (a loop in it has run long enough in the interpreter). Always returns false. */
+function compileHot(rt, prog, frame = null) {
+  const code = prog.code, method = prog.method;
+  if (prog.fn === null && rt.jit && rt.instructionProbe === undefined && code.units <= MAX_COMPILED_UNITS) {
+    const tries = prog.tries ??= decodeTries(rt, code, prog.dex);
+    const tb = rt.tb, previous = tb.enter(BUCKET.COMPILE); try { prog.fn = compileMethod(rt, method, code, prog, tries, jitSupport(rt)); } finally { tb.leave(previous); }
+    if (prog.fn !== null) rt.jitCompiled++;
+  }
+  return false;
+}
+
+/** Gives the method its direct form (see "Direct form"). A method the compiler does not take, or one that lost its direct form (noDirect), keeps none. */
+function compileDirect(rt, prog) {
+  const code = prog.code, method = prog.method;
+  if (prog.d !== null || prog.noDirect || !rt.jit || !rt.tier2 || rt.instructionProbe !== undefined || code.units > MAX_COMPILED_UNITS || code.registers > 240) return;
+  const tries = prog.tries ??= decodeTries(rt, code, prog.dex);
+  if (prog.ghost === null) { prog.ghost = new Frame(method, code, NO_REGS, prog); prog.ghost.busy = true; }
+  const tb = rt.tb, previous = tb.enter(BUCKET.COMPILE); try { prog.d = compileMethod(rt, method, code, prog, tries, jitSupport(rt), true); } finally { tb.leave(previous); }
+  if (prog.d !== null) rt.t2Compiled++; else prog.noDirect = true;
+}
+/**
+ * The interpreter runs the invoke at `pc` of a direct activation: a real frame of the activation (its registers: `regs`) takes the place of its ghost and a run loop of its own
+ * executes that one instruction -- with everything the interpreter does for it (caches, class initializers, host steps, the callee's frames) -- and returns the call's value. When
+ * the thread must stop inside (DEOPT), the frame stays: it is this activation's frame from then on.
+ */
+function slowInvoke(rt, prog, g, fb, site, pc, regs) {
+  const thread = rt.thread, frames = thread.frames, frame = new Frame(prog.method, prog.code, regs, prog);
+  frame.pc = pc; frame.callPc = pc; frames[fb] = frame; rt.t2Slow++;
+  if (g.handoff !== null) { frame.handoff = g.handoff; frame.handoffArgs = g.handoffArgs; g.handoff = null; g.handoffArgs = null; }   // a bridge outcome of the direct code (H.bridge): the invoke takes it instead of calling again
+  const previous = rt.t2Site, dstart = rt.dstart, dlimit = rt.dlimit; rt.t2Site = site;
+  try { const value = runLoop(rt, thread, fb + 1, frame); frames[fb] = g; return value; }
+  catch (error) { if (error !== DEOPT) { frames.length = fb + 1; frames[fb] = g; } throw error; }
+  finally { rt.t2Site = previous; rt.dstart = dstart; rt.dlimit = dlimit; }
+}
+/** Host code runs Java again (runNested, runSlice): the direct call site that led here, if any, is one that re-enters (see "Direct form"). Returns what to put back when the run ends. */
+function noteReentry(rt) { const site = rt.t2Site; if (site !== null) { site.reentries++; rt.t2Site = null; } return site; }
+/**
+ * Direct activations count their calls per method (prog.dc; prog.dn of them went through APKRuntime.recordMethod already): here they join the VM's counters -- cached calls, the
+ * per-origin method count, the method's evidence row. Run when an event ends and wherever those counters are read in the middle of one.
+ */
+export function foldDirectCalls(rt) {
+  const dirty = rt.t2Dirty; if (dirty.length === 0) return;
+  for (const prog of dirty) {
+    const calls = prog.dc, fast = calls - prog.dn; prog.dc = 0; prog.dn = 0; rt.callStats.cached += calls; prog.calls += calls;
+    if (fast > 0) { const info = prog.method.recordInfo; info.stats.methods += fast; const evidence = info.evidence; if (evidence !== undefined) evidence.calls = Math.min(Number.MAX_SAFE_INTEGER, evidence.calls + fast); }
+  }
+  dirty.length = 0;
+}
+/** A run loop is about to call a direct form with `length` frames on the thread: where the chain of direct activations starts, and the stack length at which one of them has something to do on entry (H.deep). */
+function enterDirect(rt, length) { rt.dstart = length; const limit = rt.peakCallDepth - rt.depth; rt.dlimit = limit < length + DIRECT_DEPTH ? limit : length + DIRECT_DEPTH; }
+
+let support = null;
+function jitSupport(rt) {
+  if (support !== null) return support;
+  const cmp = (kind, gt, x, y) => {
+    if (kind === 'long') return x < y ? -1 : x > y ? 1 : 0;
+    const a = kind === 'float' ? floatNumber(x) : doubleNumber(x), b = kind === 'float' ? floatNumber(y) : doubleNumber(y);
+    return Number.isNaN(a) || Number.isNaN(b) ? gt : a < b ? -1 : a > b ? 1 : 0;
+  };
+  /**
+   * A compiled caller enters a cached callee (`callee`, `prog`: site.callee or the entry of the site's polymorphic cache for the receiver's class): the callee frame is created over the
+   * register file the caller filled (`regs`, see the invoke emission) and pushed; the caller then runs the callee's compiled body directly or returns to the loop.
+   */
+  const prepareCall = (rt, f, site, callee, prog, regs, returnPc, pcOfCall) => {
+    rt.callStats.cached++;
+    if (site.isStatic && !site.initialized && rt.initialized.get(callee.method.owner)?.status !== 'initialized') rt.initialize(callee.method.owner);
+    noteCall(rt, callee.method, prog);
+    const frames = rt.thread.frames;
+    if (frames.length + rt.depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
+    f.pc = returnPc; f.callPc = pcOfCall;
+    if (frames.length + rt.depth + 1 > rt.peakCallDepth) rt.peakCallDepth = frames.length + rt.depth + 1;
+    tick(rt, prog);
+    const frame = new Frame(callee.method, callee.code, regs, prog); frames.push(frame);
+    return frame;
+  };
+  /**
+   * The frameless callees of the interpreter's cached-call path (a trivial getter, detectGetter; an identity, a parameter null check or a static getter, detectShape), for a compiled caller
+   * whose cached callee is one: the call's result, with the bookkeeping of the call it replaces (counters, trace entry, depth, JIT counter, the callee's instructions). `receiver` is the
+   * first argument word. NO_GETTER when the callee has no such body, its field site is not warm for the receiver's class, the owner of a static one is not initialized, a null check fails,
+   * or the budget is short: the caller then makes the ordinary call. `pending` is the caller's instruction count not yet added to rt.steps.
+   */
+  const getterCall = (rt, site, callee, prog, receiver, pending) => {
+    const getter = prog.getter, shape = prog.shape;
+    if ((getter === null && shape === null) || rt.fastCallPaths === false || rt.steps + pending + 2 > rt.maxInstructionsPerEvent) return NO_GETTER;
+    let value, count = 2;
+    if (getter !== null) {
+      let target; if (receiver !== null && typeof receiver === 'object') target = rt.heap.get(receiver.ref);
+      if (target === undefined) return NO_GETTER;
+      const fieldSite = prog.refs[0]; if (fieldSite === undefined || fieldSite.type !== target.type) return NO_GETTER;
+      const slot = fieldSite.slot; let v = slot >= 0 ? target.slots[slot] : target.fields.get(fieldSite.key); if (v === undefined) v = fieldSite.def;
+      if (getter === 0x55) v &= 1; else if (getter === 0x56) v = (v << 24) >> 24; else if (getter === 0x57) v &= 65535; else if (getter === 0x58) v = (v << 16) >> 16;
+      value = getter === 0x54 && (v === 0 || v === null) ? null : v;
+    } else {   // detectShape
+      count = shape.count;
+      if (shape.kind === STATIC_GET) { const v = staticGetValue(rt, prog); if (v === NO_GETTER) return NO_GETTER; value = shape.op === 0x62 && v === 0 ? null : v; }
+      else if (shape.kind === IDENTITY) value = shape.op === 0x11 && (receiver === 0 || receiver === null) ? null : receiver;
+      else if (receiver !== null && receiver !== 0) value = undefined; else return NO_GETTER;
+    }
+    if (site.isStatic && !site.initialized && rt.initialized.get(callee.method.owner)?.status !== 'initialized') return NO_GETTER;
+    rt.callStats.cached++; noteCall(rt, callee.method, prog);
+    const frames = rt.thread.frames;
+    if (frames.length + rt.depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
+    if (frames.length + rt.depth + 1 > rt.peakCallDepth) rt.peakCallDepth = frames.length + rt.depth + 1;
+    tick(rt, prog);
+    rt.steps += count; prog.stats.instructions += count;
+    return value;
+  };
+  /**
+   * A compiled caller makes a call the interpreter resolved to a SHIM/platform bridge (the bridge cache of the invoke site: site.bridge, per receiver class site.bridgePoly), exactly as the
+   * interpreter's bridged path does: the same preconditions (resolution epoch, initialized static owner, a receiver that is not an annotation or reflection proxy), the same bookkeeping
+   * (call counters, profile, monitor, trace entry, host allocation scope) and the same call. `args` are the argument words. Returns the bridge's value; NO_GETTER when the site has no
+   * usable bridge for this receiver (the caller leaves the call to the interpreter, which dispatches it); HANDOFF when the bridge answered something the run loop must handle (a frame to
+   * push, a wait, a host step): the outcome is left on the frame (f.handoff) and the interpreter's invoke at f.pc takes it instead of calling again.
+   */
+  const bridgeCall = (rt, f, site, args) => {
+    let bridge = site.bridge;
+    if (bridge === null || site.bridgeEpoch !== rt.resolveEpoch || (site.isStatic && !site.initialized) || rt.fastCallPaths === false) return NO_GETTER;
+    if (site.virtual) {
+      const receiver = args[0];
+      if (typeof receiver === 'string') { if (site.bridgeType !== 'Ljava/lang/String;') return NO_GETTER; }
+      else {
+        if (receiver === null || receiver === 0 || typeof receiver !== 'object') return NO_GETTER;
+        const record = rt.heap.get(receiver.ref);
+        if (record === undefined || record.annotationValues !== undefined || record.proxyHandler !== undefined) return NO_GETTER;
+        if (record.type !== site.bridgeType) { const poly = site.bridgePoly, entry = poly === null ? undefined : poly.get(record.type); if (entry === undefined) return NO_GETTER; bridge = entry; }
+      }
+    }
+    rt.callStats.bridged++; rt.jitBridged++; if (rt.profile.active) rt.profile.host(bridge.key); rt.monitor.hostEnter(bridge.key, bridge);
+    {   // APKRuntime.record(bridge.text), as the interpreter's bridged path
+      const plumbing = f.method.plumbing, ring = rt.traceRing;
+      if (rt.fastCallPaths === false || plumbing === undefined || rt.traceMuted || ring == null || ring.head.length < 128) rt.record(bridge.text);
+      else if (plumbing === false) {
+        if (ring.length === 384) { ring.tail[ring.start] = bridge.text; ring.start = ring.start === 383 ? 0 : ring.start + 1; rt.traceDropped = (rt.traceDropped ?? 0) + 1; }
+        else ring.tail[(ring.start + ring.length++) % 384] = bridge.text;
+      }
+    }
+    const hostMark = rt.hostAllocs.length;
+    const outcome = rt.bridge(bridge.selected, args, site.mode, bridge.key, bridge); rt.hostCall = null;
+    if (outcome instanceof Blocked || outcome instanceof Invoke) { f.handoff = outcome; f.handoffArgs = args; return HANDOFF; }
+    if (rt.hostAllocs.length > hostMark) rt.releaseHostAllocs(hostMark);
+    if (outcome instanceof PendingCall) { f.handoff = outcome; f.handoffArgs = args; return HANDOFF; }
+    return outcome;
+  };
+  /**
+   * A direct activation enters with `fb` frames below it and fb >= rt.dlimit: a new peak depth or the stack limit (as the call path of the run loop: the error is the caller's, the
+   * ghost is not pushed yet), a chain of direct activations too deep for the JavaScript stack, or a safepoint somebody asked for (rt.q = 0 with rt.dlimit = 0). True when the
+   * activation has to poll (H.poll) once its ghost is on the stack.
+   */
+  const deep = (rt, fb) => {
+    const depth = fb + rt.depth;
+    if (depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
+    if (depth + 1 > rt.peakCallDepth) rt.peakCallDepth = depth + 1;
+    const tooDeep = fb >= rt.dstart + DIRECT_DEPTH, limit = rt.peakCallDepth - rt.depth;
+    rt.dlimit = limit < rt.dstart + DIRECT_DEPTH ? limit : rt.dstart + DIRECT_DEPTH;
+    if (tooDeep) rt.t2TooDeep = true;
+    return tooDeep || rt.q <= 0;
+  };
+  /** A quantum boundary of direct code (a method entry or a backward branch), or a chain of direct activations that got too deep: the frames are rebuilt when the thread has to stop here. */
+  const poll = rt => {
+    const tooDeep = rt.t2TooDeep; rt.t2TooDeep = false;
+    if (rt.q > 0) { if (tooDeep) { rt.t2Deopts++; throw DEOPT; } return; }   // only the depth: the run loop goes on with the frames at once
+    rt.q = QUANTUM; rt.budgetTick();
+    if (tooDeep || rt.gcWanted() || (rt.multiThreaded && rt.thread !== rt.scheduler.main) || (rt.sliceDeadline !== 0 && performance.now() > rt.sliceDeadline)) { rt.deoptNeed = true; rt.t2Deopts++; throw DEOPT; }
+  };
+  /** The interpreter has to run the instruction the direct code is at. `prog`: the method, when the reason is one that repeats (a call that re-enters Java): it loses its direct form after a few. */
+  const deopt = (rt, prog) => { if (prog !== null && ++prog.deopts > 16) { prog.d = null; prog.noDirect = true; } rt.t2Deopts++; throw DEOPT; };
+  /** DEOPT passes a direct activation: its ghost becomes a real frame (unless the interpreter already runs one in its place, slowInvoke). */
+  const materialize = (rt, prog, g, fb, pc, callPc, regs, result, pending) => {
+    const frames = rt.thread.frames;
+    if (frames[fb] === g) {
+      const frame = new Frame(prog.method, prog.code, regs, prog); frame.pc = pc; frame.callPc = callPc; frame.result = result; frame.pendingException = pending;
+      if (g.handoff !== null) { frame.handoff = g.handoff; frame.handoffArgs = g.handoffArgs; g.handoff = null; g.handoffArgs = null; }
+      frames[fb] = frame;
+    }
+  };
+  /**
+   * An exception reached a direct activation at `pc`: what the run loop's unwinding does for one frame. Returns the handler's address (the exception is left in g.pendingException), or
+   * leaves the activation (ghost popped) and throws what the caller's frame has to handle.
+   */
+  const caught = (rt, error, prog, g, fb, pc, regs) => {
+    const frames = rt.thread.frames; frames.length = fb + 1;
+    if (g.handoff !== null) { g.handoff = null; g.handoffArgs = null; }
+    let current = error;
+    if (!(error?.vmFatal === true || error?.looperYield === true)) {
+      if (error instanceof JavaException && error.message === 'null object reference') refineNullPointerMessage(rt, error, prog.dex, prog.units, pc, regs);
+      rt.hostCall = null;
+      if (current instanceof APKError && /^(Integer|Long) (divide|remainder) by zero/.test(current.message)) {
+        try { rt.throwJava('Ljava/lang/ArithmeticException;', current.message); } catch (converted) { current = converted; }
+      }
+      if (current instanceof JavaException) {
+        const target = catchTarget(rt, g, pc, current.value);
+        if (target !== null) { g.pendingException = current.value; rt.record(`CATCH ${rt.typeOf(current.value)} in ${g.method.key}`); rt.noteCaught(current.value, g.method.key); return target; }
+        current.message = `${g.method.key} [${prog.filename}] at PC 0x${pc.toString(16).padStart(4, '0')}: ${current.message}`;
+      } else {
+        const where = /^Expected (int|long|wide|object|reference)/.test(current.message ?? '') ? ` [opcode 0x${(prog.units[pc] & 0xff).toString(16).padStart(2, '0')}${rt.lastHostCall ? `; last host call ${rt.lastHostCall}` : ''}]` : '';
+        const internal = !(current instanceof APKError);
+        current = new APKError(`${g.method.key} [${prog.filename}] at PC 0x${pc.toString(16).padStart(4, '0')}: ${current.message ?? current}${where}`, internal ? { ...(current.details ?? {}), kind: 'internal-js-error', jsStack: String(current.stack ?? '').split('\n').slice(0, 13).join('\n'), vmContext: rt.monitor.context() } : current.details);
+      }
+    }
+    frames.length = fb;
+    throw current;
+  };
+  /** True when nothing has to run before `type` is used: it is initialized, or it is not a DEX class (no initializer to run as frames). Anything else is the interpreter's (APKRuntime.initStep). */
+  const usable = (rt, type) => { const state = rt.initialized.get(type); return state === undefined ? !rt.classes.has(type) : state.status === 'initialized'; };
+  return support = { QUANTUM, WIDE_HIGH, makeInvokeSite, helpers: {
+    DEOPT, deep, poll, deopt, materialize, caught, slow: slowInvoke,
+    /** A frame-form caller is about to call a direct form. */
+    enter(rt) { enterDirect(rt, rt.thread.frames.length); },
+    /** The trace entry of the method for the inline ring write of a direct entry; null when its calls go through APKRuntime.recordMethod (H.note): no record yet, or plumbing kept out of the trace. */
+    entryOf(prog) { const info = prog.method.recordInfo; return info === undefined || info.exempt ? null : info.entry; },
+    note(rt, prog) { prog.dn++; rt.recordMethod(prog.method); },
+    /** Class initialization is the interpreter's (it runs <clinit> as frames and counts the instruction that triggered it as it always did): direct code leaves the instruction to it. */
+    fieldReady: (rt, reference) => usable(rt, rt.resolveField(reference).owner),
+    typeReady: usable,
+    staticReady: (rt, site, callee) => rt.initialized.get(callee.method.owner)?.status === 'initialized' ? (site.initialized = true) : false,
+    /** bridgeCall for a direct activation (`g`, its ghost, stands for the calling frame): the call site is the one a re-entry into Java is charged to. */
+    bridge(rt, g, site, args) { const previous = rt.t2Site; rt.t2Site = site; try { return bridgeCall(rt, g, site, args); } finally { rt.t2Site = previous; } },
+    throwValue(rt, value) { if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'throw with null exception'); throw new JavaException(value, rt.object(value).message ?? rt.typeOf(value), rt.object(value).exceptionDetails); },
+    /** filled-new-array and fill-array-data of a direct activation, through stepRare over a copy of its registers (neither writes a register); the new array is the instruction's result. */
+    rare(rt, g, regs, pc) { const prog = g.prog, u = prog.units, w = u[pc], a = w >> 8; stepRare(rt, g, regs, u, prog.dex, pc, w & 255, a, a & 15, a >> 4); const value = g.result; g.result = undefined; return value; },
+    prepareCall, getterCall, bridgeCall, NO_GETTER, HANDOFF, receiverType: (rt, receiver) => receiver !== null && typeof receiver === 'object' ? (rt.heap.get(receiver.ref)?.type ?? rt.typeOf(receiver)) : rt.typeOf(receiver),
+    arith: arithmetic, long: (op, x, y) => longArithmetic(op, x, y), num: (kind, op, x, y) => numericBinary(kind === 'float' ? 2 : 3, op, x, y), cmp, same: equal,
+    floatBits, floatNumber, doubleBits, doubleNumber, javaInt, javaLong,
+    fuse(max, rt) { rt.budgetExceeded(`Instruction budget (${max}/event) exceeded`); },
+    castFail(rt, value, type) { rt.throwJava('Ljava/lang/ClassCastException;', `Cannot cast ${rt.typeOf(value)} to ${type}`); },
+    fieldSite(rt, site, reference, object) {   // the compiled form of fieldSiteAt: the first receiver class stays in site.type, the others go to site.more
+      const type = object.type, more = site.more; if (more !== null && more.has(type)) return;
+      if (!reference || !rt.isSubtype(type, reference.owner)) invalidField(rt, reference, type, object);
+      if (site.key !== null) { (site.more ??= new Set()).add(type); if (site.slot >= 0 && rt.shapeOf(type).slotOf(site.key) !== site.slot) site.slot = -1; return; }
+      const field = rt.resolveField(reference); site.key = field.key; site.def = defaultValue(field.type); site.slot = rt.shapeOf(type).slotOf(field.key); site.type = type;
+    },
+    subtype(rt, site, valueType, type) {   // the compiled form of subtypeAt
+      const epoch = rt.dex.dynamicFiles?.length ?? 0;
+      if (site.type !== valueType || site.epoch !== epoch) { site.answer = rt.isSubtype(valueType, type); site.type = valueType; site.epoch = epoch; }
+      return site.answer;
+    },
+    staticSite(rt, site, reference, afterWrite = false) {
+      let value;
+      if (!afterWrite) value = rt.readStatic(reference);
+      const field = rt.resolveField(reference); site.key = field.key;
+      site.ready = rt.initialized.get(field.owner)?.status === 'initialized' && rt.staticFields.has(field.key);
+      return value;
+    },
+  } };
+}
+
+function decodeTries(rt, code, dex) {
+  const out = [];
+  if (!code.tries) return out;
+  const b = dex.reader, start = code.offset + code.units * 2 + (code.units & 1 ? 2 : 0);
+  b.check(start, code.tries * 8);
+  const handlers = start + code.tries * 8;
+  for (let i = 0; i < code.tries; i++) {
+    const entry = start + i * 8, from = b.u32(entry), count = b.u16(entry + 4);
+    const cursor = { p: handlers + b.u16(entry + 6) }, size = b.sleb(cursor);
+    if (Math.abs(size) > 10000) fail('Exception handler limit exceeded');
+    const catches = [];
+    for (let j = 0; j < Math.abs(size); j++) {
+      const type = dex.types[b.uleb(cursor)], address = b.uleb(cursor);
+      if (!type || address >= code.units) fail('Malformed DEX exception handler');
+      catches.push({ type, address });
+    }
+    let catchAll = null;
+    if (size <= 0) { const address = b.uleb(cursor); if (address >= code.units) fail('Invalid catch-all address'); catchAll = address; }
+    out.push({ from, to: from + count, catches, catchAll });
+  }
+  return out;
+}
+
+/** The handler address for `exception` thrown at `pc` (first matching try range, as the original catchTarget). */
+function catchTarget(rt, frame, pc, exception) {
+  const code = frame.code, prog = frame.prog;
+  if (!code.tries) return null;
+  const tries = prog.tries ??= decodeTries(rt, code, prog.dex);
+  for (const entry of tries) {
+    if (pc < entry.from || pc >= entry.to) continue;
+    const type = rt.typeOf(exception);
+    for (const handler of entry.catches) if (rt.isSubtype(type, handler.type)) return handler.address;
+    return entry.catchAll;
+  }
+  return null;
+}
+
+function numericBinary(group, operation, x, y) {
+  if (group === 0) return arithmetic(operation, int(x), int(y));
+  if (group === 1) return longArithmetic(operation, wide(x), operation >= 8 ? int(y) : wide(y));
+  const a = group === 2 ? floatNumber(x) : doubleNumber(x), b = group === 2 ? floatNumber(y) : doubleNumber(y);
+  const value = operation === 0 ? a + b : operation === 1 ? a - b : operation === 2 ? a * b : operation === 3 ? a / b : a % b;
+  return group === 2 ? floatBits(value) : doubleBits(value);
+}
+
+
+/**
+ * Advances a host step (see Invoke) or a thread driver. `input` is {kind: 'start', invoke} | 'drive' | 'result' | 'returned' | 'calleeResult' | 'error'. Returns OUT_FRAME (a Java
+ * frame was pushed on top), OUT_BLOCKED (thread.blocked is set), {done} (the thread's driver finished), {value} (deliver to the DEX frame on top, or the thread's driver when
+ * the stack is empty) or {error} (raise at the DEX frame on top, or in the driver). It does not throw, except for fatal uncaught-thread errors.
+ */
+/** A Java type descriptor as ART prints it in messages: I -> int, Ljava/lang/String; -> java.lang.String, [B -> byte[]. */
+const PRIMITIVE_NAMES = { Z: 'boolean', B: 'byte', S: 'short', C: 'char', I: 'int', J: 'long', F: 'float', D: 'double', V: 'void' };
+function typeName(descriptor) {
+  let dimensions = 0; while (descriptor[dimensions] === '[') dimensions++;
+  const base = descriptor.slice(dimensions), name = base[0] === 'L' ? base.slice(1, -1).replaceAll('/', '.') : PRIMITIVE_NAMES[base] ?? base;
+  return name + '[]'.repeat(dimensions);
+}
+/**
+ * Android 13's NullPointerException messages name the dereference ("Attempt to invoke virtual method 'int java.lang.String.length()' on a null object reference"); the lab's host raises the bare
+ * "null object reference" wherever a reference is dereferenced. At the catch site the failing instruction is known: when its receiver/array register really holds null, the message is rewritten.
+ */
+function refineNullPointerMessage(rt, error, dex, u, pc, regs) {
+  try {
+    const w = u[pc], op = w & 255, a = (w >> 8) & 15, b = w >> 12;
+    let message = null;
+    const nullAt = register => { const v = regs[register]; return v === null || v === undefined || v === 0; };
+    if ((op >= 0x6e && op <= 0x72) || (op >= 0x74 && op <= 0x78)) {
+      const first = op >= 0x74 ? u[pc + 2] : u[pc + 2] & 15, target = u[pc + 1] < dex.methods.length ? dex.method(u[pc + 1]) : null;
+      if (target && nullAt(first)) {
+        const kind = op === 0x72 || op === 0x78 ? 'interface' : op === 0x70 || op === 0x76 ? 'direct' : 'virtual';
+        message = `Attempt to invoke ${kind} method '${typeName(target.result)} ${typeName(target.owner)}.${target.name}(${target.parameters.map(typeName).join(', ')})' on a null object reference`;
+      }
+    } else if (op >= 0x52 && op <= 0x58 && nullAt(b)) { const field = u[pc + 1] < dex.fields.length ? dex.field(u[pc + 1]) : null; if (field) message = `Attempt to read from field '${typeName(field.type)} ${typeName(field.owner)}.${field.name}' on a null object reference`; }
+    else if (op >= 0x59 && op <= 0x5f && nullAt(b)) { const field = u[pc + 1] < dex.fields.length ? dex.field(u[pc + 1]) : null; if (field) message = `Attempt to write to field '${typeName(field.type)} ${typeName(field.owner)}.${field.name}' on a null object reference`; }
+    else if (op >= 0x44 && op <= 0x4a && nullAt(u[pc + 1] & 255)) message = 'Attempt to read from null array';
+    else if (op >= 0x4b && op <= 0x51 && nullAt(u[pc + 1] & 255)) message = 'Attempt to write to null array';
+    else if (op === 0x21 && nullAt(b)) message = 'Attempt to get length of null array';
+    void a;
+    if (message !== null) { error.message = message; const record = rt.object(error.value); record.message = message; }
+  } catch { /* the bare message stays */ }
+}
+
+function pump(rt, thread, input) {
+  const frames = thread.frames;
+  for (;;) {
+    switch (input.kind) {
+      case 'start': frames.push(new ContFrame(input.invoke)); input = { kind: 'call' }; continue;
+      case 'drive': {
+        const driver = thread.driver; if (driver === null) return { done: true };
+        let R;
+        try { R = driver(rt, thread); }
+        catch (error) {
+          let handler;
+          try { handler = rt.threadUncaught(thread, error); } catch (fatal) { fatal.vmFatal = true; throw fatal; }
+          // The uncaught-exception handler runs as this thread's last frames (it may block, e.g. a crash reporter awaiting a task); an exception it throws is ignored, as in Java.
+          if (handler instanceof Invoke) { thread.driver = null; input = { kind: 'result', R: handler, fresh: true }; continue; }
+          return { done: true };
+        }
+        if (R === undefined) return { done: true };
+        input = { kind: 'result', R, fresh: true }; continue;
+      }
+      case 'result': {
+        const R = input.R;
+        if (R instanceof Blocked) { thread.blocked = R; thread.blockKind = input.fresh ? 'site' : 'step'; thread.state = 'blocked'; return OUT_BLOCKED; }
+        if (R instanceof PendingCall) { frames.push(makeFrame(rt, R.method, R.code, R.args)); return OUT_FRAME; }
+        if (R instanceof Invoke) {
+          if (input.fresh) frames.push(new ContFrame(R)); else frames[frames.length - 1].cont = R;
+          input = { kind: 'call' }; continue;
+        }
+        if (!input.fresh) frames.pop();                              // the step is over: its marker frame goes
+        input = { kind: 'returned', value: R }; continue;
+      }
+      case 'call': {
+        const inv = frames[frames.length - 1].cont; let R;
+        try { R = rt.dispatch(inv.method, inv.args, inv.mode, null, true); } catch (error) { input = { kind: 'error', error }; continue; }
+        if (R instanceof PendingCall) { frames.push(makeFrame(rt, R.method, R.code, R.args)); return OUT_FRAME; }
+        if (R instanceof Blocked) { thread.blocked = R; thread.blockKind = 'callee'; thread.state = 'blocked'; return OUT_BLOCKED; }
+        if (R instanceof Invoke) { frames.push(new ContFrame(R)); continue; }
+        input = { kind: 'returned', value: R }; continue;
+      }
+      case 'calleeResult': {                                        // a callee native finished its wait with another wait or call
+        const R = input.R;
+        if (R instanceof Blocked) { thread.blocked = R; thread.blockKind = 'callee'; thread.state = 'blocked'; return OUT_BLOCKED; }
+        frames.push(new ContFrame(R)); input = { kind: 'call' }; continue;
+      }
+      case 'returned': {
+        const top = frames[frames.length - 1];
+        if (top === undefined || top.cont === undefined) return { value: input.value };
+        let R;
+        try { R = top.cont.then === null ? input.value : top.cont.then(input.value); } catch (error) { frames.pop(); input = { kind: 'error', error }; continue; }
+        input = { kind: 'result', R, fresh: false }; continue;
+      }
+      case 'error': {
+        if (input.error?.vmFatal === true) throw input.error;   // the process-ending crash (KillApplicationHandler) is not an exception a handler frame may swallow
+        const top = frames[frames.length - 1];
+        if (top === undefined || top.cont === undefined) return { error: input.error };
+        if (top.cont.onError !== null) {
+          let R;
+          try { R = top.cont.onError(input.error); } catch (error) { frames.pop(); input = { kind: 'error', error }; continue; }
+          input = { kind: 'result', R, fresh: false }; continue;
+        }
+        frames.pop(); continue;
+      }
+      default: fail(`Unknown host-step input ${input.kind}`);
+    }
+  }
+}
+
+/** The pump input for a thread whose Blocked has been satisfied: runs Blocked.finish and classifies what it returned for the kind of wait. */
+function wakeInput(thread) {
+  const blocked = thread.blocked, kind = thread.blockKind; thread.blocked = null;
+  let R;
+  try { R = blocked.finish(thread.timedOut === true); } catch (error) { return { kind: 'error', error }; }
+  if (kind === 'callee') return R instanceof Blocked || R instanceof Invoke ? { kind: 'calleeResult', R } : { kind: 'returned', value: R };
+  return { kind: 'result', R, fresh: kind === 'site' };
+}
+
+/** Which call left no value for the move-result at `pc` (diagnostics only): the invoke-* instruction just before it (formats 35c/3rc and invoke-polymorphic are 3 or 4 code units). */
+export function missingResultCall(dex, u, pc) {
+  for (const width of [3, 4]) {
+    const at = pc - width; if (at < 0) continue;
+    const op = u[at] & 0xff;
+    if ((op >= 0x6e && op <= 0x78) || op === 0xfa || op === 0xfb) {
+      let method = null; try { method = dex.method(u[at + 1]); } catch { /* an index the decoder rejects: name the opcode only */ }
+      return `: the call at PC 0x${at.toString(16).padStart(4, '0')}${method ? ` to ${method.owner}->${method.name}${method.signature}` : ` (opcode 0x${op.toString(16)})`} returned no value (a host method that answered undefined for a non-void signature, or a result lost on the way)`;
+    }
+  }
+  return '';
+}
+
+/** The thread the interpreter is currently running (the scheduler switches it at safepoints). */
+export function currentThread(rt) { return rt.thread ?? rt.scheduler.mainThread(); }
+
+/** Runs `method` to completion on the current thread; the entry point behind APKRuntime.execute(). */
+const EMPTY_MONITORS = Symbol('no monitors held');
+export function runNested(rt, method, code, args) {
+  if (rt.nestedRuns === 0) { rt.thread = rt.scheduler.mainThread(); rt.platform?.looperHost?.autoStart(rt); }   // host events (UI, Looper) run on the main thread; the process's main Looper exists before the first Java code runs
+  const thread = rt.thread, base = thread.frames.length;
+  if (args.length !== code.incoming) fail(`Argument/register mismatch: ${method.key}`);
+  if (base >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
+  if (++rt.nestedRuns > rt.maxNestedRuns) { rt.nestedRuns--; rt.throwJava('Ljava/lang/StackOverflowError;', 'native re-entry depth exceeded'); }
+  if (rt.nestedRuns === 1) rt.scheduler.beginEvent(rt);
+  thread.frames.push(makeFrame(rt, method, code, args));
+  thread.nestedDepth++;
+  // The thread may be parked (a Java wait below on its stack, served by this run: the scheduler runs due main-Looper messages on the main thread while it waits -- serviceEvents, idle).
+  // The run has its own blocking inside (a message that sleeps or waits parks and resumes the thread through `blocked`); the outer wait's bookkeeping is kept aside and put back when the
+  // run ends, or the outer wait was lost: the thread went on after its wait() as if it had returned, without reacquiring the monitor, and its synchronized handler looped on
+  // IllegalMonitorStateException (a real app at HandlerThread.getLooper, 500 k exceptions). The outer wait's condition is re-checked by the scheduler's wake() once it is back.
+  const parked = thread.blocked !== null ? { blocked: thread.blocked, kind: thread.blockKind, state: thread.state, timedOut: thread.timedOut } : null;
+  if (parked !== null) { thread.blocked = null; thread.state = 'runnable'; }
+  // A non-Java failure that escapes the outermost run leaves monitors in an undefined state; reset them to what they were when the event began.
+  const checkpoint = rt.nestedRuns === 1 ? (rt.monitors?.size ? new Map(rt.monitors) : EMPTY_MONITORS) : null;
+  const directSite = noteReentry(rt), dstart = rt.dstart, dlimit = rt.dlimit;
+  try { return runLoop(rt, thread, base); }
+  catch (error) { if (checkpoint && !(error instanceof JavaException)) rt.monitors = checkpoint === EMPTY_MONITORS ? new Map() : checkpoint; throw error; }
+  finally {
+    rt.t2Site = directSite; rt.dstart = dstart; rt.dlimit = dlimit; if (rt.nestedRuns === 1) foldDirectCalls(rt);
+    thread.frames.length = base; thread.nestedDepth--; rt.nestedRuns--; rt.thread = thread;
+    if (parked !== null) { thread.blocked = parked.blocked; thread.blockKind = parked.kind; thread.state = parked.state; thread.timedOut = parked.timedOut; }
+    if (rt.nestedRuns === 0 && thread === rt.scheduler.main) rt.platform?.looperHost?.hostEventRan(rt);   // the host event is over: its Looper goes back to MessageQueue.next() (IdleHandlers run once)
+  }
+}
+
+/** One scheduling slice with no owner: runs whichever thread the scheduler picks until it blocks, ends or uses its quantum (used by drainEvents and nested waits). */
+export function runSlice(rt) {
+  if (++rt.nestedRuns > rt.maxNestedRuns) { rt.nestedRuns--; rt.throwJava('Ljava/lang/StackOverflowError;', 'native re-entry depth exceeded'); }
+  if (rt.nestedRuns === 1) rt.scheduler.beginEvent(rt);
+  const previous = rt.thread, directSite = noteReentry(rt), dstart = rt.dstart, dlimit = rt.dlimit;
+  try { return runLoop(rt, null, 0); } finally { rt.t2Site = directSite; rt.dstart = dstart; rt.dlimit = dlimit; if (rt.nestedRuns === 1) foldDirectCalls(rt); rt.nestedRuns--; rt.thread = previous; }
+}
+
+/**
+ * The interpreter loop. `owner` is the thread whose base frame (index `base`) ends this run -- or null for a pure scheduling slice. Other threads run inside this loop as
+ * guests whenever the scheduler switches to them; a guest that ends is terminated, and an uncaught exception in a guest is fatal like on Android.
+ */
+function runLoop(rt, owner, base, single = null) {
+  const sched = rt.scheduler, singlePc = single === null ? -1 : single.pc;
+  // `single` (slowInvoke): this loop runs the one invoke at the pc of that frame, for a direct activation, and returns its value. It does not switch threads or collect: when its thread
+  // has to stop (it blocks, another thread is due, a collection is wanted) it throws DEOPT and the loop below the direct code goes on with the frames.
+  const mustYield = () => (rt.multiThreaded && sched.hasOtherRunnable(thread, owner)) || (single !== null && rt.gcWanted());
+  let thread = owner, frames = null, f = null, regs = null, prog = null, u = null, dex = null, stats = null, pc = 0, start = 0, returnValue, returning = false;
+  // Interpreted code counts its quantum in the local `quantum` (back-edges and calls); compiled code counts in rt.q. Both boundaries are safepoints: the thread may switch, and a collection runs
+  // when one is due (rt.gcWanted). An allocation that finds a collection due zeroes rt.q (APKRuntime.makeObject), so the next back-edge or call of either kind reaches the safepoint at once:
+  // a loop that allocates several objects per iteration can otherwise fill the whole headroom inside one quantum, and a run stays interpreted for its first JIT_LOOPS iterations.
+  let need = owner === null, quantum = QUANTUM, ran = false, input = null;
+  const max = rt.maxInstructionsPerEvent, heapChunks = rt.heap.chunks, heapList = { get: id => { const chunk = heapChunks[id >>> 12]; return chunk === undefined ? undefined : chunk[id & 4095]; } }, fastCalls = rt.fastCallPaths !== false; let probe = rt.instructionProbe;
+  if (owner !== null) { frames = owner.frames; f = frames[frames.length - 1]; if (f === undefined) fail(`The run owner thread ${owner.name} (${owner.state}) has no frames to run`); regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc; start = pc; }
+  for (;;) {
+    probe = rt.instructionProbe;
+    try {
+      // ---- host steps and thread drivers: advance them until a Java frame is on top again, the thread blocks, or a value/error reaches a DEX frame
+      while (input !== null) {
+        const res = pump(rt, thread, input); input = null;
+        if (res === OUT_FRAME) { f = frames[frames.length - 1]; regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = 0; start = 0; }
+        else if (res === OUT_BLOCKED) need = true;
+        else if (res.done === true) { sched.terminate(thread); need = true; }
+        else if (frames.length === 0) { thread.lastOutcome = res; input = DRIVE; }   // the driver sees how its last step ended
+        else {
+          f = frames[frames.length - 1]; regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc; start = f.callPc;
+          if ('error' in res) throw res.error;                         // raised at the call site of the DEX frame now on top
+          if (f === single && pc !== singlePc) return res.value;       // the one invoke of this loop is done (a host step delivered its value)
+          f.result = res.value; start = pc;
+        }
+      }
+      if (need) {
+        if (single !== null) { rt.deoptNeed = true; rt.t2Deopts++; throw DEOPT; }   // the thread has to stop under direct code: the frames are rebuilt and the outer loop does it
+        need = false;
+        if (owner === null && ran) return undefined;               // a scheduling slice ends when the thread it ran stops
+        if (rt.heap.size > rt.gcSafepointFloor || rt.gcPressure) rt.safepointCollect();   // heap pressure inside one long run: collect at this thread switch
+        // ---- thread switch: pick a runnable thread (waiting for events/timers while the owner is blocked), then resume it
+        let picked = null;
+        for (;;) {
+          if (owner !== null && (owner.state === 'blocked' || sched.starved)) sched.serviceEvents();   // threads that never stop must not starve the host event queue while the owner waits
+          const choice = sched.pick(thread, owner);
+          if (choice.thread !== null) { picked = choice.thread; break; }
+          if (owner === null) return undefined;                         // nothing runnable: this slice is over
+          if (sched.nestedReady()) return undefined;
+          rt.thread = sched.mainThread();
+          sched.idle(choice.earliest, `${owner.name} is blocked (${owner.blocked?.reason ?? 'unknown'})`);
+          rt.thread = thread ?? owner;
+        }
+        if (picked !== thread) sched.switching(rt, thread, picked);
+        thread = picked; rt.thread = thread; frames = thread.frames; quantum = QUANTUM; rt.budgetTick(); rt.q = QUANTUM; rt.budgetTick(); ran = true;
+        const top = frames[frames.length - 1];
+        if (thread.blocked !== null) {                                  // a parked thread woke up: finish the wait it was in
+          if (thread.blocked.retry && top !== undefined && top.cont === undefined) {            // monitor contention: run the monitor-enter again
+            thread.blocked = null; f = top; regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc; start = pc;
+          } else input = wakeInput(thread);
+        } else if (top === undefined) input = DRIVE;                    // a new thread, or a driver thread between steps
+        else if (top.cont !== undefined) fail('Thread resumed on a host continuation without a pending step');
+        else { f = top; regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc; start = pc; }   // preempted: resume where it stopped
+        if (input !== null) continue;
+      }
+      inner: for (;;) {
+       interp: {
+        if (prog.fn !== null && f !== single && f.handoff === null) {
+          // Compiled code runs until an instruction it leaves to this loop (a call it has not cached, throw, monitor), a call it entered, a return, or a preemption point.
+          f.pc = pc; f.cur = -1;
+          const status = prog.fn(f);
+          if (status === RET) { returnValue = f.rv; returning = true; break interp; }
+          if (status === CALL) {
+            f = frames[frames.length - 1]; regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc;
+            if (rt.q <= 0) { rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (mustYield() || (owner === null && rt.sliceDeadline !== 0 && performance.now() > rt.sliceDeadline)) { need = true; break inner; } }
+            continue inner;
+          }
+          pc = f.pc;
+          if (status === YIELD) { if (mustYield() || (owner === null && rt.sliceDeadline !== 0 && performance.now() > rt.sliceDeadline)) { need = true; break inner; } rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); continue inner; }
+        }
+        start = pc;
+        if (++rt.steps > max) rt.budgetExceeded(`Instruction budget (${max}/event) exceeded`);
+        stats.instructions++;
+        const w = u[pc], op = w & 255, a = w >> 8, lo = a & 15, hi = a >> 4;
+        if (probe) probe(f.method, dex, pc, op, probeWord(u, pc));
+        switch (op) {
+          case 0x00: if (w) fail('Attempted to execute a DEX data payload'); pc++; break;
+          case 0x01: case 0x07: regs[lo] = regs[hi]; pc++; break;
+          case 0x02: case 0x08: regs[a] = regs[u[pc + 1]]; pc += 2; break;
+          case 0x03: case 0x09: regs[u[pc + 1]] = regs[u[pc + 2]]; pc += 3; break;
+          case 0x0a: case 0x0c: if (f.result === undefined) fail(`move-result without result${missingResultCall(dex, u, pc)}`); regs[a] = f.result; f.result = undefined; pc++; break;
+          case 0x0b: if (typeof f.result !== 'bigint') fail(`move-result-wide without wide result${missingResultCall(dex, u, pc)}`); regs[a] = BigInt.asIntN(64, f.result); regs[a + 1] = WIDE_HIGH; f.result = undefined; pc++; break;
+          case 0x0d: if (!f.pendingException) fail('move-exception without caught exception'); regs[a] = f.pendingException; f.pendingException = null; pc++; break;
+          case 0x0e: returnValue = undefined; returning = true; break;
+          case 0x0f: { const v = regs[a]; if (v === undefined) fail(`Invalid/uninitialized register v${a}`); returnValue = v; returning = true; break; }
+          case 0x11: { const v = regs[a]; if (v === undefined) fail(`Invalid/uninitialized register v${a}`); returnValue = isNull(v) ? null : v; returning = true; break; }
+          case 0x10: { if (regs[a + 1] !== WIDE_HIGH) fail(`Invalid wide high register v${a + 1}`); returnValue = wide(regs[a]); returning = true; break; }
+          case 0x12: regs[lo] = hi >= 8 ? hi - 16 : hi; pc++; break;
+          case 0x13: regs[a] = (u[pc + 1] << 16) >> 16; pc += 2; break;
+          case 0x14: regs[a] = u[pc + 1] | (u[pc + 2] << 16); pc += 3; break;
+          case 0x15: regs[a] = u[pc + 1] << 16; pc += 2; break;
+          case 0x1a: case 0x1b: {
+            const index = op === 0x1a ? u[pc + 1] : u[pc + 1] + u[pc + 2] * 65536;
+            if (index >= dex.strings.length) fail('Invalid string index');
+            regs[a] = dex.string(index); pc += op === 0x1a ? 2 : 3; break;
+          }
+          case 0x1d: case 0x1e: {
+            const value = regs[a]; if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'null monitor');
+            if (op === 0x1d) {
+              if (!rt.monitorTryEnter(value, thread)) {
+                // Another thread owns the monitor: park, and run this monitor-enter again when it is released.
+                f.pc = pc; thread.blocked = monitorWait(rt, value); thread.blockKind = 'site'; thread.state = 'blocked'; need = true; break inner;
+              }
+            } else rt.monitorExit(value, thread);
+            pc++; break;
+          }
+          case 0x1f: {
+            const type = dex.types[u[pc + 1]], value = regs[a]; if (!type) fail('Invalid type index');
+            if (!isNull(value) && !subtypeAt(rt, prog, pc, rt.typeOf(value), type)) { rt.assertResolvable(type); rt.throwJava('Ljava/lang/ClassCastException;', `Cannot cast ${rt.typeOf(value)} to ${type}`); }
+            pc += 2; break;
+          }
+          case 0x20: { const type = dex.types[u[pc + 1]], value = regs[hi]; if (!type) fail('Invalid instanceof type'); regs[lo] = !isNull(value) && subtypeAt(rt, prog, pc, rt.typeOf(value), type) ? 1 : (rt.assertResolvable(type), 0); pc += 2; break; }
+          case 0x21: regs[lo] = rt.vmArray(regs[hi]).cells.length; pc++; break;
+          case 0x22: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid allocation type'); if (rt.initialized.get(type)?.status !== 'initialized') { const gate = rt.initStep(type); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.bytecodeAlloc = true; try { regs[a] = rt.allocate(type); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
+          case 0x23: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid array type'); rt.bytecodeAlloc = true; try { regs[lo] = rt.newArray(type, int(regs[hi])); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
+          case 0x27: { const value = regs[a]; if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'throw with null exception'); throw new JavaException(value, rt.object(value).message ?? rt.typeOf(value), rt.object(value).exceptionDetails); }
+          case 0x28: { const target = pc + ((a << 24) >> 24); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, (--quantum <= 0 || rt.q <= 0))) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (mustYield()) { f.pc = pc; need = true; break inner; } } break; }
+          case 0x29: { const target = pc + ((u[pc + 1] << 16) >> 16); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, (--quantum <= 0 || rt.q <= 0))) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (mustYield()) { f.pc = pc; need = true; break inner; } } break; }
+          case 0x2a: { const target = pc + (u[pc + 1] | (u[pc + 2] << 16)); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, (--quantum <= 0 || rt.q <= 0))) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (mustYield()) { f.pc = pc; need = true; break inner; } } break; }
+          case 0x32: case 0x33: case 0x34: case 0x35: case 0x36: case 0x37: {
+            const x = regs[lo], y = regs[hi];
+            const match = op === 0x32 ? (x === y || equal(x, y)) : op === 0x33 ? (x !== y && !equal(x, y)) : op === 0x34 ? x < y : op === 0x35 ? x >= y : op === 0x36 ? x > y : x <= y;
+            if (match) { const t = pc + ((u[pc + 1] << 16) >> 16); pc = t; if (t <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, (--quantum <= 0 || rt.q <= 0))) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (mustYield()) { f.pc = pc; need = true; break inner; } } } else pc += 2;
+            break;
+          }
+          case 0x38: case 0x39: case 0x3a: case 0x3b: case 0x3c: case 0x3d: {
+            const x = regs[a];
+            const match = op === 0x38 ? (x === null || x === 0) : op === 0x39 ? (x !== null && x !== 0) : op === 0x3a ? x < 0 : op === 0x3b ? x >= 0 : op === 0x3c ? x > 0 : x <= 0;
+            if (match) { const t = pc + ((u[pc + 1] << 16) >> 16); pc = t; if (t <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, (--quantum <= 0 || rt.q <= 0))) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (mustYield()) { f.pc = pc; need = true; break inner; } } } else pc += 2;
+            break;
+          }
+          case 0x44: case 0x45: case 0x46: case 0x47: case 0x48: case 0x49: case 0x4a: {
+            const packed = u[pc + 1], index = regs[packed >> 8], arrayRef = regs[packed & 255]; let array; if (arrayRef !== null && typeof arrayRef === 'object') array = heapList.get(arrayRef.ref);
+            if (array === undefined || array.cells === undefined || !(index >= 0 && index < array.cells.length)) array = rt.vmArray(arrayRef, index);
+            const variant = op - 0x44, e = array.cells[index];
+            if (variant === 1) { regs[a] = e; regs[a + 1] = WIDE_HIGH; } else regs[a] = variant === 3 ? e & 1 : variant === 4 ? (e << 24) >> 24 : variant === 5 ? e & 65535 : variant === 6 ? (e << 16) >> 16 : e;
+            pc += 2; break;
+          }
+          case 0x4b: case 0x4c: case 0x4d: case 0x4e: case 0x4f: case 0x50: case 0x51: {
+            const packed = u[pc + 1], index = regs[packed >> 8], arrayRef = regs[packed & 255]; let array; if (arrayRef !== null && typeof arrayRef === 'object') array = heapList.get(arrayRef.ref);
+            if (array === undefined || array.cells === undefined || !(index >= 0 && index < array.cells.length)) array = rt.vmArray(arrayRef, index);
+            const variant = op - 0x4b, v = regs[a];
+            const value = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
+            if (variant === 2) { rt.checkArrayValue(array, value); if (array.id < rt.gcOldBound && value !== null && typeof value === 'object' && !(value.ref < rt.gcOldBound)) rt.remember(array); }   // write barrier (heap-gc.js, "Young generation")
+            array.cells[index] = value;
+            pc += 2; break;
+          }
+          case 0x52: case 0x53: case 0x54: case 0x55: case 0x56: case 0x57: case 0x58: {
+            const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.vmObject(objectRef);
+            let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = fieldSiteAt(rt, prog, pc, dex.field(u[pc + 1]), obj.type);
+            const slot = site.slot; let v = slot >= 0 ? obj.slots[slot] : obj.fields.get(site.key); if (v === undefined) v = site.def;
+            const variant = op - 0x52;
+            if (variant === 0 || variant === 2) regs[lo] = v;
+            else if (variant === 1) { regs[lo] = v; regs[lo + 1] = WIDE_HIGH; } else regs[lo] = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : (v << 16) >> 16;
+            pc += 2; break;
+          }
+          case 0x59: case 0x5a: case 0x5b: case 0x5c: case 0x5d: case 0x5e: case 0x5f: {
+            const objectRef = regs[hi]; let obj; if (objectRef !== null && typeof objectRef === 'object') obj = heapList.get(objectRef.ref); if (obj === undefined) obj = rt.vmObject(objectRef);
+            let site = prog.refs[pc]; if (site === undefined || site.type !== obj.type) site = fieldSiteAt(rt, prog, pc, dex.field(u[pc + 1]), obj.type);
+            const variant = op - 0x59, v = regs[lo], value = variant <= 2 ? v : variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : (v << 16) >> 16;
+            const slot = site.slot;   // field store (write-barrier point): an already-stored slot directly, a first store through storeSlot (budget), a key outside the shape through the facade
+            if (slot >= 0) { const slots = obj.slots; if (slots[slot] !== undefined) { slots[slot] = value; if (variant === 2 && obj.id < rt.gcOldBound && value !== null && typeof value === 'object' && !(value.ref < rt.gcOldBound)) rt.remember(obj); } else rt.storeSlot(obj, slot, site.key, value); }   // write barrier: an old record that now holds a young reference
+            else { const fields = obj.fields; if (fields.has(site.key)) { fields.set(site.key, value); if (variant === 2 && obj.id < rt.gcOldBound && value !== null && typeof value === 'object' && !(value.ref < rt.gcOldBound)) rt.remember(obj); } else rt.storeField(fields, site.key, value); }
+            pc += 2; break;
+          }
+          case 0x60: case 0x61: case 0x62: case 0x63: case 0x64: case 0x65: case 0x66: {
+            let site = prog.refs[pc], v;
+            if (site !== undefined && site.ready) { v = rt.staticFields.get(site.key); if (v === undefined) v = rt.readStatic(dex.field(u[pc + 1])); }
+            else { const reference = dex.field(u[pc + 1]), field = rt.resolveField(reference); if (rt.initialized.get(field.owner)?.status !== 'initialized') { const gate = rt.initStep(field.owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } v = rt.readStatic(reference); prog.refs[pc] = { ready: rt.initialized.get(field.owner)?.status === 'initialized' && rt.staticFields.has(field.key), key: field.key }; }
+            const variant = op - 0x60;
+            if (variant === 1) { regs[a] = v; regs[a + 1] = WIDE_HIGH; } else regs[a] = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
+            pc += 2; break;
+          }
+          case 0x67: case 0x68: case 0x69: case 0x6a: case 0x6b: case 0x6c: case 0x6d: {
+            const variant = op - 0x67, v = regs[a], value = variant === 3 ? v & 1 : variant === 4 ? (v << 24) >> 24 : variant === 5 ? v & 65535 : variant === 6 ? (v << 16) >> 16 : v;
+            const site = prog.refs[pc];
+            if (site !== undefined && site.ready && rt.staticFields.has(site.key)) rt.staticFields.set(site.key, value);
+            else { const reference = dex.field(u[pc + 1]), field = rt.resolveField(reference); if (rt.initialized.get(field.owner)?.status !== 'initialized') { const gate = rt.initStep(field.owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.writeStatic(reference, value); prog.refs[pc] = { ready: rt.initialized.get(field.owner)?.status === 'initialized' && rt.staticFields.has(field.key), key: field.key }; }
+            pc += 2; break;
+          }
+          case 0x6e: case 0x6f: case 0x70: case 0x71: case 0x72:
+          case 0x74: case 0x75: case 0x76: case 0x77: case 0x78: {
+            let site = prog.refs[pc]; if (site === undefined) site = prog.refs[pc] = makeInvokeSite(dex, u, pc, op, a, hi);
+            if (f === single && site.reentries > REENTRANT) { rt.steps--; stats.instructions--; rt.t2Deopts++; if (++prog.deopts > 16) { prog.d = null; prog.noDirect = true; } throw DEOPT; }   // this call re-enters Java through host code: made with the frames rebuilt (see "Direct form")
+            let outcome, args;
+            const handoff = f.handoff;
+            if (handoff !== null) { f.handoff = null; outcome = handoff; args = f.handoffArgs; f.handoffArgs = null; }   // compiled code made this bridged call already (H.bridgeCall): only its outcome is handled here
+            else {
+            // Inline cache: the DEX callee a call site resolved to is remembered (per receiver class for virtual calls) and entered without going through dispatch().
+            // The callee's register file is filled straight from this frame's registers; no argument array is built on a hit.
+            let cached = site.callee, calleeProg = site.calleeProg;
+            if (cached !== null) {
+              let hit = true;
+              if (site.virtual) {
+                const receiver = regs[site.first >= 0 ? site.first : u[pc + 2] & 15];
+                let receiverType; if (receiver !== null && typeof receiver === 'object') { const record = heapList.get(receiver.ref); receiverType = record !== undefined ? record.type : rt.typeOf(receiver); } else receiverType = rt.typeOf(receiver);
+                if (receiverType !== site.type) {
+                  // Polymorphic inline cache: the other receiver classes this site has resolved to a DEX body (the first one stays in site.callee, which compiled code reads).
+                  hit = false; const poly = site.poly;
+                  if (poly !== null) { const entry = poly.get(receiverType); if (entry !== undefined) { cached = entry.callee; calleeProg = entry.prog; hit = true; } }
+                }
+              }
+              if (hit) {
+                rt.callStats.cached++;
+                if (site.isStatic && !site.initialized) { { const gate = rt.initStep(cached.method.owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } site.initialized = rt.initialized.get(cached.method.owner)?.status === 'initialized'; }
+                const direct = calleeProg.d;
+                if (direct !== null && !probe && calleeProg.getter === null && calleeProg.shape === null) {
+                  // The callee's direct form: a JavaScript call over the argument words (see "Direct form"). DEOPT out of it is handled by this loop's catch: the frames are above f.
+                  let value; const argc = site.argc; rt.callStats.cached--; f.pc = pc + 3; f.callPc = start; enterDirect(rt, frames.length);   // the activation counts its call and enters the trace itself (prog.dc); the depth checks are its entry's (H.deep)
+                  if (site.first >= 0) { const first = site.first; value = argc === 1 ? direct(regs[first]) : argc === 2 ? direct(regs[first], regs[first + 1]) : direct(...regs.slice(first, first + argc)); }
+                  else {
+                    const packed = u[pc + 2];
+                    switch (argc) {
+                      case 0: value = direct(); break;
+                      case 1: value = direct(regs[packed & 15]); break;
+                      case 2: value = direct(regs[packed & 15], regs[(packed >> 4) & 15]); break;
+                      case 3: value = direct(regs[packed & 15], regs[(packed >> 4) & 15], regs[(packed >> 8) & 15]); break;
+                      case 4: value = direct(regs[packed & 15], regs[(packed >> 4) & 15], regs[(packed >> 8) & 15], regs[(packed >> 12) & 15]); break;
+                      default: value = direct(regs[packed & 15], regs[(packed >> 4) & 15], regs[(packed >> 8) & 15], regs[(packed >> 12) & 15], regs[lo]);
+                    }
+                  }
+                  if (f === single) return value;
+                  f.result = value; pc += 3; --quantum; break;
+                }
+                // APKRuntime.recordMethod / record, inlined for the steady state (counters known, trace ring past its fixed head): per-method counters, evidence row, ring entry.
+                const calleeMethod = cached.method, info = calleeInfo(calleeMethod, calleeProg), ring = rt.traceRing;
+                if (!fastCalls || info === undefined || info.exempt || rt.traceMuted || ring == null || ring.head.length < 128) rt.recordMethod(calleeMethod);
+                else {
+                  info.stats.methods++; const evidence = info.evidence; if (evidence !== undefined && evidence.calls < Number.MAX_SAFE_INTEGER) evidence.calls++;
+                  if (ring.length === 384) { ring.tail[ring.start] = info.entry; ring.start = ring.start === 383 ? 0 : ring.start + 1; rt.traceDropped = (rt.traceDropped ?? 0) + 1; }
+                  else ring.tail[(ring.start + ring.length++) % 384] = info.entry;
+                }
+                if (frames.length + rt.depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
+                const calleeCode = cached.code, argc = site.argc, nregs = calleeCode.registers, at = nregs - argc;
+                f.pc = pc + 3; f.callPc = start; if (frames.length + rt.depth + 1 > rt.peakCallDepth) rt.peakCallDepth = frames.length + rt.depth + 1;
+                tick(rt, calleeProg);
+                const getter = calleeProg.getter;
+                if (getter !== null && fastCalls && quantum > 1 && rt.steps + 2 <= max && !probe) {
+                  // Frameless trivial getter: the two instructions the callee would run (iget, return) are executed here, with their effects on the instruction budget and counters.
+                  const receiver = regs[site.first >= 0 ? site.first : u[pc + 2] & 15]; let target; if (receiver !== null && typeof receiver === 'object') target = heapList.get(receiver.ref);
+                  if (target !== undefined) {
+                    const fieldSite = calleeProg.refs[0];
+                    if (fieldSite !== undefined && fieldSite.type === target.type) {
+                      const slot = fieldSite.slot; let v = slot >= 0 ? target.slots[slot] : target.fields.get(fieldSite.key); if (v === undefined) v = fieldSite.def;
+                      if (getter === 0x55) v &= 1; else if (getter === 0x56) v = (v << 24) >> 24; else if (getter === 0x57) v &= 65535; else if (getter === 0x58) v = (v << 16) >> 16;
+                      rt.steps += 2; calleeProg.stats.instructions += 2; quantum--;
+                      f.result = getter === 0x54 && (v === 0 || v === null) ? null : v; if (f === single) return f.result; pc += 3; break;
+                    }
+                  }
+                }
+                const shape = calleeProg.shape;
+                if (shape !== null && fastCalls && quantum > 1 && rt.steps + 2 <= max && !probe) {
+                  // Frameless identity / parameter null check / static getter (detectShape): the callee's instructions are accounted for here, as for the getter above.
+                  let value = NO_GETTER;
+                  if (shape.kind === STATIC_GET) { const v = staticGetValue(rt, calleeProg); if (v !== NO_GETTER) value = shape.op === 0x62 && v === 0 ? null : v; }
+                  else { const p0 = regs[site.first >= 0 ? site.first : u[pc + 2] & 15]; if (shape.kind === IDENTITY) value = shape.op === 0x11 && (p0 === 0 || p0 === null) ? null : p0; else if (p0 !== null && p0 !== 0) value = undefined; }
+                  if (value !== NO_GETTER) { rt.steps += shape.count; calleeProg.stats.instructions += shape.count; quantum--; if (f === single) return value; f.result = value; pc += 3; break; }
+                }
+                const nr = new Array(nregs);
+                if (site.first >= 0) { const first = site.first; for (let j = 0; j < argc; j++) nr[at + j] = regs[first + j]; }
+                else { const packed = u[pc + 2]; switch (argc) { case 5: nr[at + 4] = regs[lo]; case 4: nr[at + 3] = regs[(packed >> 12) & 15]; case 3: nr[at + 2] = regs[(packed >> 8) & 15]; case 2: nr[at + 1] = regs[(packed >> 4) & 15]; case 1: nr[at] = regs[packed & 15]; } }
+                f = new Frame(cached.method, calleeCode, nr, calleeProg); frames.push(f);
+                regs = nr; prog = calleeProg; u = prog.units; dex = prog.dex; stats = prog.stats; pc = 0;
+                if (--quantum <= 0 || rt.q <= 0) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (mustYield()) { f.pc = 0; need = true; break inner; } }
+                break;
+              }
+            }
+            if (site.isStatic && !site.initialized) { const owner = rt.staticOwner(site.target); if (rt.initialized.get(owner)?.status !== 'initialized') { const gate = rt.initStep(owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } else site.initialized = true; }
+            const argc = site.argc; args = new Array(argc);
+            if (site.first >= 0) { const first = site.first; for (let j = 0; j < argc; j++) args[j] = regs[first + j]; }
+            else { const packed = u[pc + 2]; switch (argc) { case 5: args[4] = regs[lo]; case 4: args[3] = regs[(packed >> 12) & 15]; case 3: args[2] = regs[(packed >> 8) & 15]; case 2: args[1] = regs[(packed >> 4) & 15]; case 1: args[0] = regs[packed & 15]; } }
+            // Calls that resolve to a SHIM/platform bridge are cached too: the resolution is reused for the same call site without re-walking dispatch(). A virtual site remembers the resolution per
+            // receiver class (the first in site.bridge/bridgeType, the others in site.bridgePoly; a String receiver is the class String); annotation and reflection proxies always dispatch.
+            let bridge = site.bridge, bridged = false;
+            if (bridge !== null && site.bridgeEpoch === rt.resolveEpoch) {
+              if (!site.virtual) bridged = true;
+              else {
+                const receiver = args[0];
+                if (typeof receiver === 'string') bridged = site.bridgeType === 'Ljava/lang/String;';
+                else if (receiver !== null && receiver !== 0) {
+                  const record = rt.heap.get(receiver.ref);
+                  if (record !== undefined && record.annotationValues === undefined && record.proxyHandler === undefined) {
+                    if (record.type === site.bridgeType) bridged = true;
+                    else { const poly = site.bridgePoly; if (poly !== null) { const entry = poly.get(record.type); if (entry !== undefined) { bridge = entry; bridged = true; } } }
+                  }
+                }
+              }
+            }
+            if (bridged) {
+              rt.callStats.bridged++; if (rt.profile.active) rt.profile.host(bridge.key); rt.monitor.hostEnter(bridge.key, bridge);
+              { // APKRuntime.record(bridge.text), inlined for the steady state (the calling method's plumbing flag known, ring past its fixed head)
+                const plumbing = f.method.plumbing, ring = rt.traceRing;
+                if (!fastCalls || plumbing === undefined || rt.traceMuted || ring == null || ring.head.length < 128) rt.record(bridge.text);
+                else if (plumbing === false) {
+                  if (ring.length === 384) { ring.tail[ring.start] = bridge.text; ring.start = ring.start === 383 ? 0 : ring.start + 1; rt.traceDropped = (rt.traceDropped ?? 0) + 1; }
+                  else ring.tail[(ring.start + ring.length++) % 384] = bridge.text;
+                }
+              }
+              const hostMark = rt.hostAllocs.length;   // see APKRuntime.dispatch: host allocations are scoped to the call
+              outcome = rt.bridge(bridge.selected, args, site.mode, bridge.key, bridge); rt.hostCall = null;
+              if (rt.hostAllocs.length > hostMark && !(outcome instanceof Blocked || outcome instanceof Invoke)) rt.releaseHostAllocs(hostMark);
+            } else {
+              rt.callStats.dispatched++; rt.lastBridge = null; const depthBefore = rt.depth;
+              outcome = rt.dispatch(site.target, args, site.mode, f.method.owner, true);
+              if (rt.lastBridge !== null && rt.lastBridgeDepth === depthBefore + 1) {
+                const receiver = args[0], record = site.virtual && typeof receiver !== 'string' ? rt.vmObject(receiver) : null;
+                if (record === null || (record.annotationValues === undefined && record.proxyHandler === undefined)) {
+                  const type = site.virtual ? (record === null ? 'Ljava/lang/String;' : record.type) : null;
+                  if (site.bridge === null || site.bridgeEpoch !== rt.resolveEpoch) { site.bridge = rt.lastBridge; site.bridgeEpoch = rt.resolveEpoch; site.bridgeType = type; site.bridgePoly = null; }
+                  else if (fastCalls && site.virtual && type !== site.bridgeType) { const poly = site.bridgePoly ??= new Map(); if (poly.size < 64) poly.set(type, rt.lastBridge); }
+                }
+              }
+              rt.lastBridge = null;
+            }
+            }
+            if (outcome instanceof PendingCall) {
+              if (outcome.definition !== null && !(site.virtual && typeof args[0] !== 'string' && rt.vmObject(args[0]).annotationValues)) {
+                if (fastCalls && site.callee !== null && site.virtual) {
+                  const type = rt.typeOf(args[0]), poly = site.poly ??= new Map();
+                  if (type !== site.type && poly.size < 128) poly.set(type, { callee: outcome.definition, prog: prepare(rt, outcome.method, outcome.code) });
+                } else { site.callee = outcome.definition; site.type = site.virtual ? rt.typeOf(args[0]) : null; site.calleeProg = prepare(rt, outcome.method, outcome.code); }
+              }
+              if (frames.length + rt.depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
+              if (outcome.args.length !== outcome.code.incoming) fail(`Argument/register mismatch: ${outcome.method.key}`);
+              f.pc = pc + 3; f.callPc = start; if (frames.length + rt.depth + 1 > rt.peakCallDepth) rt.peakCallDepth = frames.length + rt.depth + 1;
+              f = makeFrame(rt, outcome.method, outcome.code, outcome.args); frames.push(f);
+              regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = 0;
+              if (--quantum <= 0 || rt.q <= 0) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (mustYield()) { f.pc = 0; need = true; break inner; } }
+              break;
+            }
+            if (outcome instanceof Blocked) {
+              // A blocking native: park this thread; the call finishes when the scheduler wakes it (see Scheduler.wake and the switch-in code above).
+              f.pc = outcome.retry ? start : pc + 3; f.callPc = start; thread.blocked = outcome; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; break inner;
+            }
+            if (outcome instanceof Invoke) {
+              // A host step that needs Java to run (see Invoke): its callee runs as ordinary frames on this thread.
+              f.pc = pc + 3; f.callPc = start; input = { kind: 'start', invoke: outcome }; break inner;
+            }
+            if (f === single) return outcome;
+            f.result = outcome; pc += 3; break;
+          }
+          // 32-bit integer arithmetic (the common forms; long, float and double arithmetic is in stepRare): operands are validated as before, add/sub/mul are inline.
+          case 0x90: case 0x91: case 0x92: case 0x93: case 0x94: case 0x95: case 0x96: case 0x97: case 0x98: case 0x99: case 0x9a: {
+            const packed = u[pc + 1]; let x = regs[packed & 255], y = regs[packed >> 8];
+            if (typeof x !== 'number' || (x | 0) !== x) x = int(x);
+            if (typeof y !== 'number' || (y | 0) !== y) y = int(y);
+            const o = op - 0x90; regs[a] = o === 0 ? (x + y) | 0 : o === 1 ? (x - y) | 0 : o === 2 ? Math.imul(x, y) : arithmetic(o, x, y); pc += 2; break;
+          }
+          case 0xb0: case 0xb1: case 0xb2: case 0xb3: case 0xb4: case 0xb5: case 0xb6: case 0xb7: case 0xb8: case 0xb9: case 0xba: {
+            let x = regs[lo], y = regs[hi];
+            if (typeof x !== 'number' || (x | 0) !== x) x = int(x);
+            if (typeof y !== 'number' || (y | 0) !== y) y = int(y);
+            const o = op - 0xb0; regs[lo] = o === 0 ? (x + y) | 0 : o === 1 ? (x - y) | 0 : o === 2 ? Math.imul(x, y) : arithmetic(o, x, y); pc++; break;
+          }
+          case 0xd0: case 0xd1: case 0xd2: case 0xd3: case 0xd4: case 0xd5: case 0xd6: case 0xd7: {
+            let x = regs[hi]; if (typeof x !== 'number' || (x | 0) !== x) x = int(x);
+            const y = (u[pc + 1] << 16) >> 16, o = op - 0xd0;
+            regs[lo] = o === 0 ? (x + y) | 0 : o === 1 ? (y - x) | 0 : o === 2 ? Math.imul(x, y) : arithmetic(o, x, y); pc += 2; break;
+          }
+          case 0xd8: case 0xd9: case 0xda: case 0xdb: case 0xdc: case 0xdd: case 0xde: case 0xdf: case 0xe0: case 0xe1: case 0xe2: {
+            const packed = u[pc + 1]; let x = regs[packed & 255]; if (typeof x !== 'number' || (x | 0) !== x) x = int(x);
+            const y = ((packed >> 8) << 24) >> 24, o = op - 0xd8;
+            regs[a] = o === 0 ? (x + y) | 0 : o === 1 ? (y - x) | 0 : o === 2 ? Math.imul(x, y) : arithmetic(o, x, y); pc += 2; break;
+          }
+          default: pc = stepRare(rt, f, regs, u, dex, pc, op, a, lo, hi); break;
+        }
+       }
+        if (returning) {
+          // return from this frame to its caller (or out of the run loop at its base)
+          returning = false; frames.pop();
+          if (thread === owner && frames.length <= base) return returnValue;
+          const caller = frames[frames.length - 1];
+          if (caller === undefined) { thread.lastOutcome = { value: returnValue }; input = DRIVE; break inner; }   // a thread's run() finished
+          if (caller.cont !== undefined) { input = { kind: 'returned', value: returnValue }; break inner; }       // a host step was waiting for this callee
+          f = caller; regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc;
+          f.result = returnValue;
+        }
+      }
+    } catch (error) {
+      returning = false; input = null;
+      if (error === DEOPT) {
+        // Direct code this loop entered rebuilt its frames (see "Direct form"): they are on the thread's stack above the frame that made the call, the top one at the instruction to run next.
+        if (single !== null) throw error;
+        f = frames[frames.length - 1]; regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc; start = pc;
+        if (rt.deoptNeed) {
+          rt.deoptNeed = false;
+          if (thread.blocked !== null || mustYield() || (owner === null && rt.sliceDeadline !== 0 && performance.now() > rt.sliceDeadline)) need = true;
+          else if (rt.gcWanted()) rt.safepointCollect();
+        }
+        continue;
+      }
+      if (error?.vmFatal === true || error?.looperYield === true || f === null) throw error;   // looperYield: the main thread's MessageQueue.next() returns control to the host event loop (message-queue-native.js)
+      // No frame is left to handle it (the failure happened after the last frame of this run returned, or in the host code that completes the run): the original error is the report, not a TypeError about a missing frame.
+      if (frames.length === 0 || (thread === owner && frames.length <= base)) throw error;
+      f = frames[frames.length - 1];                                // compiled code may have entered callees directly: the failing frame is the top one
+      if (f.handoff != null) { f.handoff = null; f.handoffArgs = null; }   // a bridge outcome compiled code left for an invoke that did not run (the budget ran out first)
+      regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats;
+      if (f.cur >= 0) { start = f.cur; f.cur = -1; }               // thrown by compiled code: the instruction it was executing
+      if (error instanceof JavaException && error.message === 'null object reference') refineNullPointerMessage(rt, error, dex, u, start, regs);   // ART's wording: which method, field or array was dereferenced
+      // Unwind: the frame that failed handles it, then its callers (and any host step waiting on them) until the run's base frame.
+      rt.hostCall = null;   // the host call that threw is over: a stale marker would blame it for the silence that follows
+      let current = error, innermost = true;
+      for (;;) {
+        if (current instanceof APKError && /^(Integer|Long) (divide|remainder) by zero/.test(current.message)) {
+          try { rt.throwJava('Ljava/lang/ArithmeticException;', current.message); } catch (converted) { current = converted; }
+        }
+        if (current instanceof JavaException) {
+          const target = catchTarget(rt, f, start, current.value);
+          if (target !== null) { f.pendingException = current.value; pc = target; rt.record(`CATCH ${rt.typeOf(current.value)} in ${f.method.key}`); rt.noteCaught(current.value, f.method.key); regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; break; }
+          current.message = `${f.method.key} [${prog.filename}] at PC 0x${start.toString(16).padStart(4, '0')}: ${current.message}`;
+        } else {
+          // A register-type error names the failing opcode and the last host bridge the VM called, which is usually where the bad value came from.
+          const where = innermost && /^Expected (int|long|wide|object|reference)/.test(current.message ?? '') ? ` [opcode 0x${(u[start] & 0xff).toString(16).padStart(2, '0')}${rt.lastHostCall ? `; last host call ${rt.lastHostCall}` : ''}]` : '';
+          if (globalThis.process?.env?.APKWEB_DEBUG_HOST_ERRORS && innermost) console.error(current.stack);
+          const internal = !(current instanceof APKError);   // a JavaScript error inside the VM (TypeError ...): keep where it happened
+          current = new APKError(`${f.method.key} [${prog.filename}] at PC 0x${start.toString(16).padStart(4, '0')}: ${current.message ?? current}${where}`, internal ? { ...(current.details ?? {}), kind: 'internal-js-error', jsStack: String(current.stack ?? '').split('\n').slice(0, 13).join('\n'), vmContext: rt.monitor.context() } : current.details);
+        }
+        innermost = false;
+        frames.pop();
+        if (thread === owner && frames.length <= base) throw current;
+        const below = frames[frames.length - 1];
+        if (below === undefined) { thread.lastOutcome = { error: current }; input = DRIVE; break; }         // uncaught in a thread: its driver decides (handler, fatal)
+        if (below.cont !== undefined) { input = { kind: 'error', error: current }; break; }                 // a host step was waiting for the callee that failed
+        f = below; regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; start = f.callPc; pc = f.pc;
+      }
+    }
+  }
+}
+
+/** Opcodes that are rare or large (wide moves/constants, filled arrays, switches, comparisons, conversions, wide and mixed arithmetic), kept out of runLoop so its bytecode, register file and
+ *  deoptimization surface stay small. Executes the instruction at `pc` and returns the next pc; it neither blocks nor switches frames. */
+function stepRare(rt, f, regs, u, dex, pc, op, a, lo, hi) {
+  switch (op) {
+      case 0x04: { if (regs[hi + 1] !== WIDE_HIGH) fail(`Invalid wide high register v${hi + 1}`); regs[lo] = wide(regs[hi]); regs[lo + 1] = WIDE_HIGH; pc++; break; }
+      case 0x05: { const s = u[pc + 1]; if (regs[s + 1] !== WIDE_HIGH) fail(`Invalid wide high register v${s + 1}`); regs[a] = wide(regs[s]); regs[a + 1] = WIDE_HIGH; pc += 2; break; }
+      case 0x06: { const d = u[pc + 1], s = u[pc + 2]; if (regs[s + 1] !== WIDE_HIGH) fail(`Invalid wide high register v${s + 1}`); regs[d] = wide(regs[s]); regs[d + 1] = WIDE_HIGH; pc += 3; break; }
+      case 0x16: regs[a] = BigInt((u[pc + 1] << 16) >> 16); regs[a + 1] = WIDE_HIGH; pc += 2; break;
+      case 0x17: regs[a] = BigInt(u[pc + 1] | (u[pc + 2] << 16)); regs[a + 1] = WIDE_HIGH; pc += 3; break;
+      case 0x18: regs[a] = BigInt.asIntN(64, BigInt(u[pc + 1]) | BigInt(u[pc + 2]) << 16n | BigInt(u[pc + 3]) << 32n | BigInt(u[pc + 4]) << 48n); regs[a + 1] = WIDE_HIGH; pc += 5; break;
+      case 0x19: regs[a] = BigInt.asIntN(64, BigInt(u[pc + 1]) << 48n); regs[a + 1] = WIDE_HIGH; pc += 2; break;
+      case 0x1c: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid class type'); if (!rt.classes.has(type)) rt.assertResolvable(type); regs[a] = rt.classObject(type); pc += 2; break; }
+      case 0x24: case 0x25: {
+        const type = dex.types[u[pc + 1]]; if (!type?.startsWith('[') || ['J', 'D'].includes(type.slice(1))) fail('Invalid filled-new-array type');
+        const registers = invokeRegisters(u, pc, regs, op, a, lo, hi); rt.bytecodeAlloc = true; let value; try { value = rt.newArray(type, registers.length); } finally { rt.bytecodeAlloc = false; } const array = rt.object(value);
+        for (let i = 0; i < registers.length; i++) { const entry = regs[registers[i]]; rt.checkArrayValue(array, entry); array.cells[i] = narrow(entry, type.slice(1)); }
+        f.result = value; pc += 3; break;
+      }
+      case 0x26: {
+        const array = rt.vmArray(regs[a]), payload = pc + (u[pc + 1] | (u[pc + 2] << 16)), tag = u[payload], width = u[payload + 1];
+        const size = u[payload + 2] + u[payload + 3] * 65536;
+        const expected = { Z: 1, B: 1, C: 2, S: 2, I: 4, F: 4, J: 8, D: 8 }[array.type.slice(1)];
+        if (tag !== 0x0300 || !expected || size > array.cells.length || width !== expected || payload + 4 + Math.ceil(size * width / 2) > f.code.units) fail('Malformed fill-array-data payload');
+        // The payload is the little-endian byte image of the elements, exactly the array's storage: copy it through a byte view of the code units (u is a Uint16Array over the DEX bytes, or a copy of them).
+        const cells = array.cells, bytes = new Uint8Array(u.buffer, u.byteOffset + (payload + 4) * 2, size * width);
+        if (ArrayBuffer.isView(cells)) new Uint8Array(cells.buffer, cells.byteOffset, cells.byteLength).set(bytes);   // same byte image: a byte[] is its bytes, a char[] its UTF-16 units, an int[]/float[] its 32-bit words, a long[]/double[] its 64-bit words
+        else { const type = array.type.slice(1), view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength); for (let i = 0; i < size; i++) cells[i] = narrow(width === 1 ? view.getInt8(i) : width === 2 ? view.getUint16(i * 2, true) : width === 4 ? view.getInt32(i * 4, true) : view.getBigInt64(i * 8, true), type); }
+        pc += 3; break;
+      }
+      case 0x2b: case 0x2c: {
+        const value = int(regs[a]), payload = pc + (u[pc + 1] | (u[pc + 2] << 16)), expected = op === 0x2b ? 0x0100 : 0x0200;
+        if (u[payload] !== expected) fail('Malformed switch payload');
+        const size = u[payload + 1]; if (size > 65535) fail('Switch size exceeds limit');
+        let target = null;
+        if (op === 0x2b) { const index = value - (u[payload + 2] | (u[payload + 3] << 16)); if (index >= 0 && index < size) { const at = payload + 4 + index * 2; target = u[at] | (u[at + 1] << 16); } }
+        else {
+          let low = 0, high = size - 1;
+          while (low <= high) {
+            const middle = (low + high) >>> 1, keyAt = payload + 2 + middle * 2, key = u[keyAt] | (u[keyAt + 1] << 16);
+            if (key === value) { const at = payload + 2 + size * 2 + middle * 2; target = u[at] | (u[at + 1] << 16); break; }
+            if (key < value) low = middle + 1; else high = middle - 1;
+          }
+        }
+        if (target === null) pc += 3; else { const t = pc + target; if (t < 0 || t >= f.code.units) fail('Branch target outside method'); pc = t; }
+        break;
+      }
+      case 0x2d: case 0x2e: case 0x2f: case 0x30: case 0x31: {
+        const packed = u[pc + 1], left = packed & 255, right = packed >> 8;
+        let x, y;
+        if (op === 0x31) { x = H.getWide(regs, left); y = H.getWide(regs, right); }
+        else if (op <= 0x2e) { x = floatNumber(regs[left]); y = floatNumber(regs[right]); }
+        else { x = doubleNumber(H.getWide(regs, left)); y = doubleNumber(H.getWide(regs, right)); }
+        regs[a] = Number.isNaN(x) || Number.isNaN(y) ? (op === 0x2e || op === 0x30 ? 1 : -1) : x < y ? -1 : x > y ? 1 : 0; pc += 2; break;
+      }
+      case 0x7b: regs[lo] = (-int(regs[hi])) | 0; pc++; break;
+      case 0x7c: regs[lo] = ~int(regs[hi]); pc++; break;
+      case 0x7d: H.putWide(regs, lo, -H.getWide(regs, hi)); pc++; break;
+      case 0x7e: H.putWide(regs, lo, ~H.getWide(regs, hi)); pc++; break;
+      case 0x7f: regs[lo] = floatBits(-floatNumber(regs[hi])); pc++; break;
+      case 0x80: H.putWide(regs, lo, doubleBits(-doubleNumber(H.getWide(regs, hi)))); pc++; break;
+      case 0x81: H.putWide(regs, lo, BigInt(int(regs[hi]))); pc++; break;
+      case 0x82: regs[lo] = floatBits(int(regs[hi])); pc++; break;
+      case 0x83: H.putWide(regs, lo, doubleBits(int(regs[hi]))); pc++; break;
+      case 0x84: regs[lo] = Number(BigInt.asIntN(32, H.getWide(regs, hi))); pc++; break;
+      case 0x85: regs[lo] = floatBits(Number(H.getWide(regs, hi))); pc++; break;
+      case 0x86: H.putWide(regs, lo, doubleBits(Number(H.getWide(regs, hi)))); pc++; break;
+      case 0x87: regs[lo] = javaInt(floatNumber(regs[hi])); pc++; break;
+      case 0x88: H.putWide(regs, lo, javaLong(floatNumber(regs[hi]))); pc++; break;
+      case 0x89: H.putWide(regs, lo, doubleBits(floatNumber(regs[hi]))); pc++; break;
+      case 0x8a: regs[lo] = javaInt(doubleNumber(H.getWide(regs, hi))); pc++; break;
+      case 0x8b: H.putWide(regs, lo, javaLong(doubleNumber(H.getWide(regs, hi)))); pc++; break;
+      case 0x8c: regs[lo] = floatBits(doubleNumber(H.getWide(regs, hi))); pc++; break;
+      case 0x8d: regs[lo] = signed8(int(regs[hi])); pc++; break;
+      case 0x8e: regs[lo] = int(regs[hi]) & 65535; pc++; break;
+      case 0x8f: regs[lo] = signed16(int(regs[hi])); pc++; break;
+    default: {
+        if (op >= 0x90 && op <= 0xcf) {
+          const two = op >= 0xb0, relative = op - (two ? 0xb0 : 0x90);
+          const group = relative < 11 ? 0 : relative < 22 ? 1 : relative < 27 ? 2 : 3;
+          const operation = relative - (group === 0 ? 0 : group === 1 ? 11 : group === 2 ? 22 : 27);
+          const packed = two ? 0 : u[pc + 1], destination = two ? lo : a, left = two ? lo : packed & 255, right = two ? hi : packed >> 8;
+          const wideLeft = group === 1 || group === 3, wideRight = group === 3 || (group === 1 && operation < 8);
+          const x = wideLeft ? H.getWide(regs, left) : regs[left], y = wideRight ? H.getWide(regs, right) : regs[right];
+          const value = numericBinary(group, operation, x, y);
+          if (wideLeft) H.putWide(regs, destination, value); else regs[destination] = value;
+          pc += two ? 1 : 2;
+        } else if (op >= 0xd0 && op <= 0xd7) {
+          const x = int(regs[hi]), y = (u[pc + 1] << 16) >> 16, operation = op - 0xd0;
+          regs[lo] = operation === 1 ? (y - x) | 0 : arithmetic(operation, x, y); pc += 2;
+        } else if (op >= 0xd8 && op <= 0xe2) {
+          const packed = u[pc + 1], x = int(regs[packed & 255]), y = ((packed >> 8) << 24) >> 24, operation = op - 0xd8;
+          regs[a] = operation === 1 ? (y - x) | 0 : arithmetic(operation, x, y); pc += 2;
+        } else fail(`Unsupported opcode 0x${op.toString(16).padStart(2, '0')}`);
+      }
+  }
+  return pc;
+}
+
+// Closures live outside runLoop: a function that creates closures over its locals keeps them in a heap context, which slows every instruction.
+function probeWord(u, pc) { return offset => u[pc + (offset ?? 0)]; }
+function monitorWait(rt, value) { return new Blocked({ ready: () => rt.monitorFree(value), reason: 'monitor', retry: true }); }
+
+function invokeRegisters(u, pc, regs, op, a, lo, hi) {
+  if (op === 0x24 || op === 0x6e || op === 0x6f || op === 0x70 || op === 0x71 || op === 0x72) {
+    if (hi > 5) fail('Invalid invoke register count');
+    const packed = u[pc + 2];
+    if (hi === 0) return [];
+    const list = [packed & 15, (packed >> 4) & 15, (packed >> 8) & 15, (packed >> 12) & 15, lo];
+    return list.slice(0, hi);
+  }
+  const first = u[pc + 2]; if (first + a > regs.length) fail('Invalid invoke-range registers');
+  const out = new Array(a); for (let j = 0; j < a; j++) out[j] = first + j; return out;
+}

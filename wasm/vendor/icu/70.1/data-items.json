@@ -1,0 +1,186 @@
+{
+  "sourcePackage": "ICU70.1 original icudt70l.dat",
+  "allRetainedItemBytesIdentical": true,
+  "items": [
+    {
+      "path": "brkitr/burmesedict.dict",
+      "bytes": 254448,
+      "sha256": "99f1b2afe6672bc495a872e85dd5ed2be5ffc4d9b8377deff2dbc18a2b4538e5"
+    },
+    {
+      "path": "brkitr/char.brk",
+      "bytes": 13680,
+      "sha256": "998e9b0c0f9532c2445e33943f17f6664cdd1c91c27e75af900979bdbc730006"
+    },
+    {
+      "path": "brkitr/cjdict.dict",
+      "bytes": 2003568,
+      "sha256": "4d4e486cb3c57838a75a9fa7a8a8f37efe0640bd2c8c4d6e655ccb137c057200"
+    },
+    {
+      "path": "brkitr/de.res",
+      "bytes": 2992,
+      "sha256": "a08312a9303b1373f7129bdb6ebd798cb39073476f75d30f1602c0c6a99c05b2"
+    },
+    {
+      "path": "brkitr/el.res",
+      "bytes": 160,
+      "sha256": "de0af623cf2c0440bfd567bb89116f02c78dc666b7fe3f62baaa47315937ebe3"
+    },
+    {
+      "path": "brkitr/en.res",
+      "bytes": 1776,
+      "sha256": "74c5fbfbfc3517d5383a84f9cbfbd0e3ab7c47fbdd09320d0429938fdb6ca984"
+    },
+    {
+      "path": "brkitr/en_US.res",
+      "bytes": 80,
+      "sha256": "ee066818c0bfc2e92c9f4486f3087c3669b998786b0363a04467136d80c00d8b"
+    },
+    {
+      "path": "brkitr/en_US_POSIX.res",
+      "bytes": 160,
+      "sha256": "f0b36c871bf8cde086d24478f43c465de47a62ad267922022f0b2cf29bc5f94c"
+    },
+    {
+      "path": "brkitr/es.res",
+      "bytes": 2176,
+      "sha256": "4db4b3ef626368fa010b546855296c5fa1556e5843d62fa5647e19bbe25cfdc6"
+    },
+    {
+      "path": "brkitr/fr.res",
+      "bytes": 1200,
+      "sha256": "d95b1d5e778b175096289618ba726c7f31844609cdd1a69b5bb6748873f2d7ce"
+    },
+    {
+      "path": "brkitr/it.res",
+      "bytes": 688,
+      "sha256": "86b433f7a2456522c6c9310e6a23d7783e414f72c66dd5d4643096225caeec6a"
+    },
+    {
+      "path": "brkitr/ja.res",
+      "bytes": 304,
+      "sha256": "9a69b8e6e0a96ff955bbac3e93187ee95cd287e1f2e70e87700fae4b69728dac"
+    },
+    {
+      "path": "brkitr/khmerdict.dict",
+      "bytes": 445552,
+      "sha256": "080582d61636c7f9039d65bc37452d100faa07f3ba7f5e21aa32aa1672441413"
+    },
+    {
+      "path": "brkitr/laodict.dict",
+      "bytes": 162624,
+      "sha256": "3948404bd059be5f7049fc894266710178eae95f026c568753b56cf6ce9ae574"
+    },
+    {
+      "path": "brkitr/line.brk",
+      "bytes": 24704,
+      "sha256": "7f15ae3aabe05266baa59cb24b38f19fa30f7808d7972c80a88a243f4c1b5857"
+    },
+    {
+      "path": "brkitr/line_cj.brk",
+      "bytes": 24736,
+      "sha256": "acdba0bf0d33244b8bf44cfd5f7203200063fb1dce8ae048ab9acf7ece032c94"
+    },
+    {
+      "path": "brkitr/line_loose.brk",
+      "bytes": 24848,
+      "sha256": "fffb4acd3aeb7c5f66904a50fcfef0444c8c25330dc0c2579f1c753d139cfa5f"
+    },
+    {
+      "path": "brkitr/line_loose_cj.brk",
+      "bytes": 25728,
+      "sha256": "7beadf52c66e3ed1ce05d6dd61d88ee540bcdf80496efe733912a292700f9bd9"
+    },
+    {
+      "path": "brkitr/line_normal.brk",
+      "bytes": 24528,
+      "sha256": "dd01f877091a0ef65dd30b37cbb7f0aa2ca1879c1afcd90ef51a3bbea3521648"
+    },
+    {
+      "path": "brkitr/line_normal_cj.brk",
+      "bytes": 24912,
+      "sha256": "c636f320b18976a690f65f181542dce46f4fe41696a85db58000b3cbc7297b80"
+    },
+    {
+      "path": "brkitr/pt.res",
+      "bytes": 2288,
+      "sha256": "200c5c8d1a5d1ef45a57b40517cb966842ce9fa63d0147f8f6fb210a8a8dbefe"
+    },
+    {
+      "path": "brkitr/res_index.res",
+      "bytes": 224,
+      "sha256": "866417bf6ea1c7c0559b585c237b3fc72a1c355187b62bb07b110638384fc12f"
+    },
+    {
+      "path": "brkitr/root.res",
+      "bytes": 800,
+      "sha256": "4707b745b957074045aaa6b2313da9af45c847f1ff731cbaebcb2f4171f5bec7"
+    },
+    {
+      "path": "brkitr/ru.res",
+      "bytes": 336,
+      "sha256": "9e934ecf7041a7aead1c5aa813582e36b21565fb626e762cf6247c709d936614"
+    },
+    {
+      "path": "brkitr/sent.brk",
+      "bytes": 19440,
+      "sha256": "5c00347fef4c73456357ca76039aaf10a506b2b5010ad84e5a63de9c4040e6e5"
+    },
+    {
+      "path": "brkitr/sent_el.brk",
+      "bytes": 19456,
+      "sha256": "eef4a58ed59d0cc2dc36b24ffbcd35798e4f3c9dab39f855addfbd2cb78d02ed"
+    },
+    {
+      "path": "brkitr/thaidict.dict",
+      "bytes": 126144,
+      "sha256": "388bd2db64e7eddd9223c746b68c35ccdd7adb67623125c13e1d8af5fa8390a8"
+    },
+    {
+      "path": "brkitr/title.brk",
+      "bytes": 12064,
+      "sha256": "3a69d94901c755f524939e31023f81f5218ac8f15c317cb26eb0c326a5d69b40"
+    },
+    {
+      "path": "brkitr/word.brk",
+      "bytes": 22384,
+      "sha256": "8d42f5f898284d7e428b4ee79361baadd370707a8a70cf11b3bbd2ad252f83b3"
+    },
+    {
+      "path": "brkitr/word_POSIX.brk",
+      "bytes": 22384,
+      "sha256": "82924ecf49c0a7dc259c7fdfc33fe9c934c97c04613533e4f41a77a8330290d2"
+    },
+    {
+      "path": "brkitr/zh.res",
+      "bytes": 272,
+      "sha256": "35e7c34f5b94dda401bfc8d79c88dacc80a6985d821df44b5b8b667eacfe3646"
+    },
+    {
+      "path": "brkitr/zh_Hant.res",
+      "bytes": 272,
+      "sha256": "35e7c34f5b94dda401bfc8d79c88dacc80a6985d821df44b5b8b667eacfe3646"
+    },
+    {
+      "path": "cnvalias.icu",
+      "bytes": 63984,
+      "sha256": "46e08176356b7a4091fb3b0d35ced44474c75355dad0927b3a55fbfc4514afbb"
+    },
+    {
+      "path": "nfkc.nrm",
+      "bytes": 54720,
+      "sha256": "76f63a2907f13841ffae50143f424fe44dd85a45fc1bdc07376df17215ee85c5"
+    },
+    {
+      "path": "nfkc_cf.nrm",
+      "bytes": 52080,
+      "sha256": "a4a2401606ee652935243639010523039b897cd4aabeeba685feb1eb7462f813"
+    },
+    {
+      "path": "ulayout.icu",
+      "bytes": 13664,
+      "sha256": "867638ba1f9253f48b346e899371c8097dc047b194586b28c6aa99aa93591beb"
+    }
+  ]
+}

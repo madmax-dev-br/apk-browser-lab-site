@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "source": "Android SDK Platform 16, API36, platform revision2, extension17; installed official android.jar resources.arsc",
+  "sourceFile": "platforms/android-36/android.jar!/resources.arsc",
+  "sourceArscBytes": 18220604,
+  "sourceArscSha256": "760f96db566cca5237fb126a2559cebe7455b07e47c15eeed050c4a73fea2d54",
+  "asset": "framework-resources.json",
+  "bytes": 6317709,
+  "sha256": "ede88f5ead33e891eef7dc603f1ca24497f1e06b18da59a144969f5bc3ab18ca",
+  "gzipBytes": 396985,
+  "packageId": 1,
+  "sourceUniqueResourceIds": 14778,
+  "selectedUniqueResourceIds": 12824,
+  "selection": "Unqualified variants (ResTable_config all zero) and night-only variants (only the uiMode night bits set). IDs, names, parent links, map items, scalar type/data and decoded strings are preserved. The SDK table is collapsed for its platform level and has no -vNN variants; every other qualified bucket (locale, density, size, orientation, uiMode type, input) is absent and fails explicitly.",
+  "excludedQualifiedOnlyResources": 1954,
+  "containsExecutableSDKStubs": false,
+  "containsImageFontOrMediaFiles": false,
+  "algorithmPatches": [],
+  "referenceSourceTag": "android-16.0.0_r1",
+  "referenceSources": [
+    "https://android.googlesource.com/platform/frameworks/base/+/android-16.0.0_r1/core/res/res/values/themes_material.xml",
+    "https://android.googlesource.com/platform/frameworks/base/+/android-16.0.0_r1/core/res/res/values/attrs.xml",
+    "https://android.googlesource.com/platform/frameworks/base/+/android-16.0.0_r1/core/res/res/values/public-final.xml"
+  ],
+  "referenceSourcesNote": "Exact upstream source references for style/attribute/ID review; this does not assert bit-identical recompilation of SDK revision2.",
+  "license": "Apache-2.0 (AOSP framework resource data; see LICENSE and NOTICE)",
+  "nightVariants": 113
+}

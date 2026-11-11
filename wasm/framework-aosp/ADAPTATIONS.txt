@@ -1,0 +1,149 @@
+Original algorithm source patches: NONE.
+
+upstream/ contains exact Android android-13.0.0_r1 source bytes. The source lock
+records each project URL, byte count and SHA-256. Builds fail on changed bytes.
+runtime-sources.txt selects the classes compiled into the boot DEX. Additional
+downloaded upstream classes are retained as reference, not falsely advertised as
+executing framework code.
+
+support/, support-javatime/ and support-jca/ contain the few compile-only declarations the
+android-all jar cannot provide (see "Compile-time classpath" below): java.* / sun.* / jdk.*
+core members (libcore is not part of the jar), the lab's own host contracts
+(dev.apkweb.*) and the android.compat.annotation.UnsupportedAppUsage annotation. No support
+class is packaged in framework.dex. They do not provide runtime algorithms or services.
+Calls to hidden signatures require the explicitly implemented Java core
+backend; they never execute the declaration's placeholder method bodies.
+
+android.os.StrictMode (with the android.os.strictmode violation classes), dalvik.system.CloseGuard, android.util.Singleton and the FastPrintWriter/HexDump helpers are pinned originals in framework.dex
+(the java.time group is their compilation unit, next to Parcel and BlockGuard); the support/ StrictMode and CloseGuard declarations only serve the runtime group. StrictMode's lab
+transforms (hidden members, absent system services) are recorded in build/strictmode-transforms.json and in the manifest's sourceTransforms.
+No original source annotation or algorithm is deleted or rewritten.
+
+Compile-time classpath. The AOSP-built android-all jar (org.robolectric:android-all
+13-robolectric-9030017, the Android 13 / API 33 framework, libcore and ICU classes with all
+hidden members, pinned with its SHA-256 in android-all.json and fetched into work/android-all/
+by scripts/fetch-android-all.py) is used only to resolve declarations at compile time: it is on
+javac's bootclasspath of every group (after the lab's own compile-only overlays, so an overlay
+that deliberately shadows a declaration still wins) and on D8's --classpath. It is AOSP build
+output, not an AOSP original source: it is never a D8 input, never packaged, never executed and
+never committed. What runs is still exactly the pinned original sources listed in the
+*-sources.txt files and the compiler-generated nested/lambda classes derived from them. Adding
+an original class therefore needs only its line in runtime-sources.txt; hidden members, constants
+and annotations of the classes it touches resolve from the jar.
+android.jar stays behind it for java.* (libcore java.* is not in the jar), as D8's --lib, and for
+the public android.R resource ids (the lab's resource table follows the API36 profile; the
+internal R is the lab-generated one). It is never an implementation input to the boot artifact.
+
+SystemProperties retains its original Java implementation and native method
+declarations. The browser binds only explicitly supported native method keys
+from trusted boot definitions. The density proof uses native_get_int(String,int)
+with read-only VM properties; it does not load Android ELF/JNI libraries.
+
+The Android util/framework sources are Apache-2.0. java.util.Objects and
+jdk.internal.util.Preconditions originate in OpenJDK via Android libcore and
+retain GPLv2 with the Classpath Exception. Corresponding original source,
+copyright headers and both license texts are included.
+
+TypedArray is compiled unchanged with its seven-word attribute layout, Java
+pooling, resize and getter algorithms. Its Resources/AssetManager inputs come
+from the web platform's actual decoded ARSC/XML/string-pool state. Compile-only
+contracts do not claim those Android services are implemented in this DEX.
+Sparse collections, ContainerHelpers, GrowingArrayUtils, ArrayUtils, EmptyArray,
+UtilConfig and VMRuntime are original source. ART allocation native methods map
+to checked VM arrays; addressOf returns an opaque stable VM handle, never a web
+or ELF pointer. The ART rule that only nonmovable primitive arrays have handles
+is preserved. VMRuntime.getRuntime itself executes original Java singleton code.
+ViewTreeObserver and its copy-on-write listener dispatch also run original Java.
+
+ActivityInfo, Parcelable, Parcelling, ArrayMap, ArraySet and MapCollections now
+also come from complete unmodified original sources. ActivityInfo conversion
+therefore executes its actual CONFIG_NATIVE_BITS loop and original cache setup.
+Its inherited platform/service APIs (ComponentInfo, Parcel, compat policy) and the
+Configuration constants resolve from the compile-time classpath; no Configuration
+runtime/service algorithm is claimed.
+
+Graphics source compilation includes original Drawable, VectorDrawable, Rect,
+RectF, Insets, Color, ColorStateList, StateSet, BlendMode/PorterDuff/Xfermode,
+Property and PathParser algorithms. Native rendering, graphics handles, shaders,
+image codecs, resource parsing and tracing remain explicit platform/VM boundaries.
+A successfully compiled class is not a claim that every method or backend exists;
+unavailable paths must report their exact unsupported API/native boundary.
+
+Further complete original classes include WindowInsets and its bounds helpers,
+ContentObserver, ViewConfiguration, AccessibilityNodeProvider, AutofillId,
+ClipData/ClipDescription, Matrix and CursorAnchorInfo/SparseRectFArray/
+EditorBoundsInfo. Their algorithms are not patched. Android Java metadata and
+Java8 JDK API metadata are distinct compiler stages: original AbstractCollection,
+AbstractList and AbstractSet compile against Android metadata, while selected
+libcore ojluni collections (including ArrayList, HashMap/LinkedHashMap,
+TreeMap/TreeSet/UUID/Modifier) compile with --release 8. Only classfiles generated
+from selected source files enter D8; no JDK implementation class is copied.
+
+Exact nested-source extractions (Paint/Path enums, View.AccessibilityDelegate,
+AutofillCallback) and source measurement helper owner adaptations have independent
+byte-range hashes in extracted/*/provenance.json. Their outer compilation shells
+are excluded. Arrays is a partial original-source class: selected original
+asList/backed-list/iterator, float hash and int binary-search algorithms retain
+their canonical owner. One native copyOf overload declaration is compilation metadata
+only; strip-arrays-compile-metadata.py removes its classfile method record
+before D8. Neither a stub nor an invented implementation for that overload is
+packaged. Other Arrays operations remain explicit runtime boundaries.
+
+Complete original FrameLayout/LinearLayout/Gravity are compiled in the separate
+opt-in profiles/layouts profile, preserving all source bodies. The profile is not
+silently activated by the default framework build. Its support View/ViewGroup
+classes provide metadata only; actual geometry, widget state and native rendering
+remain platform inputs, with actual APK callbacks invoked during traversal.
+
+
+OverScroller and Scroller (including spline physics and viscous-fluid
+interpolation) are full original sources. AnimationUtils uses an exact extracted
+subset of original clock state, ThreadLocal initializer and lock/unlock/current
+methods; XML animation loading remains external. Source methods use the VM's
+monotonic SystemClock boundary. Choreographer may lock/unlock this same original
+clock during its frame callbacks. All stateful clock algorithms execute DEX.
+
+Arrays now also includes all four original object/comparator sort entry points
+and rangeCheck. Complete original TimSort and ComparableTimSort implement the
+sorting algorithms; comparator calls dispatch to actual DEX callbacks. No JavaScript
+sort substitutes the source path. The sole removed compilation-only method is
+the copyOf overload declaration; array copying remains a checked VM primitive.
+
+
+Observable and IdentityHashMap are complete original source classes. Reference,
+ReferenceQueue, WeakReference, SoftReference and PhantomReference are complete
+original libcore sources, including the original queue/list synchronization and
+explicit enqueue algorithms. Only getReferent/refersTo0/clearReferent use exact
+boot-only VM native bindings. The current VM retains objects until teardown; no
+automatic GC, finalizer or Cleaner dispatch is invented. Explicit enqueue, poll
+and remove of an already queued object execute original DEX. Blocking removal
+on an empty queue fails specifically as unsupported-blocking. The Cleaner class
+under support is compilation metadata only and is excluded from D8.
+
+Trace.java is now the complete original Android13 source. The virtual device
+reports nativeGetEnabledTags()=0 because it has no kernel atrace/profiling
+session. Original Java isTagEnabled/beginSection/endSection/counter methods
+therefore perform their actual short-circuit behavior. Emission and tracing
+activation natives remain unbound; an explicitly enabled test mask reaches the
+original validation or a specific unavailable-JNI error, never a fake emission.
+
+android.view.textclassifier (data classes): TextClassifier (NO_OP, Utils, EntityConfig...), TextClassificationContext, TextClassificationSession(+Factory, Id), TextSelection, TextClassification,
+TextLinks(+TextLinksParams), TextLanguage, ConversationAction(s), SelectionEvent, TextClassifierEvent, EntityConfidence, ExtrasUtils, Log, SelectionSessionLogger and SystemTextClassifierMetadata are pinned
+originals in the java.time compilation group (next to Linkify), plus android.util / com.android.internal.util IndentingPrintWriter for TextClassifier.dump. The support/ TextClassifier.java declaration only serves
+the runtime group (ClipDescription reads TextClassifier.EntityType). TextClassificationManager stays host code (src/system-managers-host.js): its original needs the ITextClassifierService binder and
+Settings.Global/DeviceConfig flags; SystemTextClassifier and TextClassificationConstants are not packaged. Recorded source transforms (build/javatime-transforms.json): TextLinks.TextLinkSpan.onClick takes the
+AOSP default of the smart-linkify flag and its two hidden TextView hooks refuse explicitly; TextClassification.maybeLoadDrawable (documented best effort) skips the hidden Icon accessors; TextClassificationSession
+drops the SystemTextClassifier remote-session initialization (the lab has no such service).
+
+Hash collections: java.util.HashSet, LinkedHashSet and WeakHashMap (java8 group, javac --release 8, next to HashMap/LinkedHashMap) and java.util.concurrent.ConcurrentHashMap, ConcurrentMap
+and Helpers (java.time group, which compiles the pinned jdk.internal.misc.Unsafe) are complete pinned originals; the host JavaScript implementations of HashSet, LinkedHashSet,
+ConcurrentHashMap (+KeySetView) and WeakHashMap are gone, so iteration order, resizing, treeification and weak consistency are libcore's. ConcurrentHashMap reaches its table through
+jdk.internal.misc.Unsafe (getObjectAcquire/compareAndSetObject/putObjectRelease on Node[] elements at arrayBaseOffset + i << ASHIFT, compareAndSetInt/Long and getAndAddInt on its
+fields): the VM natives address the reference-array storage and the object field slots directly; one green thread runs at a time and a native is never preempted, so each
+compare-and-set is an exact compare-then-store. One recorded source transform (build/javatime-transforms.json, kind thread-local-random-probe-to-lab-thread-probe): the counter-cell
+probe calls ThreadLocalRandom.getProbe/localInit/advanceProbe (package-private, ThreadLocalRandom is a host class) go to the lab dev.apkweb.util.ThreadProbe (the per-thread probe
+Striped64 already uses, with ThreadLocalRandom's Weyl increment and xorshift), and the @Contended padding hint on CounterCell is dropped. The parallel bulk operations
+(forEach/search/reduce with a parallelismThreshold) build ForkJoin CountedCompleter tasks and the VM has no ForkJoinPool: those 31 methods are served sequentially by the lab
+dev.apkweb.util.ChmBulkOps over the original map's iterator. WeakHashMap entries are original WeakReferences on the map's ReferenceQueue: the collector clears them like any weak
+reference and enqueues them at the next looper pump, and the original expungeStaleEntries removes them (a value that references its key keeps it alive, as on ART).
+CopyOnWriteArraySet stays a host set: its original delegates to CopyOnWriteArrayList internals (getArray, addAllAbsent) and CopyOnWriteArrayList is still a host class.

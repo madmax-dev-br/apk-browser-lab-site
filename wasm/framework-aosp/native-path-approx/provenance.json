@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "source": "original-AOSP-Path-approximation-C++/Skia-point-math",
+  "tag": "android-13.0.0_r1",
+  "artifact": "path-approx.wasm",
+  "bytes": 12959,
+  "sha256": "e1d4060162a00c16b2a51ccba3601e1e91e2488e9520e8bca1a3cb2fbd92ad55",
+  "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 3.1.74 (1092ec30a3fb1d46b1782ff1b4db5094d3d06ae5)",
+  "flags": [
+    "-std=c++17",
+    "-O2",
+    "-ffp-contract=off",
+    "-fno-fast-math",
+    "-fno-exceptions",
+    "--no-entry",
+    "-sSTANDALONE_WASM=1",
+    "-sFILESYSTEM=0",
+    "-sEXPORTED_FUNCTIONS=_path_input,_path_output,_path_approximate",
+    "-sINITIAL_MEMORY=16777216",
+    "-sSTACK_SIZE=131072",
+    "-sALLOW_MEMORY_GROWTH=0"
+  ],
+  "memoryBytes": 16777216,
+  "limits": {
+    "inputFloats": 65536,
+    "outputFloats": 300000,
+    "points": 100000,
+    "subdivisionWork": 200000
+  },
+  "sourceFiles": [
+    {
+      "file": "Path.cpp",
+      "project": "frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "libs/hwui/jni/Path.cpp",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/libs/hwui/jni/Path.cpp?format=TEXT",
+      "sha256": "5b0a268b5f7dc183f70e96f926fbeccec8a718fd3bda2c9ae151468bc5dbe467",
+      "bytes": 24114
+    },
+    {
+      "file": "SkPoint.cpp",
+      "project": "external/skia",
+      "tag": "android-13.0.0_r1",
+      "path": "src/core/SkPoint.cpp",
+      "url": "https://android.googlesource.com/platform/external/skia/+/android-13.0.0_r1/src/core/SkPoint.cpp?format=TEXT",
+      "sha256": "fba9c7cde874988721cec83e0a5a94a4bba4a7ef9d579b6eeb5e0bcfd9c792ad",
+      "bytes": 5495
+    },
+    {
+      "file": "SkPoint.h",
+      "project": "external/skia",
+      "tag": "android-13.0.0_r1",
+      "path": "include/core/SkPoint.h",
+      "url": "https://android.googlesource.com/platform/external/skia/+/android-13.0.0_r1/include/core/SkPoint.h?format=TEXT",
+      "sha256": "b98399239358e2a1dfc009587427604caeb142890592b2f7aed9e372acb34c93",
+      "bytes": 17134
+    }
+  ],
+  "excerpts": [
+    {
+      "file": "Path.cpp",
+      "text": "bezierCalculation through addBezier inclusive",
+      "sha256": "b0c7dca7025db049aceb314cd346388c58099444ebcad3c069ba665fd36badbb"
+    },
+    {
+      "file": "SkPoint.cpp",
+      "text": "SkPoint::Length full body",
+      "sha256": "d71dcce6300372d36b1f6b89664fced5c8c5ccb3719897818bcad745a1a38457"
+    },
+    {
+      "file": "SkPoint.h",
+      "text": "SkPoint::Distance full body",
+      "sha256": "74487427f6133880828debbef4a3dc83c6634679d9a40325d54f1784e1fe95ae"
+    }
+  ],
+  "adaptations": [
+    "JNI/SkPath pointer replaced with CanvasKit SkPath command transport and bounded output buffer",
+    "SkPoint data adapter preserves original Length/Distance math",
+    "Unchanged subdivision math plus explicit work/stagnation safety abort guards",
+    "Conic conversion is unsupported and rejected explicitly; no surrogate curve is returned"
+  ],
+  "correspondingSource": "source-bundle.zip"
+}

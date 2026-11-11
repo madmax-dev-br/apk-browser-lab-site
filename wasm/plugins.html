@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
+  <title>Plugins · APK Browser Lab</title>
+  <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
+  <link rel="stylesheet" href="./site-pages.css?v=37ef911634a5">
+</head>
+<body>
+  <header class="topbar">
+    <a href="./" class="brand" aria-label="APK Browser Lab: voltar ao laboratório"><span class="brand-icon" aria-hidden="true">a<span>›</span></span><span>APK <b>Browser Lab</b></span></a>
+    <nav class="topnav" aria-label="Páginas do site">
+      <a href="./">Laboratório</a>
+      <a href="./arquitetura.html">Arquitetura</a>
+      <a href="./plugins.html" aria-current="page">Plugins</a>
+      <a href="./player/example.html">Exemplo de integração</a>
+    </nav>
+    <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Alternar tema claro/escuro"><span aria-hidden="true">◐</span></button>
+  </header>
+
+  <div class="page">
+    <nav class="toc" aria-label="Nesta página">
+      <p>Nesta página</p>
+      <ol>
+        <li><a href="#o-que-sao">O que são</a></li>
+        <li><a href="#onde-ficam">Onde ficam</a></li>
+        <li><a href="#adicionar">Adicionar um plugin</a></li>
+        <li><a href="#gerenciar">Ligar, parar e editar</a></li>
+        <li><a href="#pacote">Filtro de pacote</a></li>
+        <li><a href="#json">Exportar e importar</a></li>
+        <li><a href="#api">A API lab</a></li>
+        <li><a href="#estado-global">Estado fora da tela</a></li>
+        <li><a href="#mcp">MCP (Claude)</a></li>
+        <li><a href="#valores">Valores e handles</a></li>
+        <li><a href="#custos">Custos e limites</a></li>
+        <li><a href="#nao-permitido">O que não é permitido</a></li>
+        <li><a href="#seguranca">Segurança</a></li>
+        <li><a href="#exemplos">Exemplos</a></li>
+      </ol>
+    </nav>
+
+    <article>
+      <div class="intro">
+        <a class="back" href="./">‹ Voltar ao laboratório</a>
+        <h1>Plugins: ferramentas suas sobre o app em execução</h1>
+        <p class="lead">Um plugin é um trecho de JavaScript que você escreve no laboratório. Ele observa a tela ativa, a árvore do Compose, os ViewModels, o Logcat e a rede do app, recorta partes da tela e mostra o resultado num painel abaixo do aparelho. Ele só lê: nada do que um plugin faz muda o app.</p>
+        <details class="toc-inline">
+          <summary>Nesta página</summary>
+          <ol>
+            <li><a href="#o-que-sao">O que são</a></li>
+            <li><a href="#onde-ficam">Onde ficam</a></li>
+            <li><a href="#adicionar">Adicionar um plugin</a></li>
+            <li><a href="#gerenciar">Ligar, parar e editar</a></li>
+            <li><a href="#pacote">Filtro de pacote</a></li>
+            <li><a href="#json">Exportar e importar</a></li>
+            <li><a href="#api">A API lab</a></li>
+            <li><a href="#estado-global">Estado fora da tela</a></li>
+            <li><a href="#mcp">MCP (Claude)</a></li>
+            <li><a href="#valores">Valores e handles</a></li>
+            <li><a href="#custos">Custos e limites</a></li>
+            <li><a href="#nao-permitido">O que não é permitido</a></li>
+            <li><a href="#seguranca">Segurança</a></li>
+            <li><a href="#exemplos">Exemplos</a></li>
+          </ol>
+        </details>
+      </div>
+
+      <section id="o-que-sao" aria-labelledby="h-oque">
+        <h2 id="h-oque">O que são</h2>
+        <p>Cada plugin ligado roda num Web Worker só dele, separado da página e da VM. Um plugin lento ou preso num laço trava apenas o próprio Worker. As perguntas à VM passam por uma fila com limite de custo, e a saída vira blocos de texto, tabelas e imagens no painel <b>Plugins</b>.</p>
+        <figure class="diagram">
+          <div class="diagram-box"><!--SVG:plugins--><svg class="dg" viewBox="0 0 612 250" role="img" aria-labelledby="fig-plugins-cap" style="--min:520px"><defs><marker id="ah-plugins" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0 0L10 5L0 10z"/></marker></defs><g class="anim"><rect class="lane-page" x="0" y="0" width="300" height="250" rx="12"/><rect class="lane-vm" x="312" y="0" width="300" height="250" rx="12"/><text class="t-lane ink-page" x="14" y="26">Página</text><text class="t-lane ink-vm" x="326" y="26">Web Worker da VM</text><rect class="glow" x="11" y="41" width="278" height="52" rx="11" style="--d:0s;--cycle:6s"/><rect class="node page" x="14" y="44" width="272" height="46" rx="8"/><text x="26" y="63" font-weight="600">Worker do plugin</text><text class="t-small" x="26" y="80">seu código, um Worker por plugin</text><rect class="glow" x="11" y="117" width="278" height="52" rx="11" style="--d:1.5s;--cycle:6s"/><rect class="node page" x="14" y="120" width="272" height="46" rx="8"/><text x="26" y="139" font-weight="600">Host de plugins</text><text class="t-small" x="26" y="156">tela, Logcat, rede; cache por quadro</text><rect class="glow" x="11" y="191" width="278" height="52" rx="11" style="--d:4.5s;--cycle:6s"/><rect class="node page" x="14" y="194" width="272" height="46" rx="8"/><text x="26" y="213" font-weight="600">Painel Plugins</text><text class="t-small" x="26" y="230">blocos de texto, no máximo 10/s</text><rect class="glow" x="323" y="117" width="278" height="52" rx="11" style="--d:3s;--cycle:6s"/><rect class="node vm" x="326" y="120" width="272" height="46" rx="8"/><text x="338" y="139" font-weight="600">Fila de consultas</text><text class="t-small" x="338" y="156">entre eventos, 40 ms por segundo</text><path class="edge" d="M120 90 V118" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M120 90 V118" style="--d:0s;--dur:0.8s"/><path class="edge" d="M180 118 V90" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M180 118 V90" style="--d:4s;--dur:0.8s"/><path class="edge" d="M286 136 H324" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M286 136 H324" style="--d:1.6s;--dur:0.8s"/><path class="edge" d="M326 152 H288" marker-end="url(#${mk})"/><path class="packet vm" pathLength="200" d="M326 152 H288" style="--d:3.4s;--dur:0.8s"/><path class="edge" d="M150 166 V192" marker-end="url(#${mk})"/><path class="packet page" pathLength="200" d="M150 166 V192" style="--d:4.6s;--dur:0.8s"/></g></svg><!--/SVG--></div>
+          <button type="button" class="motion-control" aria-pressed="false">Pausar animação</button>
+          <figcaption id="fig-plugins-cap"><strong>Figura 1.</strong> Por onde passa uma consulta de plugin.</figcaption>
+          <ol class="steps">
+            <li>Seu código roda no Worker do plugin e chama a API <code>lab</code>.</li>
+            <li>O host de plugins, na página, responde o que a página já tem (a tela, as linhas do Logcat, a rede, o quadro desenhado) sem trabalho na VM.</li>
+            <li>O que precisa da VM (ViewModels, campos, árvore Compose) vai para uma fila no Worker da VM e roda entre eventos do app, com um orçamento de tempo por segundo.</li>
+            <li>A resposta volta ao plugin; o que ele escreve com <code>lab.ui</code> aparece no painel Plugins.</li>
+          </ol>
+        </figure>
+        <p>Sem nenhum plugin ligado não existe Worker, timer, mensagem à VM nem gancho nos caminhos do app. Como um plugin se encaixa no resto do laboratório: <a href="./arquitetura.html#ferramentas">arquitetura, ferramentas</a>.</p>
+      </section>
+
+      <section id="onde-ficam" aria-labelledby="h-onde">
+        <h2 id="h-onde">Onde ficam</h2>
+        <ul>
+          <li><b>Configuração:</b> painel <b>Controles</b> do laboratório, seção <b>Plugins</b> (a última). O título mostra quantos estão rodando.</li>
+          <li><b>Saída:</b> painel <b>Plugins</b> abaixo do aparelho, ao lado de Logcat, Rede e Compose. Ele aparece quando há pelo menos um plugin na lista e mostra um cartão por plugin: os blocos de saída, um selo curto, o console e os erros.</li>
+          <li><b>Armazenamento:</b> a lista é guardada no <code>localStorage</code> deste navegador e vale para qualquer APK (não é por pacote). Cabem até 32 plugins, com até 200.000 caracteres de código cada.</li>
+        </ul>
+      </section>
+
+      <section id="adicionar" aria-labelledby="h-adicionar">
+        <h2 id="h-adicionar">Adicionar um plugin</h2>
+        <ol>
+          <li>Abra <b>Controles › Plugins</b>.</li>
+          <li>Clique em <b>+ Adicionar</b>. O diálogo abre em branco: <b>Nome</b>, <b>Pacote</b> (opcional), as opções de saída e <b>Código</b>. No editor, Tab insere dois espaços e Esc fecha.</li>
+          <li>Escreva o código, ou copie um dos <a href="#exemplos">exemplos</a> (Tela atual, Logs filtrados, Observar ViewModel, Componentes da tela, Árvore Compose resumida, Print na tela pronta e outros).</li>
+          <li>Clique em <b>Salvar</b>. O plugin novo já vem ligado e começa a rodar quando há um APK aberto que passa no filtro de pacote.</li>
+        </ol>
+        <p>O código é o corpo de uma função assíncrona: use <code>await</code> no topo à vontade. <code>import</code> estático não funciona; <code>await import(url)</code> funciona. O objeto global <code>lab</code> é a API.</p>
+      </section>
+
+      <section id="gerenciar" aria-labelledby="h-gerenciar">
+        <h2 id="h-gerenciar">Ligar, parar e editar</h2>
+        <ul>
+          <li><b>Caixa de seleção</b> na linha do plugin: liga ou desliga. Desligado, o Worker dele é encerrado.</li>
+          <li><b>↑ e ↓</b> mudam a ordem da lista (e dos cartões).</li>
+          <li><b>Editar</b> abre o mesmo diálogo; ao salvar, o plugin recomeça com o código novo.</li>
+          <li><b>Remover</b> pede confirmação e apaga o plugin da lista.</li>
+          <li>No cartão do painel Plugins, <b>Parar</b> encerra o Worker do plugin (útil se ele entrou em laço) e <b>Reiniciar</b> cria outro do zero.</li>
+          <li>Os cartões começam <b>recolhidos</b>: um clique no nome abre. Fechado, o cartão só atualiza o cabeçalho (estado, selo, “novos dados”) e não redesenha os blocos.</li>
+          <li>Ao criar ou editar o plugin, no mesmo diálogo do código: <b>Atualização da saída</b> automática (os blocos acompanham o plugin) ou manual (ficam parados até você clicar em <b>Atualizar</b> no cartão, que mostra “novos dados” quando há saída nova); e <b>Altura dos blocos</b>: <i>Limitada</i> (até 320 px, com rolagem, o padrão), <i>Conteúdo inteiro</i> ou <i>Fixa</i> (80 a 2000 px). O cartão fica simples: <b>Atualizar</b>, <b>Parar</b> e <b>Reiniciar</b>. <b>Atualizar</b> também chama <code>lab.on('refresh')</code> do plugin.</li>
+          <li>Um bloco com <code>id</code> é atualizado no lugar e mantém a rolagem quando o plugin escreve de novo.</li>
+          <li><b>⤢ Expandir</b> no cartão abre a saída do plugin numa janela grande, que continua atualizando; feche com × ou Esc.</li>
+          <li>Essas opções ficam com o plugin (vão junto na exportação) e mudá-las não reinicia o plugin.</li>
+          <li>A linha mostra o estado: <i>rodando</i>, <i>iniciando</i>, <i>parado</i> (com o motivo: desligado, parado no painel, só para outro pacote) ou <i>erro</i>, e quantos erros houve.</li>
+        </ul>
+      </section>
+
+      <section id="pacote" aria-labelledby="h-pacote">
+        <h2 id="h-pacote">Filtro de pacote</h2>
+        <p>O campo <b>Pacote</b> limita o plugin a certos apps. Vazio ou <code>*</code>: qualquer app. Vários pacotes podem ser separados por vírgula ou espaço, e <code>*</code> funciona como curinga dentro de um nome (por exemplo <code>com.exemplo.*</code>). Quando o APK aberto não casa, o plugin fica parado com o motivo “só para …”.</p>
+      </section>
+
+      <section id="json" aria-labelledby="h-json">
+        <h2 id="h-json">Exportar e importar</h2>
+        <p><b>Exportar</b> baixa um arquivo <code>plugins-AAAAMMDD-hhmmss.json</code> com a lista inteira. <b>Importar</b> lê um arquivo nesse formato (ou só um array de plugins) e acrescenta os plugins à lista.</p>
+        <div class="code" data-name="formato do arquivo"><pre><code>{
+  "format": "apk-web-lab-plugins",
+  "version": 1,
+  "plugins": [
+    { "name": "Tela atual", "code": "lab.on('screen', tela => lab.ui.text(tela.activity ?? '—'));", "enabled": true, "packageFilter": "" }
+  ]
+}</code></pre></div>
+        <p class="note">Plugins importados chegam <b>desligados</b>: o código é de outra pessoa, então leia antes de ligar. Só os primeiros 32 da lista são importados.</p>
+      </section>
+
+      <section id="api" aria-labelledby="h-api">
+        <h2 id="h-api">A API lab</h2>
+        <h3>Eventos</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Chamada</th><th scope="col">O que entrega</th></tr></thead>
+          <tbody>
+            <tr><td><code>lab.on('screen', fn)</code></td><td>A tela ativa mudou: <code>{ activity, activityStack, tasks, windows, dialogs, canGoBack, closed, packageName, frame }</code>. Destinos do Navigation dentro da mesma Activity não contam como mudança de tela. Devolve a função que cancela.</td></tr>
+            <tr><td><code>lab.on('log', fn)</code></td><td>Lotes (arrays) de linhas do Logcat: <code>{ seq, uptime, wall, pid, tid, thread, level, tag, message }</code>.</td></tr>
+            <tr><td><code>lab.on('network', fn)</code></td><td>Lotes de entradas do log de rede, novas ou atualizadas.</td></tr>
+            <tr><td><code>lab.on('refresh', fn)</code></td><td>Você clicou em <b>Atualizar</b> no cartão do plugin. Para plugins que leem sob demanda (com atualização manual, por exemplo) em vez de vigiar o tempo todo.</td></tr>
+            <tr><td><code>lab.off(nome, fn?)</code></td><td>Cancela uma escuta (ou todas daquele evento).</td></tr>
+          </tbody>
+        </table></div>
+        <h3>Consultas</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Chamada</th><th scope="col">O que devolve</th></tr></thead>
+          <tbody>
+            <tr><td><code>await lab.screen()</code></td><td>A tela atual, no mesmo formato do evento, sem trabalho na VM. <code>screen.ready</code> é a “Tela pronta”: <code>{ ready, activity, readySince, waitingFor, fragments }</code>. Fica pronta quando a Activity está em onResume com o primeiro quadro desenhado, os fragments em RESUMED, e não há quadro, layout, mensagem da thread principal nem requisição de rede pendente por 300 ms.</td></tr>
+            <tr><td><code>lab.on('ready', fn)</code></td><td>Chama <code>fn(tela)</code> cada vez que a tela fica pronta: uma Activity nova, um Recriar/Reabrir, uma navegação que assenta. Uma tela que anima sem parar (spinner, cursor piscando) não fica pronta; <code>waitingFor</code> diz por quê.</td></tr>
+            <tr><td><code>await lab.waitReady({ timeoutMs })</code></td><td>Espera a tela ficar pronta (15 s por padrão); erro com <code>code: 'timeout'</code> e o motivo. Use antes de <code>lab.screenshot()</code>.</td></tr>
+            <tr><td><code>await lab.composeTree({ maxNodes, locals })</code></td><td>A árvore de layout do Compose: <code>{ owners: [{ nodes: [{ id, handle, parentId, depth, name, bounds, texts, editableText, role, testTag, actions, … }] }], totalNodes, truncated }</code>. Custa dezenas de milissegundos na VM: no máximo uma por segundo por plugin.</td> Com <code>locals: ['LocalContentColor', 'LocalMeuTema']</code>, cada nó traz <code>locals.LocalX</code>: o valor que aquele composable vê, para diferenciar componentes por um Local numa chamada só.</tr>
+            <tr><td><code>await lab.layoutBounds({ names })</code></td><td>As caixas que “Mostrar limites de layout” desenha (Views e nós semânticos do Compose), como no painel Compose: <code>[{ key, kind, name, nameSource, bounds, size, texts, editableText, role, testTag, contentDescriptions, actions, modifiers, measurePolicy, type, hasImage }]</code>, com <code>bounds</code> em pixels da janela. Os nomes vêm de uma <code>composeTree</code> (mesmo limite de uma por segundo); <code>names: false</code> não consulta a VM.</td></tr>
+            <tr><td><code>await lab.screenshot({ key | bounds | element | node, maxWidth, type })</code></td><td>Imagem da tela inteira, ou de uma caixa (<code>key</code> de <code>layoutBounds</code>), cortada do quadro que a página mostra, sem trabalho na VM: <code>{ blob, width, height, type, notes }</code>. Padrões: <code>maxWidth</code> 1080, <code>type</code> <code>'image/png'</code>. No máximo uma a cada 500 ms por plugin. Views que a página desenha com elementos próprios (widgets XML simples) não têm raster: ficam de fora da tela inteira (<code>notes</code> diz quantas) e a caixa delas responde <code>no-image</code>.</td> Para recortar qualquer componente: <code>bounds</code> com um retângulo na janela, <code>element</code> com um item de <code>lab.layoutBounds()</code> ou <code>node</code> com um nó de <code>lab.composeTree()</code> (usa o <code>boundsInWindow</code> dele); o recorte vem de todos os rasters sob a área, na resolução deles.</tr>
+            <tr><td><code>await lab.viewModels()</code></td><td>Os ViewModels da tela: da Activity, dos fragments na tela e os guardados pelas entradas da pilha do Navigation. <code>[{ handle, className, key, library, owner: { kind, label, className, handle } }]</code>.</td></tr>
+            <tr><td><code>await lab.fragments()</code></td><td>Os fragments androidx na tela, com os filhos: <code>[{ handle, className, who, tag, id, hidden, state, children }]</code>.</td></tr>
+            <tr><td><code>await lab.activity()</code></td><td><code>{ handle, className }</code> da Activity atual.</td></tr>
+            <tr><td><code>await lab.inspect(handle, opções)</code></td><td>Os campos de um objeto em JSON. Opções: <code>depth</code> (2), <code>maxFields</code> (200), <code>maxItems</code> (20), <code>maxString</code> (1000).</td></tr>
+            <tr><td><code>await lab.field(handle, 'a.b.0.c', opções)</code></td><td>Um valor por caminho: nomes de campo (um delegate Kotlin <code>x$delegate</code> responde por <code>x</code>), índices de lista ou array, chaves de mapa, <code>size</code>. Um StateFlow, LiveData, MutableState ou atômico é atravessado; <code>x.value</code> é o valor atual. Um <code>WeakReference</code>/<code>SoftReference</code> (<code>ref.get</code>), um <code>by lazy</code> do Kotlin e um <code>ThreadLocal</code> também são atravessados. Uma parte com pontos (uma chave de mapa) vai num array: <code>['registro', 'a.b.Tipo::escopo', 'value']</code>.</td></tr>
+            <tr><td><code>lab.watch(handle, caminho, fn, opções)</code></td><td><code>handle</code> também pode ser <code>{ static: 'pacote.Classe' }</code> para seguir um campo estático. Lê o campo a cada <code>intervalMs</code> (padrão 500, mínimo 250) e chama <code>fn(valor, anterior)</code> só quando muda. Se o objeto for coletado, o watch para e <code>onError</code> recebe o erro. Devolve a função que para.</td></tr>
+            <tr><td><code>await lab.statics('pacote.Classe', opções)</code></td><td>Os campos estáticos de uma classe que o app já inicializou: <code>{ className, status, fields }</code>. Serve para um <code>object</code> Kotlin, um companion, um singleton ou um contêiner de injeção de dependências guardado num campo estático. Uma classe ainda não inicializada responde <code>status: 'not-initialized'</code> e a lista <code>declared</code>: a consulta nunca roda o <code>&lt;clinit&gt;</code>.</td></tr>
+            <tr><td><code>await lab.staticField('pacote.Classe', caminho, opções)</code></td><td>Um valor por caminho a partir de um campo estático, como <code>lab.field</code>: <code>lab.staticField('a.b.Registro', 'atual.estado.value')</code>. O primeiro nome é o campo estático (da classe ou de uma superclasse).</td></tr>
+            <tr><td><code>await lab.classes('parte do nome', { limit, initialized })</code></td><td>As classes do APK cujo nome contém o texto (ou casam com <code>'/regex/'</code>): <code>{ items: [{ className, status, staticFields }], matched }</code>. Para achar a classe que guarda um estático.</td></tr>
+            <tr><td><code>await lab.instances('pacote.Classe', { subclasses, limit, after, maxPages })</code></td><td>Os objetos vivos de uma classe (subclasses e implementações incluídas, a menos que <code>subclasses: false</code>): <code>{ items: [{ handle, className }], scanned, done, next }</code>. Varre o heap em páginas curtas; <code>next</code> continua uma varredura que parou (<code>after</code>).</td></tr>
+            <tr><td><code>await lab.referrers(handle, { limit, after })</code></td><td>Quem segura um objeto: campos estáticos (<code>{ kind: 'static', className, field }</code>) e objetos cujo campo, célula de array ou slot interno aponta para ele (<code>{ kind: 'object', handle, className, via }</code>). Para descobrir o caminho até um objeto achado com <code>instances</code>.</td></tr>
+            <tr><td><code>await lab.compositionLocals(nó.handle, { only, depth })</code></td><td>Os CompositionLocals de um componente do Compose: o que <code>LocalX.current</code> responde naquele nó. Pegue o <code>handle</code> do nó em <code>lab.composeTree()</code>. Devolve <code>{ count, locals: [{ name, declaredIn, kind, value }], values }</code>; <code>values.LocalContentColor</code> é o valor direto. <code>kind</code>: <code>static</code>, <code>dynamic</code> (o valor atual do estado) ou <code>computed</code> (calculado pela composição; não é avaliado aqui). Só aparecem os Locals fornecidos no caminho até o nó; os outros valem o padrão. <code>only</code> aceita o nome inteiro ou parte dele (sem diferenciar maiúsculas), <code>Classe.campo</code> ou parte da classe do valor. O nome vem do campo estático que declara o Local, ou do campo de instância que o guarda (um Local dentro de uma classe ou de um objeto); num app minificado, é o nome renomeado. Cores do Compose vêm como <code>{ $kind: 'color', argb: '#AARRGGBB' }</code>.</td></tr>
+            <tr><td><code>await lab.findCompositionLocal('LocalTema', { limit, budgetMs })</code></td><td>Onde um Local é fornecido na tela, sem escolher o nó: lê o mapa de cada componente e agrupa por valor. Devolve <code>{ matches: [{ name, declaredIn, kind, valueType, value, nodes, node }] }</code>: cada valor diferente, quantos componentes o veem e o <code>handle</code> de um deles. Bom para achar um Local seu e a instância que ele carrega.</td></tr>
+          </tbody>
+        </table></div>
+        <h3>Agir no lab</h3>
+        <p>Um plugin também usa os controles do próprio laboratório, como você faria em Controles. Tudo fica visível ali e no Logcat; o app em si continua sem ser alterado por dentro.</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Chamada</th><th scope="col">O que faz</th></tr></thead>
+          <tbody>
+            <tr><td><code>await lab.reload('recreate' | 'reopen')</code></td><td>Recarrega a tela atual: <code>recreate</code> (padrão) é o <code>Activity.recreate()</code>, que mantém o estado salvo e os ViewModels; <code>reopen</code> abre uma instância nova com o mesmo Intent. Igual aos botões ↻ da barra do aparelho.</td></tr>
+            <tr><td><code>await lab.mock({ method, url, status, headers, body, delayMs, query, id })</code></td><td>Cria ou troca (mesmo <code>id</code>) um mock em <b>Controles › Mock de endpoints</b>, do pacote aberto: a próxima requisição que casar recebe essa resposta sem ir à rede. <code>body</code> pode ser texto ou um objeto (vira JSON). Devolve <code>{ id }</code>; um mock inválido dá erro com o motivo.</td></tr>
+            <tr><td><code>await lab.unmock(id)</code> · <code>await lab.mocks()</code></td><td>Remove um mock; lista os mocks do pacote com as respostas dadas.</td></tr>
+            <tr><td><code>const m = await lab.modal.open({ title, size, html })</code></td><td>Abre uma janela na página, <code>small</code>, <code>medium</code> ou <code>full</code> (tela inteira), com botão de fechar e Esc. <code>html</code> é qualquer HTML, CSS e JavaScript seu: roda isolado na janela (um iframe sem acesso à página do lab). Na janela, <code>window.lab.post(dados)</code> manda para o plugin e <code>window.lab.on(fn)</code> recebe.</td></tr>
+            <tr><td><code>m.update({ title, size, html })</code> · <code>m.post(dados)</code> · <code>m.close()</code> · <code>m.onMessage(fn)</code> · <code>m.onClose(fn)</code></td><td>Troca o conteúdo, conversa com a janela e fica sabendo quando ela é fechada (<code>user</code>, <code>code</code> ou <code>stopped</code>, quando o plugin para).</td></tr>
+            <tr><td><code>await lab.dataUrl(imagem)</code></td><td>Uma imagem (de <code>lab.screenshot</code>) como <code>data:</code> URL, para pôr no HTML de uma janela.</td></tr>
+          </tbody>
+        </table></div>
+        <h3>Saída e utilidades</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Chamada</th><th scope="col">O que faz</th></tr></thead>
+          <tbody>
+            <tr><td><code>lab.ui.text(s, { id })</code></td><td>Um bloco de texto.</td></tr>
+            <tr><td><code>lab.ui.kv(objeto, { id })</code></td><td>Pares chave e valor.</td></tr>
+            <tr><td><code>lab.ui.table(linhas, colunas?, { id })</code></td><td>Uma tabela (até 500 linhas e 20 colunas).</td></tr>
+            <tr><td><code>lab.ui.json(valor, { id })</code></td><td>JSON formatado.</td></tr>
+            <tr><td><code>lab.ui.image(blob, { id, caption })</code></td><td>Uma imagem: um Blob <code>image/*</code> de até 8 MiB. O resultado de <code>lab.screenshot</code> serve direto.</td></tr>
+            <tr><td><code>lab.ui.clear()</code>, <code>lab.ui.badge(s)</code></td><td>Limpa os blocos; põe um selo curto no cartão.</td></tr>
+            <tr><td><code>lab.sleep(ms)</code>, <code>lab.info</code></td><td>Espera; <code>{ id, name, packageName }</code> do plugin.</td></tr>
+            <tr><td><code>console.log</code> e afins</td><td>Vão para o console do cartão do plugin (limitado).</td></tr>
+          </tbody>
+        </table></div>
+        <p>Cada chamada de <code>lab.ui</code> acrescenta um bloco. Um bloco com o mesmo <code>id</code> é substituído no lugar, o que permite atualizar um valor sem empilhar saída. Texto é sempre mostrado como texto, nunca como HTML.</p>
+      </section>
+
+      <section id="estado-global" aria-labelledby="h-estado">
+        <h2 id="h-estado">Estado fora da tela</h2>
+        <p>Nem todo estado está num ViewModel da tela. Muitos apps guardam objetos num campo estático: um <code>object</code> Kotlin, um companion, um singleton ou o contêiner de injeção de dependências, que mantém escopos e as instâncias criadas em cada escopo. Esses objetos não aparecem em <code>lab.viewModels()</code>, mas estão no heap. Há três caminhos para chegar até eles, todos só de leitura:</p>
+        <ol>
+          <li><b>Pela classe que guarda o estático.</b> <code>lab.classes('Contexto')</code> acha o nome; <code>lab.statics(nome)</code> mostra os campos; <code>lab.staticField(nome, caminho)</code> desce até o valor.</li>
+          <li><b>Pela classe do objeto.</b> Quando você sabe o tipo, mas não o caminho: <code>lab.instances('pacote.Armazenamento')</code> devolve os objetos vivos desse tipo com seus handles, e <code>lab.inspect</code> / <code>lab.field</code> leem os campos.</li>
+          <li><b>De volta até a raiz.</b> <code>lab.referrers(handle)</code> mostra quem segura o objeto (um campo estático, um mapa de um escopo, um ViewModel). Repetindo, você descobre o caminho e depois usa o caminho direto, que é mais barato.</li>
+        </ol>
+        <pre><code>// Um contêiner de injeção de dependências num campo estático: escopos -&gt; instâncias.
+// Os nomes abaixo são de exemplo; use lab.classes / lab.statics para achar os do seu app.
+const raiz = await lab.statics('com.exemplo.di.ContextoGlobal');
+lab.ui.json(raiz.fields, { id: 'raiz' });                 // veja onde está o registro de escopos
+
+// Os objetos de um tipo, onde quer que estejam (escopo, ViewModel, singleton):
+const { items } = await lab.instances('com.exemplo.tela.Armazenamento', { limit: 5 });
+for (const item of items) lab.ui.json(await lab.field(item.handle, 'dados', { depth: 2 }), { id: item.handle });
+
+// Quem guarda o primeiro deles (para saber o caminho a partir do estático):
+if (items[0]) lab.ui.table((await lab.referrers(items[0].handle)).items, ['kind', 'className', 'via', 'field'], { id: 'quem' });
+
+// Uma chave de mapa com pontos vai num array:
+const valor = await lab.staticField('com.exemplo.di.ContextoGlobal', ['registro', 'escopos', 'com.exemplo.Tela::id', 'valor']);
+
+// Os CompositionLocals de um componente (o que LocalX.current vale ali):
+const arvore = await lab.composeTree();
+const no = arvore.owners[0].nodes.find(n => n.testTag === 'salvar');
+if (no) lab.ui.kv((await lab.compositionLocals(no.handle, { only: ['LocalContentColor', 'LocalMeuTema'] })).values, { id: 'locals' });
+
+// Seguir um estático ao vivo:
+lab.watch({ static: 'com.exemplo.Sessao' }, 'atual.usuario', v =&gt; lab.ui.json(v, { id: 'sessao' }));</code></pre>
+        <p><b>O que não dá para fazer:</b> chamar métodos, como <code>escopo.get&lt;Tipo&gt;()</code>. Uma consulta lê os campos que o objeto já tem; um objeto que o app ainda não criou não existe para a consulta, e uma classe que o app ainda não inicializou mostra só os nomes dos campos. Uma referência fraca (<code>WeakReference</code>) mostra o objeto enquanto ele existir: <code>caminho.get</code> ou <code>caminho.value</code>.</p>
+        <p><b>Custo:</b> <code>statics</code>, <code>staticField</code> e <code>classes</code> custam como <code>field</code>. <code>instances</code> e <code>referrers</code> varrem o heap em páginas de no máximo 40 ms, uma por consulta, e o plugin junta as páginas sozinho; num app grande a resposta pode levar algumas centenas de milissegundos sem travar a tela. Use-as para descobrir o caminho e depois troque por <code>staticField</code> ou <code>field</code> no <code>watch</code>.</p>
+      </section>
+
+      <section id="mcp" aria-labelledby="h-mcp">
+        <h2 id="h-mcp">MCP: o Claude usando esta página</h2>
+        <p>Um cliente MCP (Claude Code, Claude Desktop) pode usar a página do lab aberta no seu navegador: tirar print da tela ou de um componente, ler a saída dos plugins, a árvore do Compose com os CompositionLocals de cada composable, ViewModels e estado estático, o Logcat e a rede. Uma página web não aceita conexões, então uma ponte pequena roda no seu computador entre os dois:</p>
+        <pre><code>cliente MCP  --stdio-->  lab-mcp.mjs (127.0.0.1:8790)  <--  esta página (Controles › MCP › Conectar)</code></pre>
+        <ol>
+          <li><b>Baixe a ponte</b> (Node.js 22 ou mais novo, sem dependências): <code>curl -O https://madmax-dev-br.github.io/apk-browser-lab-site/tools/lab-mcp.mjs</code></li>
+          <li><b>Registre no cliente.</b> Claude Code: <code>claude mcp add apk-web-lab -- node /caminho/lab-mcp.mjs</code>. Claude Desktop, em <code>claude_desktop_config.json</code>: <code>{ "mcpServers": { "apk-web-lab": { "command": "node", "args": ["/caminho/lab-mcp.mjs"] } } }</code>. O cliente inicia a ponte sozinho.</li>
+          <li><b>Pareie a página:</b> no terminal, <code>node lab-mcp.mjs token</code> mostra o token (guardado em <code>~/.apk-web-lab-mcp-token</code>). Cole em <b>Controles › MCP › Token</b> e clique em <b>Conectar</b>. O navegador pode pedir permissão para a página acessar a rede local: permita.</li>
+          <li><b>Peça ao Claude:</b> “tire um print do botão Salvar”, “qual LocalContentColor cada texto da tela recebe?”, “o que o plugin X está mostrando?”, “quais requisições falharam?”, “faça /v1/perfil devolver um usuário premium e recarregue a tela”, “acompanhe o Logcat por erros enquanto eu navego”, “filtre por Pendentes, busque Monitor e me mostre o resultado”.</li>
+        </ol>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Ferramenta</th><th scope="col">O que faz</th></tr></thead>
+          <tbody>
+            <tr><td><code>lab_status</code>, <code>wait_ready</code></td><td>A tela atual e a “Tela pronta”; espera a tela assentar.</td></tr>
+            <tr><td><code>screenshot</code></td><td>Imagem da tela, ou de um componente por <code>test_tag</code>, por texto visível, pela chave de <code>layout_bounds</code> ou por um retângulo; opcional <code>wait_ready</code>.</td></tr>
+            <tr><td><code>layout_bounds</code>, <code>compose_tree</code></td><td>Os componentes com limites, nomes, textos e ações; <code>compose_tree</code> aceita <code>locals</code> para anexar CompositionLocals a cada nó.</td></tr>
+            <tr><td><code>composition_locals</code>, <code>find_composition_local</code></td><td>Os Locals de um componente; onde um Local é fornecido na tela, por valor.</td></tr>
+            <tr><td><code>view_models</code>, <code>inspect</code>, <code>field</code>, <code>statics</code>, <code>static_field</code>, <code>classes</code>, <code>instances</code>, <code>referrers</code></td><td>As mesmas leituras somente leitura dos plugins.</td></tr>
+            <tr><td><code>plugins</code></td><td>A saída de cada plugin (texto, tabelas, JSON, imagens), estado e erros.</td></tr>
+            <tr><td><code>logcat</code>, <code>network</code></td><td>Logcat (coletado enquanto o MCP está conectado) e o log de rede, com filtros (<code>level</code>, <code>contains</code>, <code>limit</code>). Escolha o intervalo para não trazer tudo: <code>start: "now"</code> só marca o ponto de partida (devolve o cursor), <code>since</code> traz o que veio depois de um cursor, <code>last_seconds</code> os últimos N segundos e <code>from_time</code> a partir de um momento. Para acompanhar ao vivo, cada resposta traz <code>next</code> e <code>wait_ms</code> espera até chegar algo novo (até 30 s). <code>network</code> com <code>include_body</code> devolve o corpo das respostas (texto).</td></tr>
+            <tr><td><code>tap</code>, <code>type</code>, <code>scroll</code>, <code>back</code></td><td>Mexem no app como você: <code>tap</code> toca num componente (por <code>test_tag</code>, <code>text</code> ou <code>element_key</code>) ou num ponto (<code>x</code>, <code>y</code>), com um toque real em Compose e o clique numa View; <code>type</code> escreve num campo (<code>value</code>); <code>scroll</code> rola a lista do componente (<code>dy</code>, <code>dx</code>); <code>back</code> é o botão Voltar. Cada um espera a tela assentar e devolve a tela; com <code>screenshot: true</code>, o print também.</td></tr>
+            <tr><td><code>set_mock</code>, <code>remove_mock</code>, <code>list_mocks</code></td><td>Cria ou troca (mesmo <code>id</code>) um mock de endpoint (<code>url</code>, <code>method</code>, <code>status</code>, <code>body</code> texto ou objeto, <code>headers</code>, <code>delay_ms</code>), remove e lista. Os mocks ficam em <b>Controles › Mock de endpoints</b> do pacote aberto, como os seus.</td></tr>
+            <tr><td><code>reload</code></td><td>Recarrega a tela (<code>recreate</code> ou <code>reopen</code>), por exemplo depois de um <code>set_mock</code>, para o app buscar de novo.</td></tr>
+          </tbody>
+        </table></div>
+        <p><b>Segurança:</b> a ponte escuta só em 127.0.0.1, aceita só as origens do lab (esta página e uma cópia local; outras com <code>--origin</code>) e exige o token; não guarda nada. O MCP não muda o app por dentro: além das leituras, toca e digita como você e usa os controles do laboratório (mocks e recarregar a tela), que aparecem em Controles. Mantenha a aba do lab visível enquanto usa (abas em segundo plano ficam lentas). Opções: <code>--port</code>, <code>--origin</code>, <code>--token</code>, <code>--timeout-ms</code>.</p>
+      </section>
+
+      <section id="valores" aria-labelledby="h-valores">
+        <h2 id="h-valores">Valores e handles</h2>
+        <ul>
+          <li><b>Primitivos</b> viram números e booleanos; <code>long</code> fora do intervalo seguro vira string; <code>char</code> e <code>String</code> viram string (cortada em <code>maxString</code>).</li>
+          <li><b>Objetos</b> viram <code>{ $type, $handle, fields }</code> até a profundidade pedida; além dela, só <code>{ $type, $handle }</code>.</li>
+          <li><b>Coleções conhecidas</b> viram <code>{ $kind: 'list' | 'set', size, items }</code>, mapas <code>{ $kind: 'map', size, entries }</code>, arrays <code>{ $kind: 'array', size, items }</code>, enums <code>{ $kind: 'enum', name }</code>.</li>
+          <li><b>Observáveis</b> mostram o valor atual: <code>{ $kind: 'StateFlow' | 'LiveData' | 'MutableState' | 'Atomic' | 'Reference' | 'Lazy' | 'ThreadLocal', value }</code> (<code>Reference</code> também <code>cleared</code>, <code>Lazy</code> também <code>initialized</code>). Coleções e observáveis não gastam profundidade; ciclos viram <code>$seen</code>; um corte por tempo ou por número de campos marca <code>$truncated</code>.</li>
+        </ul>
+        <h3>Handles e “objeto coletado”</h3>
+        <p>Um handle tem a forma <code>"h&lt;id&gt;.&lt;época&gt;"</code>: o id do objeto na VM e a época da VM. Um handle de outra execução é recusado. Guardar um handle <b>não</b> mantém o objeto vivo: quando o app o solta, o coletor o libera e a consulta responde com o código <code>collected</code> (“objeto coletado”). Trate esse erro buscando o objeto de novo, como faz o modelo Observar ViewModel.</p>
+        <h3>Códigos de erro</h3>
+        <p>Os erros de consulta têm <code>error.code</code>: <code>no-apk</code>, <code>collected</code>, <code>bad-handle</code>, <code>bad-path</code>, <code>bad-query</code>, <code>no-class</code> (a classe não está nos DEX), <code>not-initialized</code> (o app ainda não inicializou a classe), <code>bad-class</code>, <code>bad-args</code>, <code>busy</code> (a fila estava cheia ou a VM ficou ocupada; tente depois), <code>failed</code>. <code>lab.screenshot</code> também usa <code>no-image</code>, <code>not-found</code> (a <code>key</code> não está mais na tela) e <code>unsupported</code>.</p>
+      </section>
+
+      <section id="custos" aria-labelledby="h-custos">
+        <h2 id="h-custos">Custos e limites</h2>
+        <p>Os limites existem para que um plugin não deixe o app mais lento. Valores de <code>src/plugin-host.js</code> e <code>src/apk-worker.js</code>:</p>
+        <ul>
+          <li><b>Eventos:</b> <code>screen</code> vem do quadro que a página já desenhou. Logcat e rede são os lotes que a página já recebe, entregues no máximo a cada 250 ms. A VM só envia linhas do Logcat enquanto algum plugin escuta <code>log</code> ou o painel Logcat está aberto.</li>
+          <li><b>Consultas à VM:</b> uma por vez, no máximo uma a cada 25 ms, respondidas de um cache por quadro (a mesma pergunta no mesmo quadro não vai à VM). Até 16 consultas pendentes por plugin.</li>
+          <li><b>Na VM:</b> as consultas esperam numa fila e rodam só entre eventos do app, nunca até 120 ms depois de uma entrada sua, com no máximo 40 ms de consulta por segundo.</li>
+          <li><b>Mais caras:</b> <code>composeTree</code> e <code>layoutBounds</code> com nomes, uma por segundo por plugin; <code>screenshot</code>, uma a cada 500 ms (uma chamada antes disso espera a vez). <code>instances</code> e <code>referrers</code> varrem o heap em páginas de até 40 ms (no máximo 200 ms com <code>budgetMs</code>), cada página uma consulta na fila.</li>
+          <li><b>Saída:</b> o painel redesenha no máximo 10 vezes por segundo e só aberto; console, erros e blocos têm limite.</li>
+        </ul>
+      </section>
+
+      <section id="nao-permitido" aria-labelledby="h-nao">
+        <h2 id="h-nao">O que não é permitido</h2>
+        <ul>
+          <li><b>Escrever no app.</b> Não há API para mudar campos, estado ou arquivos do app. As ações de <a href="#api">Agir no lab</a> usam os controles do laboratório (recarregar a tela, mocks, janelas), que você vê em Controles.</li>
+          <li><b>Chamar métodos.</b> Nenhuma consulta executa código do app ou de bibliotecas. Os valores são lidos dos campos que os objetos já têm, como num heap dump: uma consulta não cria estado (um getter que criaria um objeto não é chamado; o campo é lido).</li>
+          <li><b>Mexer em nativos protegidos.</b> Plugins não têm acesso a código nativo.</li>
+        </ul>
+        <p>Para mudar o comportamento do app há ferramentas próprias, que deixam rastro no Logcat e no Resumo: Retornos de métodos, Activities ignoradas, Redirecionar hosts e Mock de endpoints, em Controles.</p>
+      </section>
+
+      <section id="seguranca" aria-labelledby="h-seguranca">
+        <h2 id="h-seguranca">Segurança</h2>
+        <p class="note warn">O código de um plugin roda com a origem desta página, dentro de um Worker. Ele pode usar <code>fetch</code> como qualquer script da página. O laboratório não acrescenta nenhuma permissão de rede, mas também não impede o que o navegador permite. Use só código seu ou que você revisou.</p>
+      </section>
+
+      <section id="exemplos" aria-labelledby="h-exemplos">
+        <h2 id="h-exemplos">Exemplos</h2>
+        <p>Copie um exemplo, clique em <b>+ Adicionar</b> em Controles › Plugins (o editor abre em branco) e cole no campo Código.</p>
+
+        <h3>Tela atual</h3>
+        <p>Mostra a Activity, a pilha e as janelas a cada mudança de tela. Não custa nada na VM.</p>
+        <h3>Print quando a tela fica pronta</h3>
+        <p>Espera a Activity e os fragments terminarem de carregar e tira o print da tela inteira a cada tela nova.</p>
+        <div class="code" data-name="Print na tela pronta"><pre><code>lab.on('ready', async tela =&gt; {
+  const imagem = await lab.screenshot({ maxWidth: 360 });
+  lab.ui.image(imagem, { id: 'tela', caption: tela.activity + ' · pronta' });
+  lab.ui.badge(tela.activity.split('.').pop());
+});
+const tela = await lab.waitReady({ timeoutMs: 20000 }).catch(erro =&gt; { lab.ui.text(erro.message, { id: 'espera' }); return null; });
+if (tela) lab.ui.image(await lab.screenshot({ maxWidth: 360 }), { id: 'tela', caption: tela.activity + ' · pronta' });</code></pre></div>
+        <div class="code" data-name="Tela atual"><pre><code>async function mostrar(tela) {
+  lab.ui.badge(tela.activity ? tela.activity.split('.').pop() : '—');
+  lab.ui.kv({
+    Activity: tela.activity ?? '—',
+    Pilha: tela.activityStack.join(' › ') || '—',
+    Janelas: tela.windows.map(j => j.kind + (j.modal ? ' (modal)' : '')).join(', ') || 'só a Activity',
+    Voltar: tela.canGoBack ? 'sim' : 'não',
+  }, { id: 'tela' });
+}
+lab.on('screen', mostrar);
+mostrar(await lab.screen());</code></pre></div>
+
+        <h3>Logs filtrados</h3>
+        <p>Guarda as últimas 100 linhas do Logcat cuja tag ou mensagem casa com uma expressão regular.</p>
+        <div class="code" data-name="Logs filtrados"><pre><code>const FILTRO = /erro|error|exception|warn/i;   // edite a expressão
+const MAXIMO = 100;
+const linhas = [];
+let total = 0;
+lab.on('log', lote => {
+  for (const linha of lote) {
+    if (!FILTRO.test(linha.tag + ' ' + linha.message)) continue;
+    total++;
+    linhas.push({ hora: new Date(linha.wall).toLocaleTimeString(), nível: linha.level, tag: linha.tag, mensagem: linha.message });
+  }
+  if (linhas.length > MAXIMO) linhas.splice(0, linhas.length - MAXIMO);
+  lab.ui.badge(String(total));
+  lab.ui.table(linhas.slice().reverse(), ['hora', 'nível', 'tag', 'mensagem'], { id: 'linhas' });
+});
+lab.ui.text('Esperando linhas que casem com ' + FILTRO + '…', { id: 'linhas' });</code></pre></div>
+
+        <h3>Observar um campo de ViewModel</h3>
+        <p>Pega o primeiro ViewModel do app na tela e mostra um campo ao vivo. Quando o objeto é coletado ou a tela muda, procura de novo.</p>
+        <div class="code" data-name="Observar ViewModel"><pre><code>const CAMPO = 'estado.value';   // um caminho: 'contador', 'itens.size', 'estado.value'
+let parar = null, atual = null;
+async function conectar() {
+  const lista = await lab.viewModels();
+  const vm = lista.find(item => !item.library) ?? lista[0];
+  if (vm?.handle === atual) return;
+  parar?.(); parar = null; atual = vm?.handle ?? null;
+  if (!vm) { lab.ui.text('Nenhum ViewModel na tela.', { id: 'valor' }); return; }
+  lab.ui.badge(vm.className.split('.').pop());
+  parar = lab.watch(vm.handle, CAMPO, valor => lab.ui.json(valor, { id: 'valor' }), {
+    intervalMs: 250,
+    onError: erro => { if (erro.code === 'collected') { atual = null; conectar(); } else lab.ui.text(erro.message, { id: 'valor' }); },
+  });
+}
+lab.on('screen', () => conectar().catch(erro => lab.ui.text(erro.message, { id: 'erro' })));
+await conectar();</code></pre></div>
+
+        <h3>Árvore Compose resumida</h3>
+        <p>Lista só os nós do Compose com texto, papel ou testTag. A árvore custa dezenas de milissegundos na VM, por isso é lida a cada mudança de tela e no máximo a cada 2 s.</p>
+        <div class="code" data-name="Árvore Compose resumida"><pre><code>async function mostrar() {
+  const arvore = await lab.composeTree();
+  if (!arvore.owners.length) { lab.ui.text('A tela não tem Compose.', { id: 'arvore' }); return; }
+  const nos = arvore.owners.flatMap(dono => dono.nodes)
+    .filter(no => no.texts.length || no.editableText !== null || no.role || no.testTag);
+  lab.ui.badge(`${nos.length}/${arvore.totalNodes} nós`);
+  lab.ui.table(nos.slice(0, 150).map(no => ({
+    nível: no.depth, nome: no.name,
+    texto: (no.editableText ?? no.texts.join(' ')).slice(0, 60),
+    tag: no.testTag ?? '', ações: no.actions.join(' '),
+  })), ['nível', 'nome', 'texto', 'tag', 'ações'], { id: 'arvore' });
+}
+lab.on('screen', () => mostrar().catch(() => {}));
+setInterval(() => mostrar().catch(() => {}), 2000);
+await mostrar();</code></pre></div>
+
+        <h3>Recortes dos componentes</h3>
+        <p>Lista as caixas do Compose com nome e posição e mostra o recorte das primeiras. Como cada recorte espera 500 ms pela vez, só as primeiras ganham imagem.</p>
+        <div class="code" data-name="Recortes dos componentes"><pre><code>const LIMITE = 6;
+let rodada = 0;
+async function mostrar() {
+  const minha = ++rodada;
+  const caixas = (await lab.layoutBounds()).filter(caixa => caixa.kind === 'compose');
+  lab.ui.clear();
+  lab.ui.badge(String(caixas.length));
+  lab.ui.table(caixas.map(caixa => ({ nome: caixa.name, x: caixa.bounds.left, y: caixa.bounds.top, largura: caixa.size.width, altura: caixa.size.height })),
+    ['nome', 'x', 'y', 'largura', 'altura'], { id: 'lista' });
+  for (const caixa of caixas.slice(0, LIMITE)) {
+    if (minha !== rodada) return;   // a tela mudou: a próxima rodada recomeça
+    try { lab.ui.image(await lab.screenshot({ key: caixa.key, maxWidth: 360 }), { id: caixa.key, caption: caixa.name }); }
+    catch (erro) { lab.ui.text(caixa.name + ': ' + erro.message, { id: caixa.key }); }
+  }
+}
+lab.on('screen', () => mostrar().catch(erro => lab.ui.text(erro.message, { id: 'erro' })));
+await mostrar();</code></pre></div>
+      
+        <h3>Componentes da tela</h3>
+        <p>As caixas de &quot;Mostrar limites de layout&quot; com nome, posição e o recorte de cada uma.</p>
+        <div class="code" data-name="Componentes da tela"><pre><code>// Componentes da tela: as caixas de "Mostrar limites de layout", com o recorte de cada uma
+// (lab.screenshot corta do quadro que a página mostra; no máximo um recorte a cada 500 ms, então só os primeiros LIMITE ganham imagem).
+const LIMITE = 8;
+let rodada = 0;
+async function mostrar() {
+  const minha = ++rodada;
+  const caixas = (await lab.layoutBounds()).filter(caixa =&gt; caixa.kind === 'compose');
+  lab.ui.clear(); lab.ui.badge(String(caixas.length));
+  lab.ui.table(caixas.map(caixa =&gt; ({ nome: caixa.name, x: caixa.bounds.left, y: caixa.bounds.top, largura: caixa.size.width, altura: caixa.size.height, tag: caixa.testTag ?? '' })), ['nome', 'x', 'y', 'largura', 'altura', 'tag'], { id: 'lista' });
+  for (const caixa of caixas.slice(0, LIMITE)) {
+    if (minha !== rodada) return;   // a tela mudou: a próxima rodada recomeça
+    try { lab.ui.image(await lab.screenshot({ key: caixa.key, maxWidth: 360 }), { id: caixa.key, caption: caixa.name }); }
+    catch (erro) { lab.ui.text(caixa.name + ': ' + erro.message, { id: caixa.key }); }
+  }
+}
+lab.on('screen', () =&gt; mostrar().catch(erro =&gt; lab.ui.text(erro.message, { id: 'erro' })));
+await mostrar();
+</code></pre></div>
+      
+        <h3>Painel em janela</h3>
+        <p>Abre uma janela pequena com um layout próprio: o print da tela, os ViewModels e um botão que recarrega a tela. O HTML conversa com o plugin por mensagens.</p>
+        <div class="code" data-name="Painel em janela"><pre><code>const janela = await lab.modal.open({ title: 'Painel', size: 'medium', html: '&lt;p&gt;Carregando…&lt;/p&gt;' });
+async function desenhar() {
+  const tela = await lab.waitReady({ timeoutMs: 20000 }).catch(() =&gt; null);
+  const imagem = await lab.dataUrl(await lab.screenshot({ maxWidth: 240 }));
+  const vms = (await lab.viewModels()).filter(vm =&gt; !vm.library).map(vm =&gt; vm.className.split('.').pop());
+  await janela.update({ html: `
+    &lt;style&gt;body{font:14px system-ui;margin:16px;display:flex;gap:16px} img{border-radius:12px;box-shadow:0 2px 8px #0003}&lt;/style&gt;
+    &lt;img src="${imagem}" width="240"&gt;
+    &lt;div&gt;&lt;h3&gt;${tela?.activity ?? 'sem tela pronta'}&lt;/h3&gt;&lt;p&gt;ViewModels: ${vms.join(', ') || 'nenhum'}&lt;/p&gt;
+    &lt;button onclick="lab.post('recarregar')"&gt;Recarregar a tela&lt;/button&gt;&lt;/div&gt;` });
+}
+janela.onMessage(async pedido =&gt; { if (pedido === 'recarregar') { await lab.reload('recreate'); await desenhar(); } });
+await desenhar();</code></pre></div>
+
+        <h3>Mock pelo plugin</h3>
+        <p>Responde um endpoint sem ir à rede e recarrega a tela para o app buscar de novo.</p>
+        <div class="code" data-name="Mock pelo plugin"><pre><code>const { id } = await lab.mock({ id: 'perfil', method: 'GET', url: 'https://api.exemplo.com/v1/perfil', status: 200,
+  headers: { 'Content-Type': 'application/json' }, body: { nome: 'Ana', plano: 'premium' } });
+await lab.reload('reopen');
+lab.ui.kv({ mock: id, ativos: (await lab.mocks()).length });</code></pre></div>
+      </section>
+
+      <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./arquitetura.html">Arquitetura da VM</a></p>
+    </article>
+  </div>
+  <script type="module" src="./site-pages.js?v=37ef911634a5"></script>
+</body>
+</html>
