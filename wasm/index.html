@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=7a839fa82e6c">
-  <meta name="apk-browser-build" content="7a839fa82e6c">
+  <link rel="stylesheet" href="./styles.css?v=f6a892d62d6e">
+  <meta name="apk-browser-build" content="f6a892d62d6e">
 </head>
 <body>
   <header class="topbar">
@@ -105,6 +105,17 @@
               <label class="cp-field" for="vm-memory"><span>Memória da VM <em id="vm-memory-hint" class="vm-memory-hint" role="status" hidden>reabra o APK para aplicar</em><small>Orçamento do heap Java; vale quando o APK é aberto de novo</small></span><select id="vm-memory" aria-describedby="vm-memory-note"></select></label>
               <p id="vm-memory-note" class="cp-note">Este número é o orçamento do heap Java (objetos e arrays da VM; os demais orçamentos crescem junto). O navegador gasta mais que isso: tabelas do DEX, CanvasKit, rasters e um objeto JavaScript por objeto Java. Uma aba acima de ~2–4 GiB pode ser encerrada pelo navegador. O limite do motor é 2 097 152 objetos (4 GiB é limitado a ele).</p>
               <p id="vm-memory-device" class="cp-note"></p>
+              <fieldset class="cp-core" id="vm-core">
+                <legend>Memória do núcleo Wasm <em id="vm-core-hint" class="vm-memory-hint" role="status" hidden>reabra o APK para aplicar</em></legend>
+                <div class="cp-core-grid">
+                  <label for="vm-core-heap">Heap Java<small>MiB · 64 a 1536</small></label><input id="vm-core-heap" type="number" inputmode="numeric" min="64" max="1536" step="32" aria-describedby="vm-core-note">
+                  <label for="vm-core-meta">Metaspace<small>MiB · 64 a 1024</small></label><input id="vm-core-meta" type="number" inputmode="numeric" min="64" max="1024" step="32" aria-describedby="vm-core-note">
+                  <label for="vm-core-threads">Threads vivas<small>16 a 1000 · 1 MiB cada</small></label><input id="vm-core-threads" type="number" inputmode="numeric" min="16" max="1000" step="10" aria-describedby="vm-core-note">
+                </div>
+                <p id="vm-core-total" class="cp-note" role="status"></p>
+                <p id="vm-core-note" class="cp-note">Só vale com o núcleo WebAssembly (<code>?engine=wasm</code>), quando o APK é aberto de novo. Heap: objetos e arrays do app. Metaspace: classes e métodos ligados (cresce com o tamanho do app). Threads: quantas threads Java podem estar vivas ao mesmo tempo. Os três dividem uma memória de no máximo 2048 MiB; o resumo do diagnóstico mostra quanto de cada um está em uso.</p>
+                <button id="vm-core-reset" class="cp-button" type="button">Restaurar padrão do núcleo</button>
+              </fieldset>
               <label class="cp-field" for="vm-event-time"><span>Tempo máximo por evento<small>Quanto a VM espera um evento terminar antes de encerrá-lo com o relatório; vale na hora</small></span><select id="vm-event-time" aria-describedby="vm-event-note"></select></label>
               <p id="vm-event-note" class="cp-note">A VM roda o código do app muitas vezes mais devagar que um aparelho. Uma inicialização com centenas de threads pode passar dos 25 s padrão sem estar travada: o relatório "Instruction budget exceeded" mostra as threads ainda avançando. Um tempo maior deixa terminar; um laço infinito de verdade continua sendo encerrado com relatório, só que mais tarde.</p>
               <label class="cp-field" for="vm-raster-scale"><span>Resolução no movimento<small>Enquanto a tela se mexe (animação, rolagem, transição), o quadro é desenhado nesta escala e refeito nítido quando para; vale na hora</small></span><select id="vm-raster-scale"><option value="1">100% (sempre nítido)</option><option value="0.75">75%</option><option value="0.5">50% (padrão)</option><option value="0.35">35%</option><option value="0.25">25%</option></select></label>
@@ -227,7 +238,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=7a839fa82e6c"></script>
+  <script type="module" src="./app.js?v=f6a892d62d6e"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>
