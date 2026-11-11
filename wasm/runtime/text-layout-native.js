@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=37ef911634a5';
-import {getPaintStateByHandle} from './paint-host.js?v=37ef911634a5';
-import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=37ef911634a5';
-import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=37ef911634a5';
+import {APKError} from './apk-error.js?v=8cf39c3035e0';
+import {getPaintStateByHandle} from './paint-host.js?v=8cf39c3035e0';
+import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=8cf39c3035e0';
+import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=8cf39c3035e0';
 
 const MT='Landroid/graphics/text/MeasuredText;',BUILDER=MT.slice(0,-1)+'$Builder;',LB='Landroid/graphics/text/LineBreaker;';
 const REG='Llibcore/util/NativeAllocationRegistry;';
@@ -13,7 +13,8 @@ const decode=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'text-layout-backend-unsupported',backend:'official-Skia-SkParagraph/CPU',scope:'Installed-font LTR, simple breaks, no hyphenation'});};
 const stateFor=r=>{if(!state.has(r))state.set(r,{next:0x5458000000n,handles:new Map()});return state.get(r);};
 const backend=r=>{const b=r.skia;if(!b?.CanvasKit?.ParagraphBuilder||!b.fontManager)fail('Text layout requires the verified SkParagraph CPU backend');if(b.CanvasKit.ParagraphBuilder.RequiresClientICU())fail('SkParagraph requires unavailable Unicode segmentation data');return b;};
-const allocate=(r,kind,value)=>{const s=stateFor(r);if(s.handles.size>=8192)fail('Text layout exceeds8192 live handles');const h=s.next++;s.handles.set(h,{kind,...value});return h;};
+// A full table first asks for a collection: the handles of layouts whose Java owners are unreachable are released by their owners' cleaners (registerNativeAllocation below).
+const allocate=(r,kind,value)=>{const s=stateFor(r);if(s.handles.size>=8192)r.collectForNativeHandles?.('handles de layout de texto');if(s.handles.size>=8192)fail('Text layout exceeds 8192 live handles');const h=s.next++;s.handles.set(h,{kind,...value});return h;};
 const get=(r,h,kind)=>{const v=stateFor(r).handles.get(h);if(!v||v.kind!==kind)fail(`Invalid or released ${kind} text-layout token`);return v;};
 const release=(r,h)=>{const s=stateFor(r),v=s.handles.get(h);if(v){v.paragraph?.delete();s.handles.delete(h);}};
 const chars=(r,ref)=>{const a=r.array(ref);if(a.type!=='[C'||a.elements.length>65536)fail('Text layout requires at most65536 UTF16 code units');const cells=a.cells;let text='';for(let i=0;i<cells.length;i+=8192)text+=String.fromCharCode(...(ArrayBuffer.isView(cells)?cells.subarray(i,i+8192):cells.slice(i,i+8192)));return text;};
@@ -178,15 +179,14 @@ export function breakParagraphs(r,text,style,width,strategy,frequency){
  return out;
 }
 
-/** Ownership is explicit: the VM holds Java objects until shutdown. A returned
- * Runnable releases only its checked native token when explicitly invoked.
- */
+/** A registered native allocation is released when its referent is collected, or earlier when the returned Runnable is run; release is idempotent. */
 export function textLayoutRegistryBridge(r,method,args){
  if(method.owner===REG&&method.name==='createMalloced'&&method.signature===`(Ljava/lang/ClassLoader;J)${REG}`&&FINALIZERS.has(args[1])){
   const value=r.makeObject(REG),object=r.object(value);object.textLayoutKind=FINALIZERS.get(args[1]);r.storeField(object.fields,`${REG}->freeFunction:J`,args[1]);return{value};
  }
  if(method.owner===REG&&method.name==='registerNativeAllocation'&&method.signature==='(Ljava/lang/Object;J)Ljava/lang/Runnable;'){
   const registry=r.object(args[0]);if(!registry.textLayoutKind)return null;r.object(args[1]);get(r,args[2],registry.textLayoutKind);
+  const handle=args[2],referent=r.object(args[1]),previous=referent.onFree;referent.onFree=()=>{if(typeof previous==='function')previous();release(r,handle);};/* NativeAllocationRegistry: the native allocation is freed when the referent is collected (or earlier, by the returned Runnable) */
   const value=r.makeObject(TEXT_LAYOUT_CLEANER);r.object(value).textLayoutCleanup=args[2];return{value};
  }
  if(method.name==='run'&&method.signature==='()V'&&args[0]&&r.object(args[0]).type===TEXT_LAYOUT_CLEANER){const cleaner=r.object(args[0]);if(cleaner.textLayoutCleanup){release(r,cleaner.textLayoutCleanup);cleaner.textLayoutCleanup=0n;}return{value:undefined};}

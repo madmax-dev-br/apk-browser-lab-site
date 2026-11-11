@@ -1,12 +1,12 @@
-import { isMemoryStep } from './memory-budget.js?v=37ef911634a5';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=37ef911634a5';
-import { sanitizeHostMap } from './host-map.js?v=37ef911634a5';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, resolveDevice } from './device-profile.js?v=37ef911634a5';
-import { sanitizeLocation } from './runtime-permissions.js?v=37ef911634a5';
-import { sanitizeRenderer } from './gpu-raster.js?v=37ef911634a5';
+import { isMemoryStep } from './memory-budget.js?v=8cf39c3035e0';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=8cf39c3035e0';
+import { sanitizeHostMap } from './host-map.js?v=8cf39c3035e0';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=8cf39c3035e0';
+import { sanitizeLocation } from './runtime-permissions.js?v=8cf39c3035e0';
+import { sanitizeRenderer } from './gpu-raster.js?v=8cf39c3035e0';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
-const ALLOWED = { screen: SCREEN_PRESETS.map(p => p.id), orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
+const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
 const HOST_PATTERN = /^(?:\*|(?:\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::\d{1,5})?|\[[0-9a-f:.]+\](?::\d{1,5})?|[0-9a-f:]+:[0-9a-f:.]*)$/;
 /** Allowlist entries: "host", "*.suffix", "host:port", an IP literal or "*". Malformed entries are dropped (never guessed), the list is de-duplicated and bounded. */
 export function sanitizeHosts(list) {
@@ -21,11 +21,12 @@ export function sanitizeProxyUrl(value) {
   return '';
 }
 // The engine a load uses when nothing names one. scripts/build-web.mjs rewrites the next line for APKWEB_DEFAULT_ENGINE=wasm: a build whose default is the experimental WebAssembly core.
-export const DEFAULT_ENGINE = 'wasm';
+export const DEFAULT_ENGINE = 'js';
 export function sanitizeSettings(input = {}) {
   const out = { ...DEFAULT_DEVICE, battery: { ...DEFAULT_DEVICE.battery }, network: { allowedHosts: [], proxyUrl: '', hostMap: [] }, memoryMiB: 0, eventSeconds: 0, location: sanitizeLocation(null) };   // memoryMiB: Java heap budget of the VM in MiB, 0 = automatic; applies at the next load
   if (input.network && typeof input.network === 'object') { out.network.allowedHosts = sanitizeHosts(input.network.allowedHosts); out.network.proxyUrl = sanitizeProxyUrl(input.network.proxyUrl); out.network.hostMap = sanitizeHostMap(input.network.hostMap); }
   for (const [name, values] of Object.entries(ALLOWED)) if (values.includes(input[name])) out[name] = input[name];
+  { const custom = checkCustomScreen(input.customScreen); out.customScreen = custom.value ?? DEFAULT_CUSTOM_SCREEN; if (out.screen === 'custom' && !custom.value) out.screen = DEFAULT_DEVICE.screen; }   // "Personalizado" { width, height, unit: 'dp' | 'px' } (device-profile.js checkCustomScreen); kept while a preset is selected so switching back restores it
   if (Number.isFinite(Number(input.fontScale))) out.fontScale = Math.min(2, Math.max(0.85, Number(input.fontScale)));
   if (Number.isFinite(Number(input.animatorScale))) out.animatorScale = Math.min(10, Math.max(0, Number(input.animatorScale)));
   if (Number.isFinite(Number(input.statusBarHeightDp)) && input.statusBarHeightDp !== null && input.statusBarHeightDp !== '') out.statusBarHeightDp = Math.min(64, Math.max(16, Number(input.statusBarHeightDp)));   // dp; null = the framework's status_bar_height
@@ -58,7 +59,7 @@ export function loadDeviceSettings() {
   } catch { return defaultDeviceSettings(); }
 }
 export function saveDeviceSettings(settings) { try { globalThis.localStorage?.setItem(KEY, JSON.stringify({ ...settings, version: SETTINGS_VERSION })); return true; } catch { return false; } }
-export { resolveDevice };
+export { resolveDevice, checkCustomScreen };
 
 /** The device model the VM gets: the page-only blocks (simulated location) are left out so they never count as a device change. */
 export function deviceForVM(settings) { const { location, renderer, ...device } = settings; return device; }

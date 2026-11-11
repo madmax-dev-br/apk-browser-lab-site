@@ -1,55 +1,57 @@
-import { buildScreenState } from './screen-state.js?v=37ef911634a5';
-import { createLogcat } from './logcat.js?v=37ef911634a5';
-import { createNetlog } from './netlog.js?v=37ef911634a5';
-import { reportSummary } from './report-summary.js?v=37ef911634a5';
-import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=37ef911634a5';
-import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=37ef911634a5';
-import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=37ef911634a5';
-import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=37ef911634a5';
-import { describeRedirects } from './host-map.js?v=37ef911634a5';
-import { TimeBreakdown } from './time-breakdown.js?v=37ef911634a5';
-import { createMessageSink } from './audio-native.js?v=37ef911634a5';
-import { loadAPK } from './apk-loader.js?v=37ef911634a5';
-import { buildPreparedFile } from './apklab-file.js?v=37ef911634a5';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=37ef911634a5';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=37ef911634a5';
-import { createWebViewBackend } from './webview-backend.js?v=37ef911634a5';
-import { FrameworkProvider } from './framework-provider.js?v=37ef911634a5';
-import { createRasterSender } from './raster-cache.js?v=37ef911634a5';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=37ef911634a5';
-import { dispatchPointer } from './pointer-input-host.js?v=37ef911634a5';
-import { resolveDevice } from './device-profile.js?v=37ef911634a5';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=37ef911634a5';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=37ef911634a5';
-import { SkiaProvider } from './skia-provider.js?v=37ef911634a5';
-import { inspectCompose } from './compose-inspector.js?v=37ef911634a5';
-import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=37ef911634a5';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=37ef911634a5';
-import { SemanticsPacer } from './semantics-pacing.js?v=37ef911634a5';
-import { MOTION_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=37ef911634a5';
-import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=37ef911634a5';
-import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=37ef911634a5';
-import { disposeTextLayout } from './text-layout-native.js?v=37ef911634a5';
-import { IcuBreakProvider } from './icu-break-provider.js?v=37ef911634a5';
-import { SqliteProvider } from './sqlite-native.js?v=37ef911634a5';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=37ef911634a5';
-import { TzdataProvider } from './java-time-native.js?v=37ef911634a5';
-import { ZlibProvider } from './zip-native.js?v=37ef911634a5';
-import { IcuConverterProvider } from './icu-converter-native.js?v=37ef911634a5';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=37ef911634a5';
-import { JavacryptoProvider } from './javacrypto-native.js?v=37ef911634a5';
-import { disposeColorFilters } from './color-filter-native.js?v=37ef911634a5';
-import { disposeRegex } from './regex-native.js?v=37ef911634a5';
-import { disposeRenderNodes } from './rendernode-native.js?v=37ef911634a5';
-import { startDeepLink } from './deep-link-host.js?v=37ef911634a5';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=37ef911634a5';
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=37ef911634a5';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=37ef911634a5';
+import { buildScreenState } from './screen-state.js?v=8cf39c3035e0';
+import { createLogcat } from './logcat.js?v=8cf39c3035e0';
+import { createNetlog } from './netlog.js?v=8cf39c3035e0';
+import { reportSummary } from './report-summary.js?v=8cf39c3035e0';
+import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=8cf39c3035e0';
+import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=8cf39c3035e0';
+import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=8cf39c3035e0';
+import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=8cf39c3035e0';
+import { describeRedirects } from './host-map.js?v=8cf39c3035e0';
+import { TimeBreakdown } from './time-breakdown.js?v=8cf39c3035e0';
+import { createMessageSink } from './audio-native.js?v=8cf39c3035e0';
+import { loadAPK } from './apk-loader.js?v=8cf39c3035e0';
+import { buildPreparedFile } from './apklab-file.js?v=8cf39c3035e0';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=8cf39c3035e0';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=8cf39c3035e0';
+import { createWebViewBackend } from './webview-backend.js?v=8cf39c3035e0';
+import { FrameworkProvider } from './framework-provider.js?v=8cf39c3035e0';
+import { createRasterSender } from './raster-cache.js?v=8cf39c3035e0';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=8cf39c3035e0';
+import { dispatchPointer } from './pointer-input-host.js?v=8cf39c3035e0';
+import { resolveDevice } from './device-profile.js?v=8cf39c3035e0';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=8cf39c3035e0';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=8cf39c3035e0';
+import { SkiaProvider } from './skia-provider.js?v=8cf39c3035e0';
+import { inspectCompose } from './compose-inspector.js?v=8cf39c3035e0';
+import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=8cf39c3035e0';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=8cf39c3035e0';
+import { readScrollInfo } from './scroll-info.js?v=8cf39c3035e0';
+import { SemanticsPacer } from './semantics-pacing.js?v=8cf39c3035e0';
+import { MOTION_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=8cf39c3035e0';
+import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=8cf39c3035e0';
+import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=8cf39c3035e0';
+import { disposeTextLayout } from './text-layout-native.js?v=8cf39c3035e0';
+import { IcuBreakProvider } from './icu-break-provider.js?v=8cf39c3035e0';
+import { SqliteProvider } from './sqlite-native.js?v=8cf39c3035e0';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=8cf39c3035e0';
+import { TzdataProvider } from './java-time-native.js?v=8cf39c3035e0';
+import { ZlibProvider } from './zip-native.js?v=8cf39c3035e0';
+import { IcuConverterProvider } from './icu-converter-native.js?v=8cf39c3035e0';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=8cf39c3035e0';
+import { JavacryptoProvider } from './javacrypto-native.js?v=8cf39c3035e0';
+import { disposeColorFilters } from './color-filter-native.js?v=8cf39c3035e0';
+import { disposeRegex } from './regex-native.js?v=8cf39c3035e0';
+import { disposeRenderNodes } from './rendernode-native.js?v=8cf39c3035e0';
+import { startDeepLink } from './deep-link-host.js?v=8cf39c3035e0';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=8cf39c3035e0';
+import { renderVariant, RenderVariantError } from './render-variant.js?v=8cf39c3035e0';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=8cf39c3035e0';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=8cf39c3035e0';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=37ef911634a5';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=37ef911634a5';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=37ef911634a5';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '37ef911634a5';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=8cf39c3035e0';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=8cf39c3035e0';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=8cf39c3035e0';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '8cf39c3035e0';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -68,7 +70,9 @@ let eventTimer = null, lastEventMs = 0;
 function errorData(error) { const summary = (() => { try { return runtime ? reportSummary(runtime, { tela: (() => { try { return runtime.runDiagnostic(() => buildScreenState(runtime, { semantics: null }).tela, null); } catch { return null; } })(), error: { message: error.message, details: { jsStack: error.details?.jsStack ?? (!error.details && /^(TypeError|RangeError|ReferenceError|SyntaxError|EvalError)$/.test(error.name ?? '') ? String(error.stack ?? '') : null) } } }).join('\n') : null; } catch { return null; } })(); const uncaught = (() => { try { return runtime?.uncaughtText?.() || null; } catch { return null; } })(); const internal = !error.details && /^(TypeError|RangeError|ReferenceError|SyntaxError|EvalError)$/.test(error.name ?? ''); return { summary, uncaught, name: error.name || 'Error', message: error.message || String(error), stack: error.stack, details: internal ? { kind: 'internal-js-error', jsStack: String(error.stack ?? '').split('\n').slice(0, 13).join('\n'), vmContext: runtime?.monitor?.context?.() ?? null } : error.details, navigation: runtime?.platform?.navigationState?.(runtime), trace: Array.isArray(runtime?.trace) ? runtime.trace.slice(-512) : [], stubs: runtime ? [...[...(runtime.missingLibraries ?? [])].map(([key, count]) => [`lib${key}.so`, count]), ...(runtime.missingClasses ?? []), ...(runtime.missingReturns ?? []), ...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`) : [], stubLists: runtime ? { void: [...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`), returns: [...(runtime.missingReturns ?? [])].map(([key, count]) => `${key} x${count}`), classes: [...(runtime.missingClasses ?? [])].map(([key, count]) => `${key} x${count}`) } : null }; }
 const rasterSender = createRasterSender();
 const semanticsPacer = new SemanticsPacer();
-const workerTiming = { snapshots: 0, snapshotMs: 0, semanticsWalks: 0, semanticsReused: 0, semanticsMs: 0, scheduledBatches: 0, scheduledMs: 0 };   // cumulative host time of the Worker's own work per snapshot, reported in vmHealth for the page and the benchmarks
+const workerTiming = { snapshots: 0, snapshotMs: 0, semanticsWalks: 0, semanticsReused: 0, semanticsMs: 0, scheduledBatches: 0, scheduledMs: 0, pacing: { edges: [2, 4, 8, 12, 17, 25, 34, 50], timerLate: new Array(9).fill(0), batch: new Array(9).fill(0), snapshot: new Array(9).fill(0), gap: new Array(9).fill(0) } };
+// Histograms of the frame loop (ms, upper edges in pacing.edges, last bucket = the rest): how late a timer fired, how long a batch of events and a snapshot took, and the time between two batches that ran events.
+const pace = (name, ms) => { const { edges } = workerTiming.pacing; let i = 0; while (i < edges.length && ms >= edges[i]) i++; workerTiming.pacing[name][i]++; }; let lastBatchAt = 0;   // cumulative host time of the Worker's own work per snapshot, reported in vmHealth for the page and the benchmarks
 let lastComposeSemantics = null;   // the tree of the last walk, reused by scheduled events inside the pacing gap (src/semantics-pacing.js)
 // Progressive raster (src/motion-raster.js): display rasters are replayed at a reduced scale while the screen is moving and at full density once it is still. `load { motionRaster: false }` turns it off.
 let motionRaster = new MotionRasterPolicy(), lastPointerAt = 0;
@@ -119,8 +123,8 @@ function currentSnapshot({ paced = false, request = null } = {}) {
   // VM health the page can show: live Java objects, collections, and any OutOfMemoryError the VM raised (even if the app caught it).
   snapshot.pendingEventDelay = runtime.platform.nextEventDelay?.() ?? null;   // ms until the VM's next scheduled event (frame, timer); null when nothing is scheduled
   if (rasterReduced) snapshot.pendingEventDelay = Math.min(snapshot.pendingEventDelay ?? Infinity, motionRaster.quietMs);   // the refinement is due within the quiet period
-  snapshot.vmHealth = { engine: runtime.engine, workerHeapBytes: self.performance?.memory?.usedJSHeapSize ?? null, raster: runtime.rasterStats ? { ...runtime.rasterStats, keyMs: Math.round(runtime.rasterStats.keyMs), replayMs: Math.round(runtime.rasterStats.replayMs), encodeMs: Math.round(runtime.rasterStats.encodeMs), reducedMs: Math.round(runtime.rasterStats.reducedMs ?? 0), refinedMs: Math.round(runtime.rasterStats.refinedMs ?? 0) } : null, motionRaster: { enabled: motionRaster.enabled, scale: motionRaster.scale, ...motionRaster.stats }, renderer: rendererStatus(), framesProduced: runtime.platform.viewWindowHost?.frameState?.().framesRun ?? 0, liveObjects: runtime.heap.size, limit: runtime.maxHeapObjects, bytesPerObject: BYTES_PER_OBJECT, lastEventMs, workerTiming: { ...workerTiming, snapshotMs: Math.round(workerTiming.snapshotMs), semanticsMs: Math.round(workerTiming.semanticsMs), scheduledMs: Math.round(workerTiming.scheduledMs) }, collections: runtime.gcStats?.collections ?? 0, freedObjects: runtime.gcStats?.freed ?? 0, gcMs: Math.round(runtime.gcStats?.totalMs ?? 0), oomCount: runtime.oomCount ?? 0, lastOom: runtime.lastOom ? { ...runtime.lastOom, census: undefined } : null, heapCensus: runtime.lastOom?.census && runtime.lastOom.count !== reportedCensus ? (reportedCensus = runtime.lastOom.count, runtime.lastOom.census) : undefined };
-  workerTiming.snapshots++; workerTiming.snapshotMs += performance.now() - snapshotStarted;
+  snapshot.vmHealth = { engine: runtime.engine, framesSkipped: runtime.platform.framesSkipped ?? 0, framesConsecutive: runtime.platform.framesConsecutive ?? 0, workerHeapBytes: self.performance?.memory?.usedJSHeapSize ?? null, raster: runtime.rasterStats ? { ...runtime.rasterStats, keyMs: Math.round(runtime.rasterStats.keyMs), replayMs: Math.round(runtime.rasterStats.replayMs), encodeMs: Math.round(runtime.rasterStats.encodeMs), reducedMs: Math.round(runtime.rasterStats.reducedMs ?? 0), refinedMs: Math.round(runtime.rasterStats.refinedMs ?? 0) } : null, motionRaster: { enabled: motionRaster.enabled, scale: motionRaster.scale, ...motionRaster.stats }, renderer: rendererStatus(), framesProduced: runtime.platform.viewWindowHost?.frameState?.().framesRun ?? 0, liveObjects: runtime.heap.size, limit: runtime.maxHeapObjects, bytesPerObject: BYTES_PER_OBJECT, lastEventMs, workerTiming: { ...workerTiming, snapshotMs: Math.round(workerTiming.snapshotMs), semanticsMs: Math.round(workerTiming.semanticsMs), scheduledMs: Math.round(workerTiming.scheduledMs) }, collections: runtime.gcStats?.collections ?? 0, freedObjects: runtime.gcStats?.freed ?? 0, gcMs: Math.round(runtime.gcStats?.totalMs ?? 0), oomCount: runtime.oomCount ?? 0, lastOom: runtime.lastOom ? { ...runtime.lastOom, census: undefined } : null, heapCensus: runtime.lastOom?.census && runtime.lastOom.count !== reportedCensus ? (reportedCensus = runtime.lastOom.count, runtime.lastOom.census) : undefined };
+  workerTiming.snapshots++; workerTiming.snapshotMs += performance.now() - snapshotStarted; pace('snapshot', performance.now() - snapshotStarted);
   return rasterSender.intern(snapshot); // repeated PNGs travel once; the page resolves rasterId to a cached Blob URL
 }
 // Host-time limit of one VM event in the Worker. The instruction fuse (100M per thread: a React Native startup needs ~3.4M-85M in one dispatch, see the comment at
@@ -215,12 +219,14 @@ function scheduleEvents() {
   const refine = motionRaster.refineDelay(motionSignal());   // the last snapshot carried a reduced raster: a full-density one is owed once the screen is still (src/motion-raster.js)
   if (refine !== null) delay = delay == null ? refine : Math.min(delay, refine);
   if (delay == null) return;
+  const dueAt = performance.now() + Math.max(0, delay);
   eventTimer = setTimeout(() => {
     if (busy) { scheduleEvents(); return; }
+    pace('timerLate', performance.now() - dueAt);
     busy = true; let succeeded = false;
     self.postMessage({ type: 'runtime-busy' });   // the page must not treat the screen as settled while a scheduled VM event is being processed
     try {
-      const started = performance.now(), drained = monitored('evento agendado', () => drainReadyEvents()); lastEventMs = Math.round(performance.now() - started); if (drained.processed) { workerTiming.scheduledBatches++; workerTiming.scheduledMs += performance.now() - started; }
+      const started = performance.now(), drained = monitored('evento agendado', () => drainReadyEvents()); lastEventMs = Math.round(performance.now() - started); if (drained.processed) { workerTiming.scheduledBatches++; workerTiming.scheduledMs += performance.now() - started; pace('batch', performance.now() - started); if (lastBatchAt) pace('gap', started - lastBatchAt); lastBatchAt = started; }
       logcat.flush(); netlog.flush();
       const refining = !drained.processed && !snapshotOwed && motionRaster.refinementDue(motionSignal()); if (refining) motionRaster.noteRefinement();   // the quiet period passed with the screen still: replay the last frame at full density
       const readyFlip = !drained.processed && readyTracker.flipDue(performance.now());   // nothing ran and the quiet period passed: a fresh snapshot carries screenReady.ready = true
@@ -283,6 +289,9 @@ function servePluginQuery() {
       value.activityName = runtime.activityType ? runtime.activityType.slice(1, -1).replaceAll('/', '.') : null;
       const locals = Array.isArray(args.locals) ? args.locals.map(String).filter(Boolean).slice(0, 32) : [];
       if (locals.length) runtime.runDiagnostic(() => attachCompositionLocals(runtime, value, locals), null, error => value.notes.push(`CompositionLocals indisponíveis: ${String(error?.message ?? error).slice(0, 200)}`));
+    } else if (data.query === 'scrollState') {   // where a scrollable is and how far it goes (src/scroll-info.js): what lab.scrollTo / scroll_to steer by
+      value = runtime.runDiagnostic(() => readScrollInfo(runtime, composeSemantics, args), null, error => { failure = error; });
+      if (failure) throw failure;
     } else {
       value = runtime.runDiagnostic(() => runPluginQuery(runtime, data.query, args), null, error => { failure = error; });
       if (failure) throw failure;
@@ -461,7 +470,7 @@ self.onmessage = async ({ data }) => {
       const javacryptoProvider = NATIVE_LIBS_URL ? (sharedJavacryptoProvider ??= await JavacryptoProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
       const result = await loadAPK(data.buffer, { maxEventWallMs: timeLimitsFor(data.eventSeconds).eventWallMs ?? EVENT_WALL_LIMIT_MS, maxHeapObjects: heapLimitFor(data), nativeLibraryProvider, javacryptoProvider, device: resolveDevice(data.device || {}), engine: data.engine === 'wasm' ? 'wasm' : 'js', tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', strictCrash: data.strictCrash === true, enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => self.postMessage({ type: 'progress', requestId: activeRequestId, progress }) });
       runtime = result.runtime; archive = result.archive;
-      if (runtime.engine === 'wasm') await (await import('../vmcore/js/attach.js?v=37ef911634a5')).attachCore(runtime);   // the experimental WebAssembly core (docs/WASM-CORE-PLANO.md), before anything runs
+      if (runtime.engine === 'wasm') await (await import('../vmcore/js/attach.js?v=8cf39c3035e0')).attachCore(runtime);   // the experimental WebAssembly core (docs/WASM-CORE-PLANO.md), before anything runs
       if (Array.isArray(data.methodOverrides) && data.methodOverrides.length) applyMethodOverrides(result.runtime, data.methodOverrides); if (Array.isArray(data.ignoredActivities) && data.ignoredActivities.length) applyIgnoredActivities(result.runtime, data.ignoredActivities); if (Array.isArray(data.endpointMocks) && data.endpointMocks.length) applyEndpointMocks(result.runtime, data.endpointMocks); /* before any app code runs */
       inventory = result.inventory; logcat.clear(); logcat.setStreaming(data.logcatStreaming === true); logcat.attach(runtime); netlog.clear(); netlog.attach(runtime);
       runtime.contentRasterOptions = { transport: 'rgba' };   // Compose/Canvas content reaches the page as raw RGBA8 (src/raster-cache.js), not as a PNG
@@ -498,6 +507,23 @@ self.onmessage = async ({ data }) => {
       if (!runtime || typeof inspectNativeLibraries !== 'function') throw new Error('Reabra o APK para disponibilizar a inspeção ELF.');
       const libraries = await inspectNativeLibraries(data.paths, data.limits);
       send({ type: 'result', libraries, nativeInspection: inventory.nativeInspection });
+    } else if (type === 'render-variant') {
+      // lab.renderVariant (src/render-variant.js, docs/RENDER-VARIANT.md): a second instance of the Activity on top runs in the background with its own endpoint mocks, its window
+      // is returned as RGBA images (transferred) and it is destroyed. It holds the one-operation slot: page input waits, no snapshot of the background instance reaches the page.
+      if (!runtime) throw new Error('Reabra um APK antes de executar a VM.');
+      lastOperationAt = performance.now();
+      const refresh = () => { try { if (runtime?.activity) postRuntimeEvent(); } catch { snapshotOwed = true; } };   // the visible windows were redrawn: the page gets a fresh frame of them
+      let variant;
+      try {
+        variant = await renderVariant(runtime, data.options, { drain: () => monitored('render-variant', () => drainReadyEvents()), semantics: composeSemantics,
+          composeTree: () => { const maxNodes = 2000, tree = compactComposeTree(inspectCompose(runtime, { maxNodes }), { maxNodes }); tree.activityName = runtime.activityType ? runtime.activityType.slice(1, -1).replaceAll('/', '.') : null; return tree; } });
+      } catch (error) {
+        if (!(error instanceof RenderVariantError)) throw error;
+        send({ type: 'error', error: { name: error.name, code: error.code, message: error.message } }); refresh(); succeeded = true; return;
+      }
+      const pixels = []; for (const entry of [variant, ...variant.images]) if (entry.image) { entry.image.pixels = entry.image.pixels.buffer; pixels.push(entry.image.pixels); }
+      logcat.flush(); netlog.flush(); lastOperationAt = performance.now();
+      self.postMessage({ requestId, type: 'result', variant }, [...rasterSender.takeTransfers(), ...pixels]); refresh();
     } else if (type === 'launch' || type === 'intent' || type === 'click' || type === 'back' || type === 'reload-activity' || type === 'input' || type === 'check' || type === 'focus' || type === 'press' || type === 'scroll' || type === 'compose-action' || type === 'ime' || type === 'pointer' || type === 'scrollby' || type === 'action-item') {
       if (!runtime) throw new Error('Reabra um APK antes de executar a VM.');
       send({ type: 'progress', progress: { phase: type, completed: 0, total: 1 } });

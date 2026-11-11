@@ -485,3 +485,69 @@ body.lab-modal-open{overflow:hidden}
 .prepare-file:disabled{opacity:.6;cursor:progress}
 :root[data-theme=dark] .prepare-file{background:#13261b;border-color:#2b4a36;color:#8fc9a2}
 :root[data-theme=dark] .load-times{color:#a3a7b1}
+.mcp-token-field label{font:inherit;color:inherit}
+.mcp-token-row{display:flex;gap:4px;min-width:0}
+.mcp-token-row input{flex:1 1 auto;min-width:0;font:10px ui-monospace,SFMono-Regular,Menlo,monospace}
+.mcp-config{margin:0 0 10px}
+.mcp-config-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#6e7384;margin-bottom:5px}
+.mcp-config-head code{font:9px ui-monospace,monospace}
+.mcp-config-json{margin:0;padding:9px 10px;border:1px solid #e1e3ec;border-radius:6px;background:#f7f8fb;color:#2b2f3a;font:9.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow-x:auto;max-width:100%}
+:root[data-theme=dark] .mcp-config-head{color:#a9a6b8}
+:root[data-theme=dark] .mcp-config-json{background:#15141c;border-color:#2c2b36;color:#d8d5e4}
+.cp-field.mcp-token-field{grid-template-columns:minmax(0,1fr)}
+.mcp-token-row .cp-button{white-space:nowrap}
+.control-panel #mcp-url,.control-panel #mcp-token{width:100%;min-width:0;font:9px ui-monospace,monospace;color:#5d6072;border:1px solid #e7e9f0;border-radius:4px;background:#fbfcfe;padding:7px}
+:root[data-theme=dark] .control-panel #mcp-url,:root[data-theme=dark] .control-panel #mcp-token{color:#acacb5;border-color:#363944;background:#101520}
+/* "Personalizado" screen size (src/custom-screen-panel.js) */
+.cp-custom-screen{grid-column:1/-1;display:flex;flex-direction:column;gap:4px}.cp-custom-row{display:flex;align-items:center;gap:6px}.cp-custom-row input{width:64px;min-width:0;font:9px ui-monospace,monospace;color:#5d6072;border:1px solid #e7e9f0;border-radius:4px;background:#fbfcfe;padding:7px}:root[data-theme=dark] .cp-custom-row input{color:#acacb5;border-color:#363944;background:#101520}.cp-custom-row input:focus-visible{outline:3px solid #b1adff;outline-offset:1px}.cp-custom-row select{width:auto;min-width:58px;flex:none}.cp-custom-row input::-webkit-inner-spin-button{opacity:.5}.cp-custom-row>span{font-size:10px;color:#8d94a4}.cp-custom-screen .cp-note{margin:0}.cp-custom-screen .cp-note[data-state=error]{color:#c2410c}.cp-custom-row input[aria-invalid=true],:root[data-theme=dark] .cp-custom-row input[aria-invalid=true]{border-color:#c2410c;outline-color:#c2410c}
+/* "Tela cheia" (src/device-fullscreen.js): the stage becomes a fixed layer over a dimmed, blurred page; only the device's CSS scale changes */
+.fullscreen-close{display:none}
+#preview-stage.device-fullscreen{position:fixed;inset:0;z-index:1000;height:auto;background:rgba(10,12,18,.55);background-image:none;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);overflow:hidden}
+#preview-stage.device-fullscreen>.fullscreen-close{display:flex;align-items:center;justify-content:center;position:absolute;top:14px;right:14px;z-index:2;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(20,22,30,.7);color:#fff;font-size:16px;cursor:pointer}
+#preview-stage.device-fullscreen>.fullscreen-close:focus-visible{outline:3px solid var(--accent)}
+#preview-stage.device-fullscreen>.empty-preview{color:#e8eaf0}
+.has-device-fullscreen body{overflow:hidden}
+/* Plugin side tabs (src/lab-side-tabs.js): a column of tabs on an edge of the page, next to the panel of the open one */
+.lab-tabs{position:fixed;top:0;bottom:0;z-index:45;display:flex;align-items:center;pointer-events:none}
+.lab-tabs[hidden]{display:none}
+.lab-tabs[data-side=left]{left:0;flex-direction:row-reverse}
+.lab-tabs[data-side=right]{right:0;flex-direction:row}
+.lab-tabs-rail{display:flex;flex-direction:column;gap:6px;pointer-events:auto;max-height:100%;overflow:hidden auto;scrollbar-width:none;padding:6px 0}
+.lab-tab{width:34px;box-sizing:border-box;padding:9px 0;display:flex;flex-direction:column;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;color:#1f2430;cursor:pointer;box-shadow:0 4px 14px #10121a26;font:inherit;flex:none}
+.lab-tabs[data-side=left] .lab-tab{border-left:0;border-radius:0 9px 9px 0}
+.lab-tabs[data-side=right] .lab-tab{border-right:0;border-radius:9px 0 0 9px}
+.lab-tab-icon{font-size:15px;line-height:1;font-weight:700}
+.lab-tab-name{writing-mode:vertical-rl;font:600 10px/1.1 Inter,-apple-system,sans-serif;letter-spacing:.02em;max-height:132px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lab-tab:hover{border-color:var(--accent);color:var(--accent)}
+.lab-tab[aria-expanded=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.lab-tab:focus-visible,.lab-tab-close:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.lab-tabs-panels{position:relative;width:0;overflow:hidden;pointer-events:auto;transition:width .22s ease;max-height:100%;flex:none}
+.lab-tab-panel{position:absolute;top:0;display:flex;flex-direction:column;box-sizing:border-box;background:#fff;color:#1f2430;border:1px solid var(--line);visibility:hidden;transition:visibility 0s .22s,opacity .15s}
+.lab-tabs[data-side=left] .lab-tab-panel{right:0;border-left:0;border-radius:0 10px 10px 0}
+.lab-tabs[data-side=right] .lab-tab-panel{left:0;border-right:0;border-radius:10px 0 0 10px}
+.lab-tab-panel[data-open=true]{visibility:visible;transition:opacity .15s;z-index:1}
+.lab-tab-head{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 12px;border-bottom:1px solid var(--line);flex:none}
+.lab-tab-title{font-size:12px;font-weight:600;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lab-tab-close{border:1px solid #e3e5ec;background:#fff;border-radius:6px;width:24px;height:24px;font-size:14px;line-height:1;color:#4a5060;cursor:pointer}
+.lab-tab-close:hover{color:var(--accent);border-color:#cfcbf3}
+.lab-tab-body{flex:1;min-height:0}
+.lab-tab-frame{display:block;width:100%;height:100%;border:0;background:#fff}
+.lab-tabs[data-dragging=true] .lab-tab-panel[data-mode=overlay]{opacity:.4}
+body.lab-tab-push{padding-left:var(--lab-push-left,0px);padding-right:var(--lab-push-right,0px);transition:padding .22s ease}
+:root[data-theme=dark] .lab-tab,:root[data-theme=dark] .lab-tab-panel{background:#16181f;color:#d9dce4}
+:root[data-theme=dark] .lab-tab[aria-expanded=true]{background:var(--accent);color:#10121a}
+:root[data-theme=dark] .lab-tab-close{background:#1d1f26;border-color:#333740;color:#c4c8d2}
+.pl-package-note .cp-button{margin-left:6px}
+/* A drag from a plugin's tab onto the device (src/lab-drag.js): the ghost, the frame around the device screen and the mark under the pointer */
+.lab-drag-ghost{position:fixed;left:0;top:0;z-index:2147483600;pointer-events:none;display:flex;align-items:center;gap:7px;padding:5px 9px;border-radius:8px;background:#1f2430;color:#fff;font:600 11px/1.2 Inter,-apple-system,sans-serif;box-shadow:0 6px 18px #10121a55;max-width:240px;white-space:nowrap;overflow:hidden}
+.lab-drag-ghost img{width:36px;height:36px;object-fit:contain;border-radius:4px;background:#fff;flex:none}
+.lab-drop-frame{position:fixed;z-index:2147483500;pointer-events:none;box-sizing:border-box;border:2px dashed var(--accent);border-radius:8px;opacity:.6}
+.lab-drop-frame[hidden],.lab-drop-mark[hidden]{display:none}
+.lab-drop-frame[data-over=true]{opacity:1;border-style:solid;background:#6b5cff1f}
+.lab-drop-mark{position:fixed;left:0;top:0;z-index:2147483550;pointer-events:none;width:0;height:0}
+.lab-drop-mark::before{content:"";position:absolute;left:-9px;top:-9px;width:18px;height:18px;box-sizing:border-box;border-radius:50%;border:2px solid var(--accent);background:#ffffffb0}
+.lab-drop-mark span{position:absolute;left:-60px;top:-30px;white-space:nowrap;font:10px ui-monospace,monospace;background:#1f2430;color:#fff;border-radius:5px;padding:2px 6px}
+body.lab-dragging{user-select:none;-webkit-user-select:none}
+@media (prefers-reduced-motion:reduce){.lab-tabs-panels,.lab-tab-panel,.lab-tab-panel[data-open=true],body.lab-tab-push{transition:none}}
+.lab-drag-shield{position:fixed;inset:0;z-index:2147483400;cursor:grabbing;touch-action:none;background:transparent}
+#pl-dialog-help a{color:var(--accent);text-decoration:underline}

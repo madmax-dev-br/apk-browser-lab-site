@@ -1,7 +1,7 @@
-import { APKError } from './apk-runtime.js?v=37ef911634a5';
-import { breakParagraphs } from './text-layout-native.js?v=37ef911634a5';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=37ef911634a5';
-import { gcRoot } from './heap-gc.js?v=37ef911634a5';
+import { APKError } from './apk-runtime.js?v=8cf39c3035e0';
+import { breakParagraphs } from './text-layout-native.js?v=8cf39c3035e0';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=8cf39c3035e0';
+import { gcRoot, ephemeronMap } from './heap-gc.js?v=8cf39c3035e0';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -28,6 +28,9 @@ export function createViewLayoutHost(platform) {
   const store = (runtime, receiver, name, value) => runtime.storeField(runtime.object(receiver).fields, `${VIEW}->${name}:I`, value | 0);
   const measured = (runtime, receiver, width, height) => { const view = runtime.object(receiver); view.measuredWidth = width | 0; view.measuredHeight = height | 0; view.measuredDimensionSet = true; store(runtime, receiver, 'mMeasuredWidth', width); store(runtime, receiver, 'mMeasuredHeight', height); };
   const pendingRoots = gcRoot(new Map()), queuedRoots = gcRoot(new Set());
+  // A layout requested on a tree that is not attached waits for its attach, but must not keep the tree alive: the views of a destroyed Activity that ask for a layout afterwards
+  // (a late callback) were held for ever by this record. An ephemeron: the entry lives only while something else keeps its root alive.
+  const detachedRoots = new Map();
   const rootFor = (runtime, receiver) => {
     const surface = platform.dialogWindowHost?.recordFor(runtime, receiver); if (surface) return surface.root;
     let ref = receiver; const seen = new Set();
@@ -41,13 +44,15 @@ export function createViewLayoutHost(platform) {
     let ref = receiver; const seen = new Set();
     while (ref) { if (seen.has(ref.ref) || seen.size >= 4096) fail('Cyclic/excessive layout hierarchy'); seen.add(ref.ref); const object = runtime.object(ref); object.layoutRequested = true; object.measureCache?.clear(); ref = object.parent; }
     const root = rootFor(runtime, receiver); if (!root) return;
-    pendingRoots.set(root.ref,root); pending = true; if (runtime.object(root).attached) schedule(runtime,root);
+    if (!runtime.object(root).attached) { ephemeronMap(runtime, detachedRoots); detachedRoots.set(root.ref, root); return; }
+    pendingRoots.set(root.ref,root); pending = true; schedule(runtime,root);
   };
   const schedule = (runtime, root) => {
     if (queuedRoots.has(root.ref)) return; queuedRoots.add(root.ref); queued = true;
     platform.queueTask(() => {
       queuedRoots.delete(root.ref); queued = queuedRoots.size > 0;
-      if (!pendingRoots.has(root.ref) || !runtime.object(root).attached || platform.taskClosed) return;
+      if (pendingRoots.has(root.ref) && !runtime.object(root).attached) { pendingRoots.delete(root.ref); pending = pendingRoots.size > 0; ephemeronMap(runtime, detachedRoots); detachedRoots.set(root.ref, root); return; }   // detached since the request (a layout asked for while the window was being removed): it waits for an attach without being held
+      if (!pendingRoots.has(root.ref) || platform.taskClosed) return;
       pendingRoots.delete(root.ref); pending = pendingRoots.size > 0;
       const rootView = runtime.object(root), frameRect = platform.systemBarsHost?.contentFrame(runtime, root), geometry = platform.dialogWindowHost?.geometry(runtime,root) ?? (frameRect ? { width: frameRect.right - frameRect.left, height: frameRect.bottom - frameRect.top } : null), device = platform.device ?? { widthDp: 411, heightDp: 840 }, parentW = algorithm(runtime, SPEC, 'makeMeasureSpec', '(II)I', [geometry?.width??device.widthDp, 0x40000000]), parentH = algorithm(runtime, SPEC, 'makeMeasureSpec', '(II)I', [geometry?.height??device.heightDp, 0x40000000]);
       const width = algorithm(runtime, CHILD, 'getChildMeasureSpec', '(III)I', [parentW, 0, geometry?.layoutWidth??rootView.layoutWidth??-1]), height = algorithm(runtime, CHILD, 'getChildMeasureSpec', '(III)I', [parentH, 0, geometry?.layoutHeight??rootView.layoutHeight??-1]);
@@ -159,10 +164,10 @@ export function createViewLayoutHost(platform) {
   return {
     supports: key => keys.has(key),
     rootReady(runtime, root) { if (!root) return; let type = runtime.object(root).type, source = runtime.dex.classes.has(type); const seen = new Set(); while (type && !seen.has(type)) { seen.add(type); if (runtime.classes.get(type)?.methods.has('onMeasure(II)V')) { source = true; break; } type = runtime.parent(type); } if (source || runtime.skia) request(runtime, root); },
-    afterAttach(runtime, receiver, attached) { if(!attached&&pendingRoots.has(receiver.ref)){pendingRoots.delete(receiver.ref);pending=pendingRoots.size>0;} if (attached && pending) { const root=rootFor(runtime,receiver); if(root&&pendingRoots.has(root.ref))schedule(runtime,root); } },
+    afterAttach(runtime, receiver, attached) { if(!attached&&pendingRoots.has(receiver.ref)){pendingRoots.delete(receiver.ref);pending=pendingRoots.size>0;} if (attached && (pending || detachedRoots.size)) { const root=rootFor(runtime,receiver); if(root&&detachedRoots.has(root.ref)){detachedRoots.delete(root.ref);pendingRoots.set(root.ref,root);pending=true;} if(root&&pendingRoots.has(root.ref))schedule(runtime,root); } },
     state: () => ({ pending, queued }),
     /** Which roots still wait for a measure/layout pass, whether the pass is queued as a task (the performTraversals of this VM) and whether the root is attached to a window. */
-    detail: runtime => ({ pending, queued, roots: [...pendingRoots.values()].map(root => ({ ref: root.ref, type: runtime.object(root).type, attached: !!runtime.object(root).attached, queued: queuedRoots.has(root.ref) })) }),
+    detail: runtime => ({ pending, queued, roots: [...pendingRoots.values(), ...detachedRoots.values()].map(root => ({ ref: root.ref, type: runtime.object(root).type, attached: !!runtime.object(root).attached, queued: queuedRoots.has(root.ref) })) }),
     relayoutRoot(runtime, root) { request(runtime, root); },
     invoke(runtime, method, args) {
       const name = method.name;

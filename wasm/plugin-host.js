@@ -7,13 +7,16 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=37ef911634a5';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=37ef911634a5';
+import { pluginWorkerSource } from './plugin-runtime.js?v=8cf39c3035e0';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=8cf39c3035e0';
+import { encodeVariantImages } from './render-variant-image.js?v=8cf39c3035e0';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
 const ACTION_METHODS = new Set(['reload', 'mock', 'unmock', 'mocks', 'modal']);
-const VM_METHODS = new Set(['viewModels', 'fragments', 'activity', 'inspect', 'field', 'composeTree', 'statics', 'staticField', 'classes', 'instances', 'referrers', 'compositionLocals', 'findCompositionLocal']);
+for (const method of ['scrollTo', 'scrollInfo', 'tab']) ACTION_METHODS.add(method);   // scrolling the app to a position / percentage (src/lab-scroll.js) and the side tabs (src/lab-side-tabs.js)
+const UNCACHED_VM_METHODS = new Set(['scrollState']);   // read again on every call: lab.scrollTo steers by it between two scroll steps, and an animated scroll moves without a new answer of the cache's frame
+const VM_METHODS = new Set(['scrollState', 'viewModels', 'fragments', 'activity', 'inspect', 'field', 'composeTree', 'statics', 'staticField', 'classes', 'instances', 'referrers', 'compositionLocals', 'findCompositionLocal']);
 
 /** The screen as the 'screen' event and lab.screen() give it, from the snapshot the page drew. */
 export function screenFromSnapshot(snapshot, { packageName = null, frame = 0 } = {}) {
@@ -143,6 +146,16 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       return action({ id: plugin.id, name: plugin.name }, args ?? {});
     }
     if (method === 'layoutBounds') return (await layoutBoundsFor(plugin, { names: args?.names !== false })).map(elementOut);
+    // ---- lab.renderVariant (src/render-variant.js, docs/RENDER-VARIANT.md): begin ---------------------------------------------------------------------------------------
+    // The only way a background render starts. The page's own operation slot when it provides one (actions.renderVariant: user input waits), else the VM client's.
+    if (method === 'renderVariant') {
+      const run = typeof actions?.renderVariant === 'function' ? actions.renderVariant : typeof vm?.renderVariant === 'function' ? (_caller, options) => vm.renderVariant(options) : null;
+      if (!run) throw Object.assign(new Error('lab.renderVariant não está disponível aqui.'), { code: 'unsupported' });
+      const options = JSON.parse(JSON.stringify(args ?? {}));
+      let result; try { result = await run({ id: plugin.id, name: plugin.name }, options); } catch (error) { throw Object.assign(error, { code: error?.code ?? (error?.kind === 'vm-busy' ? 'busy' : 'failed') }); }
+      return encodeVariantImages(result, { type: options.type, pixels: options.pixels === true });
+    }
+    // ---- lab.renderVariant: end ------------------------------------------------------------------------------------------------------------------------------------------
     if (method === 'screenshot') {
       if (typeof captureImage !== 'function') throw Object.assign(new Error('Captura de imagem indisponível nesta página.'), { code: 'unsupported' });
       const wait = (plugin.lastShotAt ?? -Infinity) + SCREENSHOT_MS - now(); if (wait > 0) await new Promise(resolve => setTimer(resolve, wait));
@@ -174,6 +187,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       plugin.lastComposeAt = now();
       return cached(key, () => vmCall('composeTree', safeArgs));
     }
+    if (UNCACHED_VM_METHODS.has(method)) return vmCall(method, safeArgs);
     return cached(`${method}:${JSON.stringify(safeArgs)}`, () => vmCall(method, safeArgs));
   }
 
@@ -190,7 +204,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       case 'console': record(plugin, plugin.console, { level: ['log', 'info', 'warn', 'error', 'debug'].includes(data.level) ? data.level : 'log', text: clipText(data.text, 2000), at: Date.now() }, MAX_CONSOLE); changed(plugin); return;
       case 'ui': applyUiOps(plugin.output, data.ops); changed(plugin); return;
       case 'sub': {
-        const name = String(data.name); if (!['screen', 'log', 'network', 'refresh', 'modal'].includes(name)) return;
+        const name = String(data.name); if (!['screen', 'log', 'network', 'refresh', 'modal', 'tab'].includes(name)) return;
         if (data.on) plugin.subs.add(name); else plugin.subs.delete(name);
         if (name === 'log') updateLogWanted();
         return;

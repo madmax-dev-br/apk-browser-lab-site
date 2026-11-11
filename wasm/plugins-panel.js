@@ -1,9 +1,9 @@
 // The "Plugins" section of the Controles panel and the "Plugins" output panel under the device (docs/PLUGINS.md). The section lists the plugins (on/off, name, status, Editar,
-// Remover, order, export / import) and the dialog edits one (name, package filter, code); the list lives in localStorage (src/plugin-store.js) and is handed to the host
+// Remover, order, export / import) and the dialog edits one (name, output options, code; a stored package filter is kept, not edited); the list lives in localStorage (src/plugin-store.js) and is handed to the host
 // (src/plugin-host.js), which runs each enabled plugin in its own Worker. The output panel shows one card per running or failed plugin: its blocks (rendered with textContent
 // and DOM building only, never HTML), badge, console and errors, with Parar / Reiniciar. Renders are coalesced (at most every RENDER_MS) and skipped while the panel is closed.
-import { RENDER_MS } from './plugin-host.js?v=37ef911634a5';
-import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=37ef911634a5';
+import { RENDER_MS } from './plugin-host.js?v=8cf39c3035e0';
+import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=8cf39c3035e0';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const STATUS_LABEL = { rodando: 'rodando', iniciando: 'iniciando', parado: 'parado', erro: 'erro' };
@@ -65,7 +65,7 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     [...$('pl-list').children].forEach((li, index) => { const plugin = S.plugins[index]; if (!plugin) return; const [text, state] = meta(plugin), info = li.querySelector('.em-meta'); if (info) { info.textContent = text; info.dataset.state = state; } });
     const runningCount = host.runningCount;
     $('pl-summary').textContent = `${runningCount} rodando`;
-    $('pl-status').textContent = !S.plugins.length ? 'Nenhum plugin. Clique em + Adicionar (veja os Exemplos).' : `${S.plugins.length} ${S.plugins.length === 1 ? 'plugin' : 'plugins'}, ${runningCount} rodando.${runningCount ? ' A saída aparece no painel Plugins abaixo do aparelho.' : ''}`;
+    $('pl-status').textContent = !S.plugins.length ? 'Nenhum plugin. Clique em + Adicionar.' : `${S.plugins.length} ${S.plugins.length === 1 ? 'plugin' : 'plugins'}, ${runningCount} rodando.${runningCount ? ' A saída aparece no painel Plugins abaixo do aparelho.' : ''}`;
     $('pl-export').disabled = !S.plugins.length;
     if (outputRoot) { outputRoot.hidden = !S.plugins.length; const count = outputRoot.querySelector('.po-count'); if (count) count.textContent = `${runningCount} rodando`; }
   }
@@ -98,11 +98,18 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     for (const field of ['name', 'code']) { const node = $(`pl-err-${field}`), list = S.submitted ? errors.filter(error => error.field === field) : []; node.textContent = list.map(error => error.message).join(' '); node.hidden = !node.textContent; }
     return errors;
   }
+  // The dialog has no package field. A plugin saved or imported with a package filter keeps it (the host still honours it, the list row shows it): the dialog only says so
+  // and offers to drop the restriction; a new plugin applies to any app.
+  function showPackage(filter) {
+    S.packageFilter = String(filter ?? ''); const note = $('pl-package-note'); if (!note) return;
+    note.hidden = !S.packageFilter; const text = $('pl-package-text'); if (text) text.textContent = S.packageFilter ? `Este plugin só roda quando o pacote aberto é ${S.packageFilter}.` : '';
+  }
+  $('pl-package-clear')?.addEventListener('click', () => { showPackage(''); $('pl-name').focus?.(); });
   function openDialog(plugin, opener, draft = null) {
     S.editing = plugin ? plugin.id : null; S.opener = opener ?? doc.activeElement; S.submitted = false;
     const data = plugin ?? draft ?? blankPlugin();
     $('pl-dialog-title').textContent = plugin ? 'Editar plugin' : 'Adicionar plugin';
-    $('pl-name').value = data.name; $('pl-package').value = data.packageFilter; $('pl-code').value = data.code; S.draft = data; showErrors();
+    $('pl-name').value = data.name; showPackage(data.packageFilter ?? ''); $('pl-code').value = data.code; S.draft = data; showErrors();
     const fixed = typeof data.height === 'number';
     $('pl-updates').value = data.updates === 'manual' ? 'manual' : 'auto'; $('pl-height').value = fixed ? 'fixed' : (data.height ?? 'wrap'); $('pl-height-px').value = String(fixed ? data.height : 240); $('pl-height-px').hidden = !fixed;
     $('pl-dialog').hidden = false; doc.body?.classList?.add('em-modal-open');
@@ -120,7 +127,7 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     event?.preventDefault?.(); S.submitted = true;
     if (showErrors().length) { (validatePlugin({ name: $('pl-name').value, code: '' }).errors.some(e => e.field === 'name') ? $('pl-name') : $('pl-code')).focus?.(); return; }
     const at = S.plugins.findIndex(item => item.id === S.editing), base = at >= 0 ? S.plugins[at] : S.draft;
-    const plugin = normalizePlugin({ ...base, name: $('pl-name').value, packageFilter: $('pl-package').value, code: $('pl-code').value,
+    const plugin = normalizePlugin({ ...base, name: $('pl-name').value, packageFilter: S.packageFilter, code: $('pl-code').value,
       updates: $('pl-updates').value, height: $('pl-height').value === 'fixed' ? Number($('pl-height-px').value) || 240 : $('pl-height').value });   // display options: never restart the plugin
     if (at >= 0) S.plugins[at] = plugin;
     else { if (S.plugins.length >= MAX_PLUGINS) { $('pl-err-code').textContent = `No máximo ${MAX_PLUGINS} plugins.`; $('pl-err-code').hidden = false; return; } S.plugins.push(plugin); }

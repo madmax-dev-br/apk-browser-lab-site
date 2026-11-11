@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=37ef911634a5';
-import { createRasterReceiver } from './raster-cache.js?v=37ef911634a5';
+import { createWebAudioPlayer } from './web-audio-player.js?v=8cf39c3035e0';
+import { createRasterReceiver } from './raster-cache.js?v=8cf39c3035e0';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=37ef911634a5', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=8cf39c3035e0', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -179,6 +179,13 @@ export class APKWorkerClient {
   /** "Recriar" (mode recreate: Activity.recreate(), state kept) or "Reabrir" (mode reopen: a fresh instance with the same Intent); answers the snapshot after the relaunch. */
   async reloadActivity({ mode = 'recreate', onProgress } = {}) {
     return (await this.request('reload-activity', { mode }, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot;
+  }
+  /** lab.renderVariant (src/render-variant.js, docs/RENDER-VARIANT.md): renders a second, background instance of the Activity on top with `endpointMocks` in front of the lab's and
+   *  resolves with its screen ({ image, images, views, semantics, composeTree, requests, mocks, timedOut, ... }; each image is { width, height, scale, pixels: ArrayBuffer RGBA8 }).
+   *  It takes the one-operation slot like a click; rejects with `code` (bad-args, no-activity, not-resumed, busy, unsupported, cleanup-failed). */
+  async renderVariant(options = {}) {
+    const timeoutMs = Math.max(this.eventTimeoutMs, 2 * (Number(options?.timeoutMs) || 0) + 15000);
+    return (await this.request('render-variant', { options }, { timeoutMs })).variant;
   }
   async back({ onProgress } = {}) {
     return (await this.request('back', {}, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot;

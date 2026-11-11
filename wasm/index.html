@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=37ef911634a5">
-  <meta name="apk-browser-build" content="37ef911634a5">
+  <link rel="stylesheet" href="./styles.css?v=8cf39c3035e0">
+  <meta name="apk-browser-build" content="8cf39c3035e0">
 </head>
 <body>
   <header class="topbar">
@@ -66,6 +66,7 @@
                 <label for="dev-locale">Idioma e região</label><select id="dev-locale"></select>
                 <label for="dev-orientation">Orientação</label><select id="dev-orientation"><option value="portrait">Retrato</option><option value="landscape">Paisagem</option></select>
                 <label for="dev-screen">Tela</label><select id="dev-screen"></select>
+                <div id="dev-custom-screen" class="cp-custom-screen" hidden><div class="cp-custom-row"><label for="dev-custom-w">Largura</label><input id="dev-custom-w" type="number" min="1" max="4096" step="1" inputmode="numeric"><span aria-hidden="true">×</span><label for="dev-custom-h">Altura</label><input id="dev-custom-h" type="number" min="1" max="4096" step="1" inputmode="numeric"><select id="dev-custom-unit" aria-label="Unidade"><option value="dp">dp</option><option value="px">px</option></select></div><p id="dev-custom-msg" class="cp-note" role="status" aria-live="polite"></p></div>
                 <label for="dev-nav">Navegação</label><select id="dev-nav"><option value="gesture">Gestos</option><option value="buttons">3 botões</option></select>
                 <label for="dev-animator">Escala de animação</label><select id="dev-animator"><option value="0">Desligada</option><option value="0.5">0,5×</option><option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select>
               </div>
@@ -157,13 +158,15 @@
               <p class="cp-note ov-warning">O código de um plugin roda com a origem desta página (pode usar fetch como qualquer script dela). Use só código seu ou que você revisou.</p>
               <ul id="pl-list" class="ov-list pl-list" aria-label="Plugins, na ordem do painel"></ul>
               <p id="pl-status" class="cp-note" role="status" aria-live="polite">Nenhum plugin.</p>
-              <div class="em-actions"><button id="pl-add" class="cp-button" type="button">+ Adicionar</button><a class="pl-examples-link" href="plugins.html#exemplos" target="_blank" rel="noopener">Exemplos</a><button id="pl-export" class="cp-button" type="button" disabled>Exportar</button><button id="pl-import" class="cp-button" type="button">Importar</button><input id="pl-import-file" type="file" accept="application/json,.json" hidden></div>
+              <div class="em-actions"><button id="pl-add" class="cp-button" type="button">+ Adicionar</button><button id="pl-export" class="cp-button" type="button" disabled>Exportar</button><button id="pl-import" class="cp-button" type="button">Importar</button><input id="pl-import-file" type="file" accept="application/json,.json" hidden></div>
             </div></details>
           <details class="cp-group" id="cp-sec-mcp" data-section="mcp">
               <summary><h3 id="cp-mcp-title">MCP</h3><span id="mcp-summary" class="cp-badge">desligado</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <p class="cp-note">Conecta esta página a um cliente MCP (Claude Desktop, Claude Code): ele pode tirar print da tela ou de um componente, ler a saída dos plugins, a árvore do Compose, os CompositionLocals, os ViewModels, o Logcat e a rede do app aberto aqui. Rode a ponte <a href="tools/lab-mcp.mjs" download>lab-mcp.mjs</a> no seu computador (veja <a href="plugins.html#mcp">como configurar</a>).</p>
-              <label class="cp-field" for="mcp-url"><span>Endereço da ponte<small>a ponte escuta só em 127.0.0.1; porta padrão 8790</small></span><input id="mcp-url" type="url" value="http://127.0.0.1:8790" autocomplete="off" spellcheck="false"></label>
-              <label class="cp-field" for="mcp-token"><span>Token<small>no terminal: node lab-mcp.mjs token</small></span><input id="mcp-token" type="password" autocomplete="off" spellcheck="false"></label>
+              <p class="cp-note">Conecta esta página a um cliente MCP (Claude Desktop, Claude Code): ele pode tirar print da tela ou de um componente, ler a saída dos plugins, a árvore do Compose, os CompositionLocals, os ViewModels, o Logcat e a rede do app aberto aqui. Uma ponte pequena (<a href="tools/lab-mcp.mjs" download>lab-mcp.mjs</a>, Node.js) roda no seu computador entre os dois (veja <a href="plugins.html#mcp">como funciona</a>).</p>
+              <label class="cp-field" for="mcp-script"><span>1. Onde está a ponte<small><a href="tools/lab-mcp.mjs" download>Baixe lab-mcp.mjs</a> (ou <code id="mcp-download">curl -O …/tools/lab-mcp.mjs</code>) e informe o caminho completo</small></span><input id="mcp-script" type="text" placeholder="/caminho/para/lab-mcp.mjs" autocomplete="off" spellcheck="false"></label>
+              <div class="cp-field mcp-token-field"><span><label for="mcp-token">2. Token de pareamento</label><small>gerado neste navegador e guardado só nele; a ponte recusa outra página</small></span><div class="mcp-token-row"><input id="mcp-token" type="password" autocomplete="off" spellcheck="false" aria-describedby="mcp-config-title"><button id="mcp-token-show" type="button" class="cp-button" aria-pressed="false" aria-controls="mcp-token">Mostrar</button><button id="mcp-token-new" type="button" class="cp-button">Gerar novo</button></div></div>
+              <div class="mcp-config"><div class="mcp-config-head"><span id="mcp-config-title">3. Cole no <code>.mcp.json</code> do seu projeto (ou em <code>mcpServers</code> do seu cliente MCP) e reinicie o cliente</span><button id="mcp-copy" type="button" class="cp-button">Copiar</button></div><pre class="mcp-config-json" aria-labelledby="mcp-config-title"><code id="mcp-config-json"></code></pre></div>
+              <label class="cp-field" for="mcp-url"><span>4. Endereço da ponte<small>a ponte escuta só em 127.0.0.1; porta padrão 8790 (outra porta entra no JSON)</small></span><input id="mcp-url" type="url" value="http://127.0.0.1:8790" autocomplete="off" spellcheck="false"></label>
               <div class="em-actions"><button id="mcp-connect" type="button" class="cp-button primary">Conectar</button></div>
               <p id="mcp-status" class="cp-note" role="status" aria-live="polite">Desconectado.</p>
             </div></details>
@@ -171,8 +174,9 @@
         </section>
       </aside>
       <section class="preview" aria-label="Aplicativo em execução">
-        <div class="preview-bar"><div class="preview-title"><span class="window-dots"><i></i><i></i><i></i></span><span id="preview-name">Prévia do aplicativo</span></div><button id="recreate-activity" class="back-button reload-activity" type="button" hidden title="Recriar: como Activity.recreate() ou uma rotação. onPause, onStop, onSaveInstanceState e onDestroy, depois uma nova instância com o estado salvo; os ViewModels continuam">↻ Recriar</button><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reabrir: como fechar e abrir de novo a mesma tela. Nova instância com o mesmo Intent, sem estado salvo e com ViewModels novos: o conteúdo é carregado de novo">⟲ Reabrir</button><button id="back-button" class="back-button" hidden>← Voltar</button><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> INATIVO</span></div>
+        <div class="preview-bar"><div class="preview-title"><span class="window-dots"><i></i><i></i><i></i></span><span id="preview-name">Prévia do aplicativo</span></div><button id="recreate-activity" class="back-button reload-activity" type="button" hidden title="Recriar: como Activity.recreate() ou uma rotação. onPause, onStop, onSaveInstanceState e onDestroy, depois uma nova instância com o estado salvo; os ViewModels continuam">↻ Recriar</button><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reabrir: como fechar e abrir de novo a mesma tela. Nova instância com o mesmo Intent, sem estado salvo e com ViewModels novos: o conteúdo é carregado de novo">⟲ Reabrir</button><button id="back-button" class="back-button" hidden>← Voltar</button><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Tela cheia: mostra o dispositivo ampliado sobre a página (Esc fecha). A resolução da VM não muda" aria-pressed="false">⤢ Tela cheia</button><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> INATIVO</span></div>
         <div class="preview-stage" id="preview-stage">
+          <button id="fullscreen-close" class="fullscreen-close" type="button" hidden title="Fechar tela cheia (Esc)" aria-label="Fechar tela cheia">✕</button>
           <div id="empty-preview" class="empty-preview"><div class="empty-device"><span></span><div>▶</div><i></i></div><h2>Seu aplicativo começa aqui.</h2><p>Selecione um APK e clique em Executar.<br>Ou rode a demonstração para testar.</p><span class="browser-chip"><span>◉</span> Tudo acontece neste navegador</span></div>
           <div id="boot-overlay" class="boot-overlay" hidden role="status" aria-live="polite"><div class="boot-screen"><svg class="boot-logo" viewBox="0 0 64 64" width="84" height="84" aria-hidden="true"><path class="boot-antenna" d="M20 8l6 9M44 8l-6 9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M10 40a22 22 0 0 1 44 0z" fill="currentColor"/><circle cx="24" cy="32" r="2.6" class="boot-eye"/><circle cx="40" cy="32" r="2.6" class="boot-eye"/><rect x="10" y="44" width="44" height="12" rx="6" fill="currentColor" opacity=".35"/></svg><div class="boot-bar"><i></i></div><p id="boot-caption" class="boot-caption">Iniciando…</p></div></div>
           <div id="android-device" class="android-device" hidden>
@@ -222,7 +226,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=37ef911634a5"></script>
+  <script type="module" src="./app.js?v=8cf39c3035e0"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>
@@ -258,12 +262,10 @@
 <div id="pl-dialog" class="em-scrim" hidden>
   <div class="em-card pl-card" role="dialog" aria-modal="true" aria-labelledby="pl-dialog-title" aria-describedby="pl-dialog-help">
     <div class="em-card-head"><h2 id="pl-dialog-title">Adicionar plugin</h2><button id="pl-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>
-    <p id="pl-dialog-help" class="em-help">O código é o corpo de uma função assíncrona: use <code>await</code> à vontade e o objeto <code>lab</code>: <code>lab.on('screen' | 'log' | 'network', fn)</code>, <code>await lab.screen()</code>, <code>lab.viewModels()</code>, <code>lab.fragments()</code>, <code>lab.inspect(handle)</code>, <code>lab.field(handle, 'a.b')</code>, <code>lab.watch(handle, 'a.b', fn)</code>, <code>lab.composeTree()</code> e a saída <code>lab.ui.text / kv / table / json / clear / badge</code>. Tudo é só leitura.</p>
+    <p id="pl-dialog-help" class="em-help">JavaScript seu que usa o objeto <code>lab</code> para observar e controlar o app aberto. <a href="plugins.html#exemplos" target="_blank" rel="noopener">Ver exemplos prontos</a></p>
     <form id="pl-form" novalidate>
-      <div class="pl-fields">
-        <label class="em-field" for="pl-name"><span>Nome</span><input id="pl-name" type="text" autocomplete="off" spellcheck="false" maxlength="120" required aria-describedby="pl-err-name"></label>
-        <label class="em-field" for="pl-package"><span>Pacote <small>opcional; vazio = qualquer app. Vários separados por vírgula, <code>*</code> como curinga</small></span><input id="pl-package" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="com.exemplo.app"></label>
-      </div>
+      <label class="em-field em-wide" for="pl-name"><span>Nome</span><input id="pl-name" type="text" autocomplete="off" spellcheck="false" maxlength="120" required aria-describedby="pl-err-name"></label>
+      <p id="pl-package-note" class="em-help pl-package-note" hidden><span id="pl-package-text"></span> <button id="pl-package-clear" type="button" class="cp-button">Valer para qualquer app</button></p>
       <div class="pl-fields">
         <label class="em-field" for="pl-updates"><span>Atualização da saída <small>automática: os blocos seguem o plugin; manual: ficam parados até Atualizar no cartão</small></span><select id="pl-updates"><option value="auto">Automática</option><option value="manual">Manual</option></select></label>
         <label class="em-field" for="pl-height"><span>Altura dos blocos <small>limitada rola acima de 320 px; fixa usa a altura em px</small></span><span class="pl-height-row"><select id="pl-height"><option value="wrap">Limitada (320 px)</option><option value="auto">Conteúdo inteiro</option><option value="fixed">Fixa</option></select><input id="pl-height-px" type="number" min="80" max="2000" step="20" value="240" aria-label="Altura fixa dos blocos em px" hidden></span></label>

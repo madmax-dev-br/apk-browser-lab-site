@@ -1,32 +1,32 @@
-import { VMClock } from './vm-clock.js?v=37ef911634a5';
-import { overrideHit } from './method-overrides.js?v=37ef911634a5';
-import { OperationMonitor } from './operation-monitor.js?v=37ef911634a5';
-import { ExecutionProfile } from './execution-profile.js?v=37ef911634a5';
-import { SamplingProfiler } from './sampling-profiler.js?v=37ef911634a5';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=37ef911634a5';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=37ef911634a5';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=37ef911634a5';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=37ef911634a5';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=37ef911634a5';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=37ef911634a5';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=37ef911634a5';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=37ef911634a5';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=37ef911634a5';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=37ef911634a5';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=37ef911634a5';
-import { APKError } from './apk-error.js?v=37ef911634a5';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=37ef911634a5';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=37ef911634a5';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=37ef911634a5';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=37ef911634a5';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=37ef911634a5';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=37ef911634a5';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=37ef911634a5';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=37ef911634a5';
+import { VMClock } from './vm-clock.js?v=8cf39c3035e0';
+import { overrideHit } from './method-overrides.js?v=8cf39c3035e0';
+import { OperationMonitor } from './operation-monitor.js?v=8cf39c3035e0';
+import { ExecutionProfile } from './execution-profile.js?v=8cf39c3035e0';
+import { SamplingProfiler } from './sampling-profiler.js?v=8cf39c3035e0';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=8cf39c3035e0';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=8cf39c3035e0';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=8cf39c3035e0';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=8cf39c3035e0';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=8cf39c3035e0';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=8cf39c3035e0';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=8cf39c3035e0';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=8cf39c3035e0';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=8cf39c3035e0';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=8cf39c3035e0';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=8cf39c3035e0';
+import { APKError } from './apk-error.js?v=8cf39c3035e0';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=8cf39c3035e0';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=8cf39c3035e0';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=8cf39c3035e0';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=8cf39c3035e0';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=8cf39c3035e0';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=8cf39c3035e0';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=8cf39c3035e0';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=8cf39c3035e0';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=37ef911634a5';
-import { bootClassLacksMember } from './boot-class-members.js?v=37ef911634a5';
-export { APKError } from './apk-error.js?v=37ef911634a5';
+import { Scheduler, Blocked } from './scheduler.js?v=8cf39c3035e0';
+import { bootClassLacksMember } from './boot-class-members.js?v=8cf39c3035e0';
+export { APKError } from './apk-error.js?v=8cf39c3035e0';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -2004,6 +2004,8 @@ export class APKRuntime {
   /** True when a collection is due and a long run should reach a safepoint for it (checked at every scheduling quantum, not only at thread switches). */
   gcWanted() { return this.gcEnabled && (GC_STRESS || (this.heap.size > this.gcSafepointFloor && collectionKind(this) !== null)); }
   /** Stress mode only: a collection at an event boundary (nothing in flight), before the next queued task runs. */
+  /** A host's table of native handles is full: collect now, so the cleaners of unreachable owners release theirs (record.onFree). False when no collection could run. */
+  collectForNativeHandles(what) { if (this.engine === 'wasm') { if (!this.wasm) return false; this.wasm.collect('native-handles'); return true; } return this.emergencyCollect(what); }
   stressCollect() { if (GC_STRESS && this.gcEnabled) collectGarbage(this, { reason: 'stress', generation: auditGeneration(this) }); }
   safepointCollect() {
     const tries = this.gcSafepointTries ??= { calls: 0, notDue: 0, deferred: 0, disabled: 0 }; tries.calls++;   // reported by OperationMonitor.gcLine: a heap that fills with no collection says whether safepoints were reached at all

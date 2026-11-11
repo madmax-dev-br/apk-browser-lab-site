@@ -1,29 +1,34 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=37ef911634a5';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=37ef911634a5';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=37ef911634a5';
-import { initCollapsibleSections } from './panel-sections.js?v=37ef911634a5';
-import { initHelpTips } from './help-tips.js?v=37ef911634a5';
-import { createToolDock } from './tool-dock.js?v=37ef911634a5';
-import { createPermissionsPanel } from './permissions-panel.js?v=37ef911634a5';
-import { createOverridesPanel } from './overrides-panel.js?v=37ef911634a5';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=37ef911634a5';
-import { createHostMapPanel } from './host-map-panel.js?v=37ef911634a5';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=37ef911634a5';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=37ef911634a5';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=37ef911634a5';
-import { createDeviceView, createViewState } from './device-view.js?v=37ef911634a5';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=37ef911634a5';
-import { formatApiGapReport } from './api-gap-scan.js?v=37ef911634a5';
-import { createLogcatPanel } from './logcat-panel.js?v=37ef911634a5';
-import { createComposeInspectorPanel, flattenViews } from './compose-inspector-panel.js?v=37ef911634a5';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=37ef911634a5';
-import { createPluginHost } from './plugin-host.js?v=37ef911634a5';
-import { captureImage } from './screen-capture.js?v=37ef911634a5';
-import { createPluginsPanel } from './plugins-panel.js?v=37ef911634a5';
-import { createMcpTools } from './mcp-tools.js?v=37ef911634a5';
-import { createMcpLink } from './mcp-link.js?v=37ef911634a5';
-import { createModalHost } from './lab-modal.js?v=37ef911634a5';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=37ef911634a5';
+import { APKWorkerClient } from './apk-worker-client.js?v=8cf39c3035e0';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=8cf39c3035e0';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=8cf39c3035e0';
+import { initCollapsibleSections } from './panel-sections.js?v=8cf39c3035e0';
+import { initHelpTips } from './help-tips.js?v=8cf39c3035e0';
+import { createToolDock } from './tool-dock.js?v=8cf39c3035e0';
+import { createPermissionsPanel } from './permissions-panel.js?v=8cf39c3035e0';
+import { createOverridesPanel } from './overrides-panel.js?v=8cf39c3035e0';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=8cf39c3035e0';
+import { createHostMapPanel } from './host-map-panel.js?v=8cf39c3035e0';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=8cf39c3035e0';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=8cf39c3035e0';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=8cf39c3035e0';
+import { createDeviceView, createViewState } from './device-view.js?v=8cf39c3035e0';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=8cf39c3035e0';
+import { formatApiGapReport } from './api-gap-scan.js?v=8cf39c3035e0';
+import { createLogcatPanel } from './logcat-panel.js?v=8cf39c3035e0';
+import { createComposeInspectorPanel, flattenViews } from './compose-inspector-panel.js?v=8cf39c3035e0';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=8cf39c3035e0';
+import { createPluginHost } from './plugin-host.js?v=8cf39c3035e0';
+import { captureImage } from './screen-capture.js?v=8cf39c3035e0';
+import { createPluginsPanel } from './plugins-panel.js?v=8cf39c3035e0';
+import { createMcpTools } from './mcp-tools.js?v=8cf39c3035e0';
+import { createMcpLink, generateMcpToken, mcpClientConfig, mcpBridgePort } from './mcp-link.js?v=8cf39c3035e0';
+import { createModalHost } from './lab-modal.js?v=8cf39c3035e0';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=8cf39c3035e0';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=8cf39c3035e0';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=8cf39c3035e0';
+import { createDragLayer } from './lab-drag.js?v=8cf39c3035e0';
+import { createLabScroll } from './lab-scroll.js?v=8cf39c3035e0';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=8cf39c3035e0';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -254,6 +259,14 @@ const pluginActions = {
     return { id: result.id };
   },
   unmock(plugin, { id }) { return { removed: mocksPanel.remove(String(id)) }; },
+  /** lab.renderVariant (src/render-variant.js): one operation of the page like a click, so the user's input waits for it; nothing of the background instance is drawn here. */
+  async renderVariant(plugin, options) {
+    if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('Nenhum app rodando.'), { code: 'no-apk' });
+    if (state.busy) throw Object.assign(new Error('A VM está ocupada com outra operação; tente de novo.'), { code: 'busy' });
+    await flushPendingInputs(); if (state.busy) throw Object.assign(new Error('A VM está ocupada com outra operação; tente de novo.'), { code: 'busy' });
+    const token = beginOperation(`Renderizando uma variante da tela em segundo plano (plugin ${plugin.name})…`);
+    try { return await state.runtime.renderVariant(options); } finally { finishOperation(token); }
+  },
   mocks() { return mocksPanel.list(); },
   modal(plugin, args) {
     const entry = args.id ? pluginModals.get(String(args.id)) : null;
@@ -270,7 +283,23 @@ const pluginActions = {
     throw Object.assign(new Error(`op desconhecida: ${args.op}`), { code: 'bad-args' });
   },
 };
-const pluginHost = createPluginHost({ vm: apkVM, actions: pluginActions, getPackage: () => state.inventory?.packageName ?? null, captureImage: request => captureImage({ ...request, getHost: id => state.viewElements.get(String(id)) ?? null }), onChange: id => { pluginsPanel?.changed(id); if (!pluginHost?.get?.(id)?.worker) for (const [modalId, entry] of pluginModals) if (entry.pluginId === id) entry.modal.close('stopped'); }, onLogStreaming: () => { syncLogcatStreaming().catch(() => {}); } });
+// Plugin side tabs (src/lab-side-tabs.js), the drag from a tab onto the device (src/lab-drag.js: positions from the screen's live rectangle) and scrolling a scrollable to
+// a position or percentage through the app's own scroll paths (src/lab-scroll.js: the ScrollBy action / View.scrollBy the wheel uses).
+const labDrag = createDragLayer({ elements: () => pluginHost.query('layoutBounds', { names: false }), getDevice: () => {
+  const element = $('android-screen'), frame = deviceState.bars?.contentFrame; if (!element || $('android-device')?.hidden) return null;
+  return { element, width: deviceState.bars?.widthDp ?? element.clientWidth, height: deviceState.bars?.heightDp ?? element.clientHeight, density: 1, origin: { x: frame?.left ?? 0, y: frame?.top ?? 0 } };
+} });
+const sideTabs = createSideTabHost({ drag: labDrag });
+const labScroll = createLabScroll({ query: args => pluginHost.query('scrollState', args), elements: () => pluginHost.query('layoutBounds', { names: false }), views: () => flattenViews(state.lastSnapshot),
+  async scrollBy(target, dx, dy) {
+    if (target.kind === 'compose') deviceView.queueComposeAction(target.ownerViewId, target.nodeId, 'ScrollBy', [dx, dy]);
+    else { const previous = state.pendingScrollBys.get(target.id) ?? { dx: 0, dy: 0 }; state.pendingScrollBys.set(target.id, { dx: previous.dx + dx, dy: previous.dy + dy }); }
+    await flushPendingInputs();
+  },
+  async scrollToIndex(target, index) { deviceView.queueComposeAction(target.ownerViewId, target.nodeId, 'ScrollToIndex', [index]); await flushPendingInputs(); } });
+const labScrollCall = (method, args) => { if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('Nenhum app rodando: abra um APK e clique em Executar.'), { code: 'no-apk' }); return labScroll[method](args ?? {}); };
+Object.assign(pluginActions, { tab: createTabAction({ tabs: sideTabs, emit: (id, event) => pluginHost.emit(id, 'tab', event) }), scrollTo: (plugin, args) => labScrollCall('scrollTo', args), scrollInfo: (plugin, args) => labScrollCall('info', args) });
+const pluginHost = createPluginHost({ vm: apkVM, actions: pluginActions, getPackage: () => state.inventory?.packageName ?? null, captureImage: request => captureImage({ ...request, getHost: id => state.viewElements.get(String(id)) ?? null }), onChange: id => { pluginsPanel?.changed(id); if (!pluginHost?.get?.(id)?.worker) { for (const [modalId, entry] of pluginModals) if (entry.pluginId === id) entry.modal.close('stopped'); sideTabs.closeOwner(id, 'stopped'); } }, onLogStreaming: () => { syncLogcatStreaming().catch(() => {}); } });
 window.apkLabPlugins = pluginHost;   // test and console access: .list(), .stats
 // The Worker streams Logcat lines while the Logcat panel is open or a running plugin listens to 'log'; opening the panel always asks again (it shows the ring's recent lines).
 let logcatPanelOpen = false, logcatStreamingSent = false;
@@ -574,6 +603,7 @@ const mcpInput = {
     return { via: 'rolagem da View', id: views[0].id, dx, dy };
   },
   async back() { if (!state.canGoBack) throw Object.assign(new Error('Não há tela anterior para voltar.'), { code: 'bad-args' }); await backAPK(); return { back: true }; },
+  scrollTo: args => labScrollCall('scrollTo', args), scrollInfo: args => labScrollCall('info', args),   // to a position / percentage (src/lab-scroll.js), as lab.scrollTo of the plugins
 };
 const mcpTools = createMcpTools({ input: mcpInput, actions: { mock: spec => pluginActions.mock(mcpCaller, spec), unmock: id => pluginActions.unmock(mcpCaller, { id }), mocks: () => pluginActions.mocks(mcpCaller), reload: mode => pluginActions.reload(mcpCaller, { mode }) }, query: (method, args) => pluginHost.query(method, args), plugins: () => pluginHost.list?.() ?? [], logcat: () => logcatPanel.store.entries, network: () => netlogPanel.store.entries,
   status: () => ({ running: !!apkVM.worker, packageName: state.inventory?.packageName ?? null, file: state.fileName ?? null }) });
@@ -585,12 +615,30 @@ mcpLink = createMcpLink({ execute: (tool, args) => mcpTools.execute(tool, args),
   $('mcp-connect').textContent = connected || linkState === 'conectando' ? 'Desconectar' : 'Conectar';
   syncLogcatStreaming().catch(() => {});   // Logcat lines reach the page while the MCP client may ask for them
 } });
-try { const saved = JSON.parse(globalThis.localStorage?.getItem(MCP_KEY) ?? 'null'); if (saved?.url) $('mcp-url').value = saved.url; if (saved?.token) $('mcp-token').value = saved.token; } catch { /* storage unavailable */ }
+// Pairing: the token is generated here (or one pasted from an older setup is kept), saved in this browser, and goes into the JSON for the MCP client's configuration
+const saveMcp = () => { try { globalThis.localStorage?.setItem(MCP_KEY, JSON.stringify({ url: $('mcp-url').value, token: $('mcp-token').value, script: $('mcp-script').value })); } catch { /* the fields last for this page */ } };
+const mcpConfigText = masked => { const token = $('mcp-token').value.trim(); return JSON.stringify(mcpClientConfig({ token: masked ? '•'.repeat(Math.min(token.length, 32)) : token, scriptPath: $('mcp-script').value, port: mcpBridgePort($('mcp-url').value), origin: location.origin }), null, 2); };
+const renderMcpConfig = () => { $('mcp-config-json').textContent = mcpConfigText($('mcp-token').type === 'password'); };
+try { const saved = JSON.parse(globalThis.localStorage?.getItem(MCP_KEY) ?? 'null'); if (saved?.url) $('mcp-url').value = saved.url; if (saved?.token) $('mcp-token').value = saved.token; if (saved?.script) $('mcp-script').value = saved.script; } catch { /* storage unavailable */ }
+try { $('mcp-download').textContent = `curl -O ${new URL('tools/lab-mcp.mjs', location.href).href}`; } catch { /* keeps the short form */ }
+if (!$('mcp-token').value.trim()) { try { $('mcp-token').value = generateMcpToken(); saveMcp(); } catch (error) { $('mcp-status').textContent = String(error?.message ?? error); } }
+renderMcpConfig();
+for (const id of ['mcp-token', 'mcp-script', 'mcp-url']) $(id).addEventListener('input', () => { saveMcp(); renderMcpConfig(); });
+$('mcp-token-show').addEventListener('click', () => { const show = $('mcp-token').type === 'password'; $('mcp-token').type = show ? 'text' : 'password'; $('mcp-token-show').textContent = show ? 'Ocultar' : 'Mostrar'; $('mcp-token-show').setAttribute('aria-pressed', String(show)); renderMcpConfig(); });
+$('mcp-token-new').addEventListener('click', () => {
+  if (mcpLink.connected || mcpLink.state.state === 'conectando') mcpLink.disconnect();
+  $('mcp-token').value = generateMcpToken(); saveMcp(); renderMcpConfig();
+  $('mcp-status').textContent = 'Token novo gerado: copie o JSON de novo para a configuração do cliente MCP e reinicie o servidor MCP antes de conectar (a ponte recusa o token antigo).'; $('mcp-status').dataset.state = '';
+});
+$('mcp-copy').addEventListener('click', async () => {
+  const text = mcpConfigText(false), button = $('mcp-copy');
+  let copied = false; try { await navigator.clipboard.writeText(text); copied = true; } catch { /* no clipboard permission: select the text instead */ }
+  if (!copied) { const range = document.createRange(); $('mcp-config-json').textContent = text; range.selectNodeContents($('mcp-config-json')); const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range); }
+  button.textContent = copied ? 'Copiado' : 'Selecionado: Ctrl+C'; setTimeout(() => { button.textContent = 'Copiar'; }, 1800);
+});
 $('mcp-connect').addEventListener('click', () => {
   if (mcpLink.connected || mcpLink.state.state === 'conectando') { mcpLink.disconnect(); return; }
-  const url = $('mcp-url').value, token = $('mcp-token').value;
-  try { globalThis.localStorage?.setItem(MCP_KEY, JSON.stringify({ url, token })); } catch { /* the fields last for this page */ }
-  mcpLink.connect({ url, token });
+  saveMcp(); mcpLink.connect({ url: $('mcp-url').value, token: $('mcp-token').value });
 });   // "Plugins" (src/plugins-panel.js): global list, output cards under the device
 // Bottom tool dock (src/tool-dock.js): Log de execução, Logcat, Rede, Compose and Plugins as Android Studio-like tool windows, hidden until an icon is clicked
 const toolDock = createToolDock({ root: $('tool-dock'), tools: [
@@ -621,10 +669,12 @@ const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTr
   },
 } });
 const { renderSnapshot, flushPendingInputs, updateSystemBarIcons } = deviceView; deviceView.bindVM(apkVM);
+createDeviceFullscreen({ stage: $('preview-stage'), openButton: $('fullscreen-button'), closeButton: $('fullscreen-close'), deviceState, refit: () => { if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); } });   // "Tela cheia" (src/device-fullscreen.js): CSS scale only
+const customScreenPanel = createCustomScreenPanel({ $ });   // "Tela" -> "Personalizado" (src/custom-screen-panel.js)
 // ---- Virtual device settings panel ("Dispositivo virtual") ----
 const DEVICE_LOCALES = [['en-US', 'English (US)'], ['pt-BR', 'Português (Brasil)'], ['es-ES', 'Español (España)'], ['fr-FR', 'Français (France)'], ['de-DE', 'Deutsch'], ['ja-JP', '日本語'], ['ar-SA', 'العربية (RTL)'], ['he-IL', 'עברית (RTL)']];
 const DEVICE_ZONES = [['', 'Seguir o navegador'], ['America/Sao_Paulo', 'São Paulo (UTC−3)'], ['UTC', 'UTC'], ['America/New_York', 'Nova York'], ['Europe/London', 'Londres'], ['Europe/Paris', 'Paris'], ['Asia/Kolkata', 'Índia (UTC+5:30)'], ['Asia/Tokyo', 'Tóquio'], ['Australia/Sydney', 'Sydney']];
-const DEVICE_SCREENS = [['phone', 'Telefone · 411 × 914 dp'], ['compact', 'Compacto · 360 × 800 dp'], ['large', 'Grande · 412 × 892 dp'], ['small', 'Pequeno · 320 × 640 dp'], ['tablet', 'Tablet · 800 × 1280 dp']];
+const DEVICE_SCREENS = [['phone', 'Telefone · 411 × 914 dp'], ['compact', 'Compacto · 360 × 800 dp'], ['large', 'Grande · 412 × 892 dp'], ['small', 'Pequeno · 320 × 640 dp'], ['tablet', 'Tablet · 800 × 1280 dp'], ['custom', 'Personalizado…']];
 const fillSelect = (select, entries) => { select.replaceChildren(...entries.map(([value, label]) => { const option = document.createElement('option'); option.value = value; option.textContent = label; return option; })); };
 function writeDevicePanel(settings) {
   $('dev-screen').value = settings.screen; $('dev-orientation').value = settings.orientation; $('dev-font').value = String(settings.fontScale); $('dev-font-out').textContent = `${settings.fontScale.toFixed(2).replace('.', ',')}×`;
@@ -633,10 +683,11 @@ function writeDevicePanel(settings) {
   if ($('vm-event-time')) $('vm-event-time').value = String(settings.eventSeconds ?? 0);
   if ($('vm-renderer')) $('vm-renderer').value = settings.renderer ?? 'cpu';
   if ($('vm-raster-scale')) $('vm-raster-scale').value = String(settings.raster?.motionScale ?? 0.5); if ($('vm-raster-navigation')) $('vm-raster-navigation').checked = settings.raster?.navigation !== false;
+  customScreenPanel.write(settings);
   const device = resolveDevice(settings); $('device-summary').textContent = `${device.widthDp} × ${device.heightDp} · ${settings.orientation === 'landscape' ? 'paisagem' : 'retrato'}`;
 }
 function readDevicePanel() {
-  return sanitizeSettings({ screen: $('dev-screen').value, orientation: $('dev-orientation').value, fontScale: Number($('dev-font').value), locale: $('dev-locale').value, darkTheme: $('dev-dark').checked, animatorScale: Number($('dev-animator').value),
+  return sanitizeSettings({ screen: $('dev-screen').value, customScreen: customScreenPanel.read(deviceState.settings.customScreen), orientation: $('dev-orientation').value, fontScale: Number($('dev-font').value), locale: $('dev-locale').value, darkTheme: $('dev-dark').checked, animatorScale: Number($('dev-animator').value),
     hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, eventSeconds: Number($('vm-event-time')?.value ?? 0), raster: { motionScale: Number($('vm-raster-scale')?.value ?? 0.5), navigation: $('vm-raster-navigation')?.checked !== false }, renderer: $('vm-renderer')?.value ?? 'cpu', network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value, hostMap: deviceState.settings.network?.hostMap ?? [] }, memoryMiB: Number($('vm-memory')?.value ?? 0), location: deviceState.settings.location });
 }
 // "Memória da VM": the Java heap budget (object limit) used at the next load; the VM limit of each step is memoryBudget({ override }).maxHeapObjects, the same rule the Worker applies (heapLimitFor).
@@ -692,7 +743,7 @@ function applyDeviceSettings(settings) {
 }
 function initDevicePanel() {
   fillSelect($('dev-screen'), DEVICE_SCREENS); fillSelect($('dev-locale'), DEVICE_LOCALES); fillSelect($('dev-tz'), DEVICE_ZONES); initVmMemory(); initVmEventTime(); writeDevicePanel(deviceState.settings);
-  for (const id of ['dev-screen', 'dev-orientation', 'dev-font', 'dev-locale', 'dev-dark', 'dev-animator', 'dev-hour24', 'dev-tz', 'dev-battery', 'dev-charging', 'dev-network', 'dev-nav', 'dev-hosts-all', 'dev-layout-bounds', 'dev-hosts', 'dev-proxy', 'vm-memory', 'vm-event-time', 'vm-raster-scale', 'vm-raster-navigation', 'vm-renderer']) $(id).addEventListener('input', () => { applyDeviceSettings(readDevicePanel()); });
+  for (const id of ['dev-screen', 'dev-custom-w', 'dev-custom-h', 'dev-custom-unit', 'dev-orientation', 'dev-font', 'dev-locale', 'dev-dark', 'dev-animator', 'dev-hour24', 'dev-tz', 'dev-battery', 'dev-charging', 'dev-network', 'dev-nav', 'dev-hosts-all', 'dev-layout-bounds', 'dev-hosts', 'dev-proxy', 'vm-memory', 'vm-event-time', 'vm-raster-scale', 'vm-raster-navigation', 'vm-renderer']) $(id).addEventListener('input', () => { applyDeviceSettings(readDevicePanel()); });
   document.querySelector('#trace .trace-actions')?.addEventListener('click', event => event.preventDefault());   // buttons in the <summary> must not toggle the panel
   $('device-reset').addEventListener('click', () => { applyDeviceSettings(defaultDeviceSettings()); hostMapPanel.refresh(); permissionsPanel.refreshLocation(); if (apkVM.worker) apkVM.setPermissions({ location: deviceState.settings.location }).catch(() => {}); });
 }

@@ -13,9 +13,9 @@
 // `get(key)` answers the type's default (0, 0n, null) before a store, and iteration, `size` and `clear()` cover the whole layout. Keys outside the layout live in an extra Map on the
 // facade, as `fieldExtra` does today. Host state hung on the record (any own property) lives on the facade object itself, the JavaScript companion of the memory record: the facade is
 // cached per id, so the same properties are seen across reads, and it is dropped when the object is freed (RecordSpace.release).
-import { cellsClassOf, NO_FIELDS } from '../../runtime/java-arrays.js?v=37ef911634a5';
-import { HandleTable, IdTable } from './handles.js?v=37ef911634a5';
-import { stringText, writeStringUnits } from './strings.js?v=37ef911634a5';
+import { cellsClassOf, NO_FIELDS } from '../../runtime/java-arrays.js?v=8cf39c3035e0';
+import { HandleTable, IdTable } from './handles.js?v=8cf39c3035e0';
+import { stringText, writeStringUnits } from './strings.js?v=8cf39c3035e0';
 
 // Field kinds: the descriptor letters of a field type (Z B S C I J F D), L for a reference.
 const KIND = { Z: 0, B: 1, S: 2, C: 3, I: 4, F: 5, J: 6, D: 7, L: 8 };
@@ -151,7 +151,15 @@ export class RecordSpace {
   /** The reference word of a host value: 0 for null, a String record for a JavaScript string (encoded, cached), the address behind a handle otherwise. */
   refWord(value) { return typeof value === 'string' ? this.strings.encode(value) : this.handles.resolve(value); }
   /** The object at `address` was freed: its id, handle and facade (with every host property on it) go away. */
-  release(address) { this.strings.release(address); const id = this.handles.release(address); if (id !== 0) this.facades.delete(id); return id; }
+  release(address) {
+    this.strings.release(address); const id = this.handles.release(address);
+    if (id !== 0) {
+      const facade = this.facades.get(id);   // a host's native resource dies with the Java object that owned it (NativeAllocationRegistry cleaners: record.onFree, as src/heap-gc.js runs them)
+      if (facade !== undefined && typeof facade.onFree === 'function') { try { facade.onFree(); } catch { /* the native resource is already gone */ } }
+      this.facades.delete(id);
+    }
+    return id;
+  }
 
   read(address, code) {
     switch (code) {

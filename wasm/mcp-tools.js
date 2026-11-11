@@ -17,6 +17,8 @@ export async function blobToBase64(blob) {
 const image = async shot => ({ type: 'image', data: await blobToBase64(shot.blob), mimeType: shot.type ?? shot.blob?.type ?? 'image/png' });
 const bounded = (value, fallback, min, max) => { const n = Number(value); return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.floor(n))) : fallback; };
 const fail = message => Object.assign(new Error(message), { code: 'bad-args' });
+/** The scrollable a scroll_to / scroll_info call names: element_key, test_tag, text or a point (x, y) inside it; none = the largest scrollable on screen. */
+const scrollTargetOf = args => args.element_key || args.test_tag || args.text || (Number.isFinite(args.x) && Number.isFinite(args.y)) ? { key: args.element_key, testTag: args.test_tag, text: args.text, x: args.x, y: args.y } : null;
 
 /**
  * query(method, args): the plugin host's page-level query (screen, layoutBounds, screenshot, composeTree, viewModels, inspect, field, statics, staticField, classes,
@@ -149,6 +151,12 @@ export function createMcpTools({ query, plugins = () => [], logcat = () => [], n
     async tap(args) { if (!input?.tap) throw fail('Entrada não disponível nesta página.'); return afterInput(await input.tap(args), args); },
     async type(args) { if (!input?.type) throw fail('Entrada não disponível nesta página.'); return afterInput(await input.type(args), args); },
     async scroll(args) { if (!input?.scroll) throw fail('Entrada não disponível nesta página.'); return afterInput(await input.scroll(args), args); },
+    // to a position (px = dp) or a percentage of the scroll range, as lab.scrollTo / lab.scrollToPercent of the plugins (src/lab-scroll.js): the app's own scroll, steered until it gets there
+    async scroll_to(args) {
+      if (!input?.scrollTo) throw fail('Entrada não disponível nesta página.');
+      return afterInput(await input.scrollTo({ target: scrollTargetOf(args), x: args.to_x, y: args.to_y, percentX: args.percent_x, percentY: args.percent_y }), args);
+    },
+    async scroll_info(args) { if (!input?.scrollInfo) throw fail('Entrada não disponível nesta página.'); return [text(await input.scrollInfo({ target: scrollTargetOf(args) }))]; },
     async back(args) { if (!input?.back) throw fail('Entrada não disponível nesta página.'); return afterInput(await input.back(args), args); },
     async reload(args) { if (!actions?.reload) throw fail('Recarregar não está disponível nesta página.'); return [text(await actions.reload(args.mode === 'reopen' ? 'reopen' : 'recreate'))]; },
     async wait_ready(args) { const result = await waitReady(args.timeout_ms); return [text({ ready: result.ready, activity: result.screen?.activity ?? null, waitingFor: result.screen?.ready?.waitingFor ?? [] })]; },
