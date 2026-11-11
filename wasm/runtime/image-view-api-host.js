@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=97c59117b00c';
-import { APKError } from './apk-error.js?v=97c59117b00c';
+import { createHostRegistry } from './host-contract.js?v=565f47a43815';
+import { APKError } from './apk-error.js?v=565f47a43815';
 
 // android.widget.ImageView API (API 33) beyond ScaleType / setImageBitmap (image-view-host.js): colour filter, alpha, tint, level, matrix, crop-to-padding, adjustViewBounds and the max
 // size, baseline alignment, setImageURI / setImageIcon, with the semantics of android-13.0.0_r1 ImageView.java. Colour filter, alpha, tint and level act on the image Drawable itself

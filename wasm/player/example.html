@@ -5,101 +5,100 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>APK Player · integração</title>
   <meta name="description" content="Documentação do componente APK Player: incorporar, carregar um APK, configurar o dispositivo e todos os recursos do laboratório, plugins, eventos e segurança, com demonstração ao vivo.">
-  <script>try { const theme = localStorage.getItem('apkweb-theme'); if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme; } catch {}</script>
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
+  <link rel="stylesheet" href="../site-pages.css?v=565f47a43815">
   <style>
-    :root{color-scheme:light;--bg:#f7f8fa;--card:#fff;--ink:#252a35;--muted:#667085;--line:#e4e6ed;--accent:#6159e8;--accent-soft:#f1f0fd;--accent-ink:#4b44c9;--code:#f3f4f8;--code-ink:#2b3040;--ok:#1f7a4d;--ok-soft:#e7f6ee;--warn:#8a5a00;--warn-soft:#fff5dc;--bad:#a12b2b;--bad-soft:#fdeeee;--stripe:rgba(127,127,127,.06)}
-    @media (prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;--bg:#13151b;--card:#1b1e26;--ink:#e9ebf2;--muted:#9aa1b2;--line:#2b303b;--accent:#8c86ff;--accent-soft:#25234a;--accent-ink:#c3bfff;--code:#0f1116;--code-ink:#d8dbe6;--ok:#7fd8a6;--ok-soft:#14301f;--warn:#f0c66b;--warn-soft:#33280f;--bad:#ff9d9d;--bad-soft:#3a1d1d}}
-    :root[data-theme=dark]{color-scheme:dark;--bg:#13151b;--card:#1b1e26;--ink:#e9ebf2;--muted:#9aa1b2;--line:#2b303b;--accent:#8c86ff;--accent-soft:#25234a;--accent-ink:#c3bfff;--code:#0f1116;--code-ink:#d8dbe6;--ok:#7fd8a6;--ok-soft:#14301f;--warn:#f0c66b;--warn-soft:#33280f;--bad:#ff9d9d;--bad-soft:#3a1d1d}
-    *{box-sizing:border-box}html{scroll-padding-top:72px}
-    body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;font-synthesis:none}
-    a{color:var(--accent-ink)}a:hover{text-decoration-thickness:2px}
-    button,select,input,textarea{font:inherit;color:inherit}
-    :focus-visible{outline:3px solid #b1adff;outline-offset:2px}
-    [hidden]{display:none!important}
-    .topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 5%;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-    .brand{display:flex;align-items:center;gap:10px;font-size:15px;letter-spacing:-.3px}.brand b{font-weight:600}
-    .brand-icon{background:#6159e8;color:#fff;border-radius:9px;width:28px;height:30px;display:grid;place-items:center;font-weight:700}
-    .top-links{display:flex;align-items:center;gap:14px;font-size:13px}.top-links a{color:var(--muted);text-decoration:none}.top-links a:hover{color:var(--ink)}
-    .icon-button{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:5px 10px;cursor:pointer}
-    .layout{max-width:1240px;margin:0 auto;padding:0 5%;display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px}
-    nav.toc{position:sticky;top:70px;align-self:start;max-height:calc(100vh - 90px);overflow:auto;padding:28px 0;font-size:13px}
-    nav.toc p{margin:0 0 8px;font-size:10px;letter-spacing:1.4px;font-weight:700;color:var(--muted);text-transform:uppercase}
-    nav.toc ol{list-style:none;margin:0;padding:0}nav.toc li a{display:block;padding:4px 10px;border-left:2px solid var(--line);color:var(--muted);text-decoration:none}nav.toc li a:hover{color:var(--ink);border-color:var(--accent)}
-    main{padding:28px 0 80px;min-width:0}
-    .eyebrow{font-size:10px;letter-spacing:1.6px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:0}
-    h1{font-size:34px;line-height:1.15;letter-spacing:-.8px;margin:6px 0 12px}
-    h2{font-size:22px;letter-spacing:-.3px;margin:56px 0 8px;padding-top:8px;border-top:1px solid var(--line)}
-    h3{font-size:16px;margin:28px 0 6px}
-    p,li{max-width:76ch}.lead{font-size:17px;color:var(--muted);margin:0 0 20px}
-    code{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code);color:var(--code-ink);padding:1px 5px;border-radius:5px;overflow-wrap:anywhere}
-    .code{position:relative;margin:12px 0 18px}
-    .code pre{margin:0;background:var(--code);color:var(--code-ink);border:1px solid var(--line);border-radius:12px;padding:14px 16px;overflow:auto;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;tab-size:2}
-    .code pre code{background:none;padding:0;overflow-wrap:normal}
-    .copy{position:absolute;top:8px;right:8px;font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;opacity:.9}.copy:hover{color:var(--ink)}
-    .table-wrap{overflow-x:auto;margin:12px 0 18px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
-    table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{text-align:left;vertical-align:top;padding:8px 12px;border-bottom:1px solid var(--line)}tr:last-child td{border-bottom:0}
-    th{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:700;background:color-mix(in srgb,var(--code) 60%,transparent)}
-    td code{white-space:nowrap}td.wrap code{white-space:normal}
-    .note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--card);border-radius:10px;padding:10px 14px;margin:14px 0;max-width:80ch}
-    .note.warn{border-left-color:var(--warn)}
-    .pill{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);white-space:nowrap}
-    .pill.next{background:var(--warn-soft);color:var(--warn)}
-    /* demo */
-    .demo{display:grid;grid-template-columns:minmax(280px,400px) minmax(0,1fr);gap:20px;margin-top:14px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
-    .device-slot{height:680px;border-radius:10px;background:repeating-linear-gradient(45deg,transparent 0 10px,var(--stripe) 10px 20px);display:grid;place-items:center;color:var(--muted);font-size:13px;text-align:center;overflow:hidden}
+    /* The live demo: the player's slot and its controls. Everything else comes from site-pages.css. */
+    .demo{display:grid;grid-template-columns:minmax(280px,400px) minmax(0,1fr);gap:20px;margin-top:16px}
+    .demo>*{min-width:0}
+    .demo button,.demo select,.demo input,.demo textarea{font:inherit;color:inherit}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+    .device-slot{height:680px;border-radius:8px;background:repeating-linear-gradient(45deg,transparent 0 10px,rgba(127,127,127,.06) 10px 20px);display:grid;place-items:center;color:var(--muted);font-size:14px;text-align:center;overflow:hidden}
     .device-slot>p{padding:0 24px}
     .source{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
     .file-pick{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
     .file-pick label.button{display:inline-block}
-    .button,.controls button{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 11px;cursor:pointer;font-size:13.5px;line-height:1.3}
-    .button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    .button,.controls button{border:1px solid var(--line-strong);background:var(--surface);border-radius:7px;padding:6px 11px;cursor:pointer;font-size:14px;line-height:1.3}
+    .controls button:hover,.button:hover{border-color:var(--accent)}
+    .button.primary{background:#6159e8;border-color:#6159e8;color:#fff}
     .button:disabled,.controls button:disabled{opacity:.5;cursor:not-allowed}
     .controls{display:flex;flex-direction:column;gap:12px}
-    .group{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
-    .group>h4{margin:0 0 8px;font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+    .group{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--surface)}
+    .group>h4{margin:0 0 8px;font-size:13.5px;font-weight:600;color:var(--soft)}
     .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-    .row input[type=text],.row select,textarea{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 9px;min-width:0;font-size:13.5px}
+    .row input[type=text],.row select,.demo textarea{border:1px solid var(--line-strong);background:var(--bg);border-radius:7px;padding:6px 9px;min-width:0;font-size:14px}
     .row input[type=text]{flex:1 1 180px}.row select{max-width:100%}#demo-catalog{flex:1 1 200px;width:0}
-    .demo>*{min-width:0}
-    textarea{width:100%;min-height:150px;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}
-    .log{margin:8px 0 0;max-height:180px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);background:var(--code);border-radius:8px;padding:8px 10px}
+    .demo textarea{width:100%;min-height:150px;font:13px/1.5 var(--mono);resize:vertical}
+    .log{margin:8px 0 0;max-height:180px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.5 var(--mono);color:var(--soft);background:var(--code-bg);border-radius:7px;padding:8px 10px}
     .log:empty::before{content:attr(data-empty)}
-    .status-line{font-size:12.5px;color:var(--muted);margin:6px 0 0;min-height:1.4em}
+    .status-line{font-size:13.5px;color:var(--muted);margin:6px 0 0;min-height:1.4em}
     .plugin-out{display:flex;flex-direction:column;gap:8px;margin-top:8px}.plugin-out img{max-width:100%;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
-    .plugin-out table{font-size:12px}.plugin-out figure{margin:0}.plugin-out figcaption{font-size:12px;color:var(--muted)}
+    .plugin-out table{font-size:12.5px}.plugin-out figure{margin:0}.plugin-out figcaption{font-size:12.5px;color:var(--muted)}
     .perm-ask{border:1px solid var(--accent);background:var(--accent-soft);border-radius:10px;padding:10px;margin-top:8px}
     .shot img{max-width:100%;border-radius:8px;border:1px solid var(--line);margin-top:8px}
-    @media (max-width:1000px){.layout{grid-template-columns:1fr;gap:0}nav.toc{position:static;max-height:none;padding:16px 0 0}nav.toc ol{display:flex;flex-wrap:wrap;gap:4px}nav.toc li a{border:1px solid var(--line);border-radius:999px;padding:3px 10px}.demo{grid-template-columns:minmax(0,1fr)}}
-    @media (max-width:560px){.topbar,.layout{padding-left:16px;padding-right:16px}h1{font-size:27px}.device-slot{height:620px}.top-links .hide-sm{display:none}}
+    @media (max-width:1100px){.demo{grid-template-columns:minmax(0,1fr)}}
+    @media (max-width:560px){.device-slot{height:620px}}
   </style>
 </head>
 <body>
 <header class="topbar">
-  <a class="brand" href="../index.html" style="text-decoration:none;color:inherit"><span class="brand-icon" aria-hidden="true">A</span><span>APK Browser <b>Lab</b> · Player</span></a>
-  <div class="top-links"><a class="hide-sm" href="../index.html">← Laboratório</a><a class="hide-sm" href="#api">API</a><button id="theme-toggle" class="icon-button" type="button" aria-label="Alternar tema claro/escuro">◐</button></div>
-</header>
-<div class="layout">
-  <nav class="toc" aria-label="Nesta página">
-    <p>Nesta página</p>
-    <ol>
-      <li><a href="#o-que-e">O que é</a></li>
-      <li><a href="#demo">Demonstração</a></li>
-      <li><a href="#incorporar">Incorporar</a></li>
-      <li><a href="#carregar">Carregar um APK</a></li>
-      <li><a href="#opcoes">Opções e atributos</a></li>
-      <li><a href="#configuracao">Configuração</a></li>
-      <li><a href="#api">Métodos</a></li>
-      <li><a href="#eventos">Eventos</a></li>
-      <li><a href="#recursos">Recursos do laboratório</a></li>
-      <li><a href="#cors">CORS</a></li>
-      <li><a href="#plugins">Plugins</a></li>
-      <li><a href="#seguranca">Segurança e privacidade</a></li>
-      <li><a href="#limites">Limitações</a></li>
-      <li><a href="#protocolo">Protocolo</a></li>
-    </ol>
+  <a href="../" class="brand" aria-label="APK Browser Lab: voltar ao laboratório"><span class="brand-icon" aria-hidden="true">a<span>›</span></span><span>APK <b>Browser Lab</b></span></a>
+  <nav class="topnav" aria-label="Páginas do site">
+    <a href="../">Laboratório</a>
+    <a href="../arquitetura.html">Arquitetura</a>
+    <a href="../plugins.html">Plugins</a>
+    <a href="./example.html" aria-current="page">Exemplo de integração</a>
   </nav>
-  <main>
+  <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Alternar tema claro/escuro"><span aria-hidden="true">◐</span></button>
+</header>
+<div class="page">
+  <nav class="toc" aria-label="Nesta página">
+    <p class="toc-title">Nesta página</p>
+    <div class="toc-body">
+      <ol>
+        <li><a href="#o-que-e">O que é</a></li>
+        <li><a href="#demo">Demonstração</a></li>
+        <li><a href="#incorporar">Incorporar</a></li>
+        <li><a href="#carregar">Carregar um APK</a></li>
+        <li><a href="#opcoes">Opções e atributos</a></li>
+        <li><a href="#configuracao">Configuração</a></li>
+        <li><a href="#api">Métodos</a></li>
+        <li><a href="#eventos">Eventos</a></li>
+        <li><a href="#recursos">Recursos do laboratório</a>
+          <ol>
+            <li><a href="#recurso-dispositivo-virtual">Dispositivo virtual</a></li>
+            <li><a href="#recurso-rede-hosts-permitidos-e-relay">Rede: hosts permitidos e relay</a></li>
+            <li><a href="#recurso-redirecionar-hosts">Redirecionar hosts</a></li>
+            <li><a href="#recurso-mock-de-endpoints">Mock de endpoints</a></li>
+            <li><a href="#recurso-permissoes-localizacao-e-o-dialogo">Permissões, localização e o diálogo</a></li>
+            <li><a href="#recurso-retornos-de-metodos-e-activities-ignoradas">Retornos de métodos e Activities ignoradas</a></li>
+            <li><a href="#recurso-tempo-por-evento-memoria-modo-tolerante">Tempo por evento, memória, modo tolerante</a></li>
+            <li><a href="#recurso-abrir-um-intent-deep-link">Abrir um Intent (deep link)</a></li>
+            <li><a href="#recurso-dados-do-app">Dados do app</a></li>
+            <li><a href="#recurso-logcat-e-log-de-rede">Logcat e log de rede</a></li>
+            <li><a href="#recurso-compose-limites-de-layout-e-imagens">Compose, limites de layout e imagens</a></li>
+            <li><a href="#recurso-diagnostico-e-estado-da-tela">Diagnóstico e estado da tela</a></li>
+            <li><a href="#recurso-webview-e-raster">WebView e raster</a></li>
+          </ol>
+        </li>
+        <li><a href="#cors">CORS</a>
+          <ol>
+            <li><a href="#cors-como-a-falha-aparece">Como a falha aparece</a></li>
+            <li><a href="#cors-relay-cors-local">Relay CORS local</a></li>
+            <li><a href="#cors-mock-de-endpoints">Mock de endpoints</a></li>
+            <li><a href="#cors-redirecionar-para-um-servidor-seu-que-responda-cors">Redirecionar para um servidor seu que responda CORS</a></li>
+            <li><a href="#cors-rodar-a-vm-no-servidor">Rodar a VM no servidor</a></li>
+          </ol>
+        </li>
+        <li><a href="#plugins">Plugins</a></li>
+        <li><a href="#seguranca">Segurança e privacidade</a></li>
+        <li><a href="#limites">Limitações</a></li>
+        <li><a href="#protocolo">Protocolo</a></li>
+      </ol>
+    </div>
+  </nav>
+  <main class="doc">
+    <a class="back" href="../">‹ Voltar ao laboratório</a>
     <p class="eyebrow">Componente de integração</p>
     <h1 id="o-que-e">APK Player</h1>
     <p class="lead">Um elemento <code>&lt;apk-player&gt;</code> (e a classe <code>ApkPlayer</code>) que roda um APK Android de verdade dentro da sua página, no navegador do visitante, com a mesma VM e os mesmos recursos da página de testes do laboratório.</p>
@@ -161,7 +160,7 @@
       <li><b>Carregamento preguiçoso.</b> <code>loading="lazy"</code> (ou <code>lazy: true</code>) só cria o frame quando ele fica visível. Cada player tem o próprio Worker e a própria memória: mantenha poucos ao mesmo tempo.</li>
       <li><b>Página de origem opaca.</b> Páginas <code>file://</code> ou em sandbox sem <code>allow-same-origin</code> são recusadas (<code>error</code> com <code>kind: "opaque-host-origin"</code>): sirva por http(s).</li>
     </ul>
-    <h3>Pela classe</h3>
+    <h3 id="incorporar-pela-classe">Pela classe</h3>
     <div class="code"><pre><code>import { ApkPlayer } from 'https://SEU-RUNTIME/player/apk-player.js';
 
 const player = ApkPlayer.mount(document.querySelector('#slot'), {
@@ -186,7 +185,7 @@ input.addEventListener('change', () =&gt; el.load(input.files[0], { activity: 'c
     <p>Limite: 1 GiB por APK (DEX somados até 768 MiB). <code>restart()</code> reabre a partir da cópia guardada no frame.</p>
 
     <h2 id="opcoes">Opções e atributos de montagem</h2>
-    <div class="table-wrap"><table>
+    <div class="table-wrap"><table class="cols-4">
       <thead><tr><th>Opção (<code>ApkPlayer.mount</code>)</th><th>Atributo</th><th>Tipo · padrão</th><th>Efeito</th></tr></thead>
       <tbody>
         <tr><td><code>apk</code></td><td><code>src</code></td><td>URL | File | Blob | ArrayBuffer</td><td class="wrap">O APK. Mudar <code>src</code> cria outro player (assinaturas e plugins do elemento são reaplicados).</td></tr>
@@ -205,7 +204,7 @@ input.addEventListener('change', () =&gt; el.load(input.files[0], { activity: 'c
 
     <h2 id="configuracao">Configuração</h2>
     <p>As mesmas chaves valem em <code>config</code>, <code>setConfig(patch)</code>, <code>configure(patch)</code> e no evento <code>config-applied</code>; as simples também como atributo (em kebab-case). Um patch mescla com a configuração atual (listas são substituídas por inteiro). Valores inválidos nunca são adivinhados: aparecem em <code>rejected</code>. <span class="pill">ao vivo</span> vale na hora, com a semântica do Android; <span class="pill next">próximo início</span> vale no próximo <code>restart()</code> (o player avisa em <code>rejected</code>).</p>
-    <div class="table-wrap"><table>
+    <div class="table-wrap"><table class="cols-4">
       <thead><tr><th>Chave</th><th>Atributo</th><th>Valores · padrão</th><th>Quando</th></tr></thead>
       <tbody>
         <tr><td><code>device</code></td><td><code>device</code></td><td><code>phone</code> (411×914 dp), <code>compact</code>, <code>large</code>, <code>small</code>, <code>tablet</code> · <code>phone</code></td><td><span class="pill">ao vivo</span></td></tr>
@@ -244,73 +243,172 @@ input.addEventListener('change', () =&gt; el.load(input.files[0], { activity: 'c
 
     <h2 id="api">Métodos</h2>
     <p>Valem no elemento e na instância de <code>ApkPlayer</code>. Os que devolvem <code>Promise</code> rejeitam com um <code>Error</code> que tem <code>code</code> (<code>bad-args</code>, <code>no-apk</code>, <code>not-found</code>, <code>unsupported</code>, <code>timeout</code>, <code>destroyed</code>, <code>vm</code>).</p>
-    <div class="table-wrap"><table>
-      <thead><tr><th>Método</th><th>Devolve</th><th>O que faz</th></tr></thead>
-      <tbody>
-        <tr><td><code>setConfig(patch)</code></td><td>o player</td><td class="wrap">Mescla a configuração; o resultado chega no evento <code>config-applied</code>.</td></tr>
-        <tr><td><code>configure(patch)</code></td><td><code>Promise&lt;{ config, rejected, live, outcome, statuses }&gt;</code></td><td class="wrap">O mesmo, esperando a resposta deste patch.</td></tr>
-        <tr><td><code>reloadActivity({ mode })</code></td><td><code>Promise&lt;{ activity }&gt;</code></td><td class="wrap">“Recriar” (<code>mode: 'recreate'</code>, padrão: como <code>Activity.recreate()</code>, estado e ViewModels mantidos) ou “Reabrir” (<code>'reopen'</code>: nova instância com o mesmo Intent, conteúdo carregado de novo).</td></tr>
-        <tr><td><code>openIntent({ data, action, component, type, category, extras })</code></td><td><code>Promise&lt;{ deepLink, state, message, detail }&gt;</code></td><td class="wrap">Deep link ou Intent explícito resolvido pelos filtros do manifesto, como <code>am start</code>. <code>action</code> padrão <code>android.intent.action.VIEW</code>; <code>extras</code> de string, número ou booleano.</td></tr>
-        <tr><td><code>back()</code>, <code>restart()</code></td><td>o player</td><td class="wrap">Voltar do sistema; reabrir o APK e iniciar de novo.</td></tr>
-        <tr><td><code>stop()</code></td><td><code>Promise&lt;{ stopped }&gt;</code></td><td class="wrap">Parar a VM (encerra o Worker); evento <code>stopped</code>.</td></tr>
-        <tr><td><code>clearData()</code></td><td>o player</td><td class="wrap">Configurações › Apps › Limpar armazenamento e reiniciar; evento <code>data-cleared</code>.</td></tr>
-        <tr><td><code>logcat.subscribe(fn)</code></td><td>função para cancelar</td><td class="wrap"><code>fn({ entries, reset, dropped, total })</code>, cada entrada <code>{ seq, uptime, wall, pid, tid, thread, level, tag, message }</code>. O Worker só transmite linhas enquanto houver assinante.</td></tr>
-        <tr><td><code>network.subscribe(fn)</code></td><td>função para cancelar</td><td class="wrap"><code>fn({ entries, reset, dropped, total })</code>, cada entrada uma requisição (método, URL, status, cabeçalhos, tamanhos, duração, <code>outcome</code>, redirecionamento e mock que respondeu). Corpos nunca.</td></tr>
-        <tr><td><code>inspectCompose({ maxNodes })</code></td><td><code>Promise&lt;inspeção&gt;</code></td><td class="wrap">A árvore de LayoutNodes do Compose na tela (o painel Compose), até 4000 nós.</td></tr>
-        <tr><td><code>layoutBounds({ names })</code></td><td><code>Promise&lt;elemento[]&gt;</code></td><td class="wrap">As caixas de “Mostrar limites de layout” como dados: <code>{ key, kind, name, bounds, size, texts, role, testTag, actions, modifiers, hasImage }</code>.</td></tr>
-        <tr><td><code>screenshot({ key, maxWidth, type })</code></td><td><code>Promise&lt;{ blob, width, height, notes }&gt;</code></td><td class="wrap">Imagem da tela inteira ou de uma caixa (<code>key</code> de <code>layoutBounds()</code>), cortada do quadro exibido. No máximo uma a cada 250 ms.</td></tr>
-        <tr><td><code>screenState()</code></td><td><code>Promise&lt;{ text, blank, reasons }&gt;</code></td><td class="wrap">“Estado da tela”: pilha de Activities, Views, Compose, quadros, fila, threads, memória.</td></tr>
-        <tr><td><code>diagnostic()</code></td><td><code>Promise&lt;string&gt;</code></td><td class="wrap">O texto de “Copiar diagnóstico”: causa, pilha, stubs, recursos de depuração ativos, log, estado da tela e estimativa de APIs.</td></tr>
-        <tr><td><code>diagnostics()</code></td><td><code>Promise&lt;{ stubs, tolerateMissing, packageName, report }&gt;</code></td><td class="wrap">As listas de stubs do app em execução (modo tolerante).</td></tr>
-        <tr><td><code>status()</code></td><td><code>Promise&lt;…&gt;</code></td><td class="wrap">Estado e contadores de overrides, Activities ignoradas, mocks e redirecionamentos; permissões; assinaturas.</td></tr>
-        <tr><td><code>answerPermission(id, answers)</code></td><td><code>Promise&lt;{ config }&gt;</code></td><td class="wrap">Responde um <code>permission-request</code>: <code>'allow'</code> | <code>'once'</code> | <code>'deny'</code> por diálogo (ou um para todos), <code>null</code> = dispensado.</td></tr>
-        <tr><td><code>plugins.set(list)</code>, <code>.stop(id)</code>, <code>.restart(id)</code>, <code>.list()</code>, <code>.subscribe(fn)</code>, <code>.outputs</code></td><td>—</td><td class="wrap">Plugins do laboratório dentro do player (ver <a href="#plugins">Plugins</a>).</td></tr>
-        <tr><td><code>destroy()</code></td><td>—</td><td class="wrap">Encerra o Worker e remove o frame (o elemento faz isso ao sair do DOM).</td></tr>
-      </tbody></table></div>
+    <div class="api" id="metodo-setconfig">
+      <h3 class="api-sig"><code>setConfig(patch)</code></h3>
+      <p>Mescla a configuração; o resultado chega no evento <code>config-applied</code>.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd>O player</dd></div></dl>
+    </div>
+    <div class="api" id="metodo-configure">
+      <h3 class="api-sig"><code>configure(patch)</code></h3>
+      <p>O mesmo, esperando a resposta deste patch.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd><code>Promise&lt;{ config, rejected, live, outcome, statuses }&gt;</code></dd></div></dl>
+    </div>
+    <div class="api" id="metodo-reloadactivity">
+      <h3 class="api-sig"><code>reloadActivity({ mode })</code></h3>
+      <p>“Recriar” (<code>mode: 'recreate'</code>, padrão: como <code>Activity.recreate()</code>, estado e ViewModels mantidos) ou “Reabrir” (<code>'reopen'</code>: nova instância com o mesmo Intent, conteúdo carregado de novo).</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd><code>Promise&lt;{ activity }&gt;</code></dd></div></dl>
+    </div>
+    <div class="api" id="metodo-openintent">
+      <h3 class="api-sig"><code>openIntent({ data, action, component, type, category, extras })</code></h3>
+      <p>Deep link ou Intent explícito resolvido pelos filtros do manifesto, como <code>am start</code>. <code>action</code> padrão <code>android.intent.action.VIEW</code>; <code>extras</code> de string, número ou booleano.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd><code>Promise&lt;{ deepLink, state, message, detail }&gt;</code></dd></div></dl>
+    </div>
+    <div class="api" id="metodo-back">
+      <h3 class="api-sig"><code>back()</code><code>restart()</code></h3>
+      <p>Voltar do sistema; reabrir o APK e iniciar de novo.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd>O player</dd></div></dl>
+    </div>
+    <div class="api" id="metodo-stop">
+      <h3 class="api-sig"><code>stop()</code></h3>
+      <p>Parar a VM (encerra o Worker); evento <code>stopped</code>.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd><code>Promise&lt;{ stopped }&gt;</code></dd></div></dl>
+    </div>
+    <div class="api" id="metodo-cleardata">
+      <h3 class="api-sig"><code>clearData()</code></h3>
+      <p>Configurações › Apps › Limpar armazenamento e reiniciar; evento <code>data-cleared</code>.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd>O player</dd></div></dl>
+    </div>
+    <div class="api" id="metodo-logcat-subscribe">
+      <h3 class="api-sig"><code>logcat.subscribe(fn)</code></h3>
+      <p><code>fn({ entries, reset, dropped, total })</code>, cada entrada <code>{ seq, uptime, wall, pid, tid, thread, level, tag, message }</code>. O Worker só transmite linhas enquanto houver assinante.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd>Função para cancelar</dd></div></dl>
+    </div>
+    <div class="api" id="metodo-network-subscribe">
+      <h3 class="api-sig"><code>network.subscribe(fn)</code></h3>
+      <p><code>fn({ entries, reset, dropped, total })</code>, cada entrada uma requisição (método, URL, status, cabeçalhos, tamanhos, duração, <code>outcome</code>, redirecionamento e mock que respondeu). Corpos nunca.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd>Função para cancelar</dd></div></dl>
+    </div>
+    <div class="api" id="metodo-inspectcompose">
+      <h3 class="api-sig"><code>inspectCompose({ maxNodes })</code></h3>
+      <p>A árvore de LayoutNodes do Compose na tela (o painel Compose), até 4000 nós.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd><code>Promise&lt;inspeção&gt;</code></dd></div></dl>
+    </div>
+    <div class="api" id="metodo-layoutbounds">
+      <h3 class="api-sig"><code>layoutBounds({ names })</code></h3>
+      <p>As caixas de “Mostrar limites de layout” como dados: <code>{ key, kind, name, bounds, size, texts, role, testTag, actions, modifiers, hasImage }</code>.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd><code>Promise&lt;elemento[]&gt;</code></dd></div></dl>
+    </div>
+    <div class="api" id="metodo-screenshot">
+      <h3 class="api-sig"><code>screenshot({ key, maxWidth, type })</code></h3>
+      <p>Imagem da tela inteira ou de uma caixa (<code>key</code> de <code>layoutBounds()</code>), cortada do quadro exibido. No máximo uma a cada 250 ms.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd><code>Promise&lt;{ blob, width, height, notes }&gt;</code></dd></div></dl>
+    </div>
+    <div class="api" id="metodo-screenstate">
+      <h3 class="api-sig"><code>screenState()</code></h3>
+      <p>“Estado da tela”: pilha de Activities, Views, Compose, quadros, fila, threads, memória.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd><code>Promise&lt;{ text, blank, reasons }&gt;</code></dd></div></dl>
+    </div>
+    <div class="api" id="metodo-diagnostic">
+      <h3 class="api-sig"><code>diagnostic()</code></h3>
+      <p>O texto de “Copiar diagnóstico”: causa, pilha, stubs, recursos de depuração ativos, log, estado da tela e estimativa de APIs.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd><code>Promise&lt;string&gt;</code></dd></div></dl>
+    </div>
+    <div class="api" id="metodo-diagnostics">
+      <h3 class="api-sig"><code>diagnostics()</code></h3>
+      <p>As listas de stubs do app em execução (modo tolerante).</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd><code>Promise&lt;{ stubs, tolerateMissing, packageName, report }&gt;</code></dd></div></dl>
+    </div>
+    <div class="api" id="metodo-status">
+      <h3 class="api-sig"><code>status()</code></h3>
+      <p>Estado e contadores de overrides, Activities ignoradas, mocks e redirecionamentos; permissões; assinaturas.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd><code>Promise&lt;…&gt;</code></dd></div></dl>
+    </div>
+    <div class="api" id="metodo-answerpermission">
+      <h3 class="api-sig"><code>answerPermission(id, answers)</code></h3>
+      <p>Responde um <code>permission-request</code>: <code>'allow'</code> | <code>'once'</code> | <code>'deny'</code> por diálogo (ou um para todos), <code>null</code> = dispensado.</p>
+      <dl class="facts"><div><dt>Devolve</dt><dd><code>Promise&lt;{ config }&gt;</code></dd></div></dl>
+    </div>
+    <div class="api" id="metodo-plugins-set">
+      <h3 class="api-sig"><code>plugins.set(list)</code><code>.stop(id)</code><code>.restart(id)</code><code>.list()</code><code>.subscribe(fn)</code><code>.outputs</code></h3>
+      <p>Plugins do laboratório dentro do player (ver <a href="#plugins">Plugins</a>).</p>
+    </div>
+    <div class="api" id="metodo-destroy">
+      <h3 class="api-sig"><code>destroy()</code></h3>
+      <p>Encerra o Worker e remove o frame (o elemento faz isso ao sair do DOM).</p>
+    </div>
 
     <h2 id="eventos">Eventos</h2>
     <p>Disparados no elemento (ou na instância), com os dados em <code>event.detail</code>.</p>
-    <div class="table-wrap"><table>
-      <thead><tr><th>Evento</th><th><code>detail</code></th></tr></thead>
-      <tbody>
-        <tr><td><code>ready</code></td><td class="wrap"><code>{ activity, inventory: { packageName, activities }, statuses, rejected }</code></td></tr>
-        <tr><td><code>activity-changed</code></td><td class="wrap"><code>{ activity, canGoBack }</code></td></tr>
-        <tr><td><code>screen</code></td><td class="wrap"><code>{ screen: { activity, activityStack, tasks, windows, dialogs, canGoBack, closed, packageName, frame, ready } }</code> (<code>ready</code>: a “Tela pronta”, <code>{ ready, activity, readySince, waitingFor, fragments }</code>), quando a tela muda (Activity, pilha, janela ou diálogo).</td></tr>
-        <tr><td><code>config-applied</code></td><td class="wrap"><code>{ config, rejected, live, outcome, statuses }</code></td></tr>
-        <tr><td><code>permission-request</code></td><td class="wrap"><code>{ request: { id, requestCode, appLabel, dialogs: [{ group, label, question, permissions, oneTime }] } }</code> (com <code>permissionDialog: 'host'</code>)</td></tr>
-        <tr><td><code>permission-config</code></td><td class="wrap"><code>{ config: { states, denials, once } }</code>, depois de cada resposta (guarde se quiser lembrar entre visitas).</td></tr>
-        <tr><td><code>logcat</code>, <code>network</code></td><td class="wrap">Os lotes das assinaturas.</td></tr>
-        <tr><td><code>plugin-output</code></td><td class="wrap"><code>{ plugin: { id, name, status, badge, blocks, console, errors, errorCount } }</code></td></tr>
-        <tr><td><code>closed</code>, <code>stopped</code></td><td class="wrap">A pilha de Activities esvaziou; a VM foi parada.</td></tr>
-        <tr><td><code>data-status</code>, <code>data-cleared</code></td><td class="wrap"><code>{ status: { enabled, bytes, files, limitBytes, overLimit, error } }</code></td></tr>
-        <tr><td><code>error</code></td><td class="wrap"><code>{ kind, message, cause, phase, frontier, report, stubs }</code>. <code>report</code> é o diagnóstico em texto; <code>frontier</code> a fronteira da VM (ex.: <code>{ kind: "jni-required", … }</code>).</td></tr>
-      </tbody></table></div>
+    <div class="api" id="evento-ready">
+      <h3 class="api-sig names"><code>ready</code></h3>
+      <dl class="facts"><div><dt><code>detail</code></dt><dd><code class="shape">{ activity, inventory: { packageName, activities }, statuses, rejected }</code></dd></div></dl>
+    </div>
+    <div class="api" id="evento-activity-changed">
+      <h3 class="api-sig names"><code>activity-changed</code></h3>
+      <dl class="facts"><div><dt><code>detail</code></dt><dd><code class="shape">{ activity, canGoBack }</code></dd></div></dl>
+    </div>
+    <div class="api" id="evento-screen">
+      <h3 class="api-sig names"><code>screen</code></h3>
+      <dl class="facts"><div><dt><code>detail</code></dt><dd><code class="shape">{ screen: { activity, activityStack, tasks, windows, dialogs, canGoBack, closed, packageName, frame, ready } }</code> (<code>ready</code>: a “Tela pronta”, <code>{ ready, activity, readySince, waitingFor, fragments }</code>), quando a tela muda (Activity, pilha, janela ou diálogo).</dd></div></dl>
+    </div>
+    <div class="api" id="evento-config-applied">
+      <h3 class="api-sig names"><code>config-applied</code></h3>
+      <dl class="facts"><div><dt><code>detail</code></dt><dd><code class="shape">{ config, rejected, live, outcome, statuses }</code></dd></div></dl>
+    </div>
+    <div class="api" id="evento-permission-request">
+      <h3 class="api-sig names"><code>permission-request</code></h3>
+      <dl class="facts"><div><dt><code>detail</code></dt><dd><code class="shape">{ request: { id, requestCode, appLabel, dialogs: [{ group, label, question, permissions, oneTime }] } }</code> Com <code>permissionDialog: 'host'</code></dd></div></dl>
+    </div>
+    <div class="api" id="evento-permission-config">
+      <h3 class="api-sig names"><code>permission-config</code></h3>
+      <dl class="facts"><div><dt><code>detail</code></dt><dd><code class="shape">{ config: { states, denials, once } }</code> Depois de cada resposta (guarde se quiser lembrar entre visitas).</dd></div></dl>
+    </div>
+    <div class="api" id="evento-logcat">
+      <h3 class="api-sig names"><code>logcat</code><code>network</code></h3>
+      <p>Os lotes das assinaturas.</p>
+    </div>
+    <div class="api" id="evento-plugin-output">
+      <h3 class="api-sig names"><code>plugin-output</code></h3>
+      <dl class="facts"><div><dt><code>detail</code></dt><dd><code class="shape">{ plugin: { id, name, status, badge, blocks, console, errors, errorCount } }</code></dd></div></dl>
+    </div>
+    <div class="api" id="evento-closed">
+      <h3 class="api-sig names"><code>closed</code><code>stopped</code></h3>
+      <p>A pilha de Activities esvaziou; a VM foi parada.</p>
+    </div>
+    <div class="api" id="evento-data-status">
+      <h3 class="api-sig names"><code>data-status</code><code>data-cleared</code></h3>
+      <dl class="facts"><div><dt><code>detail</code></dt><dd><code class="shape">{ status: { enabled, bytes, files, limitBytes, overLimit, error } }</code></dd></div></dl>
+    </div>
+    <div class="api" id="evento-error">
+      <h3 class="api-sig names"><code>error</code></h3>
+      <dl class="facts"><div><dt><code>detail</code></dt><dd><code class="shape">{ kind, message, cause, phase, frontier, report, stubs }</code> <code>report</code> é o diagnóstico em texto; <code>frontier</code> a fronteira da VM (ex.: <code>{ kind: "jni-required", … }</code>).</dd></div></dl>
+    </div>
 
     <h2 id="recursos">Recursos do laboratório</h2>
     <p>Cada recurso do painel <b>Controles</b> da página de testes, e como usá-lo no player. Todos passam pela mesma chamada do Worker que o painel usa e pelos mesmos validadores.</p>
 
-    <h3>Dispositivo virtual</h3>
+    <h3 id="recurso-dispositivo-virtual">Dispositivo virtual</h3>
     <div class="code"><pre><code>&lt;apk-player src="app.apk" device="tablet" orientation="landscape" locale="ar-SA"
             theme="dark" font-scale="1.3" time-zone="America/Sao_Paulo" battery="15"&gt;&lt;/apk-player&gt;
 &lt;script&gt; player.setConfig({ orientation: 'portrait' }); &lt;/script&gt;  &lt;!-- nova Configuration, como no Android --&gt;</code></pre></div>
 
-    <h3>Rede: hosts permitidos e relay</h3>
+    <h3 id="recurso-rede-hosts-permitidos-e-relay">Rede: hosts permitidos e relay</h3>
     <p>O padrão do player é não alcançar host nenhum (o nome falha como num aparelho sem conexão). A requisição sai pelo <code>fetch</code> do navegador (CORS vale) ou pelo relay que você opera.</p>
     <div class="code"><pre><code>await player.configure({ network: { allowedHosts: ['api.exemplo.com', '*.cdn.exemplo.com'], proxyUrl: 'https://relay.seu-site.com/?u={url}' } });</code></pre></div>
 
-    <h3>Redirecionar hosts</h3>
+    <h3 id="recurso-redirecionar-hosts">Redirecionar hosts</h3>
     <p>O app pede a URL original; a troca vai para outro destino (por exemplo seu servidor local de desenvolvimento). O app continua vendo a URL que pediu.</p>
     <div class="code"><pre><code>await player.configure({ hostMap: [{ from: 'api.exemplo.com', to: 'localhost:8080' }], allowedHosts: ['localhost:8080'] });
 // atributo: host-map="api.exemplo.com -&gt; localhost:8080"</code></pre></div>
 
-    <h3>Mock de endpoints</h3>
+    <h3 id="recurso-mock-de-endpoints">Mock de endpoints</h3>
     <div class="code"><pre><code>await player.configure({ endpointMocks: [{
   id: 'perfil', method: 'GET', url: 'https://api.exemplo.com/v1/perfil', status: 200,
   headers: [{ name: 'Content-Type', value: 'application/json' }], body: '{"nome":"Ana"}', delayMs: 300,
 }] });
 const { statuses } = await player.status();   // { endpointMocks: [{ id, state: 'active', hits }] }</code></pre></div>
 
-    <h3>Permissões, localização e o diálogo</h3>
+    <h3 id="recurso-permissoes-localizacao-e-o-dialogo">Permissões, localização e o diálogo</h3>
     <div class="code"><pre><code>&lt;apk-player src="app.apk" permission-dialog="host"&gt;&lt;/apk-player&gt;
 &lt;script type="module"&gt;
   const player = document.querySelector('apk-player');
@@ -322,27 +420,27 @@ const { statuses } = await player.status();   // { endpointMocks: [{ id, state: 
   });
 &lt;/script&gt;</code></pre></div>
 
-    <h3>Retornos de métodos e Activities ignoradas</h3>
+    <h3 id="recurso-retornos-de-metodos-e-activities-ignoradas">Retornos de métodos e Activities ignoradas</h3>
     <p>Ferramentas de depuração do seu próprio app: o método substituído não executa o código original, e a abertura de uma Activity ignorada não acontece. O diagnóstico marca as duas como ativas. Métodos nativos não são substituídos.</p>
     <div class="code"><pre><code>await player.configure({
   methodOverrides: [{ method: 'com.exemplo.Flags.novaTela()', value: 'true' }],
   ignoredActivities: ['com.exemplo.SplashActivity'],
 });</code></pre></div>
 
-    <h3>Tempo por evento, memória, modo tolerante</h3>
+    <h3 id="recurso-tempo-por-evento-memoria-modo-tolerante">Tempo por evento, memória, modo tolerante</h3>
     <div class="code"><pre><code>&lt;apk-player src="app.apk" event-seconds="120" memory-mib="2048" tolerate-missing="primitives"&gt;&lt;/apk-player&gt;
 &lt;script&gt; const { stubs } = await player.diagnostics(); &lt;/script&gt;  &lt;!-- APIs que receberam stub --&gt;</code></pre></div>
 
-    <h3>Abrir um Intent (deep link)</h3>
+    <h3 id="recurso-abrir-um-intent-deep-link">Abrir um Intent (deep link)</h3>
     <div class="code"><pre><code>const r = await player.openIntent({ data: 'meuapp://pedido?id=42', extras: { origem: 'site' } });
 console.log(r.state, r.message);   // 'ok', 'Activity iniciada: PedidoActivity'
 await player.openIntent({ component: 'com.exemplo/.AjudaActivity' });</code></pre></div>
 
-    <h3>Dados do app</h3>
+    <h3 id="recurso-dados-do-app">Dados do app</h3>
     <div class="code"><pre><code>&lt;apk-player src="notas.apk" keep-data&gt;&lt;/apk-player&gt;
 &lt;script&gt; player.clearData(); &lt;/script&gt;  &lt;!-- limpa e reinicia --&gt;</code></pre></div>
 
-    <h3>Logcat e log de rede</h3>
+    <h3 id="recurso-logcat-e-log-de-rede">Logcat e log de rede</h3>
     <div class="code"><pre><code>const parar = player.logcat.subscribe(({ entries }) =&gt; {
   for (const linha of entries) console.log(linha.level, linha.tag, linha.message);
 });
@@ -350,19 +448,19 @@ const pararRede = player.network.subscribe(({ entries }) =&gt; console.table(ent
 // …
 parar(); pararRede();   // sem assinantes, o Worker volta a mandar só um contador</code></pre></div>
 
-    <h3>Compose, limites de layout e imagens</h3>
+    <h3 id="recurso-compose-limites-de-layout-e-imagens">Compose, limites de layout e imagens</h3>
     <div class="code"><pre><code>player.setConfig({ layoutBounds: true });              // desenha as caixas sobre a tela
 const caixas = await player.layoutBounds();            // [{ key, name: 'Button "Salvar"', bounds, … }]
 const { blob } = await player.screenshot({ key: caixas[0].key, maxWidth: 600 });
 img.src = URL.createObjectURL(blob);
 const arvore = await player.inspectCompose({ maxNodes: 2000 });</code></pre></div>
 
-    <h3>Diagnóstico e estado da tela</h3>
+    <h3 id="recurso-diagnostico-e-estado-da-tela">Diagnóstico e estado da tela</h3>
     <div class="code"><pre><code>player.addEventListener('error', e =&gt; console.warn(e.detail.report));
 const texto = await player.diagnostic();      // o mesmo “Copiar diagnóstico” do laboratório
 const { text } = await player.screenState();</code></pre></div>
 
-    <h3>WebView e raster</h3>
+    <h3 id="recurso-webview-e-raster">WebView e raster</h3>
     <p><code>webview="on"</code> mostra o conteúdo de <code>android.webkit.WebView</code> em iframes isolados do frame (desligado por padrão: sem ele, o WebView falha de forma explícita). <code>raster: 'full'</code> desliga o raster progressivo (útil para medir).</p>
 
     <h2 id="cors">CORS: quando a rede do app falha no navegador</h2>
@@ -374,9 +472,9 @@ const { text } = await player.screenState();</code></pre></div>
       <li><b>Cookies e credenciais.</b> O lab faz todo <code>fetch</code> com <code>credentials: "omit"</code>: cookies do navegador nunca vão junto, e <code>Cookie</code>, <code>User-Agent</code> e <code>Set-Cookie</code> do app não passam pelo navegador (só por um relay). Por isso <code>Access-Control-Allow-Credentials</code> não é necessário.</li>
       <li><b>Rede local a partir de uma página https.</b> Um destino em <code>localhost</code> ou na rede local, pedido por uma origem pública, passa pelas regras de acesso à rede privada do navegador: conforme o navegador e a versão, ele exige no preflight a resposta <code>Access-Control-Allow-Private-Network: true</code> ou pede a permissão de acesso à rede local ao visitante. (<code>http://localhost</code> não conta como conteúdo misto; outros destinos <code>http://</code> a partir de uma página https são bloqueados.)</li>
     </ul>
-    <h3>Como a falha aparece</h3>
+    <h3 id="cors-como-a-falha-aparece">Como a falha aparece</h3>
     <p>O navegador não diz à página por que um <code>fetch</code> falhou: CORS recusado, host inacessível e bloqueio por extensão dão o mesmo erro. Por isso o app recebe o que um aparelho sem rota receberia, <code>java.net.ConnectException: failed to connect to host/host (port 443): the browser reports unreachable hosts, CORS rejections and blocked requests identically (…)</code>. No log de rede (painel <b>Rede</b> do laboratório, ou <code>player.network.subscribe</code>) a entrada fica com <code>outcome: "error"</code> e essa mensagem em <code>failure.message</code>; o painel acrescenta a dica de que só o console do navegador diz qual foi a causa. O console mostra “blocked by CORS policy” quando foi CORS.</p>
-    <h3>1. Relay CORS local</h3>
+    <h3 id="cors-relay-cors-local">1. Relay CORS local</h3>
     <p>Um programa pequeno que roda no seu computador e repete cada requisição a partir dali, como o aparelho faria, respondendo à página com CORS. Baixe <a href="https://madmax-dev-br.github.io/apk-browser-lab-site/tools/cors-relay.mjs" download>cors-relay.mjs</a> (publicado no site em <code>tools/cors-relay.mjs</code>; Node 18 ou mais novo) e rode:</p>
     <div class="code"><pre><code>node cors-relay.mjs
 # APK Web Lab CORS relay on http://127.0.0.1:8787 (only this machine can reach it)
@@ -395,11 +493,11 @@ await player.configure({ network: { allowedHosts: ['*'], proxyUrl: 'http://127.0
         <tr><td><code>--allow-private</code></td><td class="wrap">Permite destinos neste computador ou na rede local (loopback, faixas privadas, link-local). Sem ela o relay recusa, e o app recebe <code>ConnectException … the CORS relay refused the target</code>.</td></tr>
       </tbody></table></div>
     <p>O relay segue redirecionamentos, devolve <code>Set-Cookie</code> (que o navegador esconde) como <code>x-apkweb-set-cookie</code>, envia <code>Cookie</code>/<code>User-Agent</code> do app, responde ao preflight (inclusive com <code>Access-Control-Allow-Private-Network</code>) e transforma “host desconhecido”, “recusado”, “tempo esgotado” e erro de certificado na exceção que o Android lançaria. Não guarda nada. Não resolve bloqueios de extensões do navegador nem serviços que o aparelho virtual não tem.</p>
-    <h3>2. Mock de endpoints</h3>
+    <h3 id="cors-mock-de-endpoints">2. Mock de endpoints</h3>
     <p>Respostas fixas servidas dentro do laboratório: a requisição nunca chega à rede, então não existe CORS. Bom para telas que só precisam de dados plausíveis.</p>
     <div class="code"><pre><code>await player.configure({ endpointMocks: [{ method: 'GET', url: 'https://api.exemplo.com/v1/*', status: 200,
   headers: [{ name: 'Content-Type', value: 'application/json' }], body: '{"itens":[]}' }] });</code></pre></div>
-    <h3>3. Redirecionar para um servidor seu que responda CORS</h3>
+    <h3 id="cors-redirecionar-para-um-servidor-seu-que-responda-cors">3. Redirecionar para um servidor seu que responda CORS</h3>
     <p>Aponte o host do app para um servidor que você controla (por exemplo o backend de desenvolvimento) e faça esse servidor autorizar a origem do runtime. O app continua vendo a URL original. (Com relay ligado, o relay repete o destino já redirecionado.)</p>
     <div class="code"><pre><code>await player.configure({ hostMap: [{ from: 'api.exemplo.com', to: 'localhost:8080' }], allowedHosts: ['api.exemplo.com', 'localhost:8080'] });</code></pre></div>
     <p>Cabeçalhos que o servidor precisa enviar (troque a origem pela do seu runtime):</p>
@@ -421,7 +519,7 @@ http.createServer((req, res) =&gt; {
   // … a resposta normal
 }).listen(8080);</code></pre></div>
     <p><code>Access-Control-Allow-Credentials</code> não é preciso: o lab nunca manda credenciais do navegador.</p>
-    <h3>4. Rodar a VM no servidor</h3>
+    <h3 id="cors-rodar-a-vm-no-servidor">4. Rodar a VM no servidor</h3>
     <p>Fora do navegador não há CORS: os serviços Node do repositório público <code>apk-lab-node-service</code> rodam a mesma VM em Node, e lá as requisições do app saem direto do servidor, com cookies, <code>User-Agent</code> e redirecionamentos como num aparelho. É o caminho para automação ou para apps cujos servidores não podem ser alcançados de uma página.</p>
 
     <h2 id="plugins">Plugins no player</h2>
@@ -475,28 +573,17 @@ await player.plugins.stop('componentes');</code></pre></div>
       <li>frame → página: <code>reply { id, ok, value | error { code, message } }</code>, <code>screen</code>, <code>logcat</code>, <code>network</code>, <code>plugin-output</code>, <code>permission-request</code>, <code>permission-config</code>, <code>stopped</code>.</li>
     </ul>
     <p>Um frame antigo (revisão 1) responde <code>hello</code> sem <code>capabilities</code>: os métodos novos rejeitam com <code>code: "unsupported"</code> e o resto funciona como antes. A referência em Markdown está em <code>docs/PLAYER.md</code>.</p>
+    <nav class="see-also" aria-label="Continue lendo">
+      <a href="../plugins.html"><b>Plugins</b><span>A API <code>lab</code> que os plugins do player também usam.</span></a>
+      <a href="../arquitetura.html"><b>Arquitetura da VM</b><span>Como o APK roda, e o que explica cada limitação.</span></a>
+      <a href="../"><b>Laboratório</b><span>A página de testes, com todos os painéis.</span></a>
+    </nav>
   </main>
 </div>
+<script type="module" src="../site-pages.js?v=565f47a43815"></script>
 <script type="module">
   import { ApkPlayer } from './apk-player.js';
   const $ = id => document.getElementById(id);
-  // Theme: the same per-viewer preference as the lab (localStorage key apkweb-theme), every access guarded.
-  $('theme-toggle').addEventListener('click', () => {
-    const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-    document.documentElement.dataset.theme = dark ? 'light' : 'dark';
-    try { localStorage.setItem('apkweb-theme', document.documentElement.dataset.theme); } catch { /* storage unavailable */ }
-  });
-  // Copy buttons on every code block.
-  for (const block of document.querySelectorAll('.code')) {
-    const button = document.createElement('button'); button.type = 'button'; button.className = 'copy'; button.textContent = 'Copiar'; button.setAttribute('aria-label', 'Copiar o código');
-    button.addEventListener('click', async () => {
-      const text = block.querySelector('code').textContent; let ok = false;
-      try { await navigator.clipboard.writeText(text); ok = true; } catch { const range = document.createRange(); range.selectNodeContents(block.querySelector('code')); const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range); try { ok = document.execCommand('copy'); } catch { ok = false; } }
-      button.textContent = ok ? 'Copiado' : 'Selecionado'; setTimeout(() => { button.textContent = 'Copiar'; }, 1800);
-    });
-    block.append(button);
-  }
-
   // ---- live demo ----
   const PLUGIN_CODE = `// Componentes da tela: as caixas de "Mostrar limites de layout", com imagens.
 lab.on('screen', mostrar);
