@@ -59,19 +59,19 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=27ff15f3244d';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=27ff15f3244d';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=27ff15f3244d';
-import { HandleTable } from './handles.js?v=27ff15f3244d';
-import { Exceptions } from './exceptions.js?v=27ff15f3244d';
-import { coreImports } from './boundary-imports.js?v=27ff15f3244d';
-import { installHostLinking, methodReference } from './host-linking.js?v=27ff15f3244d';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=27ff15f3244d';
-import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=27ff15f3244d';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=27ff15f3244d';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=27ff15f3244d';
-import { Blocked } from '../../runtime/scheduler.js?v=27ff15f3244d';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=27ff15f3244d';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=5be31ba741dc';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=5be31ba741dc';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=5be31ba741dc';
+import { HandleTable } from './handles.js?v=5be31ba741dc';
+import { Exceptions } from './exceptions.js?v=5be31ba741dc';
+import { coreImports } from './boundary-imports.js?v=5be31ba741dc';
+import { installHostLinking, methodReference } from './host-linking.js?v=5be31ba741dc';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=5be31ba741dc';
+import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=5be31ba741dc';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=5be31ba741dc';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=5be31ba741dc';
+import { Blocked } from '../../runtime/scheduler.js?v=5be31ba741dc';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=5be31ba741dc';
 
 const MiB = 1 << 20;
 /** Memory map (bytes): low memory is the module's data; metaspace; the Thread records with their Java and native stacks; the collected heap. */
@@ -146,6 +146,7 @@ export class WasmEngine {
     this.w32(h + GC.threadCap, 1024); this.w32(h + GC.rootCap, 1 << 19); this.w32(h + GC.reportCap, 1 << 16); this.w32(h + GC.freedCap, 1 << 14);
     if (!exports.gc_init(h, LAYOUT.HEAP, this.pages * 65536)) throw new Error('vmcore: gc_init refused the region');
     this.w32(h + GC.stress, this.stress ? 1 : 0); if (this.fixedTrigger !== undefined) this.w32(h + GC.trigger, this.fixedTrigger);
+    else this.w32(h + GC.trigger, Math.min(this.r32(h + GC.trigger), 64 * MiB));   // the first collection after 64 MiB allocated, not after half of a large heap: the hosts' handle and native tables are only trimmed by collections (gc.c paces the later ones by what survived)
     this.w32(linker.vm + VM_GC, h);
     this.initRecord(this.mainRecord, this.mainRecord + THREAD.javaStack, this.mainRecord + THREAD.javaStack + THREAD.javaStackBytes);
     // threads (vmcore/js/core-threads.js): ThreadsState, the main thread's record attached, the scheduler driving the core's threads
@@ -488,6 +489,9 @@ export class WasmEngine {
         if (mi && (outcome.args === args || sameWords(outcome.args, args))) { this.stats.frames++; this.w32(t + THREAD.detail, mi.address); return Status.HOST_FRAME; }
       }
       // a host step (a wait, a call into Java with a continuation): the run stops here and the thread takes the step where it can park and resume (CoreThreads.pump)
+      // A wait that asks for the call again (Blocked.retry: a read with nothing to read yet, an accept, a certificate chain still being made) has no value of its own: once it is
+      // ready the host method runs again with the same arguments, as the JavaScript interpreter runs the invoke again (interpreter.js: f.pc = outcome.retry ? start : ...).
+      if (outcome instanceof Blocked && outcome.retry) { const again = () => { const next = this.call(site, args); if (next instanceof Blocked && next.retry) next.coreRetry = again; return next; }; outcome.coreRetry = again; }
       if (outcome instanceof PendingCall || outcome instanceof Invoke || outcome instanceof Blocked) { this.parked = { step: outcome, result: site.result }; return Status.HOST_BLOCKED; }
       this.writeValue(t + THREAD.result, site.result, outcome);
       if (kindOf(site.result) !== 'W') this.w32(t + THREAD.result + 4, 0);
