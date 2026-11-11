@@ -162,6 +162,10 @@
 .cp-grid select,.cp-grid input[type=text],.cp-field select,.deeplink-row input{width:100%;min-width:0}
 .cp-grid input[type=range]{width:100%;accent-color:var(--accent)}
 .cp-grid input[type=checkbox],.cp-check input{accent-color:var(--accent);justify-self:start}
+.cp-core{margin:12px 0;padding:10px 12px 12px;border:1px solid var(--line);border-radius:8px;min-width:0}.cp-core legend{padding:0 6px;font-size:10px;font-weight:600;color:#6e7384}.cp-core .cp-note:first-of-type{margin-top:10px}
+.cp-core-grid{display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:8px 10px;align-items:center;font-size:10px;color:#6e7384}.cp-core-grid label{display:flex;flex-direction:column;gap:2px}.cp-core-grid small{font-size:9px;color:#9aa0ae}.cp-core-grid input{width:100%;min-width:0;text-align:right}
+.cp-core [data-state=error]{color:#c62828}.cp-core .cp-button{margin-top:10px}
+:root[data-theme=dark] .cp-core{border-color:#2c2a3a}:root[data-theme=dark] .cp-core legend,:root[data-theme=dark] .cp-core-grid{color:#a9a6b8}:root[data-theme=dark] .cp-core [data-state=error]{color:#ff8a80}
 .cp-note{margin:8px 0 0;font-size:9px;line-height:1.55;color:#9aa0ae}.cp-note code{font:9px ui-monospace,monospace}
 .cp-field{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:6px 10px;align-items:start;font-size:10px;color:#6e7384;margin:0 0 10px}
 .cp-field span,.cp-check span{display:flex;flex-direction:column;gap:2px}

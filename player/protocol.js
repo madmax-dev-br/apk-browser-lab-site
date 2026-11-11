@@ -1,9 +1,10 @@
 // Versioned host <-> frame message schema and the <apk-player> configuration model. No DOM: shared by the host script, the frame and the tests.
-import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=7a839fa82e6c';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=7a839fa82e6c';
-import { parseRule } from '../host-map.js?v=7a839fa82e6c';
-import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=7a839fa82e6c';
-import { isMemoryStep } from '../memory-budget.js?v=7a839fa82e6c';
+import { checkCoreMemory } from '../core-memory.js?v=f6a892d62d6e';
+import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=f6a892d62d6e';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=f6a892d62d6e';
+import { parseRule } from '../host-map.js?v=f6a892d62d6e';
+import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=f6a892d62d6e';
+import { isMemoryStep } from '../memory-budget.js?v=f6a892d62d6e';
 export const PROTOCOL = 'apk-player';
 /** Envelope version: every message carries it; a frame or host of another version is refused. Unchanged since the first release, so old hosts keep working. */
 export const VERSION = 1;
@@ -21,7 +22,7 @@ export const MAX_APK_BYTES = 1024 * 1024 * 1024;
 /** Keys that change the device model the VM sees (delivered live through setDevice, Android Configuration semantics). */
 export const DEVICE_KEYS = Object.freeze(['device', 'orientation', 'locale', 'theme', 'fontScale', 'animatorScale', 'hour24', 'timeZone', 'battery', 'charging', 'connectivity', 'navigation', 'statusBarHeight', 'allowedHosts', 'proxyUrl', 'hostMap']);
 /** The lab's debugging features (the "Controles" of the test page), revision 2: the same lists the panels keep, validated in the frame by the panels' own sanitizers. */
-export const LAB_KEYS = Object.freeze(['hostMap', 'eventSeconds', 'memoryMiB', 'strictCrash', 'layoutBounds', 'methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog', 'renderer', 'engine']);
+export const LAB_KEYS = Object.freeze(['hostMap', 'eventSeconds', 'memoryMiB', 'strictCrash', 'layoutBounds', 'methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog', 'renderer', 'engine', 'coreMemory']);
 export const CONFIG_KEYS = Object.freeze(['device', 'orientation', 'locale', 'theme', 'fontScale', 'animatorScale', 'hour24', 'timeZone', 'battery', 'charging', 'connectivity', 'navigation', 'statusBarHeight', 'allowedHosts', 'proxyUrl', 'tolerateMissing', 'webview', ...LAB_KEYS]);
 export const ATTRIBUTES = Object.freeze({ device: 'device', orientation: 'orientation', locale: 'locale', theme: 'theme', 'font-scale': 'fontScale', 'animator-scale': 'animatorScale', 'hour-24': 'hour24', 'time-zone': 'timeZone', battery: 'battery', charging: 'charging', connectivity: 'connectivity', navigation: 'navigation', 'status-bar-height': 'statusBarHeight', 'allowed-hosts': 'allowedHosts', 'proxy-url': 'proxyUrl', 'tolerate-missing': 'tolerateMissing', webview: 'webview',
   'host-map': 'hostMap', 'event-seconds': 'eventSeconds', 'memory-mib': 'memoryMiB', 'strict-crash': 'strictCrash', 'layout-bounds': 'layoutBounds', 'ignored-activities': 'ignoredActivities', 'permission-dialog': 'permissionDialog', renderer: 'renderer', engine: 'engine' });
@@ -75,6 +76,7 @@ export function parseLabValue(key, raw) {
     case 'strictCrash': case 'layoutBounds': return bool(raw);
     case 'permissionDialog': return PERMISSION_DIALOG.includes(raw) ? raw : undefined;
     case 'renderer': return raw === 'cpu' || raw === 'gpu' ? raw : undefined;   // 'cpu' (default) or 'gpu' (experimental WebGL replay in the Worker, src/gpu-raster.js); applied live
+    case 'coreMemory': { if (!raw || typeof raw !== 'object') return undefined; const checked = checkCoreMemory(raw); return checked.error ? undefined : checked.value; }   // { heapMiB, metaMiB, threads }: the sizes of the WebAssembly core's memory (src/core-memory.js); only with engine 'wasm', applies at the next launch
     case 'engine': return raw === 'js' || raw === 'wasm' ? raw : undefined;   // 'js' (default) or 'wasm' (experimental: the Java heap, frames and interpreter in vmcore/core.wasm, docs/WASM-CORE-PLANO.md); applies at the next launch
     case 'hostMap': {   // [{ from, to, enabled }] or, as an attribute, "api.example.com -> localhost:8080, *.cdn.example.com -> 127.0.0.1:9000"
       const list = typeof raw === 'string' ? raw.split(/[,;\n]+/).map(item => item.trim()).filter(Boolean).map(item => { const at = item.indexOf('->'); return at < 0 ? { from: item, to: '' } : { from: item.slice(0, at).trim(), to: item.slice(at + 2).trim() }; }) : raw;
@@ -146,7 +148,7 @@ export function configToSettings(config = {}) {
   if (config.statusBarHeight !== undefined) input.statusBarHeightDp = config.statusBarHeight;
   if (config.battery !== undefined || config.charging !== undefined) input.battery = { level: config.battery ?? 80, charging: !!config.charging };
   if (config.allowedHosts !== undefined || config.proxyUrl !== undefined || config.hostMap !== undefined) input.network = { allowedHosts: config.allowedHosts ?? [], proxyUrl: config.proxyUrl ?? '', hostMap: config.hostMap ?? [] };
-  for (const key of ['eventSeconds', 'memoryMiB', 'layoutBounds', 'renderer', 'engine']) if (config[key] !== undefined) input[key] = config[key];
+  for (const key of ['eventSeconds', 'memoryMiB', 'layoutBounds', 'renderer', 'engine', 'coreMemory']) if (config[key] !== undefined) input[key] = config[key];
   const settings = sanitizeSettings(input);
   (config.hostMap ?? []).forEach((rule, index) => { const parsed = parseRule(rule); if (parsed.error) rejected.push(`hostMap[${index}] (${parsed.error})`); });   // kept in the list (as the panel keeps them), ignored by the redirect
   if (config.allowedHosts !== undefined) { const dropped = config.allowedHosts.filter(host => !settings.network.allowedHosts.includes(String(host).trim().toLowerCase())); if (dropped.length) rejected.push(`allowedHosts (dropped: ${dropped.join(', ')})`); }
@@ -163,7 +165,7 @@ export function configToSettings(config = {}) {
 }
 /** The lab-feature part of the effective config (revision 2), reported by `config-applied` next to settingsToConfig. Mocks are summarized (their bodies are not echoed). */
 export function labConfigOf(config, settings) {
-  return { hostMap: settings.network.hostMap.map(rule => ({ ...rule })), eventSeconds: settings.eventSeconds ?? 0, memoryMiB: settings.memoryMiB ?? 0, layoutBounds: !!settings.layoutBounds, strictCrash: config.strictCrash === true, permissionDialog: config.permissionDialog ?? 'none', renderer: settings.renderer ?? 'cpu', engine: settings.engine ?? 'js',
+  return { hostMap: settings.network.hostMap.map(rule => ({ ...rule })), eventSeconds: settings.eventSeconds ?? 0, memoryMiB: settings.memoryMiB ?? 0, layoutBounds: !!settings.layoutBounds, strictCrash: config.strictCrash === true, permissionDialog: config.permissionDialog ?? 'none', renderer: settings.renderer ?? 'cpu', engine: settings.engine ?? 'js', coreMemory: { ...settings.coreMemory },
     methodOverrides: (config.methodOverrides ?? []).map(item => ({ ...item })), ignoredActivities: (config.ignoredActivities ?? []).map(item => ({ ...item })),
     endpointMocks: (config.endpointMocks ?? []).map(mock => ({ id: mock.id ?? null, name: String(mock.name ?? ''), method: String(mock.method ?? 'ANY'), url: String(mock.url ?? ''), enabled: mock.enabled !== false })),
     permissions: config.permissions ? { states: { ...config.permissions.states } } : null, location: config.location ?? null };
