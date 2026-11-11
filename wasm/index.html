@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=f6a892d62d6e">
-  <meta name="apk-browser-build" content="f6a892d62d6e">
+  <link rel="stylesheet" href="./styles.css?v=6e726a8066c8">
+  <meta name="apk-browser-build" content="6e726a8066c8">
 </head>
 <body>
   <header class="topbar">
@@ -113,6 +113,7 @@
                   <label for="vm-core-threads">Threads vivas<small>16 a 1000 · 1 MiB cada</small></label><input id="vm-core-threads" type="number" inputmode="numeric" min="16" max="1000" step="10" aria-describedby="vm-core-note">
                 </div>
                 <p id="vm-core-total" class="cp-note" role="status"></p>
+                <p id="vm-core-usage" class="cp-note" hidden></p>
                 <p id="vm-core-note" class="cp-note">Só vale com o núcleo WebAssembly (<code>?engine=wasm</code>), quando o APK é aberto de novo. Heap: objetos e arrays do app. Metaspace: classes e métodos ligados (cresce com o tamanho do app). Threads: quantas threads Java podem estar vivas ao mesmo tempo. Os três dividem uma memória de no máximo 2048 MiB; o resumo do diagnóstico mostra quanto de cada um está em uso.</p>
                 <button id="vm-core-reset" class="cp-button" type="button">Restaurar padrão do núcleo</button>
               </fieldset>
@@ -238,7 +239,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=f6a892d62d6e"></script>
+  <script type="module" src="./app.js?v=6e726a8066c8"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>

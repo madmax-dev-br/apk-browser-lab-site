@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=f6a892d62d6e';
-import { APKError } from './apk-error.js?v=f6a892d62d6e';
+import { createHostRegistry } from './host-contract.js?v=6e726a8066c8';
+import { APKError } from './apk-error.js?v=6e726a8066c8';
 
 // Public android.view.View API (API 33) that the platform View model did not carry, with the semantics of android-13.0.0_r1 View.java. Grouped by topic below; state lives on the
 // View's host object (`r.object(view)`), the same place the other view hosts keep theirs.
