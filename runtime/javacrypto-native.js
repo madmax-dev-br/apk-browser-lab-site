@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=f6a892d62d6e';
-import { NativeLibraryProvider, BASE_SONAME } from './jni-host.js?v=f6a892d62d6e';
-import { buildElfDescriptor } from './native-descriptor.js?v=f6a892d62d6e';
-import { sha256Hex } from './sha256-sync.js?v=f6a892d62d6e';
-import { xhrFetchSync } from './native-library-fetch.js?v=f6a892d62d6e';
+import { APKError } from './apk-error.js?v=6e726a8066c8';
+import { NativeLibraryProvider, BASE_SONAME } from './jni-host.js?v=6e726a8066c8';
+import { buildElfDescriptor } from './native-descriptor.js?v=6e726a8066c8';
+import { sha256Hex } from './sha256-sync.js?v=6e726a8066c8';
+import { xhrFetchSync } from './native-library-fetch.js?v=6e726a8066c8';
 
 // The native half of Android's public-key / TLS stack: System.loadLibrary("javacrypto") from the original Conscrypt classes in the framework DEX
 // (com.android.org.conscrypt.NativeCryptoJni) is served by the lab's wasm32 modules libjavacrypto.so, libssl.so and libcrypto.so, built from AOSP's own
