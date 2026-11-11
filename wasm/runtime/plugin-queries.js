@@ -15,7 +15,7 @@
 //   ConcurrentHashMap, the Collections wrappers), androidx ArrayMap / SimpleArrayMap, Kotlin's empty collections and ArrayDeque, Compose's persistent vectors, and the
 //   observable holders shown as their current value: kotlinx StateFlowImpl (`_state`), androidx LiveData (`mData`, `mVersion`), Compose snapshot state (the newest valid
 //   StateRecord of `next`: SnapshotMutableState, the Int/Long/Float/Double states, SnapshotStateList), and the java.util.concurrent atomics.
-import { isFreedId } from './heap-gc.js?v=dcfaf7b69a30';
+import { isFreedId } from './heap-gc.js?v=53e22ef7a9c4';
 
 export const QUERY_LIMITS = { depth: 2, maxDepth: 6, maxFields: 200, maxFieldsLimit: 2000, maxItems: 20, maxItemsLimit: 500, maxString: 1000, maxStringLimit: 20000, maxNodes: 4000, budgetMs: 25 };
 const VIEW_MODEL_STORE = 'Landroidx/lifecycle/ViewModelStore;', VIEW_MODEL = 'Landroidx/lifecycle/ViewModel;';
@@ -492,7 +492,13 @@ export function classDescriptor(name) {
   if (text.startsWith('[')) throw new PluginQueryError('bad-class', 'Use o nome de uma classe, não de um array.');
   return text.startsWith('L') && text.endsWith(';') ? text : `L${text.replaceAll('.', '/')};`;
 }
-const classStatus = (runtime, type) => runtime.initialized?.get?.(type)?.status ?? 'not-initialized';
+// Engine 'wasm': the classes' state, the statics of DEX classes and the heap are the core's (vmcore/js/host-bridge.js "inspection"); the JavaScript VM's tables hold none of it.
+const coreOf = runtime => runtime.engine === 'wasm' && runtime.wasm ? runtime.wasm : null;
+const classStatus = (runtime, type) => { const core = coreOf(runtime); return core ? core.classStatus(type) : runtime.initialized?.get?.(type)?.status ?? 'not-initialized'; };
+/** The value of a static field without initializing its class, or undefined when it has none. */
+const staticValue = (runtime, field) => { const core = coreOf(runtime); if (core) { const value = core.peekStatic(field); if (value !== undefined) return value; } return runtime.staticFields.has(field.key) ? runtime.staticFields.get(field.key) : undefined; };
+/** [key, value] of the statics that may hold an object: the core's reference statics, and the JavaScript VM's table (all of them there; the host-modelled ones on the core). */
+function* staticEntries(runtime) { const core = coreOf(runtime); if (core) yield* core.referenceStatics(); yield* runtime.staticFields ?? []; }
 function classRecord(runtime, type) {
   let cls = null; try { cls = runtime.classes?.get?.(type) ?? null; } catch { cls = null; }
   if (!cls) throw new PluginQueryError('no-class', `Classe não encontrada nos DEX do app: ${dotted(type)}`);
@@ -509,8 +515,8 @@ export function readStatics(runtime, reader, className, options = {}) {
   if (status !== 'initialized' && status !== 'initializing') { out.note = 'classe ainda não inicializada pelo app: os campos estáticos não existem ainda (uma consulta nunca roda o <clinit>)'; out.declared = declared.map(field => ({ name: field.name, type: typeName(field.type) })); return out; }
   const o = { depth: 1, ...options };
   for (const field of declared) {
-    if (!runtime.staticFields.has(field.key)) { out.fields[field.name] = null; continue; }
-    const result = reader.view(runtime.staticFields.get(field.key), field.type, o);
+    const value = staticValue(runtime, field); if (value === undefined) { out.fields[field.name] = null; continue; }
+    const result = reader.view(value, field.type, o);
     out.fields[field.name] = result.value; if (result.truncated) out.$truncated = true;
   }
   return out;
@@ -526,7 +532,7 @@ export function resolveStaticPath(runtime, reader, className, path) {
     if (field) {
       const status = classStatus(runtime, field.owner);
       if (status !== 'initialized' && status !== 'initializing') throw new PluginQueryError('not-initialized', `${dotted(field.owner)} ainda não foi inicializada pelo app: o campo estático ${name} não existe ainda (uma consulta nunca roda o <clinit>)`);
-      return walkPath(reader, { value: runtime.staticFields.has(field.key) ? runtime.staticFields.get(field.key) : null, type: field.type }, rest);
+      return walkPath(reader, { value: staticValue(runtime, field) ?? null, type: field.type }, rest);
     }
     try { owner = runtime.parent(owner); } catch { owner = null; }
     if (owner === OBJECT) break;
@@ -551,7 +557,17 @@ export function listClasses(runtime, { match = '', limit, initialized = false } 
 }
 const boundedInt = (value, fallback, max, min = 0) => { const n = Number(value); return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.floor(n))) : fallback; };
 /** Walks the heap records from id `after` (exclusive) for at most `budgetMs`; `visit(record, id)` returns false to stop. -> { scanned, next (cursor) | null when the heap ended } */
-function scanHeap(runtime, { after = 0, budgetMs, now }, visit) {
+function scanHeap(runtime, { after = 0, budgetMs, now }, visit, wanted = null) {
+  const core = coreOf(runtime);
+  if (core) {   // the core's heap in address order (the cursor is an address); `wanted(type)` spares a record for the objects the caller would skip anyway
+    const limit = now() + budgetMs; let count = 0;
+    const next = core.walkHeap(Math.max(0, Math.floor(Number(after) || 0)), (address, type) => {
+      count++; if (wanted !== null && !wanted(type)) return (count & 4095) !== 0 || now() <= limit;
+      const rec = core.recordAt(address); if (visit(rec, rec.id) === false) return false;
+      return (count & 255) !== 0 || now() <= limit;
+    });
+    return { scanned: count, next };
+  }
   const heap = runtime.heap, deadline = now() + budgetMs, start = Math.max(0, Math.floor(Number(after) || 0)) + 1; let scanned = 0;
   if (!heap?.chunks) throw new PluginQueryError('failed', 'Heap da VM indisponível para varredura.');
   const shift = 12, size = 1 << shift;
@@ -575,7 +591,7 @@ export function findInstances(runtime, reader, className, { subclasses = true, l
     if (typeof rec.type !== 'string' || !matches(rec.type)) return true;
     items.push({ handle: handleOf(runtime, rec.id ?? id), className: dotted(rec.type) });
     return items.length < max;
-  });
+  }, matches);
   return { items, scanned: result.scanned, next: result.next, done: result.next === null };
 }
 /** Who holds the object of `handle`: static fields (first page only) and heap objects whose fields, array cells or host slots point to it.
@@ -583,7 +599,7 @@ export function findInstances(runtime, reader, className, { subclasses = true, l
 export function findReferrers(runtime, reader, handle, { limit, after = 0, budgetMs } = {}, now = () => performance.now()) {
   const target = liveRecord(runtime, handle), id = target.id ?? parseHandle(runtime, handle), max = boundedInt(limit, SCAN_LIMITS.limit, SCAN_LIMITS.maxLimit, 1), budget = boundedInt(budgetMs, SCAN_LIMITS.budgetMs, SCAN_LIMITS.maxBudgetMs, 1);
   const items = [], points = value => value !== null && typeof value === 'object' && value.ref === id;
-  if (!(Number(after) > 0)) for (const [key, value] of runtime.staticFields ?? []) { if (items.length >= max) break; if (points(value)) { const { owner, name } = parseKey(key); items.push({ kind: 'static', className: dotted(owner), field: name }); } }
+  if (!(Number(after) > 0)) for (const [key, value] of staticEntries(runtime)) { if (items.length >= max) break; if (points(value)) { const { owner, name } = parseKey(key); items.push({ kind: 'static', className: dotted(owner), field: name }); } }
   const via = rec => {
     if (rec.fields) for (const [key, value] of rec.fields) if (points(value)) return key.includes('->') ? parseKey(key).name : key;
     if (rec.cells !== undefined) { const cells = rec.cells; if (!ArrayBuffer.isView(cells)) for (let i = 0; i < cells.length; i++) if (points(cells[i])) return `[${i}]`; }
@@ -610,10 +626,10 @@ export function findReferrers(runtime, reader, handle, { limit, after = 0, budge
 // (top-level vals compile to static fields: LocalContentColor in ContentColorKt); a minified app shows its renamed field. Values: StaticValueHolder.value,
 // DynamicValueHolder.state (a MutableState: its current value), ComputedValueHolder (a lambda run by the composition: not computed here, reported as such).
 function staticNames(runtime) {
-  const size = runtime.staticFields?.size ?? 0, cached = runtime.pluginStaticNames;
+  const core = coreOf(runtime), size = (runtime.staticFields?.size ?? 0) + (core ? core.linker.classList.length * 65536 : 0), cached = runtime.pluginStaticNames;   // on the core the cache follows the classes laid out
   if (cached && cached.size === size) return cached.map;
   const map = new Map();
-  for (const [key, value] of runtime.staticFields ?? []) if (isRef(value) && !map.has(value.ref)) { const { owner, name } = parseKey(key); map.set(value.ref, { name, declaredIn: dotted(owner) }); }
+  for (const [key, value] of staticEntries(runtime)) if (isRef(value) && !map.has(value.ref)) { const { owner, name } = parseKey(key); map.set(value.ref, { name, declaredIn: dotted(owner) }); }
   runtime.pluginStaticNames = { size, map };
   return map;
 }
