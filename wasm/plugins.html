@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=8cf39c3035e0">
+  <link rel="stylesheet" href="./site-pages.css?v=0f9135b5c65a">
 </head>
 <body>
   <header class="topbar">
@@ -554,11 +554,49 @@ aba.onDrop(solto =&gt; lab.ui.kv({ item: solto.payload.id, 'na tela': solto.insi
 // Miniatura do primeiro item: um recorte do primeiro componente clicável da tela
 const clicavel = (await lab.layoutBounds({ names: false })).find(e =&gt; e.actions.includes('OnClick'));
 if (clicavel) { itens[0].thumb = await lab.dataUrl(await lab.screenshot({ key: clicavel.key, maxWidth: 64 })); await aba.post(itens); }</code></pre></div>
+
+        <h3>Paleta de componentes da tela</h3>
+        <p>Uma aba cujos itens são componentes reais da tela: <code>lab.renderVariant</code> renderiza a tela atual numa segunda instância em segundo plano (com outros mocks de endpoint, se você quiser outro estado) e devolve um recorte por componente. Cada recorte vira um item que você arrasta até o aparelho, com a própria imagem seguindo o ponteiro; a aba mostra onde ele caiu. Um recorte sem imagem aparece com o motivo.</p>
+        <div class="code" data-name="Paleta de componentes da tela"><pre><code>const PAPEIS = ['Switch', 'Checkbox', 'Button'];   // o que recortar; um seletor também aceita name, testTag, text, contentDescription, viewId
+const LIMITE = 8;
+const aba = await lab.tab.open({ title: 'Componentes', icon: '🎨', side: 'left', width: 250, height: '80%', open: true, html: `
+  &lt;style&gt;body{font:13px system-ui;margin:10px} .item{padding:6px;margin-bottom:8px;border:1px solid #ccd;border-radius:8px;background:#f6f6fb}
+    .item img{display:block;max-width:100%;max-height:80px;pointer-events:none} .item small{color:#667} .erro small{color:#a33} #onde{font:11px ui-monospace,monospace;white-space:pre-wrap}&lt;/style&gt;
+  &lt;p id="onde"&gt;Renderizando a tela em segundo plano…&lt;/p&gt;&lt;div id="paleta"&gt;&lt;/div&gt;
+  &lt;script&gt;
+    const paleta = document.getElementById('paleta'), onde = document.getElementById('onde');
+    lab.on(itens =&gt; {   // cada recorte vira um item; os que têm imagem podem ser arrastados, com a própria imagem seguindo o ponteiro
+      onde.textContent = 'Arraste um componente até o aparelho.';
+      paleta.replaceChildren(...itens.map(item =&gt; {
+        const el = document.createElement('div'); el.className = item.imagem ? 'item' : 'item erro';
+        if (item.imagem) { el.append(Object.assign(new Image(), { src: item.imagem })); lab.draggable(el, { nome: item.nome }, { label: item.nome, image: item.imagem }); }
+        el.append(Object.assign(document.createElement('small'), { textContent: item.imagem ? item.nome : item.nome + ': ' + item.erro }));
+        return el;
+      }));
+    });
+    lab.onDrop(e =&gt; { onde.textContent = !e.inside ? 'Solto fora da tela.' : e.payload.nome + '\\npx: ' + e.x + ', ' + e.y + '\\ndp: ' + e.dpX + ', ' + e.dpY
+      + '\\n%: ' + e.percentX + ', ' + e.percentY + '\\nsobre: ' + (e.element ? e.element.texts[0] || e.element.role || e.element.name : '—'); });
+  &lt;/script&gt;` });
+await lab.waitReady({ timeoutMs: 20000 }).catch(() =&gt; null);
+// Uma renderização da tela atual numa segunda instância, que não aparece; todos os recortes saem dela
+const variante = await lab.renderVariant({
+  // endpointMocks: [{ url: 'https://api.exemplo.com/v1/itens', body: '{"itens":[]}' }],   // os mesmos componentes com outra resposta do servidor
+  crops: PAPEIS.map(papel =&gt; ({ selector: { role: papel }, all: true })),
+  tree: true,   // com a árvore do Compose cada recorte vem com o nome do componente (Button "Salvar")
+});
+const itens = [];
+for (const recorte of variante.images.slice(0, LIMITE)) itens.push({
+  nome: recorte.element?.name ?? JSON.stringify(recorte.selector),
+  imagem: recorte.image ? await lab.dataUrl(recorte.image) : null,   // sem imagem, o recorte traz o motivo (crop-not-found, no-image…)
+  erro: recorte.error?.message,
+});
+await aba.post(itens);
+lab.ui.kv({ recortes: variante.images.length, 'tela parada': variante.settled, 'tempo (ms)': variante.ms.total }, { id: 'paleta' });</code></pre></div>
       </section>
 
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./arquitetura.html">Arquitetura da VM</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=8cf39c3035e0"></script>
+  <script type="module" src="./site-pages.js?v=0f9135b5c65a"></script>
 </body>
 </html>
