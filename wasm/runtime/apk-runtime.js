@@ -1,32 +1,32 @@
-import { VMClock } from './vm-clock.js?v=6e726a8066c8';
-import { overrideHit } from './method-overrides.js?v=6e726a8066c8';
-import { OperationMonitor } from './operation-monitor.js?v=6e726a8066c8';
-import { ExecutionProfile } from './execution-profile.js?v=6e726a8066c8';
-import { SamplingProfiler } from './sampling-profiler.js?v=6e726a8066c8';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=6e726a8066c8';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=6e726a8066c8';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=6e726a8066c8';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=6e726a8066c8';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=6e726a8066c8';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=6e726a8066c8';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=6e726a8066c8';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=6e726a8066c8';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=6e726a8066c8';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=6e726a8066c8';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=6e726a8066c8';
-import { APKError } from './apk-error.js?v=6e726a8066c8';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=6e726a8066c8';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=6e726a8066c8';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=6e726a8066c8';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=6e726a8066c8';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=6e726a8066c8';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=6e726a8066c8';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=6e726a8066c8';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=6e726a8066c8';
+import { VMClock } from './vm-clock.js?v=b8911598aecd';
+import { overrideHit } from './method-overrides.js?v=b8911598aecd';
+import { OperationMonitor } from './operation-monitor.js?v=b8911598aecd';
+import { ExecutionProfile } from './execution-profile.js?v=b8911598aecd';
+import { SamplingProfiler } from './sampling-profiler.js?v=b8911598aecd';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=b8911598aecd';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=b8911598aecd';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=b8911598aecd';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=b8911598aecd';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=b8911598aecd';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=b8911598aecd';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=b8911598aecd';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=b8911598aecd';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=b8911598aecd';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=b8911598aecd';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=b8911598aecd';
+import { APKError } from './apk-error.js?v=b8911598aecd';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=b8911598aecd';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=b8911598aecd';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=b8911598aecd';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=b8911598aecd';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=b8911598aecd';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=b8911598aecd';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=b8911598aecd';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=b8911598aecd';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=6e726a8066c8';
-import { bootClassLacksMember } from './boot-class-members.js?v=6e726a8066c8';
-export { APKError } from './apk-error.js?v=6e726a8066c8';
+import { Scheduler, Blocked } from './scheduler.js?v=b8911598aecd';
+import { bootClassLacksMember } from './boot-class-members.js?v=b8911598aecd';
+export { APKError } from './apk-error.js?v=b8911598aecd';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1141,7 +1141,7 @@ export const LATE_RUNTIME_PROPERTIES = Object.freeze([
   'traceMuted', 'allProgs', 'lastHostCall', 'mainThread', 'objectInitIsPlain', 'targetSdkVersion', 'canvasCompatibilityVersion', 'frameworkRuntimeConfigured', 'resolvableMemo',
   'dedupeHiddenApiWarnings', 'unicodeCaseBackend', 'traceDropped', 'constructedStringUnits', 'runtimeObject', 'internedStrings', 'nativeMemory', 'inheritableLocals', 'allocationSamples',
   'caughtExceptions', 'boxCache', 'activityType', 'ephemeronMaps', 'lastResourceCall', 'timeUnits', 'applicationClassLoader', 'methodEvidenceTruncated', 'icuRegexMetadata', 'icuBreakMetadata',
-  'rasterStats', 'rasterCache', 'rasterCacheBytes', 'threadGroups', 'systemThreadGroup', 'mainThreadGroup', 'uncaughtHook', 'themeLightingCache', 'gcDeferral', 'gcDeferralStats', 'gcMarkChunks',
+  'loadTiming', 'rasterStats', 'rasterCache', 'rasterCacheBytes', 'threadGroups', 'systemThreadGroup', 'mainThreadGroup', 'uncaughtHook', 'themeLightingCache', 'gcDeferral', 'gcDeferralStats', 'gcMarkChunks',
   'gcHeavyPaths', 'gcTopRoots', 'gcFreedRing', 'gcPhases', 'gcNextAt', 'gcMinAlloc', 'gcOldSize', 'gcMinorMs', 'gcPressure', 'gcCellPressure', 'gcLastNextId', 'arrayBytes', 'gcStats', 'gcLastEnd',
   'gcLastMs', 'gcTotalMs', 'gcMinorHeld', 'gcMinorStats', 'gcNurseryNow', 'gcSafepointTries', 'libcoreIo', 'hostStaticValues', 'rasterCacheDisabled', 'rasterCacheVerify', 'strictCrash',
   'androidxVersions', 'reactNativeVersion', 'hermesBytecodeVersion', 'apkSigningCertificates', 'apkFileSource', 'gcExtraRoots', 'gcEnabled', 'propertyValuesHolderJni', 'pointerGesture',

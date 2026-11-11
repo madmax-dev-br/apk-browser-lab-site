@@ -41,3 +41,18 @@ export class TimeBreakdown {
     return `Tempo do host: ${snapshot.ms.map((v, i) => `${NAMES[i]} ${v} ms (${Math.round(100 * v / total)}%${snapshot.counts[i] ? ', ' + snapshot.counts[i] + '×' : ''})`).join('; ')}; ${(snapshot.pollers ?? []).map(p => `; thread ${p.thread} está em polling (${p.perSecond} chamadas do host/s): ${p.calls.map(([key, n]) => `${key} ${n}×`).join(', ')}`).join('')}; interpretador por thread: ${snapshot.threads.map(([name, ms]) => `${name} ${ms} ms`).join(', ') || '-'}; chamadas do host mais frequentes: ${(snapshot.hostByCount ?? []).map(([key, n, ms]) => `${key} ${n}× (${ms} ms)`).join(', ') || '-'}; mais lentas (tempo inclusivo): ${(snapshot.hostByTime ?? []).map(([key, n, ms]) => `${key} ${ms} ms (${n}×)`).join(', ') || '-'}`;
   }
 }
+
+/**
+ * Where the time of one APK load went: mark(phase) says a phase starts (the loader's progress phases, then 'core' and what follows); the time until the next mark is that
+ * phase's. finish() -> { totalMs, phases: [[phase, ms], ...] } with the longest first (at most 16).
+ */
+export function createLoadTiming(now = () => performance.now()) {
+  const started = now(), phases = new Map(); let current = 'start', last = started;
+  const close = () => { const at = now(); phases.set(current, (phases.get(current) ?? 0) + (at - last)); last = at; };
+  return {
+    mark(phase) { close(); current = typeof phase === 'string' && phase ? phase.slice(0, 40) : 'other'; },
+    finish() { close(); return { totalMs: Math.round(last - started), phases: [...phases].map(([phase, ms]) => [phase, Math.round(ms)]).filter(row => row[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 16) }; },
+  };
+}
+/** 'Carga do APK: 2140 ms (framework 900 ms, dex 500 ms, ...)' for the diagnostic summary. */
+export const loadTimingText = timing => timing ? `Carga do APK: ${timing.totalMs} ms (${timing.phases.slice(0, 8).map(([phase, ms]) => `${phase} ${ms} ms`).join(', ')})` : '';

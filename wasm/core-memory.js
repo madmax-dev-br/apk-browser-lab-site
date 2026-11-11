@@ -38,3 +38,9 @@ export function coreLayout(input = CORE_MEMORY_DEFAULT) {
   const metaEnd = value.metaMiB * MiB, threads = metaEnd, guests = threads + THREAD_SPAN_MIB * MiB;
   return Object.freeze({ META: 1 * MiB, META_END: metaEnd, THREADS: threads, THREAD_SPAN: THREAD_SPAN_MIB * MiB, GUESTS: guests, GUEST_SPAN: GUEST_SPAN_MIB * MiB, GUEST_COUNT: value.threads, HEAP: heapStartMiB(value) * MiB, pages: totalMiB * 16, memory: Object.freeze(value) });
 }
+
+/** The message of a load that failed because the core could not start: what happened, and how to open the APK on the JavaScript VM instead (`?engine=js`, player `engine: 'js'`). */
+export function coreStartMessage(error) {
+  const reason = String(error?.message ?? error).slice(0, 400), hint = "Para abrir com a VM JavaScript: ?engine=js na página (no player, engine: 'js').";
+  return reason.includes('?engine=js') ? reason : `O núcleo WebAssembly não iniciou: ${reason}. ${hint}`;
+}

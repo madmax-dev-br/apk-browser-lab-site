@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=6e726a8066c8">
-  <meta name="apk-browser-build" content="6e726a8066c8">
+  <link rel="stylesheet" href="./styles.css?v=b8911598aecd">
+  <meta name="apk-browser-build" content="b8911598aecd">
 </head>
 <body>
   <header class="topbar">
@@ -114,7 +114,7 @@
                 </div>
                 <p id="vm-core-total" class="cp-note" role="status"></p>
                 <p id="vm-core-usage" class="cp-note" hidden></p>
-                <p id="vm-core-note" class="cp-note">Só vale com o núcleo WebAssembly (<code>?engine=wasm</code>), quando o APK é aberto de novo. Heap: objetos e arrays do app. Metaspace: classes e métodos ligados (cresce com o tamanho do app). Threads: quantas threads Java podem estar vivas ao mesmo tempo. Os três dividem uma memória de no máximo 2048 MiB; o resumo do diagnóstico mostra quanto de cada um está em uso.</p>
+                <p id="vm-core-note" class="cp-note">Só vale com o núcleo WebAssembly (o padrão; não com <code>?engine=js</code>), quando o APK é aberto de novo. Heap: objetos e arrays do app. Metaspace: classes e métodos ligados (cresce com o tamanho do app). Threads: quantas threads Java podem estar vivas ao mesmo tempo. Os três dividem uma memória de no máximo 2048 MiB; o resumo do diagnóstico mostra quanto de cada um está em uso.</p>
                 <button id="vm-core-reset" class="cp-button" type="button">Restaurar padrão do núcleo</button>
               </fieldset>
               <label class="cp-field" for="vm-event-time"><span>Tempo máximo por evento<small>Quanto a VM espera um evento terminar antes de encerrá-lo com o relatório; vale na hora</small></span><select id="vm-event-time" aria-describedby="vm-event-note"></select></label>
@@ -239,7 +239,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=6e726a8066c8"></script>
+  <script type="module" src="./app.js?v=b8911598aecd"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>

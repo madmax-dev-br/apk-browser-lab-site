@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=6e726a8066c8';
-import { createHostRegistry } from './host-contract.js?v=6e726a8066c8';
-import { CONTENT_DIGEST, TYPE, TYPE_NAMES, digestSteps, merkleSteps, signatureContentDigests } from './apk-checksums.js?v=6e726a8066c8';
+import { APKError } from './apk-error.js?v=b8911598aecd';
+import { createHostRegistry } from './host-contract.js?v=b8911598aecd';
+import { CONTENT_DIGEST, TYPE, TYPE_NAMES, digestSteps, merkleSteps, signatureContentDigests } from './apk-checksums.js?v=b8911598aecd';
 
 // PackageManager.requestChecksums (API 31+) with android.content.pm.Checksum / ApkChecksum, as ApplicationPackageManager and PackageManagerService/ApkChecksums (android-13.0.0_r1) answer for an app that
 // was side-loaded (no installer: no installer-provided checksums, so the trusted-installer part is empty):
