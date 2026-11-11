@@ -5,6 +5,8 @@ const NAMES = ['interpretador e código compilado', 'chamadas do host', 'decodif
 export class TimeBreakdown {
   constructor() { this.reset(); }
   reset() {
+    // what the breakdown of each operation drops is kept in the lifetime totals (src/warmup.js reads them)
+    this.lifeMs ??= new Float64Array(6); this.lifeCounts ??= new Float64Array(6); if (this.ms) for (let i = 0; i < 6; i++) { this.lifeMs[i] += this.ms[i]; this.lifeCounts[i] += this.counts[i]; }
     this.ms = new Float64Array(6); this.counts = new Float64Array(6); this.cur = BUCKET.INTERP; this.last = this.startedAt = performance.now(); this.threads = new Map(); this.acc = this.accumulatorFor('main'); this.host = new Map();
   }
   accumulatorFor(name) { let acc = this.threads.get(name); if (acc === undefined) this.threads.set(name, acc = { name, ms: 0, calls: 0, hosts: new Map() }); return acc; }

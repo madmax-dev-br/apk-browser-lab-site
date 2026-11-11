@@ -1,34 +1,35 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=346cde125f88';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=346cde125f88';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=346cde125f88';
-import { initCollapsibleSections } from './panel-sections.js?v=346cde125f88';
-import { initHelpTips } from './help-tips.js?v=346cde125f88';
-import { createToolDock } from './tool-dock.js?v=346cde125f88';
-import { createPermissionsPanel } from './permissions-panel.js?v=346cde125f88';
-import { createOverridesPanel } from './overrides-panel.js?v=346cde125f88';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=346cde125f88';
-import { createHostMapPanel } from './host-map-panel.js?v=346cde125f88';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=346cde125f88';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=346cde125f88';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=346cde125f88';
-import { createDeviceView, createViewState } from './device-view.js?v=346cde125f88';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=346cde125f88';
-import { formatApiGapReport } from './api-gap-scan.js?v=346cde125f88';
-import { createLogcatPanel } from './logcat-panel.js?v=346cde125f88';
-import { createComposeInspectorPanel, flattenViews } from './compose-inspector-panel.js?v=346cde125f88';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=346cde125f88';
-import { createPluginHost } from './plugin-host.js?v=346cde125f88';
-import { captureImage } from './screen-capture.js?v=346cde125f88';
-import { createPluginsPanel } from './plugins-panel.js?v=346cde125f88';
-import { createMcpTools } from './mcp-tools.js?v=346cde125f88';
-import { createMcpLink, generateMcpToken, mcpClientConfig, mcpBridgePort } from './mcp-link.js?v=346cde125f88';
-import { createModalHost } from './lab-modal.js?v=346cde125f88';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=346cde125f88';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=346cde125f88';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=346cde125f88';
-import { createDragLayer } from './lab-drag.js?v=346cde125f88';
-import { createLabScroll } from './lab-scroll.js?v=346cde125f88';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=346cde125f88';
+import { APKWorkerClient } from './apk-worker-client.js?v=dcfaf7b69a30';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=dcfaf7b69a30';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=dcfaf7b69a30';
+import { initCollapsibleSections } from './panel-sections.js?v=dcfaf7b69a30';
+import { warmupLabel } from './warmup.js?v=dcfaf7b69a30';
+import { initHelpTips } from './help-tips.js?v=dcfaf7b69a30';
+import { createToolDock } from './tool-dock.js?v=dcfaf7b69a30';
+import { createPermissionsPanel } from './permissions-panel.js?v=dcfaf7b69a30';
+import { createOverridesPanel } from './overrides-panel.js?v=dcfaf7b69a30';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=dcfaf7b69a30';
+import { createHostMapPanel } from './host-map-panel.js?v=dcfaf7b69a30';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=dcfaf7b69a30';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=dcfaf7b69a30';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=dcfaf7b69a30';
+import { createDeviceView, createViewState } from './device-view.js?v=dcfaf7b69a30';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=dcfaf7b69a30';
+import { formatApiGapReport } from './api-gap-scan.js?v=dcfaf7b69a30';
+import { createLogcatPanel } from './logcat-panel.js?v=dcfaf7b69a30';
+import { createComposeInspectorPanel, flattenViews } from './compose-inspector-panel.js?v=dcfaf7b69a30';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=dcfaf7b69a30';
+import { createPluginHost } from './plugin-host.js?v=dcfaf7b69a30';
+import { captureImage } from './screen-capture.js?v=dcfaf7b69a30';
+import { createPluginsPanel } from './plugins-panel.js?v=dcfaf7b69a30';
+import { createMcpTools } from './mcp-tools.js?v=dcfaf7b69a30';
+import { createMcpLink, generateMcpToken, mcpClientConfig, mcpBridgePort } from './mcp-link.js?v=dcfaf7b69a30';
+import { createModalHost } from './lab-modal.js?v=dcfaf7b69a30';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=dcfaf7b69a30';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=dcfaf7b69a30';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=dcfaf7b69a30';
+import { createDragLayer } from './lab-drag.js?v=dcfaf7b69a30';
+import { createLabScroll } from './lab-scroll.js?v=dcfaf7b69a30';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=dcfaf7b69a30';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -51,6 +52,12 @@ function showScreenReady(ready) {
   if (!ready || !state.apkRunning) { chip.hidden = true; return; }
   chip.hidden = false; chip.dataset.ready = String(!!ready.ready); chip.textContent = ready.ready ? '● pronta' : '◌ carregando';
   chip.title = ready.ready ? `Tela pronta: ${ready.activity ?? ''}${ready.fragments?.length ? ` com ${ready.fragments.length} fragment(s)` : ''}` : `Ainda carregando: ${(ready.waitingFor ?? []).join('; ')}`;
+}
+// "Aquecendo" (src/warmup.js): the VM is still paying for first-time work (classes, methods prepared on their first call); the title has the numbers.
+function showWarmup(warmup) {
+  const chip = $('vm-warmup'); if (!chip) return;
+  const label = state.apkRunning ? warmupLabel(warmup) : null; if (!label) { chip.hidden = true; return; }
+  chip.hidden = false; chip.dataset.ready = String(!label.warming); chip.textContent = label.text; chip.title = label.title;
 }
 function setBusy(busy) {
   state.busy = busy; syncReloadButton();
@@ -659,7 +666,7 @@ const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTr
     if (state.mode === 'apk') { setStatus('Aplicativo encerrado · nenhuma Activity ativa'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENCERRADO'; }
   },
   rendered(snapshot, composeReady) {
-    syncReloadButton(); showScreenReady(snapshot.screenReady);
+    syncReloadButton(); showScreenReady(snapshot.screenReady); showWarmup(snapshot.warmup);
     overridesPanel.hits(snapshot.methodOverrides); ignoredPanel.hits(snapshot.ignoredActivities); mocksPanel.hits(snapshot.endpointMocks); hostMapPanel.hits(snapshot.hostMap);
     hideBoot({ force: true }); $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth); state.lastSnapshot = snapshot; redrawLayoutBounds(); if (snapshot.vmHealth) state.lastVmHealth = snapshot.vmHealth; if (snapshot.vmHealth?.renderer) showRendererStatus(snapshot.vmHealth.renderer, true); composeInspector.rendered(snapshot); pluginHost.snapshot(snapshot);
     if (snapshot.droppedEvent) appendTrace(`Evento descartado: a View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) já não existe na VM.`);
