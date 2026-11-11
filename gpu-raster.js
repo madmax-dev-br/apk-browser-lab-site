@@ -14,7 +14,10 @@
 // and read back as the same PNG the page already shows (a synchronous GPU read-back plus the CPU PNG encode: the replay moves, the encode does not).
 // What stays on the CPU even with GPU selected: Bitmap pixel reads (Bitmap.getPixel/compress, typed surfaces) and the other PNG rasters (shadows, nine-patches, text).
 export const RENDERERS = Object.freeze(['cpu', 'gpu']);
-export const DEFAULT_RENDERER = 'cpu';
+export const DEFAULT_RENDERER = 'cpu';   // what a caller that names no renderer gets (the Worker, Node, the servers): nothing of the GPU path is created
+/** The renderer of the device settings (the lab page and the player) when none was chosen: the GPU replay, which falls back to CPU by itself where WebGL is not available in the Worker. */
+export const DEFAULT_SETTING_RENDERER = 'gpu';
+export const sanitizeRendererSetting = value => (value === 'cpu' || value === 'gpu' ? value : DEFAULT_SETTING_RENDERER);
 export const sanitizeRenderer = value => (value === 'gpu' ? 'gpu' : DEFAULT_RENDERER);
 export const SLOW_FRAME_MS = 250, SLOW_FRAMES = 3;
 
