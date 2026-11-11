@@ -5,20 +5,20 @@
 // device settings -> setDevice, "Tempo máximo por evento" -> setTimeLimits, "Retornos de métodos" -> setMethodOverrides, "Activities ignoradas" -> setIgnoredActivities,
 // "Mock de endpoints" -> setEndpointMocks, "Permissões" / location / dialog -> setPermissions + permissionResponse, "Abrir" -> startIntent, Logcat -> setLogcatStreaming,
 // Compose -> inspectCompose, plugins -> src/plugin-host.js. The host page is another origin: everything it sends is validated here before it reaches the VM.
-import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=346cde125f88';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=346cde125f88';
-import { formatApiGapReport } from '../api-gap-scan.js?v=346cde125f88';
-import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=346cde125f88';
-import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=346cde125f88';
-import { parseMethodSpec } from '../method-overrides.js?v=346cde125f88';
-import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=346cde125f88';
-import { normalizeIntentRequest } from '../intent-resolver.js?v=346cde125f88';
-import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=346cde125f88';
-import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=346cde125f88';
-import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=346cde125f88';
-import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=346cde125f88';
-import { rowToEntry } from '../logcat.js?v=346cde125f88';
-import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=346cde125f88';
+import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=dcfaf7b69a30';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=dcfaf7b69a30';
+import { formatApiGapReport } from '../api-gap-scan.js?v=dcfaf7b69a30';
+import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=dcfaf7b69a30';
+import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=dcfaf7b69a30';
+import { parseMethodSpec } from '../method-overrides.js?v=dcfaf7b69a30';
+import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=dcfaf7b69a30';
+import { normalizeIntentRequest } from '../intent-resolver.js?v=dcfaf7b69a30';
+import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=dcfaf7b69a30';
+import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=dcfaf7b69a30';
+import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=dcfaf7b69a30';
+import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=dcfaf7b69a30';
+import { rowToEntry } from '../logcat.js?v=dcfaf7b69a30';
+import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=dcfaf7b69a30';
 
 export const SCREENSHOT_GAP_MS = 250, PLUGIN_OUTPUT_MS = 100, MAX_STREAM_BATCH = MAX_LOG_BATCH;
 const LAB_LIVE = ['methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog'];
@@ -313,7 +313,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     status() {
       return { running: running(), activity: lastSnapshot?.activityName ?? null, packageName: packageName || null, statuses: copyStatuses(), hits: { methodOverrides: lastSnapshot?.methodOverrides ?? [], ignoredActivities: lastSnapshot?.ignoredActivities ?? [], endpointMocks: lastSnapshot?.endpointMocks ?? [], hostMap: lastSnapshot?.hostMap ?? [] },
         permissions: { states: { ...permConfig.states }, denials: { ...permConfig.denials }, once: [...permConfig.once] }, pendingPermissionRequests: [...pendingPermissions.keys()], streams: { ...subscribed }, plugins: pluginHost ? pluginHost.list().length : 0,
-        renderer: rendererOut(lastSnapshot?.vmHealth?.renderer ?? rendererStatus), engine: lastSnapshot?.vmHealth?.engine ?? loaded.engine };
+        renderer: rendererOut(lastSnapshot?.vmHealth?.renderer ?? rendererStatus), engine: lastSnapshot?.vmHealth?.engine ?? loaded.engine, warmup: lastSnapshot?.warmup ?? null };
     },
     answerPermission(args) {
       if (!Number.isSafeInteger(args.id)) throw callError('bad-args', 'id must be an integer');

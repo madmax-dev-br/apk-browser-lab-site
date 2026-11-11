@@ -59,19 +59,19 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=346cde125f88';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=346cde125f88';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=346cde125f88';
-import { HandleTable } from './handles.js?v=346cde125f88';
-import { Exceptions } from './exceptions.js?v=346cde125f88';
-import { coreImports } from './boundary-imports.js?v=346cde125f88';
-import { installHostLinking, methodReference } from './host-linking.js?v=346cde125f88';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=346cde125f88';
-import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=346cde125f88';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=346cde125f88';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=346cde125f88';
-import { Blocked } from '../../runtime/scheduler.js?v=346cde125f88';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=346cde125f88';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=dcfaf7b69a30';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=dcfaf7b69a30';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=dcfaf7b69a30';
+import { HandleTable } from './handles.js?v=dcfaf7b69a30';
+import { Exceptions } from './exceptions.js?v=dcfaf7b69a30';
+import { coreImports } from './boundary-imports.js?v=dcfaf7b69a30';
+import { installHostLinking, methodReference } from './host-linking.js?v=dcfaf7b69a30';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=dcfaf7b69a30';
+import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=dcfaf7b69a30';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=dcfaf7b69a30';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=dcfaf7b69a30';
+import { Blocked } from '../../runtime/scheduler.js?v=dcfaf7b69a30';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=dcfaf7b69a30';
 
 const MiB = 1 << 20;
 /** Memory map (bytes): low memory is the module's data; metaspace; the Thread records with their Java and native stacks; the collected heap. */
@@ -133,7 +133,9 @@ export class WasmEngine {
 
   async instantiate(module) {
     const { linker, exceptions, memory } = this;
-    const imports = coreImports(memory, { resolve: linker.imports.resolve, exception: (...a) => this.exceptionEvent(...a), bridge: (m, c, t) => this.bridge(m >>> 0, c >>> 0, t >>> 0),
+    // the linker's work (a method's code copied and its constants resolved the first time they are used) is first-time work: timed as the JavaScript VM times its method decoding
+    const tbLink = this.runtime.tb, resolve = (t, method, what) => { const previous = tbLink.enter(BUCKET.DECODE); try { return linker.imports.resolve(t, method, what); } finally { tbLink.leave(previous); } };
+    const imports = coreImports(memory, { resolve, exception: (...a) => this.exceptionEvent(...a), bridge: (m, c, t) => this.bridge(m >>> 0, c >>> 0, t >>> 0),
       field: (t, object, caller, constant, op, reg) => this.hostField(t >>> 0, object >>> 0, caller >>> 0, constant >>> 0, op >>> 0, reg >>> 0) });
     const { exports } = await WebAssembly.instantiate(module, imports);
     this.x = exports;
