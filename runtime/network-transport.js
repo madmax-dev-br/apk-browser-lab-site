@@ -1,6 +1,6 @@
 // The wire side of the web device's network: one HTTP exchange over fetch, shared by the in-realm executor (network-native.js) and the synchronous network worker
 // (network-worker.js). No VM state in here.
-import { mapUrl } from './host-map.js?v=8cf39c3035e0';
+import { mapUrl } from './host-map.js?v=0f9135b5c65a';
 export const FORBIDDEN_REQUEST_HEADERS = new Set(['content-length', 'host', 'connection', 'transfer-encoding', 'keep-alive', 'upgrade', 'expect', 'te', 'trailer', 'proxy-connection']);
 /** Header names a browser's fetch silently drops; with a relay they travel under an x-apkweb- prefix instead. */
 export const BROWSER_ONLY_FORBIDDEN = new Set(['cookie', 'cookie2', 'user-agent', 'accept-encoding', 'origin', 'referer', 'date', 'dnt', 'via']);
