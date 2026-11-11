@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=5b686e9c43d9">
+  <link rel="stylesheet" href="./site-pages.css?v=b70e9f52fe0c">
 </head>
 <body>
   <header class="topbar">
@@ -404,6 +404,7 @@
           <dl class="facts">
             <div><dt>Devolve</dt><dd><code class="shape">{ blob, width, height, type, notes, element, matches }</code>: <code>element</code> é o componente capturado e <code>matches</code> quantos casaram.</dd></div>
             <div><dt>Opções</dt><dd><code>padding</code> (0 a 64 px) inclui uma folga em volta; <code>maxWidth</code> e <code>type</code> como em <code>screenshot</code>.</dd></div>
+            <div><dt>Views XML</dt><dd>Uma View que a página desenha com elementos próprios (texto, botão, fundos) é fotografada a partir do elemento da página, com os filhos dela; <code>notes</code> avisa, <code>padding</code> não se aplica e o limite é de 600 elementos por componente. Componentes Compose e Views com raster são cortados do raster.</dd></div>
             <div><dt>Limite</dt><dd>O de <code>screenshot</code>: uma a cada 500 ms por plugin.</dd></div>
             <div><dt>Erro</dt><dd><code>not-found</code> quando nada casa (a mensagem diz se o APK não tem aquele id de recurso), <code>no-image</code> quando a área não tem raster.</dd></div>
           </dl>
@@ -1254,6 +1255,6 @@ lab.ui.kv({ recortes: variante.images.length, 'tela parada': variante.settled, '
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=5b686e9c43d9"></script>
+  <script type="module" src="./site-pages.js?v=b70e9f52fe0c"></script>
 </body>
 </html>

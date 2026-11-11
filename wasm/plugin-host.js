@@ -7,11 +7,11 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=5b686e9c43d9';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=5b686e9c43d9';
-import { encodeVariantImages } from './render-variant-image.js?v=5b686e9c43d9';
-import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=5b686e9c43d9';
-import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=5b686e9c43d9';
+import { pluginWorkerSource } from './plugin-runtime.js?v=b70e9f52fe0c';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=b70e9f52fe0c';
+import { encodeVariantImages } from './render-variant-image.js?v=b70e9f52fe0c';
+import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=b70e9f52fe0c';
+import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=b70e9f52fe0c';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
@@ -217,18 +217,16 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       if (!plugin.worker) throw Object.assign(new Error('Plugin parado.'), { code: 'stopped' });
       plugin.lastShotAt = now();
       let element = null, named = null;
-      if (args?.target !== undefined && args?.target !== null) {   // a component by id (src/lab-target.js): cut from its own raster, or with `padding` from every raster under the enlarged box
+      if (args?.target !== undefined && args?.target !== null) {   // a component by id (src/lab-target.js): src/screen-capture.js cuts it from its raster (with `padding`, from every raster under the enlarged box) or, for a View the page draws with its DOM, images the page's element
         const found = await targetsFor(plugin, args.target), chosen = chooseTarget(found.matches, found.selector); if (!chosen) throw targetNotFound(found.selector);
-        named = { element: chosen, matches: found.matches.length }; const padding = Math.max(0, Math.min(64, Number(args.padding) || 0)), raw = found.raw.find(item => item.key === chosen.key);
-        if (padding > 0 || raw.hostId === null || raw.hostId === undefined) { const b = chosen.bounds; args = { ...args, bounds: { left: b.left - padding, top: b.top - padding, right: b.right + padding, bottom: b.bottom + padding } }; }
-        else element = raw;
+        named = { element: chosen, matches: found.matches.length }; element = found.raw.find(item => item.key === chosen.key);
       } else if (args?.key) { element = (await layoutBoundsFor(plugin, { names: false })).find(item => item.key === String(args.key)) ?? null; if (!element) throw Object.assign(new Error(`Elemento ${String(args.key).slice(0, 60)} não está na tela (use lab.layoutBounds() para as chaves atuais).`), { code: 'not-found' }); }
       let region = null;
       if (args?.bounds !== undefined && args?.bounds !== null) {   // a box of the window: a layoutBounds element's bounds, a composeTree node's boundsInWindow, or a rectangle
         const b = args.bounds; if (![b?.left, b?.top, b?.right, b?.bottom].every(Number.isFinite) || !(b.right > b.left && b.bottom > b.top)) throw Object.assign(new Error('bounds precisa de { left, top, right, bottom } com área (coordenadas da janela).'), { code: 'bad-args' });
         region = { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
       }
-      const shot = await captureImage({ snapshot: lastSnapshot, element: region ? null : element, region, maxWidth: args?.maxWidth, type: args?.type });
+      const shot = await captureImage({ snapshot: lastSnapshot, element: region ? null : element, region, padding: named ? args?.padding : 0, maxWidth: args?.maxWidth, type: args?.type });
       return named ? { ...shot, element: named.element, matches: named.matches } : shot;
     }
     if (!VM_METHODS.has(method)) throw Object.assign(new Error(`Método desconhecido: ${String(method).slice(0, 40)}`), { code: 'bad-query' });
