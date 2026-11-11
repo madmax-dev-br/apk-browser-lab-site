@@ -64,6 +64,12 @@
  *   isolated iframe (window.lab.post / on / draggable / onDrag / onDrop inside). The handle: { id, isOpen, update, post, setOpen, expand, collapse, close, onMessage, onToggle,
  *   onClose, onDrag, onDrop }. A drag started in the surface with window.lab.draggable(element, data) reports where it is over the simulated device: onDrag / onDrop get
  *   { type: 'start'|'over'|'cancel'|'drop', payload, inside, x, y (device px), dpX, dpY, percentX, percentY, windowX, windowY, screen: { width, height, density }, element }.
+ * @property {(options: string|{ label?: string, icon?: string, title?: string, id?: string, variant?: 'default'|'primary'|'danger', disabled?: boolean, placement?: 'plugin'|'toolbar' }, onClick?: Function) => Promise<object>} button
+ *   A button of the plugin that the lab renders (src/plugin-buttons.js): 'plugin' (default) in the plugin's output card and its row in Controles › Plugins, 'toolbar' in the
+ *   device preview's bar. onClick(event: { id, by: 'user'|'mcp', button }) runs here and may be async; the button is busy until it finishes. The same `id` again updates
+ *   that button (and replaces its handler when one is given). At most 12 per plugin. -> { id, state, update(changes), remove(), onClick(fn) -> off }.
+ * @property {{ list(): Promise<object[]>, clear(): Promise<{ removed: number }> }} buttons   The plugin's buttons as the page shows them ({ id, label, icon, title, variant,
+ *   disabled, placement, busy, clicks }); clear removes them all. They also go away when the plugin stops.
  * @property {(ms: number) => Promise<void>} sleep
  * @property {{ id: string, name: string, packageName: string|null }} info
  */
@@ -110,6 +116,27 @@ export function pluginWorkerMain(scope) {
   const wrapError = error => Object.assign(new Error(error?.message ?? 'Falha na consulta.'), { code: error?.code ?? 'failed' });
   const watches = new Set(), readyWrappers = new Map(), modals = new Map(); let modalSubscribed = false;
   const tabs = new Map(); let tabSubscribed = false;
+  const buttons = new Map();   // button id -> { handlers: Set, handle }: the plugin's buttons (lab.button); the page keeps their state and sends { t: 'click', id }
+  const buttonConfig = options => { const out = {}; for (const key of ['id', 'label', 'icon', 'title', 'variant', 'disabled', 'placement']) if (options?.[key] !== undefined) out[key] = options[key]; return out; };
+  async function runClick(data) {
+    const id = String(data.id ?? ''), entry = buttons.get(id), handlers = entry ? [...entry.handlers] : [];
+    let ok = true, message = '';
+    await Promise.all(handlers.map(async fn => {
+      try { await fn({ id, by: data.by === 'mcp' ? 'mcp' : 'user', button: entry.handle }); }
+      catch (error) { ok = false; message = clip(error?.message ?? String(error)).slice(0, 400); reportError(error, `button('${id}')`); }
+    }));
+    post({ t: 'clicked', id, ok, handlers: handlers.length, ...(ok ? {} : { error: message }) });
+  }
+  function buttonHandle(id) {
+    let entry = buttons.get(id); if (entry) return entry;
+    entry = { handlers: new Set(), state: null, handle: null };
+    const listen = fn => { if (typeof fn !== 'function') throw new TypeError('button.onClick(função)'); entry.handlers.add(fn); return () => entry.handlers.delete(fn); };
+    entry.handle = Object.freeze({ id, get state() { return entry.state; },
+      update: async (changes = {}) => { entry.state = await call('button', { op: 'update', id, config: buttonConfig(changes) }); return entry.state; },
+      remove: async () => { buttons.delete(id); return call('button', { op: 'remove', id }); },
+      onClick: listen });
+    buttons.set(id, entry); return entry;
+  }
   const fire = (set, phase, ...args) => { for (const fn of [...set]) { try { const result = fn(...args); if (result && typeof result.then === 'function') result.then(undefined, error => reportError(error, phase)); } catch (error) { reportError(error, phase); } } };
   const tabConfig = options => { const out = {}; for (const key of ['id', 'title', 'icon', 'side', 'width', 'height', 'mode', 'trigger', 'open', 'remember']) if (options?.[key] !== undefined) out[key] = options[key]; return out; };
   // a scroll target: a testTag (string), { testTag }, { text }, { key } or a layoutBounds element, { x, y } (a point of the window); nothing = the largest scrollable on screen
@@ -247,6 +274,18 @@ export function pluginWorkerMain(scope) {
       const timer = setInterval(tick, interval); const stop = () => { if (stopped) return; stopped = true; clearInterval(timer); watches.delete(stop); };
       watches.add(stop); tick(); return stop;
     },
+    /** A button of the plugin rendered by the lab: lab.button({ label, icon, title, id, variant, disabled, placement }, onClick) -> { id, state, update, remove, onClick }. */
+    async button(options = {}, onClick) {
+      if (typeof options === 'string') options = { label: options };
+      if (onClick !== undefined && typeof onClick !== 'function') throw new TypeError('lab.button(opções, função)');
+      const reply = await call('button', { op: 'add', config: buttonConfig(options) }), entry = buttonHandle(reply.id);
+      if (onClick) { if (reply.replaced) entry.handlers.clear(); entry.handlers.add(onClick); }
+      entry.state = reply.button; return entry.handle;
+    },
+    buttons: Object.freeze({
+      list: () => call('button', { op: 'list' }),
+      clear: async () => { buttons.clear(); return call('button', { op: 'clear' }); },
+    }),
     sleep: ms => new Promise(resolve => setTimeout(resolve, Math.max(0, Number(ms) || 0))),
     ui,
     info: Object.freeze({ id: '', name: '', packageName: null }),
@@ -255,6 +294,7 @@ export function pluginWorkerMain(scope) {
   scope.onmessage = async ({ data }) => {
     if (!data || typeof data !== 'object') return;
     if (data.t === 'reply') { const waiter = pending.get(data.id); if (!waiter) return; pending.delete(data.id); if (data.ok) waiter.resolve(data.value); else waiter.reject(wrapError(data.error)); return; }
+    if (data.t === 'click') { runClick(data); return; }
     if (data.t === 'event') {
       const set = handlers.get(data.name); if (!set) return;
       for (const fn of [...set]) { try { const result = fn(data.data); if (result && typeof result.then === 'function') result.then(undefined, error => reportError(error, `on('${data.name}')`)); } catch (error) { reportError(error, `on('${data.name}')`); } }

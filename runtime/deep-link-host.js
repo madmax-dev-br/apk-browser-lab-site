@@ -2,7 +2,7 @@
 // (src/intent-resolver.js), builds the real android.content.Intent inside the VM through its public API (new Intent, setAction, setData(Uri.parse), addCategory, putExtra,
 // setComponent) and hands it to the same starter every startActivity() uses. A running app gets a system launch (no source Activity: FLAG_ACTIVITY_NEW_TASK, launchMode and
 // onNewIntent decide the rest); an app that was not started yet gets the Intent as its launcher Intent.
-import { resolveIntent, unresolvedMessage, describeIntent, normalizeIntentRequest } from './intent-resolver.js?v=5be31ba741dc';
+import { resolveIntent, unresolvedMessage, describeIntent, normalizeIntentRequest } from './intent-resolver.js?v=346cde125f88';
 
 const INTENT = 'Landroid/content/Intent;', URI = 'Landroid/net/Uri;', COMPONENT = 'Landroid/content/ComponentName;', STRING = 'Ljava/lang/String;';
 const F64 = new Float64Array(1), B64 = new BigInt64Array(F64.buffer);

@@ -1,34 +1,34 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=5be31ba741dc';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=5be31ba741dc';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=5be31ba741dc';
-import { initCollapsibleSections } from './panel-sections.js?v=5be31ba741dc';
-import { initHelpTips } from './help-tips.js?v=5be31ba741dc';
-import { createToolDock } from './tool-dock.js?v=5be31ba741dc';
-import { createPermissionsPanel } from './permissions-panel.js?v=5be31ba741dc';
-import { createOverridesPanel } from './overrides-panel.js?v=5be31ba741dc';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=5be31ba741dc';
-import { createHostMapPanel } from './host-map-panel.js?v=5be31ba741dc';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=5be31ba741dc';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=5be31ba741dc';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=5be31ba741dc';
-import { createDeviceView, createViewState } from './device-view.js?v=5be31ba741dc';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=5be31ba741dc';
-import { formatApiGapReport } from './api-gap-scan.js?v=5be31ba741dc';
-import { createLogcatPanel } from './logcat-panel.js?v=5be31ba741dc';
-import { createComposeInspectorPanel, flattenViews } from './compose-inspector-panel.js?v=5be31ba741dc';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=5be31ba741dc';
-import { createPluginHost } from './plugin-host.js?v=5be31ba741dc';
-import { captureImage } from './screen-capture.js?v=5be31ba741dc';
-import { createPluginsPanel } from './plugins-panel.js?v=5be31ba741dc';
-import { createMcpTools } from './mcp-tools.js?v=5be31ba741dc';
-import { createMcpLink, generateMcpToken, mcpClientConfig, mcpBridgePort } from './mcp-link.js?v=5be31ba741dc';
-import { createModalHost } from './lab-modal.js?v=5be31ba741dc';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=5be31ba741dc';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=5be31ba741dc';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=5be31ba741dc';
-import { createDragLayer } from './lab-drag.js?v=5be31ba741dc';
-import { createLabScroll } from './lab-scroll.js?v=5be31ba741dc';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=5be31ba741dc';
+import { APKWorkerClient } from './apk-worker-client.js?v=346cde125f88';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=346cde125f88';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=346cde125f88';
+import { initCollapsibleSections } from './panel-sections.js?v=346cde125f88';
+import { initHelpTips } from './help-tips.js?v=346cde125f88';
+import { createToolDock } from './tool-dock.js?v=346cde125f88';
+import { createPermissionsPanel } from './permissions-panel.js?v=346cde125f88';
+import { createOverridesPanel } from './overrides-panel.js?v=346cde125f88';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=346cde125f88';
+import { createHostMapPanel } from './host-map-panel.js?v=346cde125f88';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=346cde125f88';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=346cde125f88';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=346cde125f88';
+import { createDeviceView, createViewState } from './device-view.js?v=346cde125f88';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=346cde125f88';
+import { formatApiGapReport } from './api-gap-scan.js?v=346cde125f88';
+import { createLogcatPanel } from './logcat-panel.js?v=346cde125f88';
+import { createComposeInspectorPanel, flattenViews } from './compose-inspector-panel.js?v=346cde125f88';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=346cde125f88';
+import { createPluginHost } from './plugin-host.js?v=346cde125f88';
+import { captureImage } from './screen-capture.js?v=346cde125f88';
+import { createPluginsPanel } from './plugins-panel.js?v=346cde125f88';
+import { createMcpTools } from './mcp-tools.js?v=346cde125f88';
+import { createMcpLink, generateMcpToken, mcpClientConfig, mcpBridgePort } from './mcp-link.js?v=346cde125f88';
+import { createModalHost } from './lab-modal.js?v=346cde125f88';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=346cde125f88';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=346cde125f88';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=346cde125f88';
+import { createDragLayer } from './lab-drag.js?v=346cde125f88';
+import { createLabScroll } from './lab-scroll.js?v=346cde125f88';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=346cde125f88';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -539,7 +539,7 @@ const deviceState = { settings: loadDeviceSettings(), clockTimer: null };
 const permissionsPanel = createPermissionsPanel({ $, vm: apkVM, location: { get: () => deviceState.settings.location, set: block => { deviceState.settings = { ...deviceState.settings, location: block }; saveDeviceSettings(deviceState.settings); } } });
 const overridesPanel = createOverridesPanel({ $, vm: apkVM });
 const ignoredPanel = createIgnoredActivitiesPanel({ $, vm: apkVM });
-pluginsPanel = createPluginsPanel({ $, host: pluginHost, modals: modalHost });
+pluginsPanel = createPluginsPanel({ $, host: pluginHost, modals: modalHost, toolbarRoot: $('plugin-toolbar') });   // toolbarRoot: lab.button({ placement: 'toolbar' }) in the preview bar
 // "MCP" (src/mcp-link.js, src/mcp-tools.js, scripts/lab-mcp.mjs): an MCP client on this machine uses this page through the local bridge; off until Conectar
 const MCP_KEY = 'apkweb-mcp-v1';
 const mcpCaller = { id: 'mcp', name: 'MCP' };
@@ -605,7 +605,7 @@ const mcpInput = {
   async back() { if (!state.canGoBack) throw Object.assign(new Error('Não há tela anterior para voltar.'), { code: 'bad-args' }); await backAPK(); return { back: true }; },
   scrollTo: args => labScrollCall('scrollTo', args), scrollInfo: args => labScrollCall('info', args),   // to a position / percentage (src/lab-scroll.js), as lab.scrollTo of the plugins
 };
-const mcpTools = createMcpTools({ input: mcpInput, actions: { mock: spec => pluginActions.mock(mcpCaller, spec), unmock: id => pluginActions.unmock(mcpCaller, { id }), mocks: () => pluginActions.mocks(mcpCaller), reload: mode => pluginActions.reload(mcpCaller, { mode }) }, query: (method, args) => pluginHost.query(method, args), plugins: () => pluginHost.list?.() ?? [], logcat: () => logcatPanel.store.entries, network: () => netlogPanel.store.entries,
+const mcpTools = createMcpTools({ input: mcpInput, actions: { mock: spec => pluginActions.mock(mcpCaller, spec), unmock: id => pluginActions.unmock(mcpCaller, { id }), mocks: () => pluginActions.mocks(mcpCaller), reload: mode => pluginActions.reload(mcpCaller, { mode }) }, query: (method, args) => pluginHost.query(method, args), plugins: () => pluginHost.list?.() ?? [], clickButton: (id, button) => pluginHost.clickButton(id, button, { by: 'mcp' }), logcat: () => logcatPanel.store.entries, network: () => netlogPanel.store.entries,
   status: () => ({ running: !!apkVM.worker, packageName: state.inventory?.packageName ?? null, file: state.fileName ?? null }) });
 mcpLink = createMcpLink({ execute: (tool, args) => mcpTools.execute(tool, args), onState: ({ state: linkState, message, calls, lastTool }) => {
   const connected = linkState === 'conectado';

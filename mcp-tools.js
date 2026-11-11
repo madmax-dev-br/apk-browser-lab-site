@@ -23,9 +23,9 @@ const scrollTargetOf = args => args.element_key || args.test_tag || args.text ||
 /**
  * query(method, args): the plugin host's page-level query (screen, layoutBounds, screenshot, composeTree, viewModels, inspect, field, statics, staticField, classes,
  * instances, referrers, compositionLocals, findCompositionLocal). plugins(): the host's read model of the plugins. logcat() / network(): the entries of the page stores.
- * status(): what the page knows about the loaded APK. sleep(ms).
+ * status(): what the page knows about the loaded APK. clickButton(pluginId, buttonId): a click on a plugin's button (lab.button), resolved when its handler finished. sleep(ms).
  */
-export function createMcpTools({ query, plugins = () => [], logcat = () => [], network = () => [], status = () => ({}), actions = null, input = null, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
+export function createMcpTools({ query, plugins = () => [], clickButton = null, logcat = () => [], network = () => [], status = () => ({}), actions = null, input = null, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
   async function waitReady(timeoutMs = 15000) {
     const until = now() + bounded(timeoutMs, 15000, 100, 120000);
     for (;;) {
@@ -107,12 +107,25 @@ export function createMcpTools({ query, plugins = () => [], logcat = () => [], n
           else blocks.push({ id: block.id, kind: block.kind, text: block.text });
         }
         out.push({ id: plugin.id, name: plugin.name, status: plugin.status, reason: plugin.reason || undefined, badge: plugin.output?.badge || undefined, blocks,
+          ...(plugin.buttons?.length ? { buttons: plugin.buttons.map(button => ({ id: button.id, label: button.label, icon: button.icon || undefined, title: button.title || undefined, placement: button.placement, disabled: button.disabled || undefined, busy: button.busy || undefined })) } : {}),
           errors: (plugin.errors ?? []).slice(-5).map(error => `${error.phase}: ${error.message}`), console: (plugin.console ?? []).slice(-20).map(line => `${line.level}: ${line.text}`) });
       }
       if (wanted && !out.length) throw fail(`Plugin "${wanted}" não encontrado (lab_status lista os plugins).`);
       const content = [text(out)];
       for (const { plugin, block } of images.slice(0, 8)) { content.push(await image({ blob: block.blob, type: block.blob.type })); content.push(text(`↑ imagem do plugin ${plugin}${block.caption ? `: ${block.caption}` : ''}`)); }
       return content;
+    },
+    /** A click on a plugin's button (lab.button), as the user's: the plugin's handler runs; the answer comes when it finished, with what it wrote (blocks, errors). */
+    async click_plugin_button(args) {
+      if (typeof clickButton !== 'function') throw fail('Botões de plugin não estão disponíveis nesta página.');
+      const wanted = String(args.plugin ?? ''), plugin = plugins().find(item => item.id === wanted) ?? plugins().find(item => item.name === wanted);
+      if (!plugin) throw fail(`Plugin "${wanted}" não encontrado (lab_status lista os plugins).`);
+      const key = String(args.button ?? ''), button = (plugin.buttons ?? []).find(item => item.id === key) ?? (plugin.buttons ?? []).find(item => item.label === key);
+      if (!button) throw fail(`O plugin ${plugin.name} não tem o botão "${key}" (plugins lista os botões: ${(plugin.buttons ?? []).map(item => item.id).join(', ') || 'nenhum'}).`);
+      const errorsBefore = plugin.errorCount ?? 0, wait = bounded(args.wait_ms, 10000, 0, 60000);
+      const result = await Promise.race([clickButton(plugin.id, button.id), sleep(wait).then(() => ({ ok: null, reason: 'still-running' }))]);
+      const after = plugins().find(item => item.id === plugin.id) ?? plugin, fresh = Math.min(5, Math.max(0, (after.errorCount ?? 0) - errorsBefore));
+      return [text({ plugin: plugin.name, button: button.id, ...result, newErrors: fresh ? (after.errors ?? []).slice(-fresh).map(error => `${error.phase}: ${error.message}`) : [] })];
     },
     async logcat(args) {
       // a cursor to follow the Logcat: `since` (the `next` of the previous answer) returns only newer lines; `wait_ms` waits up to that long for one to arrive

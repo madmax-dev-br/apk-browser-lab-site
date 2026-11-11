@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=5be31ba741dc">
+  <link rel="stylesheet" href="./site-pages.css?v=346cde125f88">
 </head>
 <body>
   <header class="topbar">
@@ -98,7 +98,7 @@
         <ol>
           <li>Abra <b>Controles › Plugins</b>.</li>
           <li>Clique em <b>+ Adicionar</b>. O diálogo abre em branco, com um link para os exemplos: <b>Nome</b>, as opções de saída e <b>Código</b>. No editor, Tab insere dois espaços e Esc fecha.</li>
-          <li>Escreva o código, ou copie um dos <a href="#exemplos">exemplos</a> (Tela atual, Logs filtrados, Observar ViewModel, Componentes da tela, Árvore Compose resumida, Print na tela pronta e outros).</li>
+          <li>Escreva o código, ou copie um dos <a href="#exemplos">exemplos</a> (Tela atual, Logs filtrados, Observar ViewModel, Componentes da tela, Árvore Compose resumida, Print na tela pronta, Botões do plugin e outros).</li>
           <li>Clique em <b>Salvar</b>. O plugin novo já vem ligado, vale para qualquer app e começa a rodar quando há um APK aberto.</li>
         </ol>
         <p>O código é o corpo de uma função assíncrona: use <code>await</code> no topo à vontade. <code>import</code> estático não funciona; <code>await import(url)</code> funciona. O objeto global <code>lab</code> é a API.</p>
@@ -225,6 +225,17 @@
             <tr><td>Campos do evento</td><td><code>inside</code>: o ponteiro está sobre a tela do aparelho. <code>x</code>, <code>y</code>: px da tela do aparelho; <code>dpX</code>, <code>dpY</code>: os mesmos em dp; <code>percentX</code>, <code>percentY</code>: porcentagem da largura e da altura da tela. <code>windowX</code>, <code>windowY</code>: o ponto na janela do app, o sistema de <code>lab.layoutBounds()</code>. <code>element</code>: o componente do app sob o ponto (<code>key</code>, <code>name</code>, <code>testTag</code>, <code>role</code>, <code>texts</code>, <code>actions</code>, <code>bounds</code>) ou <code>null</code>. A posição vem do retângulo da tela no momento, então vale com o aparelho em qualquer escala.</td></tr>
           </tbody>
         </table></div>
+        <h3 id="h-botoes">Botões do plugin</h3>
+        <p>Um plugin pode ter botões próprios sem montar HTML: ele diz o texto, o ícone e o que fazer, e o laboratório desenha botões de verdade (com foco pelo teclado, Enter e Espaço). Com <code>placement: 'plugin'</code> (o padrão) eles aparecem no cartão do plugin, no painel <b>Plugins</b>, e na linha dele em <b>Controles › Plugins</b>; com <code>placement: 'toolbar'</code>, na barra do aparelho, ao lado de Recriar, Reabrir, Voltar e Tela cheia, com borda tracejada e o nome do plugin na dica. Enquanto o código do clique roda, o botão mostra que está ocupado e ignora novos cliques. Tudo é texto, nunca HTML. Os botões somem quando o plugin para, é desligado ou removido.</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Chamada</th><th scope="col">O que faz</th></tr></thead>
+          <tbody>
+            <tr><td><code>const b = await lab.button({ label, icon, title, id, variant, disabled, placement }, aoClicar)</code> · <code>lab.button('Texto', aoClicar)</code></td><td><code>label</code>: o texto (até 40 caracteres). <code>icon</code>: um emoji ou até dois caracteres. <code>title</code>: a dica (até 200). <code>variant</code>: <code>'default'</code>, <code>'primary'</code> ou <code>'danger'</code>. <code>disabled: true</code> desenha desabilitado. <code>placement</code>: <code>'plugin'</code> ou <code>'toolbar'</code>. <code>id</code>: o mesmo <code>id</code> de novo atualiza aquele botão (e troca o código do clique, se vier um). Até 12 botões por plugin (erro <code>limit</code> depois disso).</td></tr>
+            <tr><td><code>aoClicar({ id, by, button })</code></td><td>Roda no plugin, pode ser <code>async</code>. <code>by</code>: <code>'user'</code> ou <code>'mcp'</code>; <code>button</code> é o próprio botão (<code>button.update(…)</code>). Um erro aparece nos erros do cartão (fase <code>button('id')</code>) e o plugin continua rodando.</td></tr>
+            <tr><td><code>b.update({ label, icon, title, variant, disabled, placement })</code> · <code>b.remove()</code> · <code>b.onClick(fn)</code> · <code>b.state</code></td><td>Muda só o que for passado; remove o botão; acrescenta outro código de clique (devolve a função que tira); o estado como a página o mostra.</td></tr>
+            <tr><td><code>await lab.buttons.list()</code> · <code>await lab.buttons.clear()</code></td><td>Os botões do plugin <code>[{ id, label, icon, title, variant, disabled, placement, busy, clicks }]</code>; remove todos.</td></tr>
+          </tbody>
+        </table></div>
         <h3>Saída e utilidades</h3>
         <div class="table-scroll"><table>
           <thead><tr><th scope="col">Chamada</th><th scope="col">O que faz</th></tr></thead>
@@ -304,7 +315,8 @@ lab.watch({ static: 'com.exemplo.Sessao' }, 'atual.usuario', v =&gt; lab.ui.json
             <tr><td><code>layout_bounds</code>, <code>compose_tree</code></td><td>Os componentes com limites, nomes, textos e ações; <code>compose_tree</code> aceita <code>locals</code> para anexar CompositionLocals a cada nó.</td></tr>
             <tr><td><code>composition_locals</code>, <code>find_composition_local</code></td><td>Os Locals de um componente; onde um Local é fornecido na tela, por valor.</td></tr>
             <tr><td><code>view_models</code>, <code>inspect</code>, <code>field</code>, <code>statics</code>, <code>static_field</code>, <code>classes</code>, <code>instances</code>, <code>referrers</code></td><td>As mesmas leituras somente leitura dos plugins.</td></tr>
-            <tr><td><code>plugins</code></td><td>A saída de cada plugin (texto, tabelas, JSON, imagens), estado e erros.</td></tr>
+            <tr><td><code>plugins</code></td><td>A saída de cada plugin (texto, tabelas, JSON, imagens), estado, erros e os botões dele.</td></tr>
+            <tr><td><code>click_plugin_button</code></td><td>Clica num botão de um plugin (<code>plugin</code>: id ou nome; <code>button</code>: id ou texto), como você clicaria: o código do plugin roda e a resposta vem quando terminou, com o tempo e os erros novos.</td></tr>
             <tr><td><code>logcat</code>, <code>network</code></td><td>Logcat (coletado enquanto o MCP está conectado) e o log de rede, com filtros (<code>level</code>, <code>contains</code>, <code>limit</code>). Escolha o intervalo para não trazer tudo: <code>start: "now"</code> só marca o ponto de partida (devolve o cursor), <code>since</code> traz o que veio depois de um cursor, <code>last_seconds</code> os últimos N segundos e <code>from_time</code> a partir de um momento. Para acompanhar ao vivo, cada resposta traz <code>next</code> e <code>wait_ms</code> espera até chegar algo novo (até 30 s). <code>network</code> com <code>include_body</code> devolve o corpo das respostas (texto).</td></tr>
             <tr><td><code>scroll_to</code>, <code>scroll_info</code></td><td>Rolam uma lista até uma posição em px (<code>to_y</code>, <code>to_x</code>) ou até uma porcentagem do curso (<code>percent_y</code>, <code>percent_x</code>, 0 a 100), como <code>lab.scrollTo</code> e <code>lab.scrollToPercent</code>, e dizem onde a rolagem está. O alvo é <code>test_tag</code>, <code>text</code>, <code>element_key</code> ou um ponto; sem alvo, a maior lista da tela.</td></tr>
             <tr><td><code>tap</code>, <code>type</code>, <code>scroll</code>, <code>back</code></td><td>Mexem no app como você: <code>tap</code> toca num componente (por <code>test_tag</code>, <code>text</code> ou <code>element_key</code>) ou num ponto (<code>x</code>, <code>y</code>), com um toque real em Compose e o clique numa View; <code>type</code> escreve num campo (<code>value</code>); <code>scroll</code> rola a lista do componente (<code>dy</code>, <code>dx</code>); <code>back</code> é o botão Voltar. Cada um espera a tela assentar e devolve a tela; com <code>screenshot: true</code>, o print também.</td></tr>
@@ -527,6 +539,23 @@ aba.onMessage(async porcentagem =&gt; {
 });
 aba.onToggle((aberta, por) =&gt; lab.ui.text(`aba ${aberta ? 'aberta' : 'recolhida'} (${por})`, { id: 'aba' }));</code></pre></div>
 
+        <h3>Botões do plugin</h3>
+        <p>Três botões sem nenhum HTML: dois no cartão do plugin (e na linha dele em Controles › Plugins), um que rola a lista até o fim e outro que tira um print e diz o tamanho, e um na barra do aparelho que troca o próprio texto a cada clique.</p>
+        <div class="code" data-name="Botões do plugin"><pre><code>await lab.button({ id: 'fim', label: 'Ir ao fim', icon: '⤓', title: 'Rola a maior lista da tela até o fim' }, async () =&gt; {
+  const onde = await lab.scrollToPercent(100);
+  lab.ui.kv({ lista: onde.element, porcentagem: `${onde.percentY} %`, chegou: onde.reached }, { id: 'rolagem' });
+});
+await lab.button({ id: 'print', label: 'Print', icon: '📷', variant: 'primary' }, async () =&gt; {
+  const print = await lab.screenshot({ maxWidth: 480 });
+  lab.ui.text(`Print: ${print.width} × ${print.height} px, ${(print.blob.size / 1024).toFixed(1)} KiB`, { id: 'tamanho' });
+  lab.ui.image(print, { id: 'print' });
+});
+let ligado = false;
+await lab.button({ id: 'alternar', label: 'Modo: desligado', icon: '○', placement: 'toolbar', title: 'Troca o próprio texto' }, async ({ button }) =&gt; {
+  ligado = !ligado;
+  await button.update({ label: `Modo: ${ligado ? 'ligado' : 'desligado'}`, icon: ligado ? '●' : '○' });
+});</code></pre></div>
+
         <h3>Paleta de arrastar</h3>
         <p>Uma aba com itens que você arrasta até o aparelho; o plugin recebe onde cada um caiu, em px, dp e porcentagem da tela, e o componente que estava embaixo. Cada item tem um campo <code>thumb</code> para uma miniatura (uma <code>data:</code> URL): aqui a do primeiro item vem de um recorte da tela, e qualquer outra imagem do componente entra no mesmo campo.</p>
         <div class="code" data-name="Paleta de arrastar"><pre><code>const itens = [{ id: 'toque', nome: 'Toque', thumb: null }, { id: 'nota', nome: 'Nota', thumb: null }];
@@ -597,6 +626,6 @@ lab.ui.kv({ recortes: variante.images.length, 'tela parada': variante.settled, '
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./arquitetura.html">Arquitetura da VM</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=5be31ba741dc"></script>
+  <script type="module" src="./site-pages.js?v=346cde125f88"></script>
 </body>
 </html>

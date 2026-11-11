@@ -2,8 +2,9 @@
 // Remover, order, export / import) and the dialog edits one (name, output options, code; a stored package filter is kept, not edited); the list lives in localStorage (src/plugin-store.js) and is handed to the host
 // (src/plugin-host.js), which runs each enabled plugin in its own Worker. The output panel shows one card per running or failed plugin: its blocks (rendered with textContent
 // and DOM building only, never HTML), badge, console and errors, with Parar / Reiniciar. Renders are coalesced (at most every RENDER_MS) and skipped while the panel is closed.
-import { RENDER_MS } from './plugin-host.js?v=5be31ba741dc';
-import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=5be31ba741dc';
+import { RENDER_MS } from './plugin-host.js?v=346cde125f88';
+import { syncButtons, buttonItems } from './plugin-buttons.js?v=346cde125f88';
+import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=346cde125f88';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const STATUS_LABEL = { rodando: 'rodando', iniciando: 'iniciando', parado: 'parado', erro: 'erro' };
@@ -48,11 +49,16 @@ const imageURLs = new Map();
 function imageURL(blob) { let url = imageURLs.get(blob); if (!url) { url = URL.createObjectURL(blob); imageURLs.set(blob, url); } return url; }
 export function releaseImages(liveBlobs) { for (const [blob, url] of imageURLs) if (!liveBlobs.has(blob)) { URL.revokeObjectURL(url); imageURLs.delete(blob); } }
 
-export function createPluginsPanel({ $, host, save = download, outputRoot = $('plugins-output'), setTimer = (fn, ms) => setTimeout(fn, ms), now = () => performance.now(), modals = null }) {
+export function createPluginsPanel({ $, host, save = download, outputRoot = $('plugins-output'), toolbarRoot = null, setTimer = (fn, ms) => setTimeout(fn, ms), now = () => performance.now(), modals = null }) {
   const S = { plugins: loadPlugins(), editing: null, opener: null, submitted: false, dirty: new Set(), timer: null, lastRender: -Infinity, cards: new Map(), open: new Set() };
   const doc = outputRoot?.ownerDocument ?? globalThis.document;
   const el = (tag, className, text) => { const node = doc.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
   const button = (text, className, label, onClick) => { const node = el('button', `cp-button ${className}`, text); node.type = 'button'; if (label) node.setAttribute('aria-label', label); node.addEventListener('click', onClick); return node; };
+  // the plugins' own buttons (lab.button, src/plugin-buttons.js): a click runs the plugin's handler; the host marks the button busy until it finishes
+  const clickButton = (pluginId, buttonId) => { host.clickButton?.(pluginId, buttonId)?.then?.(() => schedule(pluginId), () => schedule(pluginId)); schedule(pluginId); };
+  const buttonGroup = label => { const group = el('div', 'pb-row'); group.setAttribute('role', 'group'); group.setAttribute('aria-label', label); group.hidden = true; return group; };
+  /** The preview bar's plugin buttons (placement 'toolbar'), in plugin order. */
+  function renderToolbar() { if (toolbarRoot) syncButtons(toolbarRoot, S.plugins.flatMap(plugin => buttonItems(plugin, host.get(plugin.id), 'toolbar')), { onClick: clickButton, toolbar: true }); }
   const statusOf = plugin => { const live = host.get(plugin.id); return live ? { status: live.status, reason: live.reason, errors: live.errorCount, badge: live.output?.badge ?? '' } : { status: 'parado', reason: plugin.enabled ? '' : 'desligado', errors: 0, badge: '' }; };
 
   // ---- the section list -----------------------------------------------------------------------------------------------------------------------------------------------
@@ -62,7 +68,11 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     return [parts.join(' · '), status === 'erro' ? 'error' : status === 'rodando' ? 'ok' : ''];
   }
   function updateMeta() {
-    [...$('pl-list').children].forEach((li, index) => { const plugin = S.plugins[index]; if (!plugin) return; const [text, state] = meta(plugin), info = li.querySelector('.em-meta'); if (info) { info.textContent = text; info.dataset.state = state; } });
+    [...$('pl-list').children].forEach((li, index) => {
+      const plugin = S.plugins[index]; if (!plugin) return; const [text, state] = meta(plugin), info = li.querySelector('.em-meta'); if (info) { info.textContent = text; info.dataset.state = state; }
+      syncButtons(li.querySelector('.pb-row'), buttonItems(plugin, host.get(plugin.id), 'plugin'), { onClick: clickButton });
+    });
+    renderToolbar();
     const runningCount = host.runningCount;
     $('pl-summary').textContent = `${runningCount} rodando`;
     $('pl-status').textContent = !S.plugins.length ? 'Nenhum plugin. Clique em + Adicionar.' : `${S.plugins.length} ${S.plugins.length === 1 ? 'plugin' : 'plugins'}, ${runningCount} rodando.${runningCount ? ' A saída aparece no painel Plugins abaixo do aparelho.' : ''}`;
@@ -81,7 +91,7 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
         button('Remover', 'em-remove', `Remover o plugin ${n}: ${plugin.name}`, () => { if (!globalThis.confirm || globalThis.confirm(`Remover o plugin "${plugin.name}"?`)) { S.plugins.splice(index, 1); changed(); $('pl-add').focus(); } }));
       actions.children[0].disabled = index === 0; actions.children[1].disabled = index === S.plugins.length - 1;
       const info = el('span', 'em-meta'); info.setAttribute('role', 'status');
-      li.append(check, what, actions, info); return li;
+      li.append(check, what, actions, info, buttonGroup(`Botões do plugin ${plugin.name}`)); return li;
     }));
     updateMeta();
   }
@@ -217,11 +227,12 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
       });
       expand.hidden = !modals;
       tools.append(refresh, expand, stop, restart);
+      const actions = buttonGroup(`Botões do plugin ${plugin.name}`);
       const blocks = el('div', 'po-blocks'), errors = el('div', 'po-errors'), consoleBox = el('details', 'po-console'), consoleSummary = el('summary', '', 'Console'), consoleLines = el('div', 'po-console-lines');
-      consoleBox.append(consoleSummary, consoleLines); head.append(name, status, badge, fresh); root.append(head, tools, errors, blocks, consoleBox);
+      consoleBox.append(consoleSummary, consoleLines); head.append(name, status, badge, fresh); root.append(head, tools, actions, errors, blocks, consoleBox);
       root.open = S.open.has(plugin.id);
       root.addEventListener('toggle', () => { if (root.open) { S.open.add(plugin.id); const current = S.cards.get(plugin.id); if (current) current.force = true; schedule(plugin.id); } else S.open.delete(plugin.id); });
-      entry = { id: plugin.id, root, name, status, badge, fresh, refresh, stop, restart, blocks, errors, consoleBox, consoleSummary, consoleLines, consoleCount: -1, errorCount: -1, force: true, acceptUntil: 0 };
+      entry = { id: plugin.id, root, name, status, badge, fresh, refresh, stop, restart, actions, blocks, errors, consoleBox, consoleSummary, consoleLines, consoleCount: -1, errorCount: -1, force: true, acceptUntil: 0 };
       S.cards.set(plugin.id, entry);
     }
     const live = host.get(plugin.id), status = live?.status ?? 'parado';
@@ -229,6 +240,7 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     entry.badge.textContent = live?.output?.badge ?? ''; entry.badge.hidden = !entry.badge.textContent;
     entry.stop.disabled = !live?.worker; entry.restart.disabled = !plugin.enabled; entry.refresh.disabled = !live?.worker || !!entry.loading;
     applyDisplay(entry, plugin);
+    syncButtons(entry.actions, buttonItems(plugin, live, 'plugin'), { onClick: clickButton });
     if (live) {
       const blocks = live.output.blocks, changedBlocks = entry.force || entry.lastStatus !== status || !entry.lastBlocks || blocks.length !== entry.lastBlocks.length || blocks.some((block, index) => entry.lastBlocks[index] !== block);
       const hold = plugin.updates === 'manual' && entry.lastBlocks && !entry.force && now() > entry.acceptUntil && entry.lastStatus === status;

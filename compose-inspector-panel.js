@@ -6,7 +6,7 @@
 // the inspected LayoutNode with the same semanticsId; "Árvore completa" lists every LayoutNode of the inspection instead.
 // The pure functions (element list, crop rectangles, bounds text, filter, JSON) are exported and tested without a DOM; createComposeInspectorPanel() wires them to the page.
 
-import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=5be31ba741dc';
+import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=346cde125f88';
 
 export const MAX_CROPS = 300;   // cards with an image in the carousel; the table lists every element
 export const EAGER_CROPS = 12;   // without IntersectionObserver, the first cards are cut at once and the others when chosen
