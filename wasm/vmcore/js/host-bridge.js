@@ -59,27 +59,28 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=b70e9f52fe0c';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=b70e9f52fe0c';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=b70e9f52fe0c';
-import { HandleTable } from './handles.js?v=b70e9f52fe0c';
-import { Exceptions } from './exceptions.js?v=b70e9f52fe0c';
-import { coreImports } from './boundary-imports.js?v=b70e9f52fe0c';
-import { installHostLinking, methodReference } from './host-linking.js?v=b70e9f52fe0c';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=b70e9f52fe0c';
-import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=b70e9f52fe0c';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=b70e9f52fe0c';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=b70e9f52fe0c';
-import { Blocked } from '../../runtime/scheduler.js?v=b70e9f52fe0c';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=b70e9f52fe0c';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=7a839fa82e6c';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=7a839fa82e6c';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=7a839fa82e6c';
+import { HandleTable } from './handles.js?v=7a839fa82e6c';
+import { Exceptions } from './exceptions.js?v=7a839fa82e6c';
+import { coreImports } from './boundary-imports.js?v=7a839fa82e6c';
+import { installHostLinking, methodReference } from './host-linking.js?v=7a839fa82e6c';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=7a839fa82e6c';
+import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=7a839fa82e6c';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=7a839fa82e6c';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=7a839fa82e6c';
+import { Blocked } from '../../runtime/scheduler.js?v=7a839fa82e6c';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=7a839fa82e6c';
 
 const MiB = 1 << 20;
 /** Memory map (bytes): low memory is the module's data; metaspace; the Thread records with their Java and native stacks; the collected heap. */
 // THREADS: the main thread's record (its Java stack, and the one native stack of the module at the top of its span); GUESTS: the records of the other Java threads (a Java stack each).
 // Sized for a large app (hundreds of thousands of methods, hundreds of threads), not for the lab's examples: the memory is address space until it is written, so a region nobody uses costs nothing.
-// Metaspace 255 MiB (the tables of LINKER_LIMITS and every linked method's code and constants), the main thread's record, 250 records for the other threads, then the collected heap.
-export const LAYOUT = Object.freeze({ META: 1 * MiB, META_END: 256 * MiB, THREADS: 256 * MiB, THREAD_SPAN: 4 * MiB, GUESTS: 260 * MiB, GUEST_SPAN: 1 * MiB, GUEST_COUNT: 250, HEAP: 512 * MiB });
-export const DEFAULT_PAGES = 16384;   // 1 GiB of memory: a collected heap of 512 MiB above LAYOUT.HEAP
+// Metaspace 511 MiB (the tables of LINKER_LIMITS and every linked method's code and constants), the main thread's record, a record for each of the other threads the core has
+// ids for (core-threads.js MAX_LIVE_THREADS: none is taken from metaspace, which an app with hundreds of live threads would exhaust a MiB at a time), then the collected heap.
+export const LAYOUT = Object.freeze({ META: 1 * MiB, META_END: 512 * MiB, THREADS: 512 * MiB, THREAD_SPAN: 4 * MiB, GUESTS: 516 * MiB, GUEST_SPAN: 1 * MiB, GUEST_COUNT: 1000, HEAP: 1536 * MiB });
+export const DEFAULT_PAGES = 32768;   // 2 GiB of memory (the most this module's memory may have): a collected heap of 512 MiB above LAYOUT.HEAP
 export const LINKER_LIMITS = Object.freeze({ maxMethods: 1 << 21, maxClasses: 1 << 18, maxStrings: 1 << 20 });
 export const THREAD = Object.freeze({ vm: 0, stackBase: 4, stackEnd: 8, status: 12, detail: 16, interrupt: 20, ringIndex: 24, steps: 32, maxSteps: 40, result: 48, calls: 56, peakDepth: 64,
   tlabTop: 68, tlabEnd: 72, stackTop: 2128, frame: 2132, pc: 2136, depth: 2140, throwing: 2144, maxDepth: 2148, args: 2304, javaStack: 4096, javaStackBytes: 2 * MiB });
@@ -841,7 +842,7 @@ export class WasmEngine {
   /** The record (facade) of the object at `address`, as runtime.object() gives it. */
   recordAt(address) { return this.space.objectAt(address); }
   /** The core's heap for reports: its size in bytes, what the last collection left alive, how many collections ran, and how many objects the hosts hold a handle of. */
-  memoryInfo() { const h = this.h; return { heapBytes: this.r32(h + GC.end) - this.r32(h + GC.base), liveBytes: this.stats.collections ? this.r32(h + GC.liveBytes) : null, liveObjects: this.stats.collections ? this.r32(h + GC.liveObjects) : null, collections: this.stats.collections, handles: Number(this.runtime.heap?.size ?? 0) }; }
+  memoryInfo() { const h = this.h; return { metaBytes: this.linker.top - LAYOUT.META, metaCapacity: LAYOUT.META_END - LAYOUT.META, classes: this.linker.classList.length, methods: this.linker.methodList.length, threadRecords: this.threads?.nextGuest ?? 0, threadRecordsFree: this.threads?.free.length ?? 0, heapBytes: this.r32(h + GC.end) - this.r32(h + GC.base), liveBytes: this.stats.collections ? this.r32(h + GC.liveBytes) : null, liveObjects: this.stats.collections ? this.r32(h + GC.liveObjects) : null, collections: this.stats.collections, handles: Number(this.runtime.heap?.size ?? 0) }; }
   /** Drops the pins of top-level host code (between top-level calls of a test or a driver that keeps nothing in JavaScript locals). */
   unpinTopLevel() { if (this.hostDepth === 0) this.pins.length = 0; }
   /** 0, or the number of the first broken heap invariant (gc_verify). */
