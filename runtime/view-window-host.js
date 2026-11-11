@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=4ebf400428b7';
-import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=4ebf400428b7';
+import { APKError } from './apk-runtime.js?v=8cf39c3035e0';
+import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=8cf39c3035e0';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -71,7 +71,7 @@ export function createViewWindowHost(platform){
   // One queue task per frame lets callbacks posted while dispatching wait until a later frame.
   for(const event of platform.looperHost.pendingEvents())if(event.windowFrameTime===when)return;
   schedule(runtime,when,()=>{
-   const vsync=Math.max(when,Math.floor(platform.clock.now()/frameInterval)*frameInterval);/* Choreographer skips frames it was too late for: the frame time is the latest vsync not after now */lastFrameMs=vsync;platform.lastFrameMs=vsync;frameTime=BigInt(Math.round(vsync*1000000));runtime.record(`FRAME ${frameTime} [explicit60HzwebVMclock]`);framesRun++;
+   const vsync=Math.max(when,Math.floor(platform.clock.now()/frameInterval)*frameInterval);/* Choreographer skips frames it was too late for: the frame time is the latest vsync not after now */platform.framesSkipped=(platform.framesSkipped??0)+Math.max(0,Math.round((vsync-when)/frameInterval));/* vsyncs this frame was too late for */if(lastFrameMs>0&&vsync-lastFrameMs<frameInterval*1.5)platform.framesConsecutive=(platform.framesConsecutive??0)+1;/* frames one vsync after the previous: the animation ran at the full rate there */lastFrameMs=vsync;platform.lastFrameMs=vsync;frameTime=BigInt(Math.round(vsync*1000000));runtime.record(`FRAME ${frameTime} [explicit60HzwebVMclock]`);framesRun++;
    let animationClockLocked=false;
    const animationClock=(name,parameters,values)=>runtime.dispatch({owner:'Landroid/view/animation/AnimationUtils;',name,parameters,result:'V',signature:`(${parameters.join('')})V`},runtime.argumentWords(parameters,values),'static');
    try{if(runtime.dex.bootClasses?.has('Landroid/view/animation/AnimationUtils;')){animationClock('lockAnimationClock',['J'],[frameTime/1000000n]);animationClockLocked=true;}for(currentPhase=0;currentPhase<=4;currentPhase++){const due=pendingFrames.filter(x=>x.when<=when&&x.phase===currentPhase);for(const item of due)pendingFrames.splice(pendingFrames.indexOf(item),1);

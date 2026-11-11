@@ -1,9 +1,9 @@
 // Versioned host <-> frame message schema and the <apk-player> configuration model. No DOM: shared by the host script, the frame and the tests.
-import { sanitizeSettings } from '../device-settings.js?v=4ebf400428b7';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=4ebf400428b7';
-import { parseRule } from '../host-map.js?v=4ebf400428b7';
-import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=4ebf400428b7';
-import { isMemoryStep } from '../memory-budget.js?v=4ebf400428b7';
+import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=8cf39c3035e0';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=8cf39c3035e0';
+import { parseRule } from '../host-map.js?v=8cf39c3035e0';
+import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=8cf39c3035e0';
+import { isMemoryStep } from '../memory-budget.js?v=8cf39c3035e0';
 export const PROTOCOL = 'apk-player';
 /** Envelope version: every message carries it; a frame or host of another version is refused. Unchanged since the first release, so old hosts keep working. */
 export const VERSION = 1;
@@ -21,10 +21,10 @@ export const MAX_APK_BYTES = 1024 * 1024 * 1024;
 /** Keys that change the device model the VM sees (delivered live through setDevice, Android Configuration semantics). */
 export const DEVICE_KEYS = Object.freeze(['device', 'orientation', 'locale', 'theme', 'fontScale', 'animatorScale', 'hour24', 'timeZone', 'battery', 'charging', 'connectivity', 'navigation', 'statusBarHeight', 'allowedHosts', 'proxyUrl', 'hostMap']);
 /** The lab's debugging features (the "Controles" of the test page), revision 2: the same lists the panels keep, validated in the frame by the panels' own sanitizers. */
-export const LAB_KEYS = Object.freeze(['hostMap', 'eventSeconds', 'memoryMiB', 'strictCrash', 'layoutBounds', 'methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog', 'renderer']);
+export const LAB_KEYS = Object.freeze(['hostMap', 'eventSeconds', 'memoryMiB', 'strictCrash', 'layoutBounds', 'methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog', 'renderer', 'engine']);
 export const CONFIG_KEYS = Object.freeze(['device', 'orientation', 'locale', 'theme', 'fontScale', 'animatorScale', 'hour24', 'timeZone', 'battery', 'charging', 'connectivity', 'navigation', 'statusBarHeight', 'allowedHosts', 'proxyUrl', 'tolerateMissing', 'webview', ...LAB_KEYS]);
 export const ATTRIBUTES = Object.freeze({ device: 'device', orientation: 'orientation', locale: 'locale', theme: 'theme', 'font-scale': 'fontScale', 'animator-scale': 'animatorScale', 'hour-24': 'hour24', 'time-zone': 'timeZone', battery: 'battery', charging: 'charging', connectivity: 'connectivity', navigation: 'navigation', 'status-bar-height': 'statusBarHeight', 'allowed-hosts': 'allowedHosts', 'proxy-url': 'proxyUrl', 'tolerate-missing': 'tolerateMissing', webview: 'webview',
-  'host-map': 'hostMap', 'event-seconds': 'eventSeconds', 'memory-mib': 'memoryMiB', 'strict-crash': 'strictCrash', 'layout-bounds': 'layoutBounds', 'ignored-activities': 'ignoredActivities', 'permission-dialog': 'permissionDialog', renderer: 'renderer' });
+  'host-map': 'hostMap', 'event-seconds': 'eventSeconds', 'memory-mib': 'memoryMiB', 'strict-crash': 'strictCrash', 'layout-bounds': 'layoutBounds', 'ignored-activities': 'ignoredActivities', 'permission-dialog': 'permissionDialog', renderer: 'renderer', engine: 'engine' });
 /** Missing-API policy of the VM (apk-runtime tolerateMissing). 'off' (the player default) stops at the first unsupported API; embedders opt in to stubs. Applies at the next launch. */
 export const TOLERATE_MISSING = Object.freeze(['off', 'void', 'primitives', 'all']);
 const bool = value => value === true || value === 'true' || value === '' || value === '1' ? true : value === false || value === 'false' || value === '0' ? false : undefined;
@@ -40,11 +40,29 @@ export function parseConfig(input = {}) {
     else if (key === 'webview') { if (raw === 'on' || raw === 'off') config[key] = raw; else rejected.push(key); }   // android.webkit.WebView content in sandboxed iframes: off unless the embedder opts in
     else if (key === 'tolerateMissing') { if (TOLERATE_MISSING.includes(raw)) config[key] = raw; else rejected.push(key); }
     else if (LAB_KEYS.includes(key)) { const value = parseLabValue(key, raw); if (value === undefined) rejected.push(key); else config[key] = value; }
+    else if (key === 'device' && (plain(raw) || (typeof raw === 'string' && SCREEN_SIZE.test(raw)))) {   // a custom size is checked here, so an invalid one never replaces the device in effect
+      const parsed = parseDeviceValue(raw); if (parsed.error) rejected.push(`device (${parsed.error})`); else config[key] = plain(raw) ? { width: parsed.customScreen.width, height: parsed.customScreen.height, unit: parsed.customScreen.unit } : raw;
+    }
     else if (typeof raw === 'string') config[key] = raw;
     else rejected.push(key);
   }
   return { config, rejected };
 }
+const SCREEN_SIZE = /^\s*(\d{1,5})\s*[x×]\s*(\d{1,5})\s*(dp|px)?\s*$/i;
+/**
+ * The `device` config value: a preset id ('phone', 'tablet', ...), a size string "360x640" / "360x640dp" / "1080x2400px", or { width, height, unit: 'dp' | 'px' }.
+ * A size is a custom screen ("Personalizado"): width and height of the portrait screen, px = dp x density, 120 to 4096 px a side. -> { screen, customScreen? } or { error }.
+ */
+export function parseDeviceValue(value) {
+  let custom = null;
+  if (plain(value)) custom = value;
+  else if (typeof value === 'string') { const match = SCREEN_SIZE.exec(value); if (!match) return { screen: value }; custom = { width: Number(match[1]), height: Number(match[2]), unit: (match[3] ?? 'dp').toLowerCase() }; }
+  else return { error: 'not a preset id or a size' };
+  const checked = checkCustomScreen(custom);
+  return checked.value ? { screen: 'custom', customScreen: checked.value } : { error: checked.error };
+}
+/** The `device` value reported back: the preset id, or "WIDTHxHEIGHTunit" for a custom screen. */
+export function deviceValueOf(settings) { return settings.screen === 'custom' ? `${settings.customScreen.width}x${settings.customScreen.height}${settings.customScreen.unit}` : settings.screen; }
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const shortString = (value, max) => (typeof value === 'string' && value.length <= max ? value : undefined);
 /** Shape and size of one lab-feature value (bounded lists of plain data). The contents are checked in the frame with the panels' validators; undefined = rejected. */
@@ -57,6 +75,7 @@ export function parseLabValue(key, raw) {
     case 'strictCrash': case 'layoutBounds': return bool(raw);
     case 'permissionDialog': return PERMISSION_DIALOG.includes(raw) ? raw : undefined;
     case 'renderer': return raw === 'cpu' || raw === 'gpu' ? raw : undefined;   // 'cpu' (default) or 'gpu' (experimental WebGL replay in the Worker, src/gpu-raster.js); applied live
+    case 'engine': return raw === 'js' || raw === 'wasm' ? raw : undefined;   // 'js' (default) or 'wasm' (experimental: the Java heap, frames and interpreter in vmcore/core.wasm, docs/WASM-CORE-PLANO.md); applies at the next launch
     case 'hostMap': {   // [{ from, to, enabled }] or, as an attribute, "api.example.com -> localhost:8080, *.cdn.example.com -> 127.0.0.1:9000"
       const list = typeof raw === 'string' ? raw.split(/[,;\n]+/).map(item => item.trim()).filter(Boolean).map(item => { const at = item.indexOf('->'); return at < 0 ? { from: item, to: '' } : { from: item.slice(0, at).trim(), to: item.slice(at + 2).trim() }; }) : raw;
       if (!Array.isArray(list) || list.length > MAX_HOST_RULES || !list.every(rule => plain(rule) && shortString(rule.from ?? '', 300) !== undefined && shortString(rule.to ?? '', 300) !== undefined && (rule.enabled === undefined || typeof rule.enabled === 'boolean'))) return undefined;
@@ -120,20 +139,22 @@ const ALLOWED_THEMES = ['light', 'dark'];
 /** Public config -> the VM/lab device settings. Values the sanitizer would silently drop are listed in `rejected`. */
 export function configToSettings(config = {}) {
   const input = {}, rejected = [];
-  if (config.device !== undefined) input.screen = config.device;
+  let deviceRejected = null;
+  if (config.device !== undefined) { const parsed = parseDeviceValue(config.device); if (parsed.error) deviceRejected = `device (${parsed.error})`; else { input.screen = parsed.screen; if (parsed.customScreen) input.customScreen = parsed.customScreen; } }
   for (const key of ['orientation', 'locale', 'fontScale', 'animatorScale', 'hour24', 'timeZone', 'connectivity', 'navigation']) if (config[key] !== undefined) input[key] = config[key];
   if (config.theme !== undefined) { if (ALLOWED_THEMES.includes(config.theme)) input.darkTheme = config.theme === 'dark'; else rejected.push('theme'); }
   if (config.statusBarHeight !== undefined) input.statusBarHeightDp = config.statusBarHeight;
   if (config.battery !== undefined || config.charging !== undefined) input.battery = { level: config.battery ?? 80, charging: !!config.charging };
   if (config.allowedHosts !== undefined || config.proxyUrl !== undefined || config.hostMap !== undefined) input.network = { allowedHosts: config.allowedHosts ?? [], proxyUrl: config.proxyUrl ?? '', hostMap: config.hostMap ?? [] };
-  for (const key of ['eventSeconds', 'memoryMiB', 'layoutBounds', 'renderer']) if (config[key] !== undefined) input[key] = config[key];
+  for (const key of ['eventSeconds', 'memoryMiB', 'layoutBounds', 'renderer', 'engine']) if (config[key] !== undefined) input[key] = config[key];
   const settings = sanitizeSettings(input);
   (config.hostMap ?? []).forEach((rule, index) => { const parsed = parseRule(rule); if (parsed.error) rejected.push(`hostMap[${index}] (${parsed.error})`); });   // kept in the list (as the panel keeps them), ignored by the redirect
   if (config.allowedHosts !== undefined) { const dropped = config.allowedHosts.filter(host => !settings.network.allowedHosts.includes(String(host).trim().toLowerCase())); if (dropped.length) rejected.push(`allowedHosts (dropped: ${dropped.join(', ')})`); }
   if (config.proxyUrl !== undefined && config.proxyUrl !== '' && !settings.network.proxyUrl) rejected.push('proxyUrl');
+  if (deviceRejected) rejected.push(deviceRejected);
   const effective = { screen: settings.screen, orientation: settings.orientation, locale: settings.locale, fontScale: settings.fontScale, animatorScale: settings.animatorScale, hour24: settings.hour24, timeZone: settings.timeZone, connectivity: settings.connectivity, navigation: settings.navigation };
   for (const [key, field] of [['device', 'screen'], ['orientation', 'orientation'], ['locale', 'locale'], ['fontScale', 'fontScale'], ['animatorScale', 'animatorScale'], ['hour24', 'hour24'], ['timeZone', 'timeZone'], ['connectivity', 'connectivity'], ['navigation', 'navigation']]) {
-    if (config[key] === undefined) continue;
+    if (config[key] === undefined || (key === 'device' && (deviceRejected || input.screen === 'custom'))) continue;   // a custom size was checked by parseDeviceValue
     const wanted = key === 'device' || key === 'orientation' || key === 'locale' || key === 'timeZone' || key === 'connectivity' || key === 'navigation' || key === 'hour24' ? config[key] : Number(config[key]);
     if (effective[field] !== wanted && !['fontScale', 'animatorScale'].includes(key)) rejected.push(key);
     if (['fontScale', 'animatorScale'].includes(key) && effective[field] !== wanted) rejected.push(key + ' (clamped to ' + effective[field] + ')');
@@ -142,14 +163,14 @@ export function configToSettings(config = {}) {
 }
 /** The lab-feature part of the effective config (revision 2), reported by `config-applied` next to settingsToConfig. Mocks are summarized (their bodies are not echoed). */
 export function labConfigOf(config, settings) {
-  return { hostMap: settings.network.hostMap.map(rule => ({ ...rule })), eventSeconds: settings.eventSeconds ?? 0, memoryMiB: settings.memoryMiB ?? 0, layoutBounds: !!settings.layoutBounds, strictCrash: config.strictCrash === true, permissionDialog: config.permissionDialog ?? 'none', renderer: settings.renderer ?? 'cpu',
+  return { hostMap: settings.network.hostMap.map(rule => ({ ...rule })), eventSeconds: settings.eventSeconds ?? 0, memoryMiB: settings.memoryMiB ?? 0, layoutBounds: !!settings.layoutBounds, strictCrash: config.strictCrash === true, permissionDialog: config.permissionDialog ?? 'none', renderer: settings.renderer ?? 'cpu', engine: settings.engine ?? 'js',
     methodOverrides: (config.methodOverrides ?? []).map(item => ({ ...item })), ignoredActivities: (config.ignoredActivities ?? []).map(item => ({ ...item })),
     endpointMocks: (config.endpointMocks ?? []).map(mock => ({ id: mock.id ?? null, name: String(mock.name ?? ''), method: String(mock.method ?? 'ANY'), url: String(mock.url ?? ''), enabled: mock.enabled !== false })),
     permissions: config.permissions ? { states: { ...config.permissions.states } } : null, location: config.location ?? null };
 }
 /** Effective public config back from settings (what `config-applied` reports). */
 export function settingsToConfig(settings) {
-  return { device: settings.screen, orientation: settings.orientation, locale: settings.locale, theme: settings.darkTheme ? 'dark' : 'light', fontScale: settings.fontScale, animatorScale: settings.animatorScale, hour24: settings.hour24, timeZone: settings.timeZone, statusBarHeight: settings.statusBarHeightDp ?? null, battery: settings.battery.level, charging: settings.battery.charging, connectivity: settings.connectivity, navigation: settings.navigation, allowedHosts: settings.network.allowedHosts.slice(), proxyUrl: settings.network.proxyUrl };
+  return { device: deviceValueOf(settings), orientation: settings.orientation, locale: settings.locale, theme: settings.darkTheme ? 'dark' : 'light', fontScale: settings.fontScale, animatorScale: settings.animatorScale, hour24: settings.hour24, timeZone: settings.timeZone, statusBarHeight: settings.statusBarHeightDp ?? null, battery: settings.battery.level, charging: settings.battery.charging, connectivity: settings.connectivity, navigation: settings.navigation, allowedHosts: settings.network.allowedHosts.slice(), proxyUrl: settings.network.proxyUrl };
 }
 
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);

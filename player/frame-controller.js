@@ -5,20 +5,20 @@
 // device settings -> setDevice, "Tempo máximo por evento" -> setTimeLimits, "Retornos de métodos" -> setMethodOverrides, "Activities ignoradas" -> setIgnoredActivities,
 // "Mock de endpoints" -> setEndpointMocks, "Permissões" / location / dialog -> setPermissions + permissionResponse, "Abrir" -> startIntent, Logcat -> setLogcatStreaming,
 // Compose -> inspectCompose, plugins -> src/plugin-host.js. The host page is another origin: everything it sends is validated here before it reaches the VM.
-import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=4ebf400428b7';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=4ebf400428b7';
-import { formatApiGapReport } from '../api-gap-scan.js?v=4ebf400428b7';
-import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=4ebf400428b7';
-import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=4ebf400428b7';
-import { parseMethodSpec } from '../method-overrides.js?v=4ebf400428b7';
-import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=4ebf400428b7';
-import { normalizeIntentRequest } from '../intent-resolver.js?v=4ebf400428b7';
-import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=4ebf400428b7';
-import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=4ebf400428b7';
-import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=4ebf400428b7';
-import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=4ebf400428b7';
-import { rowToEntry } from '../logcat.js?v=4ebf400428b7';
-import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=4ebf400428b7';
+import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=8cf39c3035e0';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=8cf39c3035e0';
+import { formatApiGapReport } from '../api-gap-scan.js?v=8cf39c3035e0';
+import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=8cf39c3035e0';
+import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=8cf39c3035e0';
+import { parseMethodSpec } from '../method-overrides.js?v=8cf39c3035e0';
+import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=8cf39c3035e0';
+import { normalizeIntentRequest } from '../intent-resolver.js?v=8cf39c3035e0';
+import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=8cf39c3035e0';
+import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=8cf39c3035e0';
+import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=8cf39c3035e0';
+import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=8cf39c3035e0';
+import { rowToEntry } from '../logcat.js?v=8cf39c3035e0';
+import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=8cf39c3035e0';
 
 export const SCREENSHOT_GAP_MS = 250, PLUGIN_OUTPUT_MS = 100, MAX_STREAM_BATCH = MAX_LOG_BATCH;
 const LAB_LIVE = ['methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog'];
@@ -33,7 +33,7 @@ const shortText = (value, max, what) => { if (value === undefined || value === n
  */
 export function createFrameController({ vm, state, deviceState, post, fetchImpl = globalThis.fetch?.bind(globalThis), hooks = {}, createPluginHost = null, captureImage = null, now = () => (globalThis.performance?.now?.() ?? Date.now()) }) {
   let view = null, source = null, config = {}, lastActivity = null, destroyed = false, chain = Promise.resolve(), inflight = 0, oomSeen = 0, lastStubs = { void: [], returns: [], classes: [] }, packageName = '', tolerateRunning = 'off'; const dropped = [];
-  let lastSnapshot = null, lastScreenKey = null, frameCount = 0, inventory = null, permConfig = emptyConfig(), lastError = null, lastShotAt = -Infinity, loaded = { memoryMiB: 0, strictCrash: false };
+  let lastSnapshot = null, lastScreenKey = null, frameCount = 0, inventory = null, permConfig = emptyConfig(), lastError = null, lastShotAt = -Infinity, loaded = { memoryMiB: 0, strictCrash: false, engine: 'js' };
   let statuses = { methodOverrides: [], ignoredActivities: [], endpointMocks: [] };
   let rendererStatus = null;   // the Worker's renderer status at load / after a live switch; later frames carry it in vmHealth.renderer
   /** status().renderer: the backend in use ('cpu' | 'gpu'), what the config asked, the fallback reason and the GPU's name when the browser exposes it. */
@@ -221,8 +221,8 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     const token = operations.beginOperation();
     try {
       const keep = buffer.slice(0); source.bytes = keep;
-      const settings = deviceState.settings; loaded = { memoryMiB: settings.memoryMiB ?? 0, strictCrash: config.strictCrash === true };
-      const result = await vm.load(buffer, { device: deviceForVM(settings), tolerateMissing: tolerateRunning, strictCrash: loaded.strictCrash, webview: config.webview === 'on', keepData: source.keepData, clearData: !!dataOptions.clearData, motionRaster: deviceState.motionRaster !== false, memoryMiB: loaded.memoryMiB, eventSeconds: settings.eventSeconds ?? 0, logcatStreaming: wantsLogcat(), renderer: settings.renderer ?? 'cpu' }); if (token !== state.operation) return; rendererStatus = result.renderer ?? null;
+      const settings = deviceState.settings; loaded = { memoryMiB: settings.memoryMiB ?? 0, strictCrash: config.strictCrash === true, engine: settings.engine ?? 'js' };
+      const result = await vm.load(buffer, { device: deviceForVM(settings), tolerateMissing: tolerateRunning, strictCrash: loaded.strictCrash, webview: config.webview === 'on', keepData: source.keepData, clearData: !!dataOptions.clearData, motionRaster: deviceState.motionRaster !== false, memoryMiB: loaded.memoryMiB, eventSeconds: settings.eventSeconds ?? 0, logcatStreaming: wantsLogcat(), renderer: settings.renderer ?? 'cpu', engine: loaded.engine }); if (token !== state.operation) return; rendererStatus = result.renderer ?? null;
       logcatSent = wantsLogcat(); dataKey = null; reportData(result.appData);
       state.runtime = vm; state.inventory = result.inventory; inventory = result.inventory; packageName = String(result.inventory?.packageName || '');
       const rejected = []; await pushLab(loadKeys(), rejected); if (token !== state.operation) return;   // before any app code runs, as the panels' attach() does on the test page
@@ -313,7 +313,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     status() {
       return { running: running(), activity: lastSnapshot?.activityName ?? null, packageName: packageName || null, statuses: copyStatuses(), hits: { methodOverrides: lastSnapshot?.methodOverrides ?? [], ignoredActivities: lastSnapshot?.ignoredActivities ?? [], endpointMocks: lastSnapshot?.endpointMocks ?? [], hostMap: lastSnapshot?.hostMap ?? [] },
         permissions: { states: { ...permConfig.states }, denials: { ...permConfig.denials }, once: [...permConfig.once] }, pendingPermissionRequests: [...pendingPermissions.keys()], streams: { ...subscribed }, plugins: pluginHost ? pluginHost.list().length : 0,
-        renderer: rendererOut(lastSnapshot?.vmHealth?.renderer ?? rendererStatus) };
+        renderer: rendererOut(lastSnapshot?.vmHealth?.renderer ?? rendererStatus), engine: lastSnapshot?.vmHealth?.engine ?? loaded.engine };
     },
     answerPermission(args) {
       if (!Number.isSafeInteger(args.id)) throw callError('bad-args', 'id must be an integer');
@@ -371,6 +371,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
       const reply = extra => send('config-applied', { config: effective(settings), rejected, ...extra, statuses: copyStatuses(), ...(message.id !== undefined ? { id: message.id } : {}) });
       const live = running();
       if (message.config.tolerateMissing !== undefined && live && tolerate() !== tolerateRunning) rejected.push(`tolerateMissing (applies at the next launch: restart() the player; running with ${tolerateRunning})`);
+      if (keys.has('engine') && live && (settings.engine ?? 'js') !== loaded.engine) rejected.push(`engine (applies at the next launch: restart() the player; running with ${loaded.engine})`);
       if (keys.has('memoryMiB') && live && (settings.memoryMiB ?? 0) !== loaded.memoryMiB) rejected.push(`memoryMiB (applies at the next launch: restart() the player; running with ${loaded.memoryMiB || 'automatic'})`);
       if (keys.has('strictCrash') && live && (config.strictCrash === true) !== loaded.strictCrash) rejected.push(`strictCrash (applies at the next launch: restart() the player; running with ${loaded.strictCrash})`);
       if (!live) { reply({ live: false, outcome: null }); return; }

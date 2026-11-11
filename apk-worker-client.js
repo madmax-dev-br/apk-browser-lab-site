@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=4ebf400428b7';
-import { createRasterReceiver } from './raster-cache.js?v=4ebf400428b7';
+import { createWebAudioPlayer } from './web-audio-player.js?v=8cf39c3035e0';
+import { createRasterReceiver } from './raster-cache.js?v=8cf39c3035e0';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=4ebf400428b7', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=8cf39c3035e0', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -86,9 +86,9 @@ export class APKWorkerClient {
       catch (error) { this.cancel(error); }
     });
   }
-  async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], endpointMocks = [], eventSeconds = 0, permissions = null, motionRaster = true, rasterScale = undefined, rasterNavigation = true, logcatStreaming = false, renderer = 'cpu' } = {}) {
+  async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], endpointMocks = [], eventSeconds = 0, permissions = null, motionRaster = true, rasterScale = undefined, rasterNavigation = true, logcatStreaming = false, renderer = 'cpu', engine = 'js' } = {}) {
     this.cancel(); this.rasters.reset(); this.apiGaps = null;
-    const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, endpointMocks, eventSeconds, permissions, motionRaster, rasterScale, rasterNavigation, logcatStreaming, renderer: renderer === 'gpu' ? 'gpu' : 'cpu' }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
+    const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, endpointMocks, eventSeconds, permissions, motionRaster, rasterScale, rasterNavigation, logcatStreaming, renderer: renderer === 'gpu' ? 'gpu' : 'cpu', engine: engine === 'wasm' ? 'wasm' : 'js' }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
     this.appData = response.appData ?? null; this.renderer = response.renderer ?? null;
     return { inventory: response.inventory, appData: this.appData, renderer: this.renderer };
   }
@@ -179,6 +179,13 @@ export class APKWorkerClient {
   /** "Recriar" (mode recreate: Activity.recreate(), state kept) or "Reabrir" (mode reopen: a fresh instance with the same Intent); answers the snapshot after the relaunch. */
   async reloadActivity({ mode = 'recreate', onProgress } = {}) {
     return (await this.request('reload-activity', { mode }, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot;
+  }
+  /** lab.renderVariant (src/render-variant.js, docs/RENDER-VARIANT.md): renders a second, background instance of the Activity on top with `endpointMocks` in front of the lab's and
+   *  resolves with its screen ({ image, images, views, semantics, composeTree, requests, mocks, timedOut, ... }; each image is { width, height, scale, pixels: ArrayBuffer RGBA8 }).
+   *  It takes the one-operation slot like a click; rejects with `code` (bad-args, no-activity, not-resumed, busy, unsupported, cleanup-failed). */
+  async renderVariant(options = {}) {
+    const timeoutMs = Math.max(this.eventTimeoutMs, 2 * (Number(options?.timeoutMs) || 0) + 15000);
+    return (await this.request('render-variant', { options }, { timeoutMs })).variant;
   }
   async back({ onProgress } = {}) {
     return (await this.request('back', {}, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot;

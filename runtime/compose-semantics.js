@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=4ebf400428b7';
+import { APKError } from './apk-runtime.js?v=8cf39c3035e0';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;';
 const OWNER = 'Landroidx/compose/ui/semantics/SemanticsOwner;', NODE = 'Landroidx/compose/ui/semantics/SemanticsNode;', CONFIG = 'Landroidx/compose/ui/semantics/SemanticsConfiguration;', KEY = 'Landroidx/compose/ui/semantics/SemanticsPropertyKey;';
 const ACTION = 'Landroidx/compose/ui/semantics/AccessibilityAction;', ANNOTATED = 'Landroidx/compose/ui/text/AnnotatedString;', RECT = 'Landroidx/compose/ui/geometry/Rect;';
@@ -144,6 +144,19 @@ export function createComposeSemanticsDriver(runtime) {
       const boxed = kinds.map((kind, i) => box(kind, args[i])), signature = '(' + boxed.map(() => 'Ljava/lang/Object;').join('') + ')Ljava/lang/Object;';
       const result = call(fn, `Lkotlin/jvm/functions/Function${boxed.length};`, 'invoke', signature, boxed);
       return { handled: result ? boolean(result) : false };
+    },
+    /** Where a scrollable node is and how far it goes, as Android accessibility reads it (AccessibilityNodeInfo scrollX/scrollY and their maximums): the node's
+     * HorizontalScrollAxisRange / VerticalScrollAxisRange, whose `value` and `maxValue` are the node's own functions. A plain scroll container answers in pixels; a lazy
+     * list (a node with ScrollToIndex) answers with its own estimate. null when the node is gone; an axis the node does not scroll has max 0. */
+    scrollInfo({ ownerViewId, nodeId }) {
+      snapshot({ roots: lastRoots ?? undefined, merged: lastMerged });
+      const node = refs.get(`${ownerViewId}:${nodeId}`); if (!node) return null;
+      const values = properties(node.config), RANGE = 'Landroidx/compose/ui/semantics/ScrollAxisRange;', FN = 'Lkotlin/jvm/functions/Function0;';
+      const read = (range, getter) => float(call(call(call(range, RANGE, getter, `()${FN}`), FN, 'invoke', '()Ljava/lang/Object;'), 'Ljava/lang/Float;', 'floatValue', '()F'));
+      const axis = name => { const range = values.get(name); if (!range) return null; const value = read(range, 'getValue'), max = read(range, 'getMaxValue'); return { value: Number.isFinite(value) ? value : 0, max: Number.isFinite(max) ? Math.max(0, max) : 0, reverse: !!call(range, RANGE, 'getReverseScrolling', '()Z') }; };
+      const horizontal = axis('HorizontalScrollAxisRange'), vertical = axis('VerticalScrollAxisRange');
+      return { x: horizontal?.value ?? 0, y: vertical?.value ?? 0, maxX: horizontal?.max ?? 0, maxY: vertical?.max ?? 0, horizontal: !!horizontal, vertical: !!vertical, reverseX: !!horizontal?.reverse, reverseY: !!vertical?.reverse,
+        lazy: values.has('ScrollToIndex') || values.has('IndexForKey'), scrollBy: node.actionRefs.has('ScrollBy'), scrollToIndex: node.actionRefs.has('ScrollToIndex'), disabled: node.disabled };
     },
   };
   (runtime.gcExtraRoots ??= new Set()).add(driver);   // the heap collector (src/heap-gc.js) finds the node references through the runtime

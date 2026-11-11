@@ -4,7 +4,7 @@
 // checked (each entry's CRC-32 was verified against the APK when the file was made, so loading does not compute it again). The loader
 // (src/apk-loader.js APKArchive) recognises the layout by itself, so the page, the embedded player and the backends accept it like an APK.
 // DOM-free; no process.*.
-import { APKArchive } from './apk-loader.js?v=4ebf400428b7';
+import { APKArchive } from './apk-loader.js?v=8cf39c3035e0';
 
 export const PREPARED_FORMAT = 'apk-web-lab-prepared', PREPARED_VERSION = 1, PREPARED_PREFIX = 'apk/', PREPARED_DESCRIPTOR = 'apklab.json';
 export const PREPARED_EXTENSION = '.apklab';

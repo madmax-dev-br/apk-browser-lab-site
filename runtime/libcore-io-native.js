@@ -1,12 +1,12 @@
-import { APKError } from './apk-error.js?v=4ebf400428b7';
-import { throwNew } from './java-throw.js?v=4ebf400428b7';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=4ebf400428b7';
-import { networkOf, isIpLiteral } from './network-native.js?v=4ebf400428b7';
-import { Blocked } from './scheduler.js?v=4ebf400428b7';
-import { installUdp } from './udp-native.js?v=4ebf400428b7';
-import { createLoopback } from './loopback-socket.js?v=4ebf400428b7';
-import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=4ebf400428b7';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=4ebf400428b7';
+import { APKError } from './apk-error.js?v=8cf39c3035e0';
+import { throwNew } from './java-throw.js?v=8cf39c3035e0';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=8cf39c3035e0';
+import { networkOf, isIpLiteral } from './network-native.js?v=8cf39c3035e0';
+import { Blocked } from './scheduler.js?v=8cf39c3035e0';
+import { installUdp } from './udp-native.js?v=8cf39c3035e0';
+import { createLoopback } from './loopback-socket.js?v=8cf39c3035e0';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=8cf39c3035e0';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=8cf39c3035e0';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -249,7 +249,8 @@ export function createLibcoreIoNativeBindings() {
   const L = (signature, callback) => add(LINUX, signature, callback);
 
   // ---- android.system.OsConstants
-  add(OSCONST, 'initConstants()V', runtime => { for (const [name, value] of Object.entries(C)) runtime.staticFields.set(`${OSCONST}->${name}:I`, value | 0); });
+  // writeStatic, not the static table: OsConstants is a DEX class, and on the WebAssembly core its statics live in the core's metaspace
+  add(OSCONST, 'initConstants()V', runtime => { for (const [name, value] of Object.entries(C)) runtime.writeStatic({ owner: OSCONST, name, type: 'I', key: `${OSCONST}->${name}:I` }, value | 0); });
 
   // ---- descriptors and I/O
   // pipe2: an in-process byte queue shared by a read end and a write end (64 KiB capacity like the kernel's default); the ends report EOF / EPIPE when the other side is closed

@@ -1,14 +1,14 @@
-import { APKError } from './apk-error.js?v=4ebf400428b7';
-import { throwNew } from './java-throw.js?v=4ebf400428b7';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=4ebf400428b7';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=4ebf400428b7';
-import { Blocked } from './scheduler.js?v=4ebf400428b7';
-import { captureBody } from './network-capture.js?v=4ebf400428b7';
-import { OS_CONSTANTS } from './os-constants-data.js?v=4ebf400428b7';
-import { openExchange, describeFailure } from './network-transport.js?v=4ebf400428b7';
-import { WorkerExecutor } from './network-worker-executor.js?v=4ebf400428b7';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=4ebf400428b7';
-import { TransportAuthority } from './transport-ca.js?v=4ebf400428b7';
+import { APKError } from './apk-error.js?v=8cf39c3035e0';
+import { throwNew } from './java-throw.js?v=8cf39c3035e0';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=8cf39c3035e0';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=8cf39c3035e0';
+import { Blocked } from './scheduler.js?v=8cf39c3035e0';
+import { captureBody } from './network-capture.js?v=8cf39c3035e0';
+import { OS_CONSTANTS } from './os-constants-data.js?v=8cf39c3035e0';
+import { openExchange, describeFailure } from './network-transport.js?v=8cf39c3035e0';
+import { WorkerExecutor } from './network-worker-executor.js?v=8cf39c3035e0';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=8cf39c3035e0';
+import { TransportAuthority } from './transport-ca.js?v=8cf39c3035e0';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -146,6 +146,7 @@ export class NetworkBridge {
     const op = reserved ?? new Operation(this.nextHandle++, request); op.request = request; this.ops.set(op.handle, op);
     this.stats.requests++; this.noteHost(new URL(request.url).hostname);
     const mock = request.mock !== undefined ? request.mock : this.matchMock(request);
+    if (this.requestObserver) this.requestObserver(request, mock);   // a background render lists the requests made while it runs (src/render-variant.js)
     if (mock) return this.startMock(op, mock);
     this.stats.bytesOut += request.body?.length ?? 0;
     op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped }) ?? null;

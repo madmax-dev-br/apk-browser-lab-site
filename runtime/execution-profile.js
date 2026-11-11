@@ -1,3 +1,4 @@
+import { foldDirectCalls } from './interpreter.js?v=8cf39c3035e0';
 // What a long-running event was doing, for the error report of an instruction-budget or wall-clock failure (and for "Copiar diagnóstico"): a cheap sampling profile that starts only once an event has run
 // PROFILE_AFTER instructions on one thread, or a tenth of the per-event budget when that is smaller (so ordinary short events pay one comparison per scheduling quantum). From then on, at every scheduling tick (QUANTUM instructions) the running thread's innermost
 // methods are sampled (self share and the distinct stacks), the per-method invocation counters the VM already keeps (methodEvidence) are compared with a snapshot taken at the start, and host-bridge calls
@@ -22,6 +23,7 @@ export class ExecutionProfile {
   }
   #start() {
     this.active = true; this.startSteps = this.rt.steps; this.baseline = new Map();
+    foldDirectCalls(this.rt);   // the calls direct code counted on its own so far (interpreter.js)
     for (const evidence of this.rt.methodEvidence?.values() ?? []) this.baseline.set(evidence, evidence.calls);
   }
   /** A call that reached a host bridge (SHIM/platform) while the profile is active. */
@@ -49,6 +51,7 @@ export class ExecutionProfile {
     if (!this.active) return { active: false, stack, text: `Perfil do evento: não coletado (o evento rodou poucas instruções numa thread).\nPilha na falha (mais interna primeiro):\n${stack.map(line => '  ' + line).join('\n')}` };
     const bySelf = [...this.self].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => ({ method: short(key), samples: count, share: count / Math.max(1, this.samples) }));
     const byCalls = [];
+    foldDirectCalls(this.rt);
     for (const evidence of this.rt.methodEvidence?.values() ?? []) { const delta = evidence.calls - (this.baseline.get(evidence) ?? 0); if (delta > 0) byCalls.push({ method: short(evidence.key), calls: delta }); }
     byCalls.sort((a, b) => b.calls - a.calls); byCalls.length = Math.min(byCalls.length, limit);
     const hosts = [...this.hostCalls].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => ({ call: short(key), count }));

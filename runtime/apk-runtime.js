@@ -1,31 +1,32 @@
-import { VMClock } from './vm-clock.js?v=4ebf400428b7';
-import { overrideHit } from './method-overrides.js?v=4ebf400428b7';
-import { OperationMonitor } from './operation-monitor.js?v=4ebf400428b7';
-import { ExecutionProfile } from './execution-profile.js?v=4ebf400428b7';
-import { SamplingProfiler } from './sampling-profiler.js?v=4ebf400428b7';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=4ebf400428b7';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=4ebf400428b7';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=4ebf400428b7';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=4ebf400428b7';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=4ebf400428b7';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=4ebf400428b7';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=4ebf400428b7';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=4ebf400428b7';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=4ebf400428b7';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=4ebf400428b7';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=4ebf400428b7';
-import { APKError } from './apk-error.js?v=4ebf400428b7';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=4ebf400428b7';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=4ebf400428b7';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason } from './heap-gc.js?v=4ebf400428b7';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=4ebf400428b7';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=4ebf400428b7';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=4ebf400428b7';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=4ebf400428b7';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=4ebf400428b7';
-import { Scheduler, Blocked } from './scheduler.js?v=4ebf400428b7';
-import { bootClassLacksMember } from './boot-class-members.js?v=4ebf400428b7';
-export { APKError } from './apk-error.js?v=4ebf400428b7';
+import { VMClock } from './vm-clock.js?v=8cf39c3035e0';
+import { overrideHit } from './method-overrides.js?v=8cf39c3035e0';
+import { OperationMonitor } from './operation-monitor.js?v=8cf39c3035e0';
+import { ExecutionProfile } from './execution-profile.js?v=8cf39c3035e0';
+import { SamplingProfiler } from './sampling-profiler.js?v=8cf39c3035e0';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=8cf39c3035e0';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=8cf39c3035e0';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=8cf39c3035e0';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=8cf39c3035e0';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=8cf39c3035e0';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=8cf39c3035e0';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=8cf39c3035e0';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=8cf39c3035e0';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=8cf39c3035e0';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=8cf39c3035e0';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=8cf39c3035e0';
+import { APKError } from './apk-error.js?v=8cf39c3035e0';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=8cf39c3035e0';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=8cf39c3035e0';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=8cf39c3035e0';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=8cf39c3035e0';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=8cf39c3035e0';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=8cf39c3035e0';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=8cf39c3035e0';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=8cf39c3035e0';
+const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
+import { Scheduler, Blocked } from './scheduler.js?v=8cf39c3035e0';
+import { bootClassLacksMember } from './boot-class-members.js?v=8cf39c3035e0';
+export { APKError } from './apk-error.js?v=8cf39c3035e0';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1130,7 +1131,7 @@ const LAB_HELPERS = new Map([
   ['Ljava/util/concurrent/CopyOnWriteArrayList;', [`${UTIL}CollectionOps;`]],
 ]);
 
-const LOOPER_PLUMBING = /^Landroid\/os\/(?:Looper|MessageQueue|Handler|Message|ThreadLocalWorkSource)(?:\$[^;]*)?;$/;
+export const LOOPER_PLUMBING = /^Landroid\/os\/(?:Looper|MessageQueue|Handler|Message|ThreadLocalWorkSource)(?:\$[^;]*)?;$/;
 // Properties other modules attach to the runtime after it is constructed (memos, collector state, host tables). They are declared here, in this order, by the constructor so the
 // runtime object keeps one hidden class from the start: every property the interpreter, the compiled code and the hosts read on it (steps, q, heap, gcOldBound, traceRing ...) is then a
 // monomorphic load. Added one by one while the app runs, each addition was a new hidden class, and the interpreter's loads on the runtime went megamorphic (about 14 % of the
@@ -1147,8 +1148,13 @@ export const LATE_RUNTIME_PROPERTIES = Object.freeze([
   'lastPointerTime',
 ]);
 export class APKRuntime {
-  constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off' } = {}) {
+  constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off', engine = 'js' } = {}) {
     if (!Number.isInteger(maxCallDepth) || maxCallDepth < 16 || maxCallDepth > 100000) fail('VM maxCallDepth must be an integer from 16 to 100000');
+    // The engine (docs/WASM-CORE-PLANO.md, decision 1): 'js' is this VM; 'wasm' keeps this runtime as the host side (class model, bridges, platform) of core.wasm, which holds the Java heap,
+    // the frames and the interpreter. vmcore/js/host-bridge.js attachWasmEngine(runtime) attaches the core to a runtime created with 'wasm' before anything runs, and redirects the entry points
+    // hosts use (object, makeObject, newArray, execute, initialize, readStatic...). Nothing in this class changes with the engine.
+    if (engine !== 'js' && engine !== 'wasm') fail("VM engine must be 'js' or 'wasm'");
+    this.engine = engine;
     if(!Number.isInteger(maxHeapObjects)||maxHeapObjects<1024||maxHeapObjects>2097152)fail('VM maxHeapObjects must be an integer from 1024 to 2097152');
     this.maxHeapObjects=maxHeapObjects; { const scale = Math.max(1, maxHeapObjects / 262144); this.maxFieldSlots = Math.round(3000000 * scale); this.maxArrayCells = Math.round(8000000 * scale); this.maxCollectionCells = Math.round(8000000 * scale); } /* storage budgets grow with the object limit: about 11 field slots, 30 array cells and 30 collection cells per object (a Kotlin/Compose object carries many fields; the old 3.8 slots per object made the field budget run out at half the object limit) */ this.gcSafepointFloor=Math.floor(maxHeapObjects*0.25); this.apkEntries=apkEntries; this.apkReader=apkReader;
     // Opt-in tolerant mode for platform methods the lab does not implement: 'void' skips void ones; 'primitives' also answers
@@ -1189,7 +1195,7 @@ export class APKRuntime {
     this.depth = 0; this.steps = 0; this.trace = []; this.activity = null; this.root = null; this.clicks = 0;
     this.initialized = new Map(); this.staticFields = new Map(); this.classObjects = new Map(); this.arrayCells = 0; this.initDepth = 0;
     this.collectionCells = 0;
-    this.nativeArrays = new Map(); this.nextNativeArrayHandle = 0x100000000n; this.nativeRanges = []; this.nestedRuns = 0; this.maxNestedRuns = 160; this.scheduler = new Scheduler(this); this.callStats = { cached: 0, dispatched: 0, bridged: 0 }; this.lastBridge = null; this.lastBridgeDepth = -1; this.jit = true; this.fastCallPaths = true; this.jitThreshold = JIT_THRESHOLD; this.jitLoops = JIT_LOOPS; this.jitCompiled = 0; this.jitInstructions = 0; this.jitBridged = 0; this.jitPolymorphic = 0; this.q = 20000; this.jitDepth = 0; this.thread = null; this.multiThreaded = false; this.monitors = new Map();
+    this.nativeArrays = new Map(); this.nextNativeArrayHandle = 0x100000000n; this.nativeRanges = []; this.nestedRuns = 0; this.maxNestedRuns = 160; this.scheduler = new Scheduler(this); this.callStats = { cached: 0, dispatched: 0, bridged: 0 }; this.lastBridge = null; this.lastBridgeDepth = -1; this.jit = true; this.fastCallPaths = true; this.jitThreshold = JIT_THRESHOLD; this.jitLoops = JIT_LOOPS; this.jitCompiled = 0; this.jitInstructions = 0; this.jitBridged = 0; this.jitPolymorphic = 0; this.q = 20000; this.jitDepth = 0; this.tier2 = TIER2; this.t2Threshold = TIER2 ? T2_THRESHOLD : 0; this.t2Compiled = 0; this.t2Deopts = 0; this.t2Slow = 0; this.t2Headroom = 0; this.t2Site = null; this.deoptNeed = false; this.dstart = 0; this.dlimit = 0; this.t2TooDeep = false; this.t2Dirty = []; this.thread = null; this.multiThreaded = false; this.monitors = new Map();
     this.skia=skia;this.skiaHost=skia?.createHost?.(this)??null;
     this.icuBreakBackend=icuBreakBackend;this.sqliteBackend=sqliteBackend;this.tzdata=tzdata;this.zlibBackend=zlibBackend;this.icuConverterBackend=icuConverterBackend;
 
@@ -1204,6 +1210,8 @@ export class APKRuntime {
     return answer;
   }
   parentUncached(type) { return type?.startsWith('[') ? 'Ljava/lang/Object;' : (this.classes.superclassOf ? this.classes.superclassOf(type) : this.classes.get(type)?.superclass) ?? this.skiaHost?.parent?.(type) ?? this.platform?.parent?.(type) ?? EXTERNAL_PARENTS.get(type) ?? this.platform?.fallbackParent?.(type) ?? (type === 'Ljava/lang/Object;' || type.length === 1 ? null : 'Ljava/lang/Object;'); }   // every reference type reaches Object (a host class declared without a parent, e.g. Resources$Theme, still answers Object.hashCode/equals)
+  /** Whether `type` is an interface: a DEX interface, or a class without DEX code that some type names as its interface (EXTERNAL_INTERFACES; Class.isInterface answers the same). */
+  isInterfaceType(type) { return ((this.classes.get(type)?.flags ?? 0) & 0x200) !== 0 || EXTERNAL_INTERFACE_NAMES.has(type); }
   interfaces(type) { return (this.classes.interfacesOf ? this.classes.interfacesOf(type) : this.classes.get(type)?.interfaces) ?? [...new Set([...(EXTERNAL_INTERFACES.get(type) ?? []), ...(this.skiaHost?.interfaces?.(type) ?? []), ...(this.platform?.interfaces?.(type) ?? [])])]; }
   /** Memoized subtype test (the class graph only grows when more DEX files are loaded, which clears the memo). */
   isSubtype(child, ancestor) {
@@ -1282,6 +1290,7 @@ export class APKRuntime {
     this.record(info.entry);
   }
   executionSnapshot() {
+    foldDirectCalls(this);
     return { framework: { ...(this.dex.frameworkSummary ?? { dexFiles: [], classes: 0, bytes: 0, shadowedAPKClasses: [], policy: 'no-boot-layer' }) },
       missingVoid: [...this.missingVoid].map(([key, count]) => ({ key, count })), missingReturns: [...this.missingReturns].map(([key, count]) => ({ key, count })), missingClasses: [...this.missingClasses].map(([key, count]) => ({ key, count })), missingLibraries: [...this.missingLibraries].map(([key, count]) => ({ key, count })), executionByOrigin: { apk: { ...this.executionByOrigin.apk }, framework: { ...this.executionByOrigin.framework }, host: { ...this.executionByOrigin.host } }, callDepth: { limit: this.maxCallDepth, peak: this.peakCallDepth }, heapBudget: { oomCount: this.oomCount ?? 0, objects: this.heap.size, limit: this.maxHeapObjects, arrayCells: this.arrayCells, fieldSlots: this.fieldSlots, collectionCells: this.collectionCells, garbageCollection: !!this.gcEnabled, collections: this.gcStats?.collections ?? 0, freedObjects: this.gcStats?.freed ?? 0, peakLiveAfterCollection: this.gcStats?.peakLiveAfterGc ?? 0 }, instructionBudget: { limit: this.maxInstructionsPerEvent, currentEvent: this.steps }, unicodeCaseBackend: this.unicodeCaseBackend ?? null, methodEvidenceSummary:{uniqueMethods:this.methodEvidence?.size??0,truncated:!!this.methodEvidenceTruncated} };
   }
@@ -1643,7 +1652,7 @@ export class APKRuntime {
     if (this.heap.size >= this.maxHeapObjects && !(this.emergencyCollect('objetos') && this.heap.size < this.maxHeapObjects) && !this.oomHeadroom()) this.outOfMemory(`Object limit (${this.maxHeapObjects}) exceeded`);
     if (ABSTRACT_GUARD && !this.bytecodeAlloc) this.assertConcreteHostType(type);
     const id = this.nextId++;
-    if ((id & 511) === 0) { this.sampleAllocation(); if (this.gcEnabled && this.heap.size > this.gcSafepointFloor && collectionKind(this) !== null) this.q = 0; }   // allocation-driven: the next back-edge or call reaches the safepoint instead of waiting out the quantum (a loop that allocates 5 objects per iteration filled the heap inside one)
+    if ((id & 511) === 0) { this.sampleAllocation(); if (this.gcEnabled && this.heap.size > this.gcSafepointFloor && collectionKind(this) !== null) { this.q = 0; this.dlimit = 0; } }   // allocation-driven: the next back-edge or call reaches the safepoint instead of waiting out the quantum (a loop that allocates 5 objects per iteration filled the heap inside one)
     return id;
   }
   makeObject(type) {
@@ -1995,6 +2004,8 @@ export class APKRuntime {
   /** True when a collection is due and a long run should reach a safepoint for it (checked at every scheduling quantum, not only at thread switches). */
   gcWanted() { return this.gcEnabled && (GC_STRESS || (this.heap.size > this.gcSafepointFloor && collectionKind(this) !== null)); }
   /** Stress mode only: a collection at an event boundary (nothing in flight), before the next queued task runs. */
+  /** A host's table of native handles is full: collect now, so the cleaners of unreachable owners release theirs (record.onFree). False when no collection could run. */
+  collectForNativeHandles(what) { if (this.engine === 'wasm') { if (!this.wasm) return false; this.wasm.collect('native-handles'); return true; } return this.emergencyCollect(what); }
   stressCollect() { if (GC_STRESS && this.gcEnabled) collectGarbage(this, { reason: 'stress', generation: auditGeneration(this) }); }
   safepointCollect() {
     const tries = this.gcSafepointTries ??= { calls: 0, notDue: 0, deferred: 0, disabled: 0 }; tries.calls++;   // reported by OperationMonitor.gcLine: a heap that fills with no collection says whether safepoints were reached at all
@@ -2292,9 +2303,12 @@ export class APKRuntime {
    */
   oomHeadroom() {
     if (!this.gcEnabled || this.inOutOfMemory) return false;
+    // Direct activations hold the collector off (heap-gc.js, 'direct-frames'): the allocation goes on above the limit, by at most a quarter of it, until their next poll rebuilds the
+    // frames and the collection that is due runs (this.q = 0 makes that the next backward branch or call).
+    if (this.t2Compiled > 0 && this.heap.size < (this.headroomBase || this.maxHeapObjects) * 1.25 && directFrames(this)) { this.gcPressure = true; this.q = 0; this.dlimit = 0; this.t2Headroom++; return true; }
     const collections = this.gcStats?.collections ?? 0, last = this.gcPhases?.[0], base = this.headroomBase || this.maxHeapObjects, extra = Math.floor(base * 0.02);
     if (this.headroomGrantedAt === collections || (last && last.before - last.after < extra / 2)) return false;
-    this.headroomBase = base; this.headroomGrantedAt = collections; this.maxHeapObjects = base + extra; this.gcPressure = true; this.q = 0;   // the next back-edge or call reaches the safepoint that collects
+    this.headroomBase = base; this.headroomGrantedAt = collections; this.maxHeapObjects = base + extra; this.gcPressure = true; this.q = 0; this.dlimit = 0;   // the next back-edge or call reaches the safepoint that collects
     this.record(`OOM headroom +${extra} objects until the next collection (${this.heap.size} live of ${base})`);
     return true;
   }
@@ -3311,7 +3325,7 @@ export class APKRuntime {
       const wanted = this.stringCharacters(args[1]);
       for (const entry of cls.staticFields) {
         if (!(entry.flags & 0x4000)) continue;
-        const field = cls.dex.field(entry.index), value = this.staticFields.get(field.key);
+        const field = cls.dex.field(entry.index), value = this.readStatic(field);   // readStatic, not the static table: on the WebAssembly core a DEX class's statics live in its metaspace
         if (value && typeof value === 'object' && this.object(value).enumName !== undefined && this.stringCharacters(this.object(value).enumName) === wanted) return value;
       }
       this.throwJava('Ljava/lang/IllegalArgumentException;', `No enum constant ${type.slice(1, -1).replaceAll('/', '.').replaceAll('$', '.')}.${wanted}`);

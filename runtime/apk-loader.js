@@ -1,16 +1,16 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=4ebf400428b7';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=4ebf400428b7';
-import { inspectELF } from './native-inspector.js?v=4ebf400428b7';
-import { inflateRaw } from './inflate.js?v=4ebf400428b7';
-import { resolveDevice } from './device-profile.js?v=4ebf400428b7';
-import { resourceProfileFor } from './device-configuration.js?v=4ebf400428b7';
-import { JniBridge } from './jni-host.js?v=4ebf400428b7';
-import { providerForApk } from './native-provider-variants.js?v=4ebf400428b7';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=4ebf400428b7';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=4ebf400428b7';
-import { AndroidResources } from './android-resources.js?v=4ebf400428b7';
-import { AndroidPlatform } from './android-platform.js?v=4ebf400428b7';
-import { FrameworkProvider } from './framework-provider.js?v=4ebf400428b7';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=8cf39c3035e0';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=8cf39c3035e0';
+import { inspectELF } from './native-inspector.js?v=8cf39c3035e0';
+import { inflateRaw } from './inflate.js?v=8cf39c3035e0';
+import { resolveDevice } from './device-profile.js?v=8cf39c3035e0';
+import { resourceProfileFor } from './device-configuration.js?v=8cf39c3035e0';
+import { JniBridge } from './jni-host.js?v=8cf39c3035e0';
+import { providerForApk } from './native-provider-variants.js?v=8cf39c3035e0';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=8cf39c3035e0';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=8cf39c3035e0';
+import { AndroidResources } from './android-resources.js?v=8cf39c3035e0';
+import { AndroidPlatform } from './android-platform.js?v=8cf39c3035e0';
+import { FrameworkProvider } from './framework-provider.js?v=8cf39c3035e0';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -657,7 +657,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const runtime = new APKRuntime(program, { apkEntries: new Set(names), apkReader: name => archive.extractSync(name, 256 * 1024 * 1024), launcherActivity: manifest.launcherActivity, unsupportedFeatures,
     maxInstructionsPerEvent: options.maxInstructionsPerEvent, maxEventWallMs: options.maxEventWallMs,
     maxCallDepth: options.maxCallDepth,
-    maxHeapObjects: options.maxHeapObjects, apiLevel: deviceSdk, tolerateMissingVoid: !!options.tolerateMissingVoid, tolerateMissing: options.tolerateMissing ?? (options.tolerateMissingVoid ? 'void' : 'off'),
+    maxHeapObjects: options.maxHeapObjects, apiLevel: deviceSdk, engine: options.engine ?? 'js', tolerateMissingVoid: !!options.tolerateMissingVoid, tolerateMissing: options.tolerateMissing ?? (options.tolerateMissingVoid ? 'void' : 'off'),
     icuBreakBackend,sqliteBackend,tzdata,zlibBackend,icuConverterBackend,
     nativeLibraries: nativeLibraryDetails, resources: resources.environment, nativeBindings: framework?.nativeBindings, skia,
     platform: new AndroidPlatform({ device: options.device, resources: resources.environment,

@@ -19,6 +19,11 @@
  *   editableText, role, testTag, actions, ... }] }], totalNodes, truncated }. At most once per second per plugin; the same frame answers from a cache.
  * @property {(options?: { names?: boolean }) => Promise<object[]>} layoutBounds   The boxes "Mostrar limites de layout" draws: [{ key, kind: 'compose'|'view', name, nameSource,
  *   bounds (window px), size, texts, editableText, role, testTag, contentDescriptions, actions, modifiers, measurePolicy, type, hasImage }]. Names come from one composeTree (same rate limit).
+ * @property {(options?: { endpointMocks?: object[], crops?: object[], crop?: object, tree?: boolean, image?: boolean, mode?: 'display'|'cover', restoreState?: boolean, timeoutMs?: number, quietMs?: number, type?: string, pixels?: boolean }) => Promise<object>} renderVariant
+ *   Another instance of the current screen, rendered in the background with `endpointMocks` in front of the lab's and destroyed afterwards (docs/RENDER-VARIANT.md): { image, images
+ *   (one per crop: { selector: { name | testTag | text | contentDescription | role | viewId }, all, index } or { rect }), views, semantics, composeTree (with tree: true), requests,
+ *   mocks, settled, timedOut, waitingFor, droppedStarts, visible, notes, ms }. Images are { width, height, scale, type, blob }. It runs in the app's process: shared state a mocked
+ *   answer writes stays; user input waits while it runs.
  * @property {(options?: { key?: string, bounds?: object, element?: object, node?: object, maxWidth?: number, type?: string }) => Promise<{ blob: Blob, width: number, height: number, type: string, notes: string[] }>} screenshot
  *   An image of the screen, of one element (`key` from layoutBounds), or of any box: `bounds` (or `element` / `node`) takes a rectangle in window coordinates, a layoutBounds
  *   element or a composeTree node (its boundsInWindow), cut from the frame the page shows at the rasters' own resolution. At most one every 500 ms per plugin.
@@ -49,6 +54,16 @@
  * @property {{ text(s: string, o?: {id?: string}): void, kv(obj: object, o?: {id?: string}): void, table(rows: object[], columns?: string[], o?: {id?: string}): void,
  *   json(value: any, o?: {id?: string}): void, image(blobOrScreenshot: Blob|{blob: Blob}, o?: {id?: string, caption?: string}): void, clear(): void, badge(s: string): void }} ui   Output of the plugin's panel. Each call adds a block; a block with the same `id`
  *   is replaced in place. Rendered as text only (no HTML), at most ~10 times a second.
+ * @property {(options: number|{ x?: number, y?: number, target?: object|string }) => Promise<object>} scrollTo   Scrolls a scrollable of the app to a position in px
+ *   (1 px = 1 dp in the lab) through the app's own scrolling (the ScrollBy semantics action of Compose, View.scrollBy of a View); `target` is { testTag }, { text }, { key },
+ *   { x, y } or nothing (the largest scrollable on screen). -> { element, key, kind, x, y, maxX, maxY, percentX, percentY, unit: 'px', estimated, reached, steps, via }.
+ * @property {(options: number|{ x?: number, y?: number, target?: object|string }) => Promise<object>} scrollToPercent   The same to a percentage (0–100) of the scroll range.
+ * @property {(target?: object|string) => Promise<object>} scrollInfo   Where a scrollable is, without moving it.
+ * @property {{ open(options: { html: string, title?: string, icon?: string, side?: 'left'|'right', width?: number|string, height?: number|string, mode?: 'overlay'|'push',
+ *   trigger?: 'click'|'hover', open?: boolean, remember?: boolean, id?: string }): Promise<object> }} tab   A side tab ("lingueta") of the lab with the plugin's HTML in an
+ *   isolated iframe (window.lab.post / on / draggable / onDrag / onDrop inside). The handle: { id, isOpen, update, post, setOpen, expand, collapse, close, onMessage, onToggle,
+ *   onClose, onDrag, onDrop }. A drag started in the surface with window.lab.draggable(element, data) reports where it is over the simulated device: onDrag / onDrop get
+ *   { type: 'start'|'over'|'cancel'|'drop', payload, inside, x, y (device px), dpX, dpY, percentX, percentY, windowX, windowY, screen: { width, height, density }, element }.
  * @property {(ms: number) => Promise<void>} sleep
  * @property {{ id: string, name: string, packageName: string|null }} info
  */
@@ -94,6 +109,11 @@ export function pluginWorkerMain(scope) {
   });
   const wrapError = error => Object.assign(new Error(error?.message ?? 'Falha na consulta.'), { code: error?.code ?? 'failed' });
   const watches = new Set(), readyWrappers = new Map(), modals = new Map(); let modalSubscribed = false;
+  const tabs = new Map(); let tabSubscribed = false;
+  const fire = (set, phase, ...args) => { for (const fn of [...set]) { try { const result = fn(...args); if (result && typeof result.then === 'function') result.then(undefined, error => reportError(error, phase)); } catch (error) { reportError(error, phase); } } };
+  const tabConfig = options => { const out = {}; for (const key of ['id', 'title', 'icon', 'side', 'width', 'height', 'mode', 'trigger', 'open', 'remember']) if (options?.[key] !== undefined) out[key] = options[key]; return out; };
+  // a scroll target: a testTag (string), { testTag }, { text }, { key } or a layoutBounds element, { x, y } (a point of the window); nothing = the largest scrollable on screen
+  const scrollTarget = target => target === undefined || target === null ? null : typeof target === 'string' ? { testTag: target } : { key: target.key ?? undefined, testTag: target.key ? undefined : target.testTag ?? undefined, text: target.key ? undefined : target.text ?? undefined, x: target.key ? undefined : target.x, y: target.key ? undefined : target.y };
   const viewOptions = options => ({ depth: options?.depth, maxFields: options?.maxFields, maxItems: options?.maxItems, maxString: options?.maxString });
   const pathArg = path => Array.isArray(path) ? path.map(part => String(part ?? '')) : String(path ?? '');
   // A heap scan is served in short pages (each one a bounded query between two VM events); this walks the pages until `limit` items, the end of the heap or `maxPages`.
@@ -116,7 +136,7 @@ export function pluginWorkerMain(scope) {
         lab.screen().then(screen => { if (screen?.ready?.ready && !was) { was = true; fn(screen); } }).catch(() => {});
         return () => { readyWrappers.delete(fn); off(); };
       }
-      if (!['screen', 'log', 'network', 'refresh', 'modal'].includes(name)) throw new TypeError(`Evento desconhecido: ${name} (use 'screen', 'ready', 'log', 'network' ou 'refresh')`);
+      if (!['screen', 'log', 'network', 'refresh', 'modal', 'tab'].includes(name)) throw new TypeError(`Evento desconhecido: ${name} (use 'screen', 'ready', 'log', 'network' ou 'refresh')`);
       let set = handlers.get(name); if (!set) { set = new Set(); handlers.set(name, set); post({ t: 'sub', name, on: true }); }
       set.add(fn); return () => lab.off(name, fn);
     },
@@ -148,6 +168,42 @@ export function pluginWorkerMain(scope) {
           onClose: fn => { entry.close.add(fn); return () => entry.close.delete(fn); } });
       },
     }),
+    // ---- a side tab ("lingueta") of the page with the plugin's own HTML (src/lab-side-tabs.js) ----
+    tab: Object.freeze({
+      /** Adds a tab to the side of the lab that expands into a panel with the plugin's HTML. -> { id, isOpen, update, post, setOpen, expand, collapse, close, onMessage, onToggle, onClose, onDrag, onDrop } */
+      async open(options = {}) {
+        if (!tabSubscribed) {
+          tabSubscribed = true;
+          lab.on('tab', event => {
+            const entry = tabs.get(event?.id); if (!entry) return;
+            if (event.type === 'closed') { tabs.delete(event.id); fire(entry.close, 'tab.onClose', event.reason); }
+            else if (event.type === 'message') fire(entry.message, 'tab.onMessage', event.data);
+            else if (event.type === 'toggle') { entry.open = !!event.open; fire(entry.toggle, 'tab.onToggle', !!event.open, event.by); }
+            else if (event.type === 'drag') fire(entry.drag, 'tab.onDrag', event.event);
+            else if (event.type === 'drop') fire(entry.drop, 'tab.onDrop', event.event);
+          });
+        }
+        const reply = await call('tab', { op: 'open', config: tabConfig(options), html: String(options?.html ?? '') }), id = reply.id;
+        let entry = tabs.get(id); if (!entry) { entry = { open: false, message: new Set(), toggle: new Set(), close: new Set(), drag: new Set(), drop: new Set() }; tabs.set(id, entry); }
+        entry.open = !!reply.open;
+        const listen = set => fn => { if (typeof fn !== 'function') throw new TypeError('Passe uma função.'); set.add(fn); return () => set.delete(fn); };
+        const setOpen = async open => { const answer = await call('tab', { op: 'setOpen', id, open: open !== false }); entry.open = !!answer.open; return entry.open; };
+        return Object.freeze({ id, get isOpen() { return entry.open; },
+          update: (changes = {}) => call('tab', { op: 'update', id, ...(Object.keys(tabConfig(changes)).length ? { config: tabConfig(changes) } : {}), ...(changes?.html !== undefined ? { html: String(changes.html) } : {}) }),
+          post: data => call('tab', { op: 'post', id, data }),
+          setOpen, expand: () => setOpen(true), collapse: () => setOpen(false),
+          close: () => call('tab', { op: 'close', id }),
+          onMessage: listen(entry.message), onToggle: listen(entry.toggle), onClose: listen(entry.close), onDrag: listen(entry.drag), onDrop: listen(entry.drop) });
+      },
+    }),
+    // ---- scrolling a scrollable of the app (src/lab-scroll.js): the app's own scroll (ScrollBy / View.scrollBy), steered until the position is reached ----
+    /** Where a scrollable is: { element, key, kind, x, y, maxX, maxY, percentX, percentY, unit: 'px', estimated, horizontal, vertical }. target: see scrollTo. */
+    scrollInfo: target => call('scrollInfo', { target: scrollTarget(target) }),
+    /** Scrolls to a position in px (= dp in the lab): scrollTo(300), scrollTo({ y: 300 }), scrollTo({ x: 0, y: 1200, target: { testTag: 'lista' } }). target: { testTag }, { text },
+     * { key } (or a layoutBounds element), { x, y } (a point of the window), or nothing for the largest scrollable on screen. -> scrollInfo plus { reached, steps, via }. */
+    scrollTo: (options = {}) => { const o = typeof options === 'number' ? { y: options } : options ?? {}; return call('scrollTo', { target: scrollTarget(o.target), x: o.x, y: o.y }); },
+    /** Scrolls to a percentage (0 to 100) of the scroll range: scrollToPercent(50), scrollToPercent({ y: 50 }), scrollToPercent({ x: 100, target: 'carrossel' }). */
+    scrollToPercent: (options = {}) => { const o = typeof options === 'number' ? { y: options } : options ?? {}; return call('scrollTo', { target: scrollTarget(o.target), percentX: o.x, percentY: o.y }); },
     async waitReady(options = {}) {   // resolves with the screen once "Tela pronta" holds; rejects with code 'timeout' (default 15 s)
       const until = Date.now() + Math.max(100, Number(options?.timeoutMs) || 15000);
       for (;;) { const screen = await lab.screen(); if (screen?.ready?.ready) return screen; if (Date.now() >= until) throw Object.assign(new Error(`A tela não ficou pronta: ${(screen?.ready?.waitingFor ?? ['sem informação']).join('; ')}`), { code: 'timeout', screen }); await new Promise(resolve => setTimeout(resolve, 100)); }
@@ -159,6 +215,7 @@ export function pluginWorkerMain(scope) {
       const source = options?.bounds ?? options?.element ?? options?.node ?? null, box = source ? (source.boundsInWindow ?? source.bounds ?? source) : null;
       return call('screenshot', { key: options?.key ?? null, bounds: box ? { left: Number(box.left), top: Number(box.top), right: Number(box.right), bottom: Number(box.bottom) } : null, maxWidth: options?.maxWidth, type: options?.type });
     },
+    renderVariant: (options = {}) => call('renderVariant', options ?? {}),   // a background instance of the current screen with other endpoint mocks, as images and data (docs/RENDER-VARIANT.md)
     viewModels: () => call('viewModels', {}),
     fragments: () => call('fragments', {}),
     activity: () => call('activity', {}),

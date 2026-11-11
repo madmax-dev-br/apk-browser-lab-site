@@ -5,16 +5,19 @@
 //
 //   MCP client  --stdio (JSON-RPC, MCP)-->  lab-mcp.mjs  <--HTTP on 127.0.0.1 (events + results)--  the lab page (Controles > MCP > Conectar)
 //
-//   node lab-mcp.mjs                      run by the MCP client (claude mcp add apk-web-lab -- node /caminho/lab-mcp.mjs)
-//   node lab-mcp.mjs token                prints the pairing token to paste in the page
+//   node lab-mcp.mjs                      run by the MCP client, configured with the JSON the page shows in Controles › MCP:
+//                                         { "mcpServers": { "apk-lab": { "command": "node", "args": ["/caminho/lab-mcp.mjs"], "env": { "APK_WEB_LAB_MCP_TOKEN": "<token da página>" } } } }
+//   node lab-mcp.mjs token                prints the token of ~/.apk-web-lab-mcp-token (only used when neither --token nor APK_WEB_LAB_MCP_TOKEN is given)
 //   options: --port 8790  --origin <lab origin> (repeatable)  --token <token>  --timeout-ms 60000
 //
 // Every tool call is answered by the page, with what the page shows at that moment; the bridge stores nothing. Safety: it listens on 127.0.0.1 only; the page's requests must come
-// from one of the allowed origins (the public lab and a local copy by default: another site open in the same browser is refused by its Origin) and carry the pairing token, kept in
-// ~/.apk-web-lab-mcp-token (created once, readable only by you). Node.js built-ins only. Protocol logs go to stderr; stdout carries MCP messages only.
+// from one of the allowed origins (the public lab and a local copy by default: another site open in the same browser is refused by its Origin) and carry the pairing token. The
+// token is always required: the page generates it (shown in its MCP JSON) and the client passes it in APK_WEB_LAB_MCP_TOKEN (or --token); without either, the token kept in
+// ~/.apk-web-lab-mcp-token (created once, readable only by you) is used, as before. Tokens are compared in constant time and never logged. Node.js built-ins only. Protocol logs
+// go to stderr; stdout carries MCP messages only.
 import http from 'node:http';
-import { randomBytes } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,10 +63,29 @@ export const TOOLS = [
     inputSchema: obj({ value: str('o texto'), test_tag: str('testTag do componente'), text: str('texto visível do componente (o primeiro que contém)'), element_key: str('chave de layout_bounds'), wait_ms: num('esperar a tela assentar depois (padrão 2000)'), screenshot: bool('devolver o print da tela depois') }, ['value']) },
   { name: 'scroll', description: 'Rola a lista que contém o componente (ou a maior lista da tela, sem alvo): dy positivo desce, dx positivo vai para a direita.',
     inputSchema: obj({ dy: num('quanto rolar na vertical, em px (padrão 400)'), dx: num('na horizontal'), test_tag: str('testTag do componente'), text: str('texto visível do componente (o primeiro que contém)'), element_key: str('chave de layout_bounds'), x: num('x de um ponto dentro da lista'), y: num('y'), wait_ms: num('esperar a tela assentar depois (padrão 2000)'), screenshot: bool('devolver o print da tela depois') }) },
+  { name: 'scroll_to', description: 'Rola uma lista (ou outro componente rolável) até uma posição em px (1 px = 1 dp no lab) ou até uma porcentagem (0 a 100) do curso da rolagem, na vertical e/ou na horizontal, pela rolagem do próprio app (ScrollBy do Compose, View.scrollBy), repetindo até chegar. Sem alvo, a maior lista da tela. Devolve a posição, o curso (maxX/maxY) e a porcentagem em que parou; numa lista preguiçosa os números são a estimativa da própria lista (estimated: true).',
+    inputSchema: obj({ to_y: num('posição vertical em px, a partir do início'), to_x: num('posição horizontal em px'), percent_y: num('porcentagem vertical do curso, 0 a 100'), percent_x: num('porcentagem horizontal, 0 a 100'), test_tag: str('testTag do componente rolável ou de algo dentro dele'), text: str('texto visível do componente (o primeiro que contém)'), element_key: str('chave de layout_bounds'), x: num('x de um ponto dentro da lista'), y: num('y'), wait_ms: num('esperar a tela assentar depois (padrão 2000)'), screenshot: bool('devolver o print da tela depois') }) },
+  { name: 'scroll_info', description: 'Onde uma lista (ou outro componente rolável) está, sem mover: posição x/y e curso maxX/maxY em px, e a porcentagem. Mesmo alvo de scroll_to.',
+    inputSchema: obj({ test_tag: str('testTag do componente rolável ou de algo dentro dele'), text: str('texto visível do componente'), element_key: str('chave de layout_bounds'), x: num('x de um ponto dentro da lista'), y: num('y') }) },
   { name: 'back', description: 'Volta para a tela anterior (o botão Voltar do aparelho).', inputSchema: obj({ wait_ms: num('esperar a tela assentar depois (padrão 2000)'), screenshot: bool('devolver o print da tela depois') }) },
   { name: 'reload', description: 'Recarrega a tela atual: recreate (padrão, mantém estado salvo e ViewModels) ou reopen (instância nova com o mesmo Intent).', inputSchema: obj({ mode: str('"recreate" ou "reopen"') }) },
   { name: 'wait_ready', description: 'Espera a "Tela pronta" (Activity e fragments carregados, nada pendente por 300 ms) e devolve a tela.', inputSchema: obj({ timeout_ms: num('tempo máximo (padrão 15000)') }) },
 ];
+
+export const TOKEN_ENV = 'APK_WEB_LAB_MCP_TOKEN';
+export const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,256}$/;
+/** Constant-time token check (both sides hashed first, so lengths do not leak either). */
+export function tokenMatches(given, expected) {
+  const digest = value => createHash('sha256').update(String(value ?? '')).digest();
+  return typeof given === 'string' && typeof expected === 'string' && expected.length > 0 && timingSafeEqual(digest(given), digest(expected));
+}
+/** Which token the bridge uses: --token, then APK_WEB_LAB_MCP_TOKEN, then ~/.apk-web-lab-mcp-token. -> { token, source } or { error } (never contains the token). */
+export function resolveToken({ argToken = null, env = {}, file = tokenFile(), readFile = readOrCreateToken } = {}) {
+  const pick = (value, source) => TOKEN_PATTERN.test(value) ? { token: value, source } : { error: `token inválido em ${source}: use o token que a página mostra em Controles › MCP (16 ou mais letras, números, _ ou -)` };
+  if (argToken != null) return pick(String(argToken).trim(), '--token');
+  const fromEnv = env[TOKEN_ENV]; if (fromEnv != null && String(fromEnv).trim() !== '') return pick(String(fromEnv).trim(), TOKEN_ENV);
+  return { token: readFile(file), source: file };
+}
 
 export function tokenFile() { return path.join(homedir(), '.apk-web-lab-mcp-token'); }
 export function readOrCreateToken(file = tokenFile()) {
@@ -73,7 +95,8 @@ export function readOrCreateToken(file = tokenFile()) {
 
 /** The bridge: an HTTP side for the page and an MCP side (handle(message) -> response or null). */
 export function createBridge({ port = DEFAULT_PORT, origins = DEFAULT_ORIGINS, token, timeoutMs = 60000, log = message => process.stderr.write(`[lab-mcp] ${message}\n`) } = {}) {
-  const allowed = new Set(origins), pending = new Map(); let page = null, nextId = 1, server = null;
+  if (!TOKEN_PATTERN.test(String(token ?? ''))) throw new Error('lab-mcp: a ponte precisa de um token (16 ou mais letras, números, _ ou -)');
+  const allowed = new Set(origins), pending = new Map(); let page = null, nextId = 1, server = null, refused = null, refusedLogged = 0;
   const cors = (origin, res, extra = {}) => { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); for (const [name, value] of Object.entries(extra)) res.setHeader(name, value); };
   const send = (res, status, body, origin) => { if (origin) cors(origin, res); res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
   function onRequest(req, res) {
@@ -84,7 +107,12 @@ export function createBridge({ port = DEFAULT_PORT, origins = DEFAULT_ORIGINS, t
       res.writeHead(204); res.end(); return;
     }
     const [, key, action] = url.pathname.split('/');
-    if (key !== token) { send(res, 401, { error: 'token inválido: copie o token de "node lab-mcp.mjs token"' }, origin); return; }
+    let given = ''; try { given = decodeURIComponent(key ?? ''); } catch { /* malformed: refused below */ }
+    if (!tokenMatches(given, token)) {
+      refused = { at: Date.now(), origin };
+      if (Date.now() - refusedLogged > 5000) { refusedLogged = Date.now(); log(`página recusada (${origin}): o token dela é diferente do desta ponte. Copie de novo o JSON de Controles › MCP para a configuração do cliente MCP e reinicie o servidor MCP.`); }
+      send(res, 401, { error: 'token recusado: o token desta página é diferente do configurado na ponte. Copie de novo o JSON de Controles › MCP para a configuração do seu cliente MCP e reinicie o servidor MCP.', code: 'bad-token' }, origin); return;
+    }
     if (req.method === 'GET' && action === 'events') {
       cors(origin, res); res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
       if (page) { page.res.write('event: replaced\ndata: {}\n\n'); page.res.end(); }
@@ -109,7 +137,10 @@ export function createBridge({ port = DEFAULT_PORT, origins = DEFAULT_ORIGINS, t
   }
   /** Sends one tool call to the page; resolves with { content, isError }. */
   function callPage(name, args) {
-    if (!page) return Promise.resolve({ isError: true, content: [{ type: 'text', text: 'A página do APK Web Lab não está conectada. Abra o lab no navegador, carregue o APK e em Controles › MCP clique em Conectar (token: node lab-mcp.mjs token).' }] });
+    if (!page) {
+      const mismatch = refused && Date.now() - refused.at < 10 * 60 * 1000 ? ` Uma página (${refused.origin}) tentou conectar há ${Math.round((Date.now() - refused.at) / 1000)} s com outro token e foi recusada: copie de novo o JSON de Controles › MCP (o token mudou?) para a configuração do cliente MCP e reinicie o servidor MCP.` : '';
+      return Promise.resolve({ isError: true, content: [{ type: 'text', text: `A página do APK Web Lab não está conectada. Abra o lab no navegador, carregue o APK e em Controles › MCP clique em Conectar.${mismatch}` }] });
+    }
     const id = nextId++, wait = name === 'wait_ready' ? Math.max(timeoutMs, Number(args?.timeout_ms ?? 15000) + 5000) : timeoutMs;
     return new Promise(resolve => {
       const timer = setTimeout(() => { pending.delete(id); resolve({ isError: true, content: [{ type: 'text', text: `A página não respondeu em ${Math.round(wait / 1000)} s (aba em segundo plano ou ocupada?).` }] }); }, wait);
@@ -165,12 +196,14 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     else if (arg === '--origin') options.origins.push(String(args[++i]).replace(/\/$/, ''));
     else if (arg === '--token') options.token = String(args[++i]);
     else if (arg === '--timeout-ms') options.timeoutMs = Number(args[++i]);
-    else if (arg === '--help' || arg === '-h') { console.error('node lab-mcp.mjs [token] [--port 8790] [--origin <origem do lab>]... [--token <token>] [--timeout-ms 60000]'); process.exit(0); }
+    else if (arg === '--help' || arg === '-h') { console.error('node lab-mcp.mjs [token] [--port 8790] [--origin <origem do lab>]... [--token <token>] [--timeout-ms 60000]  (ou o token em APK_WEB_LAB_MCP_TOKEN, como no JSON de Controles › MCP)'); process.exit(0); }
   }
-  options.token ??= readOrCreateToken();
+  const chosen = resolveToken({ argToken: options.token, env: process.env });
+  if (chosen.error) { process.stderr.write(`[lab-mcp] ${chosen.error}\n`); process.exit(1); }
+  options.token = chosen.token;
   const bridge = createBridge(options);
+  process.stderr.write(`[lab-mcp] token de pareamento: ${chosen.source}${chosen.source === tokenFile() ? ' (node lab-mcp.mjs token; cole em Controles › MCP › Token)' : ''}\n`);
   bridge.listen().then(() => {
-    process.stderr.write(`[lab-mcp] token de pareamento em ${existsSync(tokenFile()) && !args.includes('--token') ? tokenFile() : '--token'} (node lab-mcp.mjs token)\n`);
     serveStdio(bridge);
   }, error => { process.stderr.write(`[lab-mcp] não abriu a porta ${options.port}: ${error.message}\n`); process.exit(1); });
   process.stdin.on('end', () => bridge.close().then(() => process.exit(0)));

@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=4ebf400428b7">
+  <link rel="stylesheet" href="./site-pages.css?v=8cf39c3035e0">
 </head>
 <body>
   <header class="topbar">
@@ -97,9 +97,9 @@
         <h2 id="h-adicionar">Adicionar um plugin</h2>
         <ol>
           <li>Abra <b>Controles › Plugins</b>.</li>
-          <li>Clique em <b>+ Adicionar</b>. O diálogo abre em branco: <b>Nome</b>, <b>Pacote</b> (opcional), as opções de saída e <b>Código</b>. No editor, Tab insere dois espaços e Esc fecha.</li>
+          <li>Clique em <b>+ Adicionar</b>. O diálogo abre em branco, com um link para os exemplos: <b>Nome</b>, as opções de saída e <b>Código</b>. No editor, Tab insere dois espaços e Esc fecha.</li>
           <li>Escreva o código, ou copie um dos <a href="#exemplos">exemplos</a> (Tela atual, Logs filtrados, Observar ViewModel, Componentes da tela, Árvore Compose resumida, Print na tela pronta e outros).</li>
-          <li>Clique em <b>Salvar</b>. O plugin novo já vem ligado e começa a rodar quando há um APK aberto que passa no filtro de pacote.</li>
+          <li>Clique em <b>Salvar</b>. O plugin novo já vem ligado, vale para qualquer app e começa a rodar quando há um APK aberto.</li>
         </ol>
         <p>O código é o corpo de uma função assíncrona: use <code>await</code> no topo à vontade. <code>import</code> estático não funciona; <code>await import(url)</code> funciona. O objeto global <code>lab</code> é a API.</p>
       </section>
@@ -123,7 +123,8 @@
 
       <section id="pacote" aria-labelledby="h-pacote">
         <h2 id="h-pacote">Filtro de pacote</h2>
-        <p>O campo <b>Pacote</b> limita o plugin a certos apps. Vazio ou <code>*</code>: qualquer app. Vários pacotes podem ser separados por vírgula ou espaço, e <code>*</code> funciona como curinga dentro de um nome (por exemplo <code>com.exemplo.*</code>). Quando o APK aberto não casa, o plugin fica parado com o motivo “só para …”.</p>
+        <p>Um plugin criado no diálogo vale para qualquer app: o diálogo não tem mais o campo <b>Pacote</b>. Um plugin que já tinha um filtro de pacote (salvo antes, ou importado de um JSON com <code>packageFilter</code>) continua com ele: a linha do plugin mostra “pacote …”, e quando o APK aberto não casa o plugin fica parado com o motivo “só para …”. Ao editar um plugin assim, o diálogo avisa e oferece <b>Valer para qualquer app</b>, que tira o filtro ao salvar.</p>
+        <p>No JSON, <code>packageFilter</code> vazio ou <code>*</code> é qualquer app; vários pacotes vão separados por vírgula ou espaço, e <code>*</code> funciona como curinga dentro de um nome (por exemplo <code>com.exemplo.*</code>). Dentro do código, <code>lab.info.packageName</code> diz qual app está aberto.</p>
       </section>
 
       <section id="json" aria-labelledby="h-json">
@@ -162,6 +163,7 @@
             <tr><td><code>await lab.composeTree({ maxNodes, locals })</code></td><td>A árvore de layout do Compose: <code>{ owners: [{ nodes: [{ id, handle, parentId, depth, name, bounds, texts, editableText, role, testTag, actions, … }] }], totalNodes, truncated }</code>. Custa dezenas de milissegundos na VM: no máximo uma por segundo por plugin.</td> Com <code>locals: ['LocalContentColor', 'LocalMeuTema']</code>, cada nó traz <code>locals.LocalX</code>: o valor que aquele composable vê, para diferenciar componentes por um Local numa chamada só.</tr>
             <tr><td><code>await lab.layoutBounds({ names })</code></td><td>As caixas que “Mostrar limites de layout” desenha (Views e nós semânticos do Compose), como no painel Compose: <code>[{ key, kind, name, nameSource, bounds, size, texts, editableText, role, testTag, contentDescriptions, actions, modifiers, measurePolicy, type, hasImage }]</code>, com <code>bounds</code> em pixels da janela. Os nomes vêm de uma <code>composeTree</code> (mesmo limite de uma por segundo); <code>names: false</code> não consulta a VM.</td></tr>
             <tr><td><code>await lab.screenshot({ key | bounds | element | node, maxWidth, type })</code></td><td>Imagem da tela inteira, ou de uma caixa (<code>key</code> de <code>layoutBounds</code>), cortada do quadro que a página mostra, sem trabalho na VM: <code>{ blob, width, height, type, notes }</code>. Padrões: <code>maxWidth</code> 1080, <code>type</code> <code>'image/png'</code>. No máximo uma a cada 500 ms por plugin. Views que a página desenha com elementos próprios (widgets XML simples) não têm raster: ficam de fora da tela inteira (<code>notes</code> diz quantas) e a caixa delas responde <code>no-image</code>.</td> Para recortar qualquer componente: <code>bounds</code> com um retângulo na janela, <code>element</code> com um item de <code>lab.layoutBounds()</code> ou <code>node</code> com um nó de <code>lab.composeTree()</code> (usa o <code>boundsInWindow</code> dele); o recorte vem de todos os rasters sob a área, na resolução deles.</tr>
+            <tr><td><code>await lab.renderVariant({ endpointMocks, crops, tree, mode, timeoutMs })</code></td><td>Renderiza em segundo plano <b>outra instância da tela atual</b> com outros mocks de endpoint (formato de <code>lab.mock</code>) e devolve imagens e dados dela: <code>{ image, images, views, semantics, composeTree, requests, mocks, settled, timedOut, waitingFor, notes }</code>. <code>crops</code>: vários recortes de uma só renderização, cada um <code>{ selector: { name | testTag | text | contentDescription | role | viewId }, all, index }</code> ou <code>{ rect }</code>; <code>tree: true</code> traz a árvore do Compose da variante para escolher o que recortar. A instância é destruída ao final. <code>mode</code>: <code>'display'</code> (padrão; a tela visível não recebe nenhum callback) ou <code>'cover'</code> (ela é pausada, salva e parada, e depois retomada; com <code>restoreState: true</code> a instância nasce com o estado salvo, para apps de uma Activity com Navigation). Limites: roda no mesmo processo, então os mocks valem para o app todo durante a renderização e o que a resposta gravar em estado compartilhado permanece; um <code>startActivity</code> da instância é descartado (<code>droppedStarts</code>); a entrada do usuário espera; só rasters entram na imagem, como em <code>screenshot</code>. Padrões: <code>timeoutMs</code> 5000 (máx. 15000).</td></tr>
             <tr><td><code>await lab.viewModels()</code></td><td>Os ViewModels da tela: da Activity, dos fragments na tela e os guardados pelas entradas da pilha do Navigation. <code>[{ handle, className, key, library, owner: { kind, label, className, handle } }]</code>.</td></tr>
             <tr><td><code>await lab.fragments()</code></td><td>Os fragments androidx na tela, com os filhos: <code>[{ handle, className, who, tag, id, hidden, state, children }]</code>.</td></tr>
             <tr><td><code>await lab.activity()</code></td><td><code>{ handle, className }</code> da Activity atual.</td></tr>
@@ -188,6 +190,39 @@
             <tr><td><code>const m = await lab.modal.open({ title, size, html })</code></td><td>Abre uma janela na página, <code>small</code>, <code>medium</code> ou <code>full</code> (tela inteira), com botão de fechar e Esc. <code>html</code> é qualquer HTML, CSS e JavaScript seu: roda isolado na janela (um iframe sem acesso à página do lab). Na janela, <code>window.lab.post(dados)</code> manda para o plugin e <code>window.lab.on(fn)</code> recebe.</td></tr>
             <tr><td><code>m.update({ title, size, html })</code> · <code>m.post(dados)</code> · <code>m.close()</code> · <code>m.onMessage(fn)</code> · <code>m.onClose(fn)</code></td><td>Troca o conteúdo, conversa com a janela e fica sabendo quando ela é fechada (<code>user</code>, <code>code</code> ou <code>stopped</code>, quando o plugin para).</td></tr>
             <tr><td><code>await lab.dataUrl(imagem)</code></td><td>Uma imagem (de <code>lab.screenshot</code>) como <code>data:</code> URL, para pôr no HTML de uma janela.</td></tr>
+          </tbody>
+        </table></div>
+        <h3 id="h-rolar">Rolar o app</h3>
+        <p>O lab rola pelo caminho que a roda do mouse usa no aparelho: a ação <code>ScrollBy</code> do componente no Compose, ou <code>View.scrollBy</code> numa View. Ele lê onde a rolagem está, pede a diferença e lê de novo até parar no lugar; nada é escrito por fora do app. As posições são em <b>px do aparelho, que no lab são iguais a dp</b> (densidade 1).</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Chamada</th><th scope="col">O que faz</th></tr></thead>
+          <tbody>
+            <tr><td><code>await lab.scrollTo({ x, y, target })</code> · <code>lab.scrollTo(300)</code></td><td>Rola até uma posição em px a partir do início (um número sozinho é o <code>y</code>). Uma posição depois do fim para no fim. Devolve <code>{ element, key, x, y, maxX, maxY, percentX, percentY, unit: 'px', reached, steps, via }</code>: onde parou, o curso da rolagem e se chegou.</td></tr>
+            <tr><td><code>await lab.scrollToPercent({ x, y, target })</code> · <code>lab.scrollToPercent(50)</code></td><td>Rola até uma porcentagem (0 a 100) do curso da rolagem, na vertical (<code>y</code>), na horizontal (<code>x</code>) ou nas duas. Mesma resposta.</td></tr>
+            <tr><td><code>await lab.scrollInfo(target)</code></td><td>Onde a rolagem está, sem mover.</td></tr>
+            <tr><td><code>target</code></td><td>Qual componente rolar, do mesmo jeito das outras consultas: <code>{ testTag }</code> (ou só o texto do testTag), <code>{ text }</code>, <code>{ key }</code> ou um elemento de <code>lab.layoutBounds()</code>, <code>{ x, y }</code> (um ponto da janela). Se o alvo não rola, vale o componente rolável que o contém. Sem alvo: o maior componente rolável da tela.</td></tr>
+          </tbody>
+        </table></div>
+        <p><b>Listas preguiçosas</b> (<code>LazyColumn</code>, <code>LazyRow</code>) só montam os itens visíveis e não sabem a própria posição em px. Nelas o lab usa o que é exato: o primeiro item (<code>ScrollToIndex 0</code>), o fim do conteúdo e o <code>ScrollBy</code>. <code>scrollTo({ y })</code> rola essa quantidade de px a partir do primeiro item; 0 % e 100 % vão direto às pontas; uma porcentagem no meio faz o lab <b>medir o conteúdo uma vez</b>, rolando até o fim, antes de ir ao ponto (leva alguns segundos e a lista se mexe; uma lista que carrega mais itens no fim vai carregá-los). A resposta traz <code>lazy: true</code>, <code>atStart</code>, <code>atEnd</code> e, quando mediu, <code>measured: true</code> com <code>y</code> e <code>maxY</code>; <code>scrollInfo</code> numa lista dessas só sabe as pontas (<code>y: null</code>) e mostra em <code>reported</code> os números que a própria lista informa. Num <code>RecyclerView</code> os números são a estimativa do próprio componente (<code>estimated: true</code>). Uma lista longa demais para medir dá erro <code>unsupported</code>.</p>
+        <h3 id="h-aba">Aba lateral</h3>
+        <p>Uma lingueta na borda do laboratório, com o ícone e o nome do plugin, que abre um painel com HTML, CSS e JavaScript seus (isolados num iframe, como na janela de <code>lab.modal</code>). As linguetas de vários plugins ficam empilhadas na mesma borda, sem se sobrepor, e cada lado mostra um painel por vez. A lingueta é um botão: abre e fecha com clique, Enter ou Espaço; Esc fecha.</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Chamada</th><th scope="col">O que faz</th></tr></thead>
+          <tbody>
+            <tr><td><code>const aba = await lab.tab.open({ html, title, icon, side, width, height, mode, trigger, open, remember, id })</code></td><td><code>title</code>: o nome na lingueta (padrão: o nome do plugin). <code>icon</code>: um emoji ou até duas letras. <code>side</code>: <code>'right'</code> (padrão) ou <code>'left'</code>. <code>width</code> e <code>height</code>: o tamanho aberto, em px (<code>320</code>, <code>'320px'</code>) ou em % da janela (<code>'40%'</code>); padrão 320 px por 70 %. <code>mode</code>: <code>'overlay'</code> (o painel fica por cima da página, o padrão) ou <code>'push'</code> (empurra a página). <code>trigger</code>: <code>'click'</code> (padrão) ou <code>'hover'</code> (abre ao passar o ponteiro e fecha ao sair; um clique fixa). <code>open: true</code> começa aberta. <code>remember: true</code> guarda se estava aberta ou fechada e volta assim. <code>id</code> distingue as abas de um plugin (até 4).</td></tr>
+            <tr><td><code>aba.update({ html, width, … })</code> · <code>aba.post(dados)</code> · <code>aba.expand()</code> · <code>aba.collapse()</code> · <code>aba.setOpen(bool)</code> · <code>aba.close()</code> · <code>aba.isOpen</code></td><td>Troca o conteúdo ou a configuração, conversa com o painel, abre, recolhe e remove a aba. A aba some quando o plugin para.</td></tr>
+            <tr><td><code>aba.onMessage(fn)</code> · <code>aba.onToggle((aberta, por) =&gt; …)</code> · <code>aba.onClose(fn)</code></td><td>O que o painel mandou com <code>window.lab.post</code>; abriu ou fechou (<code>por</code>: <code>user</code>, <code>hover</code>, <code>code</code>, <code>start</code>, <code>other</code> quando outra aba do mesmo lado abriu); a aba foi removida.</td></tr>
+            <tr><td>No painel: <code>lab.post(dados)</code> · <code>lab.on(fn)</code></td><td>Mensagens para o plugin e do plugin, como na janela.</td></tr>
+          </tbody>
+        </table></div>
+        <h3 id="h-arrastar">Arrastar do painel para o aparelho</h3>
+        <p>Dentro do painel de uma aba, um elemento pode ser arrastado até o aparelho simulado. Enquanto arrasta, o laboratório desenha uma etiqueta que segue o ponteiro, uma moldura em volta da tela do aparelho e a posição sob o ponteiro; ao soltar, o plugin recebe onde caiu e decide o que fazer (um mock, uma rolagem, só anotar). Esc cancela.</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Chamada</th><th scope="col">O que faz</th></tr></thead>
+          <tbody>
+            <tr><td>No painel: <code>lab.draggable(elemento, dados, { label, image })</code></td><td>Torna o elemento arrastável. <code>dados</code> (JSON, ou uma função que devolve) volta nos eventos como <code>payload</code>. <code>label</code> é o texto da etiqueta (padrão: o texto do elemento) e <code>image</code> uma miniatura em <code>data:image/…</code> (padrão: a <code>&lt;img&gt;</code> de dentro do elemento, se houver). Devolve a função que desfaz.</td></tr>
+            <tr><td><code>aba.onDrag(fn)</code> · <code>aba.onDrop(fn)</code><br>no painel: <code>lab.onDrag(fn)</code> · <code>lab.onDrop(fn)</code></td><td><code>onDrag</code> recebe <code>type: 'start'</code>, <code>'over'</code> (no máximo a cada 100 ms) e <code>'cancel'</code>; <code>onDrop</code> recebe <code>type: 'drop'</code>, também quando solta fora da tela. O evento: <code>{ payload, inside, x, y, dpX, dpY, percentX, percentY, windowX, windowY, screen: { width, height, density }, element }</code>.</td></tr>
+            <tr><td>Campos do evento</td><td><code>inside</code>: o ponteiro está sobre a tela do aparelho. <code>x</code>, <code>y</code>: px da tela do aparelho; <code>dpX</code>, <code>dpY</code>: os mesmos em dp; <code>percentX</code>, <code>percentY</code>: porcentagem da largura e da altura da tela. <code>windowX</code>, <code>windowY</code>: o ponto na janela do app, o sistema de <code>lab.layoutBounds()</code>. <code>element</code>: o componente do app sob o ponto (<code>key</code>, <code>name</code>, <code>testTag</code>, <code>role</code>, <code>texts</code>, <code>actions</code>, <code>bounds</code>) ou <code>null</code>. A posição vem do retângulo da tela no momento, então vale com o aparelho em qualquer escala.</td></tr>
           </tbody>
         </table></div>
         <h3>Saída e utilidades</h3>
@@ -246,9 +281,19 @@ lab.watch({ static: 'com.exemplo.Sessao' }, 'atual.usuario', v =&gt; lab.ui.json
         <p>Um cliente MCP (Claude Code, Claude Desktop) pode usar a página do lab aberta no seu navegador: tirar print da tela ou de um componente, ler a saída dos plugins, a árvore do Compose com os CompositionLocals de cada composable, ViewModels e estado estático, o Logcat e a rede. Uma página web não aceita conexões, então uma ponte pequena roda no seu computador entre os dois:</p>
         <pre><code>cliente MCP  --stdio-->  lab-mcp.mjs (127.0.0.1:8790)  <--  esta página (Controles › MCP › Conectar)</code></pre>
         <ol>
-          <li><b>Baixe a ponte</b> (Node.js 22 ou mais novo, sem dependências): <code>curl -O https://madmax-dev-br.github.io/apk-browser-lab-site/tools/lab-mcp.mjs</code></li>
-          <li><b>Registre no cliente.</b> Claude Code: <code>claude mcp add apk-web-lab -- node /caminho/lab-mcp.mjs</code>. Claude Desktop, em <code>claude_desktop_config.json</code>: <code>{ "mcpServers": { "apk-web-lab": { "command": "node", "args": ["/caminho/lab-mcp.mjs"] } } }</code>. O cliente inicia a ponte sozinho.</li>
-          <li><b>Pareie a página:</b> no terminal, <code>node lab-mcp.mjs token</code> mostra o token (guardado em <code>~/.apk-web-lab-mcp-token</code>). Cole em <b>Controles › MCP › Token</b> e clique em <b>Conectar</b>. O navegador pode pedir permissão para a página acessar a rede local: permita.</li>
+          <li><b>Baixe a ponte</b> (Node.js 22 ou mais novo, sem dependências): <code>curl -O https://madmax-dev-br.github.io/apk-browser-lab-site/tools/lab-mcp.mjs</code>, e informe onde a salvou em <b>Controles › MCP › Onde está a ponte</b>.</li>
+          <li><b>Copie a configuração.</b> A página gera um token de pareamento (192 bits aleatórios, guardado só neste navegador; <b>Mostrar</b> revela, <b>Gerar novo</b> troca) e monta o JSON do cliente MCP com ele. Clique em <b>Copiar</b> e cole no <code>.mcp.json</code> do seu projeto (Claude Code) ou em <code>claude_desktop_config.json</code> (Claude Desktop); se o arquivo já tem <code>mcpServers</code>, junte a entrada <code>apk-lab</code> às outras. Reinicie o cliente: ele inicia a ponte sozinho.
+            <pre><code>{
+  "mcpServers": {
+    "apk-lab": {
+      "command": "node",
+      "args": ["/caminho/para/lab-mcp.mjs"],
+      "env": { "APK_WEB_LAB_MCP_TOKEN": "&lt;o token da página&gt;" }
+    }
+  }
+}</code></pre>
+            Com outra porta, o JSON traz <code>--port</code>; numa cópia do lab em outra origem, <code>--origin</code>.</li>
+          <li><b>Conecte:</b> em <b>Controles › MCP</b>, clique em <b>Conectar</b>. O navegador pode pedir permissão para a página acessar a rede local: permita. Se a ponte tem outro token (você gerou um novo, ou o cliente usa uma configuração antiga), os dois lados recusam com uma mensagem clara: copie o JSON de novo e reinicie o servidor MCP no cliente.</li>
           <li><b>Peça ao Claude:</b> “tire um print do botão Salvar”, “qual LocalContentColor cada texto da tela recebe?”, “o que o plugin X está mostrando?”, “quais requisições falharam?”, “faça /v1/perfil devolver um usuário premium e recarregue a tela”, “acompanhe o Logcat por erros enquanto eu navego”, “filtre por Pendentes, busque Monitor e me mostre o resultado”.</li>
         </ol>
         <div class="table-scroll"><table>
@@ -261,12 +306,13 @@ lab.watch({ static: 'com.exemplo.Sessao' }, 'atual.usuario', v =&gt; lab.ui.json
             <tr><td><code>view_models</code>, <code>inspect</code>, <code>field</code>, <code>statics</code>, <code>static_field</code>, <code>classes</code>, <code>instances</code>, <code>referrers</code></td><td>As mesmas leituras somente leitura dos plugins.</td></tr>
             <tr><td><code>plugins</code></td><td>A saída de cada plugin (texto, tabelas, JSON, imagens), estado e erros.</td></tr>
             <tr><td><code>logcat</code>, <code>network</code></td><td>Logcat (coletado enquanto o MCP está conectado) e o log de rede, com filtros (<code>level</code>, <code>contains</code>, <code>limit</code>). Escolha o intervalo para não trazer tudo: <code>start: "now"</code> só marca o ponto de partida (devolve o cursor), <code>since</code> traz o que veio depois de um cursor, <code>last_seconds</code> os últimos N segundos e <code>from_time</code> a partir de um momento. Para acompanhar ao vivo, cada resposta traz <code>next</code> e <code>wait_ms</code> espera até chegar algo novo (até 30 s). <code>network</code> com <code>include_body</code> devolve o corpo das respostas (texto).</td></tr>
+            <tr><td><code>scroll_to</code>, <code>scroll_info</code></td><td>Rolam uma lista até uma posição em px (<code>to_y</code>, <code>to_x</code>) ou até uma porcentagem do curso (<code>percent_y</code>, <code>percent_x</code>, 0 a 100), como <code>lab.scrollTo</code> e <code>lab.scrollToPercent</code>, e dizem onde a rolagem está. O alvo é <code>test_tag</code>, <code>text</code>, <code>element_key</code> ou um ponto; sem alvo, a maior lista da tela.</td></tr>
             <tr><td><code>tap</code>, <code>type</code>, <code>scroll</code>, <code>back</code></td><td>Mexem no app como você: <code>tap</code> toca num componente (por <code>test_tag</code>, <code>text</code> ou <code>element_key</code>) ou num ponto (<code>x</code>, <code>y</code>), com um toque real em Compose e o clique numa View; <code>type</code> escreve num campo (<code>value</code>); <code>scroll</code> rola a lista do componente (<code>dy</code>, <code>dx</code>); <code>back</code> é o botão Voltar. Cada um espera a tela assentar e devolve a tela; com <code>screenshot: true</code>, o print também.</td></tr>
             <tr><td><code>set_mock</code>, <code>remove_mock</code>, <code>list_mocks</code></td><td>Cria ou troca (mesmo <code>id</code>) um mock de endpoint (<code>url</code>, <code>method</code>, <code>status</code>, <code>body</code> texto ou objeto, <code>headers</code>, <code>delay_ms</code>), remove e lista. Os mocks ficam em <b>Controles › Mock de endpoints</b> do pacote aberto, como os seus.</td></tr>
             <tr><td><code>reload</code></td><td>Recarrega a tela (<code>recreate</code> ou <code>reopen</code>), por exemplo depois de um <code>set_mock</code>, para o app buscar de novo.</td></tr>
           </tbody>
         </table></div>
-        <p><b>Segurança:</b> a ponte escuta só em 127.0.0.1, aceita só as origens do lab (esta página e uma cópia local; outras com <code>--origin</code>) e exige o token; não guarda nada. O MCP não muda o app por dentro: além das leituras, toca e digita como você e usa os controles do laboratório (mocks e recarregar a tela), que aparecem em Controles. Mantenha a aba do lab visível enquanto usa (abas em segundo plano ficam lentas). Opções: <code>--port</code>, <code>--origin</code>, <code>--token</code>, <code>--timeout-ms</code>.</p>
+        <p><b>Segurança:</b> a ponte escuta só em 127.0.0.1, aceita só as origens do lab (esta página e uma cópia local; outras com <code>--origin</code>) e exige o token, comparado em tempo constante e nunca escrito nos logs; não guarda nada. Sem <code>APK_WEB_LAB_MCP_TOKEN</code> nem <code>--token</code>, a ponte usa o token de <code>~/.apk-web-lab-mcp-token</code> (<code>node lab-mcp.mjs token</code> mostra), que pode ser colado no campo Token da página, como antes. O MCP não muda o app por dentro: além das leituras, toca e digita como você e usa os controles do laboratório (mocks e recarregar a tela), que aparecem em Controles. Mantenha a aba do lab visível enquanto usa (abas em segundo plano ficam lentas). Opções: <code>--port</code>, <code>--origin</code>, <code>--token</code>, <code>--timeout-ms</code>.</p>
       </section>
 
       <section id="valores" aria-labelledby="h-valores">
@@ -455,11 +501,64 @@ await desenhar();</code></pre></div>
   headers: { 'Content-Type': 'application/json' }, body: { nome: 'Ana', plano: 'premium' } });
 await lab.reload('reopen');
 lab.ui.kv({ mock: id, ativos: (await lab.mocks()).length });</code></pre></div>
+
+        <h3>Rolar até a metade ou até uma posição</h3>
+        <p>Rola a lista principal até 50 % e depois até 300 px do início, pela rolagem do próprio app, e mostra onde parou. No lab, 1 px = 1 dp.</p>
+        <div class="code" data-name="Rolar até a metade ou até uma posição"><pre><code>await lab.waitReady({ timeoutMs: 20000 });
+const meio = await lab.scrollToPercent(50);
+lab.ui.kv({ lista: meio.element, posição: `${meio.y} de ${meio.maxY} px`, porcentagem: `${meio.percentY} %`, chegou: meio.reached }, { id: 'meio' });
+// Até uma posição. Para outra lista, diga o alvo: { y: 300, target: { testTag: 'minha-lista' } }
+const ponto = await lab.scrollTo({ y: 300 });
+lab.ui.kv({ posição: `${ponto.y} px`, chegou: ponto.reached, via: ponto.via }, { id: 'ponto' });
+// Atualizar no cartão mostra onde a rolagem está agora
+lab.on('refresh', async () =&gt; lab.ui.json(await lab.scrollInfo(), { id: 'agora' }));</code></pre></div>
+
+        <h3>Aba lateral</h3>
+        <p>Uma lingueta à direita com botões que rolam o app. O painel é HTML seu e conversa com o plugin por mensagens; a aba lembra se ficou aberta.</p>
+        <div class="code" data-name="Aba lateral"><pre><code>const aba = await lab.tab.open({ title: 'Rolagem', icon: '↕', side: 'right', width: 260, height: '40%', mode: 'overlay', trigger: 'click', open: true, remember: true, html: `
+  &lt;style&gt;body{font:13px system-ui;margin:12px} button{margin:0 6px 6px 0;padding:6px 10px} p{color:#555}&lt;/style&gt;
+  &lt;button onclick="lab.post(0)"&gt;Topo&lt;/button&gt;&lt;button onclick="lab.post(50)"&gt;Meio&lt;/button&gt;&lt;button onclick="lab.post(100)"&gt;Fim&lt;/button&gt;
+  &lt;p id="estado"&gt;—&lt;/p&gt;
+  &lt;script&gt;lab.on(texto =&gt; { document.getElementById('estado').textContent = texto; });&lt;/script&gt;` });
+aba.onMessage(async porcentagem =&gt; {
+  await aba.post('Rolando…');
+  const onde = await lab.scrollToPercent(porcentagem).catch(erro =&gt; ({ erro: erro.message }));
+  await aba.post(onde.erro ?? `${onde.element}: ${onde.percentY} %`);
+});
+aba.onToggle((aberta, por) =&gt; lab.ui.text(`aba ${aberta ? 'aberta' : 'recolhida'} (${por})`, { id: 'aba' }));</code></pre></div>
+
+        <h3>Paleta de arrastar</h3>
+        <p>Uma aba com itens que você arrasta até o aparelho; o plugin recebe onde cada um caiu, em px, dp e porcentagem da tela, e o componente que estava embaixo. Cada item tem um campo <code>thumb</code> para uma miniatura (uma <code>data:</code> URL): aqui a do primeiro item vem de um recorte da tela, e qualquer outra imagem do componente entra no mesmo campo.</p>
+        <div class="code" data-name="Paleta de arrastar"><pre><code>const itens = [{ id: 'toque', nome: 'Toque', thumb: null }, { id: 'nota', nome: 'Nota', thumb: null }];
+const aba = await lab.tab.open({ title: 'Paleta', icon: '🧩', side: 'left', width: 220, height: 380, open: true, html: `
+  &lt;style&gt;body{font:13px system-ui;margin:10px} .item{display:flex;align-items:center;gap:8px;padding:8px;margin-bottom:8px;border:1px solid #ccd;border-radius:8px;background:#f6f6fb}
+    .item img,.item i{width:32px;height:32px;border-radius:6px;background:#dcdcf5;object-fit:cover} #onde{font:11px ui-monospace,monospace}&lt;/style&gt;
+  &lt;div id="paleta"&gt;&lt;/div&gt;&lt;p id="onde"&gt;Arraste um item até o aparelho.&lt;/p&gt;
+  &lt;script&gt;
+    const paleta = document.getElementById('paleta'), onde = document.getElementById('onde');
+    lab.on(itens =&gt; {   // o plugin manda a lista; cada item vira um elemento arrastável
+      paleta.replaceChildren(...itens.map(item =&gt; {
+        const el = document.createElement('div'); el.className = 'item';
+        el.append(item.thumb ? Object.assign(new Image(), { src: item.thumb }) : document.createElement('i'), item.nome);
+        lab.draggable(el, { id: item.id }, { label: item.nome });
+        return el;
+      }));
+    });
+    lab.onDrag(e =&gt; { onde.textContent = e.type === 'cancel' ? 'Cancelado.' : e.inside ? e.x + ', ' + e.y + ' px' : 'Fora da tela'; });
+    lab.onDrop(e =&gt; { onde.textContent = e.inside ? 'Solto em ' + e.percentX + ' %, ' + e.percentY + ' %' : 'Solto fora da tela.'; });
+  &lt;/script&gt;` });
+await aba.post(itens);
+// Ao soltar, o plugin decide o que fazer: aqui só anota; poderia chamar lab.mock, lab.scrollTo…
+aba.onDrop(solto =&gt; lab.ui.kv({ item: solto.payload.id, 'na tela': solto.inside, px: `${solto.x}, ${solto.y}`, dp: `${solto.dpX}, ${solto.dpY}`,
+  porcentagem: `${solto.percentX} %, ${solto.percentY} %`, sobre: solto.element?.name ?? '—' }, { id: 'solto' }));
+// Miniatura do primeiro item: um recorte do primeiro componente clicável da tela
+const clicavel = (await lab.layoutBounds({ names: false })).find(e =&gt; e.actions.includes('OnClick'));
+if (clicavel) { itens[0].thumb = await lab.dataUrl(await lab.screenshot({ key: clicavel.key, maxWidth: 64 })); await aba.post(itens); }</code></pre></div>
       </section>
 
       <p class="foot"><a href="./">‹ Voltar ao laboratório</a> · <a href="./arquitetura.html">Arquitetura da VM</a></p>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=4ebf400428b7"></script>
+  <script type="module" src="./site-pages.js?v=8cf39c3035e0"></script>
 </body>
 </html>

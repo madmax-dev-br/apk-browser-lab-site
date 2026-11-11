@@ -63,9 +63,9 @@
 //  - Audit: a minor collection in audit mode is cross-checked against a full conservative mark (anything it reaches must survive); audit and stress collections alternate three minor collections
 //    and a major one. What remains unchecked by construction: host code that keeps the record of an old object without host state in a JavaScript closure (a rooted host structure is traced) and
 //    later writes a young reference into its cells or slots directly, without object(), FieldMap or storeField; the tombstone diagnosis names a minor collection for such a case.
-import { BUCKET } from './time-breakdown.js?v=4ebf400428b7';
-import { cellBytes } from './java-arrays.js?v=4ebf400428b7';
-import { storedFieldCount } from './object-shapes.js?v=4ebf400428b7';
+import { BUCKET } from './time-breakdown.js?v=8cf39c3035e0';
+import { cellBytes } from './java-arrays.js?v=8cf39c3035e0';
+import { storedFieldCount } from './object-shapes.js?v=8cf39c3035e0';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -100,7 +100,13 @@ export function pinAll(runtime) {
 /** True when `id` once named a heap object that has since been collected (a stale id from the page, a pending event...). */
 export function isFreedId(runtime, id) { return Number.isSafeInteger(id) && id > 0 && id < runtime.nextId && runtime.heap.get(id) === undefined; }
 
+/** True while a direct activation (interpreter.js, "Direct form") is on a thread stack: its registers are JavaScript locals the collector cannot see. Its ghost frame says so. */
+export function directFrames(runtime) {
+  for (const thread of runtime.scheduler?.threads ?? []) { const frames = thread.frames; for (let i = frames.length - 1; i >= 0; i--) if (frames[i].busy === true) return true; }
+  return false;
+}
 function quiescent(runtime, safepoint = false) {
+  if ((runtime.t2Compiled ?? 0) > 0 && directFrames(runtime)) { runtime.q = 0; runtime.dlimit = 0; return 'direct-frames'; }   // the next poll of the direct code rebuilds its frames; the collection runs then
   // A safepoint (the interpreter's run loop at a quantum boundary or a thread switch) is collectable even inside nested runs, host waits and class initializers: every Java frame is a root, and what
   // JavaScript code up the stack may still hold is protected by `runtime.hostAllocs` (everything host code allocated, and every result handed back to it, since the last fully quiescent
   // collection) -- see collectGarbage. Event boundaries keep the strict check.
@@ -183,7 +189,8 @@ function buildSkip(runtime) {
  * marker being created: the shared per-runtime chunks are zeroed by every marker), `epoch` (private 32-bit marks, `reset()` starts a new empty mark set without touching the chunks: used to measure
  * the reach of many roots one after the other), `order` (record the ids in the order they are marked: `marker.order`).
  */
-export function createMarker(runtime, { full = false, clearSoft = false, privateMarks = false, epoch = false, order = false, minorBound = 0, promoteBound = Infinity } = {}) {
+export function createMarker(runtime, { full = false, clearSoft = false, privateMarks = false, epoch = false, order = false, minorBound = 0, promoteBound = Infinity, visitId = null } = {}) {
+  // `visitId` (another engine's heap: vmcore/js/host-bridge.js): no marks here; the scan reports each object id it finds to visitId(id) and the caller marks, so the root walk below is shared.
   const heap = runtime.heap, weakIds = [], softIds = [], phantomIds = [], weakTypes = weakTypeCache(runtime), markOrder = order ? [] : null;
   // A minor collection (`minorBound` > 0): every id below the bound is old and counts as marked (it is never traced from here: old records that may point to young ones are rescanned
   // explicitly, see `rescan`), so the marks, the worklist and the sweep cover the young ids only. `promoteBound`: the ids below it are old after this collection (Infinity: every survivor);
@@ -193,9 +200,9 @@ export function createMarker(runtime, { full = false, clearSoft = false, private
   const refKind = type => { let kind = weakTypes.get(type); if (kind === undefined) { kind = REF_NONE; if (type.charCodeAt(0) === 76) try { for (let at = type, depth = 0; at && depth < 64; at = runtime.parent(at), depth++) { const found = REF_SUPERS.get(at); if (found !== undefined) { kind = found; break; } } } catch { kind = REF_NONE; } /* walks the superclass chain: runtime.isSubtype would memoize every type the collector meets */ weakTypes.set(type, kind); } return kind; };
   const limit = runtime.nextId, worklist = []; let nodes = 0, pruned = 0;
   // Mark bits per 4096-id chunk, allocated only for the chunks that hold records and reused across collections.
-  const markChunks = full || privateMarks || epoch ? [] : (runtime.gcMarkChunks ??= []);
+  const markChunks = full || privateMarks || epoch || visitId !== null ? [] : (runtime.gcMarkChunks ??= []);
   for (let ci = 0; ci < markChunks.length; ci++) if (markChunks[ci] !== undefined && heap.chunks[ci] === undefined) markChunks[ci] = undefined;
-  for (let ci = boundChunk; ci < heap.chunks.length; ci++) if (heap.chunks[ci] !== undefined) { if (markChunks[ci] === undefined) markChunks[ci] = epoch ? new Uint32Array(4096) : new Uint8Array(4096); else markChunks[ci].fill(0); }
+  if (visitId === null) for (let ci = boundChunk; ci < heap.chunks.length; ci++) if (heap.chunks[ci] !== undefined) { if (markChunks[ci] === undefined) markChunks[ci] = epoch ? new Uint32Array(4096) : new Uint8Array(4096); else markChunks[ci].fill(0); }
   let epochValue = 1;
   const isMarked = epoch ? (id => { const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] === epochValue; })
     : bound > 0 ? (id => { if (id < bound) return true; const chunk = markChunks[id >>> 12]; return chunk !== undefined && chunk[id & 4095] !== 0; })
@@ -211,7 +218,7 @@ export function createMarker(runtime, { full = false, clearSoft = false, private
   // generic walk into a frame's program, method record or DEX tables (millions of nodes in a large app).
   if (!full) for (const thread of [runtime.thread, ...(runtime.scheduler?.threads ?? [])]) if (thread !== null && typeof thread === 'object') { skip.add(thread); if (Array.isArray(thread.frames)) { skip.add(thread.frames); for (const frame of thread.frames) if (frame !== null && typeof frame === 'object') skip.add(frame); } }
   const violations = [];
-  const markId = (id, strict = false) => {
+  const markId = visitId !== null ? (id => { if (id > 0 && id < limit) visitId(id); }) : (id, strict = false) => {
     if (!(id > 0 && id < limit) || isMarked(id)) return; const record = heap.get(id); if (record === undefined) return;
     if (record.freed === true) { if (strict && violations.length < 20) violations.push(id); return; }   // a real {ref} to an object collected earlier: a root the collector did not see
     setMarked(id); worklist.push(id); count++; if (markOrder !== null) markOrder.push(id);
@@ -293,6 +300,30 @@ export function createMarker(runtime, { full = false, clearSoft = false, private
 }
 
 /**
+ * The JavaScript side's roots for another engine's collector (the WebAssembly core: vmcore/js/host-bridge.js), read-only: every object id that the root sources of markRoots below
+ * hold -- static fields, the scheduler's threads, the Handler/event queues, the host allocations in flight and their grace ring, the gcRoot containers, `extraRoots`, and the
+ * runtime's and the platform's own tables -- is reported to visitId(id) (repeats included; the caller dedupes). Nothing is marked or freed here. Returns the scanner, whose
+ * `scan(value)` the caller reuses for values it finds later (the companions of the records it marks: the ephemeron fixpoint).
+ */
+export function scanHostRoots(runtime, visitId, { extraRoots = null } = {}) {
+  const marker = createMarker(runtime, { visitId }), { scan, markId, idLike } = marker;
+  if (runtime.staticFields && typeof runtime.staticFields === 'object') scan(runtime.staticFields);
+  const threads = runtime.scheduler?.threads ?? [];
+  if (runtime.scheduler) for (const thread of [...threads, ...(runtime.thread && !threads.includes(runtime.thread) && Array.isArray(runtime.thread.frames) ? [runtime.thread] : [])]) { const view = Object.create(runtime.scheduler); view.threads = [thread]; runtime.scheduler.enumerateRoots.call(view, item => scan(item)); }
+  for (const queue of [runtime.platform?.looperHost?.pendingEvents?.()]) if (queue) scan([...queue]);
+  for (const id of runtime.hostAllocs ?? []) markId(id);
+  graceRoots(runtime, markId);
+  for (const weak of tracked) { const container = weak.deref(); if (container === undefined) tracked.delete(weak); else scan(container); }
+  if (extraRoots) { const values = typeof extraRoots === 'function' ? extraRoots() : extraRoots; for (const item of values ?? []) scan(item); }
+  for (const key of Object.keys(runtime)) {
+    if (SKIP_PROPS.has(key) || key === 'staticFields') continue;
+    const item = runtime[key];
+    if (item !== null && typeof item === 'object') scan(item); else if (typeof item === 'number' && idLike(key, item)) markId(item);
+  }
+  return marker;
+}
+
+/**
  * Marks from every root (see the header) with `marker` and closes over the heap. In a minor collection (marker.bound > 0) the old records of the remembered set and the host-stateful ones are
  * traced again first. Returns { t0, categories, worstRoot, quiet }: `quiet` is true when nothing host-side was in flight, so the host-allocation set was dropped.
  */
@@ -351,8 +382,17 @@ function markRoots(runtime, marker, { safepoint, emergency, extraRoots, report }
  * options: { audit, extraRoots: () => iterable of values | values[], reason, requireQuiescence = true }
  */
 export function collectGarbage(runtime, options = {}) {
+  if (runtime.engine === 'wasm') return collectCore(runtime, options);
   const tbPrevious = runtime.tb?.enter(BUCKET.GC);
   try { return collectGarbageTimed(runtime, options); } finally { runtime.tb?.leave(tbPrevious); }
+}
+// engine 'wasm': the Java heap is the core's (vmcore), and so is the collector; this module only lends it the host root walk (scanHostRoots). A collection asked for here runs there.
+function collectCore(runtime, options) {
+  const engine = runtime.wasm, size = () => Number(runtime.heap?.size ?? 0);
+  if (!engine) return { collected: false, reason: 'no-core', before: size(), after: size(), freed: 0, ms: 0 };
+  const before = size(), started = performance.now(); engine.collect(options.reason ?? 'host');
+  const ms = performance.now() - started, after = size();
+  return { collected: true, reason: options.reason ?? 'host', before, after, freed: Math.max(0, before - after), ms, markMs: ms };
 }
 function collectGarbageTimed(runtime, options) {
   const saved = runtime.hostCall, started = performance.now(); runtime.hostCall = 'coleta de lixo';   // the page must see "garbage collection" (with progress pulses), never a stale host call, while the VM is busy here
@@ -701,6 +741,7 @@ function closeDeferral(runtime, reason, motion, now) {
 
 /** Collects when the live heap passed `threshold` (default 40% of the limit) or in audit mode (every call). */
 export function maybeCollect(runtime, options = {}) {
+  if (runtime.engine === 'wasm') return { collected: false, reason: 'core-paced', before: 0, after: 0, freed: 0, ms: 0 };   // the core paces its own collections by allocated bytes (vmcore/gc.c)
   const audit = options.audit ?? globalThis.process?.env?.APKWEB_GC_AUDIT === '1';
   // Between host events nothing host-side is in flight, so the host-allocation set (what host code allocated or was handed since the last quiescent point) stops being a root here even when no
   // collection is due -- a quiescent collection drops it the same way. The safepoint collections inside the next event must keep the set alive; left to grow across events (a driver reading the
