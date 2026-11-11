@@ -59,27 +59,31 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=a9aeb2c97f5b';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=a9aeb2c97f5b';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=a9aeb2c97f5b';
-import { HandleTable } from './handles.js?v=a9aeb2c97f5b';
-import { Exceptions } from './exceptions.js?v=a9aeb2c97f5b';
-import { coreImports } from './boundary-imports.js?v=a9aeb2c97f5b';
-import { installHostLinking, methodReference } from './host-linking.js?v=a9aeb2c97f5b';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=a9aeb2c97f5b';
-import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=a9aeb2c97f5b';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=a9aeb2c97f5b';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=a9aeb2c97f5b';
-import { Blocked } from '../../runtime/scheduler.js?v=a9aeb2c97f5b';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=a9aeb2c97f5b';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=27ff15f3244d';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=27ff15f3244d';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=27ff15f3244d';
+import { HandleTable } from './handles.js?v=27ff15f3244d';
+import { Exceptions } from './exceptions.js?v=27ff15f3244d';
+import { coreImports } from './boundary-imports.js?v=27ff15f3244d';
+import { installHostLinking, methodReference } from './host-linking.js?v=27ff15f3244d';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=27ff15f3244d';
+import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=27ff15f3244d';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=27ff15f3244d';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=27ff15f3244d';
+import { Blocked } from '../../runtime/scheduler.js?v=27ff15f3244d';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=27ff15f3244d';
 
 const MiB = 1 << 20;
 /** Memory map (bytes): low memory is the module's data; metaspace; the Thread records with their Java and native stacks; the collected heap. */
 // THREADS: the main thread's record (its Java stack, and the one native stack of the module at the top of its span); GUESTS: the records of the other Java threads (a Java stack each).
-export const LAYOUT = Object.freeze({ META: 1 * MiB, META_END: 48 * MiB, THREADS: 48 * MiB, THREAD_SPAN: 4 * MiB, GUESTS: 52 * MiB, GUEST_SPAN: 1 * MiB, GUEST_COUNT: 44, HEAP: 96 * MiB });
+// Sized for a large app (hundreds of thousands of methods, hundreds of threads), not for the lab's examples: the memory is address space until it is written, so a region nobody uses costs nothing.
+// Metaspace 255 MiB (the tables of LINKER_LIMITS and every linked method's code and constants), the main thread's record, 250 records for the other threads, then the collected heap.
+export const LAYOUT = Object.freeze({ META: 1 * MiB, META_END: 256 * MiB, THREADS: 256 * MiB, THREAD_SPAN: 4 * MiB, GUESTS: 260 * MiB, GUEST_SPAN: 1 * MiB, GUEST_COUNT: 250, HEAP: 512 * MiB });
+export const DEFAULT_PAGES = 16384;   // 1 GiB of memory: a collected heap of 512 MiB above LAYOUT.HEAP
+export const LINKER_LIMITS = Object.freeze({ maxMethods: 1 << 21, maxClasses: 1 << 18, maxStrings: 1 << 20 });
 export const THREAD = Object.freeze({ vm: 0, stackBase: 4, stackEnd: 8, status: 12, detail: 16, interrupt: 20, ringIndex: 24, steps: 32, maxSteps: 40, result: 48, calls: 56, peakDepth: 64,
   tlabTop: 68, tlabEnd: 72, stackTop: 2128, frame: 2132, pc: 2136, depth: 2140, throwing: 2144, maxDepth: 2148, args: 2304, javaStack: 4096, javaStackBytes: 2 * MiB });
-const GC = Object.freeze({ base: 4, end: 8, rootCap: 56, roots: 52, rootCount: 60, reports: 76, reportCap: 80, reportCount: 84, reportOverflow: 88, freed: 92, freedCap: 96, freedCount: 100,
+const GC = Object.freeze({ base: 4, end: 8, threadCap: 44, rootCap: 56, roots: 52, rootCount: 60, reports: 76, reportCap: 80, reportCount: 84, reportOverflow: 88, freed: 92, freedCap: 96, freedCount: 100,
   trigger: 116, collectRequested: 120, collections: 124, liveObjects: 128, liveBytes: 132, freedObjects: 136, marked: 152, badRefs: 168, stress: 436, threadsState: 440, slowPaths: 444, SIZE: 448 });
 const HOST_CALL = Object.freeze({ op: 0, caller: 4, constant: 8, count: 12, args: 16 });
 export const Status = Object.freeze({ OK: 0, BUDGET: 1, OUT_OF_MEMORY: 5, UNSUPPORTED: 6, UNRESOLVED: 34, UNBOUND_NATIVE: 35, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81,
@@ -104,7 +108,7 @@ export class CoreStop extends APKError {
  * `shared`: false for an unshared memory (one Worker, green threads: the page; `module` is then compiled from unsharedCore's bytes).
  * `trigger`: a fixed pacing threshold in bytes. `maxDepth`: Thread.maxDepth. Returns the engine (also runtime.wasm, not enumerable).
  */
-export async function attachWasmEngine(runtime, { module, shared = true, pages = 8192, stress = false, stressHost = false, trigger, maxDepth = (runtime.maxCallDepth ?? 2048) - 1, natives = CORE_NATIVES } = {}) {   // maxDepth: the JavaScript VM's maxCallDepth counts the frames below the call it refuses
+export async function attachWasmEngine(runtime, { module, shared = true, pages = DEFAULT_PAGES, stress = false, stressHost = false, trigger, maxDepth = (runtime.maxCallDepth ?? 2048) - 1, natives = CORE_NATIVES } = {}) {   // maxDepth: the JavaScript VM's maxCallDepth counts the frames below the call it refuses
   if (runtime.engine !== 'wasm') throw new Error(`vmcore: attachWasmEngine needs a runtime created with engine 'wasm' (this one has '${runtime.engine}')`);
   if (runtime.wasm) throw new Error('vmcore: a core is attached to this runtime already');
   if (runtime.heap.size !== 0) throw new Error(`vmcore: the runtime already has ${runtime.heap.size} objects on the JavaScript heap; attach the core before anything runs`);
@@ -116,9 +120,10 @@ export async function attachWasmEngine(runtime, { module, shared = true, pages =
 export class WasmEngine {
   constructor(runtime, { shared = true, pages, stress, stressHost, trigger, maxDepth, natives }) {
     this.runtime = runtime; this.stressHost = stressHost; this.fixedTrigger = trigger;
-    this.memory = new WebAssembly.Memory({ initial: Math.min(pages, 2048), maximum: 32768, shared });   // `shared: false` needs the module of vmcore/js/unshared.js; the memory only grows here, before any view of it exists if (pages > 2048) this.memory.grow(pages - 2048);
+    this.memory = new WebAssembly.Memory({ initial: Math.min(pages, 2048), maximum: 32768, shared }); if (pages > 2048) this.memory.grow(pages - 2048);   // `shared: false` needs the module of vmcore/js/unshared.js; the memory only grows here, before any view of it exists
     this.pages = pages; this.maxDepth = maxDepth; this.stress = stress;
-    this.linker = new Linker(runtime, { memory: this.memory, metaStart: LAYOUT.META, metaEnd: LAYOUT.META_END, natives });
+    if (pages * 65536 <= LAYOUT.HEAP + 16 * MiB) throw new Error(`vmcore: ${pages} pages leave no heap above the ${LAYOUT.HEAP / MiB} MiB of metaspace and thread records`);
+    this.linker = new Linker(runtime, { memory: this.memory, metaStart: LAYOUT.META, metaEnd: LAYOUT.META_END, natives, ...LINKER_LIMITS });
     this.exceptions = new Exceptions(this.linker);
     this.WIDE_HIGH = runtime.argumentWords(['J'], [0n])[1];   // the JavaScript VM's marker of a long/double's second register
     this.pins = []; this.pendingHost = []; this.patched = []; this.patchEpoch = 0; this.usedBridge = null; this.hostDepth = 0; this.sites = new Map(); this.methodInfos = new WeakMap(); this.lastError = null; this.stopReason = null; this.fieldSites = new Map(); this.parked = null;
@@ -138,7 +143,7 @@ export class WasmEngine {
     linker.bindCore(exports, this.mainRecord);
     // the collected heap
     const h = this.h = linker.alloc(GC.SIZE);
-    this.w32(h + GC.rootCap, 1 << 16); this.w32(h + GC.reportCap, 1 << 16); this.w32(h + GC.freedCap, 1 << 14);
+    this.w32(h + GC.threadCap, 1024); this.w32(h + GC.rootCap, 1 << 19); this.w32(h + GC.reportCap, 1 << 16); this.w32(h + GC.freedCap, 1 << 14);
     if (!exports.gc_init(h, LAYOUT.HEAP, this.pages * 65536)) throw new Error('vmcore: gc_init refused the region');
     this.w32(h + GC.stress, this.stress ? 1 : 0); if (this.fixedTrigger !== undefined) this.w32(h + GC.trigger, this.fixedTrigger);
     this.w32(linker.vm + VM_GC, h);
