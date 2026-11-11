@@ -59,20 +59,20 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=5ce2bd9b7452';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=5ce2bd9b7452';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=5ce2bd9b7452';
-import { HandleTable } from './handles.js?v=5ce2bd9b7452';
-import { Exceptions } from './exceptions.js?v=5ce2bd9b7452';
-import { coreImports } from './boundary-imports.js?v=5ce2bd9b7452';
-import { installHostLinking, methodReference } from './host-linking.js?v=5ce2bd9b7452';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=5ce2bd9b7452';
-import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=5ce2bd9b7452';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=5ce2bd9b7452';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=5ce2bd9b7452';
-import { Blocked } from '../../runtime/scheduler.js?v=5ce2bd9b7452';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=5ce2bd9b7452';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=5ce2bd9b7452';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=ee4847240266';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=ee4847240266';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=ee4847240266';
+import { HandleTable } from './handles.js?v=ee4847240266';
+import { Exceptions } from './exceptions.js?v=ee4847240266';
+import { coreImports } from './boundary-imports.js?v=ee4847240266';
+import { installHostLinking, methodReference } from './host-linking.js?v=ee4847240266';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=ee4847240266';
+import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=ee4847240266';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=ee4847240266';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=ee4847240266';
+import { Blocked } from '../../runtime/scheduler.js?v=ee4847240266';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=ee4847240266';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=ee4847240266';
 
 const MiB = 1 << 20;
 /** Memory map (bytes): low memory is the module's data; metaspace; the Thread records with their Java and native stacks; the collected heap. */
