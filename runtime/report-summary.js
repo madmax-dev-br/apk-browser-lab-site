@@ -1,11 +1,11 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown } from './time-breakdown.js?v=b70e9f52fe0c';
-import { staticRetentionLines } from './heap-gc.js?v=b70e9f52fe0c';
-import { overrideSummaryLines } from './method-overrides.js?v=b70e9f52fe0c';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=b70e9f52fe0c';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=b70e9f52fe0c';
-import { hostMapSummaryLines } from './host-map.js?v=b70e9f52fe0c';
+import { TimeBreakdown } from './time-breakdown.js?v=7a839fa82e6c';
+import { staticRetentionLines } from './heap-gc.js?v=7a839fa82e6c';
+import { overrideSummaryLines } from './method-overrides.js?v=7a839fa82e6c';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=7a839fa82e6c';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=7a839fa82e6c';
+import { hostMapSummaryLines } from './host-map.js?v=7a839fa82e6c';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -43,7 +43,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
   part(() => {   // (a) memory
     if (runtime.engine === 'wasm' && runtime.wasm) {   // the core's heap is counted in bytes, not in records of the JavaScript VM
       const m = runtime.wasm.memoryInfo();
-      out.push(`Memória (núcleo Wasm): heap de ${Math.round(m.heapBytes / MiB)} MiB; ${m.handles} objetos com handle no host; ${m.collections ? `${m.collections} coletas, a última deixou ${m.liveObjects} objetos vivos (~${Math.round(m.liveBytes / MiB)} MiB)` : 'nenhuma coleta ainda'}`);
+      out.push(`Memória (núcleo Wasm): metaspace ${Math.round(m.metaBytes / MiB)} de ${Math.round(m.metaCapacity / MiB)} MiB (${m.classes} classes, ${m.methods} métodos ligados); ${m.threadRecords - m.threadRecordsFree} threads com registro (${m.threadRecords} já criados); heap de ${Math.round(m.heapBytes / MiB)} MiB; ${m.handles} objetos com handle no host; ${m.collections ? `${m.collections} coletas, a última deixou ${m.liveObjects} objetos vivos (~${Math.round(m.liveBytes / MiB)} MiB)` : 'nenhuma coleta ainda'}`);
       return;
     }
     const live = runtime.heap.size, limit = runtime.maxHeapObjects, last = runtime.gcPhases?.[0];
