@@ -13,9 +13,9 @@
 // `get(key)` answers the type's default (0, 0n, null) before a store, and iteration, `size` and `clear()` cover the whole layout. Keys outside the layout live in an extra Map on the
 // facade, as `fieldExtra` does today. Host state hung on the record (any own property) lives on the facade object itself, the JavaScript companion of the memory record: the facade is
 // cached per id, so the same properties are seen across reads, and it is dropped when the object is freed (RecordSpace.release).
-import { cellsClassOf, NO_FIELDS } from '../../runtime/java-arrays.js?v=53e22ef7a9c4';
-import { HandleTable, IdTable } from './handles.js?v=53e22ef7a9c4';
-import { stringText, writeStringUnits } from './strings.js?v=53e22ef7a9c4';
+import { cellsClassOf, NO_FIELDS } from '../../runtime/java-arrays.js?v=97c59117b00c';
+import { HandleTable, IdTable } from './handles.js?v=97c59117b00c';
+import { stringText, writeStringUnits } from './strings.js?v=97c59117b00c';
 
 // Field kinds: the descriptor letters of a field type (Z B S C I J F D), L for a reference.
 const KIND = { Z: 0, B: 1, S: 2, C: 3, I: 4, F: 5, J: 6, D: 7, L: 8 };

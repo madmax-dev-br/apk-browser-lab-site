@@ -7,7 +7,7 @@
 // asked for it (Layout Inspector's inspection tables, ComposerImpl.collectParameterInformation). The root composition's slot table is read through its public tooling API
 // (CompositionData / CompositionGroup.getSourceInfo / getNode); when it carries "C(Name)" markers the LayoutNode gets that name (source 'composable'). Otherwise the name is
 // built from what the node really has: the semantics Role, an editable text, the semantics text, and the measure policy class (source 'semantics' or 'layout'). Never invented.
-import { createComposeSemanticsDriver } from './compose-semantics.js?v=53e22ef7a9c4';
+import { createComposeSemanticsDriver } from './compose-semantics.js?v=97c59117b00c';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;', NODE = 'Landroidx/compose/ui/node/LayoutNode;';
 const COORDS = 'Landroidx/compose/ui/layout/LayoutCoordinates;', COORDS_KT = 'Landroidx/compose/ui/layout/LayoutCoordinatesKt;', RECT = 'Landroidx/compose/ui/geometry/Rect;';
@@ -53,7 +53,7 @@ const ownText = semantics => semantics ? (semantics.editableText || semantics.te
  * Node: { id, semanticsId, parentId, depth, index, childCount, name, nameSource, calls, bounds (unclipped, px in the owner), visibleBounds (clipped by the ancestors, px in the owner),
  *         boundsInWindow, placed, attached, zIndex, measurePolicy, modifiers: [{ className, label }], semantics }
  */
-export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_DEPTH, maxGroups = MAX_GROUPS } = {}) {
+export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_DEPTH, maxGroups = MAX_GROUPS, childReads = null } = {}) {   // childReads: the names tried for a LayoutNode's children (tests pass none to exercise the discovery below)
   const call = (receiver, owner, name, signature, values = [], mode = 'virtual') => runtime.dispatch({ owner, name, signature, parameters: params(signature), result: signature.slice(signature.indexOf(')') + 1) }, mode === 'static' ? values : [receiver, ...values], mode);
   const string = value => value == null ? null : runtime.javaString(value, 'Ljava/lang/String;');
   const typeOf = ref => ref ? runtime.object(ref).type : null;
@@ -86,12 +86,29 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
   // Reads that a minified build may have renamed (the LayoutNode members are internal API of Compose): each one fails alone, noted once, instead of ending the inspection.
   const failedReads = new Map();
   const optional = (label, fn, fallback = null) => { try { return fn(); } catch (error) { if (!failedReads.has(label)) failedReads.set(label, String(error?.message ?? error).slice(0, 120)); return fallback; } };
-  const CHILD_READS = ['getChildren$ui_release', 'getFoldedChildren$ui_release', 'get_children$ui_release'];
-  let childRead = null;
+  const CHILD_READS = childReads ?? ['getChildren$ui_release', 'getFoldedChildren$ui_release', 'get_children$ui_release'];
+  let childRead = null, childReadsMissing = false;
+  // A build whose LayoutNode has none of those names (minified, or another Compose version): the children are found by shape -- a method of LayoutNode without parameters that
+  // returns a List whose elements are LayoutNodes; among several (children, folded children, z-sorted children) the one that answers the most nodes. A node without children
+  // decides nothing, so the choice is made at the first node that has some.
+  const discoverChildren = ref => {
+    const cls = runtime.classes?.get?.(NODE); if (!cls?.methods) return null;
+    let best = null, callable = 0;
+    for (const nameSig of cls.methods.keys()) {
+      if (!nameSig.endsWith('()Ljava/util/List;')) continue; const name = nameSig.slice(0, nameSig.indexOf('('));
+      let items; try { items = list(call(ref, NODE, name, '()Ljava/util/List;'), 4096); } catch { continue; }
+      callable++;
+      if (items.length > 0 && items.every(item => item && runtime.isSubtype(typeOf(item), NODE)) && (best === null || items.length > best.items.length)) best = { name, items };
+    }
+    return { best, callable };
+  };
   const childrenOf = ref => {
     if (childRead) return list(call(ref, NODE, childRead, '()Ljava/util/List;'), 4096);
     let last = null;
-    for (const name of CHILD_READS) { try { const value = list(call(ref, NODE, name, '()Ljava/util/List;'), 4096); childRead = name; return value; } catch (error) { last = error; } }
+    if (!childReadsMissing) for (const name of CHILD_READS) { try { const value = list(call(ref, NODE, name, '()Ljava/util/List;'), 4096); childRead = name; return value; } catch (error) { last = error; } }
+    childReadsMissing = true;
+    const discovery = discoverChildren(ref), found = discovery?.best ?? null; if (found) { childRead = found.name; if (!failedReads.has('filhos')) failedReads.set('filhos', `nomes conhecidos ausentes; filhos lidos por ${found.name}()`); return found.items; }
+    if (discovery && discovery.callable > 0) return [];   // methods answered, none with LayoutNodes: a node without children
     throw last ?? new Error('LayoutNode children unavailable');
   };
   if (ownerViews.length) {
