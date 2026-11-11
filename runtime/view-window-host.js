@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=dcfaf7b69a30';
-import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=dcfaf7b69a30';
+import { APKError } from './apk-runtime.js?v=53e22ef7a9c4';
+import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=53e22ef7a9c4';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';

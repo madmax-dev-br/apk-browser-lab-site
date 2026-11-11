@@ -59,19 +59,19 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=dcfaf7b69a30';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=dcfaf7b69a30';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=dcfaf7b69a30';
-import { HandleTable } from './handles.js?v=dcfaf7b69a30';
-import { Exceptions } from './exceptions.js?v=dcfaf7b69a30';
-import { coreImports } from './boundary-imports.js?v=dcfaf7b69a30';
-import { installHostLinking, methodReference } from './host-linking.js?v=dcfaf7b69a30';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=dcfaf7b69a30';
-import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=dcfaf7b69a30';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=dcfaf7b69a30';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=dcfaf7b69a30';
-import { Blocked } from '../../runtime/scheduler.js?v=dcfaf7b69a30';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=dcfaf7b69a30';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=53e22ef7a9c4';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=53e22ef7a9c4';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=53e22ef7a9c4';
+import { HandleTable } from './handles.js?v=53e22ef7a9c4';
+import { Exceptions } from './exceptions.js?v=53e22ef7a9c4';
+import { coreImports } from './boundary-imports.js?v=53e22ef7a9c4';
+import { installHostLinking, methodReference } from './host-linking.js?v=53e22ef7a9c4';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=53e22ef7a9c4';
+import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=53e22ef7a9c4';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=53e22ef7a9c4';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=53e22ef7a9c4';
+import { Blocked } from '../../runtime/scheduler.js?v=53e22ef7a9c4';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=53e22ef7a9c4';
 
 const MiB = 1 << 20;
 /** Memory map (bytes): low memory is the module's data; metaspace; the Thread records with their Java and native stacks; the collected heap. */
@@ -83,7 +83,7 @@ export const DEFAULT_PAGES = 16384;   // 1 GiB of memory: a collected heap of 51
 export const LINKER_LIMITS = Object.freeze({ maxMethods: 1 << 21, maxClasses: 1 << 18, maxStrings: 1 << 20 });
 export const THREAD = Object.freeze({ vm: 0, stackBase: 4, stackEnd: 8, status: 12, detail: 16, interrupt: 20, ringIndex: 24, steps: 32, maxSteps: 40, result: 48, calls: 56, peakDepth: 64,
   tlabTop: 68, tlabEnd: 72, stackTop: 2128, frame: 2132, pc: 2136, depth: 2140, throwing: 2144, maxDepth: 2148, args: 2304, javaStack: 4096, javaStackBytes: 2 * MiB });
-const GC = Object.freeze({ base: 4, end: 8, threadCap: 44, rootCap: 56, roots: 52, rootCount: 60, reports: 76, reportCap: 80, reportCount: 84, reportOverflow: 88, freed: 92, freedCap: 96, freedCount: 100,
+const GC = Object.freeze({ base: 4, end: 8, startBits: 12, threadCap: 44, rootCap: 56, roots: 52, rootCount: 60, reports: 76, reportCap: 80, reportCount: 84, reportOverflow: 88, freed: 92, freedCap: 96, freedCount: 100,
   trigger: 116, collectRequested: 120, collections: 124, liveObjects: 128, liveBytes: 132, freedObjects: 136, marked: 152, badRefs: 168, stress: 436, threadsState: 440, slowPaths: 444, SIZE: 448 });
 const HOST_CALL = Object.freeze({ op: 0, caller: 4, constant: 8, count: 12, args: 16 });
 export const Status = Object.freeze({ OK: 0, BUDGET: 1, OUT_OF_MEMORY: 5, UNSUPPORTED: 6, UNRESOLVED: 34, UNBOUND_NATIVE: 35, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81,
@@ -797,6 +797,49 @@ export class WasmEngine {
     this.lastCollection = { reason, live: this.r32(h + GC.liveObjects), freed: this.r32(h + GC.freedObjects), badRefs: this.r32(h + GC.badRefs), roots: addresses.size, markMs: t1 - t0, sweepMs: t2 - t1 };
     return this.lastCollection;
   }
+  // ---- inspection (src/plugin-queries.js): what the JavaScript VM's tables answer for a read-only query -- the state of a class, a static without running <clinit>, every reference
+  //      static, and a walk of the heap -- read from the core's memory. Nothing here runs bytecode or initializes a class.
+  /** 'initialized' | 'initializing' | 'not-initialized': a class the core has not laid out yet was never used, so it is not initialized. */
+  classStatus(type) {
+    const info = this.linker.classes.get(type); if (info === undefined || !info.address) return 'not-initialized';
+    const state = this.r32(info.address + CLASS.initState); return state === INITIALIZED ? 'initialized' : state === 0 ? 'not-initialized' : 'initializing';
+  }
+  /** The value of a static a DEX class declares, as hosts see values ({ ref }, number, BigInt), without initializing anything; undefined when the class has no storage yet or the field is host-modelled. */
+  peekStatic(reference) {
+    const info = this.linker.classes.get(reference.owner), field = info?.statics?.get(reference.name + ':' + reference.type); if (!field) return undefined;
+    const kind = kindOf(field.type), view = this.view; if (kind === 'W') return view.getBigInt64(field.address, true);
+    const word = view.getInt32(field.address, true); return kind === 'L' ? this.refValue(word >>> 0) : word;
+  }
+  /** [key, { ref }] of every reference static of the laid-out DEX classes that holds an object. */
+  *referenceStatics() {
+    for (const info of this.linker.classList) {
+      if (!info.statics || !info.cls) continue;
+      for (const field of info.statics.values()) { if (kindOf(field.type) !== 'L') continue; const word = this.view.getUint32(field.address, true); if (word !== 0) yield [field.key, this.refValue(word)]; }
+    }
+  }
+  /**
+   * Walks the objects of the heap in address order from `after` (exclusive; 0 = the start): visit(address, type) -> false to stop. Returns the address it stopped at, or null at
+   * the end. Like a scan of the JavaScript VM's heap it also meets objects that are unreachable and not collected yet. The start bitmap (gc.h: one bit per 8 bytes) says where
+   * objects begin; a word whose class record is not one the linker laid out is not an object a host can see (a filler of a retired allocation buffer).
+   */
+  walkHeap(after, visit) {
+    const x = this.x, h = this.h, u32 = this.u32; x.gc_retire_buffers(h);
+    const base = this.r32(h + GC.base), end = this.r32(h + GC.end), bits = this.r32(h + GC.startBits) >>> 2, granules = (end - base) >>> 3;
+    let types = this.classTypes; if (types === undefined || this.classTypesFor !== this.linker.classList.length) { types = this.classTypes = new Map(); for (const info of this.linker.classList) types.set(info.address, info.type); this.classTypesFor = this.linker.classList.length; }
+    const first = after >= base && after < end ? ((after - base) >>> 3) + 1 : 0;
+    for (let w = first >>> 5, words = (granules + 31) >>> 5; w < words; w++) {
+      let word = u32[bits + w]; if (word === 0) continue;
+      if (w === first >>> 5) word &= (0xffffffff << (first & 31)) >>> 0;
+      while (word !== 0) {
+        const low = word & -word, bit = 31 - Math.clz32(low); word = (word & ~low) >>> 0;
+        const address = base + (((w << 5) + bit) << 3), type = types.get(u32[address >>> 2]); if (type === undefined) continue;
+        if (visit(address, type) === false) return address;
+      }
+    }
+    return null;
+  }
+  /** The record (facade) of the object at `address`, as runtime.object() gives it. */
+  recordAt(address) { return this.space.objectAt(address); }
   /** The core's heap for reports: its size in bytes, what the last collection left alive, how many collections ran, and how many objects the hosts hold a handle of. */
   memoryInfo() { const h = this.h; return { heapBytes: this.r32(h + GC.end) - this.r32(h + GC.base), liveBytes: this.stats.collections ? this.r32(h + GC.liveBytes) : null, liveObjects: this.stats.collections ? this.r32(h + GC.liveObjects) : null, collections: this.stats.collections, handles: Number(this.runtime.heap?.size ?? 0) }; }
   /** Drops the pins of top-level host code (between top-level calls of a test or a driver that keeps nothing in JavaScript locals). */
