@@ -7,17 +7,18 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=565f47a43815';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=565f47a43815';
-import { encodeVariantImages } from './render-variant-image.js?v=565f47a43815';
-import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=565f47a43815';
+import { pluginWorkerSource } from './plugin-runtime.js?v=5b686e9c43d9';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=5b686e9c43d9';
+import { encodeVariantImages } from './render-variant-image.js?v=5b686e9c43d9';
+import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=5b686e9c43d9';
+import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=5b686e9c43d9';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
 const ACTION_METHODS = new Set(['reload', 'mock', 'unmock', 'mocks', 'modal']);
 for (const method of ['scrollTo', 'scrollInfo', 'tab']) ACTION_METHODS.add(method);   // scrolling the app to a position / percentage (src/lab-scroll.js) and the side tabs (src/lab-side-tabs.js)
 const UNCACHED_VM_METHODS = new Set(['scrollState']);   // read again on every call: lab.scrollTo steers by it between two scroll steps, and an animated scroll moves without a new answer of the cache's frame
-const VM_METHODS = new Set(['scrollState', 'viewModels', 'fragments', 'activity', 'inspect', 'field', 'composeTree', 'statics', 'staticField', 'classes', 'instances', 'referrers', 'compositionLocals', 'findCompositionLocal']);
+const VM_METHODS = new Set(['scrollState', 'resourceIds', 'viewModels', 'fragments', 'activity', 'inspect', 'field', 'composeTree', 'statics', 'staticField', 'classes', 'instances', 'referrers', 'compositionLocals', 'findCompositionLocal']);
 
 /** The screen as the 'screen' event and lab.screen() give it, from the snapshot the page drew. */
 export function screenFromSnapshot(snapshot, { packageName = null, frame = 0 } = {}) {
@@ -60,7 +61,7 @@ export function sanitizeBlock(op) {
 /** One element of buildLayoutBoundsElements as lab.layoutBounds() (and the embedded player's layoutBounds()) gives it: plain data, window coordinates in dp. */
 export function layoutBoundsElementOut(element) {
   const s = element.semantics ?? null, b = element.windowBounds ?? element.bounds ?? null;
-  return { key: element.key, kind: element.kind, name: element.name, nameSource: element.nameSource, id: element.id, bounds: b, size: b ? { width: b.right - b.left, height: b.bottom - b.top } : null,
+  return { key: element.key, kind: element.kind, name: element.name, nameSource: element.nameSource, id: element.id, viewId: element.kind === 'view' && Number.isFinite(element.androidId) && element.androidId > 0 ? element.androidId : null, bounds: b, size: b ? { width: b.right - b.left, height: b.bottom - b.top } : null,
     texts: s?.texts ?? (element.text ? [element.text] : []), editableText: s?.editableText ?? null, role: s?.role ?? null, testTag: s?.testTag ?? null, contentDescriptions: s?.contentDescriptions ?? (element.contentDescription ? [element.contentDescription] : []),
     actions: s?.actions ?? [], enabled: s ? s.enabled !== false : true, modifiers: (element.modifiers ?? []).map(m => m.label), measurePolicy: element.measurePolicy ?? null, type: element.type ?? null, hasImage: element.hostId !== null && element.hostId !== undefined };
 }
@@ -139,6 +140,23 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     return buildLayoutBoundsElements(tree, lastSnapshot);
   }
   const elementOut = layoutBoundsElementOut;
+  /**
+   * The components a target names (src/lab-target.js): a testTag, an android:id (its resource name is turned into the number by the VM's resource table, one cached
+   * question), a Compose node id, a layoutBounds key, or what the component shows. -> { selector (resolved), raw (elements of buildLayoutBoundsElements), elements (the
+   * lab.layoutBounds() form), matches (the ones named, in drawing order) }. Composable names are read (one composeTree, rate-limited) only for a selector by name.
+   */
+  async function targetsFor(plugin, target) {
+    const selector = targetSelector(target), names = selectorResourceNames(selector); let ids = {};
+    if (names.length && vm?.worker) { try { ids = (await ask(plugin, 'resourceIds', { names }))?.ids ?? {}; } catch (error) { if (error?.code !== 'no-apk') throw error; } }
+    const resolved = resolveSelector(selector, ids), raw = await layoutBoundsFor(plugin, { names: selector.name !== null }), elements = raw.map(elementOut);
+    return { selector: resolved, raw, elements, matches: matchTargets(elements, resolved) };
+  }
+  /** View elements with the resource name of their android:id (`viewIdName`: 'pacote:id/nome'), from one cached question to the VM. */
+  async function withViewIdNames(plugin, list) {
+    const ids = [...new Set(list.map(element => element.viewId).filter(Number.isFinite))].slice(0, 256); if (!ids.length || !vm?.worker) return list;
+    let names = {}; try { names = (await ask(plugin, 'resourceIds', { ids }))?.names ?? {}; } catch { return list; }
+    return list.map(element => Number.isFinite(element.viewId) ? { ...element, viewIdName: names[element.viewId] ?? null } : element);
+  }
   const pageCaller = { id: 'page', name: 'página (MCP)', worker: {}, stats: { queries: 0, logLines: 0, logDropped: 0, droppedMessages: 0 }, lastComposeAt: -Infinity, lastShotAt: -Infinity };
   // ---- the plugin's own buttons (lab.button, src/plugin-buttons.js): state kept here, rendered by the panel (card, Controles row) and the preview bar --------------------
   function buttonCall(plugin, args) {
@@ -170,6 +188,18 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       const action = actions?.[method]; if (typeof action !== 'function') throw Object.assign(new Error(`lab.${method} não está disponível aqui.`), { code: 'unsupported' });
       return action({ id: plugin.id, name: plugin.name }, args ?? {});
     }
+    if (method === 'find') {   // lab.find: the components a target names, as lab.layoutBounds() elements (Views with the resource name of their android:id)
+      const found = await targetsFor(plugin, args?.target), index = found.selector.index;
+      return withViewIdNames(plugin, index === null ? found.matches.slice(0, 200) : found.matches.slice(index, index + 1));
+    }
+    if (method === 'highlight') {   // lab.highlight: an outline on the device around the component(s) a target names (src/lab-highlight.js), following them frame by frame
+      const action = actions?.highlight; if (typeof action !== 'function') throw Object.assign(new Error('lab.highlight não está disponível aqui.'), { code: 'unsupported' });
+      const caller = { id: plugin.id, name: plugin.name }, op = String(args?.op ?? 'show');
+      if (op !== 'show') return action(caller, { op, id: args?.id, options: args?.options });
+      const found = await targetsFor(plugin, args?.target);
+      if (!found.matches.length && args?.options?.required !== false) throw targetNotFound(found.selector);
+      return action(caller, { op: 'show', id: args?.options?.id, selector: found.selector, elements: found.elements, options: args?.options });
+    }
     if (method === 'layoutBounds') return (await layoutBoundsFor(plugin, { names: args?.names !== false })).map(elementOut);
     // ---- lab.renderVariant (src/render-variant.js, docs/RENDER-VARIANT.md): begin ---------------------------------------------------------------------------------------
     // The only way a background render starts. The page's own operation slot when it provides one (actions.renderVariant: user input waits), else the VM client's.
@@ -186,14 +216,20 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       const wait = (plugin.lastShotAt ?? -Infinity) + SCREENSHOT_MS - now(); if (wait > 0) await new Promise(resolve => setTimer(resolve, wait));
       if (!plugin.worker) throw Object.assign(new Error('Plugin parado.'), { code: 'stopped' });
       plugin.lastShotAt = now();
-      let element = null;
-      if (args?.key) { element = (await layoutBoundsFor(plugin, { names: false })).find(item => item.key === String(args.key)) ?? null; if (!element) throw Object.assign(new Error(`Elemento ${String(args.key).slice(0, 60)} não está na tela (use lab.layoutBounds() para as chaves atuais).`), { code: 'not-found' }); }
+      let element = null, named = null;
+      if (args?.target !== undefined && args?.target !== null) {   // a component by id (src/lab-target.js): cut from its own raster, or with `padding` from every raster under the enlarged box
+        const found = await targetsFor(plugin, args.target), chosen = chooseTarget(found.matches, found.selector); if (!chosen) throw targetNotFound(found.selector);
+        named = { element: chosen, matches: found.matches.length }; const padding = Math.max(0, Math.min(64, Number(args.padding) || 0)), raw = found.raw.find(item => item.key === chosen.key);
+        if (padding > 0 || raw.hostId === null || raw.hostId === undefined) { const b = chosen.bounds; args = { ...args, bounds: { left: b.left - padding, top: b.top - padding, right: b.right + padding, bottom: b.bottom + padding } }; }
+        else element = raw;
+      } else if (args?.key) { element = (await layoutBoundsFor(plugin, { names: false })).find(item => item.key === String(args.key)) ?? null; if (!element) throw Object.assign(new Error(`Elemento ${String(args.key).slice(0, 60)} não está na tela (use lab.layoutBounds() para as chaves atuais).`), { code: 'not-found' }); }
       let region = null;
       if (args?.bounds !== undefined && args?.bounds !== null) {   // a box of the window: a layoutBounds element's bounds, a composeTree node's boundsInWindow, or a rectangle
         const b = args.bounds; if (![b?.left, b?.top, b?.right, b?.bottom].every(Number.isFinite) || !(b.right > b.left && b.bottom > b.top)) throw Object.assign(new Error('bounds precisa de { left, top, right, bottom } com área (coordenadas da janela).'), { code: 'bad-args' });
         region = { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
       }
-      return captureImage({ snapshot: lastSnapshot, element, region, maxWidth: args?.maxWidth, type: args?.type });
+      const shot = await captureImage({ snapshot: lastSnapshot, element: region ? null : element, region, maxWidth: args?.maxWidth, type: args?.type });
+      return named ? { ...shot, element: named.element, matches: named.matches } : shot;
     }
     if (!VM_METHODS.has(method)) throw Object.assign(new Error(`Método desconhecido: ${String(method).slice(0, 40)}`), { code: 'bad-query' });
     try { return await ask(plugin, method, args); }

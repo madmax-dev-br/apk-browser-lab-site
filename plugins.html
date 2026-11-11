@@ -6,7 +6,7 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=565f47a43815">
+  <link rel="stylesheet" href="./site-pages.css?v=5b686e9c43d9">
 </head>
 <body>
   <header class="topbar">
@@ -199,6 +199,9 @@
               <li><a href="#api-composetree"><code>composeTree</code></a></li>
               <li><a href="#api-layoutbounds"><code>layoutBounds</code></a></li>
               <li><a href="#api-screenshot"><code>screenshot</code></a></li>
+              <li><a href="#api-find"><code>find</code></a></li>
+              <li><a href="#api-capture"><code>capture</code></a></li>
+              <li><a href="#api-highlight"><code>highlight</code></a></li>
               <li><a href="#api-rendervariant"><code>renderVariant</code></a></li>
             </ul>
           </div>
@@ -372,14 +375,50 @@
         </div>
 
         <div class="api" id="api-screenshot">
-          <h4 class="api-sig"><code>await lab.screenshot({ key | bounds | element | node, maxWidth, type })</code></h4>
+          <h4 class="api-sig"><code>await lab.screenshot({ target | key | bounds | element | node, maxWidth, type })</code></h4>
           <p>Imagem da tela inteira, ou de uma caixa (<code>key</code> de <code>layoutBounds</code>), cortada do quadro que a página mostra, sem trabalho na VM.</p>
           <dl class="facts">
             <div><dt>Devolve</dt><dd><code class="shape">{ blob, width, height, type, notes }</code></dd></div>
             <div><dt>Recorte</dt><dd>Para recortar qualquer componente: <code>bounds</code> com um retângulo na janela, <code>element</code> com um item de <code>lab.layoutBounds()</code> ou <code>node</code> com um nó de <code>lab.composeTree()</code> (usa o <code>boundsInWindow</code> dele); o recorte vem de todos os rasters sob a área, na resolução deles.</dd></div>
+            <div><dt>Por id</dt><dd><code>target</code> com o id do componente (o mesmo alvo de <a href="#api-find"><code>lab.find</code></a>): é o que <a href="#api-capture"><code>lab.capture</code></a> faz.</dd></div>
             <div><dt>Padrões</dt><dd><code>maxWidth</code> 1080, <code>type</code> <code>'image/png'</code>.</dd></div>
             <div><dt>Limite</dt><dd>No máximo uma a cada 500 ms por plugin.</dd></div>
             <div><dt>Sem raster</dt><dd>Views que a página desenha com elementos próprios (widgets XML simples) não têm raster: ficam de fora da tela inteira (<code>notes</code> diz quantas) e a caixa delas responde <code>no-image</code>.</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-find">
+          <h4 class="api-sig"><code>await lab.find(alvo)</code></h4>
+          <p>Os componentes da tela que um id nomeia, Compose ou View, no formato de <code>lab.layoutBounds()</code>. O mesmo <code>alvo</code> serve em <code>lab.capture</code> e <code>lab.highlight</code>.</p>
+          <dl class="facts">
+            <div><dt>Alvo simples</dt><dd>Um texto ou número: o <code>testTag</code> de um componente Compose, o <code>android:id</code> de uma View (<code>'titulo'</code>, <code>'id/titulo'</code>, <code>'@+id/titulo'</code>, <code>'pacote:id/titulo'</code> ou o número), uma <code>key</code> de <code>layoutBounds</code>, ou o número de um nó Compose (o <code>id</code> do elemento).</dd></div>
+            <div><dt>Alvo por campo</dt><dd><code class="shape">{ testTag | viewId | nodeId | key | text | contentDescription | name | role, kind, index }</code>: todos os campos dados precisam casar. <code>text</code> e <code>contentDescription</code> casam o valor exato e, se nenhum for exato, os que o contêm; <code>kind</code> é <code>'compose'</code> ou <code>'view'</code>; <code>index</code> escolhe um entre vários. Um elemento de <code>layoutBounds</code> ou de <code>find</code> também é um alvo.</dd></div>
+            <div><dt>Devolve</dt><dd>Lista na ordem de desenho, vazia se nada casa. Uma View traz <code>viewId</code> (o número do <code>android:id</code>) e <code>viewIdName</code> (<code>'pacote:id/nome'</code>).</dd></div>
+            <div><dt>Custo</dt><dd>Vem do quadro que a página mostra. A VM só é consultada para traduzir o nome de um <code>android:id</code> (uma pergunta, guardada por quadro) e, com <code>name</code>, para uma <code>composeTree</code>.</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-capture">
+          <h4 class="api-sig"><code>await lab.capture(alvo, { padding, maxWidth, type })</code></h4>
+          <p>O print de um componente pelo id: a imagem do primeiro que casa (ou do <code>index</code>), cortada do quadro que a página mostra.</p>
+          <dl class="facts">
+            <div><dt>Devolve</dt><dd><code class="shape">{ blob, width, height, type, notes, element, matches }</code>: <code>element</code> é o componente capturado e <code>matches</code> quantos casaram.</dd></div>
+            <div><dt>Opções</dt><dd><code>padding</code> (0 a 64 px) inclui uma folga em volta; <code>maxWidth</code> e <code>type</code> como em <code>screenshot</code>.</dd></div>
+            <div><dt>Limite</dt><dd>O de <code>screenshot</code>: uma a cada 500 ms por plugin.</dd></div>
+            <div><dt>Erro</dt><dd><code>not-found</code> quando nada casa (a mensagem diz se o APK não tem aquele id de recurso), <code>no-image</code> quando a área não tem raster.</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-highlight">
+          <h4 class="api-sig"><code>await lab.highlight(alvo, { color, label, fill, width, padding, all, durationMs, id, required })</code></h4>
+          <p>Desenha o limite do componente sobre o aparelho simulado e o mantém no componente quadro a quadro: acompanha a rolagem, some enquanto ele está fora da tela e volta com ele. É uma camada da página; o app não a vê.</p>
+          <dl class="facts">
+            <div><dt>Devolve</dt><dd><code class="shape">{ id, state: { matches, visible, elements, bounds, … }, update(mudanças), remove() }</code></dd></div>
+            <div><dt>Opções</dt><dd><code>color</code> (cor CSS), <code>label</code> (texto, ou <code>false</code> para nenhuma), <code>fill</code> (preenche com a cor, translúcida), <code>width</code> da linha (1 a 8), <code>padding</code> (0 a 32), <code>all</code> (todos os que casam, não só um), <code>durationMs</code> (some sozinho), <code>id</code> (o mesmo <code>id</code> de novo substitui o destaque), <code>required: false</code> (aceita um componente que ainda não está na tela).</dd></div>
+            <div><dt>Padrões</dt><dd>Linha de 2 px, sem preenchimento, etiqueta com o <code>testTag</code> ou o nome do componente, até ser removido.</dd></div>
+            <div><dt>Gerenciar</dt><dd><code>lab.highlights.list()</code> e <code>lab.highlights.clear()</code>. Os destaques somem quando o plugin para.</dd></div>
+            <div><dt>Limite</dt><dd>32 destaques por plugin, 64 caixas por destaque com <code>all</code>.</dd></div>
+            <div><dt>Erro</dt><dd><code>not-found</code> quando nada casa (sem <code>required: false</code>); <code>unsupported</code> no player embutido.</dd></div>
           </dl>
         </div>
 
@@ -926,6 +965,7 @@ lab.watch({ static: 'com.exemplo.Sessao' }, 'atual.usuario', v =&gt; lab.ui.json
           <li><a href="#ex-arvore-compose">Árvore Compose resumida</a></li>
           <li><a href="#ex-recortes">Recortes dos componentes</a></li>
           <li><a href="#ex-componentes">Componentes da tela</a></li>
+          <li><a href="#ex-por-id">Destacar e capturar por id</a></li>
           <li><a href="#ex-janela">Painel em janela</a></li>
           <li><a href="#ex-mock">Mock pelo plugin</a></li>
           <li><a href="#ex-rolar">Rolar até a metade ou até uma posição</a></li>
@@ -1034,6 +1074,26 @@ async function mostrar() {
 lab.on('screen', () => mostrar().catch(erro => lab.ui.text(erro.message, { id: 'erro' })));
 await mostrar();</code></pre></div>
       
+        <h3 id="ex-por-id">Destacar e capturar por id</h3>
+        <p>Troque os ids pelos do seu app: um <code>testTag</code> do Compose ou o <code>android:id</code> de uma View. O limite fica desenhado no aparelho e acompanha o componente; o print aparece no cartão.</p>
+        <div class="code" data-name="Destacar e capturar por id"><pre><code>const IDS = ['salvar', 'titulo'];   // testTag (Compose) ou android:id (View)
+const CORES = ['#ff3d7f', '#00c853', '#2979ff', '#ff9100'];
+async function mostrar() {
+  await lab.highlights.clear();
+  lab.ui.clear();
+  for (const [i, id] of IDS.entries()) {
+    const achados = await lab.find(id);
+    if (!achados.length) { lab.ui.text(id + ': não está nesta tela', { id }); continue; }
+    await lab.highlight(id, { id, color: CORES[i % CORES.length], label: id, all: true });
+    try {
+      const print = await lab.capture(id, { padding: 4, maxWidth: 360 });
+      lab.ui.image(print, { id, caption: id + ' · ' + print.element.name + ' · ' + print.width + ' × ' + print.height });
+    } catch (erro) { lab.ui.text(id + ': ' + erro.message, { id }); }
+  }
+}
+lab.on('ready', () => mostrar().catch(erro => lab.ui.text(erro.message, { id: 'erro' })));
+await lab.button({ label: 'Limpar destaques', icon: '✕' }, () => lab.highlights.clear());</code></pre></div>
+
         <h3 id="ex-componentes">Componentes da tela</h3>
         <p>As caixas de &quot;Mostrar limites de layout&quot; com nome, posição e o recorte de cada uma.</p>
         <div class="code" data-name="Componentes da tela"><pre><code>// Componentes da tela: as caixas de "Mostrar limites de layout", com o recorte de cada uma
@@ -1194,6 +1254,6 @@ lab.ui.kv({ recortes: variante.images.length, 'tela parada': variante.settled, '
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=565f47a43815"></script>
+  <script type="module" src="./site-pages.js?v=5b686e9c43d9"></script>
 </body>
 </html>

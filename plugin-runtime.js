@@ -27,6 +27,15 @@
  * @property {(options?: { key?: string, bounds?: object, element?: object, node?: object, maxWidth?: number, type?: string }) => Promise<{ blob: Blob, width: number, height: number, type: string, notes: string[] }>} screenshot
  *   An image of the screen, of one element (`key` from layoutBounds), or of any box: `bounds` (or `element` / `node`) takes a rectangle in window coordinates, a layoutBounds
  *   element or a composeTree node (its boundsInWindow), cut from the frame the page shows at the rasters' own resolution. At most one every 500 ms per plugin.
+ * @property {(target: string|number|object) => Promise<object[]>} find   The components a target names, as layoutBounds elements (a View also carries `viewId` and `viewIdName`). A target
+ *   is an id (a Compose testTag, a View's android:id as 'nome' / 'id/nome' / the number, a layoutBounds key, a Compose node id) or { testTag | viewId | nodeId | key | text |
+ *   contentDescription | name | role, kind?, index? } (every field given has to match), or an element of layoutBounds / find.
+ * @property {(target: string|number|object, options?: { padding?: number, maxWidth?: number, type?: string }) => Promise<object>} capture   The image of the component a target
+ *   names (the first match, or `index`): { blob, width, height, type, notes, element, matches }. Same as screenshot({ target, ... }) and its rate limit.
+ * @property {(target: string|number|object, options?: { id?: string, color?: string, label?: string|boolean, fill?: boolean, width?: number, padding?: number, all?: boolean, durationMs?: number, required?: boolean }) => Promise<object>} highlight
+ *   Draws the component's limit over the simulated device (a page overlay; the app does not see it) and keeps it on the component frame by frame: hidden while it is off
+ *   screen. -> { id, state: { matches, visible, elements, bounds, ... }, update(changes), remove() }. At most 32 per plugin; they go when the plugin stops.
+ * @property {{ list(): Promise<object[]>, clear(): Promise<{ removed: number }> }} highlights
  * @property {() => Promise<object[]>} viewModels    ViewModels of the active screen: [{ handle, className, key, library, owner: { kind, label, className, handle } }].
  * @property {() => Promise<object[]>} fragments     androidx fragments on the screen: [{ handle, className, who, tag, id, hidden, state, children }].
  * @property {() => Promise<{handle: string, className: string}|null>} activity   The current Activity object.
@@ -141,6 +150,9 @@ export function pluginWorkerMain(scope) {
   const tabConfig = options => { const out = {}; for (const key of ['id', 'title', 'icon', 'side', 'width', 'height', 'mode', 'trigger', 'open', 'remember']) if (options?.[key] !== undefined) out[key] = options[key]; return out; };
   // a scroll target: a testTag (string), { testTag }, { text }, { key } or a layoutBounds element, { x, y } (a point of the window); nothing = the largest scrollable on screen
   const scrollTarget = target => target === undefined || target === null ? null : typeof target === 'string' ? { testTag: target } : { key: target.key ?? undefined, testTag: target.key ? undefined : target.testTag ?? undefined, text: target.key ? undefined : target.text ?? undefined, x: target.key ? undefined : target.x, y: target.key ? undefined : target.y };
+  // a component by id: a string or number (testTag, android:id, layoutBounds key, node id), a selector object, or an element of lab.layoutBounds() / lab.find()
+  const targetArg = target => { if (target === undefined || target === null || typeof target !== 'object') return target ?? null; if (target.key !== undefined && target.bounds) return { key: target.key, bounds: {} }; const out = {}; for (const key of ['id', 'key', 'testTag', 'viewId', 'nodeId', 'text', 'contentDescription', 'name', 'role', 'kind', 'index']) if (target[key] !== undefined) out[key] = target[key]; return out; };
+  const highlightOptions = options => { const out = {}; for (const key of ['id', 'color', 'label', 'fill', 'width', 'padding', 'all', 'durationMs', 'required']) if (options?.[key] !== undefined) out[key] = options[key]; return out; };
   const viewOptions = options => ({ depth: options?.depth, maxFields: options?.maxFields, maxItems: options?.maxItems, maxString: options?.maxString });
   const pathArg = path => Array.isArray(path) ? path.map(part => String(part ?? '')) : String(path ?? '');
   // A heap scan is served in short pages (each one a bounded query between two VM events); this walks the pages until `limit` items, the end of the heap or `maxPages`.
@@ -240,8 +252,22 @@ export function pluginWorkerMain(scope) {
     screenshot: (options = {}) => {
       // bounds: a rectangle, a layoutBounds element ({ bounds }) or a composeTree node ({ boundsInWindow }); key: a layoutBounds element by its key
       const source = options?.bounds ?? options?.element ?? options?.node ?? null, box = source ? (source.boundsInWindow ?? source.bounds ?? source) : null;
+      if (options?.target !== undefined && options?.target !== null) return lab.capture(options.target, options);
       return call('screenshot', { key: options?.key ?? null, bounds: box ? { left: Number(box.left), top: Number(box.top), right: Number(box.right), bottom: Number(box.bottom) } : null, maxWidth: options?.maxWidth, type: options?.type });
     },
+    // ---- a component by its id (src/lab-target.js): find it, outline it on the device, image it ----
+    /** The components a target names, as lab.layoutBounds() elements: find('salvar'), find({ testTag }), find({ viewId: 'titulo' }), find({ nodeId }), find({ text }), find({ role, index }). */
+    find: target => call('find', { target: targetArg(target) }),
+    /** The image of one component by id: capture('salvar'), capture({ viewId: 'titulo' }, { padding: 8, maxWidth, type }) -> { blob, width, height, type, notes, element, matches }. */
+    capture: (target, options = {}) => call('screenshot', { target: targetArg(target), padding: options?.padding, maxWidth: options?.maxWidth, type: options?.type }),
+    /** Outlines a component on the device and follows it: highlight('salvar', { color, label, fill, width, padding, all, durationMs, id, required }) -> { id, state, update, remove }. */
+    async highlight(target, options = {}) {
+      const state = await call('highlight', { op: 'show', target: targetArg(target), options: highlightOptions(options) }), id = state.id; let last = state;
+      return Object.freeze({ id, get state() { return last; },
+        update: async (changes = {}) => { last = await call('highlight', { op: 'update', id, options: highlightOptions(changes) }); return last; },
+        remove: () => call('highlight', { op: 'remove', id }) });
+    },
+    highlights: Object.freeze({ list: () => call('highlight', { op: 'list' }), clear: () => call('highlight', { op: 'clear' }) }),
     renderVariant: (options = {}) => call('renderVariant', options ?? {}),   // a background instance of the current screen with other endpoint mocks, as images and data (docs/RENDER-VARIANT.md)
     viewModels: () => call('viewModels', {}),
     fragments: () => call('fragments', {}),
