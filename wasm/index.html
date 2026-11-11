@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=565f47a43815">
-  <meta name="apk-browser-build" content="565f47a43815">
+  <link rel="stylesheet" href="./styles.css?v=5b686e9c43d9">
+  <meta name="apk-browser-build" content="5b686e9c43d9">
 </head>
 <body>
   <header class="topbar">
@@ -184,6 +184,7 @@
               <div id="android-content" class="android-content"></div>
               <div id="android-window-layer" class="android-window-layer"></div>
               <canvas id="layout-bounds-canvas" class="layout-bounds-canvas" aria-hidden="true" hidden></canvas>
+              <div id="lab-highlight-layer" class="lab-highlight-layer" aria-hidden="true"></div>
               <div id="permission-dialog" class="perm-scrim" hidden><div class="perm-card" role="alertdialog" aria-modal="true" aria-labelledby="perm-question" aria-describedby="perm-detail" tabindex="-1"><div class="perm-icon" id="perm-icon" aria-hidden="true"></div><p id="perm-question" class="perm-question"></p><p id="perm-detail" class="perm-detail"></p><div class="perm-actions"><button id="perm-allow" type="button" class="perm-button"></button><button id="perm-once" type="button" class="perm-button" hidden>Só desta vez</button><button id="perm-deny" type="button" class="perm-button">Não permitir</button></div></div></div>
               <div class="system-bars" aria-hidden="true">
                 <div id="sysbar-status" class="sysbar-status"><span id="sysbar-clock" class="sysbar-clock">9:41</span><span class="sysbar-cutout"></span><span class="sysbar-icons"><svg id="sysbar-wifi" viewBox="0 0 24 24" width="14" height="14"><path d="M12 18.5a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM2.4 9.2l1.9 1.9a10.8 10.8 0 0 1 15.4 0l1.9-1.9a13.5 13.5 0 0 0-19.2 0zM6.2 13l1.9 1.9a5.4 5.4 0 0 1 7.8 0l1.9-1.9a8.1 8.1 0 0 0-11.6 0z" fill="currentColor"/></svg><svg id="sysbar-cell" viewBox="0 0 24 24" width="14" height="14"><path d="M2 22h20V2z" fill="currentColor"/></svg><span class="sysbar-battery"><span id="sysbar-battery-level" class="sysbar-battery-level"></span><b id="sysbar-bolt" hidden>⚡</b></span></span></div>
@@ -226,7 +227,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=565f47a43815"></script>
+  <script type="module" src="./app.js?v=5b686e9c43d9"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>

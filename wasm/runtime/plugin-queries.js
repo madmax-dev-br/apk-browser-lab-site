@@ -15,7 +15,7 @@
 //   ConcurrentHashMap, the Collections wrappers), androidx ArrayMap / SimpleArrayMap, Kotlin's empty collections and ArrayDeque, Compose's persistent vectors, and the
 //   observable holders shown as their current value: kotlinx StateFlowImpl (`_state`), androidx LiveData (`mData`, `mVersion`), Compose snapshot state (the newest valid
 //   StateRecord of `next`: SnapshotMutableState, the Int/Long/Float/Double states, SnapshotStateList), and the java.util.concurrent atomics.
-import { isFreedId } from './heap-gc.js?v=565f47a43815';
+import { isFreedId } from './heap-gc.js?v=5b686e9c43d9';
 
 export const QUERY_LIMITS = { depth: 2, maxDepth: 6, maxFields: 200, maxFieldsLimit: 2000, maxItems: 20, maxItemsLimit: 500, maxString: 1000, maxStringLimit: 20000, maxNodes: 4000, budgetMs: 25 };
 const VIEW_MODEL_STORE = 'Landroidx/lifecycle/ViewModelStore;', VIEW_MODEL = 'Landroidx/lifecycle/ViewModel;';
@@ -765,6 +765,12 @@ export function runPluginQuery(runtime, query, args = {}) {
   if (!runtime) throw new PluginQueryError('no-apk', 'Nenhum APK em execução.');
   const reader = createHeapReader(runtime);
   switch (query) {
+    case 'resourceIds': {   // names of the APK's resource table <-> ids ({ names: ['id/titulo'], ids: [0x7f0a0012] }): how a plugin names a View by its android:id
+      const table = runtime.resources?.table ?? null, ids = {}, names = {};
+      for (const name of (Array.isArray(args.names) ? args.names : []).slice(0, 64)) { const key = String(name).slice(0, 200); ids[key] = table?.findId?.(key) ?? null; }
+      for (const id of (Array.isArray(args.ids) ? args.ids : []).slice(0, 256)) { const n = Number(id) >>> 0; names[n] = table?.entries?.get?.(n)?.[0]?.fullName ?? null; }
+      return { ids, names };
+    }
     case 'viewModels': return listViewModels(runtime, reader);
     case 'fragments': return readFragments(runtime, reader);
     case 'activity': { const rec = runtime.activity && reader.record(runtime.activity.ref); return rec ? { handle: handleOf(runtime, rec.id ?? runtime.activity.ref), className: dotted(rec.type) } : null; }
