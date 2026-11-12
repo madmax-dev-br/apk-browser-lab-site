@@ -1,12 +1,15 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=b4879748881a';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=b4879748881a';
-import { isTrustedRasterURL } from './raster-cache.js?v=b4879748881a';
+import { updateWebViewSlot } from './webview-slot.js?v=f0166ffeffb5';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=f0166ffeffb5';
+import { isTrustedRasterURL } from './raster-cache.js?v=f0166ffeffb5';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
 }
+/** The CSS background-image of a View whose text is a raster: the text over the image already there (a background Drawable). After a `background` shorthand wrote a plain
+ * colour the longhand reads back as a CSS-wide keyword ("initial") or "none": that is no layer, and listing it would make the whole value invalid (the text would not be drawn). */
+export function stackBackgroundImage(image, existing) { return existing && !/^(?:none|initial|inherit|unset|revert)$/.test(existing) ? `${image}, ${existing}` : image; }
 /** A View's raw-pixel content raster on its canvas layer. The canvas holds the raster's own pixels (a reduced-scale replay while the screen moves, src/motion-raster.js,
  * has fewer); its CSS box is the View's, so the browser stretches it over the same size. `counters.putMs` / `counters.reducedDrawn` are the page's frame stats. */
 export function paintRgbaContentLayer(element, drawing, counters) {
@@ -289,7 +292,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
     const drawing = view.textRaster;
     if (!pngURLOk(drawing.dataURL) || !Number.isFinite(drawing.width) || !Number.isFinite(drawing.height)) throw new Error('PNG de parágrafo inválido recebido da VM.');
     const image = `url("${drawing.dataURL}")`, size = `${drawing.width}px ${drawing.height}px`, position = `${(view.compoundPadding || view.padding)?.left || 0}px ${(view.compoundPadding || view.padding)?.top || 0}px`;
-    element.style.backgroundImage = element.style.backgroundImage ? `${image}, ${element.style.backgroundImage}` : image;
+    element.style.backgroundImage = stackBackgroundImage(image, element.style.backgroundImage);
     element.style.backgroundSize = view.drawableSVG ? `${size}, 100% 100%` : size;
     element.style.backgroundPosition = view.drawableSVG ? `${position}, 0 0` : position;
     element.style.backgroundRepeat = 'no-repeat'; element.style.color = 'transparent'; element.style.textShadow = 'none';
