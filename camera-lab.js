@@ -4,8 +4,8 @@
 // Cost model. Nothing runs while no app uses the camera (and the section is closed). A preview is drawn by the page straight into the View's element: the Worker gets one small
 // message per frame (no pixels) and answers with an ack; a new frame is only sent after the previous one was acknowledged. Pixels cross to the Worker only for ImageReader targets:
 // one RGBA buffer per frame at the reader's size (read back from a small 2D canvas, transferred, not copied), and one buffer once for a still capture.
-import { createCameraSource } from './camera-source.js?v=e91f6eb1377f';
-import { CAMERAS, cameraById, LENS_FACING_FRONT, inlineThumbnailSize } from './camera-frames.js?v=e91f6eb1377f';
+import { createCameraSource } from './camera-source.js?v=7b9b01b1b8c5';
+import { CAMERAS, cameraById, LENS_FACING_FRONT, inlineThumbnailSize } from './camera-frames.js?v=7b9b01b1b8c5';
 
 const FRAME_MS = 1000 / 30, MONITOR_MS = 200, ACK_TIMEOUT_MS = 1500;
 const CAPTURE_SIZE = { width: 960, height: 1280 };   // the upright picture the system camera screen takes (3:4)

@@ -1,8 +1,8 @@
-import { createHostRegistry } from './host-contract.js?v=e91f6eb1377f';
-import { APKError } from './apk-error.js?v=e91f6eb1377f';
-import { cleartextPermitted } from './network-native.js?v=e91f6eb1377f';
-import { probeIsoBmff, sniffContainer } from './media-container.js?v=e91f6eb1377f';
-import { state as ioState } from './libcore-io-native.js?v=e91f6eb1377f';
+import { createHostRegistry } from './host-contract.js?v=7b9b01b1b8c5';
+import { APKError } from './apk-error.js?v=7b9b01b1b8c5';
+import { cleartextPermitted } from './network-native.js?v=7b9b01b1b8c5';
+import { probeIsoBmff, sniffContainer } from './media-container.js?v=7b9b01b1b8c5';
+import { state as ioState } from './libcore-io-native.js?v=7b9b01b1b8c5';
 
 // Small platform classes: android.os.WorkSource (a set of (uid, name) pairs the framework blames for work), android.media.MediaMetadataRetriever and android.graphics.Movie.
 // MediaMetadataRetriever reads the container metadata of MP4 / MOV / 3GP sources (src/media-container.js: duration, size, rotation, track kinds); a missing or unrecognised source fails the way

@@ -2,7 +2,7 @@
 // (the same place as "Mostrar limites de layout"): the app never sees it and nothing is asked of the VM. Each highlight keeps its selector and is matched again against the
 // elements of every drawn frame, so the outline follows the component while it moves or scrolls, hides while it is not on screen and comes back with it.
 // Costs nothing without highlights: refresh() returns at once. No process.*.
-import { matchTargets } from './lab-target.js?v=e91f6eb1377f';
+import { matchTargets } from './lab-target.js?v=7b9b01b1b8c5';
 
 export const HIGHLIGHT_LIMITS = Object.freeze({ perOwner: 32, boxes: 64, label: 60, minDurationMs: 100, maxDurationMs: 600000, maxWidth: 8, maxPadding: 32 });
 export const HIGHLIGHT_COLOR = '#ff3d7f';
