@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=f407b1282aab';
-import { NativeLibraryProvider, BASE_SONAME } from './jni-host.js?v=f407b1282aab';
-import { buildElfDescriptor } from './native-descriptor.js?v=f407b1282aab';
-import { sha256Hex } from './sha256-sync.js?v=f407b1282aab';
-import { xhrFetchSync } from './native-library-fetch.js?v=f407b1282aab';
+import { APKError } from './apk-error.js?v=d2dd099a76f6';
+import { NativeLibraryProvider, BASE_SONAME } from './jni-host.js?v=d2dd099a76f6';
+import { buildElfDescriptor } from './native-descriptor.js?v=d2dd099a76f6';
+import { sha256Hex } from './sha256-sync.js?v=d2dd099a76f6';
+import { xhrFetchSync, definePrefetch } from './native-library-fetch.js?v=d2dd099a76f6';
 
 // The native half of Android's public-key / TLS stack: System.loadLibrary("javacrypto") from the original Conscrypt classes in the framework DEX
 // (com.android.org.conscrypt.NativeCryptoJni) is served by the lab's wasm32 modules libjavacrypto.so, libssl.so and libcrypto.so, built from AOSP's own
@@ -54,7 +54,17 @@ export class JavacryptoProvider {
     };
     Object.defineProperty(entry, 'bytes', { get() { load(); return bytes; }, enumerable: false });   // lazy fetch: never triggered by walking the entry (see native-library-fetch.js)
     Object.defineProperty(entry, 'module', { get() { load(); return module; }, enumerable: false });
+    definePrefetch(entry, () => new URL(url + (self.revision ? `?v=${self.revision}` : ''), self.baseURL).href, lib.sha256, ready => { if (!bytes) { bytes = ready.bytes; module = ready.module; self.fetched.push(lib.soname); } });
     return entry;
+  }
+  /** The entry of `lib`, one per provider: a prefetch fills the same entry the link later reads. */
+  #entryFor(lib) { let entry = this.#entries.get(lib.soname); if (!entry) this.#entries.set(lib.soname, entry = this.#entry(lib, lib.file)); return entry; }
+  #entries = new Map();
+  /** Fetches, verifies and compiles the javacrypto modules and the base libraries they link against (`base`'s entries, as compose() picks them) without blocking: every app's
+   *  launch loads "javacrypto" (Security.getProviders installs the framework's Conscrypt provider, whose NativeCrypto initializer calls System.loadLibrary), and the link,
+   *  which runs inside the interpreter and cannot wait, then finds the modules ready instead of fetching, hashing and compiling them synchronously. Resolves when all settled. */
+  prefetch(base = null) {
+    return Promise.all(Object.values(this.provenance.libraries).map(lib => (base?.modules?.has(lib.soname) ? base.modules.get(lib.soname) : this.#entryFor(lib)).prefetch?.()));
   }
   /** A NativeLibraryProvider holding `base`'s modules plus the javacrypto trio (and libc++_shared.so / liblog.so unless `base` already has them). */
   compose(base = null) {
@@ -63,7 +73,7 @@ export class JavacryptoProvider {
     for (const [soname, reason] of base?.unavailable ?? []) provider.unavailable.set(soname, reason);
     for (const lib of Object.values(this.provenance.libraries)) {
       if (provider.modules.has(lib.soname)) { if (lib.shared && provider.modules.get(lib.soname).sha256 !== lib.sha256) throw new APKError(`the ${lib.soname} supplied by the caller is not the one the javacrypto modules link against`, { kind: 'javacrypto-asset' }); continue; }
-      provider.modules.set(lib.soname, this.#entry(lib, lib.file));
+      provider.modules.set(lib.soname, this.#entryFor(lib));
     }
     return provider;
   }

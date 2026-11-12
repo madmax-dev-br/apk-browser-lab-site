@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=f407b1282aab';
-import { buildElfDescriptor } from './native-descriptor.js?v=f407b1282aab';
-import { sha256Hex } from './sha256-sync.js?v=f407b1282aab';
-import { withVariants } from './native-provider-variants.js?v=f407b1282aab';
+import { APKError } from './apk-error.js?v=d2dd099a76f6';
+import { buildElfDescriptor } from './native-descriptor.js?v=d2dd099a76f6';
+import { sha256Hex } from './sha256-sync.js?v=d2dd099a76f6';
+import { withVariants } from './native-provider-variants.js?v=d2dd099a76f6';
 
 // Browser-side provider of the lab's wasm32 native libraries (vendor/native-libs/wasm32, published next to the page by scripts/build-web.mjs).
 //
@@ -21,6 +21,22 @@ export function xhrFetchSync(url) {
   request.send(null);
   if (request.status !== 200) throw new APKError(`Native library fetch failed: ${url} -> HTTP ${request.status}`, { kind: 'native-library-fetch' });
   return new Uint8Array(request.response);
+}
+
+/** The asynchronous way to the same verified module, for a library known to be linked soon (prefetch): fetch, SHA-256 by Web Crypto, compile off the interpreter's path. */
+export async function fetchVerifiedModule(url, sha256, fetchImpl = globalThis.fetch.bind(globalThis)) {
+  const response = await fetchImpl(url);
+  if (!response.ok) throw new APKError(`Native library fetch failed: ${url} -> HTTP ${response.status}`, { kind: 'native-library-fetch' });
+  const bytes = new Uint8Array(await response.arrayBuffer()), actual = [...new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes))].map(value => value.toString(16).padStart(2, '0')).join('');
+  if (actual !== sha256) throw new APKError(`Native library at ${url} does not match its pinned SHA-256 (expected ${sha256}, got ${actual})`, { kind: 'native-library-hash-mismatch' });
+  return { bytes, module: await WebAssembly.compile(bytes) };
+}
+
+/** Gives `entry` a non-enumerable prefetch(): the asynchronous load of fetchVerifiedModule, whose result the synchronous load at link time takes if it is there by then. A prefetch
+ *  that fails is forgotten: the link then loads synchronously and reports the failure itself. `adopt({ bytes, module })` stores a result unless the entry was loaded meanwhile. */
+export function definePrefetch(entry, url, sha256, adopt) {
+  let ahead = null;
+  Object.defineProperty(entry, 'prefetch', { enumerable: false, value: () => ahead ??= fetchVerifiedModule(url(), sha256).then(adopt, () => { ahead = null; }) });
 }
 
 export class LazyNativeLibraryProvider {
@@ -52,6 +68,7 @@ export class LazyNativeLibraryProvider {
     // hashed and compiled every wasm module on the first collection, ~0.5 s in the browser Worker and the memory of all of them).
     Object.defineProperty(entry, 'bytes', { get() { load(); return bytes; }, enumerable: false });
     Object.defineProperty(entry, 'module', { get() { load(); return module; }, enumerable: false });
+    definePrefetch(entry, () => new URL(lib.file + (revision ? `?v=${revision}` : ''), baseURL).href, lib.sha256, ready => { if (!bytes) { bytes = ready.bytes; module = ready.module; provider.fetched.push(lib.soname); } });
     return entry;
   }
   has(soname) { return this.modules.has(soname); }

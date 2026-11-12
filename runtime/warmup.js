@@ -2,8 +2,8 @@
 // initializing classes, preparing a method the first time it is called (the JavaScript VM decodes it and later compiles it; the WebAssembly core copies its code and resolves its
 // constants) -- and the app feels slow until that tapers off. Both engines already time that work (src/time-breakdown.js: the DECODE, COMPILE and INIT buckets; the core charges
 // its linker to DECODE). The tracker looks at the share of the last WARM_WINDOW_MS of wall time spent there: warming while it is at least WARM_SHARE, warm once a whole window
-// stayed below it. A new screen brings new classes and methods, so the state can go back to warming: `episodes` counts those. DOM-free, no process.*.
-import { BUCKET } from './time-breakdown.js?v=f407b1282aab';
+// stayed below it, and warmAfterMs is when the first-time work stopped (the end of the last busy interval), not the end of that confirming window. A new screen brings new classes and methods, so the state can go back to warming: `episodes` counts those. DOM-free, no process.*.
+import { BUCKET } from './time-breakdown.js?v=d2dd099a76f6';
 
 export const WARM_WINDOW_MS = 3000, WARM_SHARE = 0.03, WARM_POLL_MS = 500, WARM_HOT = 8;   // WARM_HOT: methods compiled within a window that still count as warming
 
@@ -15,15 +15,18 @@ export function firstTimeWork(runtime) {
 }
 
 export class WarmupTracker {
-  constructor() { this.samples = []; this.startedAt = null; this.warming = true; this.firstWarmAfterMs = null; this.episodes = 1; this.last = null; }
+  constructor() { this.samples = []; this.startedAt = null; this.warming = true; this.firstWarmAfterMs = null; this.episodes = 1; this.last = null; this.lastWorkAt = null; }
   /** A sample of firstTimeWork() at `now` (ms): returns the state the snapshot carries. */
   observe(work, now) {
     if (work === null || work === undefined) return null;
     if (this.startedAt === null) this.startedAt = now;
-    const samples = this.samples, hot = work.hot ?? 0; samples.push([now, work.ms, hot]);
+    const samples = this.samples, hot = work.hot ?? 0, previous = samples.at(-1);
+    // the end of the last interval that was itself busy: when the first-time work stopped (warmAfterMs). The quiet window only confirms it afterwards.
+    if (!previous || (now > previous[0] && (work.ms - previous[1]) / (now - previous[0]) >= WARM_SHARE) || hot - previous[2] > 0) this.lastWorkAt = now;
+    samples.push([now, work.ms, hot]);
     while (samples.length > 2 && now - samples[1][0] >= WARM_WINDOW_MS) samples.shift();   // the oldest sample kept is the last one at least a window old
     const span = now - samples[0][0], recentMs = work.ms - samples[0][1], recentHot = hot - samples[0][2], full = span >= WARM_WINDOW_MS, share = span > 0 ? recentMs / span : 1, busy = share >= WARM_SHARE || recentHot >= WARM_HOT;
-    if (full && !busy) { if (this.warming) { this.warming = false; this.firstWarmAfterMs ??= now - this.startedAt; } }
+    if (full && !busy) { if (this.warming) { this.warming = false; this.firstWarmAfterMs ??= (this.lastWorkAt ?? this.startedAt) - this.startedAt; } }
     else if (busy && !this.warming) { this.warming = true; this.episodes++; }
     return this.last = { warming: this.warming, share: Math.round(Math.min(1, share) * 1000) / 1000, recentMs: Math.round(recentMs), windowMs: Math.round(Math.min(span, WARM_WINDOW_MS)),
       totalMs: Math.round(work.ms), events: work.events, recentCompiled: recentHot, compiled: hot, sinceStartMs: Math.round(now - this.startedAt), warmAfterMs: this.firstWarmAfterMs === null ? null : Math.round(this.firstWarmAfterMs), episodes: this.episodes };
@@ -45,5 +48,5 @@ export function warmupLabel(warmup) {
   if (warmup.warming) return { text: `◌ aquecendo ${Math.round(warmup.share * 100)}%`, warming: true,
     title: `Aquecendo: ${Math.round(warmup.share * 100)}% dos últimos ${seconds(warmup.windowMs)} s foram trabalho de primeira vez (carga e inicialização de classes, preparo de métodos)${warmup.recentCompiled ? `; ${warmup.recentCompiled} métodos compilados nesse intervalo` : ''}. Total até agora: ${seconds(warmup.totalMs)} s.${warmup.episodes > 1 ? ' Uma tela nova trouxe classes e métodos novos.' : ''}` };
   return { text: `● aquecido${warmup.warmAfterMs !== null ? ` em ${seconds(warmup.warmAfterMs)} s` : ''}`, warming: false,
-    title: `Aquecido: quase nenhum trabalho de primeira vez nos últimos ${seconds(warmup.windowMs)} s. Primeira vez que ficou assim: ${warmup.warmAfterMs !== null ? seconds(warmup.warmAfterMs) + ' s depois de abrir' : '—'}; trabalho de primeira vez no total: ${seconds(warmup.totalMs)} s.` };
+    title: `Aquecido: quase nenhum trabalho de primeira vez nos últimos ${seconds(warmup.windowMs)} s. O trabalho de primeira vez parou ${warmup.warmAfterMs !== null ? seconds(warmup.warmAfterMs) + ' s depois de abrir (confirmado depois de ' + seconds(warmup.windowMs) + ' s sem ele)' : '—'}; trabalho de primeira vez no total: ${seconds(warmup.totalMs)} s.` };
 }

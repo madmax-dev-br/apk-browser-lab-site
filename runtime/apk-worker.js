@@ -1,61 +1,61 @@
-import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=f407b1282aab';
-import { launcherInfo } from './launcher-info.js?v=f407b1282aab';
-import { buildScreenState } from './screen-state.js?v=f407b1282aab';
-import { createLogcat } from './logcat.js?v=f407b1282aab';
-import { createNetlog } from './netlog.js?v=f407b1282aab';
-import { reportSummary } from './report-summary.js?v=f407b1282aab';
-import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=f407b1282aab';
-import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=f407b1282aab';
-import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=f407b1282aab';
-import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=f407b1282aab';
-import { describeRedirects } from './host-map.js?v=f407b1282aab';
-import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=f407b1282aab';
-import { createMessageSink } from './audio-native.js?v=f407b1282aab';
-import { loadAPK } from './apk-loader.js?v=f407b1282aab';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=f407b1282aab';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=f407b1282aab';
-import { createWebViewBackend } from './webview-backend.js?v=f407b1282aab';
-import { FrameworkProvider } from './framework-provider.js?v=f407b1282aab';
-import { createRasterSender } from './raster-cache.js?v=f407b1282aab';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=f407b1282aab';
-import { dispatchPointer } from './pointer-input-host.js?v=f407b1282aab';
-import { resolveDevice } from './device-profile.js?v=f407b1282aab';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=f407b1282aab';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=f407b1282aab';
-import { SkiaProvider } from './skia-provider.js?v=f407b1282aab';
-import { inspectCompose } from './compose-inspector.js?v=f407b1282aab';
-import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=f407b1282aab';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=f407b1282aab';
-import { readScrollInfo } from './scroll-info.js?v=f407b1282aab';
-import { SemanticsPacer } from './semantics-pacing.js?v=f407b1282aab';
-import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=f407b1282aab';
-import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=f407b1282aab';
-import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=f407b1282aab';
-import { WarmupTracker, firstTimeWork } from './warmup.js?v=f407b1282aab';
-import { disposeTextLayout } from './text-layout-native.js?v=f407b1282aab';
-import { IcuBreakProvider } from './icu-break-provider.js?v=f407b1282aab';
-import { SqliteProvider } from './sqlite-native.js?v=f407b1282aab';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=f407b1282aab';
-import { TzdataProvider } from './java-time-native.js?v=f407b1282aab';
-import { ZlibProvider } from './zip-native.js?v=f407b1282aab';
-import { IcuConverterProvider } from './icu-converter-native.js?v=f407b1282aab';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=f407b1282aab';
-import { JavacryptoProvider } from './javacrypto-native.js?v=f407b1282aab';
-import { disposeColorFilters } from './color-filter-native.js?v=f407b1282aab';
-import { disposeRegex } from './regex-native.js?v=f407b1282aab';
-import { disposeRenderNodes } from './rendernode-native.js?v=f407b1282aab';
-import { startDeepLink } from './deep-link-host.js?v=f407b1282aab';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=f407b1282aab';
-import { renderVariant, RenderVariantError } from './render-variant.js?v=f407b1282aab';
-import { probeWebCodecs } from './media-codec-backend.js?v=f407b1282aab';
+import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=d2dd099a76f6';
+import { launcherInfo } from './launcher-info.js?v=d2dd099a76f6';
+import { buildScreenState } from './screen-state.js?v=d2dd099a76f6';
+import { createLogcat } from './logcat.js?v=d2dd099a76f6';
+import { createNetlog } from './netlog.js?v=d2dd099a76f6';
+import { reportSummary } from './report-summary.js?v=d2dd099a76f6';
+import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=d2dd099a76f6';
+import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=d2dd099a76f6';
+import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=d2dd099a76f6';
+import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=d2dd099a76f6';
+import { describeRedirects } from './host-map.js?v=d2dd099a76f6';
+import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=d2dd099a76f6';
+import { createMessageSink } from './audio-native.js?v=d2dd099a76f6';
+import { loadAPK } from './apk-loader.js?v=d2dd099a76f6';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=d2dd099a76f6';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=d2dd099a76f6';
+import { createWebViewBackend } from './webview-backend.js?v=d2dd099a76f6';
+import { FrameworkProvider } from './framework-provider.js?v=d2dd099a76f6';
+import { createRasterSender } from './raster-cache.js?v=d2dd099a76f6';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=d2dd099a76f6';
+import { dispatchPointer } from './pointer-input-host.js?v=d2dd099a76f6';
+import { resolveDevice } from './device-profile.js?v=d2dd099a76f6';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=d2dd099a76f6';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=d2dd099a76f6';
+import { SkiaProvider } from './skia-provider.js?v=d2dd099a76f6';
+import { inspectCompose } from './compose-inspector.js?v=d2dd099a76f6';
+import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=d2dd099a76f6';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=d2dd099a76f6';
+import { readScrollInfo } from './scroll-info.js?v=d2dd099a76f6';
+import { SemanticsPacer } from './semantics-pacing.js?v=d2dd099a76f6';
+import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=d2dd099a76f6';
+import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=d2dd099a76f6';
+import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=d2dd099a76f6';
+import { WarmupTracker, firstTimeWork } from './warmup.js?v=d2dd099a76f6';
+import { disposeTextLayout } from './text-layout-native.js?v=d2dd099a76f6';
+import { IcuBreakProvider } from './icu-break-provider.js?v=d2dd099a76f6';
+import { SqliteProvider } from './sqlite-native.js?v=d2dd099a76f6';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=d2dd099a76f6';
+import { TzdataProvider } from './java-time-native.js?v=d2dd099a76f6';
+import { ZlibProvider } from './zip-native.js?v=d2dd099a76f6';
+import { IcuConverterProvider } from './icu-converter-native.js?v=d2dd099a76f6';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=d2dd099a76f6';
+import { JavacryptoProvider } from './javacrypto-native.js?v=d2dd099a76f6';
+import { disposeColorFilters } from './color-filter-native.js?v=d2dd099a76f6';
+import { disposeRegex } from './regex-native.js?v=d2dd099a76f6';
+import { disposeRenderNodes } from './rendernode-native.js?v=d2dd099a76f6';
+import { startDeepLink } from './deep-link-host.js?v=d2dd099a76f6';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=d2dd099a76f6';
+import { renderVariant, RenderVariantError } from './render-variant.js?v=d2dd099a76f6';
+import { probeWebCodecs } from './media-codec-backend.js?v=d2dd099a76f6';
 const hostCodecs = probeWebCodecs(self).catch(() => null);   // the device's video codecs are this Worker's WebCodecs (null: none); asked once, when the Worker starts
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=f407b1282aab';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=f407b1282aab';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=d2dd099a76f6';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=d2dd099a76f6';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=f407b1282aab';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=f407b1282aab';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=f407b1282aab';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'f407b1282aab';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=d2dd099a76f6';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=d2dd099a76f6';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=d2dd099a76f6';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'd2dd099a76f6';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -337,9 +337,43 @@ function cameraMessage(message) {
   } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); }
   scheduleEvents();
 }
+// The providers of the lab's own assets (framework DEX and resources, Skia, ICU, SQLite, tzdata, zlib, the platform's native libraries) for the next load. Their load() is memoized, so
+// warming them (`warmAssets`) and the load that follows share one fetch, check and compile. The page starts a new Worker for every APK; should one Worker load twice, the second load
+// gets new framework, framework-resource and resource-configuration providers (the load clears this), while Skia, ICU, SQLite, tzdata, zlib and the native libraries stay shared.
+let assetProviders = null;   // a promise: the prewarm and the load can ask at the same time, and must get the same providers
+function urlAssetProviders() { return assetProviders ??= createAssetProviders().catch(error => { assetProviders = null; throw error; }); }
+async function createAssetProviders() {
+  const at = url => new URL(url, import.meta.url);
+  const providers = {
+    framework: FRAMEWORK_ASSET_URL ? new FrameworkProvider({ url: at(FRAMEWORK_ASSET_URL), provenanceURL: at(FRAMEWORK_ASSET_URL.replace('framework.dex', 'manifestprovenance.json')) }) : null,
+    frameworkResources: FRAMEWORK_RESOURCE_URL ? new FrameworkResourceProvider({ url: at(FRAMEWORK_RESOURCE_URL), provenanceURL: at(FRAMEWORK_RESOURCE_URL.replace('framework-resources.json.gz', 'provenance.json')), xmlIndexURL: at(FRAMEWORK_RESOURCE_URL.replace('framework-resources.json.gz', 'framework-xml-index.json')), xmlDataURL: at(FRAMEWORK_RESOURCE_URL.replace('framework-resources.json.gz', 'framework-xml.bin.gz')) }) : null,
+    resourceConfig: RESOURCE_CONFIG_URL ? new ResourceConfigProvider({ url: at(RESOURCE_CONFIG_URL), provenanceURL: at(RESOURCE_CONFIG_URL.replace('resource-config.wasm', 'provenance.json')) }) : null,
+    skia: SKIA_ASSET_URL ? (sharedSkiaProvider ??= new SkiaProvider({ baseURL: at(SKIA_ASSET_URL) })) : null,
+    layouts: LAYOUT_PROFILE_URL ? (sharedLayoutProvider ??= new FrameworkProvider({ url: at(LAYOUT_PROFILE_URL), filename: 'framework-aosp/profiles/layouts/framework.dex', provenanceURL: at(LAYOUT_PROFILE_URL.replace('framework.dex', 'framework-provenance.json')) })) : null,
+    configuration: CONFIGURATION_PROFILE_URL ? (sharedConfigurationProvider ??= new FrameworkProvider({ url: at(CONFIGURATION_PROFILE_URL), filename: 'framework-aosp/profiles/configuration/framework.dex', provenanceURL: at(CONFIGURATION_PROFILE_URL.replace('framework.dex', 'framework-provenance.json')) })) : null,
+    icuBreak: sharedICUBreakProvider ??= new IcuBreakProvider(), sqlite: sharedSqliteProvider ??= new SqliteProvider(), tzdata: sharedTzdataProvider ??= new TzdataProvider(),
+    zlib: sharedZlibProvider ??= new ZlibProvider(), icuConverter: sharedIcuConverterProvider ??= new IcuConverterProvider(),
+    ...(NATIVE_LIBS_URL ? await Promise.all([   // the two provenance files, read together
+      sharedNativeLibraryProvider ??= LazyNativeLibraryProvider.fromURL(at(NATIVE_LIBS_URL), { revision: NATIVE_LIBS_REVISION }).catch(error => { sharedNativeLibraryProvider = null; throw error; }),
+      sharedJavacryptoProvider ??= JavacryptoProvider.fromURL(at(NATIVE_LIBS_URL), { revision: NATIVE_LIBS_REVISION }).catch(error => { sharedJavacryptoProvider = null; throw error; }),
+    ]).then(([nativeLibraries, javacrypto]) => ({ nativeLibraries, javacrypto })) : { nativeLibraries: undefined, javacrypto: undefined }),
+  };
+  return providers;
+}
+/** Starts every asset load at once (they download, verify and compile in parallel; loadAPK then awaits them one by one) and the WebAssembly core's modules. Called when the page
+ *  opens ('prewarm'), before an APK is chosen, so the downloads overlap the choice, and again at the load (every load() is memoized). Failures are left to the load to report. */
+async function warmAssets(wanted = {}) {   // wanted: { framework: false, ... } skips an asset the load brings its own bytes for
+  const providers = await urlAssetProviders();
+  for (const name of ['framework', 'layouts', 'configuration', 'skia', 'frameworkResources', 'resourceConfig', 'icuBreak', 'sqlite', 'tzdata', 'zlib', 'icuConverter']) if (wanted[name] !== false) providers[name]?.load?.()?.catch?.(() => {});
+  providers.javacrypto?.prefetch(providers.nativeLibraries).catch(() => {});   // every launch links javacrypto (src/javacrypto-native.js prefetch): fetched, verified and compiled ahead, not inside the interpreter
+  import('../vmcore/js/attach.js?v=d2dd099a76f6').catch(() => {});
+  return providers;
+}
+
 self.onmessage = async ({ data }) => {
   if (data?.type === 'frame-ack') { frameAcked(data.seq); return; }
   if (data?.type === 'camera') { cameraMessage(data.message); return; }   // the page's camera source (src/camera-lab.js): frames and the camera screen's answers only queue VM tasks
+  if (data?.type === 'prewarm') { warmAssets().catch(() => {}); return; }   // the page opened: fetch and compile the lab's assets while the user picks an APK
   if (!data || !Number.isSafeInteger(data.requestId)) return;
   const { requestId, type } = data;
   const send = (message) => { logcat.flush(); netlog.flush(); self.postMessage({ requestId, ...message }, rasterSender.takeTransfers()); };   // log lines first, so the page has them when the reply arrives; raw pixel rasters first seen by the page travel as transferred buffers
@@ -492,23 +526,22 @@ self.onmessage = async ({ data }) => {
       if (appData) { await appData.close().catch(() => {}); } appData = null; appDataInfo = null;
       if (runtime) { disposeRegex(runtime); disposeRenderNodes(runtime); disposeTextLayout(runtime); disposeColorFilters(runtime); } runtime?.skiaHost?.dispose?.(); runtime?.gpuRaster?.dispose(); runtime = null; rendererNote = null; reportedCensus = 0; composeSemantics = null; lastComposeSemantics = null; semanticsPacer.stale = false;
       if (!(data.buffer instanceof ArrayBuffer)) throw new TypeError('O Worker precisa receber um ArrayBuffer de APK.');
-      const frameworkProvider = data.frameworkDex ? new FrameworkProvider({ bytes: data.frameworkDex }) : FRAMEWORK_ASSET_URL ? new FrameworkProvider({ url: new URL(FRAMEWORK_ASSET_URL, import.meta.url), provenanceURL: new URL(FRAMEWORK_ASSET_URL.replace('framework.dex', 'manifestprovenance.json'), import.meta.url) }) : null;
-      const frameworkResourceProvider = data.frameworkResources ? new FrameworkResourceProvider({ data: data.frameworkResources }) : FRAMEWORK_RESOURCE_URL ? new FrameworkResourceProvider({ url: new URL(FRAMEWORK_RESOURCE_URL, import.meta.url), provenanceURL: new URL(FRAMEWORK_RESOURCE_URL.replace('framework-resources.json.gz', 'provenance.json'), import.meta.url), xmlIndexURL: new URL(FRAMEWORK_RESOURCE_URL.replace('framework-resources.json.gz', 'framework-xml-index.json'), import.meta.url), xmlDataURL: new URL(FRAMEWORK_RESOURCE_URL.replace('framework-resources.json.gz', 'framework-xml.bin.gz'), import.meta.url) }) : null;
-      const resourceConfigProvider = data.resourceConfigBytes ? new ResourceConfigProvider({ bytes: data.resourceConfigBytes, metadata: data.resourceConfigMetadata }) : RESOURCE_CONFIG_URL ? new ResourceConfigProvider({ url: new URL(RESOURCE_CONFIG_URL, import.meta.url), provenanceURL: new URL(RESOURCE_CONFIG_URL.replace('resource-config.wasm', 'provenance.json'), import.meta.url) }) : null;
-      const skiaProvider = SKIA_ASSET_URL ? (sharedSkiaProvider ??= new SkiaProvider({ baseURL: new URL(SKIA_ASSET_URL, import.meta.url) })) : null;
-      const layouts = data.layoutProfileDex ? new FrameworkProvider({ bytes: data.layoutProfileDex, filename: 'framework-aosp/profiles/layouts/framework.dex', metadata: data.layoutProfileMetadata }) : LAYOUT_PROFILE_URL ? (sharedLayoutProvider ??= new FrameworkProvider({ url: new URL(LAYOUT_PROFILE_URL, import.meta.url), filename: 'framework-aosp/profiles/layouts/framework.dex', provenanceURL: new URL(LAYOUT_PROFILE_URL.replace('framework.dex', 'framework-provenance.json'), import.meta.url) })) : null;
-      const configuration = CONFIGURATION_PROFILE_URL ? (sharedConfigurationProvider ??= new FrameworkProvider({ url: new URL(CONFIGURATION_PROFILE_URL, import.meta.url), filename: 'framework-aosp/profiles/configuration/framework.dex', provenanceURL: new URL(CONFIGURATION_PROFILE_URL.replace('framework.dex', 'framework-provenance.json'), import.meta.url) })) : null;
+      // the lab's own assets: this Worker's providers, all started at once by warmAssets (already when the page opened, if it sent 'prewarm'), unless the caller sent its own bytes
+      const shared = await warmAssets({ framework: !data.frameworkDex, frameworkResources: !data.frameworkResources, resourceConfig: !data.resourceConfigBytes, layouts: !data.layoutProfileDex });
+      assetProviders = null;   // taken by this load: another load in this Worker gets its own framework, framework resources and resource configuration (as before warming existed); Skia, ICU and the rest stay shared
+      const frameworkProvider = data.frameworkDex ? new FrameworkProvider({ bytes: data.frameworkDex }) : shared.framework;
+      const frameworkResourceProvider = data.frameworkResources ? new FrameworkResourceProvider({ data: data.frameworkResources }) : shared.frameworkResources;
+      const resourceConfigProvider = data.resourceConfigBytes ? new ResourceConfigProvider({ bytes: data.resourceConfigBytes, metadata: data.resourceConfigMetadata }) : shared.resourceConfig;
+      const skiaProvider = shared.skia, layouts = data.layoutProfileDex ? new FrameworkProvider({ bytes: data.layoutProfileDex, filename: 'framework-aosp/profiles/layouts/framework.dex', metadata: data.layoutProfileMetadata }) : shared.layouts, configuration = shared.configuration;
       const frameworkProfileProviders = { ...(layouts ? { layouts } : {}), ...(configuration ? { configuration } : {}) };
-      const icuBreakProvider = sharedICUBreakProvider ??= new IcuBreakProvider();
-      const sqliteProvider = sharedSqliteProvider ??= new SqliteProvider(), tzdataProvider = sharedTzdataProvider ??= new TzdataProvider(), zlibProvider = sharedZlibProvider ??= new ZlibProvider(), icuConverterProvider = sharedIcuConverterProvider ??= new IcuConverterProvider();
+      const icuBreakProvider = shared.icuBreak, sqliteProvider = shared.sqlite, tzdataProvider = shared.tzdata, zlibProvider = shared.zlib, icuConverterProvider = shared.icuConverter;
       // The browser product lays every APK's Views out in the VM (original AOSP LinearLayout/FrameLayout/ScrollView + Skia text), never with page CSS.
-      // Lab-built wasm32 native libraries (libreactnative, Hermes, ...): provenance now, each module only when the app's SoLoader links it
-      const nativeLibraryProvider = NATIVE_LIBS_URL ? (sharedNativeLibraryProvider ??= await LazyNativeLibraryProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
-      const javacryptoProvider = NATIVE_LIBS_URL ? (sharedJavacryptoProvider ??= await JavacryptoProvider.fromURL(new URL(NATIVE_LIBS_URL, import.meta.url), { revision: NATIVE_LIBS_REVISION })) : undefined;
+      // Lab-built wasm32 native libraries (libreactnative, Hermes, ...): provenance now, each module only when the app's SoLoader links it (javacrypto's, which every launch links, prefetched)
+      const nativeLibraryProvider = shared.nativeLibraries, javacryptoProvider = shared.javacrypto;
       const result = await loadAPK(data.buffer, { maxEventWallMs: timeLimitsFor(data.eventSeconds).eventWallMs ?? EVENT_WALL_LIMIT_MS, maxHeapObjects: heapLimitFor(data), nativeLibraryProvider, javacryptoProvider, device: resolveDevice(data.device || {}), engine: data.engine === 'wasm' ? 'wasm' : 'js', tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', strictCrash: data.strictCrash === true, enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => { loadTiming.mark(progress?.phase); self.postMessage({ type: 'progress', requestId: activeRequestId, progress }); } });
       runtime = result.runtime; archive = result.archive; loadTiming.mark('core'); runtime.platform.camera?.attachCodecs(await hostCodecs);
       if (runtime.engine === 'wasm') {   // the WebAssembly core (docs/WASM-CORE-PLANO.md), before anything runs. A core that cannot start fails the load naming the other engine; the JavaScript VM is never substituted silently
-        try { await (await import('../vmcore/js/attach.js?v=f407b1282aab')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
+        try { await (await import('../vmcore/js/attach.js?v=d2dd099a76f6')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
         catch (error) { error.message = `${coreStartMessage(error)}`; throw error; }
       }
       if (Array.isArray(data.methodOverrides) && data.methodOverrides.length) applyMethodOverrides(result.runtime, data.methodOverrides); if (Array.isArray(data.ignoredActivities) && data.ignoredActivities.length) applyIgnoredActivities(result.runtime, data.ignoredActivities); if (Array.isArray(data.endpointMocks) && data.endpointMocks.length) applyEndpointMocks(result.runtime, data.endpointMocks); /* before any app code runs */

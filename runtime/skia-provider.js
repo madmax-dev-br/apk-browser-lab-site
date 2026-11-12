@@ -1,8 +1,8 @@
-import {APKError} from './apk-runtime.js?v=f407b1282aab';
-import {PathApproxProvider} from './path-approx-provider.js?v=f407b1282aab';
-import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=f407b1282aab';
-import {createFontFallback} from './font-fallback.js?v=f407b1282aab';
-import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=f407b1282aab';
+import {APKError} from './apk-runtime.js?v=d2dd099a76f6';
+import {PathApproxProvider} from './path-approx-provider.js?v=d2dd099a76f6';
+import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=d2dd099a76f6';
+import {createFontFallback} from './font-fallback.js?v=d2dd099a76f6';
+import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=d2dd099a76f6';
 const MAX_WASM=16*1024*1024,MAX_FONT=4*1024*1024,MAX_MODULE=1024*1024;
 const hash=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
 async function read(fetchImpl,url,limit){
@@ -35,11 +35,14 @@ export class SkiaProvider{
   if(!globalThis.crypto?.subtle)throw new APKError('Pinned Skia asset integrity requires Web Crypto');
   const fonts=metadata.fonts??[{file:'Roboto-Regular.ttf',family:'Roboto',style:0,weight:400,italic:false}];if(fonts.length>12||fonts.some(f=>!/^Roboto-[A-Za-z]+\.ttf$/.test(f.file)))throw new APKError('Invalid pinned font manifest');
   const assets={};let totalFontBytes=0;
-  for(const[name,injected,limit]of [['canvaskit.wasm',this.wasmBytes,MAX_WASM],['canvaskit.mjs',this.moduleBytes,MAX_MODULE],...fonts.map(f=>[f.file,f.file==='Roboto-Regular.ttf'?this.fontBytes:null,MAX_FONT])]){
+  // every file at once (one round trip for all of them instead of one each), each checked against its pinned size and SHA-256 before anything uses it
+  const files=[['canvaskit.wasm',this.wasmBytes,MAX_WASM],['canvaskit.mjs',this.moduleBytes,MAX_MODULE],...fonts.map(f=>[f.file,f.file==='Roboto-Regular.ttf'?this.fontBytes:null,MAX_FONT])];
+  const read_=await Promise.all(files.map(async([name,injected,limit])=>{
    const bytes=injected?new Uint8Array(injected):await read(this.fetch,new URL(name,this.baseURL),limit);
    if(bytes.length>limit||bytes.length!==metadata.files[name]?.bytes||await hash(bytes)!==metadata.files[name]?.sha256)throw new APKError(`Pinned Skia asset integrity mismatch: ${name}`);
-   assets[name]=bytes;if(name.endsWith('.ttf')){totalFontBytes+=bytes.length;if(totalFontBytes>16*1024*1024)throw new APKError('Pinned font data exceeds16MiB');}
-  }
+   return bytes;
+  }));
+  files.forEach(([name],i)=>{assets[name]=read_[i];if(name.endsWith('.ttf')){totalFontBytes+=read_[i].length;if(totalFontBytes>16*1024*1024)throw new APKError('Pinned font data exceeds16MiB');}});
   await onProgress?.({phase:'skia',completed:1,total:3,message:'Initializing Skia CPU rasterizer'});
   const init=this.initialize??(await import(new URL('canvaskit.mjs',this.baseURL).href)).default;
   // CanvasKit0.42 deliberately accepts locateFile, not wasmBinary/instantiateWasm.

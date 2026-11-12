@@ -1,32 +1,32 @@
-import { APKError, DexFile } from './apk-runtime.js?v=f407b1282aab';
-import { createVectorNativeBindings } from './vector-native.js?v=f407b1282aab';
-import { createMatrixNativeBindings } from './matrix-native.js?v=f407b1282aab';
-import { createCharsetNativeBindings } from './charset-native.js?v=f407b1282aab';
-import { createSqliteNativeBindings } from './sqlite-native.js?v=f407b1282aab';
-import { createJavaTimeNativeBindings } from './java-time-native.js?v=f407b1282aab';
-import { createMathNativeBindings } from './math-native.js?v=f407b1282aab';
-import { createUnsafeNativeBindings } from './unsafe-native.js?v=f407b1282aab';
-import { createZipNativeBindings } from './zip-native.js?v=f407b1282aab';
-import { createLibcoreIoNativeBindings } from './libcore-io-native.js?v=f407b1282aab';
-import { createNetworkNativeBindings } from './network-native.js?v=f407b1282aab';
-import { createServicesNativeBindings } from './services-native.js?v=f407b1282aab';
-import { createParcelNativeBindings } from './parcel-native.js?v=f407b1282aab';
-import { createInputNativeBindings } from './input-native.js?v=f407b1282aab';
-import { createViewHiddenNativeBindings } from './view-hidden-native.js?v=f407b1282aab';
-import { createAudioNativeBindings } from './audio-native.js?v=f407b1282aab';
-import { createFileObserverNativeBindings } from './file-observer-native.js?v=f407b1282aab';
-import { createRegionNativeBindings } from './region-native.js?v=f407b1282aab';
-import { createRenderThreadAnimators } from './rt-animators.js?v=f407b1282aab';
-import { createIcuConverterNativeBindings } from './icu-converter-native.js?v=f407b1282aab';
-import { createCoreApiNativeBindings } from './core-api-natives.js?v=f407b1282aab';
-import { createMessageQueueNativeBindings } from './message-queue-native.js?v=f407b1282aab';
-import { createProcessNativeBindings } from './process-native.js?v=f407b1282aab';
-import { createTextLayoutNativeBindings } from './text-layout-native.js?v=f407b1282aab';
-import { createColorFilterNativeBindings } from './color-filter-native.js?v=f407b1282aab';
-import { createRenderNodeNativeBindings } from './rendernode-native.js?v=f407b1282aab';
-import { createAnimatedVectorNativeBindings } from './animated-vector-native.js?v=f407b1282aab';
-import { createRegexNativeBindings } from './regex-native.js?v=f407b1282aab';
-import { createMemoryFileNativeBindings } from './memory-file-native.js?v=f407b1282aab';
+import { APKError, DexFile } from './apk-runtime.js?v=d2dd099a76f6';
+import { createVectorNativeBindings } from './vector-native.js?v=d2dd099a76f6';
+import { createMatrixNativeBindings } from './matrix-native.js?v=d2dd099a76f6';
+import { createCharsetNativeBindings } from './charset-native.js?v=d2dd099a76f6';
+import { createSqliteNativeBindings } from './sqlite-native.js?v=d2dd099a76f6';
+import { createJavaTimeNativeBindings } from './java-time-native.js?v=d2dd099a76f6';
+import { createMathNativeBindings } from './math-native.js?v=d2dd099a76f6';
+import { createUnsafeNativeBindings } from './unsafe-native.js?v=d2dd099a76f6';
+import { createZipNativeBindings } from './zip-native.js?v=d2dd099a76f6';
+import { createLibcoreIoNativeBindings } from './libcore-io-native.js?v=d2dd099a76f6';
+import { createNetworkNativeBindings } from './network-native.js?v=d2dd099a76f6';
+import { createServicesNativeBindings } from './services-native.js?v=d2dd099a76f6';
+import { createParcelNativeBindings } from './parcel-native.js?v=d2dd099a76f6';
+import { createInputNativeBindings } from './input-native.js?v=d2dd099a76f6';
+import { createViewHiddenNativeBindings } from './view-hidden-native.js?v=d2dd099a76f6';
+import { createAudioNativeBindings } from './audio-native.js?v=d2dd099a76f6';
+import { createFileObserverNativeBindings } from './file-observer-native.js?v=d2dd099a76f6';
+import { createRegionNativeBindings } from './region-native.js?v=d2dd099a76f6';
+import { createRenderThreadAnimators } from './rt-animators.js?v=d2dd099a76f6';
+import { createIcuConverterNativeBindings } from './icu-converter-native.js?v=d2dd099a76f6';
+import { createCoreApiNativeBindings } from './core-api-natives.js?v=d2dd099a76f6';
+import { createMessageQueueNativeBindings } from './message-queue-native.js?v=d2dd099a76f6';
+import { createProcessNativeBindings } from './process-native.js?v=d2dd099a76f6';
+import { createTextLayoutNativeBindings } from './text-layout-native.js?v=d2dd099a76f6';
+import { createColorFilterNativeBindings } from './color-filter-native.js?v=d2dd099a76f6';
+import { createRenderNodeNativeBindings } from './rendernode-native.js?v=d2dd099a76f6';
+import { createAnimatedVectorNativeBindings } from './animated-vector-native.js?v=d2dd099a76f6';
+import { createRegexNativeBindings } from './regex-native.js?v=d2dd099a76f6';
+import { createMemoryFileNativeBindings } from './memory-file-native.js?v=d2dd099a76f6';
 
 const MAX_FRAMEWORK_BYTES = 64 * 1024 * 1024;
 const NATIVE_GET_INT = 'Landroid/os/SystemProperties;->native_get_int(Ljava/lang/String;I)I';
@@ -182,21 +182,22 @@ export class FrameworkProvider {
   }
   async loadOnce(onProgress) {
     await onProgress?.({ phase: 'framework', completed: 0, total: 1, message: 'Loading source-compiled AOSP framework DEX' });
-    let sourceMetadata = this.metadata;
-    if (this.provenanceURL) {
+    // the provenance and the DEX are fetched together (one round trip, not two); the DEX is checked against the provenance's SHA-256 once both are in
+    const readProvenance = async () => {
+      if (!this.provenanceURL) return this.metadata;
       if (typeof this.fetchImpl !== 'function') throw new APKError('Framework provenance requires a static asset fetch or injected metadata');
       const response = await this.fetchImpl(this.provenanceURL);
       if (!response.ok) throw new APKError(`AOSP provenance asset could not be loaded (${response.status})`);
-      sourceMetadata = { ...JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await responseBytes(response, 4 * 1024 * 1024, 'AOSP provenance'))), ...this.metadata };
-    }
-    let bytes;
-    if (this.bytes) bytes = this.bytes instanceof Uint8Array ? this.bytes : new Uint8Array(this.bytes);
-    else {
+      return { ...JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await responseBytes(response, 4 * 1024 * 1024, 'AOSP provenance'))), ...this.metadata };
+    };
+    const readBytes = async () => {
+      if (this.bytes) return this.bytes instanceof Uint8Array ? this.bytes : new Uint8Array(this.bytes);
       if (typeof this.fetchImpl !== 'function') throw new APKError('AOSP framework requires injected bytes or a local static asset URL');
       const response = await this.fetchImpl(this.url);
       if (!response.ok) throw new APKError(`AOSP framework asset could not be loaded (${response.status}): ${this.url}`);
-      bytes = await responseBytes(response, MAX_FRAMEWORK_BYTES, 'AOSP framework asset');
-    }
+      return responseBytes(response, MAX_FRAMEWORK_BYTES, 'AOSP framework asset');
+    };
+    const [sourceMetadata, bytes] = await Promise.all([readProvenance(), readBytes()]);
     if (bytes.byteLength > MAX_FRAMEWORK_BYTES) throw new APKError('AOSP framework DEX exceeds 64 MiB limit');
     const hash = await sha256(bytes);
     const expectedSha256 = this.expectedSha256 ?? sourceMetadata.sha256 ?? null;

@@ -1,3 +1,5 @@
+import { sharedAssetBytes } from './shared-asset-bytes.js?v=d2dd099a76f6';
+
 const TYPES = { character: 0, word: 1, line: 2, sentence: 3 };
 const MAX_HANDLES = 16384, MAX_TEXT = 65536, MAX_WASM = 4 * 1024 * 1024, MAX_DATA = 8 * 1024 * 1024;
 const fail = message => { throw new Error(`ICU boundary backend: ${message}`); };
@@ -111,7 +113,7 @@ export class IcuBreakProvider {
     for (const record of [metadata.wasm, metadata.data]) if (!record || !/^[A-Za-z0-9._-]+$/.test(record.file)) fail('invalid asset filename');
     const [wasm, data] = await Promise.all([
       checked(this.wasmBytes || await this.read(new URL(metadata.wasm.file + this.revision, this.baseURL), MAX_WASM), metadata.wasm, MAX_WASM, 'Wasm'),
-      checked(this.dataBytes || await this.read(new URL(metadata.data.file + this.revision, this.baseURL), MAX_DATA), metadata.data, MAX_DATA, 'rule data'),
+      checked(this.dataBytes || await sharedAssetBytes(new URL(metadata.data.file + this.revision, this.baseURL), url => this.read(url, MAX_DATA)), metadata.data, MAX_DATA, 'rule data'),   // the ICU common data, shared with the charset converters (src/shared-asset-bytes.js)
     ]);
     const module = await WebAssembly.compile(wasm), imports = WebAssembly.Module.imports(module);
     if (imports.length !== 2 || imports.some(value => value.module !== 'wasi_snapshot_preview1' || value.kind !== 'function' || !['environ_sizes_get', 'environ_get'].includes(value.name))) fail('unexpected Wasm imports');

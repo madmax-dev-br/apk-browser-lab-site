@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=f407b1282aab';
-import { createRasterReceiver } from './raster-cache.js?v=f407b1282aab';
+import { createWebAudioPlayer } from './web-audio-player.js?v=d2dd099a76f6';
+import { createRasterReceiver } from './raster-cache.js?v=d2dd099a76f6';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=f407b1282aab', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=d2dd099a76f6', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -10,10 +10,16 @@ export class APKWorkerClient {
     this.loadTimeoutMs = loadTimeoutMs; this.eventTimeoutMs = eventTimeoutMs;
     this.worker = null; this.pending = null; this.sequence = 0; this.rasters = createRasterReceiver();
   }
+  /** Starts the Worker ahead of the first load and has it fetch, verify and compile the lab's assets (framework, Skia, ICU, the core...) while the user picks an APK: the next
+   *  load() uses this Worker instead of starting another. Does nothing when a Worker already exists. Errors are left to the load, which reports them. */
+  prewarm() {
+    if (this.worker) return false;
+    try { this.ensureWorker(); this.worker.postMessage({ type: 'prewarm' }); this.fresh = true; return true; } catch { return false; }
+  }
   ensureWorker() {
     if (this.worker) return;
     this.rasters.reset(); const worker = this.workerFactory(this.workerURL);
-    this.worker = worker;
+    this.worker = worker; this.fresh = false;
     worker.onmessage = ({ data }) => {
       if (worker !== this.worker) return;
       // Every snapshot, delivered or not, passes the raster cache in order so Worker and page LRUs stay identical.
@@ -90,7 +96,7 @@ export class APKWorkerClient {
     });
   }
   async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], endpointMocks = [], eventSeconds = 0, permissions = null, motionRaster = true, rasterScale = undefined, rasterNavigation = true, rasterSettled = 1, logcatStreaming = false, renderer = 'cpu', engine = 'js', coreMemory = null } = {}) {
-    this.cancel(); this.rasters.reset(); this.apiGaps = null;
+    this.cancel(null, { keepFresh: true }); this.rasters.reset(); this.apiGaps = null; this.fresh = false;   // a Worker started by prewarm() that has run nothing yet is kept: its assets are loading or loaded
     const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, endpointMocks, eventSeconds, permissions, motionRaster, rasterScale, rasterNavigation, rasterSettled, logcatStreaming, renderer: renderer === 'gpu' ? 'gpu' : 'cpu', engine: engine === 'wasm' ? 'wasm' : 'js', coreMemory }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
     this.appData = response.appData ?? null; this.renderer = response.renderer ?? null;
     return { inventory: response.inventory, appData: this.appData, renderer: this.renderer };
@@ -204,9 +210,8 @@ export class APKWorkerClient {
   async inspectNative(paths, limits, { onProgress } = {}) {
     return this.request('inspect-native', { paths, limits }, { onProgress, timeoutMs: this.loadTimeoutMs });
   }
-  cancel(error) {
-    if (this.worker) this.worker.terminate();
-    this.worker = null;
+  cancel(error, { keepFresh = false } = {}) {
+    if (this.worker && !(keepFresh && this.fresh)) { this.worker.terminate(); this.worker = null; }
     for (const side of this.sideRequests?.values() ?? []) { clearTimeout(side.timer); side.resolve(this.cachedScreenState()); }
     this.sideRequests?.clear();
     for (const call of this.sideCalls?.values() ?? []) { clearTimeout(call.timer); call.reject(new Error('A VM foi encerrada.')); }

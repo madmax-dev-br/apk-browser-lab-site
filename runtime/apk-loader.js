@@ -1,17 +1,17 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=f407b1282aab';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=f407b1282aab';
-import { inspectELF } from './native-inspector.js?v=f407b1282aab';
-import { elfBuildId } from './elf-build-id.js?v=f407b1282aab';
-import { inflateRaw } from './inflate.js?v=f407b1282aab';
-import { resolveDevice } from './device-profile.js?v=f407b1282aab';
-import { resourceProfileFor } from './device-configuration.js?v=f407b1282aab';
-import { JniBridge } from './jni-host.js?v=f407b1282aab';
-import { providerForApk } from './native-provider-variants.js?v=f407b1282aab';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=f407b1282aab';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=f407b1282aab';
-import { AndroidResources } from './android-resources.js?v=f407b1282aab';
-import { AndroidPlatform } from './android-platform.js?v=f407b1282aab';
-import { FrameworkProvider } from './framework-provider.js?v=f407b1282aab';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=d2dd099a76f6';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=d2dd099a76f6';
+import { inspectELF } from './native-inspector.js?v=d2dd099a76f6';
+import { elfBuildId } from './elf-build-id.js?v=d2dd099a76f6';
+import { inflateRaw } from './inflate.js?v=d2dd099a76f6';
+import { resolveDevice } from './device-profile.js?v=d2dd099a76f6';
+import { resourceProfileFor } from './device-configuration.js?v=d2dd099a76f6';
+import { JniBridge } from './jni-host.js?v=d2dd099a76f6';
+import { providerForApk } from './native-provider-variants.js?v=d2dd099a76f6';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=d2dd099a76f6';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=d2dd099a76f6';
+import { AndroidResources } from './android-resources.js?v=d2dd099a76f6';
+import { AndroidPlatform } from './android-platform.js?v=d2dd099a76f6';
+import { FrameworkProvider } from './framework-provider.js?v=d2dd099a76f6';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -24,15 +24,23 @@ export const MAX_DEX_TOTAL = 768 * 1024 * 1024;
 const MAX_DEX_FILES = 1024;
 // The ZIP end record counts entries in 16 bits; this accepts every non-ZIP64 APK.
 const MAX_ZIP_ENTRIES = 65535;
-const crcTable = Uint32Array.from({ length: 256 }, (_, n) => {
-  let c = n;
-  for (let j = 0; j < 8; j++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-  return c >>> 0;
-});
-function crc32(bytes) {
-  let crc = 0xffffffff;
-  for (let i = 0, n = bytes.length; i < n; i++) crc = crcTable[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
-  return (crc ^ 0xffffffff) >>> 0;
+// CRC-32 (ZIP, reflected 0xEDB88320), slicing-by-8: eight tables, eight bytes per step (an APK's entries are checked as they are extracted; byte at a time this was
+// about 45 ms of every launch in the browser Worker for a few megabytes of DEX).
+const CRC_TABLES = (() => {
+  const t = new Uint32Array(8 * 256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let j = 0; j < 8; j++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+  for (let n = 0; n < 256; n++) for (let k = 1; k < 8; k++) t[k * 256 + n] = (t[(k - 1) * 256 + n] >>> 8) ^ t[t[(k - 1) * 256 + n] & 255];
+  return t;
+})();
+export function crc32(bytes) {
+  const t = CRC_TABLES, n = bytes.length; let crc = ~0, i = 0;
+  for (const end = n - (n & 7); i < end; i += 8) {
+    const a = crc ^ (bytes[i] | bytes[i + 1] << 8 | bytes[i + 2] << 16 | bytes[i + 3] << 24);
+    crc = t[1792 + (a & 255)] ^ t[1536 + ((a >>> 8) & 255)] ^ t[1280 + ((a >>> 16) & 255)] ^ t[1024 + (a >>> 24)]
+      ^ t[768 + bytes[i + 4]] ^ t[512 + bytes[i + 5]] ^ t[256 + bytes[i + 6]] ^ t[bytes[i + 7]];
+  }
+  for (; i < n; i++) crc = t[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
+  return ~crc >>> 0;
 }
 
 async function frameworkBytesHash(files) {

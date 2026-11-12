@@ -1,5 +1,5 @@
-import { FrameworkXmlProvider } from './framework-xml-provider.js?v=f407b1282aab';
-import { AndroidResources } from './android-resources.js?v=f407b1282aab';
+import { FrameworkXmlProvider } from './framework-xml-provider.js?v=d2dd099a76f6';
+import { AndroidResources } from './android-resources.js?v=d2dd099a76f6';
 
 const MAX_DATA_BYTES = 64 * 1024 * 1024;
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -22,10 +22,13 @@ export class FrameworkResourceProvider {
   async loadOnce(onProgress) {
     onProgress?.({ phase: 'framework-resources', completed: 0, total: 1, message: 'Reading original framework resource data' });
     let data = this.data, metadata = this.metadata || {}, sha256 = null;
+    // the 9-patch data is requested now and read at the end: its download overlaps the parse of the resource table (failures stay where they were reported, below)
+    const ninePatchResponse = this.ninePatchURL && typeof this.fetch === 'function' ? Promise.resolve().then(() => this.fetch(this.ninePatchURL)).then(response => ({ response }), error => ({ error })) : null;
     if (!data) {
       if (!this.url || !this.provenanceURL || typeof this.fetch !== 'function') throw new Error('Framework resources need injected data or local asset and provenance URLs');
-      metadata = JSON.parse(utf8.decode(await boundedBytes(await this.fetch(this.provenanceURL), 1024 * 1024, 'Framework resource provenance')));
-      const compressed = await boundedBytes(await this.fetch(this.url), 16 * 1024 * 1024, 'Framework resource data');
+      const [provenanceResponse, dataResponse] = await Promise.all([this.fetch(this.provenanceURL), this.fetch(this.url)]);   // together: one round trip
+      metadata = JSON.parse(utf8.decode(await boundedBytes(provenanceResponse, 1024 * 1024, 'Framework resource provenance')));
+      const compressed = await boundedBytes(dataResponse, 16 * 1024 * 1024, 'Framework resource data');
       let bytes = compressed;
       if (String(this.url).split('?')[0].endsWith('.gz') && compressed[0] === 0x1f && compressed[1] === 0x8b) {
         if (typeof DecompressionStream !== 'function') throw new Error('Framework resource profile requires gzip DecompressionStream');
@@ -41,9 +44,10 @@ export class FrameworkResourceProvider {
     if (!xmlProvider && this.xmlIndexURL && this.xmlDataURL) xmlProvider = new FrameworkXmlProvider({ table, indexURL: this.xmlIndexURL, dataURL: this.xmlDataURL, sourceArscSha256: metadata.sourceArscSha256 || null, fetchImpl: this.fetch });
     if (xmlProvider) { if (!xmlProvider.table) xmlProvider.table = table; const xml = await xmlProvider.load(); result.getXml = xml.getXml; result.metadata.xml = xml.metadata; }
     // Optional compiled framework 9-patch PNGs (mdpi); absence is explicit: a 9-patch resource that needs them fails with its resource id.
-    if (this.ninePatchURL && typeof this.fetch === 'function') {
+    if (ninePatchResponse) {
       try {
-        const compressed = await boundedBytes(await this.fetch(this.ninePatchURL), 4 * 1024 * 1024, 'Framework 9-patch data');
+        const fetched = await ninePatchResponse; if (fetched.error) throw fetched.error;
+        const compressed = await boundedBytes(fetched.response, 4 * 1024 * 1024, 'Framework 9-patch data');
         const bytes = compressed[0] === 0x1f && compressed[1] === 0x8b ? await boundedBytes(new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))), 16 * 1024 * 1024, 'Expanded framework 9-patch data') : compressed;
         const parsed = JSON.parse(utf8.decode(bytes)); if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.entries) || parsed.density !== 160) throw new Error('Invalid framework 9-patch data');
         table.ninePatch = new Map(parsed.entries.map(entry => { const binary = atob(entry.data), data = Uint8Array.from(binary, c => c.charCodeAt(0)); return [entry.id >>> 0, { name: entry.name, path: entry.path, bytes: data }]; }));

@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=f407b1282aab';
-import { gcRoot } from './heap-gc.js?v=f407b1282aab';
-import { createHostRegistry, parseSignature } from './host-contract.js?v=f407b1282aab';
-import { JavaException } from './apk-runtime.js?v=f407b1282aab';
+import { APKError } from './apk-error.js?v=d2dd099a76f6';
+import { gcRoot } from './heap-gc.js?v=d2dd099a76f6';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=d2dd099a76f6';
+import { JavaException } from './apk-runtime.js?v=d2dd099a76f6';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).
@@ -232,7 +232,13 @@ export function createDateTimeHost(platform) {
   def(SDF, 'equals', `(${OBJECT})Z`, (r, _m, [self, o]) => { if (self === o) return 1; if (o === null || typeof o !== 'object' || !r.object(o).sdf || r.typeOf(o) !== r.typeOf(self)) return 0; const a = sdf(r, self), b = sdf(r, o); return a.pattern === b.pattern && a.zone === b.zone && a.lenient === b.lenient && a.tag === b.tag ? 1 : 0; });
   def(SDF, 'hashCode', '()I', (r, _m, [self]) => { let h = 0; for (const ch of sdf(r, self).pattern) h = (Math.imul(31, h) + ch.charCodeAt(0)) | 0; return h; });
   def(SDF, 'clone', `()${OBJECT}`, (r, _m, [self]) => { const copy = r.allocate(r.typeOf(self)); r.object(copy).sdf = { ...sdf(r, self) }; return copy; });
-  const intlName = (tag, id, t, options) => new Intl.DateTimeFormat(tag, { timeZone: id === 'GMT' ? 'UTC' : /^GMT[+-]/.test(id) ? 'UTC' : id, ...options }).format(new Date(t));
+  // An Intl.DateTimeFormat costs far more to build than to use (a list that formats a month name per row built one per row): one per locale, zone and field style.
+  const intlFormats = new Map();
+  const intlName = (tag, id, t, options) => {
+    const timeZone = id === 'GMT' ? 'UTC' : /^GMT[+-]/.test(id) ? 'UTC' : id, key = `${tag}|${timeZone}|${Object.entries(options).join(';')}`;
+    let format = intlFormats.get(key); if (!format) { if (intlFormats.size >= 256) intlFormats.clear(); intlFormats.set(key, format = new Intl.DateTimeFormat(tag, { timeZone, ...options })); }
+    return format.format(new Date(t));
+  };
   function formatDate(r, f, t) {
     const p = parts(t, f.zone), o = offsetOf(f.zone, t); let out = '';
     for (const tok of f.tokens) {
