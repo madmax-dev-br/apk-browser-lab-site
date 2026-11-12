@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=f0166ffeffb5';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=f0166ffeffb5';
-import { isTrustedRasterURL } from './raster-cache.js?v=f0166ffeffb5';
+import { updateWebViewSlot } from './webview-slot.js?v=bc091d1ae253';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=bc091d1ae253';
+import { isTrustedRasterURL } from './raster-cache.js?v=bc091d1ae253';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };

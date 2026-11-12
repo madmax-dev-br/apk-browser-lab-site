@@ -1,17 +1,17 @@
-import { APKError } from './apk-error.js?v=f0166ffeffb5';
-import { JavaException } from './apk-runtime.js?v=f0166ffeffb5';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=f0166ffeffb5';
-import { buildElfDescriptor } from './native-descriptor.js?v=f0166ffeffb5';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=f0166ffeffb5';
-import { NativeLinker, LinkError } from './native-linker.js?v=f0166ffeffb5';
-import { hostFunction } from './wasm-host-function.js?v=f0166ffeffb5';
-import { parseWasm } from './wasm-dylink.js?v=f0166ffeffb5';
-import { formatVersion } from './rn-version.js?v=f0166ffeffb5';
-import { registerWasmMemory } from './unsafe-native.js?v=f0166ffeffb5';
-import { writeSkPath } from './skia-path-layout.js?v=f0166ffeffb5';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=f0166ffeffb5';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=f0166ffeffb5';
-import { withVariants } from './native-provider-variants.js?v=f0166ffeffb5';
+import { APKError } from './apk-error.js?v=bc091d1ae253';
+import { JavaException } from './apk-runtime.js?v=bc091d1ae253';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=bc091d1ae253';
+import { buildElfDescriptor } from './native-descriptor.js?v=bc091d1ae253';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=bc091d1ae253';
+import { NativeLinker, LinkError } from './native-linker.js?v=bc091d1ae253';
+import { hostFunction } from './wasm-host-function.js?v=bc091d1ae253';
+import { parseWasm } from './wasm-dylink.js?v=bc091d1ae253';
+import { formatVersion } from './rn-version.js?v=bc091d1ae253';
+import { registerWasmMemory } from './unsafe-native.js?v=bc091d1ae253';
+import { writeSkPath } from './skia-path-layout.js?v=bc091d1ae253';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=bc091d1ae253';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=bc091d1ae253';
+import { withVariants } from './native-provider-variants.js?v=bc091d1ae253';
 
 // JNI -> WebAssembly bridge.
 //
@@ -236,11 +236,16 @@ export class JniBridge {
         clock_res_get: (_id, out) => { new DataView(memory()).setBigUint64(out, 1000n, true); return 0; },
         random_get: (ptr, length) => { for (let done = 0; done < length; done += 65536) globalThis.crypto.getRandomValues(new Uint8Array(memory(), ptr + done, Math.min(65536, length - done))); return 0; },
         fd_close: () => 0, fd_seek: () => 70, fd_fdstat_get: () => EBADF, fd_read: () => EBADF, fd_sync: () => EBADF,
-        fd_write: (fd, iovs, count, written) => { // stdout/stderr are routed to the VM trace; other descriptors do not exist
+        // stdout/stderr are routed to the VM trace; other descriptors do not exist. An Android app process has no terminal: what a library prints there is discarded
+        // (it is /dev/null), so it is not logcat and is recorded as "NATIVE stdout|stderr: ...". The lab's liblog port (scripts/wasm/ports/liblog.c) has no logd socket and
+        // writes each __android_log_* record to stderr as "<priority letter>/<tag>: <text>": that one is the app's logcat record, with the priority and tag the library gave it.
+        fd_write: (fd, iovs, count, written) => {
           if (fd !== 1 && fd !== 2) return EBADF;
           const v = new DataView(memory()), bytes = new Uint8Array(memory()); let total = 0, text = '';
           for (let i = 0; i < count; i++) { const at = v.getUint32(iovs + i * 8, true), len = v.getUint32(iovs + i * 8 + 4, true); text += new TextDecoder().decode(bytes.subarray(at, at + len)); total += len; }
-          v.setUint32(written, total, true); r.record(`LOG ${fd === 1 ? 'I' : 'E'} native: ${text.trimEnd()}`); return 0;
+          v.setUint32(written, total, true); text = text.trimEnd();
+          const logged = fd === 2 ? /^([VDIWEF])\/([^:\n]*): ([\s\S]*)$/.exec(text) : null;
+          r.record(logged ? `LOG ${logged[1]} ${logged[2]}: ${logged[3]}` : `NATIVE ${fd === 1 ? 'stdout' : 'stderr'}: ${text}`); return 0;
         },
       };
       return table[name];

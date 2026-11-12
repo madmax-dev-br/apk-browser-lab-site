@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=f0166ffeffb5';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=f0166ffeffb5';
-import { installNetworkCallbacks } from './network-callbacks.js?v=f0166ffeffb5';
-import { createHostRegistry } from './host-contract.js?v=f0166ffeffb5';
-import { resolveDevice } from './device-profile.js?v=f0166ffeffb5';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=f0166ffeffb5';
-import { gcRoot } from './heap-gc.js?v=f0166ffeffb5';
+import { APKError } from './apk-error.js?v=bc091d1ae253';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=bc091d1ae253';
+import { installNetworkCallbacks } from './network-callbacks.js?v=bc091d1ae253';
+import { createHostRegistry } from './host-contract.js?v=bc091d1ae253';
+import { resolveDevice } from './device-profile.js?v=bc091d1ae253';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=bc091d1ae253';
+import { gcRoot } from './heap-gc.js?v=bc091d1ae253';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -174,7 +174,9 @@ export function createDeviceStateHost(platform) {
     // The global Configuration always exists on a device (ActivityThread keeps it); here it is built lazily, so an app that never asked for its Resources has none yet: build it from the *previous* device, or the change has nothing to diff against and no Activity would be recreated.
     if (!platform.configuration && r.classes.has(CONFIGURATION)) platform.resourceConfiguration(r, null);
     // No Configuration class in the loaded framework (the app never names it, so the configuration profile is not loaded): the diff is taken between the two device models' configuration fields.
-    const bare = !platform.configuration && !r.classes.has(CONFIGURATION), configurationBefore = bare ? platform.deviceConfiguration(r) : null;
+    // That holds whether or not something already asked the platform for its configuration record (a library reading the locale or the density does): without the class there is
+    // no Configuration.diff to call, and an Activity that declares no android:configChanges must still be recreated.
+    const bare = !r.classes.has(CONFIGURATION), configurationBefore = bare ? platform.deviceConfiguration(r) : null;
     platform.device = next;
     const seen = platform.frames.at(-1), bars = seen && (seen.root || seen.window) ? platform.systemBarsHost.describe(r, seen) : null;
     // 1. Resource selection: the original matcher now sees the new qualifiers; Themes replay their applied styles against it.
