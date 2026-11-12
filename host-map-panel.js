@@ -1,7 +1,7 @@
 // The "Redirecionar hosts" section of the Controles panel (src/host-map.js): N from -> to rows kept in the device settings (network.hostMap) and applied live through the same path as the
 // other device settings (the running VM gets them at once; the app keeps its URLs, only the exchange goes elsewhere). Each row shows the effective URL shape of its rule and, like the
 // "Mock de endpoints" rows, the live count of the requests it redirected (responses and failures), which come back with every snapshot (snapshot.hostMap).
-import { parseRule, describeRule, ruleKey, hitText } from './host-map.js?v=59e9e77ad3a2';
+import { parseRule, describeRule, ruleKey, hitText } from './host-map.js?v=999f1f5703aa';
 
 export function createHostMapPanel({ $, get, set }) {
   const list = () => $('hm-list');

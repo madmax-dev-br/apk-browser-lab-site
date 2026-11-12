@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=59e9e77ad3a2';
+import { createHostRegistry } from './host-contract.js?v=999f1f5703aa';
 
 // java.lang.System.getProperties / setProperties / getenv() and the reflection queries of java.lang.Class that the VM's class table can answer (libcore System.java, Class.java, android-13.0.0_r1).
 //  - getProperties() returns the process's one Properties object, filled from the property table the VM keeps for System.getProperty; from then on System.getProperty / setProperty /
