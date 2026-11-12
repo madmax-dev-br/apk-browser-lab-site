@@ -1,12 +1,12 @@
-import { APKError } from './apk-error.js?v=aad0dc0a4b80';
-import { throwNew } from './java-throw.js?v=aad0dc0a4b80';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=aad0dc0a4b80';
-import { networkOf, isIpLiteral } from './network-native.js?v=aad0dc0a4b80';
-import { Blocked } from './scheduler.js?v=aad0dc0a4b80';
-import { installUdp } from './udp-native.js?v=aad0dc0a4b80';
-import { createLoopback } from './loopback-socket.js?v=aad0dc0a4b80';
-import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=aad0dc0a4b80';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=aad0dc0a4b80';
+import { APKError } from './apk-error.js?v=ffff96603c9e';
+import { throwNew } from './java-throw.js?v=ffff96603c9e';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=ffff96603c9e';
+import { networkOf, isIpLiteral } from './network-native.js?v=ffff96603c9e';
+import { Blocked } from './scheduler.js?v=ffff96603c9e';
+import { installUdp } from './udp-native.js?v=ffff96603c9e';
+import { createLoopback } from './loopback-socket.js?v=ffff96603c9e';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=ffff96603c9e';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=ffff96603c9e';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK

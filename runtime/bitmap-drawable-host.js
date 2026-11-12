@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=aad0dc0a4b80';
+import { createHostRegistry } from './host-contract.js?v=ffff96603c9e';
 
 // android.graphics.drawable.BitmapDrawable is the original android-13.0.0_r1 source in the framework DEX (inflate of <bitmap> with src/tileMode/gravity/tint/antialias/dither/filter/mipMap,
 // density scaling, BitmapShader tiling, ConstantState, outline). It runs over the host Bitmap (bitmap-host.js / bitmap-codec-host.js), Paint, BitmapShader and Canvas; this host no longer

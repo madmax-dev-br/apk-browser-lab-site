@@ -1,5 +1,5 @@
-import { gcRoot } from './heap-gc.js?v=aad0dc0a4b80';
-import { createHostRegistry, doubleBits, bitsDouble, bitsFloat } from './host-contract.js?v=aad0dc0a4b80';
+import { gcRoot } from './heap-gc.js?v=ffff96603c9e';
+import { createHostRegistry, doubleBits, bitsDouble, bitsFloat } from './host-contract.js?v=ffff96603c9e';
 
 // java.text.NumberFormat / DecimalFormat / DecimalFormatSymbols / FieldPosition and java.util.Currency for the browser VM.
 //

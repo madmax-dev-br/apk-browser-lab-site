@@ -1,41 +1,41 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=aad0dc0a4b80';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=aad0dc0a4b80';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=aad0dc0a4b80';
-import { initCollapsibleSections } from './panel-sections.js?v=aad0dc0a4b80';
-import { warmupLabel } from './warmup.js?v=aad0dc0a4b80';
-import { initHelpTips } from './help-tips.js?v=aad0dc0a4b80';
-import { createToolDock } from './tool-dock.js?v=aad0dc0a4b80';
-import { createPermissionsPanel } from './permissions-panel.js?v=aad0dc0a4b80';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=aad0dc0a4b80';
-import { createCameraLab } from './camera-lab.js?v=aad0dc0a4b80';
-import { createOverridesPanel } from './overrides-panel.js?v=aad0dc0a4b80';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=aad0dc0a4b80';
-import { createHostMapPanel } from './host-map-panel.js?v=aad0dc0a4b80';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=aad0dc0a4b80';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=aad0dc0a4b80';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=aad0dc0a4b80';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=aad0dc0a4b80';
-import { createDeviceView, createViewState } from './device-view.js?v=aad0dc0a4b80';
-import { createTaskSwitcher } from './task-switcher.js?v=aad0dc0a4b80';
-import { createDeviceZoom } from './device-zoom.js?v=aad0dc0a4b80';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=aad0dc0a4b80';
-import { formatApiGapReport } from './api-gap-scan.js?v=aad0dc0a4b80';
-import { createLogcatPanel } from './logcat-panel.js?v=aad0dc0a4b80';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=aad0dc0a4b80';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=aad0dc0a4b80';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=aad0dc0a4b80';
-import { captureImage } from './screen-capture.js?v=aad0dc0a4b80';
-import { createPluginsPanel } from './plugins-panel.js?v=aad0dc0a4b80';
-import { createMcpTools } from './mcp-tools.js?v=aad0dc0a4b80';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=aad0dc0a4b80';
-import { createModalHost } from './lab-modal.js?v=aad0dc0a4b80';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=aad0dc0a4b80';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=aad0dc0a4b80';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=aad0dc0a4b80';
-import { createDragLayer } from './lab-drag.js?v=aad0dc0a4b80';
-import { createLabScroll } from './lab-scroll.js?v=aad0dc0a4b80';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=aad0dc0a4b80';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=aad0dc0a4b80';
+import { APKWorkerClient } from './apk-worker-client.js?v=ffff96603c9e';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=ffff96603c9e';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=ffff96603c9e';
+import { initCollapsibleSections } from './panel-sections.js?v=ffff96603c9e';
+import { warmupLabel } from './warmup.js?v=ffff96603c9e';
+import { initHelpTips } from './help-tips.js?v=ffff96603c9e';
+import { createToolDock } from './tool-dock.js?v=ffff96603c9e';
+import { createPermissionsPanel } from './permissions-panel.js?v=ffff96603c9e';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=ffff96603c9e';
+import { createCameraLab } from './camera-lab.js?v=ffff96603c9e';
+import { createOverridesPanel } from './overrides-panel.js?v=ffff96603c9e';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=ffff96603c9e';
+import { createHostMapPanel } from './host-map-panel.js?v=ffff96603c9e';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=ffff96603c9e';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=ffff96603c9e';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=ffff96603c9e';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=ffff96603c9e';
+import { createDeviceView, createViewState } from './device-view.js?v=ffff96603c9e';
+import { createTaskSwitcher } from './task-switcher.js?v=ffff96603c9e';
+import { createDeviceZoom } from './device-zoom.js?v=ffff96603c9e';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=ffff96603c9e';
+import { formatApiGapReport } from './api-gap-scan.js?v=ffff96603c9e';
+import { createLogcatPanel } from './logcat-panel.js?v=ffff96603c9e';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=ffff96603c9e';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=ffff96603c9e';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=ffff96603c9e';
+import { captureImage } from './screen-capture.js?v=ffff96603c9e';
+import { createPluginsPanel } from './plugins-panel.js?v=ffff96603c9e';
+import { createMcpTools } from './mcp-tools.js?v=ffff96603c9e';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=ffff96603c9e';
+import { createModalHost } from './lab-modal.js?v=ffff96603c9e';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=ffff96603c9e';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=ffff96603c9e';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=ffff96603c9e';
+import { createDragLayer } from './lab-drag.js?v=ffff96603c9e';
+import { createLabScroll } from './lab-scroll.js?v=ffff96603c9e';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=ffff96603c9e';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=ffff96603c9e';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -68,10 +68,17 @@ function showWarmup(warmup) {
   const label = state.apkRunning ? warmupLabel(warmup) : null; if (!label) { chip.hidden = true; return; }
   chip.hidden = false; chip.dataset.ready = String(!label.warming); chip.textContent = label.text; chip.title = label.title;
 }
+/** The run button: "Executar APK", or "Reiniciar e executar" after a failure (it then reopens the APK in a fresh Worker before starting it). */
+function syncRunButton() {
+  const button = $('run-button'); if (!button) return;
+  const label = state.needsRestart ? 'Reiniciar e executar' : 'Executar APK', text = [...(button.childNodes ?? [])].find(node => node.nodeType === 3);
+  if (text) text.textContent = label + ' '; else button.prepend?.(label + ' ');
+  button.title = state.needsRestart ? 'A última execução terminou com erro: reabre o APK numa VM nova e executa de novo' : '';
+}
 function setBusy(busy) {
   state.busy = busy; syncReloadButton();
   $('activity-select').disabled = busy;
-  $('run-button').disabled = busy || !state.runtime || !!state.inventory?.unsupportedFeatures?.length;
+  $('run-button').disabled = busy || !(state.runtime || (state.needsRestart && state.currentSource)) || !!state.inventory?.unsupportedFeatures?.length;   // after a failure that took the VM down, Reiniciar still works from the file
   $('stop-vm').hidden = !busy && !apkVM.worker;
   $('back-button').disabled = busy || !state.runtime || !state.canGoBack;
   $('demo-button').disabled = busy;
@@ -81,7 +88,7 @@ function setBusy(busy) {
   if ($('clear-app-data')) $('clear-app-data').disabled = busy || !state.runtime;
   $('native-abi').disabled = busy; $('native-library').disabled = busy;
   document.querySelectorAll('[data-inspect-apk]').forEach((button) => { button.disabled = busy || button.dataset.available === 'false'; });
-  $('run-button').querySelector('kbd').textContent = busy ? '…' : 'RUN';
+  $('run-button').querySelector('kbd').textContent = busy ? '…' : 'RUN'; syncRunButton();
 }
 function appendTrace(message) {
   state.trace.push(message);
@@ -166,7 +173,7 @@ function showError(error, title = 'Tentativa de execução interrompida') {
   appendTrace(`ERRO: ${raw}`);
 }
 function reportAPKError(error, title) {
-  state.lastAPKError = { error, title };
+  state.lastAPKError = { error, title }; state.needsRestart = !!state.currentSource; syncRunButton();   // after a failure the VM may be stuck or half-dead: Executar reopens the APK in a fresh Worker
   state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
   $('android-content').inert = true; $('android-window-layer').inert = true;
   if (error.navigation) state.canGoBack = !!error.navigation.canGoBack;
@@ -491,7 +498,7 @@ async function inspectSelectedNative() {
 }
 async function importSource(source, autoRun = false) {
   if (state.busy) return;
-  state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.stickyError = false; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer', 'android-action-mode-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
+  state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.stickyError = false; state.needsRestart = false; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer', 'android-action-mode-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
   permissionsPanel?.detach(); filesPanel?.detach(); cameraLab?.detach(); overridesPanel?.detach(); ignoredPanel?.detach(); mocksPanel?.detach(); hostMapPanel?.resetHits(); pluginHost.vmChanged();
   // A new run (another APK, or Executar APK again) starts clean: the Worker of the previous run is terminated by apkVM.load, and what the page still shows of it goes too
   // (Logcat, network requests, memory meter, error report, last frame and heartbeat). App data follows the "Manter dados do app" option; the panel settings are kept.
@@ -876,14 +883,14 @@ function initDeepLinkPanel() {
   $('deeplink-history-clear').addEventListener('click', () => { deepLinkPanel.history = []; saveHistory([]); renderDeepLinkHistory(); });
 }
 async function runAPK() {
-  if (!state.runtime || state.busy || state.runStarting) return;
+  if (!(state.runtime || (state.needsRestart && state.currentSource)) || state.busy || state.runStarting) return;
   state.runStarting = true; showBoot('Iniciando o aplicativo…');
   try { await runAPKOnce(); } finally { state.runStarting = false; }
 }
-async function runAPKOnce() {
+async function runAPKOnce(retried = false) {
   await flushPendingInputs();
   const activity = $('activity-select').value || undefined;
-  if (state.launchAttempted) {
+  if (state.launchAttempted || state.needsRestart) {   // a second run, or a run after a failure: the APK is reopened in a fresh Worker (a VM left busy or broken by the failure is replaced)
     const source = state.currentSource;
     if (!source) return;
     await importSource(source);
@@ -894,7 +901,11 @@ async function runAPKOnce() {
   const token = beginOperation('Tentando iniciar a Activity…');
   state.runStartedAt = Date.now(); const launchStarted = performance.now();
   try { const snapshot = await state.runtime.launch(activity, { onProgress: onWorkerProgress }); if (token === state.operation) { renderSnapshot(snapshot); if (state.loadTimes) { state.loadTimes.launchMs = Math.round(performance.now() - launchStarted); showLoadTimes(); appendTrace(`Activity aberta em ${state.loadTimes.launchMs} ms`); } } }
-  catch (error) { if (token === state.operation) reportAPKError(error); }
+  catch (error) {
+    // The Worker was still inside an earlier operation (a run that failed while it kept working): start over once in a fresh Worker instead of reporting "already busy".
+    if (token === state.operation && !retried && error?.name === 'ProtocolError' && /processando/.test(error.message ?? '')) { finishOperation(token); state.needsRestart = true; return runAPKOnce(true); }
+    if (token === state.operation) reportAPKError(error);
+  }
   finally { finishOperation(token); }
 }
 async function reloadActivity(mode = 'recreate') {
