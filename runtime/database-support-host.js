@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=94fc4dedf7f2';
-import { fieldOffset } from './unsafe-native.js?v=94fc4dedf7f2';
+import { createHostRegistry } from './host-contract.js?v=59e9e77ad3a2';
+import { fieldOffset } from './unsafe-native.js?v=59e9e77ad3a2';
 
 // Platform contract for the hidden/internal framework APIs that android.database and android.database.sqlite (Android 13 sources, compiled into the
 // framework DEX) call: dalvik.system.CloseGuard, dalvik.system.BlockGuard, android.os.FileUtils.setPermissions, android.os.StrictMode SQLite leak
@@ -68,7 +68,9 @@ export function createDatabaseSupportHost(platform) {
   // (assigned after Application.attach(), so null until then).
   const THREAD = 'Landroid/app/ActivityThread;', APPLICATION = 'Landroid/app/Application;';
   type(THREAD, OBJECT, [], { allocatable: true });
-  def(THREAD, 'currentActivityThread', `()${THREAD}`, r => r.activityThread ??= r.allocate(THREAD), { static: true });
+  // Code the lab runs on behalf of another process (the launcher loading the installed app's label and icon, src/launcher-info.js) is not in the app's process: there
+  // ActivityThread.currentActivityThread() is null, and framework code takes its own no-app branch (AdaptiveIconDrawable falls back to Resources.getSystem()).
+  def(THREAD, 'currentActivityThread', `()${THREAD}`, r => r.platform?.outsideAppProcess ? null : (r.activityThread ??= r.allocate(THREAD)), { static: true });
   // ActivityThread.H (the main Handler, ActivityThread.mH) and the MessageQueue object of a Looper: host types whose state lives in src/hidden-members.js
   type('Landroid/app/ActivityThread$H;', 'Landroid/os/Handler;', [], { allocatable: true }); type('Landroid/os/MessageQueue;', OBJECT, [], { allocatable: true });
   // FragmentManager.FragmentLifecycleCallbacks (deprecated android.app family): an abstract-in-spirit base class whose callbacks are empty; the platform calls them around fragment lifecycle steps.

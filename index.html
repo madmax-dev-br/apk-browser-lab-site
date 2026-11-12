@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=94fc4dedf7f2") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=94fc4dedf7f2">
-  <link rel="stylesheet" href="./lab-theme.css?v=94fc4dedf7f2">
-  <meta name="apk-browser-build" content="94fc4dedf7f2">
+  <style>@import url("./styles.css?v=59e9e77ad3a2") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=59e9e77ad3a2">
+  <link rel="stylesheet" href="./lab-theme.css?v=59e9e77ad3a2">
+  <meta name="apk-browser-build" content="59e9e77ad3a2">
 </head>
 <body>
   <header class="topbar">
@@ -123,7 +123,7 @@
               </fieldset>
               <label class="cp-field" for="vm-event-time"><span>Tempo máximo por evento<small>Quanto a VM espera um evento terminar antes de encerrá-lo com o relatório; vale na hora</small></span><select id="vm-event-time" aria-describedby="vm-event-note"></select></label>
               <p id="vm-event-note" class="cp-note">A VM roda o código do app muitas vezes mais devagar que um aparelho. Uma inicialização com centenas de threads pode passar dos 25 s padrão sem estar travada: o relatório "Instruction budget exceeded" mostra as threads ainda avançando. Um tempo maior deixa terminar; um laço infinito de verdade continua sendo encerrado com relatório, só que mais tarde.</p>
-              <label class="cp-field" for="vm-raster-scale"><span>Resolução no movimento<small>Enquanto a tela se mexe (animação, rolagem, transição), o quadro é desenhado nesta escala e refeito nítido quando para; vale na hora</small></span><select id="vm-raster-scale"><option value="1">100% (sempre nítido)</option><option value="0.75">75%</option><option value="0.5">50% (padrão)</option><option value="0.35">35%</option><option value="0.25">25%</option></select></label>
+              <label class="cp-field" for="vm-raster-scale"><span>Resolução no movimento<small>Enquanto a tela se mexe (animação, rolagem, transição), o quadro é desenhado nesta escala e refeito nítido quando para; vale na hora</small></span><select id="vm-raster-scale"><option value="1">100% (sempre nítido)</option><option value="0.75">75%</option><option value="0.5">50%</option><option value="0.35">35% (padrão)</option><option value="0.25">25%</option></select></label>
               <label class="cp-check" for="vm-raster-navigation"><input id="vm-raster-navigation" type="checkbox"><span>Tela nova começa em baixa resolução<small>O primeiro quadro de uma Activity ou janela nova sai na resolução de movimento e é refeito nítido quando a tela para; vale na hora</small></span></label>
               <label class="cp-field" for="vm-renderer"><span>Renderização<small>Onde o conteúdo das telas (Compose, Canvas) é desenhado. GPU usa WebGL no Worker e volta sozinha para CPU se falhar; vale na hora</small></span><select id="vm-renderer" aria-describedby="vm-renderer-status"><option value="gpu">GPU (padrão)</option><option value="cpu">CPU</option></select></label>
               <p id="vm-renderer-status" class="cp-note" role="status">Em uso: CPU</p>
@@ -244,7 +244,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=94fc4dedf7f2"></script>
+  <script type="module" src="./app.js?v=59e9e77ad3a2"></script>
   <script>
   // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
   // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.

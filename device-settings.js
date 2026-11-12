@@ -1,10 +1,10 @@
-import { coreMemorySetting } from './core-memory.js?v=94fc4dedf7f2';
-import { isMemoryStep } from './memory-budget.js?v=94fc4dedf7f2';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=94fc4dedf7f2';
-import { sanitizeHostMap } from './host-map.js?v=94fc4dedf7f2';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=94fc4dedf7f2';
-import { sanitizeLocation } from './runtime-permissions.js?v=94fc4dedf7f2';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=94fc4dedf7f2';
+import { coreMemorySetting } from './core-memory.js?v=59e9e77ad3a2';
+import { isMemoryStep } from './memory-budget.js?v=59e9e77ad3a2';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=59e9e77ad3a2';
+import { sanitizeHostMap } from './host-map.js?v=59e9e77ad3a2';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=59e9e77ad3a2';
+import { sanitizeLocation } from './runtime-permissions.js?v=59e9e77ad3a2';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=59e9e77ad3a2';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -48,10 +48,12 @@ export function sanitizeSettings(input = {}) {
   return out;
 }
 /** A new user's device reaches every host (allowedHosts = ['*']); sanitizeSettings({}) alone stays the closed policy so embedders that pass no network config keep it. */
-export function defaultDeviceSettings() { return sanitizeSettings({ network: { allowedHosts: ['*'] } }); }
+/** The lab page's defaults: every host allowed, animations off (animator scale 0) and the moving screen drawn at 35% (a VM is slower than a device: both keep interaction responsive). */
+export function defaultDeviceSettings() { return sanitizeSettings({ network: { allowedHosts: ['*'] }, animatorScale: 0, raster: { motionScale: 0.35 } }); }
 /** Stored-settings format: 2 since the "allow every host" option became the default; a record without the marker was saved by a page that only knew the closed allow list.
- * 3 since the engine and the renderer are choices of the Execução panel with new defaults (the WebAssembly core, the GPU): an older record held the old defaults, not a choice. */
-export const SETTINGS_VERSION = 3;
+ * 3 since the engine and the renderer are choices of the Execução panel with new defaults (the WebAssembly core, the GPU): an older record held the old defaults, not a choice.
+ * 4 since animations are off and the moving screen is drawn at 35% by default: an older record held the old defaults (1× and 50%), not a choice. */
+export const SETTINGS_VERSION = 4;
 export function loadDeviceSettings() {
   try {
     const text = globalThis.localStorage?.getItem(KEY); if (!text) return defaultDeviceSettings();
@@ -60,6 +62,7 @@ export function loadDeviceSettings() {
     // option shown as the default): it takes the default, like a new user; a list the user typed is kept.
     if (stored && typeof stored === 'object' && !(stored.version >= 2) && !sanitizeHosts(stored.network?.allowedHosts).length) stored.network = { ...(stored.network ?? {}), allowedHosts: ['*'] };
     if (stored && typeof stored === 'object' && !(stored.version >= 3)) { delete stored.engine; delete stored.renderer; }   // the old defaults were stored with every record: the new ones apply
+    if (stored && typeof stored === 'object' && !(stored.version >= 4)) { stored.animatorScale = 0; stored.raster = { ...(stored.raster ?? {}), motionScale: 0.35 }; }   // the new defaults apply once; what the user picks afterwards is kept
     return sanitizeSettings(stored);
   } catch { return defaultDeviceSettings(); }
 }

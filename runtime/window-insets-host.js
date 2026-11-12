@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=94fc4dedf7f2';
-import { gcRoot, ephemeronMap } from './heap-gc.js?v=94fc4dedf7f2';
+import { APKError } from './apk-runtime.js?v=59e9e77ad3a2';
+import { gcRoot, ephemeronMap } from './heap-gc.js?v=59e9e77ad3a2';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', INSETS = 'Landroid/view/WindowInsets;', RECT = 'Landroid/graphics/Rect;';
 const LISTENER = 'Landroid/view/View$OnApplyWindowInsetsListener;';

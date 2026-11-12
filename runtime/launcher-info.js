@@ -14,7 +14,8 @@ export function launcherInfo(runtime) {
   const text = cs => nullish(cs) ? '' : typeof cs === 'string' ? cs : r.stringCharacters(call(cs, 'Ljava/lang/Object;', 'toString', [], STRING));
   const context = r.platform?.application ?? r.application, packageName = r.platform?.packageName ?? '';
   const result = { packageName, label: packageName, icon: null, problems: [] };
-  const steps = r.steps;
+  const steps = r.steps, outside = r.platform.outsideAppProcess;
+  r.platform.outsideAppProcess = true;   // a launcher is another process: no app ActivityThread while it loads the label and draws the icon
   try {
     // Before the app is started there is no Application yet: the PackageManager (which does not depend on one) answers for the installed package, as a launcher's own process would ask.
     const pm = nullish(context) ? (r.platform.packageManager ??= r.makeObject(PM)) : call(context, CTX, 'getPackageManager', [], PM);
@@ -31,7 +32,7 @@ export function launcherInfo(runtime) {
       result.icon = { mime: 'image/png', bytes: Uint8Array.from(bytes), size: ICON_PX };
     } catch (error) { result.problems.push(`loadIcon: ${error?.message ?? error}`.slice(-420)); }
   } catch (error) { result.problems.push(String(error?.message ?? error).slice(-420)); }
-  finally { r.steps = steps; }
+  finally { r.steps = steps; r.platform.outsideAppProcess = outside; }
   // What the package itself declares, read without running anything (the app may not have been started yet, or its icon Drawable may need what is not there before it starts):
   // the label string of the launcher Activity or the application, and the icon when it is an image file (the variant for the device's density).
   const manifest = r.platform?.manifest ?? {}, application = manifest.application ?? {}, launcherName = r.launcherActivity ? String(r.launcherActivity).replace(/^L|;$/g, '').replaceAll('/', '.') : null;
@@ -46,5 +47,7 @@ export function launcherInfo(runtime) {
       if (extension && r.apkReader) { result.icon = { mime: extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : `image/${extension}`, bytes: Uint8Array.from(r.apkReader(file.path)), size: null, source: 'file' }; result.problems = result.problems.filter(problem => !problem.startsWith('loadIcon')); }
     } catch (error) { result.problems.push(`icon file: ${error?.message ?? error}`.slice(0, 200)); }
   }
+  // A package that declares no icon gets the system's default one, whose image the lab does not carry: that is not a problem to report, the page shows its generic mark.
+  if (result.icon === null && ![activity?.icon, application.icon, application.roundIcon].some(value => typeof value === 'number' && value)) { result.defaultIcon = true; result.problems = result.problems.filter(problem => !problem.startsWith('loadIcon')); }
   return result;
 }

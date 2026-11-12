@@ -605,3 +605,6 @@ main>footer a{color:var(--accent-ink);text-decoration:underline;text-underline-o
 
 /* The control groups are listed directly in the rail: the outer "Controles" disclosure is always open and its header is not shown (each group still opens on its own). */
 #control-panel>summary{display:none}
+
+/* "Activities ignoradas" is not offered in the panel; the feature and its state stay (lab API, saved rules), only the group is not listed. */
+#cp-sec-ignored{display:none}
