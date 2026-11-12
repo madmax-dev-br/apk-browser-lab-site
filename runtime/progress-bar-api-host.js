@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=7c0af6c6ff67';
+import { createHostRegistry } from './host-contract.js?v=f407b1282aab';
 
 // android.widget.ProgressBar public API (API 33) with the semantics of android-13.0.0_r1 ProgressBar.java: min / max / progress / secondary progress with their clamping rules, the
 // determinate <-> indeterminate switch (getProgress() is 0 while indeterminate and setProgress is ignored), progress and indeterminate drawables with the four tint sets applied to the

@@ -1,15 +1,15 @@
-import {APKError} from './apk-runtime.js?v=7c0af6c6ff67';
-import {getVectorGraphics} from './vector-native.js?v=7c0af6c6ff67';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=7c0af6c6ff67';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=7c0af6c6ff67';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=7c0af6c6ff67';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=7c0af6c6ff67';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=7c0af6c6ff67';
-import {createBitmapHost} from './bitmap-host.js?v=7c0af6c6ff67';
-import { gcRoot } from './heap-gc.js?v=7c0af6c6ff67';
-import {sha256Hex} from './sha256-sync.js?v=7c0af6c6ff67';
-import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=7c0af6c6ff67';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=7c0af6c6ff67';
+import {APKError} from './apk-runtime.js?v=f407b1282aab';
+import {getVectorGraphics} from './vector-native.js?v=f407b1282aab';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=f407b1282aab';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=f407b1282aab';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=f407b1282aab';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=f407b1282aab';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=f407b1282aab';
+import {createBitmapHost} from './bitmap-host.js?v=f407b1282aab';
+import { gcRoot } from './heap-gc.js?v=f407b1282aab';
+import {sha256Hex} from './sha256-sync.js?v=f407b1282aab';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=f407b1282aab';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=f407b1282aab';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -206,6 +206,7 @@ function decodeRasterImage(CK,raster){
  * pixel rows; bounded by decoded bytes, least recently used first. An evicted image is deleted at once unless a replay is using it (then when that replay releases it).
  * Per CanvasKit instance.
  */
+const REPLAYED_LISTS=new WeakSet();
 const DECODED_IMAGE_BYTES=96*1024*1024,decodedImages=new WeakMap();
 export function recordedImage(CK,command){
  const pixels=command.pixelData,data=pixels?pixels.base64:command.raster?.dataURL;
@@ -340,6 +341,7 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
      const isolate=!!node.layerPaint||node.layerType!==0||node.alpha<1;   // hwui only renders a node into an offscreen layer when it has alpha / a layer paint / a layer type
      if(isolate){const layer=node.layerPaint?makePaint(CK,node.layerPaint):new CK.Paint();layer.setAlphaf((node.layerPaint?.alpha??1)*Math.max(0,Math.min(1,node.alpha)));canvas.saveLayer(layer);layer.delete();}
      const stretch=renderNodeStretchMatrix(node);if(stretch)canvas.concat(stretch);   // hwui StretchEffect (approximation documented at renderNodeStretchMatrix); after the clips so the bounds stay fixed
+     {const stats=runtime.rasterStats,list=node.displayList;if(stats&&Array.isArray(list)){stats.nodeReplays=(stats.nodeReplays??0)+1;stats.nodeCommands=(stats.nodeCommands??0)+list.length;if(REPLAYED_LISTS.has(list)){stats.nodeReplaysSame=(stats.nodeReplaysSame??0)+1;stats.nodeCommandsSame=(stats.nodeCommandsSame??0)+list.length;}else REPLAYED_LISTS.add(list);}}   // how often a node replays the display list it replayed before (what retained layers could reuse)
      replay(node.displayList);if(isolate)canvas.restore();activeNodes.delete(command.node);
     }
    }else if(command.vectorTree){const tree=command.vectorState??graphics.get(command.vectorTree,'tree');canvas.translate(command.x,command.y);canvas.scale(command.width/tree.viewportWidth,command.height/tree.viewportHeight);if(command.mirrored){canvas.translate(tree.viewportWidth,0);canvas.scale(-1,1);}canvas.clipRect(CK.LTRBRect(0,0,tree.viewportWidth,tree.viewportHeight),CK.ClipOp.Intersect,true);sourceVector(CK,canvas,graphics,tree,command.colorFilter);
