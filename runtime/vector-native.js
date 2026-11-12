@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=a94e2efcced9';
-import { getSolidPaint } from './paint-host.js?v=a94e2efcced9';
-import { getMatrixValues } from './matrix-native.js?v=a94e2efcced9';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=a94e2efcced9';
+import { APKError } from './apk-error.js?v=aad0dc0a4b80';
+import { getSolidPaint } from './paint-host.js?v=aad0dc0a4b80';
+import { getMatrixValues } from './matrix-native.js?v=aad0dc0a4b80';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=aad0dc0a4b80';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -74,6 +74,9 @@ export class VectorGraphics {
   return this.snapshot(handle,{width:fields.get('Landroid/graphics/drawable/VectorDrawable$VectorDrawableState;->mBaseWidth:I'),height:fields.get('Landroid/graphics/drawable/VectorDrawable$VectorDrawableState;->mBaseHeight:I')});
  }
  createCanvas(){return this.create('canvas',{draws:[],matrix:[1,0,0,1,0,0],stack:[]});}
+ /** The native canvas of a Java object (a Canvas, a Bitmap, a Picture's recording) goes with it: a cleaner on the owner's record releases the handle when the collector frees the owner,
+  *  as Android's NativeAllocationRegistry frees an SkCanvas / SkBitmap. Without it every Canvas ever created kept its recorded draws (and their rasters) for the life of the VM. */
+ releaseWithOwner(owner,handle){const record=this.runtime.object(owner),previous=record.onFree;record.onFree=()=>{if(typeof previous==='function')previous();const object=this.handles.get(handle);if(object?.kind==='canvas')this.handles.delete(handle);};}
  canvasDraws(handle){return this.get(handle,'canvas').draws.slice();}
  captureVector(handle){const tree=this.get(handle,'tree'),active=new Set();let count=0;const capture=(pointer,depth=0)=>{if(depth>128||active.has(pointer)||++count>20000)problem('Cyclic/excessive vector draw snapshot');active.add(pointer);const node=this.get(pointer),copy={kind:node.kind,props:{...node.props},path:node.path??''};if(node.kind==='group')copy.children=node.children.map(child=>capture(child,depth+1));active.delete(pointer);return copy;};return {...tree,root:capture(tree.root)};}
  reserveDrawStorage(extra){let used=extra;for(const object of this.handles.values())if(object.kind==='canvas')for(const draw of object.draws){used+=(draw.svg?.length??0)+(draw.commands?.length??0)*4+(draw.text?.length??0);if(used>32*1024*1024)problem('Aggregate recorded graphics storage limit exceeded');}}
@@ -147,7 +150,7 @@ export function createVectorCanvasHost(){
   supports:key=>keys.has(key),canAllocate:type=>type===owner,parent:type=>type===owner?'Ljava/lang/Object;':null,
   invoke(runtime,method,args){
    const object=runtime.object(args[0]),graphics=getVectorGraphics(runtime),name=method.name;
-   if(name==='<init>'){if(object.nativeCanvasHandle)problem('Canvas is already initialized');object.nativeCanvasHandle=graphics.createCanvas();object.canvasDensity=160;return;}
+   if(name==='<init>'){if(object.nativeCanvasHandle)problem('Canvas is already initialized');object.nativeCanvasHandle=graphics.createCanvas();graphics.releaseWithOwner(args[0],object.nativeCanvasHandle);object.canvasDensity=160;return;}
    runtime.skiaHost?.bitmaps?.flattenFullCanvas(object.nativeCanvasHandle);   // a Bitmap's command list is folded into one pixel command before it reaches the command limit
    const canvas=graphics.get(object.nativeCanvasHandle,'canvas');
    if(name==='getNativeCanvasWrapper')return object.nativeCanvasHandle;

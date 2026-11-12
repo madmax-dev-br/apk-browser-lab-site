@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=a94e2efcced9';
-import {getVectorGraphics} from './vector-native.js?v=a94e2efcced9';
-import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=a94e2efcced9';
-import { gcRoot } from './heap-gc.js?v=a94e2efcced9';
+import {APKError} from './apk-error.js?v=aad0dc0a4b80';
+import {getVectorGraphics} from './vector-native.js?v=aad0dc0a4b80';
+import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=aad0dc0a4b80';
+import { gcRoot } from './heap-gc.js?v=aad0dc0a4b80';
 const BITMAP='Landroid/graphics/Bitmap;',CONFIG='Landroid/graphics/Bitmap$Config;',SPACE='Landroid/graphics/ColorSpace;',NAMED='Landroid/graphics/ColorSpace$Named;',CANVAS='Landroid/graphics/Canvas;';
 // android.graphics.Bitmap.Config declaration order (android-13.0.0_r1: RGBA_1010102 is API 33 and last) / ColorSpace.Named order (API 34 HLG/PQ appended).
 const CONFIGS=['ALPHA_8','RGB_565','ARGB_4444','ARGB_8888','RGBA_F16','HARDWARE','RGBA_1010102'];
@@ -25,7 +25,7 @@ add(CANVAS,['getWidth()I','getHeight()I',`throwIfCannotDraw(${BITMAP})V`,`<init>
  * its pixels are produced by the real Skia rasterizer when the bitmap is read or drawn (snapshot semantics at the draw call), on a Skia surface of the color type of its Config
  * (RGB_565, RGBA_F16, RGBA_1010102 natively; ARGB_8888 and ALPHA_8 on N32). Pixel setters record exact pixel data, flattened when the command list grows. The Java-facing Bitmap API is src/bitmap-ops-host.js. */
 export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
- const enums=gcRoot(new Map()),spaces=gcRoot(new Map()),byHandle=gcRoot(new Map());   // byHandle: Bitmap.getNativeInstance() token -> Bitmap
+ const enums=gcRoot(new Map()),spaces=gcRoot(new Map()),byHandle=new Map();   // byHandle: Bitmap.getNativeInstance() token -> Bitmap. Not a root (it once kept every Bitmap ever made alive): an entry resolves while its Bitmap lives and goes with it (onFree)
  const enumValue=(owner,list,name)=>{
   const key=owner+name;if(!enums.has(key)){const ref=runtime.makeObject(owner),o=runtime.object(ref);o.enumName=name;o.enumOrdinal=list.indexOf(name);if(owner===CONFIG)runtime.storeField(o.fields,`${CONFIG}->nativeInt:I`,CONFIG_INFO[name].native);enums.set(key,ref);}return enums.get(key);
  };
@@ -66,6 +66,7 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
   const spaceName=name==='ALPHA_8'?null:name==='RGBA_F16'?(requested&&requested!=='SRGB'?requested:'LINEAR_EXTENDED_SRGB'):'SRGB'   // RGBA_F16 defaults to (and, requested as sRGB, becomes) linear extended sRGB;
   o.bitmap={width,height,config,hasAlpha:name==='RGB_565'?false:!!hasAlpha,handle,recycled:false,mipMap:false,density:160,colorSpace:spaceName?colorSpace(spaceName):null,mutable,premultiplied:true,genBase:0,allocBytes:width*height*CONFIG_INFO[name].bytes,hardware:false,px:null};
   runtime.storeField(o.fields,`${BITMAP}->mDensity:I`,160);byHandle.set(handle,ref);
+  graphics.releaseWithOwner(ref,handle);{const previous=o.onFree;o.onFree=()=>{if(typeof previous==='function')previous();if(byHandle.get(handle)===ref)byHandle.delete(handle);};}   // the pixels' canvas and the handle lookup go with the Bitmap
   return ref;
  };
  /** Marks a bitmap as Config.HARDWARE: immutable, no CPU pixel access, drawing still works (pixels keep the layout they were copied from). */
@@ -175,7 +176,7 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
     if(name==='throwIfCannotDraw'){if(state(args[1]).recycled)vm.throwJava('Ljava/lang/RuntimeException;','Canvas: trying to use a recycled bitmap');return;}
     if(name==='setBitmap'){   // Canvas.setBitmap: later draws go to the bitmap (null detaches the canvas: draws land on a scratch device); the bitmap's recorded command list is shared with every Canvas bound to it
      const object=vm.object(args[0]);let handle;
-     if(args[1]===null||args[1]===0){handle=getVectorGraphics(vm).createCanvas();object.canvasBitmap=null;}
+     if(args[1]===null||args[1]===0){handle=getVectorGraphics(vm).createCanvas();getVectorGraphics(vm).releaseWithOwner(args[0],handle);object.canvasBitmap=null;}
      else{const b=state(args[1]);if(b.mutable===false)vm.throwJava('Ljava/lang/IllegalStateException;',null);if(b.recycled)vm.throwJava('Ljava/lang/RuntimeException;','Canvas: trying to use a recycled bitmap');handle=b.handle;object.canvasBitmap=args[1];}
      object.nativeCanvasHandle=handle;vm.storeField(object.fields,`${CANVAS}->mNativeCanvasWrapper:J`,handle);return;
     }
