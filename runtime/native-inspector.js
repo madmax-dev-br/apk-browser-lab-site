@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=e60dd7e71ad7';
+import { APKError } from './apk-error.js?v=1ac1d0f0dc1e';
 
 const fail = message => { throw new APKError(`ELF inspection: ${message}`); };
 const ARCHITECTURES = new Map([[3, 'x86'], [8, 'mips'], [40, 'arm'], [62, 'x86_64'], [183, 'aarch64'], [243, 'riscv']]);

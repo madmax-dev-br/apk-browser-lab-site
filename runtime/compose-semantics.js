@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=e60dd7e71ad7';
+import { APKError } from './apk-runtime.js?v=1ac1d0f0dc1e';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;';
 const OWNER = 'Landroidx/compose/ui/semantics/SemanticsOwner;', NODE = 'Landroidx/compose/ui/semantics/SemanticsNode;', CONFIG = 'Landroidx/compose/ui/semantics/SemanticsConfiguration;', KEY = 'Landroidx/compose/ui/semantics/SemanticsPropertyKey;';
 const ACTION = 'Landroidx/compose/ui/semantics/AccessibilityAction;', ANNOTATED = 'Landroidx/compose/ui/text/AnnotatedString;', RECT = 'Landroidx/compose/ui/geometry/Rect;';

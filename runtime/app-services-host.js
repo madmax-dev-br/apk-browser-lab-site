@@ -1,9 +1,9 @@
-import { resolveIntentFields } from './intent-resolver.js?v=e60dd7e71ad7';
-import { APKError } from './apk-error.js?v=e60dd7e71ad7';
-import { registerPackageValueFields } from './package-value-fields.js?v=e60dd7e71ad7';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=e60dd7e71ad7';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=e60dd7e71ad7';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=e60dd7e71ad7';
+import { resolveIntentFields } from './intent-resolver.js?v=1ac1d0f0dc1e';
+import { APKError } from './apk-error.js?v=1ac1d0f0dc1e';
+import { registerPackageValueFields } from './package-value-fields.js?v=1ac1d0f0dc1e';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=1ac1d0f0dc1e';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=1ac1d0f0dc1e';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=1ac1d0f0dc1e';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -810,8 +810,9 @@ export function createAppServicesHost(platform) {
     return action === null ? [] : details.filter(d => d.actions?.includes(r.stringCharacters(action)) && (kind !== 'activity' || wanted.every(c => d.categories?.includes(c))));
   };
   const resolveInfos = (r, intent, kind, withMeta, flags = 0) => {
-    const list = newEmptyList(r);
-    for (const detail of matchingComponents(r, intent, kind, flags)) {
+    const list = newEmptyList(r), details = matchingComponents(r, intent, kind, flags);
+    if (kind === 'activity' && !details.length) { const system = platform.sharedStorage?.systemActivity(r, intent) ?? null; if (system !== null) r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, system], 'virtual'); }   // the device's file pickers (src/shared-storage-host.js)
+    for (const detail of details) {
       const resolved = r.allocate(RESOLVE_INFO); r.dispatch({ owner: RESOLVE_INFO, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [resolved], 'direct');
       r.storeField(r.object(resolved).fields, kind === 'service' ? `${RESOLVE_INFO}->serviceInfo:${SERVICE_INFO}` : `${RESOLVE_INFO}->activityInfo:${ACTIVITY_INFO_TYPE}`, makeInfo(r, detail, kind, withMeta));
       r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, resolved], 'virtual');
@@ -1036,7 +1037,9 @@ export function createAppServicesHost(platform) {
     const action = r.dispatch({ owner: 'Landroid/content/Intent;', name: 'getAction', parameters: [], result: STRING, signature: `()${STRING}` }, [intent], 'virtual');
     const matches = (platform.manifest?.providerDetails ?? []).filter(p => action !== null && p.actions?.includes(r.stringCharacters(action)));
     if (matches.length) throw new APKError(`queryIntentContentProviders(${r.stringCharacters(action)}) matches ${matches.length} provider(s) of this app; ResolveInfo transport is not implemented`, { kind: 'resolve-info-unsupported' });
-    return newEmptyList(r);
+    const list = newEmptyList(r);
+    for (const system of platform.sharedStorage?.documentsProviders(r, action === null ? null : r.stringCharacters(action)) ?? []) r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, system], 'virtual');   // the device's documents providers (src/shared-storage-host.js)
+    return list;
   });
   function newEmptyList(r) { const list = r.allocate('Ljava/util/ArrayList;'); r.dispatch({ owner: 'Ljava/util/ArrayList;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [list], 'direct'); return list; }
 

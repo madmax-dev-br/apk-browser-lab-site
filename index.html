@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=e60dd7e71ad7") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=e60dd7e71ad7">
-  <link rel="stylesheet" href="./lab-theme.css?v=e60dd7e71ad7">
-  <meta name="apk-browser-build" content="e60dd7e71ad7">
+  <style>@import url("./styles.css?v=1ac1d0f0dc1e") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=1ac1d0f0dc1e">
+  <link rel="stylesheet" href="./lab-theme.css?v=1ac1d0f0dc1e">
+  <meta name="apk-browser-build" content="1ac1d0f0dc1e">
 </head>
 <body>
   <header class="topbar">
@@ -101,6 +101,13 @@
               </div>
               <p id="loc-note" class="cp-note" role="status" aria-live="polite">Com a permissão concedida e a localização ligada, LocationManager entrega esta posição (getLastKnownLocation e requestLocationUpdates). O cliente de localização do Google Play services não existe neste dispositivo virtual e continua falhando de forma explícita.</p>
               <button id="perms-reset" class="cp-button" type="button" disabled>Restaurar permissões deste app</button>
+            </div></details>
+            <details class="cp-group" id="cp-sec-files" data-section="files">
+              <summary><h3 id="cp-files-title">Arquivos do dispositivo</h3><span id="files-summary" class="cp-badge">nenhum</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <div id="files-drop" class="files-drop"><p>Arraste fotos, vídeos e documentos para cá</p><button id="files-add" class="cp-button" type="button">Adicionar arquivos…</button><input id="files-input" type="file" multiple hidden></div>
+              <ul id="files-list" class="files-list" aria-labelledby="cp-files-title" hidden></ul>
+              <p id="files-note" class="cp-note" role="status" aria-live="polite"></p>
+              <button id="files-clear" class="cp-button" type="button" disabled>Remover todos</button>
             </div></details>
             <details class="cp-group" id="cp-sec-run" data-section="run">
               <summary><h3 id="cp-run-title">Execução</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
@@ -204,6 +211,7 @@
               <canvas id="layout-bounds-canvas" class="layout-bounds-canvas" aria-hidden="true" hidden></canvas>
               <div id="lab-highlight-layer" class="lab-highlight-layer" aria-hidden="true"></div>
               <div id="permission-dialog" class="perm-scrim" hidden><div class="perm-card" role="alertdialog" aria-modal="true" aria-labelledby="perm-question" aria-describedby="perm-detail" tabindex="-1"><div class="perm-icon" id="perm-icon" aria-hidden="true"></div><p id="perm-question" class="perm-question"></p><p id="perm-detail" class="perm-detail"></p><div class="perm-actions"><button id="perm-allow" type="button" class="perm-button"></button><button id="perm-once" type="button" class="perm-button" hidden>Só desta vez</button><button id="perm-deny" type="button" class="perm-button">Não permitir</button></div></div></div>
+              <div id="system-picker" class="sp-scrim" hidden></div>
               <div class="system-bars" aria-hidden="true">
                 <div id="sysbar-status" class="sysbar-status"><span id="sysbar-clock" class="sysbar-clock">9:41</span><span class="sysbar-cutout"></span><span class="sysbar-icons"><svg id="sysbar-wifi" viewBox="0 0 24 24" width="14" height="14"><path d="M12 18.5a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM2.4 9.2l1.9 1.9a10.8 10.8 0 0 1 15.4 0l1.9-1.9a13.5 13.5 0 0 0-19.2 0zM6.2 13l1.9 1.9a5.4 5.4 0 0 1 7.8 0l1.9-1.9a8.1 8.1 0 0 0-11.6 0z" fill="currentColor"/></svg><svg id="sysbar-cell" viewBox="0 0 24 24" width="14" height="14"><path d="M2 22h20V2z" fill="currentColor"/></svg><span class="sysbar-battery"><span id="sysbar-battery-level" class="sysbar-battery-level"></span><b id="sysbar-bolt" hidden>⚡</b></span></span></div>
                 <div id="sysbar-nav" class="sysbar-nav"><span class="sysbar-handle"></span><span class="sysbar-buttons"><i class="sysbar-back"></i><i class="sysbar-home"></i><i class="sysbar-recents"></i></span></div>
@@ -244,7 +252,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=e60dd7e71ad7"></script>
+  <script type="module" src="./app.js?v=1ac1d0f0dc1e"></script>
   <script>
   // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
   // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.

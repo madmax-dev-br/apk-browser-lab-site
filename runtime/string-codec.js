@@ -1,4 +1,4 @@
-import { lookupCharset } from './charset-native.js?v=e60dd7e71ad7';
+import { lookupCharset } from './charset-native.js?v=1ac1d0f0dc1e';
 
 // java.lang.String <-> byte[] conversion for the six charsets of the curated Android13 ICU profile
 // (UTF-8, UTF-16, UTF-16BE, UTF-16LE, ISO-8859-1, US-ASCII), following the Android/Java REPLACE actions:

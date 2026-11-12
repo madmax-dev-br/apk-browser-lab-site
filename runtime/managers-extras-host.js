@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=e60dd7e71ad7';
+import { createHostRegistry } from './host-contract.js?v=1ac1d0f0dc1e';
 
 // The system-manager methods an ordinary app calls that the first host passes left out, for a one-user, unmanaged, unlocked phone without fingerprint hardware or thermal HAL
 // (android-13.0.0_r1 UserManager / UserManagerService, KeyguardManager / PhoneWindowManager, PowerManager / ThermalManagerService, FingerprintManager):

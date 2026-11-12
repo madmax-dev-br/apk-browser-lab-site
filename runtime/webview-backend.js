@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=e60dd7e71ad7';
-import { networkOf } from './network-native.js?v=e60dd7e71ad7';
-import { WEBVIEW_ERRORS } from './webview-host.js?v=e60dd7e71ad7';
-import { buildCsp } from './webview-bridge.js?v=e60dd7e71ad7';
-import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=e60dd7e71ad7';
+import { APKError } from './apk-error.js?v=1ac1d0f0dc1e';
+import { networkOf } from './network-native.js?v=1ac1d0f0dc1e';
+import { WEBVIEW_ERRORS } from './webview-host.js?v=1ac1d0f0dc1e';
+import { buildCsp } from './webview-bridge.js?v=1ac1d0f0dc1e';
+import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=1ac1d0f0dc1e';
 
 // The Worker's side of the WebView backend (design: docs/APK-REAL-TASKS.md, task 33). The page owns the iframes (src/webview-frame.js); this module decides what may be loaded,
 // tells the page what to load (`post`), and turns the page's events (`handleEvent`) into the callbacks Android would deliver, on the VM main thread, in Android's order.

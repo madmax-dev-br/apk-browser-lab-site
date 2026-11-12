@@ -18,6 +18,8 @@
  * Not modelled: files owned by other apps (there are none: the volume starts with only these empty directories, so the "cannot read another app's files in Download/Documents without READ_MEDIA_*"
  * rule never has a file to hide), MediaStore indexing and the media-collection permission checks (a file written here is not visible through MediaStore queries), per-file owner UIDs, quotas and case
  * folding. The shared volume is never persisted across page reloads (only the app-specific dirs are), as before.
+ * Files of another owner: the files the page attaches to the device (src/shared-storage-host.js) are placed here by that host, read-only, and only while the app's media permission
+ * covers them; MediaStore queries over them are answered by the same host.
  */
 export const PUBLIC_DIRECTORIES = Object.freeze(['Alarms', 'Audiobooks', 'DCIM', 'Documents', 'Download', 'Movies', 'Music', 'Notifications', 'Pictures', 'Podcasts', 'Recordings', 'Ringtones', 'Screenshots']);
 

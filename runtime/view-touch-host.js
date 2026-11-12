@@ -1,4 +1,4 @@
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=e60dd7e71ad7';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=1ac1d0f0dc1e';
 
 // The classic View touch pipeline: View.dispatchTouchEvent / onTouchEvent, ViewGroup.dispatchTouchEvent / onInterceptTouchEvent / requestDisallowInterceptTouchEvent and
 // View.setOnTouchListener, following android-13.0.0_r1 View.java and ViewGroup.java for a single pointer (the browser delivers one pointer per gesture). A real MotionEvent

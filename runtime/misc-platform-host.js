@@ -1,10 +1,12 @@
-import { createHostRegistry } from './host-contract.js?v=e60dd7e71ad7';
-import { APKError } from './apk-error.js?v=e60dd7e71ad7';
-import { cleartextPermitted } from './network-native.js?v=e60dd7e71ad7';
+import { createHostRegistry } from './host-contract.js?v=1ac1d0f0dc1e';
+import { APKError } from './apk-error.js?v=1ac1d0f0dc1e';
+import { cleartextPermitted } from './network-native.js?v=1ac1d0f0dc1e';
+import { probeIsoBmff, sniffContainer } from './media-container.js?v=1ac1d0f0dc1e';
+import { state as ioState } from './libcore-io-native.js?v=1ac1d0f0dc1e';
 
 // Small platform classes: android.os.WorkSource (a set of (uid, name) pairs the framework blames for work), android.media.MediaMetadataRetriever and android.graphics.Movie.
-// MediaMetadataRetriever and Movie need container / GIF decoders the lab does not carry: a missing or unreadable source fails the way the framework does, a readable one says explicitly that
-// there is no extractor (never an invented duration or frame).
+// MediaMetadataRetriever reads the container metadata of MP4 / MOV / 3GP sources (src/media-container.js: duration, size, rotation, track kinds); a missing or unrecognised source fails the way
+// the framework does, and what needs a codec or another container's parser says explicitly that there is no extractor (never an invented duration or frame). Movie (GIF) is not modelled.
 const WS = 'Landroid/os/WorkSource;', MMR = 'Landroid/media/MediaMetadataRetriever;', MOVIE = 'Landroid/graphics/Movie;', STRING = 'Ljava/lang/String;', OBJECT = 'Ljava/lang/Object;';
 const URI = 'Landroid/net/Uri;', CONTEXT = 'Landroid/content/Context;', FD = 'Ljava/io/FileDescriptor;', BITMAP = 'Landroid/graphics/Bitmap;', PARAMS = 'Landroid/media/MediaMetadataRetriever$BitmapParams;', LIST = 'Ljava/util/List;';
 const nullish = v => v === null || v === undefined || v === 0;
@@ -41,27 +43,69 @@ export function createMiscPlatformHost(platform) {
   def(WS, 'toString', `()${STRING}`, (r, _m, [self]) => `WorkSource{${entries(r, self).map(e => e.name == null ? `${e.uid}` : `${e.uid} ${e.name}`).join(', ')}}`);
   def(WS, 'describeContents', '()I', () => 0);
 
-  // ---- MediaMetadataRetriever ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  const noExtractor = what => unsupported(`${what}: the lab has no media container extractor (no MediaExtractor / codecs); a readable source cannot be probed`, 'media-extractor-unsupported');
-  const checkFile = (r, path) => {
+  // ---- MediaMetadataRetriever: container metadata of ISO BMFF sources (MP4 / MOV / 3GP, src/media-container.js); no frames, no other container ---------------------------------------------------
+  const noExtractor = what => unsupported(`${what}: the lab has no media extractor for this (it reads the duration, size, rotation and track kinds of MP4 / MOV / 3GP files; no codecs, no other container)`, 'media-extractor-unsupported');
+  const failed = r => r.throwJava('Ljava/lang/RuntimeException;', 'setDataSource failed: status = 0x80000000');
+  /** The source's bytes become the retriever's metadata; an unreadable or unrecognised source fails as the framework does, a recognised container the lab does not read says so. */
+  const setSource = (r, self, bytes, what) => {
+    const meta = bytes ? probeIsoBmff(bytes) : null;
+    if (!meta) { const container = bytes ? sniffContainer(bytes) : null; if (container === null) failed(r); noExtractor(`${what} (${container === 'ISO BMFF' ? 'an MP4-family file without a readable movie header' : container})`); }
+    r.object(self).retriever = meta;
+  };
+  const fileBytes = (r, path) => { const node = platform.javaIo.fs().node(path); return node && node.type === 'file' ? node.buf.subarray(0, node.size) : null; };
+  const streamBytes = (r, stream) => {
+    const INPUT = 'Ljava/io/InputStream;', chunks = [], buffer = r.newArray('[B', 65536), read = { owner: INPUT, name: 'read', parameters: ['[B', 'I', 'I'], result: 'I', signature: '([BII)I' };
+    try { for (;;) { const n = r.dispatch(read, [stream, buffer, 0, 65536], 'virtual'); if (n < 0) break; chunks.push(r.bytesOf(buffer, 0, n).slice()); } } finally { r.dispatch({ owner: INPUT, name: 'close', parameters: [], result: 'V', signature: '()V' }, [stream], 'virtual'); }
+    const out = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0)); let at = 0; for (const chunk of chunks) { out.set(chunk, at); at += chunk.length; } return out;
+  };
+  const pathSource = (r, self, path, what) => {
     if (nullish(path)) r.throwJava('Ljava/lang/IllegalArgumentException;', null);
-    const p = text(r, path); const exists = platform.javaIo.fs().node(p) !== null;
-    if (!exists) r.throwJava('Ljava/lang/RuntimeException;', 'setDataSource failed: status = 0x80000000');
-    noExtractor(`MediaMetadataRetriever.setDataSource(${p})`);
+    const p = text(r, path); if (/^[a-z][a-z0-9+.-]*:\/\//i.test(p) && !p.startsWith('file://')) noExtractor(`${what} with a network or content address`);
+    setSource(r, self, fileBytes(r, p.replace(/^file:\/\//, '')), what);
   };
   def(MMR, '<init>', '()V', () => {});
-  def(MMR, 'setDataSource', `(${STRING})V`, (r, _m, [, path]) => checkFile(r, path));
-  def(MMR, 'setDataSource', `(${STRING}Ljava/util/Map;)V`, (r, _m, [, path]) => checkFile(r, path));
-  def(MMR, 'setDataSource', `(${CONTEXT}${URI})V`, (r, _m, [, , uri]) => { if (nullish(uri)) r.throwJava('Ljava/lang/IllegalArgumentException;', null); noExtractor('MediaMetadataRetriever.setDataSource(Context, Uri)'); });
-  def(MMR, 'setDataSource', `(${FD})V`, () => noExtractor('MediaMetadataRetriever.setDataSource(FileDescriptor)'));
-  def(MMR, 'setDataSource', `(${FD}JJ)V`, () => noExtractor('MediaMetadataRetriever.setDataSource(FileDescriptor, offset, length)'));
+  def(MMR, 'setDataSource', `(${STRING})V`, (r, _m, [self, path]) => pathSource(r, self, path, 'MediaMetadataRetriever.setDataSource(String)'));
+  def(MMR, 'setDataSource', `(${STRING}Ljava/util/Map;)V`, (r, _m, [self, path]) => pathSource(r, self, path, 'MediaMetadataRetriever.setDataSource(String, Map)'));
+  def(MMR, 'setDataSource', `(${CONTEXT}${URI})V`, (r, _m, [self, context, uri]) => {
+    if (nullish(uri)) r.throwJava('Ljava/lang/IllegalArgumentException;', null);
+    const what = 'MediaMetadataRetriever.setDataSource(Context, Uri)', value = text(r, r.dispatch({ owner: OBJECT, name: 'toString', parameters: [], result: STRING, signature: `()${STRING}` }, [uri], 'virtual')), scheme = /^([a-z][a-z0-9+.-]*):/i.exec(value)?.[1]?.toLowerCase() ?? null;
+    if (scheme === null || scheme === 'file') return setSource(r, self, fileBytes(r, decodeURIComponent(value.replace(/^file:\/\//, '').replace(/[?#].*$/, ''))), what);
+    if (scheme !== 'content') noExtractor(`${what} with a ${scheme}: address`);
+    let bytes = platform.sharedStorage?.bytesFor(r, value, what) ?? null;   // the device's shared storage (same access checks as ContentResolver.openFile)
+    if (bytes === null) {   // another provider (the app's own): ContentResolver.openInputStream, as the framework opens an AssetFileDescriptor
+      if (nullish(context)) r.throwJava('Ljava/lang/IllegalArgumentException;', null);
+      const RESOLVER = 'Landroid/content/ContentResolver;', resolver = r.dispatch({ owner: CONTEXT, name: 'getContentResolver', parameters: [], result: RESOLVER, signature: `()${RESOLVER}` }, [context], 'virtual');
+      const stream = r.dispatch({ owner: RESOLVER, name: 'openInputStream', parameters: [URI], result: 'Ljava/io/InputStream;', signature: `(${URI})Ljava/io/InputStream;` }, [resolver, uri], 'virtual');
+      bytes = nullish(stream) ? null : streamBytes(r, stream);
+    }
+    setSource(r, self, bytes, what);
+  });
+  const descriptorBytes = (r, fd) => { if (nullish(fd)) r.throwJava('Ljava/lang/IllegalArgumentException;', null); const node = ioState(r).table.get(r.object(fd).fields.get('Ljava/io/FileDescriptor;->descriptor:I') | 0)?.desc?.node; return node && node.type === 'file' ? node.buf.subarray(0, node.size) : null; };
+  def(MMR, 'setDataSource', `(${FD})V`, (r, _m, [self, fd]) => setSource(r, self, descriptorBytes(r, fd), 'MediaMetadataRetriever.setDataSource(FileDescriptor)'));
+  def(MMR, 'setDataSource', `(${FD}JJ)V`, (r, _m, [self, fd, offset, length]) => {
+    const bytes = descriptorBytes(r, fd), from = Number(offset), count = Number(length); if (from < 0 || count < 0) r.throwJava('Ljava/lang/IllegalArgumentException;', null);
+    setSource(r, self, bytes === null ? null : bytes.subarray(Math.min(from, bytes.length), Math.min(from + count, bytes.length)), 'MediaMetadataRetriever.setDataSource(FileDescriptor, offset, length)');
+  });
   def(MMR, 'setDataSource', '(Landroid/media/MediaDataSource;)V', () => noExtractor('MediaMetadataRetriever.setDataSource(MediaDataSource)'));
-  def(MMR, 'release', '()V', () => {}); def(MMR, 'close', '()V', () => {});
+  def(MMR, 'release', '()V', (r, _m, [self]) => { r.object(self).retriever = null; }); def(MMR, 'close', '()V', (r, _m, [self]) => { r.object(self).retriever = null; });
   const noSource = r => r.throwJava('Ljava/lang/IllegalStateException;', 'No data source set.');
-  def(MMR, 'extractMetadata', `(I)${STRING}`, noSource);
-  def(MMR, 'getEmbeddedPicture', '()[B', noSource);
-  for (const [name, sig] of [['getFrameAtTime', '()'], ['getFrameAtTime', '(J)'], ['getFrameAtTime', '(JI)'], ['getFrameAtTime', `(JI${PARAMS})`], ['getScaledFrameAtTime', '(JIII)'], ['getScaledFrameAtTime', `(JIII${PARAMS})`], ['getFrameAtIndex', '(I)'], ['getFrameAtIndex', `(I${PARAMS})`], ['getImageAtIndex', '(I)'], ['getImageAtIndex', `(I${PARAMS})`], ['getPrimaryImage', '()'], ['getPrimaryImage', `(${PARAMS})`]]) def(MMR, name, `${sig}${BITMAP}`, noSource);
-  def(MMR, 'getFramesAtIndex', `(II)${LIST}`, noSource); def(MMR, 'getFramesAtIndex', `(II${PARAMS})${LIST}`, noSource);
+  const sourceOf = (r, self) => r.object(self).retriever ?? noSource(r);
+  // METADATA_KEY_*: NUM_TRACKS 10, DURATION 9, MIMETYPE 12, HAS_AUDIO 16, HAS_VIDEO 17, VIDEO_WIDTH 18, VIDEO_HEIGHT 19, VIDEO_ROTATION 24; a key the file does not carry answers null, as on Android.
+  def(MMR, 'extractMetadata', `(I)${STRING}`, (r, _m, [self, key]) => {
+    const meta = sourceOf(r, self);
+    switch (key) {
+      case 9: return String(meta.durationMs); case 10: return String(meta.tracks); case 12: return meta.mime;
+      case 16: return meta.hasAudio ? 'yes' : null; case 17: return meta.hasVideo ? 'yes' : null;
+      case 18: return meta.hasVideo && meta.width !== null ? String(meta.width) : null; case 19: return meta.hasVideo && meta.height !== null ? String(meta.height) : null;
+      case 24: return meta.hasVideo ? String(meta.rotation) : null;
+      default: return noExtractor(`MediaMetadataRetriever.extractMetadata(${key}): only the duration, track count, MIME type, has-audio / has-video, video size and rotation keys are read`);
+    }
+  });
+  def(MMR, 'getEmbeddedPicture', '()[B', (r, _m, [self]) => { sourceOf(r, self); return noExtractor('MediaMetadataRetriever.getEmbeddedPicture'); });
+  for (const [name, sig] of [['getFrameAtTime', '()'], ['getFrameAtTime', '(J)'], ['getFrameAtTime', '(JI)'], ['getFrameAtTime', `(JI${PARAMS})`], ['getScaledFrameAtTime', '(JIII)'], ['getScaledFrameAtTime', `(JIII${PARAMS})`], ['getFrameAtIndex', '(I)'], ['getFrameAtIndex', `(I${PARAMS})`], ['getImageAtIndex', '(I)'], ['getImageAtIndex', `(I${PARAMS})`], ['getPrimaryImage', '()'], ['getPrimaryImage', `(${PARAMS})`]])
+    def(MMR, name, `${sig}${BITMAP}`, (r, _m, [self]) => { sourceOf(r, self); return noExtractor(`MediaMetadataRetriever.${name}: decoding a video frame needs a codec`); });
+  def(MMR, 'getFramesAtIndex', `(II)${LIST}`, (r, _m, [self]) => { sourceOf(r, self); return noExtractor('MediaMetadataRetriever.getFramesAtIndex: decoding a video frame needs a codec'); });
+  def(MMR, 'getFramesAtIndex', `(II${PARAMS})${LIST}`, (r, _m, [self]) => { sourceOf(r, self); return noExtractor('MediaMetadataRetriever.getFramesAtIndex: decoding a video frame needs a codec'); });
 
   // ---- Movie (GIF decoding) -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   const noMovie = what => unsupported(`${what}: android.graphics.Movie (GIF decoding) is not modelled; use ImageDecoder / BitmapFactory for still images`, 'movie-unsupported');

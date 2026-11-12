@@ -608,3 +608,58 @@ main>footer a{color:var(--accent-ink);text-decoration:underline;text-underline-o
 
 /* "Activities ignoradas" is not offered in the panel; the feature and its state stay (lab API, saved rules), only the group is not listed. */
 #cp-sec-ignored{display:none}
+
+/* ---- "Arquivos do dispositivo" (src/shared-files-panel.js): the files attached to the virtual device's shared storage --------------------------------------------------- */
+.files-drop{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px 12px;border:1px dashed var(--line-strong);border-radius:var(--r-control);text-align:center}
+.files-drop p{margin:0;font-size:12px;color:var(--muted)}
+.files-drop.dragging{border-style:solid;border-color:var(--accent);background-color:var(--accent-soft)}
+.files-list{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.files-list[hidden]{display:none}
+.files-item{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:var(--r-control);background-color:var(--surface)}
+.files-thumb{width:40px;height:40px;border-radius:6px;object-fit:cover;background-color:var(--surface-2)}
+span.files-thumb{display:grid;place-items:center;color:var(--muted)}
+span.files-thumb svg{width:22px;height:22px;fill:currentColor}
+.files-text{display:flex;flex-direction:column;min-width:0}
+.files-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;color:var(--ink)}
+.files-text small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.files-remove{padding:4px 8px;border:1px solid var(--line);border-radius:6px;background-color:transparent;font-size:12px;color:var(--soft);cursor:pointer}
+.files-remove:hover{border-color:var(--warn);color:var(--warn)}
+#files-clear{margin-top:12px}
+
+/* The system file picker (src/shared-files-panel.js) is a lab dialog drawn over the phone screen, next to the permission dialog. It is the one block of this file that sits inside
+   #android-device: the embeddable player has no picker, so its rules live here and name every property they need (nothing is inherited from the page). */
+#android-device .sp-scrim{position:absolute;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45);font:400 14px/20px Roboto,system-ui,sans-serif;letter-spacing:normal;text-align:start}
+#android-device .sp-scrim[hidden]{display:none}
+#android-device .sp-card{box-sizing:border-box;width:100%;max-height:82%;display:flex;flex-direction:column;gap:8px;padding:20px 16px 36px;border-radius:28px 28px 0 0;background:#fff;color:#1f1f1f;outline:none}
+#android-device .sp-scrim:not(.sp-photos){align-items:stretch}
+#android-device .sp-scrim:not(.sp-photos) .sp-card{max-height:none;border-radius:0;padding-top:40px}
+#android-device .sp-title{margin:0;font:500 20px/28px Roboto,system-ui,sans-serif;color:inherit}
+#android-device .sp-hint,#android-device .sp-others,#android-device .sp-empty{margin:0;font-size:12px;line-height:16px;color:#5f6368}
+#android-device .sp-empty{padding:24px 8px;font-size:14px;line-height:20px;text-align:center}
+#android-device .sp-list{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:2px;overflow-y:auto;min-height:0;flex:1 1 auto}
+#android-device .sp-photos .sp-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;flex:0 1 auto}
+#android-device .sp-item{box-sizing:border-box;width:100%;display:grid;grid-template-columns:48px minmax(0,1fr);gap:12px;align-items:center;padding:8px;border:2px solid transparent;border-radius:12px;background:transparent;color:inherit;font:inherit;text-align:start;cursor:pointer}
+#android-device .sp-photos .sp-item{grid-template-columns:minmax(0,1fr);gap:4px;padding:4px}
+#android-device .sp-item:hover,#android-device .sp-item:focus-visible{background:#e8f0fe}
+#android-device .sp-item:focus-visible,#android-device .sp-button:focus-visible{outline:3px solid #0b57d0;outline-offset:1px}
+#android-device .sp-item[aria-pressed=true]{border-color:#0b57d0;background:#e8f0fe}
+#android-device .sp-thumb{width:48px;height:48px;border-radius:8px;object-fit:cover;background:#eef0f4}
+#android-device .sp-photos .sp-thumb{width:100%;height:auto;aspect-ratio:1}
+#android-device span.sp-thumb{display:grid;place-items:center;color:#5f6368}
+#android-device span.sp-thumb svg{width:26px;height:26px;fill:currentColor}
+#android-device .sp-text{display:flex;flex-direction:column;min-width:0}
+#android-device .sp-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:20px}
+#android-device .sp-text small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:16px;color:#5f6368}
+#android-device .sp-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:4px}
+#android-device .sp-button{min-height:44px;padding:8px 20px;border:1px solid #c4c7c5;border-radius:100px;background:#fff;color:#0b57d0;font:500 14px/20px Roboto,system-ui,sans-serif;cursor:pointer}
+#android-device .sp-button[hidden]{display:none}
+#android-device .sp-button.sp-primary{border-color:#0b57d0;background:#0b57d0;color:#fff}
+#android-device .sp-button:disabled{border-color:#e0e3e7;background:#e0e3e7;color:#8a8f98;cursor:default}
+#android-device .sp-scrim.dark .sp-card{background:#2b2d30;color:#e3e3e3}
+#android-device .sp-scrim.dark :is(.sp-hint,.sp-others,.sp-empty,.sp-text small,span.sp-thumb){color:#c4c7c5}
+#android-device .sp-scrim.dark .sp-thumb{background:#3a3d42}
+#android-device .sp-scrim.dark .sp-item:hover,#android-device .sp-scrim.dark .sp-item:focus-visible,#android-device .sp-scrim.dark .sp-item[aria-pressed=true]{background:#394457}
+#android-device .sp-scrim.dark .sp-item[aria-pressed=true]{border-color:#a8c7fa}
+#android-device .sp-scrim.dark .sp-button{background:#2b2d30;border-color:#5e5e5e;color:#a8c7fa}
+#android-device .sp-scrim.dark .sp-button.sp-primary{background:#a8c7fa;border-color:#a8c7fa;color:#062e6f}
+#android-device .sp-scrim.dark .sp-button:disabled{background:#3a3d42;border-color:#3a3d42;color:#8a8f98}

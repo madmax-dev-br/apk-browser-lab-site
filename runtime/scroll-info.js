@@ -2,8 +2,8 @@
 // a Compose node answers with its ScrollAxisRange semantics (src/compose-semantics.js scrollInfo), a View with what its scrollbars are drawn from
 // (View.computeVerticalScrollOffset / Range / Extent and the horizontal ones, which ScrollView, RecyclerView and the others override). Units are the VM's pixels
 // (1 px = 1 dp at the lab's density). Runs in the VM Worker as a plugin query; no process.*.
-import { isFreedId } from './heap-gc.js?v=e60dd7e71ad7';
-import { PluginQueryError } from './plugin-queries.js?v=e60dd7e71ad7';
+import { isFreedId } from './heap-gc.js?v=1ac1d0f0dc1e';
+import { PluginQueryError } from './plugin-queries.js?v=1ac1d0f0dc1e';
 
 const VIEW = 'Landroid/view/View;';
 

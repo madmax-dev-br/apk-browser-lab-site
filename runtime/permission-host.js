@@ -1,8 +1,8 @@
 // The VM side of the runtime-permission model (src/runtime-permissions.js): the state the page sends, what checkSelfPermission sees (platform.grantedPermissions), the requests that wait
 // for the page's permission dialog and the rationale flag. The Worker posts `permission-request` to the page and takes the answer back with `respond`; nothing blocks in between, as on
 // Android (Activity.requestPermissions returns at once and the result is delivered later through onRequestPermissionsResult).
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=e60dd7e71ad7';
-import { computeGranted, emptyConfig, sanitizeConfig, planRequest, answerDialog, settleRequest, rationale, sectionOf } from './runtime-permissions.js?v=e60dd7e71ad7';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=1ac1d0f0dc1e';
+import { computeGranted, emptyConfig, sanitizeConfig, planRequest, answerDialog, settleRequest, rationale, sectionOf } from './runtime-permissions.js?v=1ac1d0f0dc1e';
 
 export function createPermissionHost(platform) {
   let config = emptyConfig(), sequence = 0;
@@ -15,7 +15,7 @@ export function createPermissionHost(platform) {
     if (typeof label === 'number' && label > 0) { try { const value = platform.resource(label, ['string'])?.value; if (typeof value === 'string' && value) return value; } catch { /* unresolvable label: the package name */ } }
     return platform.packageName ?? 'O app';
   };
-  const refresh = () => { platform.grantedPermissions = computeGranted(config, manifest()); };
+  const refresh = () => { platform.grantedPermissions = computeGranted(config, manifest()); platform.sharedStorage?.permissionsChanged();   /* the media files the File API shows follow the grant (src/shared-storage-host.js) */ };
   const host = {
     get config() { return config; },
     get pendingCount() { return pending.size; },

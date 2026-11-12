@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=e60dd7e71ad7';
-import { APKError } from './apk-error.js?v=e60dd7e71ad7';
+import { createHostRegistry } from './host-contract.js?v=1ac1d0f0dc1e';
+import { APKError } from './apk-error.js?v=1ac1d0f0dc1e';
 
 // android.content.ContentResolver (android-13.0.0_r1 ContentResolver.java) and the default bodies of android.content.ContentProvider for the virtual device. The device has one package, so a
 // content authority resolves to a provider this app declares and installed at start (ActivityThread.installContentProviders); the ContentResolver calls it directly on the calling thread, which is what
@@ -23,7 +23,9 @@ export function createContentResolverApiHost(platform) {
   const uriText = (r, uri) => text(r, call(r, uri, OBJECT, 'toString', [], STRING));
   const authorityOf = (r, uri) => text(r, call(r, uri, URI, 'getAuthority', [], STRING));
   const schemeOf = (r, uri) => text(r, call(r, uri, URI, 'getScheme', [], STRING));
-  const providerOf = (r, uri) => { if (nullish(uri)) npe(r, 'uri'); const authority = authorityOf(r, uri); return authority === null ? null : platform.appServices.providerByAuthority(authority); };
+  // A content authority is one of this app's providers, else one of the device's shared-storage providers (MediaStore, the documents providers: src/shared-storage-host.js).
+  const byAuthority = (r, authority) => platform.appServices.providerByAuthority(authority) ?? platform.sharedStorage?.provider(r, authority) ?? null;
+  const providerOf = (r, uri) => { if (nullish(uri)) npe(r, 'uri'); const authority = authorityOf(r, uri); return authority === null ? null : byAuthority(r, authority); };
   const unknown = (r, uri) => r.throwJava('Ljava/lang/IllegalArgumentException;', `Unknown URL ${uriText(r, uri)}`);
   const noProvider = (r, uri) => r.throwJava('Ljava/io/FileNotFoundException;', `No content provider: ${uriText(r, uri)}`);
   const emptyList = r => callStatic(r, 'Ljava/util/Collections;', 'emptyList', [], LIST);
@@ -59,7 +61,7 @@ export function createContentResolverApiHost(platform) {
   def(RESOLVER, 'call', `(${URI}${STRING}${STRING}${BUNDLE})${BUNDLE}`, (r, _m, [, uri, method, arg, extras]) => { if (nullish(method)) npe(r, 'method'); const p = providerOf(r, uri); if (p === null) unknown(r, uri); return call(r, p, PROVIDER, 'call', [STRING, STRING, STRING, BUNDLE], BUNDLE, [authorityOf(r, uri), method, arg, extras]); });
   def(RESOLVER, 'call', `(${STRING}${STRING}${STRING}${BUNDLE})${BUNDLE}`, (r, _m, [, authority, method, arg, extras]) => {
     if (nullish(authority)) npe(r, 'authority'); if (nullish(method)) npe(r, 'method');
-    const p = platform.appServices.providerByAuthority(text(r, authority)); if (p === null) r.throwJava('Ljava/lang/IllegalArgumentException;', `Unknown authority ${text(r, authority)}`);
+    const p = byAuthority(r, text(r, authority)); if (p === null) r.throwJava('Ljava/lang/IllegalArgumentException;', `Unknown authority ${text(r, authority)}`);
     return call(r, p, PROVIDER, 'call', [STRING, STRING, STRING, BUNDLE], BUNDLE, [authority, method, arg, extras]);
   });
   def(RESOLVER, 'canonicalize', `(${URI})${URI}`, (r, _m, [, uri]) => { const p = providerOf(r, uri); return p === null ? null : call(r, p, PROVIDER, 'canonicalize', [URI], URI, [uri]); });
@@ -157,10 +159,10 @@ export function createContentResolverApiHost(platform) {
   def(RESOLVER, 'applyBatch', `(${STRING}Ljava/util/ArrayList;)[Landroid/content/ContentProviderResult;`, () => unsupported('ContentResolver.applyBatch: ContentProviderOperation / ContentProviderResult are not part of the lab framework', 'content-batch-unsupported'));
   for (const sig of [`(${PROVIDER})${RESOLVER}`, `(Landroid/content/ContentProviderClient;)${RESOLVER}`]) def(RESOLVER, 'wrap', sig, () => unsupported('ContentResolver.wrap is a test seam over a single provider; not modelled', 'content-resolver-wrap-unsupported'), { static: true });
 
-  // ---- persisted URI permissions: the app is the only package, so there are none to take or give back ----------------------------------------------------------------------------------------
-  def(RESOLVER, 'takePersistableUriPermission', `(${URI}I)V`, (r, _m, [, uri, flags]) => { if (nullish(uri)) npe(r, 'uri'); if ((flags & 3) === 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Must specify a read or write permission'); r.throwJava('Ljava/lang/SecurityException;', `No persistable permission grants found for URI ${uriText(r, uri)}`); });
-  def(RESOLVER, 'releasePersistableUriPermission', `(${URI}I)V`, (r, _m, [, uri]) => { if (nullish(uri)) npe(r, 'uri'); });
-  def(RESOLVER, 'getPersistedUriPermissions', `()${LIST}`, r => emptyList(r)); def(RESOLVER, 'getOutgoingPersistedUriPermissions', `()${LIST}`, r => emptyList(r));
+  // ---- persisted URI permissions: the grants a system picker gave (src/shared-storage-host.js); nothing else grants Uris to the only package ----------------------------------------------------------------------------------------
+  def(RESOLVER, 'takePersistableUriPermission', `(${URI}I)V`, (r, _m, [, uri, flags]) => { if (nullish(uri)) npe(r, 'uri'); if ((flags & 3) === 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Must specify a read or write permission'); if (platform.sharedStorage?.takePersistable(uriText(r, uri), flags)) return; r.throwJava('Ljava/lang/SecurityException;', `No persistable permission grants found for URI ${uriText(r, uri)}`); });
+  def(RESOLVER, 'releasePersistableUriPermission', `(${URI}I)V`, (r, _m, [, uri, flags]) => { if (nullish(uri)) npe(r, 'uri'); if ((flags & 3) === 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Must specify a read or write permission'); platform.sharedStorage?.releasePersistable(uriText(r, uri), flags); });
+  def(RESOLVER, 'getPersistedUriPermissions', `()${LIST}`, r => { const taken = platform.sharedStorage?.persistedPermissions(r) ?? []; if (!taken.length) return emptyList(r); const list = construct(r, 'Ljava/util/ArrayList;', [], []); for (const item of taken) call(r, list, 'Ljava/util/ArrayList;', 'add', [OBJECT], 'Z', [item]); return list; }); def(RESOLVER, 'getOutgoingPersistedUriPermissions', `()${LIST}`, r => emptyList(r));
 
   // ---- sync (no accounts) -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   const acct = (r, account, authority) => { if (nullish(account) || nullish(authority)) npe(r); };
@@ -208,7 +210,7 @@ export function createContentResolverApiHost(platform) {
   const acquire = (r, provider) => { if (provider === null) return null; const o = r.makeObject(CLIENT); r.object(o).client = { provider, released: false }; return o; };
   for (const name of ['acquireContentProviderClient', 'acquireUnstableContentProviderClient']) {
     def(RESOLVER, name, `(${URI})${CLIENT}`, (r, _m, [, uri]) => { if (nullish(uri)) npe(r, 'uri'); return acquire(r, providerOf(r, uri)); });
-    def(RESOLVER, name, `(${STRING})${CLIENT}`, (r, _m, [, authority]) => { if (nullish(authority)) npe(r, 'name'); return acquire(r, platform.appServices.providerByAuthority(text(r, authority))); });
+    def(RESOLVER, name, `(${STRING})${CLIENT}`, (r, _m, [, authority]) => { if (nullish(authority)) npe(r, 'name'); return acquire(r, byAuthority(r, text(r, authority))); });
   }
   const viaClient = (name, params, result, args = params) => def(CLIENT, name, `(${params.join('')})${result}`, (r, _m, [self, ...values]) => call(r, clientOf(r, self).provider, PROVIDER, name, params, result, values));
   viaClient('query', [URI, STRINGS, STRING, STRINGS, STRING], CURSOR); viaClient('query', [URI, STRINGS, STRING, STRINGS, STRING, SIGNAL], CURSOR); viaClient('query', [URI, STRINGS, BUNDLE, SIGNAL], CURSOR);

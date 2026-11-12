@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=e60dd7e71ad7';
-import { createRasterReceiver } from './raster-cache.js?v=e60dd7e71ad7';
+import { createWebAudioPlayer } from './web-audio-player.js?v=1ac1d0f0dc1e';
+import { createRasterReceiver } from './raster-cache.js?v=1ac1d0f0dc1e';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=e60dd7e71ad7', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=1ac1d0f0dc1e', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -22,6 +22,7 @@ export class APKWorkerClient {
       if (data?.type === 'screen-snapshot') { this.lastScreenSnapshot = { text: data.text, receivedAt: Date.now() }; return; }
       if (data?.type === 'permission-request') { this.onPermissionRequest?.(data.request); return; }   // Activity.requestPermissions that needs the user's answer
       if (data?.type === 'permission-config') { this.onPermissionConfig?.(data.config); return; }
+      if (data?.type === 'system-picker-request') { this.onSystemPickerRequest?.(data.request); return; }   // a file picker Intent (GET_CONTENT, OPEN_DOCUMENT, PICK, PICK_IMAGES) waits for the user's choice
       const call = this.sideCalls?.get(data?.requestId);
       if (call && (data.type === 'result' || data.type === 'error')) { clearTimeout(call.timer); this.sideCalls.delete(data.requestId); if (data.type === 'result') call.resolve(data); else call.reject(Object.assign(new Error(data.error?.message || 'Falha na VM.'), data.error || {})); return; }
       const side = this.sideRequests?.get(data?.requestId);
@@ -134,6 +135,10 @@ export class APKWorkerClient {
   async setIgnoredActivities(entries) { return (await this.sideCall('ignored-activities', { entries })).statuses; }
   /** The permission states and the simulated location ({ config, location }), applied between two VM events; either part may be left out. */
   async setPermissions(payload) { return this.sideCall('permissions-config', payload); }
+  /** The files of the device's shared storage ({ replace, remove: [id], files: [{ id, name, mime, size, modified, width, height, duration, bytes }], dialogs }); resolves with the device's list. */
+  async setSharedFiles(payload) { return this.sideCall('shared-files', payload, 30000); }
+  /** The answer to a `system-picker-request` (onSystemPickerRequest): the chosen file ids in order, or null when the picker was dismissed. */
+  systemPickerResponse(id, selected) { try { this.worker?.postMessage({ type: 'system-picker-response', requestId: ++this.sequence, id, selected }); } catch { /* the Worker is gone */ } }
   /** The answer to a `permission-request` (onPermissionRequest): the config after the user's dialog, or null when it was dismissed. */
   permissionResponse(id, config) { try { this.worker?.postMessage({ type: 'permission-response', requestId: ++this.sequence, id, config }); } catch { /* the Worker is gone */ } }
   /** Methods of the loaded APK matching `query`, and the return types of owner->name(parameters) for a Java-form text. */
