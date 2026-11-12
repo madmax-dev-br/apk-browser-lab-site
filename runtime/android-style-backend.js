@@ -1,7 +1,7 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=1ac1d0f0dc1e';
-import { APKError } from './apk-runtime.js?v=1ac1d0f0dc1e';
-import { ephemeronMap } from './heap-gc.js?v=1ac1d0f0dc1e';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=1ac1d0f0dc1e';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=b4879748881a';
+import { APKError } from './apk-runtime.js?v=b4879748881a';
+import { ephemeronMap } from './heap-gc.js?v=b4879748881a';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=b4879748881a';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };

@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=1ac1d0f0dc1e';
-import { APKError } from './apk-error.js?v=1ac1d0f0dc1e';
+import { createHostRegistry } from './host-contract.js?v=b4879748881a';
+import { APKError } from './apk-error.js?v=b4879748881a';
 
 // android.content.Intent public API (API 33) the platform Intent model did not carry, ported from android-13.0.0_r1 Intent.java: filter identity (filterEquals / filterHashCode / cloneFilter),
 // fillIn, selectors, clip data, source bounds, identifier, the list extras, createChooser, the make*Activity factories, the Intent URI syntax (toUri / parseUri / getIntent) and mime type

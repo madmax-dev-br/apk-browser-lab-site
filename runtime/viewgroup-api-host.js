@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=1ac1d0f0dc1e';
-import { APKError } from './apk-error.js?v=1ac1d0f0dc1e';
+import { createHostRegistry } from './host-contract.js?v=b4879748881a';
+import { APKError } from './apk-error.js?v=b4879748881a';
 
 // android.view.ViewGroup public API (API 33) that the platform ViewGroup model (child array, add/remove, clip flags, focus, nested scrolling) did not carry, with the semantics of
 // android-13.0.0_r1 ViewGroup.java: the group flags (states from children, drawing-cache flags, motion-event splitting, children drawing order, static transformations,

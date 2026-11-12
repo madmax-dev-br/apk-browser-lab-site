@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=1ac1d0f0dc1e';
-import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=1ac1d0f0dc1e';
-import { isInterfaceName } from './webview-bridge.js?v=1ac1d0f0dc1e';
-import { APKError } from './apk-error.js?v=1ac1d0f0dc1e';
+import { gcRoot } from './heap-gc.js?v=b4879748881a';
+import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=b4879748881a';
+import { isInterfaceName } from './webview-bridge.js?v=b4879748881a';
+import { APKError } from './apk-error.js?v=b4879748881a';
 
 // android.webkit.WebView and its public companions for the browser VM (design: docs/APK-REAL-TASKS.md, task 33).
 //
@@ -248,6 +248,8 @@ export function createWebViewHost(platform) {
   def(WEBVIEW, 'getWebViewClient', `()${CLIENT}`, (r, _m, [self]) => stateOf(r, self).client);
   def(WEBVIEW, 'setWebChromeClient', `(${CHROME})V`, (r, _m, [self, chrome]) => { stateOf(r, self).chrome = isNull(chrome) ? null : chrome; });
   def(WEBVIEW, 'getWebChromeClient', `()${CHROME}`, (r, _m, [self]) => stateOf(r, self).chrome);
+  // The listener is kept; the lab's WebView never starts a download (its frame is sandboxed without downloads), so onDownloadStart is never called.
+  def(WEBVIEW, 'setDownloadListener', '(Landroid/webkit/DownloadListener;)V', (r, _m, [self, listener]) => { stateOf(r, self).downloadListener = isNull(listener) ? null : listener; });
   for (const name of ['onPause', 'onResume']) def(WEBVIEW, name, '()V', (r, _m, [self]) => { stateOf(r, self).paused = name === 'onPause'; });
   for (const name of ['pauseTimers', 'resumeTimers', 'clearCache', 'clearFormData', 'clearSslPreferences', 'freeMemory', 'clearMatches']) def(WEBVIEW, name, name === 'clearCache' ? '(Z)V' : '()V', () => undefined);
   def(WEBVIEW, 'destroy', '()V', (r, _m, [self]) => { const s = stateOf(r, self); s.destroyed = true; s.loadId++; s.loading = false; backend()?.destroy?.(r, self, s); });
@@ -317,6 +319,9 @@ export function createWebViewHost(platform) {
   def(SETTINGS, 'getUserAgentString', `()${STRING}`, (r, _m, [self]) => r.object(self).values.get('UserAgentString'));
   def(SETTINGS, 'setAppCachePath', `(${STRING})V`, () => undefined); def(SETTINGS, 'setAppCacheMaxSize', '(J)V', () => undefined); def(SETTINGS, 'setGeolocationDatabasePath', `(${STRING})V`, () => undefined);
   def(SETTINGS, 'setDefaultZoom', '(Ljava/lang/Object;)V', () => undefined);
+  // Deprecated settings Android itself ignores: passwords are not saved since API 18 (getSavePassword() is false) and the database path is managed by the WebView since API 19 (getDatabasePath() is "").
+  def(SETTINGS, 'setSavePassword', '(Z)V', () => undefined); def(SETTINGS, 'getSavePassword', '()Z', () => 0);
+  def(SETTINGS, 'setDatabasePath', `(${STRING})V`, () => undefined); def(SETTINGS, 'getDatabasePath', `()${STRING}`, () => '');
   def(SETTINGS, 'getDefaultUserAgent', `(${CONTEXT})${STRING}`, r => settingsContext(r).userAgent, { static: true });
 
   // ---- WebViewClient / WebChromeClient defaults (what a client that overrides nothing does) ------------------------------------------------------------------------------------

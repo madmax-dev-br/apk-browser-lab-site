@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=1ac1d0f0dc1e';
-import { gcRoot } from './heap-gc.js?v=1ac1d0f0dc1e';
+import { createHostRegistry } from './host-contract.js?v=b4879748881a';
+import { gcRoot } from './heap-gc.js?v=b4879748881a';
 
 // android.net.NetworkInfo (android-13.0.0_r1, deprecated since API 29) with its State and DetailedState enums, built from the lab's connectivity model: the virtual device has a Wi-Fi radio
 // (TYPE_WIFI, SSID of the virtual access point) and a mobile radio (TYPE_MOBILE, LTE), and platform.device.connectivity says which one carries the default network ('online' = Wi-Fi, any other

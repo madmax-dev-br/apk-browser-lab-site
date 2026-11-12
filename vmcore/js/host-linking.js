@@ -23,10 +23,12 @@
 //  7. The java.lang box classes get a payload (natives.h: the value and a state word; 16 bytes, 24 for Long and Double) and the HostState record (VM.hostState) names their
 //     Class records and the boxPrimitive caches, so the box natives (natives.c, bound by vmcore/js/host-bridge.js to the bridges the JavaScript VM selects) and the record
 //     facades' `boxed` (host-bridge.js) share one value. AtomicInteger gets the same payload for its `atomicValue` (its get/compareAndSet natives).
+//  8. An interface method of the app that only a host superclass implements (linker.buildVtable leaves the abstract interface method in the slot): a host-dispatch record of
+//     the nearest host superclass, selected by APKRuntime.dispatch.
 //  5. Constructors of Throwable classes without DEX code are host methods like any other (not METHOD_THROWABLE_INIT): the JavaScript VM's constructor bridges keep the message,
 //     cause and captured stack on the record, which here is the companion, where Throwable's host methods read them.
 
-import { BOX_CLASSES, ATOMIC_INTEGER } from './natives.js?v=1ac1d0f0dc1e';
+import { BOX_CLASSES, ATOMIC_INTEGER } from './natives.js?v=b4879748881a';
 
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;';
 // natives.h HostState: boxClass[8] then boxCache[8]; the box payload sizes; the kinds with a boxPrimitive cache (B S C I J)
@@ -107,6 +109,20 @@ export function installHostLinking(linker, runtime, { staticValue }) {
       this.w32(info.address + CLASS_ITABLE, itable.length ? this.words(itable.flatMap(([it, map]) => [it.address, map])) : 0);
     }
     return info;
+  };
+
+  // (8) a class with DEX code below a host class (a View subclass, a Service...) that implements an interface of the app whose method only the host superclass provides
+  // (`interface HasContext { Context getContext(); }` on a View subclass): the linker's vtable has the abstract interface method in that slot, because host classes have no slots of
+  // their own methods. The slot gets a host-dispatch record of the nearest host superclass, so the call reaches APKRuntime.dispatch, which selects by the receiver's class as the
+  // JavaScript VM does (the host's method, or AbstractMethodError when the host has none either). Chains whose only host class is java.lang.Object keep the abstract method.
+  const buildVtable = linker.buildVtable;
+  linker.buildVtable = function (info) {
+    buildVtable.call(this, info);
+    let host = info.superInfo; while (host && host.cls) host = host.superInfo;
+    if (!host || host.type === OBJECT) return;
+    info.vtable.forEach((mi, slot) => {
+      if (mi.owner.isInterface && !mi.def?.code && !mi.hostDispatch) info.vtable[slot] = dispatchRecord(host, mi.name, mi.nameSig.slice(mi.name.length));
+    });
   };
 
   // (6) a static, direct or super call the class chain does not answer: a host-call record of the referenced class (no slot), served by APKRuntime.dispatch with the site's reference

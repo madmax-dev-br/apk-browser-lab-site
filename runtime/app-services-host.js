@@ -1,16 +1,16 @@
-import { resolveIntentFields } from './intent-resolver.js?v=1ac1d0f0dc1e';
-import { APKError } from './apk-error.js?v=1ac1d0f0dc1e';
-import { registerPackageValueFields } from './package-value-fields.js?v=1ac1d0f0dc1e';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=1ac1d0f0dc1e';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=1ac1d0f0dc1e';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=1ac1d0f0dc1e';
+import { resolveIntentFields } from './intent-resolver.js?v=b4879748881a';
+import { APKError } from './apk-error.js?v=b4879748881a';
+import { registerPackageValueFields } from './package-value-fields.js?v=b4879748881a';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=b4879748881a';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=b4879748881a';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=b4879748881a';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
 // provider lookup androidx.startup relies on. AOSP references: android-13.0.0_r1 ContextImpl.java, SharedPreferencesImpl.java,
 // ContentProvider.java, ActivityThread.installContentProviders / handleBindApplication, ActivityManagerService.generateApplicationProvidersLocked.
 
-const CONTEXT = 'Landroid/content/Context;', WRAPPER = 'Landroid/content/ContextWrapper;', IMPL = 'Landroid/app/ContextImpl;';
+const CONTEXT = 'Landroid/content/Context;', WRAPPER = 'Landroid/content/ContextWrapper;', IMPL = 'Landroid/app/ContextImpl;', MUTABLE_WRAPPER = 'Landroid/content/MutableContextWrapper;';
 const SP = 'Landroid/content/SharedPreferences;', SP_IMPL = 'Landroid/app/SharedPreferencesImpl;', EDITOR = 'Landroid/content/SharedPreferences$Editor;', EDITOR_IMPL = 'Landroid/app/SharedPreferencesImpl$EditorImpl;';
 const LISTENER = 'Landroid/content/SharedPreferences$OnSharedPreferenceChangeListener;';
 const FILE = 'Ljava/io/File;', STRING = 'Ljava/lang/String;', BUNDLE = 'Landroid/os/Bundle;', OBJECT = 'Ljava/lang/Object;';
@@ -88,6 +88,10 @@ export function createAppServicesHost(platform) {
     for (const owner of [CONTEXT, WRAPPER, IMPL]) def(owner, name, signature, scoped, options);
   };
   type(CONTEXT, OBJECT); type(WRAPPER, CONTEXT); type(IMPL, CONTEXT, [], { allocatable: true }); // same hierarchy as the platform (def() must not default these to Object)
+  // android.content.MutableContextWrapper: a ContextWrapper whose base can be replaced (ContextWrapper is a host class: its base is the record's baseContext, not a DEX field).
+  type(MUTABLE_WRAPPER, WRAPPER, [], { allocatable: true });
+  def(MUTABLE_WRAPPER, '<init>', `(${CONTEXT})V`, (r, _m, [self, base]) => { r.object(self).baseContext = base ?? null; });
+  def(MUTABLE_WRAPPER, 'setBaseContext', `(${CONTEXT})V`, (r, _m, [self, base]) => { r.object(self).baseContext = base ?? null; });
   // ---- Context permission checks (ContextImpl.checkPermission & friends). The app is the only process, so every caller is the app itself; it holds a permission when
   // its manifest requests it and the permission is installed with "normal" protection (or is one the app defines itself); dangerous permissions stay denied until a
   // runtime grant (platform.grantedPermissions), signature/privileged ones never reach a third-party app.

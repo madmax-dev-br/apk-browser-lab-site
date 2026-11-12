@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 8305024,
-  "sha256": "862bb554a287a43aa4f1dfaaf3bf523263d11fbe6c53c2390094f87b0b7ba5a6",
-  "classCount": 6411,
+  "bytes": 8305684,
+  "sha256": "37c5184e882cb5a897c738ecfc551b2cdd332c1b399d23f0d6a8c471b0e995ea",
+  "classCount": 6412,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -1336,6 +1336,7 @@
     "Landroid/os/CancellationSignal$1;",
     "Landroid/os/CancellationSignal$Transport;",
     "Landroid/os/CancellationSignal;",
+    "Landroid/os/ConditionVariable;",
     "Landroid/os/CountDownTimer$1;",
     "Landroid/os/CountDownTimer;",
     "Landroid/os/RemoteException;",
@@ -38464,6 +38465,16 @@
       "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/CountDownTimer.java?format=TEXT",
       "sha256": "7c981cfa4b5bd49fd68bb5b1ab10ecf284ce36794cbde53ec3b66acb52cac3e6",
       "bytes": 5374,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/ConditionVariable.java",
+      "localPath": "framework-aosp/upstream/android/os/ConditionVariable.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/ConditionVariable.java?format=TEXT",
+      "sha256": "d4ee27c0da64100774a19841fb0751a14919de27de5b927be5efe7b2ff844749",
+      "bytes": 3937,
       "license": "Apache-2.0"
     }
   ],

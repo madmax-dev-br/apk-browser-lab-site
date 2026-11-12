@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=1ac1d0f0dc1e';
-import { createHostRegistry } from './host-contract.js?v=1ac1d0f0dc1e';
-import { Blocked, VMThread } from './scheduler.js?v=1ac1d0f0dc1e';
-import { Invoke } from './interpreter.js?v=1ac1d0f0dc1e';
-import { GC_ROOTS } from './heap-gc.js?v=1ac1d0f0dc1e';
+import { APKError } from './apk-error.js?v=b4879748881a';
+import { createHostRegistry } from './host-contract.js?v=b4879748881a';
+import { Blocked, VMThread } from './scheduler.js?v=b4879748881a';
+import { Invoke } from './interpreter.js?v=b4879748881a';
+import { GC_ROOTS } from './heap-gc.js?v=b4879748881a';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -575,6 +575,18 @@ export function createConcurrencyHost(platform) {
   def(TPE, 'invokeAll', `(${COLLECTION})${LIST}`, (r, _m, [self, tasks]) => {
     const futures = elements(r, tasks).map(t => submitTask(r, self, newObject(r, FUTURE_TASK, [CALLABLE], [t])));
     for (const f of futures) { const st = ft(r, f); waitFor(r, 'invokeAll', () => isDone(st)); }
+    return listOf(r, futures);
+  });
+  // AbstractExecutorService.invokeAll(tasks, timeout, unit): every task is submitted, the caller waits for all of them until the deadline, and the tasks that have not
+  // completed by then are cancelled (with interruption). The list always holds one Future per task, in the collection's order.
+  def(TPE, 'invokeAll', `(${COLLECTION}J${UNIT})${LIST}`, (r, _m, [self, tasks, timeout, unit]) => {
+    if (tasks === null || unit === null) throwNew(r, 'Ljava/lang/NullPointerException;');
+    const callables = elements(r, tasks); if (callables.includes(null)) throwNew(r, 'Ljava/lang/NullPointerException;');
+    const deadline = platform.clock.now() + Number(vcall(r, unit, UNIT, 'toNanos', ['J'], 'J', [timeout])) / 1e6;
+    const futures = callables.map(t => newObject(r, FUTURE_TASK, [CALLABLE], [t])); let expired = false;
+    for (const [i, f] of futures.entries()) { if (i > 0 && platform.clock.now() >= deadline) { expired = true; break; } submitTask(r, self, f); }
+    for (const f of futures) { if (expired) break; const st = ft(r, f), left = deadline - platform.clock.now(); if (!isDone(st) && (left <= 0 || !waitFor(r, 'invokeAll', () => isDone(st), left))) expired = true; }
+    if (expired) for (const f of futures) vcall(r, f, FUTURE_TASK, 'cancel', ['Z'], 'Z', [1]);
     return listOf(r, futures);
   });
   def(TPE, 'shutdown', '()V', (r, _m, [self]) => {

@@ -7,8 +7,8 @@
 // own origin or a srcdoc is an opaque origin that cannot touch the lab's DOM, Worker or storage. Scripts run only when the app enabled JavaScript. The frame gets no
 // permissions policy features (`allow=""`), no referrer, and no ambient credentials where the browser supports `credentialless`.
 
-import { bridgeMarkup, injectIntoHead } from './webview-bridge.js?v=1ac1d0f0dc1e';
-import { rewriteDocument, RESOURCE_MAX_BYTES } from './webview-resources.js?v=1ac1d0f0dc1e';
+import { bridgeMarkup, injectIntoHead } from './webview-bridge.js?v=b4879748881a';
+import { rewriteDocument, RESOURCE_MAX_BYTES } from './webview-resources.js?v=b4879748881a';
 
 export const FRAME_SANDBOX = Object.freeze({ scripts: 'allow-scripts', forms: 'allow-forms' });
 export const FRAME_ATTRIBUTES = Object.freeze({ allow: '', referrerpolicy: 'no-referrer', loading: 'eager', 'aria-label': 'WebView' });
@@ -66,6 +66,17 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
   const frames = new Map();   // id -> { id, element, iframe, form, loadId, timer }
   const slots = new Map();    // id -> element
   const queued = new Map();   // id -> messages that arrived before the element existed
+  // A WebView that is not in the rendered View tree (never added to a window, as a library does with a WebView it only uses to run a document) loads all the same on Android.
+  // Its iframe lives in this hidden, zero-sized holder; when the View is attached later the iframe moves into the View's element (attach).
+  let holder = null;
+  const offscreen = () => {
+    if (holder) return holder;
+    holder = doc.createElement('div'); holder.className = 'android-webview-offscreen'; holder.setAttribute('aria-hidden', 'true');
+    holder.style.cssText = 'position:fixed;left:-10000px;top:0;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none';
+    doc.body?.append(holder);
+    return holder;
+  };
+  const adopt = (element, node) => { if (typeof element.moveBefore === 'function' && node.isConnected && element.isConnected) { try { element.moveBefore(node, null); return; } catch { /* not movable in place: appended below */ } } element.append(node); };
   const supportsCredentialless = () => { try { return 'credentialless' in (doc.createElement('iframe')); } catch { return false; } };
 
   const dispose = frame => {
@@ -80,8 +91,8 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
   };
   const fail = (frame, code, description) => { timers.clearTimeout(frame.timer); frame.timer = null; send({ type: 'webview-event', id: frame.id, loadId: frame.loadId, event: 'error', code, description }); };
 
-  function load(id, message) {
-    const element = slots.get(id);
+  function load(id, message, { detached = false } = {}) {
+    const element = slots.get(id) ?? (detached || frames.get(id)?.element === holder ? offscreen() : null);
     if (!element) { (queued.get(id) ?? queued.set(id, []).get(id)).push(message); return; }
     let frame = frames.get(id);
     if (!frame) frames.set(id, frame = { id, element, iframe: null, form: null, loadId: 0, timer: null });
@@ -145,6 +156,8 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
     iframe.addEventListener('load', () => {
       if (frame.iframe !== iframe || frame.loadId !== message.loadId) return;
       if (!armed) return;   // the empty document a frame without src shows before the posted form answers is not the page: its load event is not onPageFinished
+      if (frame.finished === message.loadId) return;   // the same document loading again after its frame moved in the DOM (attach) is not a second onPageFinished
+      frame.finished = message.loadId;
       timers.clearTimeout(frame.timer); frame.timer = null;
       send({ type: 'webview-event', id, loadId: message.loadId, event: 'finished' });
       // a document that was given a bridge connects to it while it loads, usually before the load event: if it has not by now, give it a moment, then say it never will
@@ -233,7 +246,9 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
     attach(id, element) {
       slots.set(id, element);
       const frame = frames.get(id);
-      if (frame && frame.element !== element) { frame.element = element; if (frame.iframe) element.append(frame.iframe); if (frame.form) element.append(frame.form); }
+      // The frame follows its View: out of the off-screen holder, or into a re-created element. Element.moveBefore keeps the document running where the browser has it;
+      // without it the browser restarts the document when the iframe is re-inserted (its second load event is not reported again).
+      if (frame && frame.element !== element) { frame.element = element; if (frame.iframe) adopt(element, frame.iframe); if (frame.form) element.append(frame.form); }
       const pending = queued.get(id); if (pending) { queued.delete(id); for (const message of pending) this.handle(message); }
     },
     handle(message) {
@@ -244,12 +259,14 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
       else if (message.op === 'stop') { const frame = frames.get(message.id); if (frame) { dispose(frame); frame.loadId = -1; } queued.delete(message.id); }
       else if (message.op === 'destroy') { dispose(frames.get(message.id)); frames.delete(message.id); queued.delete(message.id); slots.delete(message.id); }
     },
+    /** Called after every render with the ids of the WebViews in the snapshot: a load still waiting for a View that is not in the tree starts off-screen. */
     sweep(liveIds) {
       for (const id of [...slots.keys()]) if (!liveIds.has(id)) slots.delete(id);
+      for (const [id, pending] of [...queued]) if (!liveIds.has(id)) { queued.delete(id); for (const message of pending) load(id, message, { detached: true }); }
     },
-    reset() { for (const frame of frames.values()) dispose(frame); frames.clear(); slots.clear(); queued.clear(); },
+    reset() { for (const frame of frames.values()) dispose(frame); frames.clear(); slots.clear(); queued.clear(); holder?.remove?.(); holder = null; },
     /** Stops listening to the window (the manager is replaced when a new VM is bound). */
-    close() { if (listening) { listening = false; win.removeEventListener?.('message', onWindowMessage); } for (const frame of frames.values()) dispose(frame); frames.clear(); slots.clear(); queued.clear(); },
+    close() { if (listening) { listening = false; win.removeEventListener?.('message', onWindowMessage); } for (const frame of frames.values()) dispose(frame); frames.clear(); slots.clear(); queued.clear(); holder?.remove?.(); holder = null; },
   };
 }
 
