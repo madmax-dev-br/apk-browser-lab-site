@@ -1,7 +1,7 @@
 // "Estado da tela": a plain-text picture of what the VM shows and why it may be blank, for "Copiar diagnóstico" and for a button that works without any error. Read-only on the VM.
 // Pure data: no app or library names are written here; class names come from the running app and only reach the user's clipboard.
-import { reportSummary, collapseThreads } from './report-summary.js?v=aaf994ef49d6';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=aaf994ef49d6';
+import { reportSummary, collapseThreads } from './report-summary.js?v=e0bbabac13b9';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=e0bbabac13b9';
 const MiB = 1024 * 1024, BYTES_PER_OBJECT = 1600;
 const STAGES = { 0: 'destruída', 1: 'criada', 2: 'parada', 3: 'iniciada/pausada', 4: 'retomada (em primeiro plano)' };
 const dotted = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');
@@ -146,6 +146,7 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
   for (const [, entry] of [...(caught?.distinct ?? [])].slice(0, 15)) out.push(`  ${entry.count}× ${entry.type}${entry.message ? ': ' + entry.message : ''}  (capturada em ${entry.where})`);
   if (!caught?.total) out.push('  (nenhuma)');
   { const uncaught = runtime.uncaughtText?.(); if (uncaught) out.push(uncaught); }
+  { const failed = runtime.threadFailureText?.(); if (failed) out.push(failed); }
   const blank = reasons.length > 0;
   // The "Tela:" lines of the summary, read back from the sections above (activity on top, first-frame verdict, Compose, layout)
   const tela = [], find = pattern => out.find(line => pattern.test(line));

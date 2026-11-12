@@ -1,14 +1,27 @@
-import { createHostRegistry } from './host-contract.js?v=aaf994ef49d6';
-import { APKError } from './apk-error.js?v=aaf994ef49d6';
+import { createHostRegistry } from './host-contract.js?v=e0bbabac13b9';
+import { APKError } from './apk-error.js?v=e0bbabac13b9';
+import { declaredFrameCount } from './animated-image.js?v=e0bbabac13b9';
 
 // android.graphics.ImageDecoder (API 28+, android-13.0.0_r1 ImageDecoder.java) over the lab's bitmap codec: a Source is the encoded bytes (byte[], ByteBuffer, File, raw resource, asset, content Uri,
 // Callable<AssetFileDescriptor> is not modelled); decodeBitmap / decodeDrawable decode with BitmapFactory, call the OnHeaderDecodedListener with the decoder and the ImageInfo (size, mime type,
 // animated flag) and then apply what the listener asked for, in the framework's order: target size / sample size, crop (in target coordinates), mutability. Hardware allocation is accepted and decodes
-// to a software bitmap; post-processors need Canvas(Bitmap) and fail explicitly; an animated image decodes its first frame as a Bitmap and fails explicitly as a Drawable.
+// to a software bitmap; post-processors fail explicitly; an animated GIF or WebP decodes its first frame as a Bitmap and as a Drawable becomes an AnimatedImageDrawable
+// (src/animated-image-host.js); an animated AVIF or HEIF sequence fails explicitly as a Drawable, naming the format.
 const ID = 'Landroid/graphics/ImageDecoder;', SOURCE = 'Landroid/graphics/ImageDecoder$Source;', INFO = 'Landroid/graphics/ImageDecoder$ImageInfo;', LISTENER = 'Landroid/graphics/ImageDecoder$OnHeaderDecodedListener;', DECODE_EXCEPTION = 'Landroid/graphics/ImageDecoder$DecodeException;';
 const STRING = 'Ljava/lang/String;', OBJECT = 'Ljava/lang/Object;', BITMAP = 'Landroid/graphics/Bitmap;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', RECT = 'Landroid/graphics/Rect;', SIZE = 'Landroid/util/Size;';
 const FACTORY = 'Landroid/graphics/BitmapFactory;', INPUT = 'Ljava/io/InputStream;', RESOURCES = 'Landroid/content/res/Resources;';
 const nullish = v => v === null || v === undefined || v === 0;
+/** The image-sequence brand of an ISO BMFF file ('ftyp' major or compatible brands): { format: 'AVIF' | 'HEIF', brand }, or null for a still image or another container. */
+export function isoSequenceBrand(b) {
+  if (!b || b.length < 16 || b[4] !== 0x66 || b[5] !== 0x74 || b[6] !== 0x79 || b[7] !== 0x70) return null;
+  const size = Math.min(b.length, ((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]) >>> 0);
+  for (let at = 8; at + 4 <= size; at += at === 8 ? 8 : 4) {
+    const brand = String.fromCharCode(b[at], b[at + 1], b[at + 2], b[at + 3]);
+    if (brand === 'avis') return { format: 'AVIF', brand };
+    if (brand === 'msf1' || brand === 'hevc' || brand === 'hevx') return { format: 'HEIF', brand };
+  }
+  return null;
+}
 const MIME = [['image/png', b => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47], ['image/jpeg', b => b[0] === 0xff && b[1] === 0xd8], ['image/gif', b => b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46],
   ['image/webp', b => b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50], ['image/bmp', b => b[0] === 0x42 && b[1] === 0x4d]];
 const SUPPORTED = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp', 'image/x-ico', 'image/vnd.wap.wbmp', 'image/heif', 'image/heic', 'image/x-adobe-dng']);
@@ -54,10 +67,14 @@ export function createImageDecoderHost(platform) {
   const state = (r, self) => { const s = r.object(self).decoder; if (!s) ise(r, 'ImageDecoder used outside its OnHeaderDecodedListener'); if (s.closed) ise(r, 'Cannot use closed ImageDecoder'); return s; };
   const run = (r, src, listener, asDrawable, tune = null) => {
     if (nullish(src)) npe(r, 'src is null'); const bytes = r.object(src).source.load(), mime = MIME.find(([, test]) => test(bytes))?.[0];
+    if (!mime && asDrawable) {   // an ISO BMFF image sequence (animated AVIF 'avis', HEIF 'msf1'/'hevc'): Android 13 decodes animated HEIF to an AnimatedImageDrawable; the lab has no sequence decoder
+      const sequence = isoSequenceBrand(bytes);
+      if (sequence) unsupported(`ImageDecoder.decodeDrawable: animated ${sequence.format} (ISO BMFF image sequence, brand '${sequence.brand}') is not supported by the lab: its codecs decode GIF and animated WebP sequences only`, sequence.format === 'AVIF' ? 'animated-avif-unsupported' : 'animated-heif-unsupported');
+    }
     if (!mime) decodeFailure(r);
     const data = bytesArray(r, bytes), bitmap = callStatic(r, FACTORY, 'decodeByteArray', ['[B', 'I', 'I'], BITMAP, [data, 0, bytes.length]);
     if (nullish(bitmap)) decodeFailure(r);
-    const width = call(r, bitmap, BITMAP, 'getWidth', [], 'I'), height = call(r, bitmap, BITMAP, 'getHeight', [], 'I'), animated = mime === 'image/gif' && bytes.length > 12 && countGifFrames(bytes) > 1;
+    const width = call(r, bitmap, BITMAP, 'getWidth', [], 'I'), height = call(r, bitmap, BITMAP, 'getHeight', [], 'I'), animated = (mime === 'image/gif' || mime === 'image/webp') && declaredFrameCount(bytes) > 1;
     const decoder = r.makeObject(ID), s = { width, height, sample: 1, target: null, crop: null, mutable: false, allocator: 0, memoryPolicy: 1, unpremul: false, alpha: false, post: null, partial: null, closed: false };
     r.object(decoder).decoder = s;
     if (!nullish(listener)) {
@@ -67,7 +84,11 @@ export function createImageDecoderHost(platform) {
     tune?.(s);
     if (s.post) unsupported('ImageDecoder.setPostProcessor: post-processors draw on a Canvas over the decoded bitmap, which the lab cannot create (Canvas(Bitmap))', 'image-post-processor-unsupported');
     if (s.alpha) unsupported('ImageDecoder.setDecodeAsAlphaMaskEnabled: A8 alpha-mask decoding is not modelled', 'image-alpha-mask-unsupported');
-    if (asDrawable && animated) unsupported('ImageDecoder.decodeDrawable of an animated image (AnimatedImageDrawable) is not modelled; decodeBitmap returns the first frame', 'animated-image-unsupported');
+    if (asDrawable && animated) {   // ImageDecoder.decodeDrawableImpl: an AnimatedImageDrawable at the target size, cropped, scaled from the source density to the display's (src/animated-image-host.js)
+      const tw = s.target ? s.target[0] : Math.max(1, Math.floor(width / s.sample)), th = s.target ? s.target[1] : Math.max(1, Math.floor(height / s.sample)), density = r.object(src).source.density;
+      s.closed = true;
+      return platform.animatedImages.create(r, bytes, { target: [tw, th], crop: s.crop, srcDensity: density ?? 0, dstDensity: density === undefined ? 0 : 160 });
+    }
     let out = bitmap; const tw = s.target ? s.target[0] : Math.max(1, Math.floor(width / s.sample)), th = s.target ? s.target[1] : Math.max(1, Math.floor(height / s.sample));
     if (tw !== width || th !== height) out = callStatic(r, BITMAP, 'createScaledBitmap', [BITMAP, 'I', 'I', 'Z'], BITMAP, [out, tw, th, 0]);   // nearest, as the decoder's resize always was (createScaledBitmap honors `filter` now)
     if (s.crop) { const [l, t, rr, b] = s.crop; out = callStatic(r, BITMAP, 'createBitmap', [BITMAP, 'I', 'I', 'I', 'I'], BITMAP, [out, l, t, rr - l, b - t]); }
@@ -81,7 +102,6 @@ export function createImageDecoderHost(platform) {
     s.closed = true;
     return asDrawable ? construct(r, 'Landroid/graphics/drawable/BitmapDrawable;', [RESOURCES, BITMAP], [call(r, platform.application, 'Landroid/content/Context;', 'getResources', [], RESOURCES), out]) : out;
   };
-  const countGifFrames = bytes => { let frames = 0; for (let i = 0; i < bytes.length - 3; i++) if (bytes[i] === 0x21 && bytes[i + 1] === 0xf9 && bytes[i + 2] === 0x04) frames++; return frames; };
   // ContentResolver.loadThumbnail(Uri, Size, CancellationSignal) (android-13.0.0_r1 ContentResolver.loadThumbnail): ask the provider for an "image/*" asset with EXTRA_SIZE, then decode it, scaling down by an
   // integer sample when the provider returned something larger than requested. The MediaStore fallback (content://media) does not exist on the virtual device.
   const RESOLVER_T = 'Landroid/content/ContentResolver;', URI_T = 'Landroid/net/Uri;', SIZE_T = 'Landroid/util/Size;', SIGNAL_T = 'Landroid/os/CancellationSignal;', BUNDLE_T = 'Landroid/os/Bundle;', AFD_T = 'Landroid/content/res/AssetFileDescriptor;';

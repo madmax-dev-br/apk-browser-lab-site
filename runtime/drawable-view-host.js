@@ -1,9 +1,9 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=aaf994ef49d6';
-import { APKError } from './apk-runtime.js?v=aaf994ef49d6';
-import { getVectorGraphics } from './vector-native.js?v=aaf994ef49d6';
-import { deferRaster } from './deferred-raster.js?v=aaf994ef49d6';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=aaf994ef49d6';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=aaf994ef49d6';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=e0bbabac13b9';
+import { APKError } from './apk-runtime.js?v=e0bbabac13b9';
+import { getVectorGraphics } from './vector-native.js?v=e0bbabac13b9';
+import { deferRaster } from './deferred-raster.js?v=e0bbabac13b9';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=e0bbabac13b9';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=e0bbabac13b9';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -196,7 +196,14 @@ export function createDrawableViewHost(platform) {
     interfaces: type => type === VIEW || type === IMAGE ? ['Landroid/graphics/drawable/Drawable$Callback;'] : [],
     viewKind(runtime, object) { return runtime.isSubtype(object.type, IMAGE) ? 'image' : null; },
     drawTree(runtime, root, seen = new Set()) { if (!root) return; const view = runtime.object(root); if (seen.has(view.id) || seen.size >= 4096) fail('Cyclic/excessive drawable frame'); seen.add(view.id); if (view.visibility === 8 || view.visibility === 4) return; if (view.imageDrawable || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.switchState) render(runtime, root); for (const child of view.children || []) this.drawTree(runtime, child, seen); },
-    afterAttach(runtime, receiver) { const view = runtime.object(receiver); if (runtime.isSubtype(view.type, IMAGE) || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.stateListAnimator || view.switchState || (runtime.isSubtype(view.type, TEXT) && platform.textViewApi.compoundList(runtime, receiver).length)) this.invoke(runtime, { owner: VIEW, name: 'refreshDrawableState' }, [receiver]); },
+    /** ImageView.onVisibilityAggregated: the image drawable is visible while its View is attached and VISIBLE (an Animatable drawable stops counting time, see AnimatedImageDrawable.setVisible).
+     *  The lab does not aggregate the visibility of the ancestors: the View's own visibility and its attachment decide. */
+    imageVisibility(runtime, receiver, attached = !!runtime.object(receiver).attached) {
+      const view = runtime.object(receiver), drawable = view.imageDrawable; if (!drawable) return;
+      const visible = attached && (view.visibility ?? 0) === 0;
+      if (!!dispatch(runtime, DRAWABLE, 'isVisible', [], 'Z', drawable) !== visible) dispatch(runtime, DRAWABLE, 'setVisible', ['Z', 'Z'], 'Z', drawable, [visible ? 1 : 0, 0]);
+    },
+    afterAttach(runtime, receiver, attached) { if (attached !== undefined && runtime.object(receiver).attached !== undefined) this.imageVisibility(runtime, receiver, !!attached); const view = runtime.object(receiver); if (runtime.isSubtype(view.type, IMAGE) || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.stateListAnimator || view.switchState || (runtime.isSubtype(view.type, TEXT) && platform.textViewApi.compoundList(runtime, receiver).length)) this.invoke(runtime, { owner: VIEW, name: 'refreshDrawableState' }, [receiver]); },
     afterLayout(runtime, receiver) { const view = runtime.object(receiver); if (view.imageDrawable || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.switchState || (runtime.isSubtype(view.type, TEXT) && platform.textViewApi.compoundList(runtime, receiver).length)) render(runtime, receiver); },
     invoke(runtime, method, args) {
       const name = method.name;
@@ -265,6 +272,9 @@ export function createDrawableViewHost(platform) {
       if (name === 'setImageResource' || name === 'setBackgroundResource') { const drawable = args[1] ? platform.styleBackend.loadDrawable(runtime, args[1], platform.styleBackend.theme(runtime, view.context)) : null; return setDrawable(runtime, args[0], name === 'setImageResource' ? 'imageDrawable' : 'backgroundDrawable', drawable); }
       if (name === 'setImageDrawable' || name === 'setBackground' || name === 'setBackgroundDrawable') return setDrawable(runtime, args[0], name === 'setImageDrawable' ? 'imageDrawable' : 'backgroundDrawable', args[1]);
       if (name === 'verifyDrawable') return same(args[1], view.imageDrawable) || same(args[1], view.backgroundDrawable) || same(args[1], view.foregroundDrawable) || same(args[1],view.buttonDrawable) ? 1 : 0;
+      // View.invalidate does nothing for a View that is not VISIBLE (skipInvalidate) or was detached from its window (no AttachInfo to damage): its drawable is not drawn, so an
+      // animated drawable that reschedules itself from draw() stops there, and goes on from the next draw when the View is shown or attached again.
+      if (name === 'invalidateDrawable' && ((view.visibility ?? 0) !== 0 || view.attached === false)) return;
       if (name === 'invalidateDrawable') { if (same(args[1], view.imageDrawable) || same(args[1], view.backgroundDrawable) || same(args[1], view.foregroundDrawable)||same(args[1],view.buttonDrawable)||(runtime.isSubtype(view.type,TEXT)&&platform.textViewApi.compoundList(runtime,args[0]).some(d=>same(args[1],d)))){if(view.drawingDrawable){view.needsDrawableDraw=true;platform.requestDraw(runtime,args[0],1000/60);}else{render(runtime,args[0]);platform.requestDraw(runtime,args[0]);}} return; }
       fail('Unknown Drawable View method ' + name);
     },

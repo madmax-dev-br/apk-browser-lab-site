@@ -1,19 +1,19 @@
-import { createHostRegistry } from './host-contract.js?v=aaf994ef49d6';
-import { APKError } from './apk-error.js?v=aaf994ef49d6';
-import { cleartextPermitted } from './network-native.js?v=aaf994ef49d6';
-import { probeIsoBmff, sniffContainer } from './media-container.js?v=aaf994ef49d6';
-import { state as ioState } from './libcore-io-native.js?v=aaf994ef49d6';
+import { createHostRegistry } from './host-contract.js?v=e0bbabac13b9';
+import { APKError } from './apk-error.js?v=e0bbabac13b9';
+import { cleartextPermitted } from './network-native.js?v=e0bbabac13b9';
+import { probeIsoBmff, sniffContainer } from './media-container.js?v=e0bbabac13b9';
+import { state as ioState } from './libcore-io-native.js?v=e0bbabac13b9';
 
-// Small platform classes: android.os.WorkSource (a set of (uid, name) pairs the framework blames for work), android.media.MediaMetadataRetriever and android.graphics.Movie.
+// Small platform classes: android.os.WorkSource (a set of (uid, name) pairs the framework blames for work), and android.media.MediaMetadataRetriever (android.graphics.Movie is src/animated-image-host.js).
 // MediaMetadataRetriever reads the container metadata of MP4 / MOV / 3GP sources (src/media-container.js: duration, size, rotation, track kinds); a missing or unrecognised source fails the way
-// the framework does, and what needs a codec or another container's parser says explicitly that there is no extractor (never an invented duration or frame). Movie (GIF) is not modelled.
-const WS = 'Landroid/os/WorkSource;', MMR = 'Landroid/media/MediaMetadataRetriever;', MOVIE = 'Landroid/graphics/Movie;', STRING = 'Ljava/lang/String;', OBJECT = 'Ljava/lang/Object;';
+// the framework does, and what needs a codec or another container's parser says explicitly that there is no extractor (never an invented duration or frame).
+const WS = 'Landroid/os/WorkSource;', MMR = 'Landroid/media/MediaMetadataRetriever;', STRING = 'Ljava/lang/String;', OBJECT = 'Ljava/lang/Object;';
 const URI = 'Landroid/net/Uri;', CONTEXT = 'Landroid/content/Context;', FD = 'Ljava/io/FileDescriptor;', BITMAP = 'Landroid/graphics/Bitmap;', PARAMS = 'Landroid/media/MediaMetadataRetriever$BitmapParams;', LIST = 'Ljava/util/List;';
 const nullish = v => v === null || v === undefined || v === 0;
 
 export function createMiscPlatformHost(platform) {
   const registry = createHostRegistry(), { def, type, staticField } = registry;
-  type(WS, OBJECT, ['Landroid/os/Parcelable;'], { allocatable: true }); type(MMR, OBJECT, ['Ljava/lang/AutoCloseable;'], { allocatable: true }); type(MOVIE, OBJECT, [], { allocatable: false });
+  type(WS, OBJECT, ['Landroid/os/Parcelable;'], { allocatable: true }); type(MMR, OBJECT, ['Ljava/lang/AutoCloseable;'], { allocatable: true });
   const npe = (r, m = null) => r.throwJava('Ljava/lang/NullPointerException;', m);
   const text = (r, v) => nullish(v) ? null : typeof v === 'string' ? v : r.stringCharacters(v);
   const unsupported = (message, kind) => { throw new APKError(message, { kind }); };
@@ -107,13 +107,6 @@ export function createMiscPlatformHost(platform) {
   def(MMR, 'getFramesAtIndex', `(II)${LIST}`, (r, _m, [self]) => { sourceOf(r, self); return noExtractor('MediaMetadataRetriever.getFramesAtIndex: decoding a video frame needs a codec'); });
   def(MMR, 'getFramesAtIndex', `(II${PARAMS})${LIST}`, (r, _m, [self]) => { sourceOf(r, self); return noExtractor('MediaMetadataRetriever.getFramesAtIndex: decoding a video frame needs a codec'); });
 
-  // ---- Movie (GIF decoding) -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  const noMovie = what => unsupported(`${what}: android.graphics.Movie (GIF decoding) is not modelled; use ImageDecoder / BitmapFactory for still images`, 'movie-unsupported');
-  def(MOVIE, 'decodeStream', `(Ljava/io/InputStream;)${MOVIE}`, () => noMovie('Movie.decodeStream'), { static: true });
-  def(MOVIE, 'decodeByteArray', `([BII)${MOVIE}`, () => noMovie('Movie.decodeByteArray'), { static: true });
-  def(MOVIE, 'decodeFile', `(${STRING})${MOVIE}`, () => noMovie('Movie.decodeFile'), { static: true });
-  for (const [name, sig] of [['width', '()I'], ['height', '()I'], ['duration', '()I'], ['isOpaque', '()Z'], ['setTime', '(I)Z'], ['draw', 'DUMMY']]) if (sig !== 'DUMMY') def(MOVIE, name, sig, () => noMovie(`Movie.${name}`));
-  def(MOVIE, 'draw', 'Landroid/graphics/Canvas;FF'.replace(/^/, '(') + ')V', () => noMovie('Movie.draw')); def(MOVIE, 'draw', '(Landroid/graphics/Canvas;FFLandroid/graphics/Paint;)V', () => noMovie('Movie.draw'));
 
   const UL = 'Landroid/icu/util/ULocale;', LOCALE = 'Ljava/util/Locale;';
   const callV = (r, receiver, owner, name, parameters, result, args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...args], 'virtual');

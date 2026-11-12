@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=aaf994ef49d6';
-import { createRasterReceiver } from './raster-cache.js?v=aaf994ef49d6';
+import { createWebAudioPlayer } from './web-audio-player.js?v=e0bbabac13b9';
+import { createRasterReceiver } from './raster-cache.js?v=e0bbabac13b9';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=aaf994ef49d6', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=e0bbabac13b9', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -37,6 +37,7 @@ export class APKWorkerClient {
       if (data?.type === 'runtime-busy') { this.onRuntimeBusy?.(true); return; }
       if (data?.type === 'runtime-idle') { this.onRuntimeBusy?.(false); return; }
       if (data?.type === 'runtime-event') { this.onRuntimeSnapshot?.(data.snapshot, data.seq); return; }
+      if (data?.type === 'thread-failure') { this.onThreadFailure?.(data.failure ?? {}); return; }   // a lab error ended a background thread of the app (src/apk-worker.js surfaceThreadFailure), never part of a request
       if (data?.type === 'runtime-error') this.onRuntimeBusy?.(false);
       if (data?.type === 'runtime-error') { const error = new Error(data.error?.message || 'Falha em callback assíncrono da VM.'); Object.assign(error, data.error || {}); this.onRuntimeError?.(error); return; }
       const pending = this.pending;

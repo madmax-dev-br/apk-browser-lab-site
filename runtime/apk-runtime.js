@@ -1,32 +1,32 @@
-import { VMClock } from './vm-clock.js?v=aaf994ef49d6';
-import { overrideHit } from './method-overrides.js?v=aaf994ef49d6';
-import { OperationMonitor } from './operation-monitor.js?v=aaf994ef49d6';
-import { ExecutionProfile } from './execution-profile.js?v=aaf994ef49d6';
-import { SamplingProfiler } from './sampling-profiler.js?v=aaf994ef49d6';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=aaf994ef49d6';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=aaf994ef49d6';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=aaf994ef49d6';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=aaf994ef49d6';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=aaf994ef49d6';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=aaf994ef49d6';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=aaf994ef49d6';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=aaf994ef49d6';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=aaf994ef49d6';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=aaf994ef49d6';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=aaf994ef49d6';
-import { APKError } from './apk-error.js?v=aaf994ef49d6';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=aaf994ef49d6';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=aaf994ef49d6';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=aaf994ef49d6';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=aaf994ef49d6';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=aaf994ef49d6';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=aaf994ef49d6';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=aaf994ef49d6';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=aaf994ef49d6';
+import { VMClock } from './vm-clock.js?v=e0bbabac13b9';
+import { overrideHit } from './method-overrides.js?v=e0bbabac13b9';
+import { OperationMonitor } from './operation-monitor.js?v=e0bbabac13b9';
+import { ExecutionProfile } from './execution-profile.js?v=e0bbabac13b9';
+import { SamplingProfiler } from './sampling-profiler.js?v=e0bbabac13b9';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=e0bbabac13b9';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=e0bbabac13b9';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=e0bbabac13b9';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=e0bbabac13b9';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e0bbabac13b9';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=e0bbabac13b9';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=e0bbabac13b9';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=e0bbabac13b9';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=e0bbabac13b9';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=e0bbabac13b9';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=e0bbabac13b9';
+import { APKError } from './apk-error.js?v=e0bbabac13b9';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=e0bbabac13b9';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=e0bbabac13b9';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=e0bbabac13b9';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=e0bbabac13b9';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=e0bbabac13b9';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=e0bbabac13b9';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=e0bbabac13b9';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=e0bbabac13b9';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=aaf994ef49d6';
-import { bootClassLacksMember } from './boot-class-members.js?v=aaf994ef49d6';
-export { APKError } from './apk-error.js?v=aaf994ef49d6';
+import { Scheduler, Blocked } from './scheduler.js?v=e0bbabac13b9';
+import { bootClassLacksMember } from './boot-class-members.js?v=e0bbabac13b9';
+export { APKError } from './apk-error.js?v=e0bbabac13b9';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1971,6 +1971,26 @@ export class APKRuntime {
     const key = String(threadName), entry = this.uncaughtExceptions?.get(key);
     const failure = { ...this.describeThrowable(value), ref: value?.ref };
     if (entry) entry.handlerFailure = failure; else this.noteUncaught(key, value);
+  }
+  /**
+   * A lab error (an API the lab does not model, a VM limit, an internal failure: anything that is not a Java exception the app could catch) ended the run of a background thread.
+   * Java has no caller to deliver it to, and whoever happens to be pumping the scheduler when the thread runs (a scheduled event, a page request, a nested wait of the main thread,
+   * a diagnostic read) may drop what it catches, so the failure is recorded here, where it happens: a logcat error line (and the trace), the table the reports print, and
+   * `pendingThreadFailure` for the Worker to show the page whatever became of the JavaScript exception. Once per error object.
+   */
+  noteThreadFailure(thread, error) {
+    if (error === null || typeof error !== 'object' || error.looperYield === true || error.name === 'CoreStop') return;
+    if (error.threadFailureNoted === true || (this.diagnosticDepth ?? 0) > 0 && error.details?.kind === 'instruction-budget') return;
+    try { error.threadFailureNoted = true; } catch { /* a frozen error object: noted again at most */ }
+    const name = String(thread?.name ?? '?'), text = String(error.message ?? error), brief = text.length > 700 ? '... ' + text.slice(-700) : text;
+    const entry = { thread: name, message: brief, kind: error.details?.kind ?? (error.name === 'APKError' ? 'lab-error' : error.name ?? 'error'), atMs: Math.round(this.platform?.clock?.now?.() ?? 0), phase: this.monitor?.op?.name ?? null };
+    const table = this.threadFailures ??= []; table.push(entry); if (table.length > 20) table.shift();
+    this.pendingThreadFailure = { ...entry, full: text };
+    try { this.record(`LOG E ApkLab: thread "${name}" stopped by a lab error (${entry.kind}): ${brief}`); } catch { /* the log is detached */ }
+  }
+  threadFailureText() {
+    const table = this.threadFailures; if (!table?.length) return '';
+    return ['Threads interrompidas por erro do laboratório (uma API não modelada ou um limite da VM atingido fora da thread principal):', ...table.slice(-8).map(entry => `  thread "${entry.thread}" em ${entry.atMs} ms [${entry.kind}]: ${entry.message}`)].join('\n');
   }
   uncaughtText() {
     const table = this.uncaughtExceptions; if (!table?.size) return '';

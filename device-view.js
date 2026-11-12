@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=aaf994ef49d6';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=aaf994ef49d6';
-import { isTrustedRasterURL } from './raster-cache.js?v=aaf994ef49d6';
+import { updateWebViewSlot } from './webview-slot.js?v=e0bbabac13b9';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=e0bbabac13b9';
+import { isTrustedRasterURL } from './raster-cache.js?v=e0bbabac13b9';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -67,6 +67,13 @@ function bindVM(vm) {
     runtimeFrames.pending = snapshot; if (!runtimeFrames.requested) { runtimeFrames.requested = true; nextFrame(() => flushRuntimeSnapshot(vm)); }
   };
   vm.onRuntimeError = error => { if (state.runtime === vm) reportAPKError(error, 'Callback assíncrono interrompido'); };
+  // A lab error that ended a background thread of the app. The reply that carried the JavaScript exception (if any did) may already be on screen; either way the panel stays until the
+  // person reopens, relaunches or goes back: the frames the app keeps producing (the other threads go on) used to hide it at once, and the app looked like it was loading forever.
+  vm.onThreadFailure = failure => {
+    if (state.runtime !== vm) return;
+    const error = Object.assign(new Error(String(failure.message ?? 'Uma thread do app foi interrompida por um erro do laboratório.')), { details: { kind: failure.kind ?? 'thread-failure', thread: failure.thread } });
+    state.stickyError = true; reportAPKError(error, `Thread "${failure.thread ?? '?'}" interrompida`);
+  };
   if (ctx.webViews !== false) { webviews?.close(); webviews = createWebViewManager({ send: event => vm.webViewEvent?.(event) }); vm.onWebView = message => { if (state.runtime === vm) webviews.handle(message); }; }
 }
 function reconcileChildren(parent, children) {
@@ -775,7 +782,8 @@ function renderSnapshot(snapshot) {
   runtimeFrames.pending = null; runtimeFrames.rendered++; if (runtimeFrames.drawn.length < 50000) runtimeFrames.drawn.push(Date.now());
   if (snapshot && 'ime' in snapshot) state.imeState = snapshot.ime;
   if (snapshot?.droppedComposeAction) appendTrace(`Ação Compose descartada: nó ${snapshot.droppedComposeAction.ownerViewId}:${snapshot.droppedComposeAction.nodeId} não existe mais (${snapshot.droppedComposeAction.action}).`);
-  state.lastAPKError = null; state.canGoBack = !!snapshot.canGoBack; hooks.navigationChanged?.(state.canGoBack);
+  if (!state.stickyError) state.lastAPKError = null;
+  state.canGoBack = !!snapshot.canGoBack; hooks.navigationChanged?.(state.canGoBack);
   if (snapshot.closed) {
     $('android-action-mode-layer')?.replaceChildren();
     state.apkRunning = false; hideError();   // the device stays: its launcher shows the app (hooks.closed)
@@ -800,7 +808,7 @@ function renderSnapshot(snapshot) {
   renderActionModes(snapshot.actionModes);
   $('android-content').inert = surfaces.some(view => view.windowSurface.modal && view.windowSurface.visible !== false); $('android-window-layer').inert = false;
   $('android-content').style.padding = '0';
-  state.apkRunning = true; $('android-device').hidden = state.mode !== 'apk'; $('android-device').inert = state.mode !== 'apk'; hideError();
+  state.apkRunning = true; $('android-device').hidden = state.mode !== 'apk'; $('android-device').inert = state.mode !== 'apk'; if (!state.stickyError) hideError();   // a background thread's failure stays on screen (onThreadFailure)
   hooks.rendered?.(snapshot, composeReady);
   updateTrace(snapshot);
   // after the VM trace replaced the log: a key the Worker could not send through an InputConnection (its own trace has the WEB InputMethod line too)

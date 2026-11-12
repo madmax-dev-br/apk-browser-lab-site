@@ -1,7 +1,7 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=aaf994ef49d6';
-import { APKError } from './apk-runtime.js?v=aaf994ef49d6';
-import { ephemeronMap } from './heap-gc.js?v=aaf994ef49d6';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=aaf994ef49d6';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=e0bbabac13b9';
+import { APKError } from './apk-runtime.js?v=e0bbabac13b9';
+import { ephemeronMap } from './heap-gc.js?v=e0bbabac13b9';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=e0bbabac13b9';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -176,6 +176,10 @@ export class AndroidStyleBackend {
     if (hasNinePatchChunk(bytes)) {
       const drawable = this.platform.drawableViewHost.createNinePatchDrawable(runtime, bytes, scale);
       runtime.record(`RESOURCE drawable ${id >>> 0} NinePatchDrawable [${file.path}: compiled npTc chunk, density ${file.density || 160} -> 160]`); return drawable;
+    }
+    if (/\.(gif|webp)$/i.test(file.path) && this.platform.animatedImages.declaredFrameCount(bytes) > 1) {   // ResourcesImpl.decodeImageDrawable: ImageDecoder.decodeDrawable, an AnimatedImageDrawable for an animated file (API 28+)
+      const drawable = this.platform.animatedImages.create(runtime, bytes, { srcDensity: defaults.inDensity, dstDensity: defaults.inTargetDensity });
+      runtime.record(`RESOURCE drawable ${id >>> 0} AnimatedImageDrawable [${file.path}, density ${file.density || 160} -> 160]`); return drawable;
     }
     const bitmap = codec.decodeBytes(runtime, bytes, null, null, defaults);
     if (bitmap === null) fail(`Resource ${file.path} could not be decoded as an image`, { resourceId: id, path: file.path });
