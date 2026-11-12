@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=ffff96603c9e';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ffff96603c9e';
+import { APKError } from './apk-error.js?v=6152edcf6e9b';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=6152edcf6e9b';
 
 // android.view.inputmethod.InputMethodManager for the virtual device (android-13.0.0_r1 InputMethodManager.java, single client, one input method: the lab keyboard that the browser's
 // text controls play). The manager keeps the *served view*: the focused View whose onCheckIsTextEditor() is true. When such a View gains focus the manager does what startInputInner does:

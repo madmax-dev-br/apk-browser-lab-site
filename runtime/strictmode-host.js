@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=ffff96603c9e';
-import { collectGarbage } from './heap-gc.js?v=ffff96603c9e';
+import { createHostRegistry } from './host-contract.js?v=6152edcf6e9b';
+import { collectGarbage } from './heap-gc.js?v=6152edcf6e9b';
 
 // The platform side of android.os.StrictMode. StrictMode itself, its ThreadPolicy/VmPolicy builders, the android.os.strictmode violation classes, dalvik.system.CloseGuard and
 // dalvik.system.BlockGuard are the pinned originals (android-13.0.0_r1) in framework.dex; policies live in ThreadLocals and BlockGuard exactly as on a device. What the original
