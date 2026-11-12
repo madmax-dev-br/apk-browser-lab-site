@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=999f1f5703aa';
-import { Blocked } from './scheduler.js?v=999f1f5703aa';
-import { JavaException } from './apk-runtime.js?v=999f1f5703aa';
-import { networkOf } from './network-native.js?v=999f1f5703aa';
-import { httpSocketOf } from './libcore-io-native.js?v=999f1f5703aa';
+import { APKError } from './apk-error.js?v=e60dd7e71ad7';
+import { Blocked } from './scheduler.js?v=e60dd7e71ad7';
+import { JavaException } from './apk-runtime.js?v=e60dd7e71ad7';
+import { networkOf } from './network-native.js?v=e60dd7e71ad7';
+import { httpSocketOf } from './libcore-io-native.js?v=e60dd7e71ad7';
 
 // SSLSocket over the virtual HTTP socket (src/virtual-http-socket.js): the TLS surface of a Conscrypt-shaped client socket, WITHOUT any encryption in the VM.
 //

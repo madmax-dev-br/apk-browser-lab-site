@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=999f1f5703aa';
-import { APKError } from './apk-error.js?v=999f1f5703aa';
+import { createHostRegistry } from './host-contract.js?v=e60dd7e71ad7';
+import { APKError } from './apk-error.js?v=e60dd7e71ad7';
 
 // android.content.pm.PackageManager public API (API 33) that the package model of app-services-host does not answer yet, ported from android-13.0.0_r1 PackageManager.java /
 // ApplicationPackageManager.java for a device with this app and the system packages of that model. Flag-holder overloads (ComponentInfoFlags / PackageInfoFlags / ResolveInfoFlags) forward to the
@@ -66,7 +66,7 @@ export function createPackageManagerApiHost(platform) {
   });
   def(PM, 'getLeanbackLaunchIntentForPackage', `(${STRING})${INTENT}`, (r, _m, [, name]) => { if (nullish(name)) npe(r, 'packageName'); return null; });   // no Leanback launcher on a phone
   def(PM, 'getLaunchIntentSenderForPackage', `(${STRING})Landroid/content/IntentSender;`, () => unsupported('PackageManager.getLaunchIntentSenderForPackage: IntentSender is not part of the lab framework', 'intent-sender-unsupported'));
-  const resourcesOf = (r, name) => { if (text(r, name) !== own()) notFound(r, text(r, name)); return call(r, platform.application, 'Landroid/content/Context;', 'getResources', [], RESOURCES); };
+  const resourcesOf = (r, name) => { if (text(r, name) !== own()) notFound(r, text(r, name)); return nullish(platform.application) ? platform.resourcesForContext(r, null) : call(r, platform.application, 'Landroid/content/Context;', 'getResources', [], RESOURCES); };   // the package's Resources exist without its Application (a launcher asks before the app is started)
   def(PM, 'getResourcesForApplication', `(${STRING})${RESOURCES}`, (r, _m, [, name]) => { if (nullish(name)) npe(r); return resourcesOf(r, name); });
   def(PM, 'getResourcesForApplication', `(${APP_INFO})${RESOURCES}`, (r, _m, [, info]) => { if (nullish(info)) npe(r); return resourcesOf(r, r.object(info).fields.get(`Landroid/content/pm/PackageItemInfo;->packageName:${STRING}`)); });
   def(PM, 'getResourcesForApplication', `(${APP_INFO}${CONFIG})${RESOURCES}`, (r, _m, [self, info]) => call(r, self, PM, 'getResourcesForApplication', [APP_INFO], RESOURCES, [info]));

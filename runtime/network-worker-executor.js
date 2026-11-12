@@ -1,5 +1,5 @@
-import { captureBody } from './network-capture.js?v=999f1f5703aa';
-import { describeFailure } from './network-transport.js?v=999f1f5703aa';
+import { captureBody } from './network-capture.js?v=e60dd7e71ad7';
+import { describeFailure } from './network-transport.js?v=e60dd7e71ad7';
 
 // Main-side half of the synchronous network bridge. The exchange runs in a dedicated worker (network-worker.js): it fetches, then hands the response to this side through
 // SharedArrayBuffers (head as JSON, body through a ring buffer, state words) and wakes it with Atomics.notify, so a VM frame that cannot yield to the event loop can wait for
