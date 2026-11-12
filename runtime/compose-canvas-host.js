@@ -1,7 +1,7 @@
-import {APKError} from './apk-runtime.js?v=7b9b01b1b8c5';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=7b9b01b1b8c5';
-import {getVectorGraphics} from './vector-native.js?v=7b9b01b1b8c5';
-import {deferRaster} from './deferred-raster.js?v=7b9b01b1b8c5';
+import {APKError} from './apk-runtime.js?v=aaf994ef49d6';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=aaf994ef49d6';
+import {getVectorGraphics} from './vector-native.js?v=aaf994ef49d6';
+import {deferRaster} from './deferred-raster.js?v=aaf994ef49d6';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
