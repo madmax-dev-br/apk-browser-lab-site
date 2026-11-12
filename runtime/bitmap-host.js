@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=124658dca172';
-import {getVectorGraphics} from './vector-native.js?v=124658dca172';
-import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=124658dca172';
-import { gcRoot } from './heap-gc.js?v=124658dca172';
+import {APKError} from './apk-error.js?v=7c0af6c6ff67';
+import {getVectorGraphics} from './vector-native.js?v=7c0af6c6ff67';
+import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=7c0af6c6ff67';
+import { gcRoot } from './heap-gc.js?v=7c0af6c6ff67';
 const BITMAP='Landroid/graphics/Bitmap;',CONFIG='Landroid/graphics/Bitmap$Config;',SPACE='Landroid/graphics/ColorSpace;',NAMED='Landroid/graphics/ColorSpace$Named;',CANVAS='Landroid/graphics/Canvas;';
 // android.graphics.Bitmap.Config declaration order (android-13.0.0_r1: RGBA_1010102 is API 33 and last) / ColorSpace.Named order (API 34 HLG/PQ appended).
 const CONFIGS=['ALPHA_8','RGB_565','ARGB_4444','ARGB_8888','RGBA_F16','HARDWARE','RGBA_1010102'];
@@ -66,7 +66,7 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
   const spaceName=name==='ALPHA_8'?null:name==='RGBA_F16'?(requested&&requested!=='SRGB'?requested:'LINEAR_EXTENDED_SRGB'):'SRGB'   // RGBA_F16 defaults to (and, requested as sRGB, becomes) linear extended sRGB;
   o.bitmap={width,height,config,hasAlpha:name==='RGB_565'?false:!!hasAlpha,handle,recycled:false,mipMap:false,density:160,colorSpace:spaceName?colorSpace(spaceName):null,mutable,premultiplied:true,genBase:0,allocBytes:width*height*CONFIG_INFO[name].bytes,hardware:false,px:null};
   runtime.storeField(o.fields,`${BITMAP}->mDensity:I`,160);byHandle.set(handle,ref);
-  graphics.releaseWithOwner(ref,handle);{const previous=o.onFree;o.onFree=()=>{if(typeof previous==='function')previous();if(byHandle.get(handle)===ref)byHandle.delete(handle);};}   // the pixels' canvas and the handle lookup go with the Bitmap
+  graphics.releaseWithOwner(ref,handle);{const previous=o.onFree,releaseNative=runtime.registerNativeAllocation?.(o.bitmap.allocBytes);o.onFree=()=>{if(typeof previous==='function')previous();releaseNative?.();if(byHandle.get(handle)===ref)byHandle.delete(handle);};}   // the pixels' canvas and the handle lookup go with the Bitmap
   return ref;
  };
  /** Marks a bitmap as Config.HARDWARE: immutable, no CPU pixel access, drawing still works (pixels keep the layout they were copied from). */

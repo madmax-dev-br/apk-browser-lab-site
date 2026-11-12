@@ -63,9 +63,9 @@
 //  - Audit: a minor collection in audit mode is cross-checked against a full conservative mark (anything it reaches must survive); audit and stress collections alternate three minor collections
 //    and a major one. What remains unchecked by construction: host code that keeps the record of an old object without host state in a JavaScript closure (a rooted host structure is traced) and
 //    later writes a young reference into its cells or slots directly, without object(), FieldMap or storeField; the tombstone diagnosis names a minor collection for such a case.
-import { BUCKET } from './time-breakdown.js?v=124658dca172';
-import { cellBytes } from './java-arrays.js?v=124658dca172';
-import { storedFieldCount } from './object-shapes.js?v=124658dca172';
+import { BUCKET } from './time-breakdown.js?v=7c0af6c6ff67';
+import { cellBytes } from './java-arrays.js?v=7c0af6c6ff67';
+import { storedFieldCount } from './object-shapes.js?v=7c0af6c6ff67';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -401,6 +401,7 @@ function collectGarbageTimed(runtime, options) {
     const spent = performance.now() - started, major = runtime.gcPhases?.[0] && runtime.gcPhases[0].at >= started - 1, minor = (runtime.gcMinorStats?.recent.at(-1)?.at ?? -Infinity) >= started - 1;
     if (major || minor) {   // a collection happened: pace the next one (a major collection) and keep its time out of the mutator's watchdogs
       if (major) { runtime.gcLastEnd = performance.now(); runtime.gcLastMs = spent; }
+      runtime.nativeCollected?.();
       runtime.gcTotalMs = (runtime.gcTotalMs ?? 0) + spent;
       const op = runtime.monitor?.op; if (op) { op.gcMs = (op.gcMs ?? 0) + spent; op.gcCount = (op.gcCount ?? 0) + 1; op.start += spent; }
       if (runtime.eventWallStart > 0) runtime.eventWallStart += spent;
@@ -741,7 +742,14 @@ function closeDeferral(runtime, reason, motion, now) {
 
 /** Collects when the live heap passed `threshold` (default 40% of the limit) or in audit mode (every call). */
 export function maybeCollect(runtime, options = {}) {
-  if (runtime.engine === 'wasm') return { collected: false, reason: 'core-paced', before: 0, after: 0, freed: 0, ms: 0 };   // the core paces its own collections by allocated bytes (vmcore/gc.c)
+  if (runtime.engine === 'wasm') {
+    // The core paces its own collections (vmcore/gc.c, host-bridge.js requestCollection), but its host roots are the same: between host events nothing host-side is in flight, so the
+    // host-allocation set stops being a root here too (see below).
+    // The same holds for the core's pins of top-level host code (host-bridge.js: a handle made outside any run, by the Worker's snapshot or a page query, stays pinned until
+    // unpinTopLevel): left alone they pinned every record a snapshot touched, for the life of the page.
+    if ((runtime.hostAllocs?.length > 0 || runtime.wasm?.pins.length > 0) && quiescent(runtime) === null) { runtime.hostAllocs.length = 0; runtime.wasm?.unpinTopLevel(); }
+    return { collected: false, reason: 'core-paced', before: 0, after: 0, freed: 0, ms: 0 };
+  }
   const audit = options.audit ?? globalThis.process?.env?.APKWEB_GC_AUDIT === '1';
   // Between host events nothing host-side is in flight, so the host-allocation set (what host code allocated or was handed since the last quiescent point) stops being a root here even when no
   // collection is due -- a quiescent collection drops it the same way. The safepoint collections inside the next event must keep the set alive; left to grow across events (a driver reading the

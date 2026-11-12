@@ -37,12 +37,16 @@ export class HandleTable {
     this.addressById = new IdTable(); // id -> address (absent once released)
     this.handleByAddress = new Map(); // address -> the one frozen { ref: id } handed out for it (one lookup on the hot path)
     this.released = 0;
+    // Pacing (host-bridge.js requestCollection): ids issued since the last collection, and the count at which the table asks for one. Each id holds a JavaScript facade and
+    // map entries that only a collection releases, so a host that touches many short-lived records (a semantics walk per frame) grows the page's memory while the core's
+    // own heap stays far below its allocation trigger.
+    this.issuedSinceCollection = 0; this.collectAfter = Infinity; this.onCollectDue = null;
   }
   /** The id of the object at `address`, allocating one on its first crossing. 0 (null) has no id. */
   idOf(address) {
     if (address === 0) return 0;
     let id = this.idByAddress.get(address);
-    if (id === undefined) { id = this.nextId++; this.idByAddress.set(address, id); this.addressById.set(id, address); }
+    if (id === undefined) { id = this.nextId++; this.idByAddress.set(address, id); this.addressById.set(id, address); if (++this.issuedSinceCollection === this.collectAfter && this.onCollectDue !== null) this.onCollectDue(); }
     return id;
   }
   /** The `{ ref: id }` object for the object at `address` (the same object every time), or null for address 0. */

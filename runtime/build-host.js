@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=124658dca172';
+import { createHostRegistry } from './host-contract.js?v=7c0af6c6ff67';
 
 // The statics of android.os.Build / Build.VERSION that system-services-host.js and android-platform.js do not already answer, as android-13.0.0_r1 Build.java computes them from system properties.
 // Identity fields (FINGERPRINT, MODEL, TYPE, TAGS, ...) are the device model's and are not touched here; a property the VM does not set reads as it does on a device where it is unset

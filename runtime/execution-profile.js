@@ -1,4 +1,4 @@
-import { foldDirectCalls } from './interpreter.js?v=124658dca172';
+import { foldDirectCalls } from './interpreter.js?v=7c0af6c6ff67';
 // What a long-running event was doing, for the error report of an instruction-budget or wall-clock failure (and for "Copiar diagnóstico"): a cheap sampling profile that starts only once an event has run
 // PROFILE_AFTER instructions on one thread, or a tenth of the per-event budget when that is smaller (so ordinary short events pay one comparison per scheduling quantum). From then on, at every scheduling tick (QUANTUM instructions) the running thread's innermost
 // methods are sampled (self share and the distinct stacks), the per-method invocation counters the VM already keeps (methodEvidence) are compared with a snapshot taken at the start, and host-bridge calls
@@ -10,7 +10,12 @@ const pct = (count, total) => `${Math.round(1000 * count / Math.max(1, total)) /
 export class ExecutionProfile {
   constructor(runtime) { this.rt = runtime; this.active = false; this.reset(); }
   /** A new host event begins: drop what the previous one collected. */
-  reset() { this.active = false; this.byThread = new Map(); this.samples = 0; this.self = new Map(); this.stacks = new Map(); this.baseline = null; this.hostCalls = new Map(); this.startSteps = 0; }
+  reset() {
+    this.active = false; this.samples = 0; this.baseline = null; this.startSteps = 0;
+    // beginEvent resets it for every host event and every nested run of the core (thousands a second while a page walks the semantics tree): an empty profile keeps its maps
+    if (this.byThread?.size === 0 && this.self.size === 0 && this.stacks.size === 0 && this.hostCalls.size === 0) return;
+    this.byThread = new Map(); this.self = new Map(); this.stacks = new Map(); this.hostCalls = new Map();
+  }
   /** Called at every scheduling tick of the running thread. */
   tick() {
     if (!this.active) { if (this.rt.steps >= Math.min(PROFILE_AFTER, Math.floor(this.rt.maxInstructionsPerEvent / 10))) this.#start(); return; }

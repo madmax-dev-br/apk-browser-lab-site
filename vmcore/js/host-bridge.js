@@ -59,22 +59,24 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=124658dca172';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=124658dca172';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=124658dca172';
-import { HandleTable } from './handles.js?v=124658dca172';
-import { Exceptions } from './exceptions.js?v=124658dca172';
-import { coreImports } from './boundary-imports.js?v=124658dca172';
-import { installHostLinking, methodReference } from './host-linking.js?v=124658dca172';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=124658dca172';
-import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=124658dca172';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=124658dca172';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=124658dca172';
-import { Blocked } from '../../runtime/scheduler.js?v=124658dca172';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=124658dca172';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=124658dca172';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=7c0af6c6ff67';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=7c0af6c6ff67';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=7c0af6c6ff67';
+import { HandleTable } from './handles.js?v=7c0af6c6ff67';
+import { Exceptions } from './exceptions.js?v=7c0af6c6ff67';
+import { coreImports } from './boundary-imports.js?v=7c0af6c6ff67';
+import { installHostLinking, methodReference } from './host-linking.js?v=7c0af6c6ff67';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=7c0af6c6ff67';
+import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=7c0af6c6ff67';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=7c0af6c6ff67';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=7c0af6c6ff67';
+import { Blocked } from '../../runtime/scheduler.js?v=7c0af6c6ff67';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=7c0af6c6ff67';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=7c0af6c6ff67';
 
 const MiB = 1 << 20;
+/** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
+export const HANDLE_PACE_MIN = 131072;
 /** Memory map (bytes): low memory is the module's data; metaspace; the Thread records with their Java and native stacks; the collected heap. */
 // THREADS: the main thread's record (its Java stack, and the one native stack of the module at the top of its span); GUESTS: the records of the other Java threads (a Java stack each).
 // Sized for a large app (hundreds of thousands of methods, hundreds of threads), not for the lab's examples: the memory is address space until it is written, so a region nobody uses costs nothing.
@@ -162,6 +164,7 @@ export class WasmEngine {
     this.stackScratch = linker.alloc(8 * 1024);
     // handles: every record that gets an id is exported (the sweep reports its death); every handle made while host code runs is pinned (see the header)
     const engine = this, handles = this.handles = new HandleTable();
+    handles.collectAfter = HANDLE_PACE_MIN; handles.onCollectDue = () => this.requestCollection('handles');
     const idOf = handles.idOf.bind(handles), handleOf = handles.handleOf.bind(handles);
     handles.idOf = address => { const known = handles.idByAddress.get(address); if (known !== undefined || address === 0) return known ?? 0; const id = idOf(address); exports.gc_export(h, address); return id; };
     handles.handleOf = address => { if (address !== 0) engine.pins.push(address); return handleOf(address); };
@@ -742,6 +745,12 @@ export class WasmEngine {
   }
 
   // ---- the collector (see the header)
+  /**
+   * Asks for a collection at the core's next allocation safepoint (the interpreter's slow path sees `collectRequested`, the run returns OUT_OF_MEMORY and core-threads.js collects
+   * and resumes), as gc.c does when the allocation trigger is reached. Used for memory the core's trigger does not see: ids handed to hosts (each with a facade in JavaScript) and
+   * native bytes registered by hosts (APKRuntime.registerNativeAllocation, as ART's VMRuntime.registerNativeAllocation paces collections by native growth).
+   */
+  requestCollection(reason) { this.stats.requested ??= {}; this.stats.requested[reason] = (this.stats.requested[reason] ?? 0) + 1; this.w32(this.h + GC.collectRequested, 1); }
   collect(reason = 'manual') {
     const tb = this.runtime.tb, previous = tb.enter(BUCKET.GC);
     try { return this.collectNow(reason); } finally { tb.leave(previous); }
@@ -798,6 +807,8 @@ export class WasmEngine {
     for (const map of ephemeronMaps) for (const key of [...map.keys()]) if (typeof key === 'number' && !handles.addressById.has(key)) map.delete(key);   // the key died: so does the entry
     if (this.fixedTrigger !== undefined) this.w32(h + GC.trigger, this.fixedTrigger);
     const t2 = performance.now();
+    handles.issuedSinceCollection = 0; handles.collectAfter = Math.max(HANDLE_PACE_MIN, handles.size);   // the next one after as many new ids as survived (at least HANDLE_PACE_MIN)
+    this.runtime.nativeCollected?.();
     this.stats.collections++; if (reason !== 'run') this.stats.hostCollections++; this.stats.markMs += t1 - t0; this.stats.sweepMs += t2 - t1;
     this.lastCollection = { reason, live: this.r32(h + GC.liveObjects), freed: this.r32(h + GC.freedObjects), badRefs: this.r32(h + GC.badRefs), roots: addresses.size, markMs: t1 - t0, sweepMs: t2 - t1 };
     return this.lastCollection;

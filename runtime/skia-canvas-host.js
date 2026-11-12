@@ -1,15 +1,15 @@
-import {APKError} from './apk-runtime.js?v=124658dca172';
-import {getVectorGraphics} from './vector-native.js?v=124658dca172';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=124658dca172';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=124658dca172';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=124658dca172';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=124658dca172';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=124658dca172';
-import {createBitmapHost} from './bitmap-host.js?v=124658dca172';
-import { gcRoot } from './heap-gc.js?v=124658dca172';
-import {sha256Hex} from './sha256-sync.js?v=124658dca172';
-import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=124658dca172';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=124658dca172';
+import {APKError} from './apk-runtime.js?v=7c0af6c6ff67';
+import {getVectorGraphics} from './vector-native.js?v=7c0af6c6ff67';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=7c0af6c6ff67';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=7c0af6c6ff67';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=7c0af6c6ff67';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=7c0af6c6ff67';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=7c0af6c6ff67';
+import {createBitmapHost} from './bitmap-host.js?v=7c0af6c6ff67';
+import { gcRoot } from './heap-gc.js?v=7c0af6c6ff67';
+import {sha256Hex} from './sha256-sync.js?v=7c0af6c6ff67';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=7c0af6c6ff67';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=7c0af6c6ff67';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -128,13 +128,30 @@ const NO_KEY=Symbol('uncacheable'),OBJECT_IDS=new WeakMap();let nextObjectId=1; 
 // lookup per command per frame instead of a JSON.stringify of every path, paint and (large) bitmap raster. Commands that read live state (renderNode, *Props, ripple) are
 // re-serialized at every call. The integer table is bounded; after a reset the same text just gets a new id (a miss, never a wrong hit).
 const COMMAND_IDS=new WeakMap(),COMMAND_TEXTS=new Map();let nextCommandId=1,commandTextChars=0;
+// Large data strings of recorded draws (a Bitmap's PNG data URL or pixel rows) get a short id for the raster keys: the key of a draw of a photo used to carry the whole
+// encoding, copied by JSON.stringify and hashed again on every frame. Equal strings get the same id (Map keys compare by value; V8 keeps a string's hash, so the same Bitmap's
+// string is hashed once). Cleared with the command texts when it grows large, like them.
+const DATA_IDS=new Map();let nextDataId=1,dataChars=0;
+function dataId(text){let id=DATA_IDS.get(text);if(id===undefined){if(dataChars>64*1024*1024){DATA_IDS.clear();dataChars=0;}id=nextDataId++;DATA_IDS.set(text,id);dataChars+=text.length;}return id;}
 function commandId(text){let id=COMMAND_TEXTS.get(text);if(id===undefined){if(commandTextChars>16*1024*1024){COMMAND_TEXTS.clear();commandTextChars=0;}id=nextCommandId++;COMMAND_TEXTS.set(text,id);commandTextChars+=text.length;}return id;}
 /** The part of a raster key that names the output format: extent and options (transport, scale). The same recording at two scales has two keys with one body. */
 const rasterKeyPrefix=(width,height,options)=>JSON.stringify([width,height,options??null]);
+/**
+ * The raster cache keeps a digest of the key text, not the text: a screen's key is the whole recording (nested RenderNode display lists included) and can be megabytes; kept as the
+ * Map key it was flattened and hashed again on every lookup of every frame and held in the cache. 128 bits from four 32-bit lanes (FNV-1a style, distinct seeds and primes, a final
+ * avalanche per lane) plus the length: an accidental collision (two different recordings with one digest) is not a practical concern for a cache of at most a few thousand entries.
+ */
+function keyDigest(text){
+ let a=0x811c9dc5,b=0x9747b28c,c=0x85ebca6b,d=0xc2b2ae35;
+ for(let i=0;i<text.length;i++){const x=text.charCodeAt(i);a=Math.imul(a^x,0x01000193);b=Math.imul(b^x,0x5bd1e995);c=Math.imul(c^x,0x27d4eb2f);d=Math.imul(d^x,0x165667b1);}
+ const fin=h=>{h^=h>>>16;h=Math.imul(h,0x85ebca6b);h^=h>>>13;h=Math.imul(h,0xc2b2ae35);h^=h>>>16;return (h>>>0).toString(36);};
+ return `${fin(a)}.${fin(b^a)}.${fin(c^b)}.${fin(d^c)}.${text.length.toString(36)}`;
+}
 function rasterKeyBody(runtime,graphics,state,width){
  let depth=0,nodes=false,dynamic=false;
  const resolve=value=>Object.fromEntries(Object.entries(value).map(([name,handle])=>[name,graphics.get(handle)]));
  const replacer=function(name,value){
+  if(typeof value==='string'&&value.length>1024&&(name==='dataURL'||name==='base64'))return '\u0000d'+dataId(value);   // a Bitmap's encoded pixels: named by an id, not copied into every key
   if(typeof value==='bigint')return 'n'+value;
   if(value===null||typeof value!=='object')return value;
   if(ArrayBuffer.isView(value))return {t:value.constructor.name,d:Array.from(value)};
@@ -160,8 +177,8 @@ function rasterKeyBody(runtime,graphics,state,width){
   const key=state.draws.map(commandKey).join(',');
   if(key.length>4*1024*1024)return null;
   // Shadows are lit by the window theme's light: part of the input whenever a RenderNode is replayed.
-  if(!nodes)return key;
-  try{return key+JSON.stringify(renderLightInfo(runtime,width));}catch{return null;}
+  if(!nodes)return keyDigest(key);
+  try{return keyDigest(key+JSON.stringify(renderLightInfo(runtime,width)));}catch{return null;}
  }catch(error){if(error===NO_KEY)return null;throw error;}
 }
 const RASTER_CACHE_BYTES=32*1024*1024;
@@ -176,11 +193,39 @@ function cacheRaster(runtime,key,result){
  cache.set(key,{result:{...result},size});runtime.rasterCacheBytes=(runtime.rasterCacheBytes??0)+size;
  for(const [oldKey,entry] of cache){if(runtime.rasterCacheBytes<=RASTER_CACHE_BYTES&&cache.size<=64)break;cache.delete(oldKey);runtime.rasterCacheBytes-=entry.size;}
 }
+const base64Bytes=text=>{const binary=atob(text),bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return bytes;};
 /** A recorded 'raster' command's image: an encoded PNG (data URL) or exact pixel data (command.pixelData: base64 of rows in colorType/alphaType, written by Bitmap pixel setters). */
 function decodeRasterImage(CK,raster){
  if(raster?.kind!=='raster'||!raster.dataURL?.startsWith('data:image/png;base64,')||raster.dataURL.length>12*1024*1024)fail('Canvas raster requires a bounded actual PNG');
- const image=CK.MakeImageFromEncoded(Uint8Array.from(atob(raster.dataURL.slice(22)),c=>c.charCodeAt(0)));if(!image)fail('Skia rejected a recorded widget raster');return image;
+ const image=CK.MakeImageFromEncoded(base64Bytes(raster.dataURL.slice(22)));if(!image)fail('Skia rejected a recorded widget raster');return image;
 }
+/**
+ * The decoded image of a recorded 'raster' command, kept between replays: the recording holds a Bitmap's pixels encoded (a PNG data URL, or base64 pixel rows), and decoding them
+ * on every replay was most of the Worker's time on a screen of photos (every frame of a scrolling list decoded every visible image again). Keyed by the encoded data itself (a
+ * screen re-records its draws every frame, so the command objects are new while the Bitmap's data string is the same one: its hash is computed once), plus the pixel format for
+ * pixel rows; bounded by decoded bytes, least recently used first. An evicted image is deleted at once unless a replay is using it (then when that replay releases it).
+ * Per CanvasKit instance.
+ */
+const DECODED_IMAGE_BYTES=96*1024*1024,decodedImages=new WeakMap();
+export function recordedImage(CK,command){
+ const pixels=command.pixelData,data=pixels?pixels.base64:command.raster?.dataURL;
+ const key=typeof data!=='string'?null:pixels?`${pixels.colorType}/${pixels.alphaType}/${pixels.width}x${pixels.height}:${data}`:data;
+ let cache=decodedImages.get(CK);if(!cache)decodedImages.set(CK,cache={entries:new Map(),bytes:0});
+ const known=key===null?undefined:cache.entries.get(key);
+ if(known!==undefined){cache.entries.delete(key);cache.entries.set(key,known);known.users++;return known.image;}
+ const image=pixels?makePixelDataImage(CK,pixels):decodeRasterImage(CK,command.raster);
+ if(key===null)return image;
+ const bytes=image.width()*image.height()*4;if(bytes>DECODED_IMAGE_BYTES/4)return image;
+ const entry={image,bytes,users:1,evicted:false};cache.entries.set(key,entry);cache.bytes+=bytes;imageEntries.set(image,entry);
+ for(const [oldKey,old] of cache.entries){if(cache.bytes<=DECODED_IMAGE_BYTES)break;if(old!==entry)evictDecoded(cache,oldKey,old);}
+ return image;
+}
+const imageEntries=new WeakMap();
+function evictDecoded(cache,key,entry){cache.entries.delete(key);cache.bytes-=entry.bytes;entry.evicted=true;if(entry.users===0)entry.image.delete();}
+/** The replay is done with an image from recordedImage: an uncached one is deleted, a cached one stays (or goes now, if it was evicted while in use). */
+export function releaseRecordedImage(image){const entry=imageEntries.get(image);if(entry===undefined){image.delete();return;}entry.users--;if(entry.evicted&&entry.users===0)entry.image.delete();}
+/** Drops every decoded image of a CanvasKit instance (the Skia host is being disposed). */
+export function disposeDecodedImages(CK){const cache=decodedImages.get(CK);if(!cache)return;for(const [key,entry] of [...cache.entries])evictDecoded(cache,key,entry);decodedImages.delete(CK);}
 /** Canvas.drawBitmapMesh: the bitmap sampled (bilinear, clamped) over a (meshWidth+1)x(meshHeight+1) lattice of two-triangle cells; per-vertex colors modulate it (SkBlendMode::kModulate). */
 function drawBitmapMesh(CK,canvas,image,mesh,paint){
  const cw=mesh.width,ch=mesh.height,count=(cw+1)*(ch+1),tex=new Float32Array(count*2),indices=[];
@@ -194,7 +239,7 @@ function drawBitmapMesh(CK,canvas,image,mesh,paint){
 const PIXEL_BYTES={RGBA_8888:4,RGB_565:2,RGBA_F16:8,RGBA_1010102:4};
 function makePixelDataImage(CK,data){
  const bpp=PIXEL_BYTES[data.colorType];if(!bpp||CK.ColorType[data.colorType]===undefined||CK.AlphaType[data.alphaType]===undefined)fail('Unsupported Bitmap pixel data format '+data.colorType+'/'+data.alphaType);
- const bytes=Uint8Array.from(atob(data.base64),c=>c.charCodeAt(0));if(bytes.length!==data.width*data.height*bpp)fail('Bitmap pixel data length does not match its extent');
+ const bytes=base64Bytes(data.base64);if(bytes.length!==data.width*data.height*bpp)fail('Bitmap pixel data length does not match its extent');
  const image=CK.MakeImage({width:data.width,height:data.height,colorType:CK.ColorType[data.colorType],alphaType:CK.AlphaType[data.alphaType],colorSpace:CK.ColorSpace.SRGB},bytes,data.width*bpp);if(!image)fail('Skia rejected Bitmap pixel data');return image;
 }
 /** Skia color types a Bitmap config rasterizes on (RGB_565 opaque 2 B, RGBA_F16 8 B, RGBA_1010102 4 B); other configs use the N32 surface. */
@@ -333,12 +378,12 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
     }
     else if(command.op==='color')canvas.drawColor(argb(CK,command.color),{value:command.blendMode??3});
     else if(command.op==='paint')canvas.drawPaint(paint);
-    else if(command.op==='raster'){const image=command.pixelData?makePixelDataImage(CK,command.pixelData):decodeRasterImage(CK,command.raster);try{if(image.width()>4096||image.height()>4096||image.width()*image.height()>4*1024*1024)fail('Recorded widget raster exceeds Skia bounds');const drawImage=p=>{if(command.mesh){drawBitmapMesh(CK,canvas,image,command.mesh,p);return;}if(command.imageMatrix)canvas.concat(command.imageMatrix);if(command.src&&command.dst){if(command.filter)canvas.drawImageRectOptions(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImageRect(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),p);}else{if(command.imageScale&&command.imageScale!==1){canvas.translate(command.args[0],command.args[1]);canvas.scale(command.imageScale,command.imageScale);if(command.filter)canvas.drawImageOptions(image,0,0,CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,0,0,p);}else if(command.filter)canvas.drawImageOptions(image,command.args[0],command.args[1],CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,command.args[0],command.args[1],p);}};
+    else if(command.op==='raster'){const image=recordedImage(CK,command);try{if(image.width()>4096||image.height()>4096||image.width()*image.height()>4*1024*1024)fail('Recorded widget raster exceeds Skia bounds');const drawImage=p=>{if(command.mesh){drawBitmapMesh(CK,canvas,image,command.mesh,p);return;}if(command.imageMatrix)canvas.concat(command.imageMatrix);if(command.src&&command.dst){if(command.filter)canvas.drawImageRectOptions(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImageRect(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),p);}else{if(command.imageScale&&command.imageScale!==1){canvas.translate(command.args[0],command.args[1]);canvas.scale(command.imageScale,command.imageScale);if(command.filter)canvas.drawImageOptions(image,0,0,CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,0,0,p);}else if(command.filter)canvas.drawImageOptions(image,command.args[0],command.args[1],CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,command.args[0],command.args[1],p);}};
      if(command.alpha8){
       // ALPHA_8 is coverage only: Skia tints it with the Paint color, then applies the Paint's alpha/filter/blend to the result.
       const c=(command.paint?.argb??0xff000000)>>>0,filter=CK.ColorFilter.MakeMatrix([0,0,0,0,((c>>>16)&255)/255,0,0,0,0,((c>>>8)&255)/255,0,0,0,0,(c&255)/255,0,0,0,1,0]),mask=new CK.Paint();
       mask.setColorFilter(filter);canvas.saveLayer(paint);try{drawImage(mask);}finally{canvas.restore();mask.delete();filter.delete();}
-     }else drawImage(paint);}finally{image.delete();}}
+     }else drawImage(paint);}finally{releaseRecordedImage(image);}}
     else if(command.op==='paragraphRun')drawSkiaTextRun(backend,canvas,command.text,command.args[0],command.args[1],command.paint,command.isRtl,paint,{start:command.runStart??0,end:command.runEnd??command.text.length});
     else if(command.op==='text'){
      const made=makeFont(backend,command.paint,command.text);
@@ -374,7 +419,12 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
 }
 export function createSkiaCanvasHost(runtime,backend){
  const matrixHost=createMatrixAllocationHost();
- const CK=backend.CanvasKit,paths=new Map(),pathHandles=new Map(),keys=new Set();let nextPathHandle=0x620000000n;let pathCells=0,clipCells=0;const add=(owner,signatures)=>signatures.forEach(s=>keys.add(owner+'->'+s));
+ const CK=backend.CanvasKit,paths=new Map(),pathHandles=new Map(),keys=new Set();let nextPathHandle=0x620000000n;let pathCells=0,clipCells=0;
+ // pathCells only grows between recounts (a reset or a released Path does not subtract): past the limit it is recounted over the live paths, so the guard bounds
+ // the geometry held now, not every point an app has ever built.
+ const overPathLimit=(extra=0)=>{if(pathCells+extra<=1000000)return false;pathCells=0;for(const p of paths.values())pathCells+=p.builder.countPoints();return pathCells+extra>1000000;};
+ // The SkPath of an android.graphics.Path goes with its Java owner (Path registers it with NativeAllocationRegistry): the cleaner on the owner's record frees it when the collector frees the Path.
+ const releasePathWithOwner=receiver=>{const ref=receiver.ref,record=runtime.object(receiver),previous=record.onFree;record.onFree=()=>{if(typeof previous==='function')previous();const state=paths.get(ref);if(!state)return;paths.delete(ref);if(pathHandles.get(state.handle)?.ref===ref)pathHandles.delete(state.handle);pathCells=Math.max(0,pathCells-state.builder.countPoints());state.builder.delete();};};const add=(owner,signatures)=>signatures.forEach(s=>keys.add(owner+'->'+s));
  const TYPEFACE='Landroid/graphics/Typeface;',PAINT='Landroid/graphics/Paint;',typefaces=gcRoot(new Map()),faceCache=gcRoot(new Map());
  add(TYPEFACE,[`create(Ljava/lang/String;I)${TYPEFACE}`,`create(${TYPEFACE}I)${TYPEFACE}`,`create(${TYPEFACE}IZ)${TYPEFACE}`,`defaultFromStyle(I)${TYPEFACE}`,'getStyle()I','getWeight()I','isBold()Z','isItalic()Z']);
  add(PAINT,[`setTypeface(${TYPEFACE})${TYPEFACE}`,`getTypeface()${TYPEFACE}`,'getFillPath(Landroid/graphics/Path;Landroid/graphics/Path;)Z']);
@@ -456,6 +506,20 @@ export function createSkiaCanvasHost(runtime,backend){
  const path=ref=>{const value=paths.get(ref?.ref);if(!value)fail('Path native state is unavailable');return value;};
  const snapshot=ref=>{const p=path(ref).builder.snapshot();try{return {commands:new Float32Array(p.toCmds()),fillType:p.getFillType().value};}finally{p.delete();}};
  const canvasState=ref=>getVectorGraphics(runtime).get(runtime.object(ref).nativeCanvasHandle,'canvas');
+ // Clip queries (clipRect/clipPath's empty answer, getClipBounds, concat) run on a scratch raster canvas: one per extent, kept and reused inside save/restoreToCount, so its clip and
+ // matrix start clean every time. Allocating (and zeroing) a surface of the whole canvas for every clip call was most of the Worker's time while a list scrolled (thousands of
+ // clips a second). Skia answers the same; nothing is ever drawn on these surfaces. A few extents are kept, least recently used first.
+ const scratchSurfaces=new Map();
+ const withScratch=(width,height,use)=>{
+  const key=width+'x'+height;let surface=scratchSurfaces.get(key);
+  if(surface===undefined){surface=CK.MakeSurface(width,height);if(!surface)fail('Skia clip scratch allocation failed');if(scratchSurfaces.size>=4){const [oldKey,old]=scratchSurfaces.entries().next().value;scratchSurfaces.delete(oldKey);old.dispose();}}
+  else scratchSurfaces.delete(key);
+  scratchSurfaces.set(key,surface);
+  const canvas=surface.getCanvas(),count=canvas.save();try{return use(canvas);}finally{canvas.restoreToCount(count);}
+ };
+ // The clip storage the live canvases still hold (their clip stacks, saved states and recorded draws), each clip once. clipCells only grows between recounts,
+ // so this runs when it passes the limit: the guard bounds what is held now, not every clip an app has made (a scrolling list clips thousands of times a second).
+ const liveClipCells=()=>{const seen=new Set();let cells=0;const count=list=>{for(const clip of list??[])if(!seen.has(clip)){seen.add(clip);cells+=clip.commands?.length??8;}};for(const object of getVectorGraphics(runtime).handles.values())if(object.kind==='canvas'){count(object.clips);for(const saved of object.stack??[])count(saved.clips);for(const draw of object.draws??[])count(draw.clips);}return cells;};
  const record=(receiver,command)=>{const state=canvasState(receiver);bitmaps.flattenFullCanvas(runtime.object(receiver).nativeCanvasHandle);getVectorGraphics(runtime).reserveDrawStorage((command.commands?.length??0)*4+(command.text?.length??0));if(state.draws.length>=1024)fail('Skia command limit exceeded');let cells=command.commands?.length??command.text?.length??0;for(const object of getVectorGraphics(runtime).handles.values())if(object.kind==='canvas')for(const draw of object.draws){cells+=draw.commands?.length??draw.text?.length??0;if(cells>1000000)fail('Aggregate recorded Skia geometry/text limit exceeded');}state.draws.push({kind:'skia',...command,matrix:state.matrix.slice(),clips:(state.clips??[]).slice()});};
  let host;const bitmaps=createBitmapHost(runtime,{recordNative:(handle,command)=>host.recordNative(handle,command),rectF,matrixValues:getMatrixValues});
  host={
@@ -470,7 +534,7 @@ export function createSkiaCanvasHost(runtime,backend){
    const apply=font=>font.file.axes.length?{...font,axes:[...(font.axes??[]).filter(x=>!supported.some(a=>a.tag===x.tag)),...supported.filter(a=>font.file.axes.some(x=>x.tag===a.tag)).map(a=>({tag:a.tag,value:a.value}))]}:font;
    return makeCustom({id:specSeq++,families:info.spec.families.map(fonts=>fonts.map(apply)),cache:new Map()},info.weight,info.italic,info.baseWeight,info.style);
   },
-  parsePath(handle,text){const ref=pathHandles.get(handle);if(!ref)fail('Invalid or released VM SkPath token');const state=path(ref),shape=CK.Path.MakeFromSVGString(text);if(!shape)runtime.throwJava('Ljava/lang/IllegalArgumentException;','Invalid SVG pathData');try{const count=shape.countPoints(),old=state.builder.countPoints();if(count>100000||pathCells-old+count>1000000)fail('Parsed SkPath exceeds bounded geometry storage');const replacement=new CK.PathBuilder(shape);state.builder.delete();state.builder=replacement;pathCells=pathCells-old+count;}finally{shape.delete();}},
+  parsePath(handle,text){const ref=pathHandles.get(handle);if(!ref)fail('Invalid or released VM SkPath token');const state=path(ref),shape=CK.Path.MakeFromSVGString(text);if(!shape)runtime.throwJava('Ljava/lang/IllegalArgumentException;','Invalid SVG pathData');try{const count=shape.countPoints(),old=state.builder.countPoints();if(count>100000||overPathLimit(count-old))fail('Parsed SkPath exceeds bounded geometry storage');const replacement=new CK.PathBuilder(shape);state.builder.delete();state.builder=replacement;pathCells=pathCells-old+count;}finally{shape.delete();}},
   /** The commands and fill type of the Path object `ref` (what JNI code sees through Path.mNativePath: src/skia-path-layout.js). */
   pathSnapshot(ref){return snapshot(ref);},
   pathByHandle(handle){const ref=pathHandles.get(handle);if(!ref)fail('Invalid or released VM SkPath token');return snapshot(ref);},
@@ -483,7 +547,7 @@ export function createSkiaCanvasHost(runtime,backend){
    return !!backend.fallback?.covers(text,{weight:face.weight,italic:face.italic});},
   measureText(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaText(backend,text,{...state,...faceState(face)});},
   readStatic(vm,field){const bitmapStatic=bitmaps.readStatic(field);if(bitmapStatic)return bitmapStatic;if(field.owner===OP&&OPS.includes(field.name))return{handled:true,value:bitmaps.enumValue(OP,OPS,field.name)};if(field.owner===TYPEFACE&&['DEFAULT','DEFAULT_BOLD','SANS_SERIF','SERIF','MONOSPACE'].includes(field.name))return{handled:true,value:makeTypeface(field.name==='SERIF'?'serif':field.name==='MONOSPACE'?'monospace':'sans-serif',field.name==='DEFAULT_BOLD'?1:0)};return null;},
-  dispose(){runtime.rasterCache?.clear();runtime.rasterCacheBytes=0;for(const f of fontFiles.values())f.ck.delete();fontFiles.clear();for(const m of measures.values())releaseMeasure(m);measures.clear();for(const p of paths.values())p.builder.delete();paths.clear();pathHandles.clear();},
+  dispose(){runtime.rasterCache?.clear();runtime.rasterCacheBytes=0;disposeDecodedImages(CK);for(const surface of scratchSurfaces.values())surface.dispose();scratchSurfaces.clear();for(const f of fontFiles.values())f.ck.delete();fontFiles.clear();for(const m of measures.values())releaseMeasure(m);measures.clear();for(const p of paths.values())p.builder.delete();paths.clear();pathHandles.clear();},
   invoke(vm,method,args){if(bitmaps.supports(method.owner+'->'+method.name+method.signature))return bitmaps.invoke(vm,method,args);if(matrixHost.supports(method.owner+'->'+method.name+method.signature))return matrixHost.invoke(vm,method,args);const name=method.name,receiver=args[0];
    if(method.owner===CANVAS&&name==='setCompatibilityVersion'){vm.canvasCompatibilityVersion=args[0]|0;vm.record(`CANVAS compatibility target=${vm.canvasCompatibilityVersion} [actual process graphics policy]`);return;}
    if(method.owner===TYPEFACE){
@@ -586,7 +650,7 @@ export function createSkiaCanvasHost(runtime,backend){
    }
    if(method.owner===OP){const array=vm.newArray('['+OP,OPS.length);vm.object(array).elements=OPS.map(item=>bitmaps.enumValue(OP,OPS,item));return array;}
    if(method.owner===PATH){
-    if(name==='<init>'){if(paths.size>=4096)fail('Skia Path limit exceeded');let builder;if(args[1]){const source=path(args[1]).builder.snapshot();builder=new CK.PathBuilder(source);source.delete();}else builder=new CK.PathBuilder();pathCells+=builder.countPoints();if(pathCells>1000000){builder.delete();fail('Aggregate Skia Path point limit exceeded');}const pathHandle=nextPathHandle++;paths.set(receiver.ref,{builder,handle:pathHandle});pathHandles.set(pathHandle,receiver);vm.storeField(vm.object(receiver).fields,`${PATH}->mNativePath:J`,pathHandle);vm.storeField(vm.object(receiver).fields,`${PATH}->isSimplePath:Z`,0);return;}
+    if(name==='<init>'){if(paths.size>=4096)runtime.collectForNativeHandles?.('android.graphics.Path');if(paths.size>=4096)fail('Skia Path limit exceeded');let builder;if(args[1]){const source=path(args[1]).builder.snapshot();builder=new CK.PathBuilder(source);source.delete();}else builder=new CK.PathBuilder();if(overPathLimit(builder.countPoints())){builder.delete();fail('Aggregate Skia Path point limit exceeded');}pathCells+=builder.countPoints();const pathHandle=nextPathHandle++;paths.set(receiver.ref,{builder,handle:pathHandle});pathHandles.set(pathHandle,receiver);releasePathWithOwner(receiver);vm.storeField(vm.object(receiver).fields,`${PATH}->mNativePath:J`,pathHandle);vm.storeField(vm.object(receiver).fields,`${PATH}->isSimplePath:Z`,0);return;}
     const state=path(receiver),builder=state.builder;
     if(name==='op'){   // Path.op(Path, Op) / Path.op(Path, Path, Op): SkPathOps over the two snapshots; false when Skia cannot build a result
       const two=method.parameters.length===3,left=two?args[1]:receiver,right=two?args[2]:args[1],ordinal=vm.object(args.at(-1)).enumOrdinal;
@@ -594,39 +658,39 @@ export function createSkiaCanvasHost(runtime,backend){
       const a=path(left).builder.snapshot(),b=path(right).builder.snapshot();let result;
       try{result=CK.Path.MakeFromOp(a,b,CK.PathOp[CK_OPS[ordinal]]);}finally{a.delete();b.delete();}
       if(!result)return 0;
-      const count=result.countPoints();if(count>100000||pathCells+count>1000000){result.delete();fail('Aggregate Skia Path point limit exceeded');}
+      const count=result.countPoints();if(count>100000||overPathLimit(count)){result.delete();fail('Aggregate Skia Path point limit exceeded');}
       const replacement=new CK.PathBuilder(result);result.delete();state.builder.delete();state.builder=replacement;pathCells+=count;return 1;
     }
     if(name==='readOnlyNI'||name==='getNativeInstance'){if(!state.handle){state.handle=nextPathHandle++;pathHandles.set(state.handle,receiver);}return state.handle;}
     if(name==='reset'||name==='rewind'){if(name==='reset'){const shape=builder.snapshot(),fill=shape.getFillType();shape.delete();builder.reset();builder.setFillType(fill);}else builder.reset();return;}
-    if(name==='set'){if(receiver.ref===args[1]?.ref)return;const source=path(args[1]).builder.snapshot(),count=source.countPoints();if(count>100000||pathCells+count>1000000){source.delete();fail('Aggregate Skia Path point limit exceeded');}const replacement=new CK.PathBuilder(source);source.delete();state.builder.delete();state.builder=replacement;pathCells+=count;return;}
+    if(name==='set'){if(receiver.ref===args[1]?.ref)return;const source=path(args[1]).builder.snapshot(),count=source.countPoints();if(count>100000||overPathLimit(count)){source.delete();fail('Aggregate Skia Path point limit exceeded');}const replacement=new CK.PathBuilder(source);source.delete();state.builder.delete();state.builder=replacement;pathCells+=count;return;}
     if(name==='approximate'){const error=number(args[1]);if(error<0)vm.throwJava('Ljava/lang/IllegalArgumentException;','acceptableError must be greater than or equal to 0');if(!backend.pathApprox)fail('Original AOSP Path approximation Wasm is unavailable');const shape=builder.snapshot();let result;try{result=backend.pathApprox.approximate(shape.toCmds(),error);}finally{shape.delete();}vm.executionByOrigin.host.calls++;vm.record('HOST Path.approximate [original AOSP C++ Wasm / CanvasKit SkPath geometry]');const value=vm.newArray('[F',result.length);vm.array(value).elements=Array.from(result,x=>{bits.setFloat32(0,x,true);return bits.getInt32(0,true);});return value;}
     if(name==='isEmpty'){const shape=builder.snapshot();try{return shape.isEmpty()?1:0;}finally{shape.delete();}}
     if(name==='setFillType'){const index=vm.object(args[1]).fields.get('Landroid/graphics/Path$FillType;->nativeInt:I');if(!Number.isInteger(index)||index<0||index>3)fail('Path requires original FillType enum');builder.setFillType([CK.FillType.Winding,CK.FillType.EvenOdd,CK.FillType.InverseWinding,CK.FillType.InverseEvenOdd][index]);return;}
     if(name==='getFillType'){const shape=builder.snapshot();const index=shape.getFillType().value;shape.delete();const names=['WINDING','EVEN_ODD','INVERSE_WINDING','INVERSE_EVEN_ODD'],owner='Landroid/graphics/Path$FillType;',name=names[index];return vm.readStatic({owner,name,type:owner,key:`${owner}->${name}:${owner}`});}
-    if(name==='addPath'&&method.parameters.length===1){const shape=path(args[1]).builder.snapshot(),count=shape.countPoints();if(pathCells+count>1000000){shape.delete();fail('Aggregate Skia Path point limit exceeded');}builder.addPath(shape);shape.delete();pathCells+=count;return;}
+    if(name==='addPath'&&method.parameters.length===1){const shape=path(args[1]).builder.snapshot(),count=shape.countPoints();if(overPathLimit(count)){shape.delete();fail('Aggregate Skia Path point limit exceeded');}builder.addPath(shape);shape.delete();pathCells+=count;return;}
     if(name==='addRoundRect'&&method.parameters[0]==='F'&&method.parameters[4]==='[F'){   // addRoundRect(l, t, r, b, float[] radii, dir): eight radii, x then y per corner
       const radii=vm.array(args[5]);if(radii.elements.length<8)vm.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','radii[] needs 8 values');
       const direction=vm.object(args[6]).fields.get('Landroid/graphics/Path$Direction;->nativeInt:I');if(direction!==0&&direction!==1)fail('Path requires original Direction enum');
       const before=builder.countPoints();builder.addRRect(new Float32Array([...finite(args.slice(1,5).map(number)),...finite(radii.elements.slice(0,8).map(number))]),direction===1);
-      pathCells+=builder.countPoints()-before;if(pathCells>1000000)fail('Aggregate Skia Path point limit exceeded');return;
+      pathCells+=builder.countPoints()-before;if(overPathLimit())fail('Aggregate Skia Path point limit exceeded');return;
     }
     if(name==='addRoundRect'&&method.parameters[0]==='Landroid/graphics/RectF;'&&method.parameters[1]==='F'){   // addRoundRect(RectF, rx, ry, dir)
       const direction=vm.object(args[4]).fields.get('Landroid/graphics/Path$Direction;->nativeInt:I');if(direction!==0&&direction!==1)fail('Path requires original Direction enum');
       const before=builder.countPoints();builder.addRRect(CK.RRectXY(rectF(args[1]),number(args[2]),number(args[3])),direction===1);
-      pathCells+=builder.countPoints()-before;if(pathCells>1000000)fail('Aggregate Skia Path point limit exceeded');return;
+      pathCells+=builder.countPoints()-before;if(overPathLimit())fail('Aggregate Skia Path point limit exceeded');return;
     }
-    if(name==='addRoundRect'&&method.parameters[0]==='F'){const values=finite(args.slice(1,7).map(number)),direction=vm.object(args[7]).fields.get('Landroid/graphics/Path$Direction;->nativeInt:I');if(direction!==0&&direction!==1)fail('Path requires original Direction enum');const before=builder.countPoints();builder.addRRect(CK.RRectXY(values.slice(0,4),values[4],values[5]),direction===1);pathCells+=builder.countPoints()-before;if(pathCells>1000000)fail('Aggregate Skia Path point limit exceeded');return;}
+    if(name==='addRoundRect'&&method.parameters[0]==='F'){const values=finite(args.slice(1,7).map(number)),direction=vm.object(args[7]).fields.get('Landroid/graphics/Path$Direction;->nativeInt:I');if(direction!==0&&direction!==1)fail('Path requires original Direction enum');const before=builder.countPoints();builder.addRRect(CK.RRectXY(values.slice(0,4),values[4],values[5]),direction===1);pathCells+=builder.countPoints()-before;if(overPathLimit())fail('Aggregate Skia Path point limit exceeded');return;}
     if(name==='addRoundRect'){
       const radii=vm.array(args[2]);if(radii.type!=='[F')vm.throwJava('Ljava/lang/ClassCastException;','Round rectangle radii require float[]');
       if(radii.elements.length<8)vm.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','radii[] needs8values');
       const direction=vm.object(args[3]).fields.get('Landroid/graphics/Path$Direction;->nativeInt:I');if(direction!==0&&direction!==1)fail('Path requires original Direction enum');
       const before=builder.countPoints();builder.addRRect(new Float32Array([...rectF(args[1]),...finite(radii.elements.slice(0,8).map(number))]),direction===1);
-      pathCells+=builder.countPoints()-before;if(pathCells>1000000)fail('Aggregate Skia Path point limit exceeded');return;
+      pathCells+=builder.countPoints()-before;if(overPathLimit())fail('Aggregate Skia Path point limit exceeded');return;
     }
     {
       const direction=ref=>{const index=vm.object(ref).fields.get(`${DIR}->nativeInt:I`);if(index!==0&&index!==1)fail('Path requires original Direction enum');return index===1;};
-      const grow=before=>{pathCells+=Math.max(0,builder.countPoints()-before);if(pathCells>1000000)fail('Aggregate Skia Path point limit exceeded');};
+      const grow=before=>{pathCells+=Math.max(0,builder.countPoints()-before);if(overPathLimit())fail('Aggregate Skia Path point limit exceeded');};
       const before=builder.countPoints();
       if(name==='addRect'){const r=method.parameters[0]===RF?rectF(args[1]):finite(args.slice(1,5).map(number));builder.addRect(r,direction(args.at(-1)));grow(before);return;}
       if(name==='addOval'){const r=method.parameters[0]===RF?rectF(args[1]):finite(args.slice(1,5).map(number));builder.addOval(r,direction(args.at(-1)),1);grow(before);return;}
@@ -648,7 +712,7 @@ export function createSkiaCanvasHost(runtime,backend){
       if(name==='toggleInverseFillType'||name==='isInverseFillType'){const shape=builder.snapshot(),index=shape.getFillType().value;shape.delete();if(name==='isInverseFillType')return index>=2?1:0;builder.setFillType([CK.FillType.InverseWinding,CK.FillType.InverseEvenOdd,CK.FillType.Winding,CK.FillType.EvenOdd][index]);return;}
     }
     if(builder.countPoints()>100000)fail('Skia Path point limit exceeded');if(name==='close'){builder.close();return;}
-    const before=builder.countPoints(),values=finite(args.slice(1).map(number));if(typeof builder[name]!=='function')fail('Unsupported Path operation '+name);builder[name](...values);pathCells+=Math.max(0,builder.countPoints()-before);if(pathCells>1000000)fail('Aggregate Skia Path point limit exceeded');return;
+    const before=builder.countPoints(),values=finite(args.slice(1).map(number));if(typeof builder[name]!=='function')fail('Unsupported Path operation '+name);builder[name](...values);pathCells+=Math.max(0,builder.countPoints()-before);if(overPathLimit())fail('Aggregate Skia Path point limit exceeded');return;
    }
    const state=canvasState(receiver),values=args.slice(1).map((value,index)=>method.parameters[index]==='F'?number(value):value);
    if(name==='getClipBounds'&&method.parameters.length===0){   // Canvas.getClipBounds(): a new Rect filled by getClipBounds(Rect)
@@ -657,13 +721,12 @@ export function createSkiaCanvasHost(runtime,backend){
    }
    if(name==='getClipBounds'){
     if(args[1]===null||args[1]===0)vm.throwJava('Ljava/lang/NullPointerException;','Clip bounds Rect is null');const target=vm.object(args[1]);let bounds=[0,0,0,0],nonempty=false;
-    if(state.width>0&&state.height>0){const surface=CK.MakeSurface(state.width,state.height);if(!surface)fail('Skia clip scratch allocation failed');try{const c=surface.getCanvas();applyClips(CK,c,state.clips);c.concat(matrix(state.matrix));const device=c.getDeviceClipBounds(),inverse=CK.Matrix.invert(c.getTotalMatrix());if(device[2]>device[0]&&device[3]>device[1]&&inverse){const points=CK.Matrix.mapPoints(inverse,[device[0],device[1],device[2],device[1],device[2],device[3],device[0],device[3]]);finite(points);bounds=[Math.min(points[0],points[2],points[4],points[6]),Math.min(points[1],points[3],points[5],points[7]),Math.max(points[0],points[2],points[4],points[6]),Math.max(points[1],points[3],points[5],points[7])].map(v=>Math.max(-2147483648,Math.min(2147483647,Math.floor(v+.5)))|0);nonempty=true;}}finally{surface.dispose();}}
+    if(state.width>0&&state.height>0){withScratch(state.width,state.height,c=>{applyClips(CK,c,state.clips);c.concat(matrix(state.matrix));const device=c.getDeviceClipBounds(),inverse=CK.Matrix.invert(c.getTotalMatrix());if(device[2]>device[0]&&device[3]>device[1]&&inverse){const points=CK.Matrix.mapPoints(inverse,[device[0],device[1],device[2],device[1],device[2],device[3],device[0],device[3]]);finite(points);bounds=[Math.min(points[0],points[2],points[4],points[6]),Math.min(points[1],points[3],points[5],points[7]),Math.max(points[0],points[2],points[4],points[6]),Math.max(points[1],points[3],points[5],points[7])].map(v=>Math.max(-2147483648,Math.min(2147483647,Math.floor(v+.5)))|0);nonempty=true;}});}
     ['left','top','right','bottom'].forEach((field,i)=>vm.storeField(target.fields,`Landroid/graphics/Rect;->${field}:I`,bounds[i]));return nonempty?1:0;
    }
    if(name==='concat'){
     const transform=getMatrixValues(vm,args[1]);if(transform[6]!==0||transform[7]!==0||transform[8]!==1)fail('Perspective Canvas transforms require a projective canvas-state backend');
-    const surface=CK.MakeSurface(1,1);if(!surface)fail('Skia Canvas matrix scratch allocation failed');
-    try{const canvas=surface.getCanvas();canvas.concat(matrix(state.matrix));canvas.concat(transform);const result=canvas.getTotalMatrix();state.matrix=finite([result[0],result[3],result[1],result[4],result[2],result[5]]);}finally{surface.dispose();}return;
+    withScratch(1,1,canvas=>{canvas.concat(matrix(state.matrix));canvas.concat(transform);const result=canvas.getTotalMatrix();state.matrix=finite([result[0],result[3],result[1],result[4],result[2],result[5]]);});return;
    }
    if(name==='getSaveCount')return state.stack.length+1;
    if(name==='getMatrix'){   // Canvas.getMatrix(Matrix): the current transform as a 3x3 (the canvas keeps [a,b,c,d,e,f]); getMatrix() is the deprecated allocating form
@@ -697,9 +760,9 @@ export function createSkiaCanvasHost(runtime,backend){
     let operation=name.startsWith('clipOut')?0:1;const hasOp=method.parameters.at(-1)==='Landroid/graphics/Region$Op;';
     if(hasOp){if(!args.at(-1))vm.throwJava('Ljava/lang/NullPointerException;','Region.Op is null');operation=vm.object(args.at(-1)).fields.get('Landroid/graphics/Region$Op;->nativeInt:I');if(!Number.isInteger(operation)||operation<0||operation>5)fail('Clip operation requires the original Region.Op enum');if(operation>1){if((vm.canvasCompatibilityVersion??vm.targetSdkVersion??Number(vm.platform?.manifest?.usesSdk?.targetSdkVersion??1))>=28)vm.throwJava('Ljava/lang/IllegalArgumentException;','Invalid Region.Op - only INTERSECT and DIFFERENCE are allowed');fail('Legacy expanding Region.Op clip needs Skia path-operation clip state');}}
     let clip;if(name==='clipPath'||name==='clipOutPath')clip={...snapshot(args[1]),matrix:state.matrix.slice()};else{let rect;if(method.parameters[0]==='Landroid/graphics/Rect;'){const fields=vm.object(args[1]).fields;rect=['left','top','right','bottom'].map(n=>fields.get(`Landroid/graphics/Rect;->${n}:I`)??0);}else if(method.parameters[0]==='Landroid/graphics/RectF;')rect=rectF(args[1]);else rect=finite(hasOp?values.slice(0,-1):values);clip={rect,matrix:state.matrix.slice()};}clip.difference=operation===0;clip.antiAlias=false;
-    clipCells+=clip.commands?.length??8;if(clipCells>1000000)fail('Aggregate Skia clip storage limit exceeded');if((state.clips??=[]).length>=128)fail('Skia clip limit exceeded');state.clips.push(clip);
+    const cells=clip.commands?.length??8;clipCells+=cells;if(clipCells>1000000){clipCells=liveClipCells()+cells;if(clipCells>1000000)fail('Aggregate Skia clip storage limit exceeded');}if((state.clips??=[]).length>=128)fail('Skia clip limit exceeded');state.clips.push(clip);
     const width=state.width??411,height=state.height??840;if(!(width>0&&height>0))return 0;   // a canvas with no area (a RenderNode recorded at 0x0): every clip leaves it empty, as Canvas.clipRect answers false; Skia cannot even allocate the scratch surface
-    const surface=CK.MakeSurface(width,height);if(!surface)fail('Skia clip scratch allocation failed');try{const canvas=surface.getCanvas();applyClips(CK,canvas,state.clips);return canvas.quickReject(CK.LTRBRect(0,0,width,height))?0:1;}finally{surface.dispose();}
+    return withScratch(width,height,canvas=>{applyClips(CK,canvas,state.clips);return canvas.quickReject(CK.LTRBRect(0,0,width,height))?0:1;});
    }
    if(name==='drawColor'){
     if(method.parameters.length===2){const mode=vm.object(args[2]).fields.get('Landroid/graphics/PorterDuff$Mode;->nativeInt:I');if(!Number.isInteger(mode)||mode<0||mode>28)fail('drawColor needs an original PorterDuff.Mode');record(receiver,{op:'color',color:args[1],blendMode:mode});return;}

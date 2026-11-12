@@ -1,36 +1,38 @@
-import { VMClock } from './vm-clock.js?v=124658dca172';
-import { overrideHit } from './method-overrides.js?v=124658dca172';
-import { OperationMonitor } from './operation-monitor.js?v=124658dca172';
-import { ExecutionProfile } from './execution-profile.js?v=124658dca172';
-import { SamplingProfiler } from './sampling-profiler.js?v=124658dca172';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=124658dca172';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=124658dca172';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=124658dca172';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=124658dca172';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=124658dca172';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=124658dca172';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=124658dca172';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=124658dca172';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=124658dca172';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=124658dca172';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=124658dca172';
-import { APKError } from './apk-error.js?v=124658dca172';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=124658dca172';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=124658dca172';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=124658dca172';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=124658dca172';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=124658dca172';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=124658dca172';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=124658dca172';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=124658dca172';
+import { VMClock } from './vm-clock.js?v=7c0af6c6ff67';
+import { overrideHit } from './method-overrides.js?v=7c0af6c6ff67';
+import { OperationMonitor } from './operation-monitor.js?v=7c0af6c6ff67';
+import { ExecutionProfile } from './execution-profile.js?v=7c0af6c6ff67';
+import { SamplingProfiler } from './sampling-profiler.js?v=7c0af6c6ff67';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=7c0af6c6ff67';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=7c0af6c6ff67';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=7c0af6c6ff67';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=7c0af6c6ff67';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=7c0af6c6ff67';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=7c0af6c6ff67';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=7c0af6c6ff67';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=7c0af6c6ff67';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=7c0af6c6ff67';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=7c0af6c6ff67';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=7c0af6c6ff67';
+import { APKError } from './apk-error.js?v=7c0af6c6ff67';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=7c0af6c6ff67';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=7c0af6c6ff67';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=7c0af6c6ff67';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=7c0af6c6ff67';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=7c0af6c6ff67';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=7c0af6c6ff67';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=7c0af6c6ff67';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=7c0af6c6ff67';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=124658dca172';
-import { bootClassLacksMember } from './boot-class-members.js?v=124658dca172';
-export { APKError } from './apk-error.js?v=124658dca172';
+import { Scheduler, Blocked } from './scheduler.js?v=7c0af6c6ff67';
+import { bootClassLacksMember } from './boot-class-members.js?v=7c0af6c6ff67';
+export { APKError } from './apk-error.js?v=7c0af6c6ff67';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
 const NO_INDEX = 0xffffffff;
+/** Native bytes registered between two collections, at least (APKRuntime.registerNativeAllocation). */
+export const NATIVE_PACE_MIN = 64 * 1024 * 1024;
 export class JavaException extends APKError {
   constructor(value, message, details = null) { super(message, details); this.name = 'JavaException'; this.value = value; }
 }
@@ -2031,6 +2033,25 @@ export class APKRuntime {
   gcWanted() { return this.gcEnabled && (GC_STRESS || (this.heap.size > this.gcSafepointFloor && collectionKind(this) !== null)); }
   /** Stress mode only: a collection at an event boundary (nothing in flight), before the next queued task runs. */
   /** A host's table of native handles is full: collect now, so the cleaners of unreachable owners release theirs (record.onFree). False when no collection could run. */
+  /**
+   * Native memory a host holds for a Java object (a Bitmap's pixels...), as libcore's NativeAllocationRegistry reports it to VMRuntime.registerNativeAllocation: the collector is paced
+   * by Java allocation, so an app that drops many small Java objects owning large native buffers would otherwise grow the page's memory long before any collection. Once the native
+   * bytes grew past max(NATIVE_PACE_MIN, what was registered at the last collection) since that collection, a collection is requested (ART: native allocation watermark). Returns
+   * the release function the owner's cleaner calls (idempotent).
+   */
+  registerNativeAllocation(bytes) {
+    if (!(bytes > 0)) return () => {};
+    this.nativeBytes = (this.nativeBytes ?? 0) + bytes;
+    const base = this.nativeBytesAtCollection ?? 0;
+    if (this.nativeBytes - base > Math.max(NATIVE_PACE_MIN, base)) {
+      if (this.engine === 'wasm') this.wasm?.requestCollection('native');
+      else if (this.gcEnabled) this.gcPressure = true;   // heap-gc.js collectionDue: a native resource asked for it
+    }
+    let released = false;
+    return () => { if (!released) { released = true; this.nativeBytes -= bytes; } };
+  }
+  /** A collection finished: native growth is measured from here (registerNativeAllocation). */
+  nativeCollected() { this.nativeBytesAtCollection = this.nativeBytes ?? 0; }
   collectForNativeHandles(what) { if (this.engine === 'wasm') { if (!this.wasm) return false; this.wasm.collect('native-handles'); return true; } return this.emergencyCollect(what); }
   stressCollect() { if (GC_STRESS && this.gcEnabled) collectGarbage(this, { reason: 'stress', generation: auditGeneration(this) }); }
   safepointCollect() {
