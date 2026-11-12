@@ -63,3 +63,40 @@ export function probeIsoBmff(bytes) {
   out.mime = BRANDS_QT.has(brand) ? 'video/quicktime' : BRANDS_3GP.test(brand) ? (out.hasVideo ? 'video/3gpp' : 'audio/3gpp') : out.hasVideo ? 'video/mp4' : (out.hasAudio || BRANDS_AUDIO.has(brand)) ? 'audio/mp4' : 'video/mp4';
   return out;
 }
+
+/**
+ * The first video track's sample table of an ISO BMFF file: what a frame extractor needs to hand samples to a decoder, read from the track's sample description (stsd: the codec's
+ * four-character code, the coded size and, for H.264, the avcC record) and its tables (stts times, stsz sizes, stsc / stco / co64 positions, stss sync samples). Returns
+ * { fourcc, codedWidth, codedHeight, rotation, description, samples: [{ offset, size, timeUs, key }] }, or null when the file has no video track with a readable table.
+ */
+export function videoSampleTable(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.length < 16) return null;
+  const moov = boxes(bytes, 0, bytes.length).find(box => box.type === 'moov'); if (!moov) return null;
+  const child = (parent, type) => (parent ? boxes(bytes, parent.start, parent.end).find(box => box.type === type) ?? null : null);
+  for (const trak of boxes(bytes, moov.start, moov.end).filter(box => box.type === 'trak')) {
+    const mdia = child(trak, 'mdia'), hdlr = child(mdia, 'hdlr'); if (!hdlr || hdlr.end - hdlr.start < 12 || fourcc(bytes, hdlr.start + 8) !== 'vide') continue;
+    const mdhd = child(mdia, 'mdhd'), stbl = child(child(mdia, 'minf'), 'stbl'), stsd = child(stbl, 'stsd'), stts = child(stbl, 'stts'), stsz = child(stbl, 'stsz'), stsc = child(stbl, 'stsc'), stco = child(stbl, 'stco'), co64 = child(stbl, 'co64'), stss = child(stbl, 'stss');
+    if (!mdhd || !stsd || !stts || !stsz || !stsc || !(stco || co64) || stsd.end - stsd.start < 8 + 86) return null;
+    const timescale = bytes[mdhd.start] === 1 ? u32(bytes, mdhd.start + 20) : u32(bytes, mdhd.start + 12); if (!(timescale > 0)) return null;
+    const entry = stsd.start + 8, entrySize = u32(bytes, entry), code = fourcc(bytes, entry + 4), codedWidth = (bytes[entry + 32] << 8) | bytes[entry + 33], codedHeight = (bytes[entry + 34] << 8) | bytes[entry + 35];
+    const config = boxes(bytes, entry + 86, Math.min(stsd.end, entry + entrySize)).find(box => box.type === 'avcC' || box.type === 'hvcC' || box.type === 'vpcC' || box.type === 'av1C');
+    const count = u32(bytes, stsz.start + 8), fixed = u32(bytes, stsz.start + 4), sizes = index => (fixed ? fixed : u32(bytes, stsz.start + 12 + index * 4));
+    const offsets = []; { const table = stco ?? co64, n = u32(bytes, table.start + 4); for (let i = 0; i < n; i++) offsets.push(stco ? u32(bytes, table.start + 8 + i * 4) : u64(bytes, table.start + 8 + i * 8)); }
+    const runs = []; { const n = u32(bytes, stsc.start + 4); for (let i = 0; i < n; i++) runs.push({ first: u32(bytes, stsc.start + 8 + i * 12), perChunk: u32(bytes, stsc.start + 12 + i * 12) }); }
+    const sync = stss ? new Set(Array.from({ length: u32(bytes, stss.start + 4) }, (_, i) => u32(bytes, stss.start + 8 + i * 4))) : null;   // no stss: every sample is a sync sample
+    const samples = []; let time = 0, sttsAt = 0, sttsLeft = 0, delta = 0; const sttsCount = u32(bytes, stts.start + 4);
+    for (let chunk = 1, run = 0; chunk <= offsets.length && samples.length < count; chunk++) {
+      while (run + 1 < runs.length && runs[run + 1].first <= chunk) run++;
+      let offset = offsets[chunk - 1];
+      for (let i = 0; i < (runs[run]?.perChunk ?? 0) && samples.length < count; i++) {
+        if (sttsLeft === 0 && sttsAt < sttsCount) { sttsLeft = u32(bytes, stts.start + 8 + sttsAt * 8); delta = u32(bytes, stts.start + 12 + sttsAt * 8); sttsAt++; }
+        const index = samples.length, size = sizes(index); if (offset + size > bytes.length) return null;
+        samples.push({ offset, size, timeUs: Math.round(time * 1e6 / timescale), key: sync ? sync.has(index + 1) : true });
+        offset += size; time += delta; if (sttsLeft > 0) sttsLeft--;
+      }
+    }
+    const meta = probeIsoBmff(bytes);
+    return { fourcc: code, codedWidth, codedHeight, rotation: meta?.rotation ?? 0, description: config ? bytes.subarray(config.start, config.end) : null, samples };
+  }
+  return null;
+}

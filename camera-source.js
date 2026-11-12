@@ -4,6 +4,11 @@
 // The scene is "upright": what a person holding the phone in portrait sees through the lens. `drawUpright` paints it into any rectangle (the generated feed draws for the exact
 // aspect; a webcam, image or video is centre-cropped to it, as a phone's portrait view of that picture would be). `drawSensor` paints the same scene the way the sensor of a camera
 // delivers it: landscape, turned so that rotating the buffer CameraCharacteristics.SENSOR_ORIENTATION degrees clockwise makes it upright (src/camera-frames.js).
+//
+// The scene stays put when the phone turns. With the device in landscape (Display rotation 90: the phone turned a quarter counter-clockwise) a back camera's buffer needs
+// SENSOR_ORIENTATION - 90 degrees to be upright on the display, a front camera's SENSOR_ORIENTATION + 90, as on a phone; `drawNatural` paints what a preview surface holds (the buffer
+// already turned to the device's natural, portrait orientation, mirrored for a front camera), so an app's own rotation of its preview is exercised. A crop region (digital zoom) is
+// { zoom, cx, cy } in sensor coordinates (0..1).
 export const SOURCE_KINDS = Object.freeze(['pattern', 'webcam', 'image', 'video']);
 const BARS = ['#ebebeb', '#ebeb10', '#10ebeb', '#10eb10', '#eb10eb', '#eb1010', '#1010eb', '#101010'];
 const two = n => String(n).padStart(2, '0');
@@ -89,13 +94,27 @@ export function createCameraSource({ onChange = () => {}, documentRef = globalTh
       else { const scale = Math.max(width / p.width, height / p.height), sw = width / scale, sh = height / scale; ctx.drawImage(p.element, (p.width - sw) / 2, (p.height - sh) / 2, sw, sh, 0, 0, width, height); }
       ctx.restore();
     },
-    /** The scene as the sensor of a camera mounted at `orientation` (90 back, 270 front) delivers it: a width x height landscape buffer. */
-    drawSensor(ctx, width, height, orientation) {
+    /** The scene as the sensor of a camera mounted at `orientation` (90 back, 270 front) delivers it: a width x height landscape buffer. `rotation`: the display rotation; `crop`: the digital zoom. */
+    drawSensor(ctx, width, height, sensorOrientation, { rotation = 0, front = false, crop = null } = {}) {
+      const orientation = (((sensorOrientation - (front ? -rotation : rotation)) % 360) + 360) % 360;
       ctx.save();
+      if (crop) { ctx.translate(width / 2, height / 2); ctx.scale(crop.zoom, crop.zoom); ctx.translate(-crop.cx * width, -crop.cy * height); }
       if (orientation === 90) { ctx.translate(0, height); ctx.rotate(-Math.PI / 2); api.drawUpright(ctx, 0, 0, height, width); }
       else if (orientation === 270) { ctx.translate(width, 0); ctx.rotate(Math.PI / 2); api.drawUpright(ctx, 0, 0, height, width); }
       else if (orientation === 180) { ctx.translate(width, height); ctx.rotate(Math.PI); api.drawUpright(ctx, 0, 0, width, height); }
       else api.drawUpright(ctx, 0, 0, width, height);
+      ctx.restore();
+    },
+    /** What a preview surface of the camera holds, width x height in the device's natural (portrait) orientation: the scene as the phone turned by `rotation` sees it, mirrored for a front camera's preview. */
+    drawNatural(ctx, width, height, { orientation = 90, rotation = 0, front = false, mirror = false, crop = null } = {}) {
+      ctx.save();
+      if (mirror) { ctx.translate(width, 0); ctx.scale(-1, 1); }
+      if (crop) {   // the crop centre, from sensor coordinates to the natural picture (the buffer turned SENSOR_ORIENTATION clockwise)
+        const turn = ((orientation % 360) + 360) % 360, [nx, ny] = turn === 90 ? [1 - crop.cy, crop.cx] : turn === 270 ? [crop.cy, 1 - crop.cx] : turn === 180 ? [1 - crop.cx, 1 - crop.cy] : [crop.cx, crop.cy];
+        ctx.translate(width / 2, height / 2); ctx.scale(crop.zoom, crop.zoom); ctx.translate(-nx * width, -ny * height);
+      }
+      const turn = front ? -rotation : rotation, sideways = Math.abs(turn) % 180 === 90, boxWidth = sideways ? height : width, boxHeight = sideways ? width : height;
+      ctx.translate(width / 2, height / 2); ctx.rotate(turn * Math.PI / 180); api.drawUpright(ctx, -boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight);
       ctx.restore();
     },
     dispose() { release(); },

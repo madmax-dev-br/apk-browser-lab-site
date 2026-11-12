@@ -1,0 +1,26 @@
+{
+  "package": "mp4-muxer",
+  "version": "5.2.2",
+  "source": "https://registry.npmjs.org/mp4-muxer/-/mp4-muxer-5.2.2.tgz",
+  "npmIntegrity": "sha512-dhozjTywI0h2qFzeShagt8YYw811fh1XlwiDCE2f6Aeqf6xG2CyuShoSa5E0AZDO8pPF0JOZ3wOmWBNWIGdSpQ==",
+  "tarballSha256": "5f6c7bae9ad005b32f7fab99268326fe767d7da23e0bb03798c9139861317162",
+  "repository": "https://github.com/Vanilagy/mp4-muxer",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2023 Vanilagy",
+  "use": "Writes the MP4 (ISO BMFF) container of android.media.MediaMuxer, android.media.MediaRecorder and the system camera screen's video capture (src/media-mp4.js). The H.264 samples come from the browser's WebCodecs VideoEncoder; this package contains no codec.",
+  "packagingAdapter": [
+    "None: build/mp4-muxer.mjs of the official npm package, byte for byte"
+  ],
+  "files": {
+    "mp4-muxer.mjs": {
+      "packagePath": "package/build/mp4-muxer.mjs",
+      "bytes": 69011,
+      "sha256": "d2c4c782f180c86ed30b1f5d9487a34a0d370bf9b4535285734ea187d38f9bb5"
+    },
+    "LICENSE": {
+      "packagePath": "package/LICENSE",
+      "bytes": 1065,
+      "sha256": "75c54aae7ef6ad652f684f9dd3b71e4dcef86ccebd88cf441ceed7f5eec037c5"
+    }
+  }
+}

@@ -68,6 +68,16 @@ export function scaleRGBA(rgba, width, height, outWidth, outHeight) {
   for (let y = 0; y < outHeight; y++) { const sy = Math.min(height - 1, Math.floor((y + 0.5) * height / outHeight)); for (let x = 0; x < outWidth; x++) { const sx = Math.min(width - 1, Math.floor((x + 0.5) * width / outWidth)), from = (sy * width + sx) * 4, to = (y * outWidth + x) * 4; out[to] = rgba[from]; out[to + 1] = rgba[from + 1]; out[to + 2] = rgba[from + 2]; out[to + 3] = rgba[from + 3]; } }
   return out;
 }
+/** An RGBA picture turned `degrees` clockwise (90, 180, 270): { width, height, rgba }. */
+export function rotateRGBA(rgba, width, height, degrees) {
+  const turn = ((degrees % 360) + 360) % 360; if (turn === 0) return { width, height, rgba };
+  const outWidth = turn === 180 ? width : height, outHeight = turn === 180 ? height : width, aligned = rgba.byteOffset % 4 ? rgba.slice() : rgba, source = new Uint32Array(aligned.buffer, aligned.byteOffset, width * height), out = new Uint32Array(outWidth * outHeight);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const tx = turn === 90 ? height - 1 - y : turn === 180 ? width - 1 - x : y, ty = turn === 90 ? x : turn === 180 ? height - 1 - y : width - 1 - x;
+    out[ty * outWidth + tx] = source[y * width + x];
+  }
+  return { width: outWidth, height: outHeight, rgba: new Uint8Array(out.buffer) };
+}
 /** The size of the Bitmap a camera app returns in the "data" extra when the caller gave no EXTRA_OUTPUT: the capture scaled down by a power of two until it has at most `maxPixels` (AOSP Camera2 PhotoModule: makeBitmap(data, 50 * 1024)). */
 export function inlineThumbnailSize(width, height, maxPixels = 50 * 1024) {
   let sample = 1; while ((width / sample) * (height / sample) > maxPixels) sample *= 2;

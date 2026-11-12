@@ -1,12 +1,18 @@
-import { createHostRegistry } from './host-contract.js?v=0d5a397ebb41';
-import { APKError } from './apk-error.js?v=0d5a397ebb41';
-import { cleartextPermitted } from './network-native.js?v=0d5a397ebb41';
-import { probeIsoBmff, sniffContainer } from './media-container.js?v=0d5a397ebb41';
-import { state as ioState } from './libcore-io-native.js?v=0d5a397ebb41';
+import { createHostRegistry } from './host-contract.js?v=a94e2efcced9';
+import { APKError } from './apk-error.js?v=a94e2efcced9';
+import { cleartextPermitted } from './network-native.js?v=a94e2efcced9';
+import { probeIsoBmff, sniffContainer, videoSampleTable } from './media-container.js?v=a94e2efcced9';
+import { parseAvcConfigurationRecord, avcCodecString } from './media-mp4.js?v=a94e2efcced9';
+import { rotateRGBA } from './camera-frames.js?v=a94e2efcced9';
+import { Blocked } from './scheduler.js?v=a94e2efcced9';
+import { IntCells } from './java-arrays.js?v=a94e2efcced9';
+import { state as ioState } from './libcore-io-native.js?v=a94e2efcced9';
 
 // Small platform classes: android.os.WorkSource (a set of (uid, name) pairs the framework blames for work), and android.media.MediaMetadataRetriever (android.graphics.Movie is src/animated-image-host.js).
 // MediaMetadataRetriever reads the container metadata of MP4 / MOV / 3GP sources (src/media-container.js: duration, size, rotation, track kinds); a missing or unrecognised source fails the way
-// the framework does, and what needs a codec or another container's parser says explicitly that there is no extractor (never an invented duration or frame).
+// the framework does, and what needs another container's parser says explicitly that there is no extractor (never an invented duration or frame). A frame of an H.264 track is decoded by the
+// host's video decoder (src/media-codec-backend.js: WebCodecs), which answers asynchronously: the calling thread waits for it, so it has to be a thread that can wait (not a main-thread
+// callback); without a decoder, for another codec, or where the thread cannot wait, the call fails naming the reason.
 const WS = 'Landroid/os/WorkSource;', MMR = 'Landroid/media/MediaMetadataRetriever;', STRING = 'Ljava/lang/String;', OBJECT = 'Ljava/lang/Object;';
 const URI = 'Landroid/net/Uri;', CONTEXT = 'Landroid/content/Context;', FD = 'Ljava/io/FileDescriptor;', BITMAP = 'Landroid/graphics/Bitmap;', PARAMS = 'Landroid/media/MediaMetadataRetriever$BitmapParams;', LIST = 'Ljava/util/List;';
 const nullish = v => v === null || v === undefined || v === 0;
@@ -50,7 +56,7 @@ export function createMiscPlatformHost(platform) {
   const setSource = (r, self, bytes, what) => {
     const meta = bytes ? probeIsoBmff(bytes) : null;
     if (!meta) { const container = bytes ? sniffContainer(bytes) : null; if (container === null) failed(r); noExtractor(`${what} (${container === 'ISO BMFF' ? 'an MP4-family file without a readable movie header' : container})`); }
-    r.object(self).retriever = meta;
+    r.object(self).retriever = meta; meta.bytes = bytes;
   };
   const fileBytes = (r, path) => { const node = platform.javaIo.fs().node(path); return node && node.type === 'file' ? node.buf.subarray(0, node.size) : null; };
   const streamBytes = (r, stream) => {
@@ -98,14 +104,68 @@ export function createMiscPlatformHost(platform) {
       case 16: return meta.hasAudio ? 'yes' : null; case 17: return meta.hasVideo ? 'yes' : null;
       case 18: return meta.hasVideo && meta.width !== null ? String(meta.width) : null; case 19: return meta.hasVideo && meta.height !== null ? String(meta.height) : null;
       case 24: return meta.hasVideo ? String(meta.rotation) : null;
-      default: return noExtractor(`MediaMetadataRetriever.extractMetadata(${key}): only the duration, track count, MIME type, has-audio / has-video, video size and rotation keys are read`);
+      case 32: { const table = meta.hasVideo ? videoSampleTable(meta.bytes) : null; return table ? String(table.samples.length) : null; }
+      default: return noExtractor(`MediaMetadataRetriever.extractMetadata(${key}): only the duration, track count, MIME type, has-audio / has-video, video size, rotation and frame count keys are read`);
     }
   });
   def(MMR, 'getEmbeddedPicture', '()[B', (r, _m, [self]) => { sourceOf(r, self); return noExtractor('MediaMetadataRetriever.getEmbeddedPicture'); });
-  for (const [name, sig] of [['getFrameAtTime', '()'], ['getFrameAtTime', '(J)'], ['getFrameAtTime', '(JI)'], ['getFrameAtTime', `(JI${PARAMS})`], ['getScaledFrameAtTime', '(JIII)'], ['getScaledFrameAtTime', `(JIII${PARAMS})`], ['getFrameAtIndex', '(I)'], ['getFrameAtIndex', `(I${PARAMS})`], ['getImageAtIndex', '(I)'], ['getImageAtIndex', `(I${PARAMS})`], ['getPrimaryImage', '()'], ['getPrimaryImage', `(${PARAMS})`]])
-    def(MMR, name, `${sig}${BITMAP}`, (r, _m, [self]) => { sourceOf(r, self); return noExtractor(`MediaMetadataRetriever.${name}: decoding a video frame needs a codec`); });
-  def(MMR, 'getFramesAtIndex', `(II)${LIST}`, (r, _m, [self]) => { sourceOf(r, self); return noExtractor('MediaMetadataRetriever.getFramesAtIndex: decoding a video frame needs a codec'); });
-  def(MMR, 'getFramesAtIndex', `(II${PARAMS})${LIST}`, (r, _m, [self]) => { sourceOf(r, self); return noExtractor('MediaMetadataRetriever.getFramesAtIndex: decoding a video frame needs a codec'); });
+  // Frames. OPTION_PREVIOUS_SYNC 0, OPTION_NEXT_SYNC 1, OPTION_CLOSEST_SYNC 2, OPTION_CLOSEST 3; a negative time asks for a representative frame (the first sync sample here).
+  const CONFIG = 'Landroid/graphics/Bitmap$Config;';
+  const bitmapOf = (r, picture, rotation) => {
+    const turned = rotation ? rotateRGBA(picture.rgba, picture.width, picture.height, rotation) : picture, count = turned.width * turned.height, rgba = turned.rgba, colors = new IntCells(count);
+    for (let i = 0, at = 0; i < count; i++, at += 4) colors[i] = (255 << 24) | (rgba[at] << 16) | (rgba[at + 1] << 8) | rgba[at + 2];
+    return r.dispatch({ owner: BITMAP, name: 'createBitmap', parameters: ['[I', 'I', 'I', CONFIG], result: BITMAP, signature: `([III${CONFIG})${BITMAP}` }, [r.newArray('[I', count, colors), turned.width, turned.height, r.readStatic({ owner: CONFIG, name: 'ARGB_8888', type: CONFIG })], 'static');
+  };
+  /** The sample to show for (timeUs, option), by index into the track's samples; -1 when the track is empty. */
+  const pickSample = (samples, timeUs, option) => {
+    const syncs = samples.map((sample, index) => (sample.key ? index : -1)).filter(index => index >= 0); if (!syncs.length) return -1;
+    if (timeUs < 0) return syncs[0];
+    const closest = list => list.reduce((best, index) => (Math.abs(samples[index].timeUs - timeUs) < Math.abs(samples[best].timeUs - timeUs) ? index : best), list[0]);
+    if (option === 0) return syncs.filter(index => samples[index].timeUs <= timeUs).at(-1) ?? syncs[0];
+    if (option === 1) return syncs.find(index => samples[index].timeUs >= timeUs) ?? syncs.at(-1);
+    if (option === 3) return closest(samples.map((_, index) => index));
+    return closest(syncs);
+  };
+  /** Decodes sample `pick(table)` of the source's video track into a Bitmap, turned by the track's rotation; `after(bitmap)` post-processes it. null when the source has no decodable frame there. */
+  const frame = (r, self, what, pick, after = bitmap => bitmap) => {
+    const meta = sourceOf(r, self); if (!meta.hasVideo) return null;
+    const table = videoSampleTable(meta.bytes); if (!table || !table.samples.length) return null;
+    const target = pick(table); if (target < 0 || target >= table.samples.length) return null;
+    if (table.fourcc !== 'avc1' && table.fourcc !== 'avc3') noExtractor(`${what}: decoding a frame of a '${table.fourcc}' track (frames are decoded for H.264 / AVC tracks only)`);
+    const config = table.description ? parseAvcConfigurationRecord(table.description) : null; if (!config) return null;
+    const decoder = platform.camera?.media?.backend; if (typeof decoder?.decodeVideoFrame !== 'function') noExtractor(`${what}: decoding a video frame needs a codec, and this host has no video decoder (WebCodecs)`);
+    let from = target; while (from > 0 && !table.samples[from].key) from--;
+    const request = { codec: avcCodecString(config.sps), description: table.description.slice(), codedWidth: table.codedWidth, codedHeight: table.codedHeight, samples: table.samples.slice(from, target + 1).map(sample => ({ data: meta.bytes.slice(sample.offset, sample.offset + sample.size), key: sample.key, timestampUs: sample.timeUs })) };
+    // The decoder answers from the host's event loop. A thread running under a host call (a main-thread callback served by the Looper, a native that called back) cannot yield to it.
+    if ((r.thread?.nestedDepth ?? 0) > 0) throw new APKError(`${what} was called where the VM cannot wait for the host's video decoder (a main-thread callback or another host call): the decoder answers asynchronously. Call it from a background thread`, { kind: 'media-would-block' });
+    const wait = { done: false, picture: null, error: null };
+    Promise.resolve().then(() => decoder.decodeVideoFrame(request)).then(picture => { wait.picture = picture; }, error => { wait.error = error; }).then(() => { wait.done = true; platform.onExternalActivity?.(); });
+    return new Blocked({ reason: what, roots: [self],
+      ready: () => wait.done,
+      finish: () => { if (wait.error || !wait.picture) { r.record(`MEDIA ${what}: no frame (${String(wait.error?.message ?? wait.error ?? 'the decoder returned nothing')})`); return null; } return after(bitmapOf(r, wait.picture, table.rotation)); } });
+  };
+  const atTime = (r, self, what, timeUs, option, after) => { if (option < 0 || option > 3) r.throwJava('Ljava/lang/IllegalArgumentException;', `Unsupported option: ${option}`); return frame(r, self, what, table => pickSample(table.samples, Number(timeUs), option), after); };
+  def(MMR, 'getFrameAtTime', `()${BITMAP}`, (r, _m, [self]) => atTime(r, self, 'MediaMetadataRetriever.getFrameAtTime', -1, 2));
+  def(MMR, 'getFrameAtTime', `(J)${BITMAP}`, (r, _m, [self, timeUs]) => atTime(r, self, 'MediaMetadataRetriever.getFrameAtTime', timeUs, 2));
+  def(MMR, 'getFrameAtTime', `(JI)${BITMAP}`, (r, _m, [self, timeUs, option]) => atTime(r, self, 'MediaMetadataRetriever.getFrameAtTime', timeUs, option));
+  def(MMR, 'getFrameAtTime', `(JI${PARAMS})${BITMAP}`, (r, _m, [self, timeUs, option]) => atTime(r, self, 'MediaMetadataRetriever.getFrameAtTime', timeUs, option));
+  /** getScaledFrameAtTime: the frame scaled down to fit dstWidth x dstHeight, keeping its aspect ratio (MediaMetadataRetriever asks the extractor for exactly that). */
+  const scaled = (r, self, timeUs, option, width, height) => {
+    if (width <= 0) r.throwJava('Ljava/lang/IllegalArgumentException;', `Invalid width: ${width}`); if (height <= 0) r.throwJava('Ljava/lang/IllegalArgumentException;', `Invalid height: ${height}`);
+    return atTime(r, self, 'MediaMetadataRetriever.getScaledFrameAtTime', timeUs, option, bitmap => {
+      const size = name => r.dispatch({ owner: BITMAP, name, parameters: [], result: 'I', signature: '()I' }, [bitmap], 'virtual'), w = size('getWidth'), h = size('getHeight'), scale = Math.min(1, width / w, height / h);
+      return scale >= 1 ? bitmap : r.dispatch({ owner: BITMAP, name: 'createScaledBitmap', parameters: [BITMAP, 'I', 'I', 'Z'], result: BITMAP, signature: `(${BITMAP}IIZ)${BITMAP}` }, [bitmap, Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale)), 1], 'static');
+    });
+  };
+  def(MMR, 'getScaledFrameAtTime', `(JIII)${BITMAP}`, (r, _m, [self, timeUs, option, width, height]) => scaled(r, self, timeUs, option, width, height));
+  def(MMR, 'getScaledFrameAtTime', `(JIII${PARAMS})${BITMAP}`, (r, _m, [self, timeUs, option, width, height]) => scaled(r, self, timeUs, option, width, height));
+  const atIndex = (r, self, index) => { if (index < 0) r.throwJava('Ljava/lang/IllegalArgumentException;', `Invalid frameIndex: ${index}`); return frame(r, self, 'MediaMetadataRetriever.getFrameAtIndex', table => (index < table.samples.length ? index : r.throwJava('Ljava/lang/IllegalArgumentException;', `Invalid frameIndex or numFrames: ${index}, 1`))); };
+  def(MMR, 'getFrameAtIndex', `(I)${BITMAP}`, (r, _m, [self, index]) => atIndex(r, self, index)); def(MMR, 'getFrameAtIndex', `(I${PARAMS})${BITMAP}`, (r, _m, [self, index]) => atIndex(r, self, index));
+  for (const [name, sig] of [['getImageAtIndex', '(I)'], ['getImageAtIndex', `(I${PARAMS})`], ['getPrimaryImage', '()'], ['getPrimaryImage', `(${PARAMS})`]])
+    def(MMR, name, `${sig}${BITMAP}`, (r, _m, [self]) => { sourceOf(r, self); return noExtractor(`MediaMetadataRetriever.${name}: still images in a media file (HEIF) are not read`); });
+  def(MMR, 'getFramesAtIndex', `(II)${LIST}`, (r, _m, [self]) => { sourceOf(r, self); return noExtractor('MediaMetadataRetriever.getFramesAtIndex: only single frames are decoded (getFrameAtIndex)'); });
+  def(MMR, 'getFramesAtIndex', `(II${PARAMS})${LIST}`, (r, _m, [self]) => { sourceOf(r, self); return noExtractor('MediaMetadataRetriever.getFramesAtIndex: only single frames are decoded (getFrameAtIndex)'); });
+  // METADATA_KEY_VIDEO_FRAME_COUNT (32): the number of samples of the video track.
 
 
   const UL = 'Landroid/icu/util/ULocale;', LOCALE = 'Ljava/util/Locale;';

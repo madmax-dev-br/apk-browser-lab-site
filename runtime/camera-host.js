@@ -1,9 +1,10 @@
-import { createHostRegistry, floatBits } from './host-contract.js?v=0d5a397ebb41';
-import { APKError } from './apk-error.js?v=0d5a397ebb41';
-import KEY_DATA from './camera-metadata-keys-data.js?v=0d5a397ebb41';
-import { CAMERAS, cameraById, FORMAT, STREAM_SIZES, SENSOR_ARRAY, supportsSize, roundStreamSize } from './camera-frames.js?v=0d5a397ebb41';
-import { installCameraSurfaces, SURFACE, IMAGE_READER, SURFACE_TEXTURE } from './camera-surface-host.js?v=0d5a397ebb41';
-import { installCaptureIntents } from './camera-capture-intent.js?v=0d5a397ebb41';
+import { createHostRegistry, floatBits } from './host-contract.js?v=a94e2efcced9';
+import { APKError } from './apk-error.js?v=a94e2efcced9';
+import KEY_DATA from './camera-metadata-keys-data.js?v=a94e2efcced9';
+import { CAMERAS, cameraById, FORMAT, STREAM_SIZES, SENSOR_ARRAY, supportsSize, roundStreamSize } from './camera-frames.js?v=a94e2efcced9';
+import { installCameraSurfaces, SURFACE, IMAGE_READER, SURFACE_TEXTURE } from './camera-surface-host.js?v=a94e2efcced9';
+import { installCaptureIntents } from './camera-capture-intent.js?v=a94e2efcced9';
+import { installMediaCodecs } from './media-codec-host.js?v=a94e2efcced9';
 
 // android.hardware.camera2 for the browser VM (android-13.0.0_r1: CameraManager.java, impl/CameraDeviceImpl.java, impl/CameraCaptureSessionImpl.java, CaptureRequest.java,
 // CaptureResult.java, params/StreamConfigurationMap.java, params/OutputConfiguration.java, params/SessionConfiguration.java) and the camera capture Intents
@@ -12,13 +13,16 @@ import { installCaptureIntents } from './camera-capture-intent.js?v=0d5a397ebb41
 // The camera hardware is the page. Until a page attaches (`attach(backend)`: the Worker does it when the page says it can feed cameras) the device has no camera at all, exactly as
 // before: getCameraIdList() is empty, the camera features are absent, a capture Intent finds no Activity. Node probes get the same by attaching a scripted backend.
 //
+// Recording. A MediaCodec / MediaRecorder input Surface (src/media-codec-host.js) is a session output like any other: the camera hands each frame of a request that targets it to
+// the encoder behind it. The page sends that frame as a VideoFrame (no readback) or, where it cannot, as RGBA pixels; the encoder is the host's (WebCodecs).
+//
 // Frame path. Nothing flows while no request is active. A repeating request or a pending capture() makes the Worker post the streams it needs (`streams`); the page then sends one
 // `frame` per display frame it can afford, at most one in flight per camera: the Worker answers each with `ack` after the app's callbacks for it ran (a slow app drops frames, as a
 // slow consumer does on a device). A frame carries pixels (RGBA, a transferred ArrayBuffer per size) only for ImageReader targets; TextureView / SurfaceView targets are drawn by
 // the page in the View's box and cost the Worker one small message per frame. A still capture asks for its buffer once (`once`), so a 1280x960 frame is read back a single time.
 //
 // Not provided (explicit failure, never an empty frame): reprocessing, constrained high-speed and extension sessions, deferred OutputConfigurations, multi-resolution readers, RAW /
-// DEPTH / HEIC outputs, MediaRecorder and MediaCodec surfaces (no encoder), torch, the deprecated android.hardware.Camera API. Methods of those are simply not defined here and fail
+// DEPTH / HEIC outputs, torch (no camera has a flash unit), the deprecated android.hardware.Camera API. Methods of those are simply not defined here and fail
 // with the VM's unsupported-API error naming them.
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', LIST = 'Ljava/util/List;', HANDLER = 'Landroid/os/Handler;', EXECUTOR = 'Ljava/util/concurrent/Executor;', RUNNABLE = 'Ljava/lang/Runnable;', LOOPER = 'Landroid/os/Looper;', CLASS = 'Ljava/lang/Class;';
 const P = 'Landroid/hardware/camera2/';
@@ -36,6 +40,8 @@ const TEMPLATES = [1, 2, 3, 4];   // PREVIEW, STILL_CAPTURE, RECORD, VIDEO_SNAPS
 const ERROR_CAMERA_DISCONNECTED = 2;   // CameraAccessException.CAMERA_DISCONNECTED
 const AF = { INACTIVE: 0, PASSIVE_FOCUSED: 2, ACTIVE_SCAN: 3, FOCUSED_LOCKED: 4 }, AE = { CONVERGED: 2, PRECAPTURE: 5 };
 const nullish = value => value === null || value === undefined || value === 0;
+/** The largest digital zoom (SCALER_AVAILABLE_MAX_DIGITAL_ZOOM): a crop region down to a quarter of the array's width, scaled up by the page that draws the frames. */
+export const MAX_DIGITAL_ZOOM = 4;
 const K = KEY_DATA.keys, keyName = (group, field) => K[group][field] ?? (() => { throw new APKError(`Camera metadata key ${group}.${field} is not in src/camera-metadata-keys-data.js`); })();
 
 // Value descriptors: what a metadata entry holds, turned into the Java object CameraMetadata.get returns.
@@ -50,14 +56,14 @@ export function characteristicsOf(camera) {
     INFO_SUPPORTED_HARDWARE_LEVEL: I(0),   // LIMITED
     REQUEST_AVAILABLE_CAPABILITIES: ints([0]),   // BACKWARD_COMPATIBLE
     REQUEST_MAX_NUM_OUTPUT_RAW: I(0), REQUEST_MAX_NUM_OUTPUT_PROC: I(3), REQUEST_MAX_NUM_OUTPUT_PROC_STALLING: I(1), REQUEST_MAX_NUM_INPUT_STREAMS: I(0), REQUEST_PARTIAL_RESULT_COUNT: I(1), REQUEST_PIPELINE_MAX_DEPTH: B(4),
-    SCALER_STREAM_CONFIGURATION_MAP: { t: 'map' }, SCALER_AVAILABLE_MAX_DIGITAL_ZOOM: F(1), SCALER_CROPPING_TYPE: I(0),
+    SCALER_STREAM_CONFIGURATION_MAP: { t: 'map' }, SCALER_AVAILABLE_MAX_DIGITAL_ZOOM: F(MAX_DIGITAL_ZOOM), SCALER_CROPPING_TYPE: I(0),   // CENTER_ONLY: a crop region is a centred digital zoom
     SENSOR_INFO_ACTIVE_ARRAY_SIZE: rect(0, 0, width, height), SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE: rect(0, 0, width, height), SENSOR_INFO_PIXEL_ARRAY_SIZE: size(width, height), SENSOR_INFO_TIMESTAMP_SOURCE: I(0),
     SENSOR_INFO_PHYSICAL_SIZE: { t: 'sizeF', v: [4.8, 3.6] }, LENS_INFO_AVAILABLE_FOCAL_LENGTHS: floats([4]), LENS_INFO_AVAILABLE_APERTURES: floats([2]),
     LENS_INFO_MINIMUM_FOCUS_DISTANCE: F(camera.autofocus ? 10 : 0), LENS_INFO_FOCUS_DISTANCE_CALIBRATION: I(0), LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION: ints([0]),
     CONTROL_AVAILABLE_MODES: ints([1]), CONTROL_AE_AVAILABLE_MODES: ints([1]), CONTROL_AE_AVAILABLE_ANTIBANDING_MODES: ints([3]), CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES: ranges([[15, 30], [30, 30]]),
     CONTROL_AE_COMPENSATION_RANGE: range(0, 0), CONTROL_AE_COMPENSATION_STEP: rational(1, 1), CONTROL_AE_LOCK_AVAILABLE: Z(false), CONTROL_AWB_LOCK_AVAILABLE: Z(false),
     CONTROL_AF_AVAILABLE_MODES: ints(camera.autofocus ? [0, 1, 3, 4] : [0]), CONTROL_AWB_AVAILABLE_MODES: ints([1]), CONTROL_AVAILABLE_EFFECTS: ints([0]), CONTROL_AVAILABLE_SCENE_MODES: ints([0]), CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES: ints([0]),
-    CONTROL_MAX_REGIONS_AE: I(0), CONTROL_MAX_REGIONS_AWB: I(0), CONTROL_MAX_REGIONS_AF: I(0),
+    CONTROL_MAX_REGIONS_AE: I(1), CONTROL_MAX_REGIONS_AWB: I(0), CONTROL_MAX_REGIONS_AF: I(camera.autofocus ? 1 : 0),   // metering regions are accepted (the AF scan of a trigger completes); they do not change the picture
     FLASH_INFO_AVAILABLE: Z(false), JPEG_AVAILABLE_THUMBNAIL_SIZES: sizes([[0, 0], [160, 120]]), SYNC_MAX_LATENCY: I(-1),
     STATISTICS_INFO_AVAILABLE_FACE_DETECT_MODES: ints([0]), STATISTICS_INFO_MAX_FACE_COUNT: I(0), NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES: ints([0]),
   };
@@ -85,7 +91,7 @@ export function createCameraHost(platform) {
   const now = () => Number(platform.clock.nanos());
 
   /** Host state. Everything that holds a Java value is plain data reachable from the returned host (`state`), so the collector's walk of the platform finds it. */
-  const S = { backend: null, devices: new Map(), availability: [], sequence: 0, once: 0, posted: '', captures: new Map(), stats: { frames: 0, pixelFrames: 0, pixelBytes: 0, dropped: 0, frameMs: 0 } };
+  const S = { backend: null, devices: new Map(), availability: [], sequence: 0, once: 0, posted: '', captures: new Map(), stats: { frames: 0, pixelFrames: 0, pixelBytes: 0, dropped: 0, frameMs: 0, encoded: 0 } };
   const send = (message, transfer) => { try { S.backend?.post(message, transfer); } catch { /* the page is gone: the next attach starts clean */ } };
 
   // ---- delivery on the app's Handler / Executor ---------------------------------------------------------------------------------------------------------------------------
@@ -106,6 +112,7 @@ export function createCameraHost(platform) {
   };
 
   const surfaces = installCameraSurfaces({ platform, registry, post, targetFor });
+  const media = installMediaCodecs({ platform, registry, post, call, callStatic, construct, cameras: () => cameras() });
 
   // ---- metadata keys and values ---------------------------------------------------------------------------------------------------------------------------------------------
   for (const [group, owner] of Object.entries(KEY_OWNERS)) {
@@ -178,6 +185,7 @@ export function createCameraHost(platform) {
   /** The stream a consumer gets: an ImageReader's own size and format must be one the camera produces; a SurfaceTexture / SurfaceView gets the closest supported size. null: not configurable. */
   const streamFor = sink => {
     if (sink.kind === 'reader') { const { width, height, format } = sink.state; return supportsSize(format, width, height) ? { width, height, format } : null; }
+    if (sink.kind === 'encoder') { const size = media.streamSize(sink); return size ? { ...size, format: FORMAT.PRIVATE } : null; }
     if (sink.kind === 'texture') return { ...roundStreamSize(sink.state.width, sink.state.height), format: FORMAT.PRIVATE };
     const view = platform.vmRuntime?.object(sink.view), state = view?.surfaceView, bounds = view?.bounds, w = state?.fixed?.width ?? (bounds ? bounds.right - bounds.left : 0), h = state?.fixed?.height ?? (bounds ? bounds.bottom - bounds.top : 0);
     return { ...roundStreamSize(Math.max(w, h), Math.min(w, h)), format: FORMAT.PRIVATE };   // a SurfaceView buffer is sized in the sensor's (landscape) orientation; the compositor rotates it
@@ -224,10 +232,6 @@ export function createCameraHost(platform) {
     targetFor, executorTarget,
   };
 
-  // ---- CamcorderProfile: the device records no video (no encoder), so it has no camcorder profile for any camera or quality; get() stays undefined and fails naming the API
-  const CAMCORDER = 'Landroid/media/CamcorderProfile;'; type(CAMCORDER, OBJECT);
-  def(CAMCORDER, 'hasProfile', '(I)Z', () => 0, { static: true }); def(CAMCORDER, 'hasProfile', '(II)Z', () => 0, { static: true });
-
   // ---- CameraDevice ---------------------------------------------------------------------------------------------------------------------------------------------------------
   type(DEVICE, OBJECT, ['Ljava/lang/AutoCloseable;']); type(DEVICE_IMPL, DEVICE, [], { allocatable: true }); type(DEVICE_CALLBACK, OBJECT, [], { allocatable: true });
   def(DEVICE_CALLBACK, '<init>', '()V', () => {}); def(DEVICE_CALLBACK, 'onClosed', `(${DEVICE})V`, () => {});
@@ -257,8 +261,8 @@ export function createCameraHost(platform) {
     let failure = null;
     for (const surface of surfaceList) {
       const sink = nullish(surface) ? null : surfaces.sinkOf(r, surface), stream = sink ? streamFor(sink) : null;
-      if (!sink) { failure = nullish(surface) ? 'a null Surface, or an OutputConfiguration with a dynamic range profile or stream use case the camera does not have' : 'a Surface without a live consumer the camera can fill (released, never created, or of MediaRecorder / MediaCodec, which the lab has no encoder for)'; break; }
-      if (!stream) { failure = `an ImageReader of ${sink.state.width}x${sink.state.height} format 0x${sink.state.format.toString(16)}, which is not in StreamConfigurationMap.getOutputSizes`; break; }
+      if (!sink) { failure = nullish(surface) ? 'a null Surface, or an OutputConfiguration with a dynamic range profile or stream use case the camera does not have' : 'a Surface without a live consumer the camera can fill (released or never created)'; break; }
+      if (!stream) { failure = sink.kind === 'encoder' ? `an encoder Surface of ${sink.size() ? `${sink.size().width}x${sink.size().height}, which is not in StreamConfigurationMap.getOutputSizes` : 'a codec that is not configured yet'}` : `an ImageReader of ${sink.state.width}x${sink.state.height} format 0x${sink.state.format.toString(16)}, which is not in StreamConfigurationMap.getOutputSizes`; break; }
       if (session.outputs.some(output => output.surface.ref === surface.ref)) continue;
       session.outputs.push({ surface, sink, stream });
     }
@@ -315,6 +319,28 @@ export function createCameraHost(platform) {
   def(SESSION_CONFIG, 'getSessionParameters', `()${REQUEST}`, (r, _m, [self]) => r.object(self).sessionConfig.parameters);
   def(SESSION_CONFIG, 'getInputConfiguration', `()${P}params/InputConfiguration;`, () => null);
 
+  // ---- params/MeteringRectangle (android-13.0.0_r1 MeteringRectangle.java): a weighted rectangle of the active array, the value of the AE / AF / AWB region keys ---------------------
+  const METERING = `${P}params/MeteringRectangle;`, POINT = 'Landroid/graphics/Point;';
+  type(METERING, OBJECT, [], { allocatable: true });
+  for (const [name, value] of Object.entries({ METERING_WEIGHT_MIN: 0, METERING_WEIGHT_MAX: 1000, METERING_WEIGHT_DONT_CARE: 0 })) staticField(METERING, name, 'I', () => value);
+  const meteringInit = (r, self, x, y, width, height, weight) => {
+    for (const [value, name] of [[x, 'x'], [y, 'y'], [width, 'width'], [height, 'height']]) if (value < 0) iae(r, `${name} must be nonnegative`);
+    if (weight < 0 || weight > 1000) iae(r, `meteringWeight is out of range of [0, 1000] (too ${weight < 0 ? 'low' : 'high'})`);
+    r.object(self).metering = { x, y, width, height, weight };
+  };
+  const rectField = (r, rect, name) => r.object(rect).fields.get(`${RECT}->${name}:I`) ?? 0;
+  def(METERING, '<init>', '(IIIII)V', (r, _m, [self, x, y, width, height, weight]) => meteringInit(r, self, x, y, width, height, weight));
+  def(METERING, '<init>', `(${POINT}${SIZE}I)V`, (r, _m, [self, point, size, weight]) => { if (nullish(point) || nullish(size)) r.throwJava('Ljava/lang/NullPointerException;', nullish(point) ? 'xy must not be null' : 'dimensions must not be null'); const [width, height] = sizeOf(r, size), field = name => r.object(point).fields.get(`${POINT}->${name}:I`) ?? 0; meteringInit(r, self, field('x'), field('y'), width, height, weight); });
+  def(METERING, '<init>', `(${RECT}I)V`, (r, _m, [self, rect, weight]) => { if (nullish(rect)) r.throwJava('Ljava/lang/NullPointerException;', 'rect must not be null'); const left = rectField(r, rect, 'left'), top = rectField(r, rect, 'top'); meteringInit(r, self, left, top, rectField(r, rect, 'right') - left, rectField(r, rect, 'bottom') - top, weight); });
+  const metering = (r, self) => r.object(self).metering;
+  for (const [name, key] of [['getX', 'x'], ['getY', 'y'], ['getWidth', 'width'], ['getHeight', 'height'], ['getMeteringWeight', 'weight']]) def(METERING, name, '()I', (r, _m, [self]) => metering(r, self)[key]);
+  def(METERING, 'getUpperLeftPoint', `()${POINT}`, (r, _m, [self]) => construct(r, POINT, ['I', 'I'], [metering(r, self).x, metering(r, self).y]));
+  def(METERING, 'getSize', `()${SIZE}`, (r, _m, [self]) => construct(r, SIZE, ['I', 'I'], [metering(r, self).width, metering(r, self).height]));
+  def(METERING, 'getRect', `()${RECT}`, (r, _m, [self]) => { const m = metering(r, self); return construct(r, RECT, ['I', 'I', 'I', 'I'], [m.x, m.y, m.x + m.width, m.y + m.height]); });
+  def(METERING, 'equals', `(${OBJECT})Z`, (r, _m, [self, other]) => { if (nullish(other) || r.typeOf(other) !== METERING) return 0; const a = metering(r, self), b = metering(r, other); return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height && a.weight === b.weight ? 1 : 0; });
+  def(METERING, 'hashCode', '()I', (r, _m, [self]) => { const m = metering(r, self); let h = 0; for (const value of [m.x, m.y, m.width, m.height, m.weight]) h = (Math.imul(31, h) + value) | 0; return h; });
+  def(METERING, 'toString', `()${STRING}`, (r, _m, [self]) => { const m = metering(r, self); return `(x:${m.x}, y:${m.y}, w:${m.width}, h:${m.height}, wt:${m.weight})`; });
+
   // ---- CaptureRequest and its Builder ---------------------------------------------------------------------------------------------------------------------------------------
   type(REQUEST, METADATA, ['Landroid/os/Parcelable;']); type(BUILDER, OBJECT);
   const building = (r, self) => r.object(self).request;
@@ -363,10 +389,22 @@ export function createCameraHost(platform) {
   };
   /** The target for capture callbacks: none needed without a callback; otherwise the Executor, the Handler, or the calling thread's Looper. */
   const callbackTarget = (r, callback, handler, executor) => (executor !== undefined ? executorTarget(r, executor) : nullish(callback) ? null : targetFor(r, handler));
-  const markStreams = (r, outputs, live, cameraId) => {
+  /** How the page draws a frame for a request: the display rotation of the device (degrees; the scene is fixed, the phone turns) and the request's crop region (the digital zoom). Fields only when they differ from portrait / the full array. */
+  const viewOf = (r, values) => {
+    const out = {}, rotation = displayRotation(); if (rotation) out.rotation = rotation;
+    const rect = values?.get(keyName('request', 'SCALER_CROP_REGION')), field = name => r.object(rect).fields.get(`${RECT}->${name}:I`) ?? 0;
+    if (!nullish(rect)) {
+      const { width, height } = SENSOR_ARRAY, left = Math.max(0, field('left')), top = Math.max(0, field('top')), right = Math.min(width, field('right')), bottom = Math.min(height, field('bottom'));
+      const zoom = Math.min(MAX_DIGITAL_ZOOM, Math.max(1, Math.min(width / Math.max(1, right - left), height / Math.max(1, bottom - top))));
+      if (right > left && bottom > top && zoom > 1.0001) out.crop = { zoom: Math.round(zoom * 1000) / 1000, cx: Math.round((left + right) / 2 / width * 1e4) / 1e4, cy: Math.round((top + bottom) / 2 / height * 1e4) / 1e4 };
+    }
+    return out;
+  };
+  const displayRotation = () => (platform.device?.orientation === 'landscape' ? 90 : 0);   // Display.getRotation: ROTATION_90 in landscape (src/display-host.js)
+  const markStreams = (r, outputs, live, cameraId, values = null) => {
     for (const output of outputs) {
-      const sink = output.sink; if (sink.kind === 'reader') continue;
-      const camera = cameraById(cameraId); sink.stream = { cameraId, facing: camera.facing, orientation: camera.orientation, width: output.stream.width, height: output.stream.height, live };
+      const sink = output.sink; if (sink.kind === 'reader' || sink.kind === 'encoder') continue;
+      const camera = cameraById(cameraId); sink.stream = { cameraId, facing: camera.facing, orientation: camera.orientation, width: output.stream.width, height: output.stream.height, live, ...(live && values ? viewOf(r, values) : live ? {} : { ...(sink.stream?.rotation ? { rotation: sink.stream.rotation } : {}), ...(sink.stream?.crop ? { crop: sink.stream.crop } : {}) }) };
       const view = sink.kind === 'holder' ? sink.view : sink.state.ownerView; if (view) platform.requestDraw?.(r, view);
     }
   };
@@ -381,10 +419,10 @@ export function createCameraHost(platform) {
     const entries = requests.map(request => checked(r, session, request)), sequenceId = ++S.sequence, job = { entries, callback: nullish(callback) ? null : callback, target, sequenceId, next: 0, once: [], lastFrame: -1 };
     if (repeating) {
       const previous = session.repeating; if (previous) { markStreams(r, previous.entries.flatMap(entry => entry.outputs), false, session.device.id); sequenceDone(r, session, previous); }
-      session.repeating = job; markStreams(r, entries.flatMap(entry => entry.outputs), true, session.device.id);
+      session.repeating = job; markStreams(r, entries.flatMap(entry => entry.outputs), true, session.device.id, entries[0].q.values);
     } else {
       // each ImageReader target of a single capture gets its buffer once
-      entries.forEach((entry, index) => { for (const output of entry.outputs) if (output.sink.kind === 'reader') job.once.push({ id: ++S.once, index, output }); else output.sink.shots++; });
+      entries.forEach((entry, index) => { for (const output of entry.outputs) if (output.sink.kind === 'reader' || output.sink.kind === 'encoder') job.once.push({ id: ++S.once, index, output }); else output.sink.shots++; });
       session.jobs.push(job);
     }
     tellActive(r, session); publish(r); return sequenceId;
@@ -415,24 +453,31 @@ export function createCameraHost(platform) {
 
   // ---- the frame engine -------------------------------------------------------------------------------------------------------------------------------------------------------
   /** What the page has to produce: per open camera, whether frames should flow and which pixel buffers each frame (repeating ImageReader targets) or one frame (`once`: stills) must carry. Posted only when it changes. */
-  const publish = () => {
+  const publish = (r = platform.vmRuntime) => {
     const list = [];
     for (const device of S.devices.values()) {
       const session = device.session, buffers = [], once = [];
-      if (session?.repeating) for (const entry of session.repeating.entries) for (const output of entry.outputs) if (output.sink.kind === 'reader' && !buffers.some(b => b.width === output.stream.width && b.height === output.stream.height)) buffers.push({ width: output.stream.width, height: output.stream.height });
-      for (const job of session?.jobs ?? []) for (const need of job.once) if (!need.served) once.push({ id: need.id, width: need.output.stream.width, height: need.output.stream.height });
-      list.push({ id: device.id, active: !!(session && (session.repeating || session.jobs.length)), buffers, once });
+      // a size only encoders consume may arrive as a VideoFrame (`video`); a size an ImageReader reads has to be pixels
+      if (session?.repeating) for (const entry of session.repeating.entries) for (const output of entry.outputs) {
+        const kind = output.sink.kind; if (kind !== 'reader' && kind !== 'encoder') continue;
+        const same = buffers.find(b => b.width === output.stream.width && b.height === output.stream.height);
+        if (!same) buffers.push({ width: output.stream.width, height: output.stream.height, ...(kind === 'encoder' ? { video: true } : {}) }); else if (kind === 'reader') delete same.video;
+      }
+      for (const job of session?.jobs ?? []) for (const need of job.once) if (!need.served) once.push({ id: need.id, width: need.output.stream.width, height: need.output.stream.height, ...(r ? viewOf(r, job.entries[need.index].q.values) : {}) });
+      device.view = session?.repeating && r ? viewOf(r, session.repeating.entries[0].q.values) : {};
+      list.push({ id: device.id, active: !!(session && (session.repeating || session.jobs.length)), buffers, once, ...device.view });
     }
     const text = JSON.stringify(list); if (text === S.posted) return; S.posted = text; send({ op: 'streams', cameras: list });
   };
-  /** The 3A state the next result reports, after the request's AF mode and triggers (the emulator's fake camera does the same: a scan takes one frame). */
+  /** The 3A state the next result reports, after the request's AF mode and triggers (as the emulator's fake camera: an AUTO / MACRO scan reports ACTIVE_SCAN for a few frames, then FOCUSED_LOCKED). */
+  const SCAN_FRAMES = 3;
   const step3A = (r, device, values) => {
     const mode = device.camera.autofocus ? unboxed(r, values.get(keyName('request', 'CONTROL_AF_MODE')), 0) : 0, trigger = unboxed(r, values.get(keyName('request', 'CONTROL_AF_TRIGGER')), 0), af = device.af, continuous = mode === 3 || mode === 4;
     if (af.mode !== mode) { af.mode = mode; af.state = continuous ? AF.PASSIVE_FOCUSED : AF.INACTIVE; }
     if (mode === 0) af.state = AF.INACTIVE;
     else if (trigger === 2) af.state = continuous ? AF.PASSIVE_FOCUSED : AF.INACTIVE;
-    else if (trigger === 1) af.state = af.state === AF.ACTIVE_SCAN || af.state === AF.FOCUSED_LOCKED || continuous ? AF.FOCUSED_LOCKED : AF.ACTIVE_SCAN;
-    else if (af.state === AF.ACTIVE_SCAN) af.state = AF.FOCUSED_LOCKED;
+    else if (trigger === 1) { if (af.state === AF.ACTIVE_SCAN || af.state === AF.FOCUSED_LOCKED || continuous) af.state = AF.FOCUSED_LOCKED; else { af.state = AF.ACTIVE_SCAN; af.scan = SCAN_FRAMES; } }
+    else if (af.state === AF.ACTIVE_SCAN && --af.scan <= 0) af.state = AF.FOCUSED_LOCKED;
     const precapture = unboxed(r, values.get(keyName('request', 'CONTROL_AE_PRECAPTURE_TRIGGER')), 0);
     device.ae.state = precapture === 1 && device.ae.state !== AE.PRECAPTURE ? AE.PRECAPTURE : AE.CONVERGED;
   };
@@ -452,9 +497,12 @@ export function createCameraHost(platform) {
       const sink = output.sink;
       if (sink.kind === 'texture') surfaces.textureFrame(r, sink.texture, timestamp);
       else if (sink.kind === 'reader') {
-        const buffer = bufferFor(output), values = entry.q.values;
+        const picture = bufferFor(output), buffer = picture?.data ? new Uint8Array(picture.data) : null, values = entry.q.values;
         const queued = buffer ? surfaces.readerFrame(r, sink, buffer, { timestamp, jpegQuality: unboxed(r, values.get(keyName('request', 'JPEG_QUALITY')), 95), jpegOrientation: unboxed(r, values.get(keyName('request', 'JPEG_ORIENTATION')), 0) }) : false;
         if (!queued) { lost.push(output.surface); S.stats.dropped++; }
+      } else if (sink.kind === 'encoder') {
+        const picture = bufferFor(output);
+        if (!picture || !sink.frame(r, picture, timestamp)) { lost.push(output.surface); S.stats.dropped++; } else S.stats.encoded++;
       }
     }
     job.lastFrame = frameNumber;
@@ -467,27 +515,30 @@ export function createCameraHost(platform) {
   /** A frame from the page for an open camera: the oldest pending capture() whose buffers it carries, else the repeating request. Returns where that request's callbacks were posted (null: nowhere). */
   const processFrame = (r, device, frame) => {
     const session = device.session; if (!session || session.closed) return null;
-    const buffers = frame.buffers ?? [], data = buffer => new Uint8Array(buffer.data);
+    const buffers = frame.buffers ?? [];
     const job = session.jobs[0];
     if (job) {
       const index = job.next, needs = job.once.filter(need => need.index === index), found = needs.map(need => buffers.find(buffer => buffer.once === need.id));
       if (found.every(Boolean)) {
         for (const need of needs) need.served = true;
-        serve(r, device, session, job, job.entries[index], output => { const at = needs.findIndex(need => need.output === output); return at < 0 ? null : data(found[at]); });
+        serve(r, device, session, job, job.entries[index], output => { const at = needs.findIndex(need => need.output === output); return at < 0 ? null : found[at]; });
         if (++job.next >= job.entries.length) { session.jobs.shift(); sequenceDone(r, session, job); tellReadyIfIdle(r, session); }
         publish(r); return job.target;
       }
     }
     const repeating = session.repeating; if (!repeating) return null;
     const entry = repeating.entries[repeating.next++ % repeating.entries.length];
-    serve(r, device, session, repeating, entry, output => { const buffer = buffers.find(candidate => candidate.once === undefined && candidate.width === output.stream.width && candidate.height === output.stream.height); return buffer ? data(buffer) : null; });
+    const view = viewOf(r, entry.q.values); if (JSON.stringify(view) !== JSON.stringify(device.view ?? {})) { markStreams(r, entry.outputs, true, device.id, entry.q.values); publish(r); }   // the device turned, or the app zoomed: the next frames are drawn that way
+    serve(r, device, session, repeating, entry, output => { const buffer = buffers.find(candidate => candidate.once === undefined && candidate.width === output.stream.width && candidate.height === output.stream.height); return buffer ?? null; });
     return repeating.target;
   };
 
   const intents = installCaptureIntents({ platform, state: S, send, call, callStatic, construct });
 
   return {
-    ...registry, interfaces: registry.interfacesOf, state: S, manager,
+    ...registry, interfaces: registry.interfacesOf, state: S, manager, media,
+    /** The host's video codecs (src/media-codec-backend.js; null: none). Independent of the camera hardware: a device can have an encoder and no camera page. */
+    attachCodecs(backend) { media.attach(backend); },
     get attached() { return !!S.backend; },
     get stats() { return S.stats; },
     /** The page (or a scripted source) became the device's camera hardware. `backend.post(message, transfer?)` receives { op: 'open' | 'close' | 'streams' | 'ack' | 'capture-ui' | 'capture-ui-close', ... }. */
@@ -500,25 +551,28 @@ export function createCameraHost(platform) {
     detach(r) {
       if (!S.backend) return;
       if (r) { for (const device of [...S.devices.values()]) platform.queueTask(() => disconnect(r, device), 0, [device.ref]); for (const camera of CAMERAS) if (S.availability.length) platform.queueTask(() => tellAvailability(r, camera.id, false), 0, []); intents.cancelAll(r); }
-      S.backend = null; for (const feature of CAMERA_FEATURES) platform.systemFeatures.delete(feature);
+      S.backend = null; surfaces.dropPreviews(); for (const feature of CAMERA_FEATURES) platform.systemFeatures.delete(feature);
     },
     /** A message of the camera hardware: { op: 'frame', cameraId, seq, buffers: [{ width, height, data, once? }] } or { op: 'capture-result', id, ... }. The app's callbacks run later, through the pump. */
     handle(r, message) {
       if (!S.backend || !message || typeof message !== 'object') return;
       if (message.op === 'frame') {
         const device = S.devices.get(String(message.cameraId)), acknowledge = () => send({ op: 'ack', cameraId: message.cameraId, seq: message.seq });
-        if (!device || device.closed) { acknowledge(); return; }
-        S.stats.frames++; for (const buffer of message.buffers ?? []) { S.stats.pixelFrames++; S.stats.pixelBytes += buffer.data?.byteLength ?? 0; }
+        const release = () => { for (const buffer of message.buffers ?? []) if (buffer.frame && !buffer.taken) { buffer.taken = true; try { buffer.frame.close(); } catch { /* already closed */ } } };   // a VideoFrame no encoder took holds host memory until closed
+        if (!device || device.closed) { release(); acknowledge(); return; }
+        for (const preview of message.previews ?? []) surfaces.setPreview(preview.viewId, preview);   // what the page's preview surfaces show now (TextureView.getBitmap, PixelCopy)
+        S.stats.frames++; for (const buffer of message.buffers ?? []) if (buffer.data) { S.stats.pixelFrames++; S.stats.pixelBytes += buffer.data.byteLength ?? 0; }
         // The ack follows the app's callbacks for this frame on the thread they run on (its Handler or Executor), so a slow consumer slows the source down instead of growing a queue.
         platform.queueTask(() => {
           const started = performance.now(); let target = null;
           try { if (!device.closed) target = processFrame(r, device, message); }
-          finally { S.stats.frameMs += performance.now() - started; try { if (target) post(r, target, acknowledge); else platform.queueTask(acknowledge, 0, []); } catch { platform.queueTask(acknowledge, 0, []); } }
+          finally { release(); S.stats.frameMs += performance.now() - started; try { if (target) post(r, target, acknowledge); else platform.queueTask(acknowledge, 0, []); } catch { platform.queueTask(acknowledge, 0, []); } }
         }, 0, [device.ref]);
       } else if (message.op === 'capture-result') intents.respond(r, message);
+      else if (message.op === 'capabilities') S.backend.captureVideo = message.captureVideo === true;   // the page found out (asynchronously) whether its camera screen can record
     },
     viewKind: surfaces.viewKind, nodeState: surfaces.nodeState,
-    interceptStartActivity: intents.intercept, resolvesIntent: intents.resolves,
+    interceptStartActivity: intents.intercept, resolvesIntent: intents.resolves, systemActivity: intents.systemActivity,
   };
 }
 

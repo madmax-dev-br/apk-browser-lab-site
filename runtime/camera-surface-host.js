@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=0d5a397ebb41';
-import { bitsFloat, floatBits } from './host-contract.js?v=0d5a397ebb41';
-import { FORMAT, rgbaToYuv420, withExifOrientation, exifOrientation } from './camera-frames.js?v=0d5a397ebb41';
-import { ByteCells } from './java-arrays.js?v=0d5a397ebb41';
+import { APKError } from './apk-error.js?v=a94e2efcced9';
+import { bitsFloat, floatBits } from './host-contract.js?v=a94e2efcced9';
+import { FORMAT, rgbaToYuv420, withExifOrientation, exifOrientation } from './camera-frames.js?v=a94e2efcced9';
+import { ByteCells, IntCells } from './java-arrays.js?v=a94e2efcced9';
 
 // The consumers a camera stream ends in (android-13.0.0_r1 TextureView.java, SurfaceView.java, SurfaceHolder.java, ImageReader.java, Image.java), over the lab's frame path:
 //
@@ -12,8 +12,12 @@ import { ByteCells } from './java-arrays.js?v=0d5a397ebb41';
 //                               (src/camera-host.js); an Image exposes it as YUV_420_888 planes (converted when getPlanes() is called) or as a JPEG stream encoded by the lab's
 //                               libjpeg-turbo, with the request's JPEG_ORIENTATION written as the Exif Orientation tag, as a camera HAL does.
 //
-// Not provided, failing with the VM's explicit unsupported-API error: lockCanvas / lockHardwareCanvas on these surfaces (no producer other than the camera), TextureView.getBitmap
-// (the pixels are in the page, see the def below), ImageReader formats the virtual camera does not produce, Image.getHardwareBuffer.
+// Reading back a preview. With every camera frame the page also hands over what each preview surface shows (a VideoFrame of its canvas: no readback in the page), and the VM keeps
+// only the latest one per View. TextureView.getBitmap and PixelCopy.request(SurfaceView, ...) read that picture (in the Worker, only when the app asks). A host that sends no previews
+// (a page of an older build, a test that does not) makes them fail explicitly rather than return a blank picture of a surface that had frames.
+//
+// Not provided, failing with the VM's explicit unsupported-API error: lockCanvas / lockHardwareCanvas on these surfaces (no producer other than the camera), PixelCopy of a Window or of
+// a plain Surface, ImageReader formats the virtual camera does not produce, Image.getHardwareBuffer.
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', VIEW = 'Landroid/view/View;', CONTEXT = 'Landroid/content/Context;', ATTRS = 'Landroid/util/AttributeSet;', HANDLER = 'Landroid/os/Handler;';
 export const TEXTURE_VIEW = 'Landroid/view/TextureView;', SURFACE_VIEW = 'Landroid/view/SurfaceView;', SURFACE = 'Landroid/view/Surface;', SURFACE_TEXTURE = 'Landroid/graphics/SurfaceTexture;';
 const TEXTURE_LISTENER = 'Landroid/view/TextureView$SurfaceTextureListener;', HOLDER = 'Landroid/view/SurfaceHolder;', HOLDER_CALLBACK = 'Landroid/view/SurfaceHolder$Callback;', HOLDER_CALLBACK2 = 'Landroid/view/SurfaceHolder$Callback2;';
@@ -87,8 +91,76 @@ export function installCameraSurfaces({ platform, registry, post, targetFor }) {
     const out = nullish(into) ? construct(r, MATRIX) : into, values = r.newArray('[F', 9);
     r.array(values).elements = (textureView(r, self).transform ?? [1, 0, 0, 0, 1, 0, 0, 0, 1]).map(floatBits); call(r, out, MATRIX, 'setValues', ['[F'], 'V', [values]); return out;
   });
-  const noBitmap = () => { throw new APKError('android.view.TextureView.getBitmap is not provided: the frames a TextureView shows are drawn by the page and never copied into the VM; read frames through an ImageReader target instead', { kind: 'camera-unsupported', method: 'TextureView.getBitmap' }); };
-  def(TEXTURE_VIEW, 'getBitmap', `()${BITMAP}`, noBitmap); def(TEXTURE_VIEW, 'getBitmap', `(II)${BITMAP}`, noBitmap); def(TEXTURE_VIEW, 'getBitmap', `(${BITMAP})${BITMAP}`, noBitmap);
+  // ---- reading back what a preview surface shows ------------------------------------------------------------------------------------------------------------------------------
+  const previews = new Map();   // View object id -> { width, height, frame | data } (the latest picture the page drew into that View's surface)
+  const CONFIG = 'Landroid/graphics/Bitmap$Config;';
+  /** The picture's RGBA pixels (a VideoFrame is read back here, once per request). */
+  const pixelsOf = picture => {
+    if (picture.rgba) return picture;
+    if (picture.data) return (picture.rgba = new Uint8Array(picture.data), picture);
+    if (typeof OffscreenCanvas !== 'function') throw new APKError('Reading a camera preview needs OffscreenCanvas in this host', { kind: 'camera-unsupported' });
+    const canvas = new OffscreenCanvas(picture.width, picture.height), context = canvas.getContext('2d', { willReadFrequently: true }); context.drawImage(picture.frame, 0, 0, picture.width, picture.height);
+    picture.rgba = new Uint8Array(context.getImageData(0, 0, picture.width, picture.height).data.buffer); return picture;
+  };
+  /** ARGB ints of an outW x outH image whose pixel (x, y) shows the picture at map(x, y) -> [u, v] in [0, 1) (nothing there: transparent). Nearest sample. */
+  const sample = (picture, outW, outH, map) => {
+    const { width, height, rgba } = pixelsOf(picture), out = new IntCells(outW * outH);
+    for (let y = 0; y < outH; y++) for (let x = 0; x < outW; x++) {
+      const [u, v] = map(x + 0.5, y + 0.5); if (!(u >= 0 && u < 1 && v >= 0 && v < 1)) continue;
+      const at = (Math.floor(v * height) * width + Math.floor(u * width)) * 4; out[y * outW + x] = (rgba[at + 3] << 24) | (rgba[at] << 16) | (rgba[at + 1] << 8) | rgba[at + 2];
+    }
+    return out;
+  };
+  const bitmapOf = (r, colors, width, height) => callStatic(r, BITMAP, 'createBitmap', ['[I', 'I', 'I', CONFIG], BITMAP, [r.newArray('[I', width * height, colors), width, height, r.readStatic({ owner: CONFIG, name: 'ARGB_8888', type: CONFIG })]);
+  const latestOf = (r, self) => { const view = r.object(self); return previews.get(view.id) ?? null; };
+  const unreadable = what => { throw new APKError(`${what}: the preview has frames, but this page sent no picture of it to the VM (a page of an older build?), so there is nothing to read back`, { kind: 'camera-unsupported', method: what }); };
+  /** TextureView.getBitmap: the layer as drawn (the content stretched to the View, then the View's transform), scaled to width x height. null while the TextureView is not available. */
+  const textureBitmap = (r, self, width, height, into = null) => {
+    const view = r.object(self), state = view.textureView; if (!state?.texture) return null;
+    const box = size(view); if (!(width > 0 && height > 0) || !(box.width > 0 && box.height > 0)) return null;
+    const picture = latestOf(r, self), frames = r.object(state.texture).texture?.frames ?? 0;
+    if (!picture && frames > 0) unreadable('TextureView.getBitmap');
+    const m = state.transform ?? [1, 0, 0, 0, 1, 0, 0, 0, 1], det = m[0] * m[4] - m[1] * m[3];
+    const inverse = det === 0 ? null : [m[4] / det, -m[1] / det, (m[1] * m[5] - m[4] * m[2]) / det, -m[3] / det, m[0] / det, (m[3] * m[2] - m[0] * m[5]) / det];
+    const colors = picture && inverse ? sample(picture, width, height, (x, y) => { const vx = x * box.width / width, vy = y * box.height / height, sx = inverse[0] * vx + inverse[1] * vy + inverse[2], sy = inverse[3] * vx + inverse[4] * vy + inverse[5]; return [sx / box.width, sy / box.height]; }) : new IntCells(width * height);
+    if (!into) return bitmapOf(r, colors, width, height);
+    call(r, into, BITMAP, 'setPixels', ['[I', 'I', 'I', 'I', 'I', 'I', 'I'], 'V', [r.newArray('[I', width * height, colors), 0, width, 0, 0, width, height]); return into;
+  };
+  def(TEXTURE_VIEW, 'getBitmap', `()${BITMAP}`, (r, _m, [self]) => { const box = size(r.object(self)); return textureBitmap(r, self, box.width, box.height); });
+  def(TEXTURE_VIEW, 'getBitmap', `(II)${BITMAP}`, (r, _m, [self, width, height]) => textureBitmap(r, self, width, height));
+  def(TEXTURE_VIEW, 'getBitmap', `(${BITMAP})${BITMAP}`, (r, _m, [self, bitmap]) => {
+    if (nullish(bitmap)) r.throwJava('Ljava/lang/NullPointerException;', null);
+    if (!call(r, bitmap, BITMAP, 'isMutable', [], 'Z')) r.throwJava('Ljava/lang/IllegalStateException;', 'Bitmap must be mutable');
+    return textureBitmap(r, self, call(r, bitmap, BITMAP, 'getWidth', [], 'I'), call(r, bitmap, BITMAP, 'getHeight', [], 'I'), bitmap);
+  });
+
+  // ---- PixelCopy (android-13.0.0_r1 PixelCopy.java): a SurfaceView's surface into a Bitmap, answered on the given Handler ------------------------------------------------------------
+  const PIXEL_COPY = 'Landroid/view/PixelCopy;', COPY_LISTENER = 'Landroid/view/PixelCopy$OnPixelCopyFinishedListener;', WINDOW = 'Landroid/view/Window;';
+  const COPY = { SUCCESS: 0, ERROR_SOURCE_NO_DATA: 3, ERROR_SOURCE_INVALID: 4 };
+  type(PIXEL_COPY, OBJECT); type(COPY_LISTENER, OBJECT);
+  for (const [name, value] of Object.entries({ SUCCESS: 0, ERROR_UNKNOWN: 1, ERROR_TIMEOUT: 2, ERROR_SOURCE_NO_DATA: 3, ERROR_SOURCE_INVALID: 4, ERROR_DESTINATION_INVALID: 5 })) registry.staticField(PIXEL_COPY, name, 'I', () => value);
+  const readRect = (r, rect) => { const read = name => r.object(rect).fields.get(`${RECT}->${name}:I`) ?? 0; return { left: read('left'), top: read('top'), right: read('right'), bottom: read('bottom') }; };
+  const copySurfaceView = (r, viewRef, rect, bitmap, listener, handler) => {
+    if (nullish(viewRef) || nullish(bitmap) || nullish(listener) || nullish(handler)) r.throwJava('Ljava/lang/NullPointerException;', null);
+    if (call(r, bitmap, BITMAP, 'isRecycled', [], 'Z')) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Bitmap is recycled');
+    if (!call(r, bitmap, BITMAP, 'isMutable', [], 'Z')) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Bitmap is immutable');
+    const view = r.object(viewRef), state = view.surfaceView; if (!state) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Surface isn\'t valid, source.isValid() == false');
+    if (!state.created) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Surface isn\'t valid, source.isValid() == false');
+    const width = call(r, bitmap, BITMAP, 'getWidth', [], 'I'), height = call(r, bitmap, BITMAP, 'getHeight', [], 'I'), picture = previews.get(view.id) ?? null;
+    let result = COPY.SUCCESS;
+    if (!state.sink.stream) result = COPY.ERROR_SOURCE_NO_DATA;   // nothing was ever queued to the surface
+    else if (!picture) unreadable('PixelCopy.request(SurfaceView)');
+    else {
+      const source = rect ? readRect(r, rect) : null, from = source && source.right > source.left && source.bottom > source.top ? source : { left: 0, top: 0, right: picture.width, bottom: picture.height };
+      const colors = sample(picture, width, height, (x, y) => [(from.left + x * (from.right - from.left) / width) / picture.width, (from.top + y * (from.bottom - from.top) / height) / picture.height]);
+      call(r, bitmap, BITMAP, 'setPixels', ['[I', 'I', 'I', 'I', 'I', 'I', 'I'], 'V', [r.newArray('[I', width * height, colors), 0, width, 0, 0, width, height]);
+    }
+    post(r, { handler }, () => call(r, listener, COPY_LISTENER, 'onPixelCopyFinished', ['I'], 'V', [result]), [listener, bitmap]);
+  };
+  def(PIXEL_COPY, 'request', `(${SURFACE_VIEW}${BITMAP}${COPY_LISTENER}${HANDLER})V`, (r, _m, [view, bitmap, listener, handler]) => copySurfaceView(r, view, null, bitmap, listener, handler), { static: true });
+  def(PIXEL_COPY, 'request', `(${SURFACE_VIEW}${RECT}${BITMAP}${COPY_LISTENER}${HANDLER})V`, (r, _m, [view, rect, bitmap, listener, handler]) => copySurfaceView(r, view, nullish(rect) ? null : rect, bitmap, listener, handler), { static: true });
+  const noCopy = what => () => { throw new APKError(`android.view.PixelCopy.request(${what}) is not provided: the lab reads back the camera surfaces of a SurfaceView only (a window's pixels are drawn by the page)`, { kind: 'camera-unsupported', method: 'PixelCopy.request' }); };
+  for (const [signature, what] of [[`(${SURFACE}${BITMAP}${COPY_LISTENER}${HANDLER})V`, 'Surface'], [`(${SURFACE}${RECT}${BITMAP}${COPY_LISTENER}${HANDLER})V`, 'Surface'], [`(${WINDOW}${BITMAP}${COPY_LISTENER}${HANDLER})V`, 'Window'], [`(${WINDOW}${RECT}${BITMAP}${COPY_LISTENER}${HANDLER})V`, 'Window']]) def(PIXEL_COPY, 'request', signature, noCopy(what), { static: true });
   def(TEXTURE_VIEW, 'onAttachedToWindow', '()V', (r, _m, [self]) => ensureTexture(r, self));
   def(TEXTURE_VIEW, 'onDetachedFromWindow', '()V', (r, _m, [self]) => destroyTexture(r, self));
   def(TEXTURE_VIEW, 'onVisibilityChanged', `(${VIEW}I)V`, (r, _m, [self]) => ensureTexture(r, self));
@@ -223,6 +295,13 @@ export function installCameraSurfaces({ platform, registry, post, targetFor }) {
 
   return {
     ensureTexture,
+    /** The page's latest picture of a preview View (its VideoFrame is closed when replaced). */
+    setPreview(viewId, picture) {
+      if (!Number.isSafeInteger(viewId) || !picture || !(picture.width > 0 && picture.height > 0)) { try { picture?.frame?.close?.(); } catch { /* already closed */ } return; }
+      const previous = previews.get(viewId); try { previous?.frame?.close?.(); } catch { /* already closed */ }
+      previews.set(viewId, { width: picture.width, height: picture.height, frame: picture.frame ?? null, data: picture.data ?? null });
+    },
+    dropPreviews() { for (const picture of previews.values()) { try { picture.frame?.close?.(); } catch { /* already closed */ } } previews.clear(); },
     /** A frame of the camera reached a SurfaceTexture: its timestamp moves, its OnFrameAvailableListener and the owning TextureView's listener hear it. */
     textureFrame(r, texture, timestamp) {
       const state = r.object(texture).texture; if (!state || state.released) return;
@@ -250,7 +329,7 @@ export function installCameraSurfaces({ platform, registry, post, targetFor }) {
     nodeState(r, object) {
       const texture = object.textureView, surface = object.surfaceView; if (!texture && !surface) return undefined;
       const sink = texture ? (texture.texture ? r.object(texture.texture).texture?.sink : null) : surface.sink;
-      return { kind: texture ? 'texture' : 'surface', ready: texture ? !!texture.texture : surface.created, opaque: texture ? texture.opaque : true, transform: texture?.transform ?? null, stream: sink?.stream ? { ...sink.stream } : null, shots: sink?.shots ?? 0 };
+      return { viewId: object.id, kind: texture ? 'texture' : 'surface', ready: texture ? !!texture.texture : surface.created, opaque: texture ? texture.opaque : true, transform: texture?.transform ?? null, stream: sink?.stream ? { ...sink.stream } : null, shots: sink?.shots ?? 0 };
     },
   };
 }

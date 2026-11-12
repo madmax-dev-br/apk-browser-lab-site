@@ -1,9 +1,9 @@
-import { createHostRegistry } from './host-contract.js?v=0d5a397ebb41';
-import { APKError } from './apk-error.js?v=0d5a397ebb41';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=0d5a397ebb41';
-import { allocateFd } from './libcore-io-native.js?v=0d5a397ebb41';
+import { createHostRegistry } from './host-contract.js?v=a94e2efcced9';
+import { APKError } from './apk-error.js?v=a94e2efcced9';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=a94e2efcced9';
+import { allocateFd } from './libcore-io-native.js?v=a94e2efcced9';
 import { ACTION, EXTRA, AUTHORITY, SYSTEM_PICKERS, PICK_IMAGES_MAX_LIMIT, MAX_FILES, MAX_TOTAL_BYTES, QuerySyntaxError, compileSelection, directoryOf, extensionOf, fileRecord, kindOf, parseSortOrder, parseStorageUri,
-  pickerCandidates, pickerSpec, readPermissionFor, settleSelection, sortRows, titleOf, uniqueName, uriFor } from './shared-storage.js?v=0d5a397ebb41';
+  pickerCandidates, pickerSpec, readPermissionFor, settleSelection, sortRows, titleOf, uniqueName, uriFor } from './shared-storage.js?v=a94e2efcced9';
 
 // The VM side of the virtual device's shared storage (src/shared-storage.js): the files the page attached, the system providers an app reads them through and the system pickers.
 //
@@ -16,7 +16,9 @@ import { ACTION, EXTRA, AUTHORITY, SYSTEM_PICKERS, PICK_IMAGES_MAX_LIMIT, MAX_FI
 //   Access: a collection query lists the files the app's media permission covers (none without it: an empty cursor, as on Android 10+); an item Uri is readable when the permission
 //   covers the file or a picker granted the Uri; picker and document Uris only with the grant (SecurityException otherwise). Grants last for the VM (the app process); a persistable grant
 //   (ACTION_OPEN_DOCUMENT, the photo picker) can be taken with takePersistableUriPermission and is listed by getPersistedUriPermissions, also for the VM's lifetime only.
-//   The storage is read-only for apps: insert / update / delete and opening for writing fail with an explicit error naming the call.
+//   Writing. An app contributes media the way scoped storage lets it: ContentResolver.insert into a MediaStore collection of the external volume creates an item it owns (no permission
+//   needed), which it fills through openFileDescriptor / openOutputStream, publishes with IS_PENDING = 0 (update) and may delete. The files that came from the page stay read-only for
+//   apps, and documents are never written: those calls fail with an explicit error naming the call.
 //
 //   Pickers: an implicit Intent no Activity of the app handles and a system app answers on a device (pickerSpec) opens the page's picker dialog instead of throwing
 //   ActivityNotFoundException. The caller is paused (and stopped under the full-screen documents picker and gallery) while the dialog is open; the answer comes back through
@@ -72,7 +74,8 @@ export function createSharedStorageHost(platform) {
 
   // ---- the files -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   /** Whether the app's media permission covers the file (MediaStore rows and the File API of another owner's file; never a document). */
-  const canSee = entry => { const permission = readPermissionFor(entry.kind, targetSdk()); return permission !== null && !!platform.grantedPermissions?.has(permission); };
+  const canSee = entry => { if (entry.owned) return true;   // an app always sees its own contributions
+    const permission = readPermissionFor(entry.kind, targetSdk()); return permission !== null && !!platform.grantedPermissions?.has(permission); };
   /** MediaProvider's MimeUtils.resolveMimeType: the type of the extension in libcore's MimeMap, else application/octet-stream. */
   const mimeFromName = (r, name) => {
     const extension = extensionOf(name), MAP = 'Llibcore/content/type/MimeMap;';
@@ -87,7 +90,8 @@ export function createSharedStorageHost(platform) {
     for (const [path, node] of wanted) {
       if (mounted.has(path) || vfs.nodes.has(path)) continue;   // a file the app created under the same name stays the app's
       if (!vfs.nodes.has(vfs.parentOf(path)) && vfs.mkdirs(vfs.parentOf(path)) === 'ENOTDIR') continue;
-      vfs.nodes.set(path, node); vfs.readOnly.add(path); mounted.set(path, node);   // another owner's file: readable under the media permission, never writable
+      vfs.nodes.set(path, node); mounted.set(path, node);
+      if (![...files.values()].some(entry => entry.owned && entry.node === node)) vfs.readOnly.add(path);   // another owner's file: readable under the media permission, never writable; the app's own contribution is its file
     }
   };
   const describe = entry => ({ id: entry.id, name: entry.name, mime: entry.mime, size: entry.size, modified: entry.modified, width: entry.width, height: entry.height, duration: entry.duration, path: entry.path });
@@ -102,7 +106,7 @@ export function createSharedStorageHost(platform) {
       const bytes = input.bytes instanceof Uint8Array ? input.bytes : new Uint8Array(input.bytes ?? 0);
       return { record: fileRecord({ ...input, size: bytes.length }), bytes };
     });
-    const kept = payload.replace ? [] : [...files.values()].filter(entry => !(payload.remove ?? []).includes(entry.id) && !incoming.some(item => item.record.id === entry.id));
+    const kept = payload.replace ? [...files.values()].filter(entry => entry.owned) : [...files.values()].filter(entry => entry.owned || !(payload.remove ?? []).includes(entry.id) && !incoming.some(item => item.record.id === entry.id));
     if (kept.length + incoming.length > MAX_FILES) throw new RangeError(`O armazenamento do dispositivo aceita até ${MAX_FILES} arquivos.`);
     if (kept.reduce((sum, entry) => sum + entry.size, 0) + incoming.reduce((sum, item) => sum + item.bytes.length, 0) > MAX_TOTAL_BYTES) throw new RangeError(`O armazenamento do dispositivo aceita até ${MAX_TOTAL_BYTES / 1048576} MiB no total.`);
     for (const entry of [...files.values()]) if (!kept.includes(entry)) { files.delete(entry.id); dropGrantsOf(entry); }
@@ -118,7 +122,9 @@ export function createSharedStorageHost(platform) {
     r?.record?.(`STORAGE shared storage holds ${files.size} attached file(s)`);
     return list();
   }
-  const list = () => [...files.values()].map(describe);
+  const list = () => [...files.values()].filter(entry => !entry.owned).map(describe);
+  /** The media the app itself added through MediaStore (not part of the page's list). */
+  const contributed = () => [...files.values()].filter(entry => entry.owned).map(describe);
 
   // ---- Uri permission grants ---------------------------------------------------------------------------------------------------------------------------------------------------------------
   const granted = textUri => grants.has(textUri);
@@ -174,15 +180,17 @@ export function createSharedStorageHost(platform) {
   const mediaRow = (entry, table) => {
     const visual = entry.kind === 'image' || entry.kind === 'video', timed = entry.kind === 'video' || entry.kind === 'audio';
     const row = { _id: entry.id, _data: entry.path, _display_name: entry.name, _size: entry.size, mime_type: entry.mime, title: titleOf(entry.name), date_added: Math.floor(entry.added / 1000), date_modified: Math.floor(entry.modified / 1000), date_taken: null,
-      width: visual ? entry.width : null, height: visual ? entry.height : null, duration: timed ? entry.duration : null, relative_path: `${entry.directory}/`, bucket_display_name: entry.directory, bucket_id: javaHash(`${ROOT}/${entry.directory}`.toLowerCase()),
-      volume_name: 'external_primary', owner_package_name: null, is_pending: 0, is_trashed: 0, is_favorite: 0, is_download: entry.directory === 'Download' ? 1 : 0, is_drm: 0, orientation: entry.kind === 'image' ? 0 : null,
+      width: visual ? entry.width : null, height: visual ? entry.height : null, duration: timed ? entry.duration : null, relative_path: `${entry.directory}/`, bucket_display_name: entry.directory.split('/').at(-1), bucket_id: javaHash(`${ROOT}/${entry.directory}`.toLowerCase()),
+      volume_name: 'external_primary', owner_package_name: entry.owned ? platform.packageName ?? null : null, is_pending: entry.pending ? 1 : 0, is_trashed: 0, is_favorite: 0, is_download: topDirectory(entry) === 'Download' ? 1 : 0, is_drm: 0, orientation: entry.kind === 'image' ? 0 : null,
       resolution: visual && entry.width && entry.height ? `${entry.width}×${entry.height}` : null, generation_added: 1, generation_modified: 1 };
     if (table === 'file') Object.assign(row, { media_type: MEDIA_TYPE[entry.kind], parent: 0 });
     if (table === 'audio') Object.assign(row, { artist: '<unknown>', album: entry.directory, is_music: 1, is_ringtone: 0, is_alarm: 0, is_notification: 0, is_podcast: 0, is_audiobook: 0 });
     if (table === 'images' || table === 'video') Object.assign(row, { isprivate: null });
+    if (entry.values) for (const [column, value] of Object.entries(entry.values)) if (column in TABLE_COLUMNS[table]) row[column] = value;   // what the owner stored with insert / update (DATE_TAKEN, DESCRIPTION, ...)
     return row;
   };
-  const inTable = (entry, table) => table === 'file' ? true : table === 'downloads' ? entry.directory === 'Download' : entry.kind === ({ images: 'image', video: 'video', audio: 'audio' })[table];
+  const topDirectory = entry => entry.directory.split('/')[0];
+  const inTable = (entry, table) => table === 'file' ? true : table === 'downloads' ? topDirectory(entry) === 'Download' : entry.kind === ({ images: 'image', video: 'video', audio: 'audio' })[table];
   const noAccess = (r, textUri) => r.throwJava('Ljava/lang/SecurityException;', `${platform.packageName ?? 'app'} has no access to ${textUri}`);
   const pickerDenied = (r, textUri) => r.throwJava('Ljava/lang/SecurityException;', `Calling uid ( ${uid()} ) does not have permission to access picker uri: ${textUri}`);
   const documentDenied = (r, parsed, textUri, verb) => r.throwJava('Ljava/lang/SecurityException;', `Permission Denial: ${verb} ${PROVIDER_TYPES[parsed.authority].slice(1, -1).replaceAll('/', '.')} uri ${textUri} from pid=${platform.virtualProcess?.pid ?? 1}, uid=${uid()} requires that you obtain access using ACTION_OPEN_DOCUMENT or related APIs`);
@@ -208,7 +216,7 @@ export function createSharedStorageHost(platform) {
     // MediaStore collection or item
     const kinds = TABLE_COLUMNS[parsed.table], names = new Set(Object.keys(kinds)), columns = wanted ?? Object.keys(kinds);
     for (const column of columns) if (!names.has(column)) r.throwJava('Ljava/lang/IllegalArgumentException;', `Invalid column ${column}`);
-    let rows = parsed.volume === 'internal' ? [] : [...files.values()].filter(entry => inTable(entry, parsed.table) && (parsed.kind === 'collection' ? canSee(entry) : entry.id === parsed.id && (canSee(entry) || granted(textUri)))).map(entry => mediaRow(entry, parsed.table));
+    let rows = parsed.volume === 'internal' ? [] : [...files.values()].filter(entry => inTable(entry, parsed.table) && (parsed.kind === 'collection' ? canSee(entry) && !entry.pending : entry.id === parsed.id && (canSee(entry) || granted(textUri)))).map(entry => mediaRow(entry, parsed.table));
     const what = `ContentResolver.query(${textUri})`;
     const guard = (label, value, body) => {
       try { return body(); } catch (error) {
@@ -253,11 +261,66 @@ export function createSharedStorageHost(platform) {
     const textUri = uriString(r, uri).replace(/[?#].*$/, ''), modeText = text(r, mode), entry = readable(r, textUri, 'ContentResolver.openFile');
     if (modeText !== 'r') {
       if (!['w', 'wt', 'wa', 'rw', 'rwt'].includes(modeText)) r.throwJava('Ljava/lang/IllegalArgumentException;', `Invalid mode: ${modeText}`);
+      if (entry.owned) {   // the app's own item: ParcelFileDescriptor.parseMode -- "w" / "wt" / "rwt" truncate, "wa" appends, "rw" keeps the content
+        if (modeText !== 'wa' && modeText !== 'rw') { entry.node.size = 0; }
+        entry.node.mtime = entry.modified = platform.clock?.wall?.() ?? Date.now();
+        const writable = allocateFd(r, { kind: 'file', node: entry.node, path: entry.path, acc: modeText.startsWith('rw') ? 2 : 1, offset: 0, append: modeText === 'wa', ownerTag: 0n, refs: 0 }, 0, true);
+        if (writable < 0) r.throwJava('Ljava/io/FileNotFoundException;', 'open failed: EMFILE (Too many open files)');
+        return callStatic(r, PFD, 'adoptFd', ['I'], PFD, [writable]);
+      }
       unsupported(`ContentResolver.openFile(${textUri}, "${modeText}"): the virtual device's shared storage is read-only for apps (its files come from the page); only mode "r" is modelled`, 'shared-storage-write-unsupported');
     }
     const number = allocateFd(r, { kind: 'file', node: entry.node, path: entry.path, acc: 0, offset: 0, append: false, ownerTag: 0n, refs: 0 }, 0, true);   // O_RDONLY
     if (number < 0) r.throwJava('Ljava/io/FileNotFoundException;', `open failed: EMFILE (Too many open files)`);
     return callStatic(r, PFD, 'adoptFd', ['I'], PFD, [number]);
+  }
+  // ---- the app's own media: insert / update / delete (MediaProvider with scoped storage) ------------------------------------------------------------------------------------------------
+  const DEFAULT_MIME = { images: 'image/jpeg', video: 'video/mp4', audio: 'audio/mpeg' }, EXTENSION = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/heic': 'heic', 'video/mp4': 'mp4', 'video/3gpp': '3gp', 'video/webm': 'webm', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/ogg': 'ogg', 'audio/x-wav': 'wav' };
+  const ALLOWED_DIRECTORIES = { image: ['DCIM', 'Pictures'], video: ['DCIM', 'Movies', 'Pictures'], audio: ['Alarms', 'Audiobooks', 'Music', 'Notifications', 'Podcasts', 'Ringtones', 'Recordings'], document: ['Download', 'Documents'] };
+  let created = 0;
+  const valueOf = (r, values, name) => (nullish(values) || !call(r, values, VALUES, 'containsKey', [STRING], 'Z', [name]) ? undefined : text(r, call(r, values, VALUES, 'getAsString', [STRING], STRING, [name])));
+  const storedValues = (r, values, table, into = {}) => { for (const [column, kind] of Object.entries(TABLE_COLUMNS[table])) { if (['_id', '_data', '_display_name', '_size', 'mime_type', 'relative_path', 'is_pending', 'volume_name', 'owner_package_name', 'bucket_id', 'bucket_display_name', 'date_added'].includes(column)) continue; const value = valueOf(r, values, column); if (value !== undefined) into[column] = value === null ? null : kind === 'S' ? value : Number(value); } return into; };
+  function insert(r, _m, [, uri, values]) {
+    const textUri = uriString(r, uri).replace(/[?#].*$/, ''), parsed = parseStorageUri(textUri), what = `ContentResolver.insert(${textUri})`;
+    if (!parsed || parsed.kind === 'unknown') unknownUri('ContentResolver.insert', textUri);
+    if (parsed.kind !== 'collection' || parsed.authority !== AUTHORITY.MEDIA) unsupported(`${what}: only MediaStore collections take new items (documents are created through ACTION_CREATE_DOCUMENT, which the lab does not model)`, 'shared-storage-write-unsupported');
+    if (parsed.volume === 'internal') r.throwJava('Ljava/lang/UnsupportedOperationException;', 'Writing to internal storage is not supported.');
+    if (parsed.table === 'file') unsupported(`${what}: inserting into MediaStore.Files is not modelled (use the Images, Video, Audio or Downloads collection)`, 'shared-storage-write-unsupported');
+    let name = valueOf(r, values, '_display_name') ?? String(platform.clock?.wall?.() ?? Date.now());
+    const mime = (valueOf(r, values, 'mime_type') ?? (extensionOf(name) ? mimeFromName(r, name) : DEFAULT_MIME[parsed.table] ?? 'application/octet-stream')).toLowerCase(), kind = kindOf(mime);
+    const wantedKind = ({ images: 'image', video: 'video', audio: 'audio' })[parsed.table];
+    if (wantedKind && kind !== wantedKind) r.throwJava('Ljava/lang/IllegalArgumentException;', `MIME type ${mime} cannot be inserted into ${textUri}; expected MIME type under ${wantedKind}/*`);
+    if (!extensionOf(name) && EXTENSION[mime]) name = `${name}.${EXTENSION[mime]}`;   // MediaProvider adds the extension of the MIME type to a name without one
+    const allowed = parsed.table === 'downloads' ? ['Download'] : ALLOWED_DIRECTORIES[kind], relative = valueOf(r, values, 'relative_path'), directory = relative ? relative.split('/').filter(Boolean).join('/') : parsed.table === 'downloads' ? 'Download' : directoryOf(kind);
+    if (!allowed.includes(directory.split('/')[0])) r.throwJava('Ljava/lang/IllegalArgumentException;', `Primary directory ${directory.split('/')[0]} not allowed for ${textUri}; allowed directories are [${allowed.join(', ')}]`);
+    name = uniqueName(name.replaceAll('/', '_'), new Set([...files.values()].filter(entry => entry.directory === directory).map(entry => entry.name)));
+    const now = platform.clock?.wall?.() ?? Date.now(), id = 1000000 + ++created, path = `${ROOT}/${directory}/${name}`, node = { type: 'file', buf: new Uint8Array(0), size: 0, mtime: now, mode: 0o660, mounted: true, path };
+    const pendingValue = valueOf(r, values, 'is_pending');
+    const entry = { id, name, mime, kind, directory, path, modified: now, added: now, width: null, height: null, duration: null, node, pickerPath: null, owned: true, pending: pendingValue !== undefined && Number(pendingValue) !== 0, values: storedValues(r, values, parsed.table) };
+    Object.defineProperty(entry, 'size', { get: () => node.size, enumerable: true });
+    files.set(id, entry); syncMounts(); r.record(`STORAGE the app added ${path} to MediaStore (${mime}${entry.pending ? ', pending' : ''})`);
+    return uriOf(r, `${textUri}/${id}`);
+  }
+  /** The app's own item a write names; a page file, a document or a collection is not writable here (explicit). */
+  const ownItem = (r, name, uri) => {
+    const textUri = uriString(r, uri).replace(/[?#].*$/, ''), parsed = parseStorageUri(textUri); if (!parsed || parsed.kind === 'unknown') unknownUri(`ContentResolver.${name}`, textUri);
+    const entry = parsed.kind === 'item' ? files.get(parsed.id) : null;
+    if (parsed.kind === 'item' && (!entry || !inTable(entry, parsed.table))) return { textUri, parsed, entry: null };
+    if (!entry?.owned) unsupported(`ContentResolver.${name}(${textUri}): only the media the app itself added through MediaStore can be changed (the files that come from the page are read-only for apps, and collection-wide or document writes are not modelled)`, 'shared-storage-write-unsupported');
+    return { textUri, parsed, entry };
+  };
+  function update(r, _m, [, uri, values]) {
+    const { entry, parsed } = ownItem(r, 'update', uri); if (!entry) return 0;
+    const pendingValue = valueOf(r, values, 'is_pending'), name = valueOf(r, values, '_display_name');
+    if (valueOf(r, values, 'relative_path') !== undefined) unsupported('ContentResolver.update with RELATIVE_PATH (moving a MediaStore item) is not modelled', 'shared-storage-write-unsupported');
+    if (pendingValue !== undefined) entry.pending = Number(pendingValue) !== 0;
+    if (name) { const vfs = fs(), renamed = uniqueName(name.replaceAll('/', '_'), new Set([...files.values()].filter(other => other !== entry && other.directory === entry.directory).map(other => other.name))); if (vfs?.nodes.get(entry.path) === entry.node) vfs.nodes.delete(entry.path); mounted.delete(entry.path); entry.name = renamed; entry.path = entry.node.path = `${ROOT}/${entry.directory}/${renamed}`; }
+    storedValues(r, values, parsed.table, entry.values); entry.modified = platform.clock?.wall?.() ?? Date.now(); syncMounts();
+    return 1;
+  }
+  function remove(r, _m, [, uri]) {
+    const { entry } = ownItem(r, 'delete', uri); if (!entry) return 0;
+    files.delete(entry.id); dropGrantsOf(entry); syncMounts(); r.record(`STORAGE the app deleted ${entry.path} from MediaStore`); return 1;
   }
   const readOnly = (name, signature) => (r, _m, [, uri]) => unsupported(`ContentResolver.${name}(${nullish(uri) ? 'null' : typeof uri === 'string' ? uri : uriString(r, uri)}): the virtual device's shared storage is read-only for apps (its files come from the page); MediaStore and document writes are not modelled`, 'shared-storage-write-unsupported');
   for (const owner of Object.values(PROVIDER_TYPES)) {
@@ -265,8 +328,8 @@ export function createSharedStorageHost(platform) {
     def(owner, 'getType', `(${URI})${STRING}`, getType);
     def(owner, 'openFile', `(${URI}${STRING})${PFD}`, openFile); def(owner, 'openFile', `(${URI}${STRING}${SIGNAL})${PFD}`, openFile);
     def(owner, 'getStreamTypes', `(${URI}${STRING})${STRINGS}`, (r, _m, [self, uri, filter]) => { const mime = getType(r, null, [self, uri]), wanted = text(r, filter); if (mime === null || !(wanted === '*/*' || wanted === mime || (wanted.endsWith('/*') && mime.startsWith(wanted.slice(0, -1))))) return null; const out = r.newArray(STRINGS, 1); r.array(out).elements = [mime]; return out; });
-    def(owner, 'insert', `(${URI}${VALUES}${BUNDLE})${URI}`, readOnly('insert')); def(owner, 'bulkInsert', `(${URI}[${VALUES})I`, readOnly('bulkInsert'));
-    def(owner, 'update', `(${URI}${VALUES}${BUNDLE})I`, readOnly('update')); def(owner, 'delete', `(${URI}${BUNDLE})I`, readOnly('delete'));
+    def(owner, 'insert', `(${URI}${VALUES}${BUNDLE})${URI}`, insert); def(owner, 'bulkInsert', `(${URI}[${VALUES})I`, readOnly('bulkInsert'));
+    def(owner, 'update', `(${URI}${VALUES}${BUNDLE})I`, update); def(owner, 'delete', `(${URI}${BUNDLE})I`, remove);
     def(owner, 'call', `(${STRING}${STRING}${STRING}${BUNDLE})${BUNDLE}`, (r, _m, [, authority, method]) => unsupported(`ContentResolver.call(${text(r, authority)}, "${text(r, method)}"): provider calls of the device's shared storage providers are not modelled`, 'shared-storage-call-unsupported'));
   }
   /** The bytes behind a content Uri of these providers for a host that reads media (MediaMetadataRetriever), after the same access checks; null for another authority. */
@@ -396,6 +459,8 @@ export function createSharedStorageHost(platform) {
   }
 
   return { ...registry, setFiles, list, provider, bytesFor, pickerFor, startPicker, respondPicker, pendingIds: () => [...pending.keys()], permissionsChanged: syncMounts, isGranted: granted,
-    takePersistable, releasePersistable, persistedPermissions, systemActivity, documentsProviders, get fileCount() { return files.size; },
+    takePersistable, releasePersistable, persistedPermissions, systemActivity, documentsProviders, contributed,
+    /** The ResolveInfo of an Activity of another (system) package, for the hosts that answer Intents the way a system app does (the camera app: src/camera-capture-intent.js). */
+    systemResolveInfo: (r, packageName, className) => resolveInfo(r, 'activityInfo:Landroid/content/pm/ActivityInfo;', componentInfo(r, 'Landroid/content/pm/ActivityInfo;', packageName, className)), get fileCount() { return files.size; },
     [GC_ROOTS](visit) { for (const request of pending.values()) visit(request.held); for (const value of providers.values()) visit(value); } };
 }

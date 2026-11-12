@@ -1,9 +1,9 @@
-import { resolveIntentFields } from './intent-resolver.js?v=0d5a397ebb41';
-import { APKError } from './apk-error.js?v=0d5a397ebb41';
-import { registerPackageValueFields } from './package-value-fields.js?v=0d5a397ebb41';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=0d5a397ebb41';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=0d5a397ebb41';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=0d5a397ebb41';
+import { resolveIntentFields } from './intent-resolver.js?v=a94e2efcced9';
+import { APKError } from './apk-error.js?v=a94e2efcced9';
+import { registerPackageValueFields } from './package-value-fields.js?v=a94e2efcced9';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=a94e2efcced9';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=a94e2efcced9';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=a94e2efcced9';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -815,7 +815,7 @@ export function createAppServicesHost(platform) {
   };
   const resolveInfos = (r, intent, kind, withMeta, flags = 0) => {
     const list = newEmptyList(r), details = matchingComponents(r, intent, kind, flags);
-    if (kind === 'activity' && !details.length) { const system = platform.sharedStorage?.systemActivity(r, intent) ?? null; if (system !== null) r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, system], 'virtual'); }   // the device's file pickers (src/shared-storage-host.js)
+    if (kind === 'activity' && !details.length) { const system = platform.sharedStorage?.systemActivity(r, intent) ?? platform.camera?.systemActivity?.(r, intent) ?? null; if (system !== null) r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, system], 'virtual'); }   // the device's file pickers (src/shared-storage-host.js) and its camera app (src/camera-capture-intent.js)
     for (const detail of details) {
       const resolved = r.allocate(RESOLVE_INFO); r.dispatch({ owner: RESOLVE_INFO, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [resolved], 'direct');
       r.storeField(r.object(resolved).fields, kind === 'service' ? `${RESOLVE_INFO}->serviceInfo:${SERVICE_INFO}` : `${RESOLVE_INFO}->activityInfo:${ACTIVITY_INFO_TYPE}`, makeInfo(r, detail, kind, withMeta));
