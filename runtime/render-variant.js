@@ -18,8 +18,8 @@
 //   - a startActivity made by the background instance is dropped (reported in droppedStarts); one made by an Activity of the visible stack waits for the end of the render;
 //   - page input is not processed while the render runs (the Worker holds its one-operation slot, as during a launch or a click).
 // DOM-free, no process.*.
-import { validateMock, mockLabel, MAX_MOCKS } from './endpoint-mocks.js?v=6152edcf6e9b';
-import { readinessProbe, waitingFor, READY_QUIET_MS } from './screen-ready.js?v=6152edcf6e9b';
+import { validateMock, mockLabel, MAX_MOCKS } from './endpoint-mocks.js?v=124658dca172';
+import { readinessProbe, waitingFor, READY_QUIET_MS } from './screen-ready.js?v=124658dca172';
 
 const ACTIVITY = 'Landroid/app/Activity;', BUNDLE = 'Landroid/os/Bundle;';
 export const VARIANT_MODES = Object.freeze(['display', 'cover']);
