@@ -1,9 +1,9 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=a9e9656b8d6c';
-import { APKError } from './apk-runtime.js?v=a9e9656b8d6c';
-import { getVectorGraphics } from './vector-native.js?v=a9e9656b8d6c';
-import { deferRaster } from './deferred-raster.js?v=a9e9656b8d6c';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=a9e9656b8d6c';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=a9e9656b8d6c';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=0d5a397ebb41';
+import { APKError } from './apk-runtime.js?v=0d5a397ebb41';
+import { getVectorGraphics } from './vector-native.js?v=0d5a397ebb41';
+import { deferRaster } from './deferred-raster.js?v=0d5a397ebb41';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=0d5a397ebb41';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=0d5a397ebb41';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -161,6 +161,44 @@ export function createDrawableViewHost(platform) {
     try { if (dispatch(runtime, TA, 'hasValue', ['I'], 'Z', fromAppearance, [0])) view.textSize = Math.fround(floatOf(dispatch(runtime, TA, 'getDimension', ['I', 'F'], 'F', fromAppearance, [0, 0]))); }
     finally { dispatch(runtime, TA, 'recycle', [], 'V', fromAppearance); }
   };
+  /**
+   * TextView constructor: the text attributes a style gives that nothing reads later (android:textAllCaps and the font: fontFamily, typeface, textStyle, textFontWeight).
+   * As TextView does, the TextAppearance named by the android:style / android:textAppearance / default style is read first (readTextAppearance), then the style's own
+   * attributes override it, and the result is applied once (applyTextAppearance); the view's explicit XML attributes are applied by the XML pass afterwards.
+   */
+  const applyStyledTextAppearance = (runtime, receiver, attrsRef = null) => {
+    const view = runtime.object(receiver), table = platform.resources?.frameworkTable;
+    // Like applyThemeDefaults: only where the VM measures and draws the text itself (a Skia backend and the framework's styles); otherwise the page lays the View out (legacy flow mode).
+    if (!table || !platform.resources.frameworkXml || !view.context || !runtime.skia || !runtime.classes.has('Landroid/content/res/TypedArray;') || !runtime.isSubtype(view.type, TEXT)) return;
+    const names = ['textAppearance', 'textAllCaps', 'fontFamily', 'typeface', 'textStyle', 'textFontWeight'], found = names.map(name => table.findId('attr/' + name)); if (found.some(id => !id)) return;
+    const defStyle = view.defStyleAttr || table.findId(defaultStyleName(runtime, view.type)), TA = 'Landroid/content/res/TypedArray;', node = attrsRef ? runtime.object(attrsRef).node : null;
+    let attrs = null; const kept = node?.attributes.filter(a => (a.name === 'style' && !a.namespace) || (a.name === 'textAppearance' && a.namespace === 'http://schemas.android.com/apk/res/android')) ?? []; if (kept.length) { attrs = runtime.makeObject('Lapkweb/bridge/AttributeSet;'); runtime.object(attrs).node = { ...node, attributes: kept }; }
+    const ids = () => { const array = runtime.newArray('[I', found.length); runtime.object(array).elements = [...found]; return array; }, theme = platform.styleBackend.theme(runtime, view.context);
+    const merged = {};
+    const read = array => {
+      const has = index => dispatch(runtime, TA, 'hasValue', ['I'], 'Z', array, [index]);
+      if (has(1)) merged.allCaps = !!dispatch(runtime, TA, 'getBoolean', ['I', 'Z'], 'Z', array, [1, 0]);
+      if (has(2)) {   // TextView.readTextAppearance: a font resource (TypedArray.getFont) wins; any other value is a family name
+        let typeface = null;
+        try { typeface = dispatch(runtime, TA, 'getFont', ['I'], 'Landroid/graphics/Typeface;', array, [2]) ?? null; }
+        catch (error) { if (!(error?.name === 'JavaException' && ['Landroid/content/res/Resources$NotFoundException;', 'Ljava/lang/UnsupportedOperationException;'].some(type => runtime.isSubtype(runtime.typeOf(error.value), type)))) throw error; }
+        const family = typeface ? null : dispatch(runtime, TA, 'getString', ['I'], 'Ljava/lang/String;', array, [2]) ?? null;
+        merged.typeface = typeface; merged.familyName = family === null ? null : typeof family === 'string' ? family : runtime.stringCharacters(family);
+      }
+      if (has(3)) merged.typefaceIndex = dispatch(runtime, TA, 'getInt', ['I', 'I'], 'I', array, [3, -1]);
+      if (has(4)) merged.style = dispatch(runtime, TA, 'getInt', ['I', 'I'], 'I', array, [4, 0]);
+      if (has(5)) merged.weight = dispatch(runtime, TA, 'getInt', ['I', 'I'], 'I', array, [5, -1]);
+    };
+    const own = platform.styleBackend.obtain(runtime, theme, attrs, ids(), defStyle);
+    try {
+      const appearance = dispatch(runtime, TA, 'getResourceId', ['I', 'I'], 'I', own, [0, 0]);
+      if (appearance) { const base = platform.styleBackend.obtain(runtime, theme, null, ids(), 0, 0, appearance); try { read(base); } finally { dispatch(runtime, TA, 'recycle', [], 'V', base); } }
+      read(own);
+    } finally { dispatch(runtime, TA, 'recycle', [], 'V', own); }
+    if (merged.allCaps && runtime.classes.has('Landroid/text/method/AllCapsTransformationMethod;')) dispatch(runtime, TEXT, 'setAllCaps', ['Z'], 'V', receiver, [1]);
+    const font = { typeface: merged.typeface ?? null, familyName: merged.familyName ?? null, typefaceIndex: merged.typefaceIndex ?? -1, style: merged.style ?? 0, weight: merged.weight ?? -1 };
+    if (font.typeface !== null || font.familyName !== null || font.typefaceIndex !== -1 || font.style !== 0 || font.weight >= 0) { view.styledFont = font; platform.typefaceBuilder.applyTextViewFont(runtime, receiver, font); }
+  };
   const setDrawable = (runtime, receiver, field, drawable) => {
     const view = runtime.object(receiver), previous = view[field];if(drawable)prepareCpuAnimatedVector(runtime,drawable);
     if (previous && !same(previous, drawable)) dispatch(runtime, DRAWABLE, 'setCallback', ['Landroid/graphics/drawable/Drawable$Callback;'], 'V', previous, [null]);
@@ -181,7 +219,7 @@ export function createDrawableViewHost(platform) {
   return {
     /** ImageView.onDraw into an app-provided Canvas (View.draw(canvas) of a custom parent): the image drawable placed by the scale type. */
     drawImage(runtime, receiver, canvas, width, height) { placeAndDraw(runtime, receiver, canvas, runtime.object(receiver).imageDrawable, true, width, height); },
-    compoundPadding,drawButton,applyThemeDefaults,applyStyledTextSize,defaultStyleName,switchWidget:(runtime,receiver)=>switchHost.get(runtime,receiver),measureSwitch:(runtime,receiver)=>switchHost.measure(runtime,receiver),checkedChanged:(runtime,receiver,checked)=>switchHost.checkedChanged(runtime,receiver,checked),
+    compoundPadding,drawButton,applyThemeDefaults,applyStyledTextSize,applyStyledTextAppearance,defaultStyleName,switchWidget:(runtime,receiver)=>switchHost.get(runtime,receiver),measureSwitch:(runtime,receiver)=>switchHost.measure(runtime,receiver),checkedChanged:(runtime,receiver,checked)=>switchHost.checkedChanged(runtime,receiver,checked),
     setForegroundFromXML(runtime,receiver,attribute,context){
       const theme=platform.styleBackend.theme(runtime,context),reference=attribute.kind==='attribute'?platform.styleBackend.resolved(attribute,runtime.object(theme).themeValues,false):attribute;
       let drawable=null;

@@ -690,3 +690,5 @@ span.files-thumb svg{width:22px;height:22px;fill:currentColor}
 .has-device-fullscreen .stage-zoom{display:none}
 #preview-stage[data-zoomed]{overflow:auto;justify-content:safe center;align-items:safe center}
 #preview-stage[data-zoomed] .stage-callouts{display:none}
+#preview-stage[data-panning]{cursor:grabbing}
+#preview-stage[data-panning] *{cursor:grabbing!important}

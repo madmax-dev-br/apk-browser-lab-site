@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=a9e9656b8d6c';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=a9e9656b8d6c';
-import { isTrustedRasterURL } from './raster-cache.js?v=a9e9656b8d6c';
+import { updateWebViewSlot } from './webview-slot.js?v=0d5a397ebb41';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=0d5a397ebb41';
+import { isTrustedRasterURL } from './raster-cache.js?v=0d5a397ebb41';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -249,6 +249,8 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   const focused = document.activeElement === element, signature = viewSignature(view, parentKind, parentLaidOut, clipOwnBounds, renderChildren, focused && (state.pendingInputs.has(view.id) || state.inputInFlight === view.id));
   if (element._signature !== signature) {
   if (kind === 'button' || kind === 'text') element.textContent = view.displayText ?? view.text ?? '';
+  // A case-only TransformationMethod (android:textAllCaps): the element shows what Android draws; TextView.getText() is still the original text, kept for tools that look a control up by it.
+  if (kind === 'button' || kind === 'text') { const shown = String(view.displayText ?? view.text ?? ''), source = String(view.text ?? ''); if (source !== shown && source.toLowerCase() === shown.toLowerCase()) element.dataset.sourceText = source; else delete element.dataset.sourceText; }
   if (view.textInContent) element.dataset.textInContent = 'true'; else delete element.dataset.textInContent;   // the glyphs are in the content raster: the element keeps its text for accessibility and typing, transparent (styles.css)
   if (kind === 'button') element.disabled = view.clickable === false || view.enabled === false;
   if (kind === 'text' || kind === 'image' || kind === 'view') { element.dataset.clickable = String(!!view.clickable && view.enabled !== false); element.tabIndex = view.clickable && view.enabled !== false ? 0 : -1; if (view.clickable) element.setAttribute('role', 'button'); else element.removeAttribute('role'); }
@@ -298,7 +300,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (view.textRaster && ['text', 'button'].includes(kind)) {
     const drawing = view.textRaster;
     if (!pngURLOk(drawing.dataURL) || !Number.isFinite(drawing.width) || !Number.isFinite(drawing.height)) throw new Error('PNG de parágrafo inválido recebido da VM.');
-    const image = `url("${drawing.dataURL}")`, size = `${drawing.width}px ${drawing.height}px`, position = `${(view.compoundPadding || view.padding)?.left || 0}px ${(view.compoundPadding || view.padding)?.top || 0}px`;
+    const image = `url("${drawing.dataURL}")`, size = `${drawing.width}px ${drawing.height}px`, position = `${(view.compoundPadding || view.padding)?.left || 0}px ${((view.compoundPadding || view.padding)?.top || 0) + (view.textParagraph?.padTop || 0)}px`;
     element.style.backgroundImage = stackBackgroundImage(image, element.style.backgroundImage);
     element.style.backgroundSize = view.drawableSVG ? `${size}, 100% 100%` : size;
     element.style.backgroundPosition = view.drawableSVG ? `${position}, 0 0` : position;

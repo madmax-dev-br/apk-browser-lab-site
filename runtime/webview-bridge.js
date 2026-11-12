@@ -51,7 +51,7 @@ const jsonForScript = value => JSON.stringify(value).replace(/</g, '\\u003c').re
 
 /** The inline script. `config`: { loadId, userAgent, domStorage, textZoom, interfaces: { name: [method...] } } (all values data, never code). */
 export function bridgeScript(config) {
-  return BRIDGE.replace('__CONFIG__', () => jsonForScript(config));
+  return BRIDGE.replace('__ENCODE__', () => ENCODE_SOURCE).replace('__CONFIG__', () => jsonForScript(config));
 }
 
 /** Inserts `snippet` as early as the document allows without disturbing its doctype: right after <head>, else after <html>, else after the doctype, else first. */
@@ -71,9 +71,52 @@ export function bridgeMarkup({ csp, config, javascript }) {
   return `<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(csp)}">${javascript ? `<script>${bridgeScript(config)}</script>` : ''}${style}`;
 }
 
+/**
+ * How Android encodes the result of evaluateJavascript (Chromium: V8ValueConverter into a base::Value, then base::JSONWriter), as the source of a function `(value) => string`:
+ * undefined, functions, symbols, BigInt and non-finite numbers have no value ("null" at the top level and inside arrays, the property is left out of an object); toJSON is not
+ * called, so a Date, a RegExp, a Map, an Error or a DOM node is the object of its own enumerable properties (usually {}); a value met again while it is being converted (a cycle)
+ * is null; nesting stops at 100 levels; "<" is written as \\u003C and control characters as \\u00XX.
+ */
+export const ENCODE_SOURCE = `function (value) {
+  var seen = [], HEX = '0123456789ABCDEF';
+  function str(s) {
+    var out = '"';
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c === 34) out += '\\\\"'; else if (c === 92) out += '\\\\\\\\'; else if (c === 8) out += '\\\\b'; else if (c === 12) out += '\\\\f'; else if (c === 10) out += '\\\\n'; else if (c === 13) out += '\\\\r'; else if (c === 9) out += '\\\\t';
+      else if (c < 32 || c === 60 || c === 0x2028 || c === 0x2029) out += '\\\\u' + HEX[c >> 12 & 15] + HEX[c >> 8 & 15] + HEX[c >> 4 & 15] + HEX[c & 15];
+      else if (c >= 0xd800 && c <= 0xdfff) { var n = s.charCodeAt(i + 1); if (c <= 0xdbff && n >= 0xdc00 && n <= 0xdfff) { out += s.charAt(i) + s.charAt(i + 1); i++; } else out += String.fromCharCode(0xfffd); }
+      else out += s.charAt(i);
+    }
+    return out + '"';
+  }
+  function conv(v, depth) {
+    if (v === null) return 'null';
+    var t = typeof v;
+    if (t === 'boolean') return v ? 'true' : 'false';
+    if (t === 'number') return isFinite(v) ? String(v) : undefined;
+    if (t === 'string') return str(v);
+    if (t !== 'object') return undefined;
+    if (depth > 100) return undefined;
+    if (seen.indexOf(v) >= 0) return 'null';
+    seen.push(v);
+    var parts = [], i, child;
+    try {
+      if (Array.isArray(v)) { for (i = 0; i < v.length; i++) { child = conv(v[i], depth + 1); parts.push(child === undefined ? 'null' : child); } return '[' + parts.join(',') + ']'; }
+      var keys = Object.keys(v);
+      for (i = 0; i < keys.length; i++) { child = conv(v[keys[i]], depth + 1); if (child !== undefined) parts.push(str(keys[i]) + ':' + child); }
+      return '{' + parts.join(',') + '}';
+    } catch (e) { return undefined; } finally { seen.pop(); }
+  }
+  var out = conv(value, 0);
+  return out === undefined ? 'null' : out;
+}`;
+/** The encoder as a function (the document engine without a browser and the tests use it; the bridge carries its source). */
+export const encodeResult = new Function('return ' + ENCODE_SOURCE)();
+
 const BRIDGE = `(function () {
   'use strict';
-  var C = __CONFIG__, port = null, queue = [], consoleCount = 0, calls = 0, helloTries = 0, waiting = {}, R = C.resolve || null;
+  var C = __CONFIG__, encode = __ENCODE__, port = null, queue = [], consoleCount = 0, calls = 0, helloTries = 0, waiting = {}, R = C.resolve || null;
   function post(message) { if (port) { try { port.postMessage(message); } catch (e) { /* the page is gone */ } } else if (queue.length < 500) queue.push(message); }
   function text(value) {
     if (typeof value === 'string') return value;
@@ -92,14 +135,14 @@ const BRIDGE = `(function () {
     port = event.ports[0]; port.onmessage = onCommand;
     post({ t: 'ready' });
     var pending = queue; queue = []; pending.forEach(post);
-    title();
   });
-  function json(value) { if (value === undefined) return 'null'; try { var s = JSON.stringify(value); return s === undefined ? 'null' : s; } catch (e) { return 'null'; } }
+  var commands = {};
   function onCommand(event) {
     var data = event.data;
     if (data && data.t === 'resource-result') { var waiter = waiting[data.rid]; if (waiter) { delete waiting[data.rid]; waiter(data); } return; }
+    if (data && data.t === 'call' && typeof data.name === 'string' && Object.prototype.hasOwnProperty.call(commands, data.name)) { try { commands[data.name](data); } catch (e) { /* a command the document made impossible */ } return; }
     if (!data || data.t !== 'eval') return;
-    try { var value = (0, eval)(String(data.script)); post({ t: 'eval-result', evalId: data.evalId, ok: true, json: limit(json(value), 1048576) }); }
+    try { var value = (0, eval)(String(data.script)); post({ t: 'eval-result', evalId: data.evalId, ok: true, json: limit(encode(value), 1048576) }); }
     catch (error) { post({ t: 'eval-result', evalId: data.evalId, ok: false, json: null }); }
   }
   /* console: Chromium's levels, mirrored to the app's WebChromeClient */
@@ -113,16 +156,71 @@ const BRIDGE = `(function () {
   window.addEventListener('error', function (event) { if (consoleCount++ < 1000) post({ t: 'console', level: 'error', text: limit('Uncaught ' + (event.message || 'error'), 4096), source: String(event.filename || location.href), line: event.lineno | 0 }); });
   window.addEventListener('unhandledrejection', function (event) { if (consoleCount++ < 1000) post({ t: 'console', level: 'error', text: limit('Uncaught (in promise) ' + text(event.reason), 4096), source: location.href, line: 0 }); });
   /* title */
-  var lastTitle = '';
-  function title() { var t = document.title || ''; if (t !== lastTitle) { lastTitle = t; post({ t: 'title', title: limit(t, 1024) }); } }
-  document.addEventListener('DOMContentLoaded', title);
+  /* The document is "committed" for the app once it is parsed and its DOMContentLoaded listeners ran: a navigation it starts from there reaches the app first, as on Android
+     (shouldOverrideUrlLoading is asked before the Looper delivers onPageStarted of a document that navigates away while it loads). Titles are reported from then on. */
+  var lastTitle = null, dom = false;
+  function title() { if (!dom) return; var t = document.title || ''; if (t !== lastTitle) { lastTitle = t; post({ t: 'title', title: limit(t, 1024) }); } }
+  function domReady() { if (dom) return; dom = true; lastTitle = document.title || ''; post({ t: 'dom', title: limit(lastTitle, 1024) }); metrics(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(domReady, 0); }); else setTimeout(domReady, 0);
   try { new MutationObserver(title).observe(document, { childList: true, subtree: true, characterData: true }); } catch (e) { /* no observer */ }
+  /* scroll position and content size (WebView.getScrollX/Y, getContentHeight), in CSS pixels = dp */
+  var lastMetrics = '', metricsTimer = null;
+  function metrics() {
+    metricsTimer = null; if (!dom) return;
+    var e = document.documentElement || {}, b = document.body || {};
+    var m = { t: 'metrics', x: Math.round(window.scrollX || 0), y: Math.round(window.scrollY || 0), width: Math.max(e.scrollWidth || 0, b.scrollWidth || 0), height: Math.max(e.scrollHeight || 0, b.scrollHeight || 0), viewWidth: window.innerWidth || 0, viewHeight: window.innerHeight || 0 };
+    var key = JSON.stringify(m); if (key !== lastMetrics) { lastMetrics = key; post(m); }
+  }
+  function metricsSoon() { if (metricsTimer === null) metricsTimer = setTimeout(metrics, 50); }
+  window.addEventListener('scroll', metricsSoon, true); window.addEventListener('resize', metricsSoon); window.addEventListener('load', metricsSoon);
+  commands.scrollTo = function (d) { window.scrollTo(Number(d.x) || 0, Number(d.y) || 0); metrics(); };
+  commands.scrollBy = function (d) { window.scrollBy(Number(d.x) || 0, Number(d.y) || 0); metrics(); };
+  /* WebView.postWebMessage: a MessageEvent on the window, with the origin of the app's side empty as on Android */
+  commands.message = function (d) { window.dispatchEvent(new MessageEvent('message', { data: String(d.data), origin: '' })); };
+  /* WebView.findAllAsync / findNext / clearMatches: the matches of the document's text, highlighted where the browser has the CSS Custom Highlight API */
+  var found = [], active = -1;
+  function paint() {
+    try {
+      if (!window.CSS || !CSS.highlights || typeof Highlight !== 'function') return;
+      CSS.highlights.delete('apkweb-find'); CSS.highlights.delete('apkweb-find-active');
+      if (!found.length) return;
+      CSS.highlights.set('apkweb-find', new (Function.prototype.bind.apply(Highlight, [null].concat(found)))());
+      if (found[active]) { CSS.highlights.set('apkweb-find-active', new Highlight(found[active])); var el = found[active].startContainer.parentElement; if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); }
+    } catch (e) { /* highlighting is cosmetic */ }
+  }
+  commands.find = function (d) {
+    found = []; active = -1;
+    var needle = String(d.text || '').toLowerCase();
+    if (needle && document.body) {
+      var walker = document.createTreeWalker(document.body, 4), node;
+      while ((node = walker.nextNode()) && found.length < 1000) {
+        var parent = node.parentElement; if (parent && /^(SCRIPT|STYLE|NOSCRIPT)$/.test(parent.tagName)) continue;
+        var hay = node.nodeValue.toLowerCase(), at = hay.indexOf(needle);
+        while (at >= 0 && found.length < 1000) { var range = document.createRange(); range.setStart(node, at); range.setEnd(node, at + needle.length); found.push(range); at = hay.indexOf(needle, at + needle.length); }
+      }
+      if (found.length) active = 0;
+    }
+    paint(); post({ t: 'find', fid: d.fid | 0, active: Math.max(active, 0), count: found.length });
+  };
+  commands.findNext = function (d) { if (found.length) { active = (active + (d.forward === false ? found.length - 1 : 1)) % found.length; paint(); } post({ t: 'find', fid: d.fid | 0, active: Math.max(active, 0), count: found.length }); };
+  commands.clearMatches = function () { found = []; active = -1; paint(); };
+  try { var findStyle = document.createElement('style'); findStyle.textContent = '::highlight(apkweb-find){background:#ffff00;color:#000}::highlight(apkweb-find-active){background:#ff9632;color:#000}'; (document.head || document.documentElement).appendChild(findStyle); } catch (e) { /* no style */ }
   /* dialogs: no allow-modals in the sandbox, so alert is reported and does not block; confirm and prompt need the synchronous bridge */
   window.alert = function (message) { post({ t: 'dialog', kind: 'alert', text: limit(message === undefined ? '' : message, 4096) }); };
   window.confirm = function (message) { post({ t: 'dialog', kind: 'confirm', text: limit(message === undefined ? '' : message, 4096) }); return false; };
-  window.prompt = function (message) { post({ t: 'dialog', kind: 'prompt', text: limit(message === undefined ? '' : message, 4096) }); return null; };
-  window.open = function (url) { post({ t: 'popup', url: limit(url === undefined ? '' : url, 8192) }); return null; };
-  /* @JavascriptInterface objects */
+  window.prompt = function (message, value) { post({ t: 'dialog', kind: 'prompt', text: limit(message === undefined ? '' : message, 4096), value: limit(value === undefined ? '' : value, 4096) }); return null; };
+  window.open = function (url) { var u = url === undefined || url === '' ? 'about:blank' : absolute(url) || String(url); post({ t: 'popup', url: limit(u, 8192), gesture: !!(navigator.userActivation && navigator.userActivation.isActive) }); return null; };
+  /* @JavascriptInterface objects. An argument travels as Android's Java bridge sees it: a string, a number, a boolean, null, undefined ({ u: 1 }), an array of those ({ a: [...] }),
+     or some other object ({ o: 1 }: Java receives null, or "undefined" for a String parameter). */
+  function wire(a) {
+    if (a === null) return null;
+    var t = typeof a;
+    if (t === 'string') return limit(a, 65536);
+    if (t === 'number' || t === 'boolean') return a;
+    if (t === 'undefined') return { u: 1 };
+    if (Array.isArray(a)) return { a: Array.prototype.slice.call(a, 0, 4096).map(function (v) { return v === null ? null : typeof v === 'string' ? limit(v, 65536) : typeof v === 'number' || typeof v === 'boolean' ? v : typeof v === 'undefined' ? { u: 1 } : { o: 1 }; }) };
+    return { o: 1 };
+  }
   var names = C.interfaces || {};
   Object.keys(names).forEach(function (name) {
     if (!/^[A-Za-z_$][\\w$]{0,63}$/.test(name) || name === '__proto__' || name === 'constructor') return;
@@ -130,7 +228,7 @@ const BRIDGE = `(function () {
     (names[name] || []).forEach(function (method) {
       Object.defineProperty(object, method, { enumerable: true, value: function () {
         if (++calls > 5000) return undefined;
-        post({ t: 'js', name: name, method: method, args: Array.prototype.slice.call(arguments, 0, 32).map(function (a) { return a === null || a === undefined || typeof a === 'object' || typeof a === 'function' ? null : typeof a === 'symbol' ? null : a; }) });
+        post({ t: 'js', name: name, method: method, args: Array.prototype.slice.call(arguments, 0, 32).map(wire) });
         return undefined;
       } });
     });
@@ -145,18 +243,106 @@ const BRIDGE = `(function () {
     Object.defineProperty(api, 'length', { get: function () { return Object.keys(data).length; } });
     return api;
   }
+  /* DOM storage belongs to the origin of the document's URL, kept by the lab's WebView profile (the frame itself is an opaque origin with no storage): the values arrive with
+     the document and every change is reported. A document with no origin of its own (loadData, about:blank) has none, and reading the property throws as in Chromium. */
+  var S = C.storage || null;
+  function profileStorage(area, initial) {
+    var data = Object.create(null), k;
+    for (k in initial) if (Object.prototype.hasOwnProperty.call(initial, k)) data[k] = String(initial[k]);
+    var api = {
+      getItem: function (key) { key = String(key); return key in data ? data[key] : null; },
+      setItem: function (key, value) { key = String(key); value = String(value); data[key] = value; post({ t: 'storage', area: area, op: 'set', key: limit(key, 4096), value: limit(value, 1048576) }); },
+      removeItem: function (key) { key = String(key); if (key in data) { delete data[key]; post({ t: 'storage', area: area, op: 'remove', key: limit(key, 4096) }); } },
+      clear: function () { data = Object.create(null); post({ t: 'storage', area: area, op: 'clear' }); }, key: function (i) { var keys = Object.keys(data); return keys[i] === undefined ? null : keys[i]; }
+    };
+    Object.defineProperty(api, 'length', { get: function () { return Object.keys(data).length; } });
+    return api;
+  }
   ['localStorage', 'sessionStorage'].forEach(function (name) {
-    try { var value = C.domStorage ? memoryStorage() : null; Object.defineProperty(window, name, { get: function () { return value; }, configurable: true }); } catch (e) { /* not definable */ }
+    try {
+      var area = name === 'localStorage' ? 'local' : 'session', value = !C.domStorage ? null : S ? profileStorage(area, S[area] || {}) : undefined;
+      Object.defineProperty(window, name, { configurable: true, get: function () {
+        if (value === undefined) throw new DOMException("Failed to read the '" + name + "' property from 'Window': Storage is disabled inside 'data:' URLs.", 'SecurityError');
+        return value;
+      } });
+    } catch (e) { /* not definable */ }
   });
+  /* document.cookie: the cookies of the lab's CookieManager for the document's URL (not the browser's jar, which an opaque origin cannot use); assignments go to the CookieManager */
+  if (C.cookies) (function () {
+    var jar = Object.create(null);
+    String(C.cookies.value || '').split(/;\\s*/).forEach(function (pair) { var at = pair.indexOf('='); if (pair) jar[at < 0 ? '' : pair.slice(0, at)] = at < 0 ? pair : pair.slice(at + 1); });
+    try {
+      Object.defineProperty(document, 'cookie', { configurable: true,
+        get: function () { return Object.keys(jar).map(function (name) { return name === '' ? jar[name] : name + '=' + jar[name]; }).join('; '); },
+        set: function (text) {
+          text = String(text); if (!C.cookies.accept) return;
+          var parts = text.split(';'), first = parts[0].trim(), at = first.indexOf('='), name = at < 0 ? '' : first.slice(0, at).trim(), value = at < 0 ? first : first.slice(at + 1).trim(), gone = false;
+          for (var i = 1; i < parts.length; i++) {
+            var attribute = parts[i].trim().toLowerCase();
+            if (/^max-age=/.test(attribute) && Number(attribute.slice(8)) <= 0) gone = true;
+            if (/^expires=/.test(attribute)) { var when = Date.parse(parts[i].trim().slice(8)); if (!isNaN(when) && when <= Date.now()) gone = true; }
+            if (attribute === 'httponly') return;   // a script cannot set an HttpOnly cookie
+          }
+          if (gone) delete jar[name]; else jar[name] = value;
+          post({ t: 'cookie', value: limit(text, 4096) });
+        } });
+    } catch (e) { /* not definable */ }
+  })();
+  /* what a sandboxed frame is never given by the browser reaches the app instead: WebChromeClient decides */
+  var asks = {}, nextAsk = 0;
+  function ask2(message, done) { var id = ++nextAsk; asks[id] = done; message.aid = id; post(message); }
+  commands.answer = function (d) { var done = asks[d.aid]; if (done) { delete asks[d.aid]; done(d); } };
+  try {
+    var geo = {
+      getCurrentPosition: function (ok, fail) {
+        ask2({ t: 'geolocation' }, function (d) {
+          if (d.allowed && d.position) { if (typeof ok === 'function') ok({ coords: { latitude: d.position.latitude, longitude: d.position.longitude, accuracy: d.position.accuracy, altitude: null, altitudeAccuracy: null, heading: null, speed: null }, timestamp: Date.now() }); }
+          else if (typeof fail === 'function') fail({ code: d.allowed ? 2 : 1, message: d.allowed ? 'Position unavailable' : 'User denied Geolocation', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 });
+        });
+      },
+      watchPosition: function (ok, fail) { geo.getCurrentPosition(ok, fail); return ++nextAsk; }, clearWatch: function () {}
+    };
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, get: function () { return geo; } });
+  } catch (e) { /* not definable */ }
+  try {
+    var media = { getUserMedia: function (constraints) {
+      return new Promise(function (resolve, reject) {
+        var resources = []; if (constraints && constraints.video) resources.push('video'); if (constraints && constraints.audio) resources.push('audio');
+        if (!resources.length) { reject(new TypeError("Failed to execute 'getUserMedia' on 'MediaDevices': At least one of audio and video must be requested")); return; }
+        ask2({ t: 'permission', resources: resources }, function (d) { reject(new DOMException(d.granted ? 'Could not start video source' : 'Permission denied', d.granted ? 'NotReadableError' : 'NotAllowedError')); });
+      });
+    }, enumerateDevices: function () { return Promise.resolve([]); }, addEventListener: function () {}, removeEventListener: function () {} };
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, get: function () { return media; } });
+  } catch (e) { /* not definable */ }
+  /* <input type=file>: WebChromeClient.onShowFileChooser picks; the files come back as bytes */
+  document.addEventListener('click', function (event) {
+    var input = event.target && event.target.closest ? event.target.closest('input[type=file]') : null;
+    if (!input && event.target && event.target.closest) { var label = event.target.closest('label'); var control = label && (label.control || label.querySelector('input[type=file]')); if (control && control.type === 'file') input = control; }
+    if (!input || input.tagName !== 'INPUT' || String(input.type).toLowerCase() !== 'file' || input.disabled || event.defaultPrevented) return;
+    event.preventDefault();
+    ask2({ t: 'chooser', accept: limit(input.getAttribute('accept') || '', 1024), multiple: !!input.multiple, capture: input.hasAttribute('capture') }, function (d) {
+      if (!Array.isArray(d.files) || !d.files.length || typeof DataTransfer !== 'function') return;
+      try {
+        var transfer = new DataTransfer();
+        d.files.forEach(function (f) { transfer.items.add(new File([f.bytes], String(f.name || 'file'), { type: String(f.type || '') })); });
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true }));
+      } catch (e) { /* the files could not be set */ }
+    });
+  }, true);
   if (C.userAgent) { try { Object.defineProperty(navigator, 'userAgent', { get: function () { return C.userAgent; }, configurable: true }); Object.defineProperty(navigator, 'appVersion', { get: function () { return C.userAgent.replace(/^Mozilla\\//, ''); }, configurable: true }); } catch (e) { /* not definable */ } }
   /* navigations the document starts are the app's to allow: shouldOverrideUrlLoading */
   function absolute(url) { try { return new URL(url, (R && R.base) || document.baseURI).href; } catch (e) { return null; } }
-  function navigate(url, method, body, gesture) { post({ t: 'navigate', url: limit(url, 8192), method: method, body: body === null ? null : limit(body, 65536), gesture: !!gesture }); }
+  function navigate(url, method, body, gesture) { post({ t: 'navigate', url: limit(url, 8192), method: method, body: body === null ? null : limit(body, 65536), gesture: !!gesture, title: limit(document.title || '', 1024) }); }
   document.addEventListener('click', function (event) {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     var anchor = event.target && event.target.closest ? event.target.closest('a[href]') : null;
-    if (!anchor || anchor.hasAttribute('download')) return;
+    if (!anchor) return;
     var href = anchor.getAttribute('href');
+    if (anchor.hasAttribute('download')) {   // a download is the app's DownloadListener's to take (the sandbox has no allow-downloads)
+      var target = href ? absolute(href) : null; if (!target) return;
+      event.preventDefault(); post({ t: 'download', url: limit(target, 8192), name: limit(anchor.getAttribute('download') || '', 512) }); return;
+    }
     if (!href || href.charAt(0) === '#' || /^javascript:/i.test(href)) return;
     var url = absolute(href); if (!url) return;
     event.preventDefault(); navigate(url, 'GET', null, event.isTrusted === true);

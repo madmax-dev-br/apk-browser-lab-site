@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=a9e9656b8d6c';
-import { APKError } from './apk-error.js?v=a9e9656b8d6c';
+import { createHostRegistry } from './host-contract.js?v=0d5a397ebb41';
+import { APKError } from './apk-error.js?v=0d5a397ebb41';
 
 // android.icu.text / android.icu.util classes mapped over the lab's java.text hosts and the engine's CLDR data (Intl). Android 13 ships ICU4J as android.icu.*; the lab does not carry ICU4J (hundreds
 // of classes plus its resource bundles), so each android.icu class below is a thin object holding the java.text / java.util object it maps to (`inner`) and forwarding the same-named API:
@@ -201,5 +201,51 @@ export function createIcuTextHost(platform) {
   def(I_RBC, 'getInstance', `(${LOCALE})${I_RBC}`, (r, _m, [locale]) => { const o = r.allocate(I_RBC); makeCollator(r, o, locale, false); return o; }, { static: true });
   def(I_RBC, 'getInstance', `(${ULOCALE})${I_RBC}`, (r, _m, [locale]) => { const o = r.allocate(I_RBC); makeCollator(r, o, locale, false); return o; }, { static: true });
   def(I_RBC, 'getInstance', `()${I_RBC}`, r => { const o = r.allocate(I_RBC); makeCollator(r, o, null, false); return o; }, { static: true });
+
+  // ---- CaseMap / Edits (android.text.TextUtils.toUpperCase, which AllCapsTransformationMethod calls) ---------------------------------------------------------------------------------
+  // CaseMap.toUpper().apply(locale, source, destination, edits): full Unicode upper-casing of the engine (String.prototype.toLocaleUpperCase, the ICU tables of the browser) with the VM's
+  // Locale; the Edits record which source ranges changed and what replaced them, one entry per code point, so a caller can map source indices to the destination (span copying).
+  // A mapping that depends on the neighbours (the per-code-point results do not concatenate to the whole-string result) is recorded as one replacement of the whole text.
+  const CASEMAP = 'Landroid/icu/text/CaseMap;', UPPER = 'Landroid/icu/text/CaseMap$Upper;', EDITS = 'Landroid/icu/text/Edits;', EDITS_IT = 'Landroid/icu/text/Edits$Iterator;', CHARS = 'Ljava/lang/CharSequence;', APPENDABLE = 'Ljava/lang/Appendable;';
+  type(CASEMAP, OBJECT, []); type(UPPER, CASEMAP, [], { allocatable: true }); type(EDITS, OBJECT, [], { allocatable: true }); type(EDITS_IT, OBJECT, [], { allocatable: true });
+  const charsOf = (r, v) => typeof v === 'string' ? v : r.typeOf(v) === STRING ? r.stringCharacters(v) : text(r, call(r, v, r.typeOf(v), 'toString', [], STRING));
+  const caseLocale = (r, locale) => { const language = nullish(locale) ? '' : text(r, call(r, localeOf(r, locale), LOCALE, 'getLanguage', [], STRING)) ?? ''; return ['tr', 'az', 'lt', 'el'].includes(language) ? language : 'und'; };
+  def(CASEMAP, 'toUpper', `()${UPPER}`, r => r.allocate(UPPER), { static: true });
+  def(EDITS, '<init>', '()V', (r, _m, [self]) => { r.object(self).edits = []; });
+  def(EDITS, 'reset', '()V', (r, _m, [self]) => { r.object(self).edits = []; });
+  def(EDITS, 'hasChanges', '()Z', (r, _m, [self]) => (r.object(self).edits ?? []).some(edit => edit.changed) ? 1 : 0);
+  def(EDITS, 'numberOfChanges', '()I', (r, _m, [self]) => (r.object(self).edits ?? []).filter(edit => edit.changed).length);
+  def(EDITS, 'lengthDelta', '()I', (r, _m, [self]) => (r.object(self).edits ?? []).reduce((sum, edit) => sum + edit.newLength - edit.oldLength, 0));
+  def(UPPER, 'apply', `(${LOCALE}${CHARS}${APPENDABLE}${EDITS})${APPENDABLE}`, (r, _m, [_self, locale, source, destination, edits]) => {
+    if (nullish(source) || nullish(destination)) npe(r);
+    const value = charsOf(r, source), tag = caseLocale(r, locale), whole = value.toLocaleUpperCase(tag), list = [];
+    let joined = '';
+    for (const point of value) { const mapped = point.toLocaleUpperCase(tag); joined += mapped; const last = list[list.length - 1], changed = mapped !== point;
+      if (last && !changed && !last.changed) last.oldLength = last.newLength = last.oldLength + point.length; else list.push({ changed, oldLength: point.length, newLength: mapped.length }); }
+    if (joined !== whole) { list.length = 0; list.push({ changed: true, oldLength: value.length, newLength: whole.length }); }
+    if (!nullish(edits)) r.object(edits).edits = list;
+    call(r, destination, r.typeOf(destination), 'append', [CHARS], r.isSubtype(r.typeOf(destination), 'Ljava/lang/StringBuilder;') ? 'Ljava/lang/StringBuilder;' : r.isSubtype(r.typeOf(destination), 'Landroid/text/SpannableStringBuilder;') ? 'Landroid/text/SpannableStringBuilder;' : APPENDABLE, [whole]);
+    return destination;
+  });
+  // Edits.Iterator (fine iterator): positioned on one edit; findSourceIndex moves to the edit that contains the source index.
+  for (const name of ['getFineIterator', 'getFineChangesIterator', 'getCoarseIterator', 'getCoarseChangesIterator']) def(EDITS, name, `()${EDITS_IT}`, (r, _m, [self]) => {
+    if (name !== 'getFineIterator') unsupported(`android.icu.text.Edits.${name}`);
+    const o = r.allocate(EDITS_IT); Object.assign(r.object(o), { edits: r.object(self).edits ?? [], index: -1, source: 0, destination: 0 }); return o;
+  });
+  const current = (r, self) => { const it = r.object(self); return it.index >= 0 && it.index < it.edits.length ? it.edits[it.index] : null; };
+  const advance = it => { if (it.index >= 0 && it.index < it.edits.length) { it.source += it.edits[it.index].oldLength; it.destination += it.edits[it.index].newLength; } if (it.index < it.edits.length) it.index++; return it.index < it.edits.length; };
+  def(EDITS_IT, 'next', '()Z', (r, _m, [self]) => advance(r.object(self)) ? 1 : 0);
+  def(EDITS_IT, 'findSourceIndex', '(I)Z', (r, _m, [self, index]) => {
+    const it = r.object(self); if (index < 0) return 0;
+    if (it.index < 0 || it.index >= it.edits.length || index < it.source) { it.index = -1; it.source = 0; it.destination = 0; if (!advance(it)) return 0; }
+    while (index >= it.source + it.edits[it.index].oldLength) if (!advance(it)) return 0;
+    return 1;
+  });
+  def(EDITS_IT, 'hasChange', '()Z', (r, _m, [self]) => current(r, self)?.changed ? 1 : 0);
+  def(EDITS_IT, 'oldLength', '()I', (r, _m, [self]) => current(r, self)?.oldLength ?? 0);
+  def(EDITS_IT, 'newLength', '()I', (r, _m, [self]) => current(r, self)?.newLength ?? 0);
+  def(EDITS_IT, 'sourceIndex', '()I', (r, _m, [self]) => r.object(self).source);
+  def(EDITS_IT, 'destinationIndex', '()I', (r, _m, [self]) => r.object(self).destination);
+  def(EDITS_IT, 'replacementIndex', '()I', (r, _m, [self]) => r.object(self).destination);
   return registry;
 }

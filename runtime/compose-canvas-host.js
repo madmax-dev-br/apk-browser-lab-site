@@ -1,7 +1,7 @@
-import {APKError} from './apk-runtime.js?v=a9e9656b8d6c';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=a9e9656b8d6c';
-import {getVectorGraphics} from './vector-native.js?v=a9e9656b8d6c';
-import {deferRaster} from './deferred-raster.js?v=a9e9656b8d6c';
+import {APKError} from './apk-runtime.js?v=0d5a397ebb41';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=0d5a397ebb41';
+import {getVectorGraphics} from './vector-native.js?v=0d5a397ebb41';
+import {deferRaster} from './deferred-raster.js?v=0d5a397ebb41';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -92,11 +92,11 @@ export function createComposeCanvasHost(platform){
     const color=textColor(r,receiver,hint),typeface=call(r,receiver,'Landroid/widget/TextView;','getTypeface',[],'Landroid/graphics/Typeface;'),face=r.skiaHost.resolveTypeface(typeface),size=view.textSize||14;
     const gravity=view.gravity??textStyleValue(r,receiver,'gravity','getInt','I',0x800033),abs=r.classes.has('Landroid/view/Gravity;')?call(r,null,'Landroid/view/Gravity;','getAbsoluteGravity',['I','I'],'I',[gravity,view.layoutDirection??0],'static'):gravity;
     const horizontal=abs&7,vertical=abs&0x70,lines=text.split('\n'),font={textSize:size,flags:1,typefaceRef:typeface},metrics=r.skiaHost.measureText('',font).metrics,top=view.includeFontPadding===false?Math.round(metrics.ascent):Math.floor(metrics.bounds[1]),bottom=view.includeFontPadding===false?Math.round(metrics.descent):Math.ceil(metrics.bounds[3]);
-    const nativeParagraph=!hint&&view.textParagraph,blockHeight=nativeParagraph?view.textParagraph.height:bottom-top+(lines.length-1)*(view.textLineHeight??bottom-top),dy=vertical===0x10?(innerHeight-blockHeight)/2:vertical===0x50?innerHeight-blockHeight:0,save=canvas(r,target,'save',[],'I');
+    const nativeParagraph=!hint&&view.textParagraph,fontPadTop=nativeParagraph?view.textParagraph.padTop??0:0,blockHeight=nativeParagraph?view.textParagraph.height+fontPadTop+(view.textParagraph.padBottom??0):bottom-top+(lines.length-1)*(view.textLineHeight??bottom-top),dy=vertical===0x10?(innerHeight-blockHeight)/2:vertical===0x50?innerHeight-blockHeight:0,save=canvas(r,target,'save',[],'I');
     try{canvas(r,target,'clipRect',['F','F','F','F'],'Z',[raw(pad.left??0),raw(pad.top??0),raw(width-(pad.right??0)),raw(height-(pad.bottom??0))]);const scrollX=view.updatingDisplayList?0:view.fields.get(`${VIEW}->mScrollX:I`)??0,scrollY=view.updatingDisplayList?0:view.fields.get(`${VIEW}->mScrollY:I`)??0;
       if(nativeParagraph){const renderWidth=view.textParagraph.layoutWidth,align=horizontal===1?'center':horizontal===5?'right':'left',key=JSON.stringify([text,renderWidth,size,face.weight,face.italic,color,align,view.layoutDirection,view.maxLines]);
         if(view.canvasTextRasterKey!==key){const result=measureSkiaParagraph(r.skia,hint?text:view.textBreakText??text,{width:renderWidth,textSize:size,weight:face.weight,italic:face.italic,direction:view.layoutDirection??0,maxLines:view.maxLines??null,ellipsis:platform.textViewApi.ellipsizeKind(r,receiver)==='END'&&view.maxLines!=null?'\u2026':null,color,alignment:align,raster:true});if(Math.abs(result.height-view.textParagraph.height)>.001)fail('Native widget paragraph differs from its completed measurement');const length=result.raster.dataURL.length,next=cachedTextRasterBytes-(textRasterSizes.get(view.id)??0)+length;if(next>32*1024*1024)fail('Native widget paragraph raster cache exceeds32MiB');cachedTextRasterBytes=next;textRasterSizes.set(view.id,length);view.canvasTextRaster=result.raster;view.canvasTextRasterKey=key;}
-        r.skiaHost.recordNative(r.object(target).nativeCanvasHandle,{op:'raster',raster:view.canvasTextRaster,args:[(pad.left??0)+(horizontal===1?(innerWidth-renderWidth)/2:horizontal===5?innerWidth-renderWidth:0)-scrollX,(pad.top??0)+dy-scrollY]});
+        r.skiaHost.recordNative(r.object(target).nativeCanvasHandle,{op:'raster',raster:view.canvasTextRaster,args:[(pad.left??0)+(horizontal===1?(innerWidth-renderWidth)/2:horizontal===5?innerWidth-renderWidth:0)-scrollX,(pad.top??0)+dy+fontPadTop-scrollY]});   // fontPadTop: StaticLayout's first line starts at the font's top, above the ascent the paragraph starts at
       }else{const paint={argb:color>>>0,color:color>>>0,flags:1,style:0,strokeWidth:0,strokeMiter:4,strokeCap:0,strokeJoin:0,blendMode:3,textSize:size,textScaleX:1,textSkewX:0,letterSpacing:0,wordSpacing:0,hinting:1,weight:face.weight,italic:face.italic};
         lines.forEach((line,index)=>{const advance=r.skiaHost.measureText(line,font).width,dx=horizontal===1?(innerWidth-advance)/2:horizontal===5?innerWidth-advance:0;r.skiaHost.recordNative(r.object(target).nativeCanvasHandle,{op:'paragraphRun',text:line,args:[(pad.left??0)+dx-scrollX,(pad.top??0)+dy-top+index*(view.textLineHeight??bottom-top)-scrollY],isRtl:!!view.layoutDirection,paint});});
       }
@@ -164,6 +164,10 @@ export function createComposeCanvasHost(platform){
   return{
     supports:key=>keys.has(key),
     markDirty,updateDisplayList,
+    /** The TextView's current text colour (its own, or the one its style / TextAppearance resolves to in its theme, for its drawable state). */
+    textColor:(r,receiver)=>textColor(r,receiver,false),
+    /** TextView.getGravity as the constructor leaves it: the view's own gravity, or android:gravity of its style / default style (a Button's is center). */
+    textGravity:(r,receiver)=>{const view=r.object(receiver);if(view.gravity!=null)return view.gravity;return view.styledGravity??=textStyleValue(r,receiver,'gravity','getInt','I',0x800033);},
     reflectionDefinition(owner,kind,name,parameters,publicOnly){
       // Hidden android.graphics.Canvas reorder barriers (androidx CanvasUtils.enableZ). Invocation is a normal virtual dispatch,
       // so a RecordingCanvas receiver reaches its original DisplayListCanvas Java -> nInsertReorderBarrier; others fail at dispatch.

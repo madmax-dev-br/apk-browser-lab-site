@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=a9e9656b8d6c';
-import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=a9e9656b8d6c';
-import { isInterfaceName } from './webview-bridge.js?v=a9e9656b8d6c';
-import { APKError } from './apk-error.js?v=a9e9656b8d6c';
+import { gcRoot } from './heap-gc.js?v=0d5a397ebb41';
+import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=0d5a397ebb41';
+import { isInterfaceName } from './webview-bridge.js?v=0d5a397ebb41';
+import { APKError } from './apk-error.js?v=0d5a397ebb41';
 
 // android.webkit.WebView and its public companions for the browser VM (design: docs/APK-REAL-TASKS.md, task 33).
 //
@@ -24,6 +24,8 @@ export const WEBVIEW = 'Landroid/webkit/WebView;', SETTINGS = 'Landroid/webkit/W
 /** WebViewProviderFactoryBoundaryInterface.getSupportedFeatures(): support-library feature strings this WebView implements. None yet (a listed feature must work). */
 export const LAB_PROVIDER_FEATURES = Object.freeze([]);
 const isNull = v => v === null || v === undefined || v === 0;
+/** The title of Chromium's error page: what onReceivedTitle and getTitle() report after a main-frame load failed. */
+export const ERROR_PAGE_TITLE = 'Webpage not available';
 /** WebViewClient.ERROR_* (android-13.0.0_r1). */
 export const WEBVIEW_ERRORS = Object.freeze({ UNKNOWN: -1, HOST_LOOKUP: -2, UNSUPPORTED_AUTH_SCHEME: -3, AUTHENTICATION: -4, PROXY_AUTHENTICATION: -5, CONNECT: -6, IO: -7, TIMEOUT: -8, REDIRECT_LOOP: -9, UNSUPPORTED_SCHEME: -10, FAILED_SSL_HANDSHAKE: -11, BAD_URL: -12, FILE: -13, FILE_NOT_FOUND: -14, TOO_MANY_REQUESTS: -15, UNSAFE_RESOURCE: -16 });
 
@@ -96,7 +98,7 @@ export function createWebViewHost(platform) {
   def(WV_DATABASE, 'hasFormData', '()Z', () => 0); def(WV_DATABASE, 'clearFormData', '()V', () => undefined);   // autofill form data is not stored by the WebView profile of this device
 
   // ---- per-WebView state ---------------------------------------------------------------------------------------------------------------------------------------------
-  const newState = () => ({ settings: null, client: null, chrome: null, url: null, originalUrl: null, title: null, progress: 0, loading: false, history: [], index: -1, interfaces: new Map(), loadId: 0, destroyed: false, paused: false, id: null });
+  const newState = () => ({ settings: null, client: null, chrome: null, url: null, originalUrl: null, title: '', progress: 100, loading: false, scroll: { x: 0, y: 0 }, contentHeight: 0, findListener: null, nextFind: 1, history: [], index: -1, interfaces: new Map(), loadId: 0, destroyed: false, paused: false, id: null });
   const stateOf = (r, self) => { const o = r.object(self); if (!o.webview) r.throwJava('Ljava/lang/IllegalStateException;', 'WebView used before its constructor ran'); return o.webview; };
   let nextId = 1;
   const settingsContext = (r) => ({ targetSdk: platform.targetSdk ?? 34, hasInternet: platform.hasPermission?.('android.permission.INTERNET') ?? true,
@@ -128,6 +130,12 @@ export function createWebViewHost(platform) {
     if (r.tolerateMissing === 'off' || r.tolerateMissing === undefined) throw new APKError(message, { kind: 'webview-unavailable', method: what });
     if (!unavailableOnce.has(what)) { unavailableOnce.add(what); r.record(`STUB-WEBVIEW ${what} (${message})`); }
   };
+  /** An API the lab's WebView does not implement: strict mode stops with the named error, the tolerant modes record it once. */
+  const unsupported = (r, what, why) => {
+    const message = `android.webkit.WebView.${what} is not supported by the lab's WebView: ${why}`;
+    if (r.tolerateMissing === 'off' || r.tolerateMissing === undefined) throw new APKError(message, { kind: 'webview-unsupported', method: what });
+    if (!unavailableOnce.has(what)) { unavailableOnce.add(what); r.record(`STUB-WEBVIEW ${what} (${message})`); }
+  };
   const requestObject = (r, url, { mainFrame = true, method = 'GET', headers = new Map(), gesture = false, redirect = false } = {}) => {
     const ref = r.makeObject(LAB_REQUEST), o = r.object(ref); o.request = { url, mainFrame, method, headers, gesture, redirect }; return ref;
   };
@@ -145,13 +153,13 @@ export function createWebViewHost(platform) {
     return false;
   };
   const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
-  const readResponseBytes = (r, stream) => {
+  const readResponseBytes = (r, stream, limit = MAX_RESPONSE_BYTES) => {
     const chunks = []; let total = 0;
     try {
       for (;;) {
         const buffer = r.newArray('[B', 16384), got = call(r, stream, INPUT_STREAM, 'read', ['[B', 'I', 'I'], 'I', [buffer, 0, 16384]);
         if (got < 0) break;
-        total += got; if (total > MAX_RESPONSE_BYTES) return { tooLarge: true };
+        total += got; if (total > limit) return { tooLarge: true };
         chunks.push(r.bytesOf(buffer, 0, got).slice());
       }
     } finally { try { call(r, stream, INPUT_STREAM, 'close', [], 'V', []); } catch { /* a stream that cannot close */ } }
@@ -173,15 +181,23 @@ export function createWebViewHost(platform) {
     return { status: Number.isSafeInteger(o.status) ? o.status : 200, reason: chars(o.reason) ?? 'OK', mime: chars(o.mime) ?? 'text/plain', encoding: chars(o.encoding), bytes };
   };
 
-  /** Android's callbacks for a main-frame load that failed before any content: onPageStarted, onReceivedError, onPageFinished (all on the UI thread, in that order). */
-  const failLoad = (r, self, state, url, code, description) => {
-    const loadId = ++state.loadId; state.loading = true; state.originalUrl = url; state.url = url;
+  /**
+   * Android's callbacks for a main-frame load that failed, in the order of the reference device: onProgressChanged(10) (`announce`: unless the WebView was already loading),
+   * onPageStarted (unless the document had `started`), onReceivedError, onPageFinished, onReceivedTitle of the error page, onProgressChanged(100) twice. All on the UI thread.
+   */
+  const failLoad = (r, self, state, url, code, description, { announce = !state.loading, started = false, shown = url } = {}) => {
+    const loadId = ++state.loadId; state.loading = true; state.originalUrl = shown; state.url = shown;
     postMain(r, () => {
       if (state.destroyed || loadId !== state.loadId) return;
-      clientCall(r, state, 'onPageStarted', [WEBVIEW, STRING, BITMAP], 'V', [self, url, null]);
+      const progress = value => { state.progress = value; chromeCall(r, state, 'onProgressChanged', [WEBVIEW, 'I'], 'V', [self, value]); };
+      if (announce) progress(10);
+      if (!started) clientCall(r, state, 'onPageStarted', [WEBVIEW, STRING, BITMAP], 'V', [self, url, null]);
       clientCall(r, state, 'onReceivedError', [WEBVIEW, REQUEST, ERROR], 'V', [self, requestObject(r, url), errorObject(r, code, description)]);
-      state.loading = false; state.progress = 100;
+      state.loading = false;
       clientCall(r, state, 'onPageFinished', [WEBVIEW, STRING], 'V', [self, url]);
+      state.title = ERROR_PAGE_TITLE; const entry = state.history[state.index]; if (entry) entry.title = ERROR_PAGE_TITLE;
+      chromeCall(r, state, 'onReceivedTitle', [WEBVIEW, STRING], 'V', [self, ERROR_PAGE_TITLE]);
+      progress(100); progress(100);
       platform.requestDraw?.(r, self);
     }, [self, state.client, state.chrome]);
   };
@@ -210,16 +226,16 @@ export function createWebViewHost(platform) {
   def(WEBVIEW, 'loadData', `(${STRING}${STRING}${STRING})V`, (r, _m, [self, data, mime, encoding]) => {
     const body = stringArg(r, data, 'data'), type = isNull(mime) ? 'text/html' : stringArg(r, mime, 'mimeType'), enc = isNull(encoding) ? null : stringArg(r, encoding, 'encoding');
     // Android turns loadData into a data: URL, which is also what getUrl() reports
-    const url = `data:${type}${enc && enc !== 'base64' ? `;charset=${enc}` : ''}${enc === 'base64' ? ';base64' : ''},${body}`;
+    const url = `data:${type}${enc === 'base64' ? ';base64' : ''},${body}`;
     navigate(r, self, 'loadData', { kind: 'data', data: body, mime: type, encoding: enc, url, displayUrl: url });
   });
   def(WEBVIEW, 'loadDataWithBaseURL', `(${STRING}${STRING}${STRING}${STRING}${STRING})V`, (r, _m, [self, base, data, mime, encoding, history]) => {
     const baseUrl = isNull(base) ? 'about:blank' : stringArg(r, base, 'baseUrl');
-    navigate(r, self, 'loadDataWithBaseURL', { kind: 'dataBase', baseUrl, data: stringArg(r, data, 'data'), mime: isNull(mime) ? 'text/html' : stringArg(r, mime, 'mimeType'), encoding: isNull(encoding) ? null : stringArg(r, encoding, 'encoding'), historyUrl: isNull(history) ? null : stringArg(r, history, 'historyUrl'), url: baseUrl, displayUrl: baseUrl });
+    navigate(r, self, 'loadDataWithBaseURL', { kind: 'dataBase', baseUrl, data: stringArg(r, data, 'data'), mime: isNull(mime) ? 'text/html' : stringArg(r, mime, 'mimeType'), encoding: isNull(encoding) ? null : stringArg(r, encoding, 'encoding'), historyUrl: isNull(history) ? null : stringArg(r, history, 'historyUrl'), url: baseUrl, callbackUrl: baseUrl, displayUrl: isNull(history) ? 'about:blank' : stringArg(r, history, 'historyUrl') });   // getUrl() is the history URL (about:blank without one); the callbacks carry the base URL
   });
   def(WEBVIEW, 'postUrl', `(${STRING}[B)V`, (r, _m, [self, url, body]) => navigate(r, self, 'postUrl', { kind: 'post', url: stringArg(r, url, 'url'), body: isNull(body) ? new Uint8Array(0) : Uint8Array.from(r.array(body).elements, v => v & 255) }));
   def(WEBVIEW, 'reload', '()V', (r, _m, [self]) => { const state = stateOf(r, self); if (state.url === null) return; const entry = state.history[state.index]; navigate(r, self, 'reload', { ...(entry?.request ?? { kind: 'url', url: state.url, headers: new Map() }), reload: true }); });
-  def(WEBVIEW, 'stopLoading', '()V', (r, _m, [self]) => { const state = stateOf(r, self); if (!state.loading) return; state.loadId++; state.loading = false; backend()?.stop?.(r, self, state); });
+  def(WEBVIEW, 'stopLoading', '()V', (r, _m, [self]) => { const state = stateOf(r, self); if (!state.loading) return; state.loadId++; state.loading = false; state.progress = 100; backend()?.stop?.(r, self, state); });
 
   // ---- history (host-initiated navigations; the iframe's own history is not readable across origins) ---------------------------------------------------------------------------------
   def(WEBVIEW, 'canGoBack', '()Z', (r, _m, [self]) => stateOf(r, self).index > 0 ? 1 : 0);
@@ -242,6 +258,64 @@ export function createWebViewHost(platform) {
   def(WEBVIEW, 'getTitle', `()${STRING}`, (r, _m, [self]) => stateOf(r, self).title);
   def(WEBVIEW, 'getProgress', '()I', (r, _m, [self]) => stateOf(r, self).progress);
   def(WEBVIEW, 'getContentHeight', '()I', (r, _m, [self]) => stateOf(r, self).contentHeight ?? 0);
+  // ---- scrolling: the document scrolls inside its frame; the position and the content size are what its bridge last reported (CSS pixels are dp) ---------------------------------
+  def(WEBVIEW, 'getScrollX', '()I', (r, _m, [self]) => stateOf(r, self).scroll?.x ?? 0); def(WEBVIEW, 'getScrollY', '()I', (r, _m, [self]) => stateOf(r, self).scroll?.y ?? 0);
+  const scrollCommand = (r, self, api, name, x, y) => { const s = stateOf(r, self); if (!backend()?.command || !s.bridge) return false; return backend().command(r, self, s, api, { name, x, y }); };
+  def(WEBVIEW, 'scrollTo', '(II)V', (r, _m, [self, x, y]) => { scrollCommand(r, self, 'scrollTo', 'scrollTo', x, y); });
+  def(WEBVIEW, 'scrollBy', '(II)V', (r, _m, [self, x, y]) => { scrollCommand(r, self, 'scrollBy', 'scrollBy', x, y); });
+  // pageUp/pageDown answer whether the page can move (from the last reported position) and scroll by the height of the view, or to the edge
+  const page = (r, self, down, edge) => {
+    const s = stateOf(r, self), view = s.viewHeight ?? 0, max = Math.max(0, (s.contentHeight ?? 0) - view), y = s.scroll?.y ?? 0;
+    if (down ? y >= max : y <= 0) return 0;
+    const target = edge ? (down ? max : 0) : Math.max(0, Math.min(max, y + (down ? view : -view)));
+    return scrollCommand(r, self, down ? 'pageDown' : 'pageUp', 'scrollTo', s.scroll?.x ?? 0, target) ? 1 : 0;
+  };
+  def(WEBVIEW, 'pageUp', '(Z)Z', (r, _m, [self, top]) => page(r, self, false, !!top)); def(WEBVIEW, 'pageDown', '(Z)Z', (r, _m, [self, bottom]) => page(r, self, true, !!bottom));
+  // ---- find in page ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  const FIND_LISTENER = 'Landroid/webkit/WebView$FindListener;';
+  def(WEBVIEW, 'setFindListener', `(${FIND_LISTENER})V`, (r, _m, [self, listener]) => { stateOf(r, self).findListener = isNull(listener) ? null : listener; });
+  def(WEBVIEW, 'findAllAsync', `(${STRING})V`, (r, _m, [self, text]) => { const s = stateOf(r, self); if (backend()?.command && s.bridge) backend().command(r, self, s, 'findAllAsync', { name: 'find', fid: s.nextFind++, text: isNull(text) ? '' : stringArg(r, text, 'find') }); });
+  def(WEBVIEW, 'findNext', '(Z)V', (r, _m, [self, forward]) => { const s = stateOf(r, self); if (backend()?.command && s.bridge) backend().command(r, self, s, 'findNext', { name: 'findNext', fid: s.nextFind++, forward: !!forward }); });
+  def(WEBVIEW, 'clearMatches', '()V', (r, _m, [self]) => { const s = stateOf(r, self); if (backend()?.command && s.bridge?.scriptable) backend().command(r, self, s, 'clearMatches', { name: 'clearMatches' }); });
+  // ---- web messages: postWebMessage delivers a MessageEvent to the document's window; message ports are not connected (createWebMessageChannel fails by name) --------------------------
+  const WEB_MESSAGE = 'Landroid/webkit/WebMessage;';
+  def(WEBVIEW, 'postWebMessage', `(${WEB_MESSAGE}Landroid/net/Uri;)V`, (r, _m, [self, message, target]) => {
+    if (isNull(message)) r.throwJava('Ljava/lang/NullPointerException;', 'message == null');
+    const s = stateOf(r, self), data = call(r, message, WEB_MESSAGE, 'getData', [], STRING, []), ports = call(r, message, WEB_MESSAGE, 'getPorts', [], '[Landroid/webkit/WebMessagePort;', []);
+    if (!isNull(ports) && r.array(ports).elements.length) unsupported(r, 'postWebMessage', 'a WebMessage that transfers WebMessagePorts: the lab does not connect message ports to the document');
+    if (!backend()?.command) { unavailable(r, 'postWebMessage'); return; }
+    const origin = isNull(target) ? '*' : r.stringCharacters(call(r, target, 'Landroid/net/Uri;', 'toString', [], STRING, []));
+    if (origin !== '*' && origin !== '' && s.bridge?.origin && (() => { try { return new URL(origin).origin !== s.bridge.origin; } catch { return true; } })()) return;   // the target origin does not match the document: dropped, as in Chromium
+    backend().command(r, self, s, 'postWebMessage', { name: 'message', data: isNull(data) ? '' : typeof data === 'string' ? data : r.stringCharacters(data) }, { create: true });
+  });
+  def(WEBVIEW, 'createWebMessageChannel', '()[Landroid/webkit/WebMessagePort;', (r) => { unsupported(r, 'createWebMessageChannel', 'the lab does not connect WebMessagePorts to a document; WebView.postWebMessage with a string works'); return null; });
+  // ---- saveState / restoreState: the back/forward list as a byte[] under Chromium's key (the documents themselves are loaded again, as Android does) -------------------------------------
+  const BUNDLE = 'Landroid/os/Bundle;', STATE_KEY = 'WEBVIEW_CHROMIUM_STATE';
+  def(WEBVIEW, 'saveState', `(${BUNDLE})${LIST}`, (r, _m, [self, bundle]) => {
+    if (isNull(bundle)) r.throwJava('Ljava/lang/NullPointerException;', 'outState == null');
+    const s = stateOf(r, self); if (!s.history.length) return null;
+    const entries = s.history.map(e => ({ url: e.url, originalUrl: e.originalUrl, title: e.title, request: { ...e.request, headers: [...(e.request.headers ?? [])], body: e.request.body ? Array.from(e.request.body) : null } }));
+    const bytes = new TextEncoder().encode(JSON.stringify({ version: 1, index: s.index, entries })), array = r.newArray('[B', bytes.length);
+    r.bytesOf(array, 0, bytes.length).set(bytes);
+    call(r, bundle, BUNDLE, 'putByteArray', [STRING, '[B'], 'V', [STATE_KEY, array]);
+    return call(r, self, WEBVIEW, 'copyBackForwardList', [], LIST, []);
+  });
+  def(WEBVIEW, 'restoreState', `(${BUNDLE})${LIST}`, (r, _m, [self, bundle]) => {
+    if (isNull(bundle)) r.throwJava('Ljava/lang/NullPointerException;', 'inState == null');
+    const array = call(r, bundle, BUNDLE, 'getByteArray', [STRING], '[B', [STATE_KEY]); if (isNull(array)) return null;
+    let saved; try { saved = JSON.parse(new TextDecoder().decode(r.bytesOf(array, 0, r.array(array).elements.length))); } catch { return null; }
+    if (saved?.version !== 1 || !Array.isArray(saved.entries) || !saved.entries.length) return null;
+    const s = stateOf(r, self);
+    s.history = saved.entries.map(e => ({ url: e.url, originalUrl: e.originalUrl, title: e.title, request: { ...e.request, headers: new Map(e.request.headers ?? []), body: e.request.body ? Uint8Array.from(e.request.body) : undefined } }));
+    s.index = Math.max(0, Math.min(s.history.length - 1, saved.index | 0));
+    navigate(r, self, 'restoreState', { ...s.history[s.index].request, history: 'keep' });
+    return call(r, self, WEBVIEW, 'copyBackForwardList', [], LIST, []);
+  });
+  // ---- what the lab cannot do, said by name ------------------------------------------------------------------------------------------------------------------------------------------
+  def(WEBVIEW, 'capturePicture', '()Landroid/graphics/Picture;', (r) => { unsupported(r, 'capturePicture', 'the document is drawn by the browser inside a sandboxed frame whose pixels the page cannot read'); return null; });
+  def(WEBVIEW, 'zoomIn', '()Z', () => 0); def(WEBVIEW, 'zoomOut', '()Z', () => 0); def(WEBVIEW, 'canZoomIn', '()Z', () => 0); def(WEBVIEW, 'canZoomOut', '()Z', () => 0);   // the page scale is fixed at 1: there is nothing to zoom to
+  def(WEBVIEW, 'zoomBy', '(F)V', () => undefined);
+  // setWebContentsDebuggingEnabled is the process-wide flag of src/content-extras-host.js; the frame is always inspectable with the browser's own developer tools
   def(WEBVIEW, 'getScale', '()F', () => 1); def(WEBVIEW, 'getFavicon', `()${BITMAP}`, () => null);
   def(WEBVIEW, 'getSettings', `()${SETTINGS}`, (r, _m, [self]) => settingsOf(r, self));
   def(WEBVIEW, 'setWebViewClient', `(${CLIENT})V`, (r, _m, [self, client]) => { stateOf(r, self).client = isNull(client) ? null : client; });
@@ -251,7 +325,7 @@ export function createWebViewHost(platform) {
   // The listener is kept; the lab's WebView never starts a download (its frame is sandboxed without downloads), so onDownloadStart is never called.
   def(WEBVIEW, 'setDownloadListener', '(Landroid/webkit/DownloadListener;)V', (r, _m, [self, listener]) => { stateOf(r, self).downloadListener = isNull(listener) ? null : listener; });
   for (const name of ['onPause', 'onResume']) def(WEBVIEW, name, '()V', (r, _m, [self]) => { stateOf(r, self).paused = name === 'onPause'; });
-  for (const name of ['pauseTimers', 'resumeTimers', 'clearCache', 'clearFormData', 'clearSslPreferences', 'freeMemory', 'clearMatches']) def(WEBVIEW, name, name === 'clearCache' ? '(Z)V' : '()V', () => undefined);
+  for (const name of ['pauseTimers', 'resumeTimers', 'clearCache', 'clearFormData', 'clearSslPreferences', 'freeMemory']) def(WEBVIEW, name, name === 'clearCache' ? '(Z)V' : '()V', () => undefined);
   def(WEBVIEW, 'destroy', '()V', (r, _m, [self]) => { const s = stateOf(r, self); s.destroyed = true; s.loadId++; s.loading = false; backend()?.destroy?.(r, self, s); });
   def(WEBVIEW, 'setInitialScale', '(I)V', () => undefined); def(WEBVIEW, 'setVerticalScrollbarOverlay', '(Z)V', () => undefined); def(WEBVIEW, 'setHorizontalScrollbarOverlay', '(Z)V', () => undefined);
   def(WEBVIEW, 'setNetworkAvailable', '(Z)V', () => undefined);
@@ -261,7 +335,7 @@ export function createWebViewHost(platform) {
     const s = stateOf(r, self); stringArg(r, script, 'script');
     if (!backend()?.evaluate) {
       unavailable(r, 'evaluateJavascript');
-      if (!isNull(callback)) postMain(r, () => call(r, callback, CALLBACK, 'onReceiveValue', [OBJECT], 'V', [null]), [callback, self]);
+      if (!isNull(callback)) postMain(r, () => call(r, callback, CALLBACK, 'onReceiveValue', [OBJECT], 'V', ['null']), [callback, self]);
       return;
     }
     backend().evaluate(r, self, s, stringArg(r, script, 'script'), callback);
@@ -349,7 +423,8 @@ export function createWebViewHost(platform) {
   for (const name of ['onJsAlert', 'onJsConfirm', 'onJsBeforeUnload']) empty(CHROME, name, [WEBVIEW, STRING, STRING, JS_RESULT], 'Z', 0);
   empty(CHROME, 'onJsPrompt', [WEBVIEW, STRING, STRING, STRING, JS_PROMPT], 'Z', 0);
   empty(CHROME, 'onGeolocationPermissionsShowPrompt', [STRING, 'Landroid/webkit/GeolocationPermissions$Callback;']); empty(CHROME, 'onGeolocationPermissionsHidePrompt', []);
-  empty(CHROME, 'onPermissionRequest', ['Landroid/webkit/PermissionRequest;']); empty(CHROME, 'onPermissionRequestCanceled', ['Landroid/webkit/PermissionRequest;']);
+  def(CHROME, 'onPermissionRequest', '(Landroid/webkit/PermissionRequest;)V', (r, _m, [, request]) => { if (!isNull(request)) call(r, request, 'Landroid/webkit/PermissionRequest;', 'deny', [], 'V', []); });   // AOSP: a client that does not override it denies
+  empty(CHROME,'onPermissionRequestCanceled', ['Landroid/webkit/PermissionRequest;']);
   def(CHROME, 'onConsoleMessage', `(${CONSOLE})Z`, (r, _m, [self, message]) => { const o = r.object(message); call(r, self, CHROME, 'onConsoleMessage', [STRING, 'I', STRING], 'V', [o.message, o.line, o.source]); return 0; });   // AOSP: the old overload, then "not handled"
   empty(CHROME, 'onConsoleMessage', [STRING, 'I', STRING]);
   empty(CHROME, 'getDefaultVideoPoster', [], BITMAP, null); empty(CHROME, 'getVideoLoadingProgressView', [], VIEW, null);
@@ -385,9 +460,24 @@ export function createWebViewHost(platform) {
   def(JS_PROMPT, 'confirm', `(${STRING})V`, (r, _m, [self, text]) => { const o = r.object(self); o.settled = true; o.value = true; o.onResult?.(true, isNull(text) ? null : r.stringCharacters(text)); });
   const storage = gcRoot({ instance: null });
   def(STORAGE, 'getInstance', `()${STORAGE}`, r => storage.instance ??= r.allocate(STORAGE), { static: true });
-  for (const name of ['deleteAllData']) def(STORAGE, name, '()V', () => undefined);
-  def(STORAGE, 'getOrigins', `(${CALLBACK})V`, () => undefined); def(STORAGE, 'getUsageForOrigin', `(${STRING}${CALLBACK})V`, () => undefined); def(STORAGE, 'getQuotaForOrigin', `(${STRING}${CALLBACK})V`, () => undefined);
-  def(STORAGE, 'deleteOrigin', `(${STRING})V`, () => undefined);
+  // WebStorage: the DOM storage (localStorage) the profile keeps per origin for documents the lab serves (src/webview-backend.js). Answers reach the callbacks on the main Looper.
+  const domStorage = () => profile.storage ??= new Map();
+  const usage = origin => { let size = 0; for (const [k, v] of domStorage().get(origin) ?? []) size += 2 * (k.length + v.length); return size; };
+  const boxLong = (r, v) => staticCall(r, 'Ljava/lang/Long;', 'valueOf', ['J'], 'Ljava/lang/Long;', [BigInt(v)]);
+  const answer = (r, callback, make) => { if (!isNull(callback)) postMain(r, () => call(r, callback, CALLBACK, 'onReceiveValue', [OBJECT], 'V', [make()]), [callback]); };
+  def(STORAGE, 'deleteAllData', '()V', () => { domStorage().clear(); });
+  def(STORAGE, 'deleteOrigin', `(${STRING})V`, (r, _m, [, origin]) => { const key = originOf(r, origin); if (key) domStorage().delete(key); });
+  def(STORAGE, 'getUsageForOrigin', `(${STRING}${CALLBACK})V`, (r, _m, [, origin, callback]) => { const key = originOf(r, origin); answer(r, callback, () => boxLong(r, key ? usage(key) : 0)); });
+  def(STORAGE, 'getQuotaForOrigin', `(${STRING}${CALLBACK})V`, (r, _m, [, , callback]) => { answer(r, callback, () => boxLong(r, 5 * 1024 * 1024 * 2)); });
+  const ORIGIN_T = 'Landroid/webkit/WebStorage$Origin;'; type(ORIGIN_T, OBJECT, [], { allocatable: true });
+  def(ORIGIN_T, 'getOrigin', `()${STRING}`, (r, _m, [self]) => r.object(self).origin); def(ORIGIN_T, 'getUsage', '()J', (r, _m, [self]) => BigInt(usage(r.object(self).origin))); def(ORIGIN_T, 'getQuota', '()J', () => BigInt(5 * 1024 * 1024 * 2));
+  def(STORAGE, 'getOrigins', `(${CALLBACK})V`, (r, _m, [, callback]) => {
+    answer(r, callback, () => {
+      const map = r.allocate('Ljava/util/HashMap;'); r.dispatch({ owner: 'Ljava/util/HashMap;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [map], 'direct');
+      for (const origin of domStorage().keys()) { const ref = r.makeObject(ORIGIN_T); r.object(ref).origin = origin; call(r, map, MAP, 'put', [OBJECT, OBJECT], OBJECT, [origin, ref]); }
+      return map;
+    });
+  });
   type(JS_INTERFACE, 'Ljava/lang/Object;');
 
   // ---- @JavascriptInterface objects (phase 2: the bridge calls them asynchronously; return values wait for the synchronous bridge of phase 3) -----------------------------------
@@ -410,16 +500,31 @@ export function createWebViewHost(platform) {
     for (const [name, object] of state.interfaces) if (isInterfaceName(name)) out[name] = [...new Set(interfaceMethods(r, object).map(m => m.name))].sort();
     return out;
   };
-  const coerce = (type, value) => {
+  // Chromium's Java bridge (gin_java_bridge: CoerceJavaScript*ToJavaValue). It does not follow LiveConnect where that would guess: a number becomes a boolean false, a string
+  // becomes the number 0, undefined becomes the String "undefined" (null stays null) and so does any object; numbers saturate into int and long and are then narrowed.
+  const wired = value => (value !== null && typeof value === 'object' ? (value.u ? 'undefined' : Array.isArray(value.a) ? 'array' : 'object') : value === null ? 'null' : typeof value);
+  const toInt = number => (Number.isNaN(number) ? 0 : Math.max(-2147483648, Math.min(2147483647, Math.trunc(number))));
+  const numberText = number => (Number.isInteger(number) ? String(number) : Number.isFinite(number) ? String(Number(number.toPrecision(6))) : Number.isNaN(number) ? 'NaN' : number > 0 ? 'Inf' : '-Inf');
+  const coerce = (r, type, value) => {
+    const kind = wired(value);
     switch (type) {
-      case 'Z': return value === true || (typeof value === 'number' && value !== 0) || (typeof value === 'string' && value !== '' && value !== 'false') ? 1 : 0;
-      case 'B': case 'S': case 'I': return Number.isFinite(Number(value)) ? Math.trunc(Number(value)) | 0 : 0;
-      case 'C': return typeof value === 'string' ? (value.charCodeAt(0) || 0) : Math.trunc(Number(value) || 0) & 0xffff;
-      case 'J': return BigInt.asIntN(64, BigInt(Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : 0));
-      case 'F': return floatBits(Number(value) || 0);
-      case 'D': return doubleBits(Number(value) || 0);
-      case STRING: return value === null || value === undefined ? null : String(value);
-      default: return null;   // JS objects are not passed into Java (Android: null)
+      case 'Z': return value === true ? 1 : 0;
+      case 'B': return kind === 'number' ? (toInt(value) << 24) >> 24 : 0;
+      case 'S': return kind === 'number' ? (toInt(value) << 16) >> 16 : 0;
+      case 'I': return kind === 'number' ? toInt(value) : 0;
+      case 'C': return kind === 'number' && Number.isInteger(value) ? value & 0xffff : 0;
+      case 'J': return kind === 'number' && !Number.isNaN(value) ? BigInt.asIntN(64, BigInt(Math.trunc(Math.max(-9223372036854775808, Math.min(9223372036854775807, value))))) : 0n;
+      case 'F': return floatBits(kind === 'number' ? value : 0);
+      case 'D': return doubleBits(kind === 'number' ? value : 0);
+      case STRING:   // a String parameter takes the text of any value; null stays null; undefined, objects and arrays are "undefined" (Chromium, not LiveConnect's toString)
+        if (kind === 'string') return value; if (kind === 'null') return null;
+        return kind === 'number' ? numberText(value) : kind === 'boolean' ? String(value) : 'undefined';
+      default: {
+        if (kind !== 'array' || type[0] !== '[' || !(/^\[[ZBSIJFDC]$/.test(type) || type === `[${STRING}`)) return null;   // a Java object or an array of them cannot be made from a JavaScript value
+        const element = type.slice(1), array = r.newArray(type, value.a.length), converted = value.a.map(item => coerce(r, element, item));
+        r.array(array).elements = element === 'F' ? converted : element === 'D' ? converted.map(bits => BigInt.asIntN(64, typeof bits === 'bigint' ? bits : BigInt(bits))) : converted;
+        return array;
+      }
     }
   };
   /**
@@ -431,7 +536,7 @@ export function createWebViewHost(platform) {
     const candidates = interfaceMethods(r, object).filter(m => m.name === method && m.parameters.length === args.length);
     if (!candidates.length) return { called: false };
     const target = candidates[0];
-    try { r.dispatch(target, r.argumentWords(target.parameters, target.parameters.map((p, i) => coerce(p, args[i])), { receiver: object }), 'virtual'); }
+    try { r.dispatch(target, r.argumentWords(target.parameters, target.parameters.map((p, i) => coerce(r, p, args[i])), { receiver: object }), 'virtual'); }
     catch (error) { if (error?.name === 'JavaException') return { called: true, result: target.result, error: r.object(error.value).type }; throw error; }
     return { called: true, result: target.result };
   };
@@ -442,6 +547,85 @@ export function createWebViewHost(platform) {
   };
   const jsResult = (r, prompt = false) => { const ref = r.allocate(prompt ? JS_PROMPT : JS_RESULT); return ref; };
 
+  // ---- requests of a document that only the app can answer (the page bridge reports them; `done` carries the app's answer back) -----------------------------------------------------
+  const GEO_CALLBACK = 'Landroid/webkit/GeolocationPermissions$Callback;', LAB_GEO_CALLBACK = 'Llab/webkit/LabGeolocationCallback;', PERMISSION = 'Landroid/webkit/PermissionRequest;', LAB_PERMISSION = 'Llab/webkit/LabPermissionRequest;',
+    CHOOSER = 'Landroid/webkit/WebChromeClient$FileChooserParams;', LAB_CHOOSER = 'Llab/webkit/LabFileChooserParams;', LAB_CALLBACK = 'Llab/webkit/LabValueCallback;', INTENT = 'Landroid/content/Intent;', URI_T = 'Landroid/net/Uri;';
+  type(GEO_CALLBACK, OBJECT); type(LAB_GEO_CALLBACK, OBJECT, [GEO_CALLBACK], { allocatable: true }); type(PERMISSION, OBJECT); type(LAB_PERMISSION, PERMISSION, [], { allocatable: true });
+  type(CHOOSER, OBJECT); type(LAB_CHOOSER, CHOOSER, [], { allocatable: true }); type(LAB_CALLBACK, OBJECT, [CALLBACK], { allocatable: true });
+  const settle = (r, ref, ...values) => { const o = r.object(ref); if (o.settled) return; o.settled = true; o.done?.(...values); };
+  /** navigator.geolocation: a stored decision of GeolocationPermissions answers at once; otherwise WebChromeClient.onGeolocationPermissionsShowPrompt decides (a client that never invokes the callback leaves the page waiting, as on Android). */
+  const geolocationPrompt = (r, self, state, origin, done) => {
+    if (!settingsOf(r, self) || !setting(r, state.settings, 'GeolocationEnabled')) { done(false); return; }
+    if (profile.origins.has(origin)) { done(profile.origins.get(origin) === true); return; }
+    const ref = r.makeObject(LAB_GEO_CALLBACK); r.object(ref).done = (allow, retain) => { if (retain) profile.origins.set(origin, !!allow); done(!!allow); };
+    chromeCall(r, state, 'onGeolocationPermissionsShowPrompt', [STRING, GEO_CALLBACK], 'V', [origin, ref]);
+  };
+  def(LAB_GEO_CALLBACK, 'invoke', `(${STRING}ZZ)V`, (r, _m, [self, , allow, retain]) => settle(r, self, !!allow, !!retain));
+  /** getUserMedia: WebChromeClient.onPermissionRequest decides; a client that does not override it denies (AOSP's default calls request.deny()). */
+  const RESOURCES = { video: 'android.webkit.resource.VIDEO_CAPTURE', audio: 'android.webkit.resource.AUDIO_CAPTURE' };
+  const permissionRequest = (r, self, state, origin, kinds, done) => {
+    const ref = r.makeObject(LAB_PERMISSION), o = r.object(ref); o.origin = origin; o.resources = kinds.filter(kind => RESOURCES[kind]).map(kind => RESOURCES[kind]); o.done = done;
+    if (isNull(state.chrome)) { settle(r, ref, false); return; }
+    chromeCall(r, state, 'onPermissionRequest', [PERMISSION], 'V', [ref]);
+  };
+  for (const [name, value] of [['RESOURCE_VIDEO_CAPTURE', RESOURCES.video], ['RESOURCE_AUDIO_CAPTURE', RESOURCES.audio], ['RESOURCE_PROTECTED_MEDIA_ID', 'android.webkit.resource.PROTECTED_MEDIA_ID'], ['RESOURCE_MIDI_SYSEX', 'android.webkit.resource.MIDI_SYSEX']]) registry.staticField(PERMISSION, name, STRING, () => value);
+  def(PERMISSION, '<init>', '()V', () => undefined);
+  def(LAB_PERMISSION, 'getOrigin', `()${URI_T}`, (r, _m, [self]) => uriOf(r, r.object(self).origin));
+  def(LAB_PERMISSION, 'getResources', `()[${STRING}`, (r, _m, [self]) => { const list = r.object(self).resources, a = r.newArray(`[${STRING}`, list.length); r.array(a).elements = [...list]; return a; });
+  def(LAB_PERMISSION, 'grant', `([${STRING})V`, (r, _m, [self, resources]) => settle(r, self, !isNull(resources) && r.array(resources).elements.length > 0));
+  def(LAB_PERMISSION, 'deny', '()V', (r, _m, [self]) => settle(r, self, false));
+  /**
+   * <input type=file>: WebChromeClient.onShowFileChooser picks. The app answers the ValueCallback with content Uris (usually from the device's document picker); their bytes are read
+   * through the app's ContentResolver and handed to the input. A client that returns false, or answers null, selects nothing.
+   */
+  const MAX_CHOSEN_BYTES = 16 * 1024 * 1024;
+  const fileChooser = (r, self, state, { accept, multiple, capture }, done) => {
+    const params = r.makeObject(LAB_CHOOSER); Object.assign(r.object(params), { accept: accept.split(',').map(t => t.trim()).filter(Boolean), multiple, capture });
+    const callback = r.makeObject(LAB_CALLBACK);
+    r.object(callback).done = uris => {
+      const files = [];
+      if (!isNull(uris)) {
+        const context = call(r, self, VIEW, 'getContext', [], CONTEXT, []), resolver = call(r, context, CONTEXT, 'getContentResolver', [], 'Landroid/content/ContentResolver;', []);
+        for (const uri of r.array(uris).elements.slice(0, multiple ? 32 : 1)) {
+          if (isNull(uri)) continue;
+          const stream = call(r, resolver, 'Landroid/content/ContentResolver;', 'openInputStream', [URI_T], INPUT_STREAM, [uri]); if (isNull(stream)) continue;
+          const read = readResponseBytes(r, stream, MAX_CHOSEN_BYTES); if (read.tooLarge) { r.record(`LOG W chromium: a chosen file is larger than ${MAX_CHOSEN_BYTES} bytes and was not handed to the page`); continue; }
+          const type = call(r, resolver, 'Landroid/content/ContentResolver;', 'getType', [URI_T], STRING, [uri]), name = call(r, uri, URI_T, 'getLastPathSegment', [], STRING, []);
+          const text = v => (isNull(v) ? '' : typeof v === 'string' ? v : r.stringCharacters(v));
+          files.push({ name: text(name).split('/').pop() || 'file', type: text(type), bytes: read.bytes });
+        }
+      }
+      done(files);
+    };
+    const handled = chromeCall(r, state, 'onShowFileChooser', [WEBVIEW, CALLBACK, CHOOSER], 'Z', [self, callback, params]);
+    if (!handled) settle(r, callback, null);
+  };
+  def(LAB_CALLBACK, 'onReceiveValue', `(${OBJECT})V`, (r, _m, [self, value]) => settle(r, self, value));
+  for (const [name, value] of [['MODE_OPEN', 0], ['MODE_OPEN_MULTIPLE', 1], ['MODE_OPEN_FOLDER', 2], ['MODE_SAVE', 3]]) registry.staticField(CHOOSER, name, 'I', () => value);
+  def(CHOOSER, '<init>', '()V', () => undefined);
+  def(LAB_CHOOSER, 'getMode', '()I', (r, _m, [self]) => (r.object(self).multiple ? 1 : 0));
+  def(LAB_CHOOSER, 'getAcceptTypes', `()[${STRING}`, (r, _m, [self]) => { const list = r.object(self).accept, a = r.newArray(`[${STRING}`, list.length); r.array(a).elements = [...list]; return a; });
+  def(LAB_CHOOSER, 'isCaptureEnabled', '()Z', (r, _m, [self]) => (r.object(self).capture ? 1 : 0));
+  def(LAB_CHOOSER, 'getTitle', '()Ljava/lang/CharSequence;', () => null); def(LAB_CHOOSER, 'getFilenameHint', `()${STRING}`, () => null);
+  // Chromium's FileChooserParams.createIntent: ACTION_GET_CONTENT, openable, the first accepted type (or */*), every accepted type as EXTRA_MIME_TYPES, EXTRA_ALLOW_MULTIPLE
+  def(LAB_CHOOSER, 'createIntent', `()${INTENT}`, (r, _m, [self]) => {
+    const o = r.object(self), intent = r.allocate(INTENT), mimes = o.accept.filter(t => t.includes('/'));
+    r.dispatch({ owner: INTENT, name: '<init>', parameters: [STRING], result: 'V', signature: `(${STRING})V` }, [intent, 'android.intent.action.GET_CONTENT'], 'direct');
+    call(r, intent, INTENT, 'addCategory', [STRING], INTENT, ['android.intent.category.OPENABLE']); call(r, intent, INTENT, 'setType', [STRING], INTENT, [mimes[0] ?? '*/*']);
+    if (mimes.length > 1) { const a = r.newArray(`[${STRING}`, mimes.length); r.array(a).elements = [...mimes]; call(r, intent, INTENT, 'putExtra', [STRING, `[${STRING}`], INTENT, ['android.intent.extra.MIME_TYPES', a]); }
+    if (o.multiple) call(r, intent, INTENT, 'putExtra', [STRING, 'Z'], INTENT, ['android.intent.extra.ALLOW_MULTIPLE', 1]);
+    return intent;
+  });
+  // FileChooserParams.parseResult (AOSP): RESULT_OK with data -> the Uri of the Intent, or every Uri of its ClipData
+  def(CHOOSER, 'parseResult', `(I${INTENT})[${URI_T}`, (r, _m, [resultCode, intent]) => {
+    if (resultCode !== -1 || isNull(intent)) return null;
+    const uris = [], data = call(r, intent, INTENT, 'getData', [], URI_T, []), clip = call(r, intent, INTENT, 'getClipData', [], 'Landroid/content/ClipData;', []);
+    if (!isNull(data)) uris.push(data);
+    else if (!isNull(clip)) { const count = call(r, clip, 'Landroid/content/ClipData;', 'getItemCount', [], 'I', []); for (let i = 0; i < count; i++) { const uri = call(r, call(r, clip, 'Landroid/content/ClipData;', 'getItemAt', ['I'], 'Landroid/content/ClipData$Item;', [i]), 'Landroid/content/ClipData$Item;', 'getUri', [], URI_T, []); if (!isNull(uri)) uris.push(uri); } }
+    if (!uris.length) return null;
+    const a = r.newArray(`[${URI_T}`, uris.length); r.array(a).elements = uris; return a;
+  }, { static: true });
+
   return {
     ...registry, interfaces: registry.interfacesOf,
     /** The platform's view kind for a WebView (device-view.js renders it as an iframe slot). */
@@ -449,9 +633,10 @@ export function createWebViewHost(platform) {
     /** Snapshot payload of a WebView node: what the page needs to drive its iframe and what a diagnostic shows. */
     nodeState(r, object) {
       const s = object.webview; if (!s) return null;
-      return { webviewId: s.id, url: s.url, loading: s.loading, progress: s.progress, canGoBack: s.index > 0, canGoForward: s.index >= 0 && s.index < s.history.length - 1, javascript: !!s.settings && !!r.object(s.settings).values.get('JavaScriptEnabled'), backend: !!backend() };
+      return { webviewId: s.id, url: s.url, loading: s.loading, progress: s.progress, canGoBack: s.index > 0, canGoForward: s.index >= 0 && s.index < s.history.length - 1, javascript: !!s.settings && !!r.object(s.settings).values.get('JavaScriptEnabled'), backend: !!backend(),
+        document: !s.bridge || s.bridge.blank ? 'blank' : s.bridge.scriptable ? 'scriptable' : 'opaque' };
     },
     /** For the backend (phase 1): state access and the Android callbacks it triggers. */
-    internals: { interfaceDescriptors, interfaceMethods, invokeInterface, consoleMessage, jsResult, stateOf, postMain, clientCall, chromeCall, requestObject, errorObject, pushHistory, failLoad, settingsOf, setting, levelValue, uriOf, historyItem, unavailable, staticCall, call, overridesIntercept, intercept },
+    internals: { geolocationPrompt, permissionRequest, fileChooser, unsupported, interfaceDescriptors, interfaceMethods, invokeInterface, consoleMessage, jsResult, stateOf, postMain, clientCall, chromeCall, requestObject, errorObject, pushHistory, failLoad, settingsOf, setting, levelValue, uriOf, historyItem, unavailable, staticCall, call, overridesIntercept, intercept },
   };
 }

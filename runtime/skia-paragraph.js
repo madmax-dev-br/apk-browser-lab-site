@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=a9e9656b8d6c';
+import { APKError } from './apk-runtime.js?v=0d5a397ebb41';
 
 const fail = message => { throw new APKError(message, { kind: 'skia-paragraph-unsupported' }); };
 const fontWeightOf = (CK, weight) => { if(!Number.isInteger(weight)||weight<0||weight>1000)fail('Font weight must be in [0,1000]'); return Object.values(CK.FontWeight).find(value=>value?.value===weight)??{value:weight}; };
@@ -33,8 +33,12 @@ export function measureSkiaParagraph(backend, text, { width, textSize = 14, weig
   const argb = color >>> 0;
   const textStyle = { color: CK.Color(argb >>> 16 & 255, argb >>> 8 & 255, argb & 255, (argb >>> 24) / 255), fontFamilies: familiesOf(families), fontSize: textSize, ...variationsOf(fontVariations),
     fontStyle: { weight: fontWeight, width: CK.FontWidth.Normal, slant: italic ? CK.FontSlant.Italic : CK.FontSlant.Upright } };
-  const style = new CK.ParagraphStyle({ ...(maxLines === null ? {} : { maxLines }), ...(ellipsis ? { ellipsis } : {}), textDirection: direction ? CK.TextDirection.RTL : CK.TextDirection.LTR, textAlign: {start:CK.TextAlign.Start,left:CK.TextAlign.Left,right:CK.TextAlign.Right,center:CK.TextAlign.Center}[alignment], textStyle });
   const itemized = itemizeFonts(backend, text, weight, italic);
+  // Android's Roboto is one variable font: every weight and slant has the vertical metrics of the regular face (hhea 1900 / -500 in 2048 units). The pinned bold / medium / italic
+  // faces here are separate static files whose own ascent / descent are larger, which would make a line of medium text taller than a line of regular text. For text set in Roboto
+  // alone (no app font, no fallback run) the line box therefore comes from the regular face, as a strut; the glyphs still come from the requested face.
+  const regularBox = !itemized && !families && (fontWeight.value !== 400 || italic) ? { strutStyle: { strutEnabled: true, forceStrutHeight: true, fontFamilies: ['Roboto'], fontSize: textSize, fontStyle: { weight: fontWeightOf(CK, 400), width: CK.FontWidth.Normal, slant: CK.FontSlant.Upright } } } : {};
+  const style = new CK.ParagraphStyle({ ...(maxLines === null ? {} : { maxLines }), ...(ellipsis ? { ellipsis } : {}), ...regularBox, textDirection: direction ? CK.TextDirection.RTL : CK.TextDirection.LTR, textAlign: {start:CK.TextAlign.Start,left:CK.TextAlign.Left,right:CK.TextAlign.Right,center:CK.TextAlign.Center}[alignment], textStyle });
   let builder, paragraph;
   try {
     builder = makeParagraphBuilder(backend, CK, style, itemized, !!families);

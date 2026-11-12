@@ -20,7 +20,26 @@ export function createDeviceZoom({ stage, deviceState, refit, shownScale, doc = 
   const out = button('−', 'Diminuir o dispositivo'), value = button('Ajustar', 'Ajustar ao espaço'), into = button('+', 'Aumentar o dispositivo');
   stage.parentElement?.insertBefore(box, stage);
   deviceState.zoom = readZoom();
-  const apply = zoom => { deviceState.zoom = zoom; writeZoom(zoom); refit(); sync(); };
+  // Keeps the point at the centre of what is visible where it was when the zoom changes (the device grows or shrinks around what you were looking at).
+  const apply = zoom => {
+    const cx = (stage.scrollLeft + stage.clientWidth / 2) / Math.max(1, stage.scrollWidth), cy = (stage.scrollTop + stage.clientHeight / 2) / Math.max(1, stage.scrollHeight);
+    deviceState.zoom = zoom; writeZoom(zoom); refit(); sync();
+    stage.scrollLeft = cx * stage.scrollWidth - stage.clientWidth / 2; stage.scrollTop = cy * stage.scrollHeight - stage.clientHeight / 2;
+  };
+  // Middle-button drag moves the device around the stage when it is larger than the stage (over the device too: the middle button never reaches the app). Wheel and the
+  // scrollbars scroll the stage as usual outside the device; over the device the wheel belongs to the app.
+  let pan = null;
+  stage.addEventListener('pointerdown', event => {
+    if (event.button !== 1 || (stage.scrollWidth <= stage.clientWidth && stage.scrollHeight <= stage.clientHeight)) return;
+    event.preventDefault(); event.stopPropagation();   // no browser auto-scroll, no tap for the app
+    pan = { id: event.pointerId, x: event.clientX, y: event.clientY, left: stage.scrollLeft, top: stage.scrollTop }; stage.dataset.panning = 'true';
+    try { stage.setPointerCapture(event.pointerId); } catch { /* released already */ }
+  }, true);
+  stage.addEventListener('pointermove', event => { if (!pan || event.pointerId !== pan.id) return; event.preventDefault(); event.stopPropagation(); stage.scrollLeft = pan.left - (event.clientX - pan.x); stage.scrollTop = pan.top - (event.clientY - pan.y); }, true);
+  const end = event => { if (!pan || event.pointerId !== pan.id) return; event.stopPropagation(); pan = null; delete stage.dataset.panning; try { stage.releasePointerCapture(event.pointerId); } catch { /* gone */ } };
+  stage.addEventListener('pointerup', end, true); stage.addEventListener('pointercancel', end, true);
+  stage.addEventListener('mousedown', event => { if (event.button === 1) event.preventDefault(); }, true);   // Windows/Linux middle-click auto-scroll
+  stage.addEventListener('auxclick', event => { if (event.button === 1) { event.preventDefault(); event.stopPropagation(); } }, true);
   out.addEventListener('click', () => apply(nextZoom(shownScale(), -1)));
   into.addEventListener('click', () => apply(nextZoom(shownScale(), +1)));
   value.addEventListener('click', () => apply(null));

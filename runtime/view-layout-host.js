@@ -1,7 +1,7 @@
-import { APKError } from './apk-runtime.js?v=a9e9656b8d6c';
-import { breakParagraphs } from './text-layout-native.js?v=a9e9656b8d6c';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=a9e9656b8d6c';
-import { gcRoot, ephemeronMap } from './heap-gc.js?v=a9e9656b8d6c';
+import { APKError } from './apk-runtime.js?v=0d5a397ebb41';
+import { breakParagraphs } from './text-layout-native.js?v=0d5a397ebb41';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=0d5a397ebb41';
+import { gcRoot, ephemeronMap } from './heap-gc.js?v=0d5a397ebb41';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -100,6 +100,23 @@ export function createViewLayoutHost(platform) {
     const right = longest(n => width(line.slice(line.length - n)), avail / 2), rest = avail - width(line.slice(line.length - right));
     return line.slice(0, longest(n => width(line.slice(0, n)), rest)) + ellipsis + line.slice(line.length - right);
   };
+  /** The colour the measured paragraph is rasterized with: the TextView's current text colour (its own or its theme's); the neutral grey only when no theme resolves one. */
+  const paragraphColor = (runtime, receiver) => {
+    const view = runtime.object(receiver);
+    if (view.textColor != null) return typeof view.textColor === 'string' ? parseInt(view.textColor.replace('#', ''), 16) : view.textColor;
+    try { const color = platform.composeCanvasHost?.textColor?.(runtime, receiver); return color == null ? 0xff757575 : color >>> 0; }
+    catch (error) { if (error?.name === 'JavaException') throw error; return 0xff757575; }
+  };
+  /** Layout.Alignment of the paragraph from the horizontal part of TextView.getGravity (the view's own, or its style's: a Button's text is centred). */
+  const textGravity = (runtime, receiver) => { const view = runtime.object(receiver); if (view.gravity != null) return view.gravity; try { return platform.composeCanvasHost?.textGravity?.(runtime, receiver) ?? 0x800033; } catch (error) { if (error?.name === 'JavaException') throw error; return 0x800033; } };
+  const paragraphAlignment = (runtime, receiver) => { const view = runtime.object(receiver), gravity = textGravity(runtime, receiver), rtl = view.layoutDirection === 1, horizontal = gravity & 0x800007; return (horizontal & 7) === 1 ? 'center' : horizontal === 0x800005 ? (rtl ? 'left' : 'right') : horizontal === 5 ? 'right' : horizontal === 3 ? 'left' : 'start'; };
+  /** TextView.getVerticalOffset(true): the space the vertical gravity leaves above the laid-out text inside the measured box (0 for Gravity.TOP or when the text fills the box). */
+  const textVerticalOffset = (runtime, receiver) => {
+    const view = runtime.object(receiver); if (view.textBlockHeight == null) return 0;
+    const vertical = textGravity(runtime, receiver) & 0x70; if (vertical === 0x30) return 0;
+    const box = ((view.measuredHeight || 0) & SIZE) - (view.textBoxPadding || 0), text = view.textBlockHeight;
+    return text >= box ? 0 : vertical === 0x50 ? box - text : (box - text) >> 1;
+  };
   const nativeTextMeasure = (runtime, receiver, wSpec, hSpec) => {
     if (!runtime.skia?.measureText) fail('Native text measurement requires the verified Skia CPU font backend');
     const switchState = platform.drawableViewHost.measureSwitch?.(runtime, receiver);
@@ -121,7 +138,7 @@ export function createViewLayoutHost(platform) {
     let textHeight = bottom - top + (lines.length - 1) * lineHeight, textWidth = Math.ceil(Math.max(...runs.map(run => run.width)));
     const extents = platform.textViewApi.compoundExtents(runtime, receiver);   // TextView.onMeasure: the left / right drawables set a minimum height, the top / bottom ones a minimum width
     if (extents) { textHeight = Math.max(textHeight, extents.leftHeight, extents.rightHeight); textWidth = Math.max(textWidth, extents.topWidth, extents.bottomWidth); }
-    let height = textHeight + (padding.top || 0) + (padding.bottom || 0), width = textWidth + (padding.left || 0) + (padding.right || 0);
+    let height = textHeight + (padding.top || 0) + (padding.bottom || 0), width = textWidth + (padding.left || 0) + (padding.right || 0), blockHeight = bottom - top + (lines.length - 1) * lineHeight;
     view.textRaster = null; view.textParagraph = null;
     let paragraph = null;
     view.textBreakText = null;
@@ -132,11 +149,16 @@ export function createViewLayoutHost(platform) {
       // Layout.BREAK_STRATEGY_HIGH_QUALITY / BALANCED: Minikin's optimal breaker decides the lines, SkParagraph then lays out one hard line per entry
       const strategy = platform.textViewApi.breakStrategy(runtime, receiver), brokenText = strategy > 0 && !text.includes('\t') ? breakParagraphs(runtime, text, { textSize: font.textSize, weight: info.weight, italic: info.italic, locale: 'en-US' }, contentWidth, strategy, platform.textViewApi.hyphenationFrequency(runtime, receiver)).join('\n') : null;
       if (brokenText !== null) view.textBreakText = brokenText;
-      paragraph = measureSkiaParagraph(runtime.skia, brokenText ?? text, { width: contentWidth, textSize: font.textSize, weight: info.weight, italic: info.italic, families: info.families ?? null, fontVariations: info.fontVariations ?? null, direction: view.layoutDirection || 0, maxLines: view.maxLines ?? null, ellipsis: where === 'END' && view.maxLines != null ? '\u2026' : null, color: view.textColor == null ? 0xff757575 : typeof view.textColor === 'string' ? parseInt(view.textColor.replace('#', ''), 16) : view.textColor, raster: true });
+      paragraph = measureSkiaParagraph(runtime.skia, brokenText ?? text, { width: contentWidth, textSize: font.textSize, weight: info.weight, italic: info.italic, families: info.families ?? null, fontVariations: info.fontVariations ?? null, direction: view.layoutDirection || 0, maxLines: view.maxLines ?? null, ellipsis: where === 'END' && view.maxLines != null ? '\u2026' : null, color: paragraphColor(runtime, receiver), alignment: paragraphAlignment(runtime, receiver), raster: true });
       width = paragraphWidth;
-      height = Math.ceil(paragraph.height) + (padding.top || 0) + (padding.bottom || 0);
+      // StaticLayout with includeFontPadding: the first line starts at the font's top instead of its ascent and the last one ends at its bottom instead of its descent.
+      // Roboto's line box is the regular face's at every weight (see measureSkiaParagraph); an app font brings its own.
+      const box = info.custom ? metrics : runtime.skiaHost.measureText('', { textSize: font.textSize, flags: 1 }).metrics;
+      const padTop = includePadding ? Math.max(0, Math.round(box.ascent) - Math.floor(box.bounds[1])) : 0, padBottom = includePadding ? Math.max(0, Math.ceil(box.bounds[3]) - Math.round(box.descent)) : 0;
+      blockHeight = Math.ceil(paragraph.height) + padTop + padBottom;
+      height = blockHeight + (padding.top || 0) + (padding.bottom || 0);
       view.textRaster = paragraph.raster;
-      const { raster, ...metrics } = paragraph; view.textParagraph = metrics;
+      const { raster, ...rest } = paragraph; view.textParagraph = { ...rest, padTop, padBottom };
     }
     if (view.minLines != null) {
       if (!Number.isInteger(view.minLines) || view.minLines < 0 || view.minLines > 1024) fail('Native text minimum lines exceeds the supported 0..1024 range');
@@ -158,7 +180,8 @@ export function createViewLayoutHost(platform) {
     if (switchState && (resolvedHeight & SIZE) < switchState.switchHeight) resolvedHeight = switchState.switchHeight;
     measured(runtime, receiver, algorithm(runtime, ALGORITHMS, 'resolveSizeAndState', '(III)I', [Math.max(width, minWidth), wSpec, 0]), resolvedHeight);
     view.textBaseline = (padding.top || 0) - top; view.textLineHeight = Math.max(lineHeight, bottom - top); view.textMetrics = { width, height, baseline: view.textBaseline, lineHeight: view.textLineHeight, fontSize: font.textSize, glyphCount: runs.reduce((sum, run) => sum + run.glyphCount, 0), source: runs[0].source, scope: 'simple Latin; no paragraph shaping/fallback' };
-    if (paragraph) { view.textBaseline = (padding.top || 0) + Math.round(paragraph.baseline); view.textMetrics = { ...view.textMetrics, width, height, baseline: view.textBaseline, source: paragraph.source, scope: paragraph.scope, lineCount: paragraph.lineCount }; }
+    view.textBlockHeight = blockHeight; view.textBoxPadding = (padding.top || 0) + (padding.bottom || 0);   // what TextView.getVerticalOffset needs: the height of the laid-out text and the padding around its box
+    if (paragraph) { view.textBaseline = (padding.top || 0) + view.textParagraph.padTop + Math.round(paragraph.baseline); view.textMetrics = { ...view.textMetrics, width, height, baseline: view.textBaseline, source: paragraph.source, scope: paragraph.scope, lineCount: paragraph.lineCount }; }
     runtime.record(paragraph ? 'MEASURE native paragraph: official SkParagraph/Roboto + original AOSP size constraints' : 'MEASURE native text: actual Skia/Roboto glyph metrics + original AOSP size constraints');
   };
   return {
@@ -215,7 +238,7 @@ export function createViewLayoutHost(platform) {
       if (name === 'getPaddingStart' || name === 'getPaddingEnd') return view.padding?.[name === 'getPaddingStart' ? view.layoutDirection === 1 ? 'right' : 'left' : view.layoutDirection === 1 ? 'left' : 'right'] || 0;
       if (name === 'addOnLayoutChangeListener') { const list = view.layoutListeners ||= []; if (!list.some(ref => ref.ref === args[1]?.ref)) list.push(args[1]); return; }
       if (name === 'removeOnLayoutChangeListener') { view.layoutListeners = (view.layoutListeners || []).filter(ref => ref.ref !== args[1]?.ref); return; }
-      if (name === 'getBaseline') { if (runtime.isSubtype(view.type, 'Landroid/widget/TextView;')) { return view.textBaseline ?? -1; /* TextView.getBaseline: with no Layout yet (not measured) it is View.getBaseline(), -1; ConstraintLayout/LinearLayout ask before the child's first measure */ } return -1; }
+      if (name === 'getBaseline') { if (runtime.isSubtype(view.type, 'Landroid/widget/TextView;')) { return view.textBaseline == null ? -1 : view.textBaseline + textVerticalOffset(runtime, receiver); /* TextView.getBaseline: getBaselineOffset() (the padding plus the vertical gravity offset in the measured box) + the first line's baseline; with no Layout yet (not measured) it is View.getBaseline(), -1; ConstraintLayout/LinearLayout ask before the child's first measure */ } return -1; }
       if (name.startsWith('getMeasured')) { if (name === 'getMeasuredState') return ((view.measuredWidth || 0) & STATE) | (((view.measuredHeight || 0) >> 16) & (STATE >> 16)); const value = name.includes('Width') ? view.measuredWidth || 0 : view.measuredHeight || 0; return name.endsWith('AndState') ? value : value & SIZE; }
       if (['setLeft', 'setTop', 'setRight', 'setBottom'].includes(name)) {   // View.setLeft/..: move one edge of the frame (Compose's ripple host view), invalidate, notify a size change
         const bounds = view.bounds ||= { left: 0, top: 0, right: 0, bottom: 0 }, edge = name.slice(3).toLowerCase(), value = args[1] | 0;
