@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=bc091d1ae253") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=bc091d1ae253">
-  <link rel="stylesheet" href="./lab-theme.css?v=bc091d1ae253">
-  <meta name="apk-browser-build" content="bc091d1ae253">
+  <style>@import url("./styles.css?v=e91f6eb1377f") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=e91f6eb1377f">
+  <link rel="stylesheet" href="./lab-theme.css?v=e91f6eb1377f">
+  <meta name="apk-browser-build" content="e91f6eb1377f">
 </head>
 <body>
   <header class="topbar">
@@ -108,6 +108,15 @@
               <ul id="files-list" class="files-list" aria-labelledby="cp-files-title" hidden></ul>
               <p id="files-note" class="cp-note" role="status" aria-live="polite"></p>
               <button id="files-clear" class="cp-button" type="button" disabled>Remover todos</button>
+            </div></details>
+            <details class="cp-group" id="cp-sec-camera" data-section="camera">
+              <summary><h3 id="cp-camera-title">Câmera</h3><span id="cam-summary" class="cp-badge">padrão de teste</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <label class="cp-field" for="cam-source"><span>O que as câmeras veem<small>Vale para a traseira (0) e a frontal (1, prévia espelhada); troca na hora</small></span><select id="cam-source" aria-describedby="cam-note"><option value="pattern">Padrão de teste gerado</option><option value="webcam">Webcam do computador</option><option value="image">Imagem do computador…</option><option value="video">Vídeo do computador…</option></select></label>
+              <input id="cam-file" type="file" hidden>
+              <div class="cam-monitor-row"><canvas id="cam-monitor" class="cam-monitor" width="150" height="200" role="img" aria-label="O que as câmeras do dispositivo veem agora"></canvas><p id="cam-label" class="cp-note" role="status" aria-live="polite"></p></div>
+              <p id="cam-error" class="cp-note cam-error" role="alert" hidden></p>
+              <p id="cam-status" class="cp-note" role="status"></p>
+              <p id="cam-note" class="cp-note">A webcam só é pedida ao navegador quando você a escolhe aqui (o aviso de permissão é o do próprio navegador). <b>Os quadros ficam no navegador</b>: vão da página para a VM, que roda nesta aba, e nada é enviado para fora. Com uma imagem ou um vídeo, o arquivo também é lido só aqui. O app ainda precisa da permissão <code>CAMERA</code> (seção Permissões) para abrir a câmera.</p>
             </div></details>
             <details class="cp-group" id="cp-sec-run" data-section="run">
               <summary><h3 id="cp-run-title">Execução</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
@@ -252,7 +261,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=bc091d1ae253"></script>
+  <script type="module" src="./app.js?v=e91f6eb1377f"></script>
   <script>
   // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
   // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.

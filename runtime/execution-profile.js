@@ -1,4 +1,4 @@
-import { foldDirectCalls } from './interpreter.js?v=bc091d1ae253';
+import { foldDirectCalls } from './interpreter.js?v=e91f6eb1377f';
 // What a long-running event was doing, for the error report of an instruction-budget or wall-clock failure (and for "Copiar diagnóstico"): a cheap sampling profile that starts only once an event has run
 // PROFILE_AFTER instructions on one thread, or a tenth of the per-event budget when that is smaller (so ordinary short events pay one comparison per scheduling quantum). From then on, at every scheduling tick (QUANTUM instructions) the running thread's innermost
 // methods are sampled (self share and the distinct stacks), the per-method invocation counters the VM already keeps (methodEvidence) are compared with a snapshot taken at the start, and host-bridge calls

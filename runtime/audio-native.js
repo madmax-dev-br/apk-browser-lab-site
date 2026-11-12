@@ -1,6 +1,6 @@
-import { Blocked } from './scheduler.js?v=bc091d1ae253';
-import { bitsFloat } from './host-contract.js?v=bc091d1ae253';
-import { readNativeBytes } from './unsafe-native.js?v=bc091d1ae253';
+import { Blocked } from './scheduler.js?v=e91f6eb1377f';
+import { bitsFloat } from './host-contract.js?v=e91f6eb1377f';
+import { readNativeBytes } from './unsafe-native.js?v=e91f6eb1377f';
 
 // The mixer behind android.media.AudioTrack (framework-aosp/lab-java/android/media/AudioTrack.java): one software track per Java AudioTrack.
 //   * written PCM is converted to float32 and queued (stream mode) or kept in the static buffer (static mode);

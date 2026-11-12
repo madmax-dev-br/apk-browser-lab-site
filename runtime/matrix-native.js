@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=bc091d1ae253';
+import { APKError } from './apk-error.js?v=e91f6eb1377f';
 const MATRIX = 'Landroid/graphics/Matrix;', RECT = 'Landroid/graphics/RectF;';
 const REGISTRY = 'Llibcore/util/NativeAllocationRegistry;', CLEANER = 'Lapkweb/bridge/MatrixCleaner;';
 const FINALIZER = 0x4d415452n;
@@ -97,6 +97,17 @@ export function createMatrixNativeBindings() {
     if (target.type !== '[F' || source.type !== '[F' || count < 0 || count > 524288 || srcIndex < 0 || dstIndex < 0 || srcIndex + size > source.elements.length || dstIndex + size > target.elements.length) fail('Invalid Matrix point buffer');
     const mapped = pointMap(runtime, get(runtime, handle), source.elements.slice(srcIndex, srcIndex + size).map(decode), !points);
     mapped.forEach((value, i) => { target.elements[dstIndex + i] = encode(value); });
+  });
+  // SkMatrix::setRectToRect (android-13.0.0_r1 external/skia/src/core/SkMatrix.cpp), single-precision like SkScalar; `fit` is Matrix.ScaleToFit.nativeInt: FILL 0, START 1, CENTER 2, END 3.
+  add('nSetRectToRect', ['J', RECT, RECT, 'I'], 'Z', (runtime, [handle, srcRef, dstRef, fit]) => {
+    const f = Math.fround, [sl, st, sr, sb] = readRect(runtime, srcRef), [dl, dt, dr, db] = readRect(runtime, dstRef), empty = (l, t, r, b) => !(l < r && t < b);
+    if (empty(sl, st, sr, sb)) { put(runtime, handle, identity()); return 0; }
+    if (empty(dl, dt, dr, db)) { put(runtime, handle, [0, 0, 0, 0, 0, 0, 0, 0, 1]); return 1; }
+    const sw = f(sr - sl), sh = f(sb - st), dw = f(dr - dl), dh = f(db - dt); let sx = f(dw / sw), sy = f(dh / sh), xLarger = false;
+    if (fit !== 0) { if (sx > sy) { xLarger = true; sx = sy; } else sy = sx; }
+    let tx = f(dl - f(sl * sx)), ty = f(dt - f(st * sy));
+    if (fit === 2 || fit === 3) { let diff = xLarger ? f(dw - f(sw * sy)) : f(dh - f(sh * sy)); if (fit === 2) diff = f(diff * 0.5); if (xLarger) tx = f(tx + diff); else ty = f(ty + diff); }
+    put(runtime, handle, [sx, 0, tx, 0, sy, ty, 0, 0, 1]); return 1;
   });
   add('nMapRect', ['J', RECT, RECT], 'Z', (runtime, [handle, dst, src]) => {
     const [left, top, right, bottom] = readRect(runtime, src), matrix = get(runtime, handle), points = pointMap(runtime, matrix, [left, top, right, top, right, bottom, left, bottom]);

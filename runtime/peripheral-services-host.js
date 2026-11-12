@@ -1,6 +1,7 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=bc091d1ae253';
-import { APKError } from './apk-error.js?v=bc091d1ae253';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=bc091d1ae253';
+import { bitsFloat, floatBits } from './host-contract.js?v=e91f6eb1377f';
+import { APKError } from './apk-error.js?v=e91f6eb1377f';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=e91f6eb1377f';
+import { installCameraManager } from './camera-host.js?v=e91f6eb1377f';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB
@@ -126,18 +127,8 @@ export function createPeripheralServicesHost(platform) {
   def(BLUETOOTH, 'getDevicesMatchingConnectionStates', `(I[I)${LIST}`, (r, _m, [, profile]) => { gattProfile(r, profile); return emptyList(r); });
   def(BLUETOOTH, 'getConnectionState', '(Landroid/bluetooth/BluetoothDevice;I)I', (r, _m, [, , profile]) => { gattProfile(r, profile); return 0; });
 
-  // ---- CameraManager: no cameras
-  const CAMERA = service('camera', 'Landroid/hardware/camera2/CameraManager;');
-  def(CAMERA, 'getCameraIdList', `()[${STRING}`, r => stringArray(r, []));
-  def(CAMERA, 'getConcurrentCameraIds', '()Ljava/util/Set;', r => construct(r, 'Ljava/util/HashSet;'));
-  def(CAMERA, 'registerAvailabilityCallback', '(Landroid/hardware/camera2/CameraManager$AvailabilityCallback;Landroid/os/Handler;)V', (r, _m, [, callback]) => { if (nullish(callback)) iae(r, 'callback must not be null'); });
-  def(CAMERA, 'unregisterAvailabilityCallback', '(Landroid/hardware/camera2/CameraManager$AvailabilityCallback;)V', (r, _m, [, callback]) => { if (nullish(callback)) iae(r, 'callback must not be null'); });
-  def(CAMERA, 'registerTorchCallback', '(Landroid/hardware/camera2/CameraManager$TorchCallback;Landroid/os/Handler;)V', (r, _m, [, callback]) => { if (nullish(callback)) iae(r, 'callback must not be null'); });
-  def(CAMERA, 'unregisterTorchCallback', '(Landroid/hardware/camera2/CameraManager$TorchCallback;)V', (r, _m, [, callback]) => { if (nullish(callback)) iae(r, 'callback must not be null'); });
-  const unknownCamera = (r, id) => { if (nullish(id)) iae(r, 'cameraId was null'); iae(r, `Unable to retrieve camera characteristics for unknown device ${text(r, id)}`); };
-  def(CAMERA, 'getCameraCharacteristics', `(${STRING})Landroid/hardware/camera2/CameraCharacteristics;`, (r, _m, [, id]) => unknownCamera(r, id));
-  def(CAMERA, 'setTorchMode', `(${STRING}Z)V`, (r, _m, [, id]) => { if (nullish(id)) iae(r, 'cameraId was null'); iae(r, `Camera ${text(r, id)} is not a flashlight device`); });
-  def(CAMERA, 'openCamera', `(${STRING}Landroid/hardware/camera2/CameraDevice$StateCallback;Landroid/os/Handler;)V`, (r, _m, [, id]) => unknownCamera(r, id));
+  // ---- CameraManager: the cameras of the page's camera source, none until a page attaches (src/camera-host.js)
+  installCameraManager(kit, platform, service('camera', 'Landroid/hardware/camera2/CameraManager;'));
 
   // ---- UsbManager: no host or accessory port, so no devices
   const USB = service('usb', 'Landroid/hardware/usb/UsbManager;');

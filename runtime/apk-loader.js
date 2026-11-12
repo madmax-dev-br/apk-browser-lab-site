@@ -1,17 +1,17 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=bc091d1ae253';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=bc091d1ae253';
-import { inspectELF } from './native-inspector.js?v=bc091d1ae253';
-import { elfBuildId } from './elf-build-id.js?v=bc091d1ae253';
-import { inflateRaw } from './inflate.js?v=bc091d1ae253';
-import { resolveDevice } from './device-profile.js?v=bc091d1ae253';
-import { resourceProfileFor } from './device-configuration.js?v=bc091d1ae253';
-import { JniBridge } from './jni-host.js?v=bc091d1ae253';
-import { providerForApk } from './native-provider-variants.js?v=bc091d1ae253';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=bc091d1ae253';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=bc091d1ae253';
-import { AndroidResources } from './android-resources.js?v=bc091d1ae253';
-import { AndroidPlatform } from './android-platform.js?v=bc091d1ae253';
-import { FrameworkProvider } from './framework-provider.js?v=bc091d1ae253';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=e91f6eb1377f';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=e91f6eb1377f';
+import { inspectELF } from './native-inspector.js?v=e91f6eb1377f';
+import { elfBuildId } from './elf-build-id.js?v=e91f6eb1377f';
+import { inflateRaw } from './inflate.js?v=e91f6eb1377f';
+import { resolveDevice } from './device-profile.js?v=e91f6eb1377f';
+import { resourceProfileFor } from './device-configuration.js?v=e91f6eb1377f';
+import { JniBridge } from './jni-host.js?v=e91f6eb1377f';
+import { providerForApk } from './native-provider-variants.js?v=e91f6eb1377f';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=e91f6eb1377f';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=e91f6eb1377f';
+import { AndroidResources } from './android-resources.js?v=e91f6eb1377f';
+import { AndroidPlatform } from './android-platform.js?v=e91f6eb1377f';
+import { FrameworkProvider } from './framework-provider.js?v=e91f6eb1377f';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -593,7 +593,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   let skia=options.skiaBackend??null;
   if(!skia&&options.skiaProvider&&(needsSkia||options.forceSkia===true)){const source=options.skiaProvider;skia=typeof source==='function'?await source({onProgress:options.onProgress}):await source.load({onProgress:options.onProgress});}
   // JPEG/WebP/AVIF codecs (vendor/lab-codecs) load only for an APK that can decode or encode images: it references BitmapFactory / ImageDecoder / Bitmap.CompressFormat, or ships image files.
-  const usesImageCodecs=program.types.some(type=>/^Landroid\/graphics\/(BitmapFactory|ImageDecoder)(\$|;)/.test(type)||type==='Landroid/graphics/Bitmap$CompressFormat;')||[...archive.entries.keys()].some(name=>/\.(jpe?g|webp|avif)$/i.test(name));
+  const usesImageCodecs=program.types.some(type=>/^Landroid\/graphics\/(BitmapFactory|ImageDecoder)(\$|;)/.test(type)||type==='Landroid/graphics/Bitmap$CompressFormat;'||type==='Landroid/media/ImageReader;')||[...archive.entries.keys()].some(name=>/\.(jpe?g|webp|avif)$/i.test(name));
   if(skia&&usesImageCodecs&&typeof skia.prepareCodecs==='function')await skia.prepareCodecs();
   if(skia&&(typeof skia.createHost!=='function'||typeof skia.rasterizeCanvas!=='function'))fail('Invalid official Skia provider result');
   let frameworkResources = null;

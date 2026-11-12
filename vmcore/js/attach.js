@@ -1,9 +1,9 @@
 // The page path of the WebAssembly core: fetches and compiles core.wasm once per Worker and attaches it to a runtime created with engine 'wasm' (host-bridge.js attachWasmEngine).
-import { attachWasmEngine } from './host-bridge.js?v=bc091d1ae253';
-import { unsharedCore } from './unshared.js?v=bc091d1ae253';
+import { attachWasmEngine } from './host-bridge.js?v=e91f6eb1377f';
+import { unsharedCore } from './unshared.js?v=e91f6eb1377f';
 
 let compiled = null;
 export async function attachCore(runtime, options = {}) {
-  compiled ??= fetch(new URL('../core.wasm?v=bc091d1ae253', import.meta.url)).then(async response => { if (!response.ok) throw new Error(`vmcore: core.wasm could not be fetched (HTTP ${response.status})`); return WebAssembly.compile(unsharedCore(await response.arrayBuffer())); });   // one Worker, green threads: an unshared memory, whose views the web platform's APIs accept
+  compiled ??= fetch(new URL('../core.wasm?v=e91f6eb1377f', import.meta.url)).then(async response => { if (!response.ok) throw new Error(`vmcore: core.wasm could not be fetched (HTTP ${response.status})`); return WebAssembly.compile(unsharedCore(await response.arrayBuffer())); });   // one Worker, green threads: an unshared memory, whose views the web platform's APIs accept
   return attachWasmEngine(runtime, { module: await compiled, shared: false, ...options });
 }

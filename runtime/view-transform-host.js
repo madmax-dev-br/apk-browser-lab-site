@@ -1,6 +1,6 @@
-import { APKError } from './apk-runtime.js?v=bc091d1ae253';
-import { getMatrixValues } from './matrix-native.js?v=bc091d1ae253';
-import { renderLightInfo, renderNodeProperties } from './rendernode-native.js?v=bc091d1ae253';
+import { APKError } from './apk-runtime.js?v=e91f6eb1377f';
+import { getMatrixValues } from './matrix-native.js?v=e91f6eb1377f';
+import { renderLightInfo, renderNodeProperties } from './rendernode-native.js?v=e91f6eb1377f';
 
 const VIEW = 'Landroid/view/View;', MATRIX = 'Landroid/graphics/Matrix;';
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];

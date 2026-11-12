@@ -1,32 +1,32 @@
-import { VMClock } from './vm-clock.js?v=bc091d1ae253';
-import { overrideHit } from './method-overrides.js?v=bc091d1ae253';
-import { OperationMonitor } from './operation-monitor.js?v=bc091d1ae253';
-import { ExecutionProfile } from './execution-profile.js?v=bc091d1ae253';
-import { SamplingProfiler } from './sampling-profiler.js?v=bc091d1ae253';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=bc091d1ae253';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=bc091d1ae253';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=bc091d1ae253';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=bc091d1ae253';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=bc091d1ae253';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=bc091d1ae253';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=bc091d1ae253';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=bc091d1ae253';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=bc091d1ae253';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=bc091d1ae253';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=bc091d1ae253';
-import { APKError } from './apk-error.js?v=bc091d1ae253';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=bc091d1ae253';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=bc091d1ae253';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=bc091d1ae253';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=bc091d1ae253';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=bc091d1ae253';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=bc091d1ae253';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=bc091d1ae253';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=bc091d1ae253';
+import { VMClock } from './vm-clock.js?v=e91f6eb1377f';
+import { overrideHit } from './method-overrides.js?v=e91f6eb1377f';
+import { OperationMonitor } from './operation-monitor.js?v=e91f6eb1377f';
+import { ExecutionProfile } from './execution-profile.js?v=e91f6eb1377f';
+import { SamplingProfiler } from './sampling-profiler.js?v=e91f6eb1377f';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=e91f6eb1377f';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=e91f6eb1377f';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=e91f6eb1377f';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=e91f6eb1377f';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e91f6eb1377f';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=e91f6eb1377f';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=e91f6eb1377f';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=e91f6eb1377f';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=e91f6eb1377f';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=e91f6eb1377f';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=e91f6eb1377f';
+import { APKError } from './apk-error.js?v=e91f6eb1377f';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=e91f6eb1377f';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=e91f6eb1377f';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=e91f6eb1377f';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=e91f6eb1377f';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=e91f6eb1377f';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=e91f6eb1377f';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=e91f6eb1377f';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=e91f6eb1377f';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=bc091d1ae253';
-import { bootClassLacksMember } from './boot-class-members.js?v=bc091d1ae253';
-export { APKError } from './apk-error.js?v=bc091d1ae253';
+import { Scheduler, Blocked } from './scheduler.js?v=e91f6eb1377f';
+import { bootClassLacksMember } from './boot-class-members.js?v=e91f6eb1377f';
+export { APKError } from './apk-error.js?v=e91f6eb1377f';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1865,6 +1865,7 @@ export class APKRuntime {
         scrollX: v.fields.get('Landroid/view/View;->mScrollX:I') ?? 0, scrollY: v.fields.get('Landroid/view/View;->mScrollY:I') ?? 0,
         drawableSVG: v.drawableSVG ?? null,
         webview: this.platform?.webView?.nodeState?.(this, v) ?? null,
+        cameraSurface: this.platform?.camera?.nodeState?.(this, v),   // a TextureView / SurfaceView: the camera stream the page draws in its box (undefined for every other View)
         buttonSVG: v.buttonSVG ?? null, buttonBounds: v.buttonBounds ?? null, compoundPadding: v.compoundPadding ?? null,
         foregroundSVG: v.foregroundSVG ?? null,
         foregroundBounds: v.foregroundBounds ?? null,
