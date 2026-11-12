@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=ee4847240266';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ee4847240266';
+import { APKError } from './apk-runtime.js?v=94fc4dedf7f2';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=94fc4dedf7f2';
 const RESOLVER = 'Landroid/content/ContentResolver;', URI = 'Landroid/net/Uri;', GLOBAL = 'Landroid/provider/Settings$Global;', OBSERVER = 'Landroid/database/ContentObserver;';
 const fail = message => { throw new APKError(message, { kind: 'virtual-content-provider-unsupported' }); };
 const keys = new Set();
@@ -118,7 +118,7 @@ export function createContentResolverHost(platform) {
         const appendSegment = segment => { const old = state.path ?? ''; state.path = !old.length ? '/' + segment : old.endsWith('/') ? old + segment : old + '/' + segment; state.opaque = null; };
         const text = () => {
           if (state.opaque !== null) { if (state.scheme === null) runtime.throwJava('Ljava/lang/UnsupportedOperationException;', 'An opaque URI must have a scheme.'); return `${state.scheme}:${state.opaque}${state.fragment !== null ? '#' + state.fragment : ''}`; }
-          let path = state.path ?? ''; if (state.authority !== null && path.length && !path.startsWith('/')) path = '/' + path;
+          let path = state.path ?? ''; if ((state.scheme !== null || state.authority !== null) && path.length && !path.startsWith('/')) path = '/' + path;   // Uri.Builder.build: with a scheme and/or an authority the path must be absolute (PathPart.makeAbsolute)
           return `${state.scheme !== null ? state.scheme + ':' : ''}${state.authority !== null ? '//' + state.authority : ''}${path}${state.query !== null ? '?' + state.query : ''}${state.fragment !== null ? '#' + state.fragment : ''}`;
         };
         switch (name) {

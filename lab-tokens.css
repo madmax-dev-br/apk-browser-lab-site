@@ -1,0 +1,48 @@
+/* APK Browser Lab: the design tokens, the UI typeface and the top bar, shared by the lab page (index.html, with lab-theme.css) and the documentation pages
+   (arquitetura.html, plugins.html, player/example.html, over site-pages.css). Linked after the page's own stylesheet.
+   Palette: paper and ink with one accent, blueprint cobalt. Amber is for experimental / warnings only, green for running / validated only, red for errors only.
+   Type: Roboto (the Android system typeface, the variable font the device already ships) in one family; monospace only for code. Scale 12 / 14 / 16 / 20 / 28. */
+@font-face{font-family:"Lab Roboto";src:url('./fonts/Roboto.ttf') format('truetype');font-style:normal;font-weight:100 900;font-display:swap}
+:root{
+  --bg:#F3F5F8;--surface:#FFFFFF;--surface-2:#F7F8FB;--ink:#131A2B;--soft:#3D465A;--muted:#5A6479;--line:#D6DCE8;--line-strong:#AEB8CC;
+  --accent:#2447F9;--accent-ink:#2447F9;--accent-soft:#E6EBFF;--accent-hover:#1A38D6;--on-accent:#FFFFFF;
+  --amber:#B86E00;--amber-ink:#8A5200;--amber-soft:#FBF1DF;
+  --run:#0E8A4F;--ok:#0A6E3F;--ok-soft:#E2F4EA;
+  --warn:#B3261E;--warn-soft:#FCEBE9;
+  --code-bg:#EBEEF4;--code-ink:#1D2538;
+  --lane-vm:#2447F9;--lane-vm-soft:#E6EBFF;--syn-keyword:#2447F9;
+  --grid:#D6DCE8;--scrim:rgba(19,26,43,.48);
+  --r-control:8px;--r-panel:14px;--r-pill:999px;
+  --bar-h:56px;
+  --sans:"Lab Roboto",Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Roboto Mono",monospace;
+  --ring:0 0 0 2px var(--bg),0 0 0 4px var(--accent);
+}
+:root[data-theme=dark]{
+  --bg:#0F1524;--surface:#161D30;--surface-2:#1B2339;--ink:#E8ECF6;--soft:#C0C8DA;--muted:#99A4BC;--line:#26304A;--line-strong:#43507A;
+  --accent:#7C93FF;--accent-ink:#9DAEFF;--accent-soft:#1C2750;--accent-hover:#93A6FF;--on-accent:#0B1020;
+  --amber:#E0A040;--amber-ink:#F0BC6A;--amber-soft:#2C2311;
+  --run:#3CCB85;--ok:#5BD99A;--ok-soft:#10291D;
+  --warn:#FF9388;--warn-soft:#331A1C;
+  --code-bg:#1B2339;--code-ink:#DCE2F0;
+  --lane-vm:#7C93FF;--lane-vm-soft:#1C2750;--syn-keyword:#9DAEFF;
+  --grid:#26304A;--scrim:rgba(4,7,14,.62);
+}
+body{font-family:var(--sans);background:var(--bg)}
+::selection{background:var(--accent);color:var(--on-accent)}
+
+/* Top bar: the mark is a device outline, drawn in CSS over the legacy letter mark (the markup stays) */
+.topbar{background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--sans);font-size:16px;font-weight:700;letter-spacing:0;color:var(--ink);text-decoration:none;white-space:nowrap}
+.brand b{font-weight:400}
+.brand-icon{position:relative;flex:none;box-sizing:border-box;width:17px;height:26px;border:2px solid var(--accent);border-radius:5px;background:none;color:transparent;font-size:0;line-height:0}
+.brand-icon span{display:none}
+.brand-icon::after{content:"";position:absolute;left:50%;bottom:2px;width:5px;height:2px;margin-left:-2.5px;border-radius:1px;background:var(--accent)}
+.topnav a{font-family:var(--sans);font-size:14px;font-weight:500;color:var(--soft);letter-spacing:0}
+.topnav a:hover{color:var(--ink)}
+.topnav a[aria-current=page]{color:var(--ink);font-weight:500;border-bottom-color:var(--accent)}
+.theme-toggle{flex:none;width:32px;height:32px;padding:0;border-radius:var(--r-control);border:1px solid var(--line);background:transparent;color:var(--soft);font-size:16px;line-height:1;cursor:pointer}
+.theme-toggle:hover{color:var(--ink);border-color:var(--line-strong)}
+.topbar a:focus-visible,.theme-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* Documentation pages: their one hard-coded accent */
+:root .button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}

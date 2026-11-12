@@ -7,8 +7,8 @@
 // own origin or a srcdoc is an opaque origin that cannot touch the lab's DOM, Worker or storage. Scripts run only when the app enabled JavaScript. The frame gets no
 // permissions policy features (`allow=""`), no referrer, and no ambient credentials where the browser supports `credentialless`.
 
-import { bridgeMarkup, injectIntoHead } from './webview-bridge.js?v=ee4847240266';
-import { rewriteDocument, RESOURCE_MAX_BYTES } from './webview-resources.js?v=ee4847240266';
+import { bridgeMarkup, injectIntoHead } from './webview-bridge.js?v=94fc4dedf7f2';
+import { rewriteDocument, RESOURCE_MAX_BYTES } from './webview-resources.js?v=94fc4dedf7f2';
 
 export const FRAME_SANDBOX = Object.freeze({ scripts: 'allow-scripts', forms: 'allow-forms' });
 export const FRAME_ATTRIBUTES = Object.freeze({ allow: '', referrerpolicy: 'no-referrer', loading: 'eager', 'aria-label': 'WebView' });
@@ -141,8 +141,10 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
     if (supportsCredentialless()) iframe.setAttribute('credentialless', '');
     iframe.className = 'android-webview-frame'; iframe.title = 'WebView';
     iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff';
+    let armed = !source.form;
     iframe.addEventListener('load', () => {
       if (frame.iframe !== iframe || frame.loadId !== message.loadId) return;
+      if (!armed) return;   // the empty document a frame without src shows before the posted form answers is not the page: its load event is not onPageFinished
       timers.clearTimeout(frame.timer); frame.timer = null;
       send({ type: 'webview-event', id, loadId: message.loadId, event: 'finished' });
       // a document that was given a bridge connects to it while it loads, usually before the load event: if it has not by now, give it a moment, then say it never will
@@ -156,13 +158,15 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
       if (message.bridge) { frame.bridge = message.javascript ? { ...message.bridge, loadId: message.loadId } : null; document_ = injectIntoHead(document_, bridgeMarkup({ csp: message.bridge.csp, config: { ...message.bridge.config, loadId: message.loadId }, javascript: !!message.javascript })); }
       iframe.setAttribute('srcdoc', document_);
     } else if ('src' in source) iframe.setAttribute('src', source.src);
+    // postUrl targets the frame by name: the name must be on the element before it is inserted, because the nested browsing context takes it when it is created
+    // (set afterwards, the submission did not find the frame and navigated a top-level context instead).
+    const formTarget = source.form ? `apkweb-webview-${id}-${message.loadId}` : null; if (formTarget) iframe.setAttribute('name', formTarget);
     element.append(iframe);
     if (source.form) {   // postUrl: a form posted into the frame (the body of a POST cannot be set on an iframe's src)
       const form = doc.createElement('form');
-      form.method = 'POST'; form.action = source.form.action; form.target = `apkweb-webview-${id}-${message.loadId}`; form.enctype = 'application/x-www-form-urlencoded'; form.hidden = true;
-      iframe.setAttribute('name', form.target);
+      form.method = 'POST'; form.action = source.form.action; form.target = formTarget; form.enctype = 'application/x-www-form-urlencoded'; form.hidden = true;
       for (const [name, value] of source.form.fields) { const input = doc.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value; form.append(input); }
-      element.append(form); frame.form = form; form.submit();
+      element.append(form); frame.form = form; form.submit(); armed = true;
     }
     frame.timer = timers.setTimeout(() => { if (frame.loadId === message.loadId && frame.iframe === iframe) fail(frame, -8, 'net::ERR_TIMED_OUT (no load event from the WebView frame)'); }, message.timeoutMs ?? 30000);
   }

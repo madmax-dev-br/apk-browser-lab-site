@@ -1,7 +1,7 @@
-import {APKError} from './apk-runtime.js?v=ee4847240266';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=ee4847240266';
-import {getVectorGraphics} from './vector-native.js?v=ee4847240266';
-import {deferRaster} from './deferred-raster.js?v=ee4847240266';
+import {APKError} from './apk-runtime.js?v=94fc4dedf7f2';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=94fc4dedf7f2';
+import {getVectorGraphics} from './vector-native.js?v=94fc4dedf7f2';
+import {deferRaster} from './deferred-raster.js?v=94fc4dedf7f2';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -76,6 +76,19 @@ export function createComposeCanvasHost(platform){
     {const [cw,ch]=dimensions(view);for(const {drawable:d,x,y} of platform.textViewApi.compoundPlacements(r,receiver,cw,ch)){const save=canvas(r,target,'save',[],'I');try{canvas(r,target,'translate',['F','F'],'V',[raw(x),raw(y)]);call(r,d,DRAWABLE,'draw',[CANVAS],'V',[target]);}finally{canvas(r,target,'restoreToCount',['I'],'V',[save]);}}}   // TextView.onDraw: compound drawables first, then the text
     const displayed=String(view.ellipsizedText??view.displayText??view.text??''),hint=!displayed&&!!view.hint,text=hint?String(view.hint):displayed;if(!text)return;
     const [width,height]=dimensions(view),pad=platform.drawableViewHost.compoundPadding(r,receiver)??view.padding??{},innerWidth=Math.max(0,width-(pad.left??0)-(pad.right??0)),innerHeight=Math.max(0,height-(pad.top??0)-(pad.bottom??0));if(!innerWidth||!innerHeight)return;
+    // Styled text (a Spanned with CharacterStyle spans: colours, sizes, typefaces, underlines per range): TextView.onDraw draws its Layout, and the spans change the paint run by run
+    // (android.text.TextLine). The single-style paragraph below cannot show that, so the original StaticLayout the TextView builds (getLayout) draws itself on this Canvas.
+    if(!hint&&!view.marquee){const TEXTVIEW='Landroid/widget/TextView;',CS='Ljava/lang/CharSequence;',SPANNED='Landroid/text/Spanned;',LAYOUT='Landroid/text/Layout;',source=call(r,receiver,TEXTVIEW,'getText',[],CS);
+      if(source!==null&&source!==undefined&&typeof source!=='string'&&r.isSubtype(r.object(source).type,SPANNED)&&r.classes.has('Landroid/text/style/CharacterStyle;')){
+        const spans=call(r,source,SPANNED,'getSpans',['I','I','Ljava/lang/Class;'],'[Ljava/lang/Object;',[0,displayed.length,r.classObject('Landroid/text/style/CharacterStyle;')]);
+        const layout=r.array(spans).elements.length>0?call(r,receiver,TEXTVIEW,'getLayout',[],LAYOUT):null;
+        if(layout!==null&&layout!==undefined){const gravity=view.gravity??0x800033,blockHeight=call(r,layout,LAYOUT,'getHeight',[],'I'),vertical=gravity&0x70,dy=vertical===0x10?(innerHeight-blockHeight)/2:vertical===0x50?innerHeight-blockHeight:0,save=canvas(r,target,'save',[],'I');
+          try{const scrollX=view.updatingDisplayList?0:view.fields.get(`${VIEW}->mScrollX:I`)??0,scrollY=view.updatingDisplayList?0:view.fields.get(`${VIEW}->mScrollY:I`)??0;
+            canvas(r,target,'clipRect',['F','F','F','F'],'Z',[raw(pad.left??0),raw(pad.top??0),raw(width-(pad.right??0)),raw(height-(pad.bottom??0))]);canvas(r,target,'translate',['F','F'],'V',[raw((pad.left??0)-scrollX),raw((pad.top??0)+dy-scrollY)]);
+            call(r,layout,LAYOUT,'draw',[CANVAS],'V',[target]);
+            view.nativeCanvasText={source:'original android.text.Layout.draw (styled spans)',textLength:text.length,hint:false,gravity,spans:r.array(spans).elements.length};r.record('DRAW TextView styled text: original Layout.draw with CharacterStyle spans -> Canvas');
+          }finally{canvas(r,target,'restoreToCount',['I'],'V',[save]);}
+          return;}}}
     const color=textColor(r,receiver,hint),typeface=call(r,receiver,'Landroid/widget/TextView;','getTypeface',[],'Landroid/graphics/Typeface;'),face=r.skiaHost.resolveTypeface(typeface),size=view.textSize||14;
     const gravity=view.gravity??textStyleValue(r,receiver,'gravity','getInt','I',0x800033),abs=r.classes.has('Landroid/view/Gravity;')?call(r,null,'Landroid/view/Gravity;','getAbsoluteGravity',['I','I'],'I',[gravity,view.layoutDirection??0],'static'):gravity;
     const horizontal=abs&7,vertical=abs&0x70,lines=text.split('\n'),font={textSize:size,flags:1,typefaceRef:typeface},metrics=r.skiaHost.measureText('',font).metrics,top=view.includeFontPadding===false?Math.round(metrics.ascent):Math.floor(metrics.bounds[1]),bottom=view.includeFontPadding===false?Math.round(metrics.descent):Math.ceil(metrics.bounds[3]);

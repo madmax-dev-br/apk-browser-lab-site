@@ -23,7 +23,7 @@ export function createDeviceFullscreen({ stage, openButton, closeButton, deviceS
     spacer = doc.createElement('div'); spacer.className = 'preview-stage-spacer'; spacer.style.height = `${stage.offsetHeight}px`; stage.before(spacer);   // the page behind keeps its layout
     stage.classList.add('device-fullscreen'); doc.documentElement.classList.add('has-device-fullscreen');
     stage.setAttribute('role', 'dialog'); stage.setAttribute('aria-modal', 'true'); stage.setAttribute('aria-label', 'Dispositivo em tela cheia');
-    deviceState.maxScale = FULLSCREEN_MAX_SCALE; deviceState.stagePadding = 96;
+    deviceState.maxScale = FULLSCREEN_MAX_SCALE; deviceState.stagePadding = 16;   // the device takes the viewport: 8px of air on each side horizontally, 4px vertically
     if (closeButton) closeButton.hidden = false; openButton?.setAttribute('aria-pressed', 'true');
     refit(); closeButton?.focus({ preventScroll: true });
   }

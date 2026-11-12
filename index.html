@@ -6,44 +6,46 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <link rel="stylesheet" href="./styles.css?v=ee4847240266">
-  <meta name="apk-browser-build" content="ee4847240266">
+  <style>@import url("./styles.css?v=94fc4dedf7f2") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=94fc4dedf7f2">
+  <link rel="stylesheet" href="./lab-theme.css?v=94fc4dedf7f2">
+  <meta name="apk-browser-build" content="94fc4dedf7f2">
 </head>
 <body>
   <header class="topbar">
-    <a href="./" class="brand" aria-label="APK Browser Lab"><span class="brand-icon">a<span>›</span></span><span>APK <b>Browser Lab</b></span><span class="beta">EXPERIMENTAL</span></a>
-    <a class="site-link" href="./arquitetura.html">Arquitetura</a><a class="site-link" href="./plugins.html">Plugins</a><a class="integration-link" href="./player/example.html">Exemplo de integração <span aria-hidden="true">↗</span></a><button type="button" id="theme-toggle" class="theme-toggle" aria-label="Alternar tema claro/escuro"><span aria-hidden="true">◐</span></button>
+    <a href="./" class="brand" aria-label="APK Browser Lab"><span class="brand-icon" aria-hidden="true">a<span>›</span></span><span>APK <b>Browser Lab</b></span></a><span class="beta">Experimental</span>
+    <nav class="topnav" aria-label="Páginas do site"><a class="site-link" href="./arquitetura.html">Arquitetura</a><a class="site-link" href="./plugins.html">Plugins</a><a class="site-link integration-link" href="./player/example.html">Integração</a></nav><button type="button" id="theme-toggle" class="theme-toggle" aria-label="Alternar tema claro/escuro"><span aria-hidden="true">◐</span></button>
   </header>
   <main>
     <div class="workspace">
       <aside class="controls-column">
         <section id="apk-panel" class="controls">
-          <div class="section-label">01 <span>SELECIONE O APLICATIVO</span></div>
+          <h2 class="rail-title">Abrir APK</h2>
           <label id="drop-zone" class="drop-zone" for="apk-file">
-            <span class="upload-icon" aria-hidden="true">↥</span><strong>Solte seu APK aqui</strong><span>ou <u>escolha um arquivo</u> no computador</span><small>.apk ou .apklab (preparado) · processamento 100% local</small>
+            <strong>Solte um APK aqui</strong><span>ou <u>escolha um arquivo</u></span><small>Aceita arquivos .apk. O arquivo não sai deste navegador.</small>
           </label>
-          <input id="apk-file" type="file" accept=".apk,.apklab,application/vnd.android.package-archive" class="visually-hidden">
-          <div class="demo-row"><span>Quer experimentar primeiro?</span><button id="demo-button">Rodar demo <span aria-hidden="true">↗</span></button></div>
-          <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div><button id="stop-vm" class="stop-vm" aria-label="Encerrar VM e cancelar callbacks" hidden>Encerrar</button><button id="prepare-file" class="prepare-file" type="button" title="Baixar o arquivo preparado (.apklab) deste APK: abre mais rápido e pode ser enviado no lugar do APK" aria-label="Baixar arquivo preparado (.apklab)" hidden>⇩ Baixar arquivo preparado (.apklab)</button><button id="reopen-file" class="reopen-file" hidden>Reabrir</button><span class="file-check">✓</span></div>
-          <div id="operation-panel" class="operation-panel" hidden><div><span class="spinner"></span><strong id="operation-message">Processando no Web Worker…</strong><button id="cancel-operation">Cancelar</button></div><progress id="operation-progress" max="1"></progress><small id="operation-detail">A interface permanece disponível · limite de 120 s para inspeção</small></div>
+          <input id="apk-file" type="file" accept=".apk,application/vnd.android.package-archive" class="visually-hidden">
+          <div class="demo-row"><span>Sem um APK à mão?</span><button id="demo-button">Rodar demo</button></div>
+          <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div><button id="stop-vm" class="stop-vm" aria-label="Encerrar VM e cancelar callbacks" hidden>Encerrar</button><button id="reopen-file" class="reopen-file" hidden>Reabrir</button></div>
+          <div id="operation-panel" class="operation-panel" hidden><div><span class="spinner"></span><strong id="operation-message">Processando no Web Worker…</strong><button id="cancel-operation">Cancelar</button></div><progress id="operation-progress" max="1"></progress><small id="operation-detail">A página continua respondendo. A inspeção tem limite de 120 s.</small></div>
           <details id="inspection-panel" class="inspection-panel">
-          <summary class="section-label inspection-label">02 <span>INSPEÇÃO DO PACOTE</span><span id="inspection-badge" class="quiet-badge">AGUARDANDO</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
-          <div id="inventory-empty" class="inventory-empty"><span aria-hidden="true">⌘</span><p>Pacote, classes e dependências<br>aparecerão aqui.</p></div>
+          <summary class="inspection-label"><h2 class="rail-title">Pacote</h2><span id="inspection-badge" class="quiet-badge">Aguardando</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
+          <div id="inventory-empty" class="inventory-empty"><p>Abra um APK para ver o pacote, as classes e as dependências.</p></div>
           <div id="inventory" class="inventory" hidden>
-            <div class="inventory-heading"><span class="tiny-label">PACOTE</span><strong id="package-name"></strong></div>
-            <div class="stats"><div><strong id="class-count">0</strong><span>classes DEX</span></div><div><strong id="activity-count">0</strong><span>activities</span></div><div><strong id="dependency-count">0</strong><span>dependências</span></div></div>
+            <div class="inventory-heading"><span class="tiny-label">Nome do pacote</span><strong id="package-name"></strong></div>
+            <div class="stats"><div><strong id="class-count">0</strong><span>Classes DEX</span></div><div><strong id="activity-count">0</strong><span>Activities</span></div><div><strong id="dependency-count">0</strong><span>Dependências</span></div></div>
             <label class="activity-label" for="activity-select">Activity inicial</label><select id="activity-select"></select>
-            <div id="load-times" class="load-times" role="status" hidden></div><div id="archive-summary" class="archive-summary" hidden></div><details class="findings"><summary>Classes e dependências <span>+</span></summary><div id="inventory-details"></div></details>
+            <div id="load-times" class="load-times" role="status" hidden></div><div id="archive-summary" class="archive-summary" hidden></div><details class="findings"><summary>Classes e dependências <span class="trace-chevron" aria-hidden="true">⌄</span></summary><div id="inventory-details"></div></details>
           </div>
-          <details id="native-inspection" class="native-inspection" hidden><summary>Analisar bibliotecas nativas <span>ELF</span></summary><p>Inspeção de metadados de uma biblioteca por vez, até 32 MiB. Não executa código nativo nem implementa JNI.</p><label for="native-abi">ABI</label><select id="native-abi"></select><label for="native-library">Biblioteca</label><select id="native-library"></select><button id="inspect-native-button">Analisar ELF selecionado</button><pre id="native-result" hidden></pre></details>
+          <details id="native-inspection" class="native-inspection" hidden><summary>Analisar bibliotecas nativas <span>ELF</span></summary><p>Inspeção de metadados de uma biblioteca por vez, até 32 MiB. Não executa código nativo nem implementa JNI.</p><label for="native-abi">ABI</label><select id="native-abi"></select><label for="native-library">Biblioteca</label><select id="native-library"></select><button id="inspect-native-button">Analisar biblioteca</button><pre id="native-result" hidden></pre></details>
           </details>
           <div id="unsupported-notice" class="unsupported-notice" role="status" hidden><strong>Este APK ainda não pode ser executado</strong><p>O relatório indica limites de arquivo que impedem a tentativa. Veja os detalhes abaixo; uma inspeção parcial não comprova compatibilidade.</p><ul id="unsupported-list"></ul></div>
-          <button id="run-button" class="run-button" disabled><span aria-hidden="true">▶</span> Executar APK <kbd>RUN</kbd></button>
-          <p class="support-note"><span aria-hidden="true">ⓘ</span><span>VM experimental para Android Views e bytecode DEX. Multidex é inspecionado no Worker; Android, Compose e JNI ainda podem exigir APIs não implementadas. </span></p>
+          <button id="run-button" class="run-button" disabled>Executar APK <kbd aria-hidden="true">RUN</kbd></button>
+          <p class="support-note">VM experimental para Android Views e bytecode DEX. Multidex é inspecionado no Worker; Android, Compose e JNI ainda podem exigir APIs não implementadas.</p>
         </section>
         <section class="controls controls-card" aria-label="Controles">
-          <details id="control-panel" class="device-panel control-panel">
-            <summary><span>Controles</span><span id="device-summary" class="quiet-badge" title="Tela e orientação do dispositivo virtual">411 × 914 · retrato</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
+          <details id="control-panel" class="device-panel control-panel" open>
+            <summary><h2 class="rail-title">Controles</h2><span id="device-summary" class="quiet-badge" title="Tela e orientação do dispositivo virtual">411 × 914 · retrato</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
             <details class="cp-group" id="cp-sec-open" data-section="open">
               <summary><h3 id="cp-open-title">Abrir</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
               <form id="deeplink-form" class="deeplink-form" autocomplete="off">
@@ -176,11 +178,12 @@
             </div></details>
           <details class="cp-group" id="cp-sec-mcp" data-section="mcp">
               <summary><h3 id="cp-mcp-title">MCP</h3><span id="mcp-summary" class="cp-badge">desligado</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <p class="cp-note">Conecta esta página a um cliente MCP (Claude Desktop, Claude Code): ele pode tirar print da tela ou de um componente, ler a saída dos plugins, a árvore do Compose, os CompositionLocals, os ViewModels, o Logcat e a rede do app aberto aqui. Uma ponte pequena (<a href="tools/lab-mcp.mjs" download>lab-mcp.mjs</a>, Node.js) roda no seu computador entre os dois (veja <a href="plugins.html#mcp">como funciona</a>).</p>
-              <label class="cp-field" for="mcp-script"><span>1. Onde está a ponte<small><a href="tools/lab-mcp.mjs" download>Baixe lab-mcp.mjs</a> (ou <code id="mcp-download">curl -O …/tools/lab-mcp.mjs</code>) e informe o caminho completo</small></span><input id="mcp-script" type="text" placeholder="/caminho/para/lab-mcp.mjs" autocomplete="off" spellcheck="false"></label>
-              <div class="cp-field mcp-token-field"><span><label for="mcp-token">2. Token de pareamento</label><small>gerado neste navegador e guardado só nele; a ponte recusa outra página</small></span><div class="mcp-token-row"><input id="mcp-token" type="password" autocomplete="off" spellcheck="false" aria-describedby="mcp-config-title"><button id="mcp-token-show" type="button" class="cp-button" aria-pressed="false" aria-controls="mcp-token">Mostrar</button><button id="mcp-token-new" type="button" class="cp-button">Gerar novo</button></div></div>
-              <div class="mcp-config"><div class="mcp-config-head"><span id="mcp-config-title">3. Cole no <code>.mcp.json</code> do seu projeto (ou em <code>mcpServers</code> do seu cliente MCP) e reinicie o cliente</span><button id="mcp-copy" type="button" class="cp-button">Copiar</button></div><pre class="mcp-config-json" aria-labelledby="mcp-config-title"><code id="mcp-config-json"></code></pre></div>
-              <label class="cp-field" for="mcp-url"><span>4. Endereço da ponte<small>a ponte escuta só em 127.0.0.1; porta padrão 8790 (outra porta entra no JSON)</small></span><input id="mcp-url" type="url" value="http://127.0.0.1:8790" autocomplete="off" spellcheck="false"></label>
+              <p class="cp-note">Liga esta página a um agente (Claude Code, Claude Desktop ou outro cliente MCP): ele pode tirar print da tela ou de um componente, tocar, digitar e ler a saída dos plugins, a árvore do Compose, os ViewModels, o Logcat e a rede do app aberto aqui. Uma ponte pequena (<a href="tools/lab-mcp.mjs" download>lab-mcp.mjs</a>, Node.js) fica rodando no seu computador e o agente se conecta a ela por um endereço (veja <a href="plugins.html#mcp">como funciona</a>).</p>
+              <div class="mcp-config"><div class="mcp-config-head"><span id="mcp-config-title">1. Rode no terminal e deixe aberto</span><button id="mcp-copy" type="button" class="cp-button">Copiar</button></div><pre class="mcp-config-json" aria-labelledby="mcp-config-title"><code id="mcp-config-json"></code></pre></div>
+              <label class="cp-check" for="mcp-lan"><input id="mcp-lan" type="checkbox"><span>Aceitar agentes de outras máquinas da rede<small>A ponte passa a escutar também no IP local deste computador e mostra os endereços ao iniciar. Quem estiver na rede alcança a porta: o token no endereço é a única proteção e o tráfego vai sem criptografia. Use só em redes de confiança.</small></span></label>
+              <div class="mcp-config"><div class="mcp-config-head"><span id="mcp-agent-title">2. Conecte o agente a este endereço</span><button id="mcp-copy-agent" type="button" class="cp-button">Copiar</button></div><div id="mcp-agent-pick" class="mcp-agent-pick" role="group" aria-label="Agente"><button type="button" class="cp-button" data-agent="claude" aria-pressed="true">Claude</button><button type="button" class="cp-button" data-agent="codex" aria-pressed="false">Codex</button><button type="button" class="cp-button" data-agent="cursor" aria-pressed="false">Cursor</button></div><p id="mcp-agent-where" class="cp-note mcp-agent-where"></p><pre class="mcp-config-json" aria-labelledby="mcp-agent-title"><code id="mcp-agent-command"></code></pre><a id="mcp-agent-link" class="mcp-agent-link" hidden>Adicionar ao Cursor com um clique</a></div>
+              <div class="cp-field mcp-token-field"><span><label for="mcp-token">Token de pareamento</label><small>gerado neste navegador e guardado só nele; vai no comando e no endereço acima</small></span><div class="mcp-token-row"><input id="mcp-token" type="password" autocomplete="off" spellcheck="false"><button id="mcp-token-show" type="button" class="cp-button" aria-pressed="false" aria-controls="mcp-token">Mostrar</button><button id="mcp-token-new" type="button" class="cp-button">Gerar novo</button></div></div>
+              <label class="cp-field" for="mcp-url"><span>Endereço da ponte nesta máquina<small>a página fala com a ponte sempre por 127.0.0.1; porta padrão 8790 (outra porta entra no comando)</small></span><input id="mcp-url" type="url" value="http://127.0.0.1:8790" autocomplete="off" spellcheck="false"></label>
               <div class="em-actions"><button id="mcp-connect" type="button" class="cp-button primary">Conectar</button></div>
               <p id="mcp-status" class="cp-note" role="status" aria-live="polite">Desconectado.</p>
             </div></details>
@@ -188,11 +191,12 @@
         </section>
       </aside>
       <section class="preview" aria-label="Aplicativo em execução">
-        <div class="preview-bar"><div class="preview-title"><span class="window-dots"><i></i><i></i><i></i></span><span id="preview-name">Prévia do aplicativo</span></div><button id="recreate-activity" class="back-button reload-activity" type="button" hidden title="Recriar: como Activity.recreate() ou uma rotação. onPause, onStop, onSaveInstanceState e onDestroy, depois uma nova instância com o estado salvo; os ViewModels continuam">↻ Recriar</button><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reabrir: como fechar e abrir de novo a mesma tela. Nova instância com o mesmo Intent, sem estado salvo e com ViewModels novos: o conteúdo é carregado de novo">⟲ Reabrir</button><button id="back-button" class="back-button" hidden>← Voltar</button><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Tela cheia: mostra o dispositivo ampliado sobre a página (Esc fecha). A resolução da VM não muda" aria-pressed="false">⤢ Tela cheia</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Botões de plugins" hidden></span><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> INATIVO</span></div>
+        <div class="preview-bar"><div class="preview-title"><span id="preview-name">Prévia do aplicativo</span></div><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reabrir: como fechar e abrir de novo a mesma tela. Nova instância com o mesmo Intent, sem estado salvo e com ViewModels novos: o conteúdo é carregado de novo">Reabrir</button><button id="back-button" class="back-button" hidden>Voltar</button><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Tela cheia: mostra o dispositivo ampliado sobre a página (Esc fecha). A resolução da VM não muda" aria-pressed="false">Tela cheia</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Botões de plugins" hidden></span><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inativo</span></div>
         <div class="preview-stage" id="preview-stage">
           <button id="fullscreen-close" class="fullscreen-close" type="button" hidden title="Fechar tela cheia (Esc)" aria-label="Fechar tela cheia">✕</button>
-          <div id="empty-preview" class="empty-preview"><div class="empty-device"><span></span><div>▶</div><i></i></div><h2>Seu aplicativo começa aqui.</h2><p>Selecione um APK e clique em Executar.<br>Ou rode a demonstração para testar.</p><span class="browser-chip"><span>◉</span> Tudo acontece neste navegador</span></div>
-          <div id="boot-overlay" class="boot-overlay" hidden role="status" aria-live="polite"><div class="boot-screen"><svg class="boot-logo" viewBox="0 0 64 64" width="84" height="84" aria-hidden="true"><path class="boot-antenna" d="M20 8l6 9M44 8l-6 9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M10 40a22 22 0 0 1 44 0z" fill="currentColor"/><circle cx="24" cy="32" r="2.6" class="boot-eye"/><circle cx="40" cy="32" r="2.6" class="boot-eye"/><rect x="10" y="44" width="44" height="12" rx="6" fill="currentColor" opacity=".35"/></svg><div class="boot-bar"><i></i></div><p id="boot-caption" class="boot-caption">Iniciando…</p></div></div>
+          <div id="stage-callouts" class="stage-callouts" aria-hidden="true" hidden><div class="callout callout-w"><span id="callout-w"></span></div><div class="callout callout-h"><span id="callout-h"></span></div><p id="callout-note" class="callout-note"></p></div>
+          <div id="empty-preview" class="empty-preview"><h2>Seu aplicativo começa aqui.</h2><p>Selecione um APK e clique em Executar.<br>Ou escolha um dos exemplos na aba Exemplos, na barra de baixo.</p></div>
+          <div id="boot-overlay" class="boot-overlay" hidden role="status" aria-live="polite"><div class="boot-screen"><img id="boot-app-icon" class="boot-app-icon" alt="" hidden><svg class="boot-logo" viewBox="0 0 24 24" width="84" height="84" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85-.29-.15-.65-.06-.83.22l-1.88 3.24a11.463 11.463 0 00-8.94 0L5.65 5.67c-.19-.29-.58-.38-.87-.2-.28.18-.37.54-.22.83L6.4 9.48A10.78 10.78 0 001 18h22a10.78 10.78 0 00-5.4-8.52zM7 15.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm10 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"/></svg><div class="boot-bar"><i></i></div><p id="boot-caption" class="boot-caption">Iniciando…</p></div></div>
           <div id="android-device" class="android-device" hidden>
             <div id="android-screen" class="android-screen">
               <div id="android-content" class="android-content"></div>
@@ -208,7 +212,7 @@
           </div>
           <div id="error-panel" class="error-panel" role="alert" hidden><span class="error-icon">!</span><h2 id="error-title">Não foi possível executar</h2><p id="error-message"></p><details id="error-diagnostics" hidden><summary>Detalhes técnicos da execução</summary><pre id="error-detail" hidden></pre></details><button id="error-copy" type="button">Copiar diagnóstico</button> <button id="error-summary" type="button" title="Mostra só o resumo (memória, quem retém, exceções, thread principal) em letras grandes: uma foto basta">Mostrar resumo</button></div>
         </div>
-        <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Aguardando um aplicativo</span></span><span id="memory-meter" class="memory-meter" role="status" hidden><i></i><span></span></span><span id="execution-engine">411 × 914 dp · DENSIDADE 1</span></div>
+        <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Aguardando um aplicativo</span></span><span id="memory-meter" class="memory-meter" role="status" hidden><i></i><span></span></span><span id="execution-engine">411 × 914 dp · densidade 1</span></div>
         <details id="trace" class="trace"><summary><span>Log de execução</span><span id="trace-count">0 eventos</span><span class="trace-actions"><button id="screen-state-summary" type="button" title="Mostra só o resumo (memória, quem retém, exceções, thread principal) em letras grandes: uma foto basta">Resumo</button><button id="screen-state-copy" type="button" title="Copia um resumo do que a VM mostra (Activities, árvore de views, Compose, quadros, fila, threads, memória) mesmo sem erro">Estado</button></span><span class="trace-chevron">⌄</span></summary><pre id="trace-output">O log aparecerá após a execução.</pre></details>
         <details id="logcat" class="trace logcat"><summary><span>Logcat</span><span class="logcat-count">0 linhas</span><span class="trace-chevron">⌄</span></summary>
           <div class="logcat-bar"><input class="logcat-filter" type="search" placeholder="Filtrar por tag ou texto" aria-label="Filtrar logcat por tag ou texto"><select class="logcat-level" aria-label="Nível mínimo"><option value="V">V Verbose</option><option value="D">D Debug</option><option value="I">I Info</option><option value="W">W Warning</option><option value="E">E Error</option></select><label class="logcat-auto"><input class="logcat-autoscroll" type="checkbox" checked> Rolar</label><button class="logcat-clear" type="button">Limpar</button><select class="logcat-scope" aria-label="O que salvar"><option value="all">Salvar tudo</option><option value="filtered">Salvar o filtrado</option></select><button class="logcat-save" type="button">Salvar</button></div>
@@ -224,14 +228,13 @@
       </section>
     </div>
     <details id="scenario-catalog" class="scenario-catalog">
-      <summary><span class="catalog-icon" aria-hidden="true">▦</span><span>Biblioteca de APKs <small>Cenários de teste</small></span><span class="catalog-toggle" aria-hidden="true">+</span></summary>
+      <summary><h2>Exemplos</h2><span id="catalog-count" class="catalog-count"></span><span class="catalog-toggle trace-chevron" aria-hidden="true">⌄</span></summary>
       <div class="catalog-body">
-        <div class="catalog-intro"><div><h2>Aplicativos reais para explorar os limites da VM.</h2><p>Baixe um APK ou inspecione seu pacote, Activities e dependências no próprio navegador.</p></div><span class="catalog-local">ARQUIVOS LOCAIS · SEM UPLOAD</span></div>
-        <p class="catalog-boundary"><span aria-hidden="true">ⓘ</span> Os casos avançados são APKs Android reais para tentativas experimentais e diagnóstico. Inspecionar lê os DEX reais; Executar tenta iniciar a Activity e informa o primeiro limite encontrado. Bibliotecas nativas empacotadas não garantem suporte JNI. O exemplo Compose Web permanece separado.</p>
-        <div id="scenario-list" class="scenario-list" aria-live="polite"><p class="catalog-loading">Carregando catálogo…</p></div>
+        <p class="catalog-intro">APKs de teste servidos por esta página. Inspecionar lê os DEX do pacote; Executar tenta iniciar a Activity e mostra o primeiro limite encontrado. Os experimentais são APKs Android reais para diagnóstico e podem parar em uma API que a VM ainda não tem; bibliotecas nativas no pacote não garantem suporte a JNI.</p>
+        <div class="catalog-head" aria-hidden="true"><span>Exemplo</span><span>Arquivo</span><span>Estado</span><span></span></div>
+        <div id="scenario-list" class="scenario-list" aria-live="polite"><p class="catalog-loading">Carregando exemplos…</p></div>
       </div>
     </details>
-    <footer><span><span class="footer-dot"></span> Sem instalação. Sem emulador. Sem upload.</span><a href="./hermes-proof/">Experimento Hermes no navegador ↗</a><span>APK Browser Lab <span class="footer-slash">/</span> protótipo técnico</span></footer>
   </main>
   <div id="tool-dock" class="tool-dock" role="region" aria-label="Ferramentas">
     <div class="tool-dock-panel" hidden>
@@ -241,7 +244,37 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=ee4847240266"></script>
+  <script type="module" src="./app.js?v=94fc4dedf7f2"></script>
+  <script>
+  // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
+  // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.
+  (() => {
+    const $ = id => document.getElementById(id), stage = $('preview-stage'), box = $('stage-callouts'); if (!stage || !box || !('ResizeObserver' in window)) return;
+    const device = $('android-device'), boot = $('boot-overlay'), empty = $('empty-preview'), engine = $('execution-engine'), summary = $('device-summary');
+    let queued = false;
+    const dp = (element, w, h) => { const a = Number(element.style.getPropertyValue(w)), b = Number(element.style.getPropertyValue(h)); return a > 0 && b > 0 ? [a, b] : null; };
+    const fromText = text => { const m = /(\d+)\s*×\s*(\d+)/.exec(text ?? ''); return m ? [Number(m[1]), Number(m[2])] : null; };
+    const draw = () => {
+      queued = false;
+      const target = !device.hidden ? device : !boot.hidden ? boot : !empty.hidden ? empty : null;
+      if (!target || stage.classList.contains('device-fullscreen')) { box.hidden = true; return; }
+      const size = (target === device ? dp(device, '--screen-w', '--screen-h') : target === boot ? dp(boot, '--boot-w', '--boot-h') : null) ?? fromText(summary?.textContent) ?? fromText(engine?.textContent);
+      const s = stage.getBoundingClientRect(), r = target.getBoundingClientRect(); if (!size || r.width < 40) { box.hidden = true; return; }
+      const x = r.left - s.left, y = r.top - s.top, density = /densidade\s*([\d.,]+)/i.exec(engine?.textContent ?? '')?.[1];
+      box.style.setProperty('--x', x + 'px'); box.style.setProperty('--y', y + 'px'); box.style.setProperty('--w', r.width + 'px'); box.style.setProperty('--h', r.height + 'px');
+      box.dataset.top = y >= 28 ? 'line' : 'none'; box.dataset.side = s.width - (x + r.width) >= 132 ? 'line' : 'none';
+      $('callout-w').textContent = size[0] + ' dp'; $('callout-h').textContent = box.dataset.top === 'none' ? size[0] + ' × ' + size[1] + ' dp' : size[1] + ' dp';
+      $('callout-note').textContent = (density ? 'densidade ' + density + '\n' : '') + 'escala ' + Math.round(r.width / (size[0] + 10) * 100) + '%';
+      box.hidden = false;
+    };
+    const queue = () => { if (!queued) { queued = true; requestAnimationFrame(draw); } };
+    const resize = new ResizeObserver(queue); for (const element of [stage, device, boot, empty]) resize.observe(element);
+    const mutation = new MutationObserver(queue);
+    for (const element of [stage, device, boot, empty]) mutation.observe(element, { attributes: true, attributeFilter: ['style', 'hidden', 'class'] });
+    for (const element of [engine, summary]) if (element) mutation.observe(element, { childList: true, characterData: true, subtree: true });
+    addEventListener('resize', queue); queue();
+  })();
+  </script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Adicionar mock</h2><button id="em-close" type="button" class="em-close" aria-label="Fechar sem salvar">×</button></div>
@@ -261,7 +294,7 @@
         <label class="em-field" for="em-status-code"><span>Status</span><input id="em-status-code" type="number" inputmode="numeric" min="200" max="599" step="1" aria-describedby="em-err-status"></label>
         <label class="em-field" for="em-reason"><span>Mensagem <small>vazio: a padrão do status</small></span><input id="em-reason" type="text" autocomplete="off" placeholder="OK" aria-describedby="em-err-status"></label>
         <small id="em-err-status" class="em-error em-wide" hidden></small>
-        <div class="em-wide em-headers-box" role="group" aria-labelledby="em-headers-title"><span id="em-headers-title" class="em-label">Cabeçalhos</span><ul id="em-headers" class="em-headers"></ul><button id="em-header-add" type="button" class="cp-button">+ Cabeçalho</button><small id="em-err-headers" class="em-error" hidden></small></div>
+        <div class="em-wide em-headers-box" role="group" aria-labelledby="em-headers-title"><span id="em-headers-title" class="em-label">Cabeçalhos</span><ul id="em-headers" class="em-headers"></ul><button id="em-header-add" type="button" class="cp-button">Adicionar cabeçalho</button><small id="em-err-headers" class="em-error" hidden></small></div>
         <label class="em-field em-wide" for="em-body"><span>Corpo</span><textarea id="em-body" rows="8" spellcheck="false" autocomplete="off" aria-describedby="em-body-hint em-err-body"></textarea></label>
         <div class="em-wide em-body-tools"><button id="em-body-file-button" type="button" class="cp-button">Carregar de arquivo…</button><input id="em-body-file" type="file" hidden><button id="em-body-file-clear" type="button" class="cp-button" hidden>Remover arquivo</button><button id="em-body-format" type="button" class="cp-button" hidden>Formatar JSON</button><span id="em-body-file-info" class="em-help" role="status"></span></div>
         <small id="em-body-hint" class="em-hint em-wide" role="status" aria-live="polite"></small>

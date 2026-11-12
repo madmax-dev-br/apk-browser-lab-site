@@ -196,7 +196,7 @@
 /* boot overlay: the phone frame shown from the click on "Executar APK" until the first real frame */
 .boot-overlay{position:absolute;left:50%;top:50%;z-index:6;width:calc(var(--boot-w,411)*1px + 10px);height:calc(var(--boot-h,914)*1px + 10px);transform:translate(-50%,-50%) scale(var(--boot-scale,.7));transform-origin:center center;background:#262934;border-radius:34px;padding:5px;opacity:1;transition:opacity .35s ease;pointer-events:none}
 .boot-overlay.fading{opacity:0}
-.boot-screen{width:100%;height:100%;border-radius:28px;background:radial-gradient(circle at 50% 42%,#1c2030 0,#0b0d14 70%);color:#a4c639;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px}
+.boot-screen{width:100%;height:100%;border-radius:28px;background:radial-gradient(circle at 50% 42%,#1c2030 0,#0b0d14 70%);color:#3ddc84;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px}
 .boot-logo{width:104px;height:104px;animation:boot-pulse 1.6s ease-in-out infinite}
 .boot-eye{fill:#0b0d14}
 .boot-bar{width:140px;height:4px;border-radius:2px;background:#2a2f40;overflow:hidden;position:relative}
@@ -487,14 +487,8 @@ body.lab-modal-open{overflow:hidden}
 :root[data-theme=dark] .netlog-menu-item{color:#d0d3da}
 :root[data-theme=dark] .netlog-menu-item:hover,:root[data-theme=dark] .netlog-menu-item:focus-visible{background:#26233f;color:#c9c5ff}
 :root[data-theme=dark] .netlog-body{background:#14161c;color:#c4c8d2}
-/* Load times and the prepared file (.apklab) */
+/* Load times */
 .load-times{font:10px/1.6 ui-monospace,monospace;color:#6f7686;margin:10px 0 0;word-break:break-word}
-.file-info:has(.prepare-file:not([hidden])){flex-wrap:wrap}
-.file-info:has(.prepare-file:not([hidden]))>div{flex:1 1 0}
-.prepare-file{order:99;flex:1 0 100%;font-size:9px;font-weight:600;background:#eef6f1;border:1px solid #d6eadc;color:#4f8a63;border-radius:5px;padding:6px;cursor:pointer}
-.prepare-file:hover{background:#e3f1e8}
-.prepare-file:disabled{opacity:.6;cursor:progress}
-:root[data-theme=dark] .prepare-file{background:#13261b;border-color:#2b4a36;color:#8fc9a2}
 :root[data-theme=dark] .load-times{color:#a3a7b1}
 .mcp-token-field label{font:inherit;color:inherit}
 .mcp-token-row{display:flex;gap:4px;min-width:0}
@@ -573,3 +567,49 @@ body.lab-dragging{user-select:none;-webkit-user-select:none}
 .pb-toolbar .pb-toolbar-button.pb-primary{border-style:solid;background:var(--accent);color:#fff}.pb-toolbar .pb-toolbar-button.pb-danger{border-color:#e7b4b1;color:#b4403a;background:#fff7f6}
 :root[data-theme=dark] .pb-button.pb-danger,:root[data-theme=dark] .pb-toolbar .pb-toolbar-button.pb-danger{background:#2a1517;border-color:#5a2c2f;color:#f0a39e}:root[data-theme=dark] .pb-button.pb-primary{background:var(--accent);border-color:var(--accent);color:#14131b}
 :root[data-theme=dark] .pb-toolbar{border-left-color:#3a314b}:root[data-theme=dark] .pb-toolbar .pb-toolbar-button{background:#1a1325;border-color:#4a3e66;color:#b2a6d6}:root[data-theme=dark] .pb-toolbar .pb-toolbar-button.pb-primary{background:var(--accent);color:#14131b}
+
+/* A View that drew its own text on the Canvas that is its content raster (src/device-view.js, textInContent): the element's own glyphs are transparent, so the text is not drawn twice. */
+[data-text-in-content=true]{color:transparent!important;caret-color:#1b1b1f}[data-text-in-content=true]::placeholder{color:transparent!important}
+/* SystemUI navigation on the page (src/task-switcher.js): launcher with the installed app, recents card, the swipe-up zone and the three buttons. */
+.launcher-layer{position:absolute;inset:0;z-index:0;background:radial-gradient(120% 80% at 20% 0,#3b5bdb 0,transparent 60%),radial-gradient(110% 70% at 100% 30%,#7048e8 0,transparent 55%),linear-gradient(160deg,#101a3a,#1b1040 60%,#0b0f24);display:grid;grid-template-columns:repeat(4,1fr);align-content:start;padding:calc(var(--status-h,24)*1px + 56px) 18px 0;font-family:AndroidRoboto,Roboto,Arial,sans-serif}
+.launcher-layer[hidden]{display:none}
+.launcher-app{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:7px;padding:8px 2px;border-radius:16px;color:#fff;-webkit-tap-highlight-color:transparent}
+.launcher-app:focus-visible{outline:2px solid #fff;outline-offset:2px}.launcher-app:active .launcher-icon{transform:scale(.92)}
+.launcher-icon{width:56px;height:56px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:#ffffff14;transition:transform .12s;box-shadow:0 2px 6px #0005}
+.launcher-icon img{width:100%;height:100%;display:block;object-fit:cover}.launcher-icon.generic{background:#fff;color:#3ddc84}.launcher-icon svg{width:36px;height:36px}
+.launcher-label{font-size:12px;line-height:15px;max-width:76px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 2px #000a}
+.launcher-hint{display:none}
+.android-screen[data-task=overview]>.android-content,.android-screen[data-task=dragging]>.android-content{box-shadow:0 18px 50px #000a;overflow:hidden}
+.android-screen[data-task=overview]>.android-content,.android-screen[data-task=overview]>.android-window-layer,.android-screen[data-task=home]>.android-content,.android-screen[data-task=home]>.android-window-layer,.android-screen[data-task=closed]>.android-content,.android-screen[data-task=closed]>.android-window-layer{pointer-events:none}
+.android-screen[data-task=overview] .sysbar-status,.android-screen[data-task=home] .sysbar-status,.android-screen[data-task=closed] .sysbar-status,.android-screen[data-task=dragging] .sysbar-status{background:transparent!important;color:#fff}
+.android-screen[data-task=overview] .sysbar-nav,.android-screen[data-task=home] .sysbar-nav,.android-screen[data-task=closed] .sysbar-nav,.android-screen[data-task=dragging] .sysbar-nav{background:transparent!important;color:#fff}
+.task-card-hit{all:unset;position:absolute;inset:0;z-index:55;cursor:pointer}.task-card-hit[hidden]{display:none}
+.task-gesture-zone{position:absolute;left:0;right:0;bottom:0;height:26px;z-index:62;touch-action:none;cursor:grab}
+.sysbar-nav.buttons~.task-gesture-zone,.system-bars:has(.sysbar-nav.buttons)~.task-gesture-zone{display:none}
+.sysbar-nav.buttons .sysbar-buttons{pointer-events:auto}.sysbar-nav.buttons .sysbar-buttons i{cursor:pointer;outline:14px solid transparent}
+/* Back gesture (edge strips + bubble) and the blurred launcher behind the recents card (src/task-switcher.js). */
+.task-back-edge{position:absolute;top:calc(var(--status-h,24)*1px);bottom:26px;width:14px;z-index:62;touch-action:none}
+.task-back-edge.left{left:0}.task-back-edge.right{right:0}
+.system-bars:has(.sysbar-nav.buttons)~.task-back-edge,.android-screen[data-task=overview]>.task-back-edge,.android-screen[data-task=home]>.task-back-edge,.android-screen[data-task=closed]>.task-back-edge{display:none}
+.task-back-bubble{position:absolute;z-index:63;width:44px;height:44px;margin-top:-22px;border-radius:50%;display:grid;place-items:center;pointer-events:none;background:#1b1b1fd9;color:#fff;box-shadow:0 4px 14px #0006;transform:scale(var(--grow,.6));transition:background-color .12s,color .12s}
+.task-back-bubble[hidden]{display:none}.task-back-bubble svg{width:24px;height:24px}
+.task-back-bubble[data-side=right] svg{transform:scaleX(-1)}
+.task-back-bubble[data-armed=true]{background:#fff;color:#1b1b1f}
+.launcher-layer{transition:filter .26s,transform .26s}
+.android-screen[data-task=overview]>.launcher-layer,.android-screen[data-task=dragging]>.launcher-layer{filter:blur(18px) brightness(.7);transform:scale(1.12)}
+.sysbar-nav.adaptive:not(.buttons) .sysbar-handle{background:transparent;-webkit-backdrop-filter:invert(1) grayscale(1) contrast(100);backdrop-filter:invert(1) grayscale(1) contrast(100)}
+/* The launcher before an app runs (src/task-switcher.js home()): a hint when nothing is installed, a spinner over the icon while the package is read. */
+.launcher-hint{display:block;grid-column:1/-1;margin-top:38%;text-align:center;color:#ffffffb3;font-size:14px;line-height:20px}.launcher-hint[hidden]{display:none}
+.launcher-app[hidden]{display:none}.launcher-app{position:relative}.launcher-app:disabled{cursor:progress}
+.launcher-installing{display:none;position:absolute;top:8px;left:50%;width:56px;height:56px;margin-left:-28px;border-radius:50%;background:#0b0f2499;place-items:center}
+.launcher-app[data-state=installing] .launcher-installing{display:grid}
+.launcher-installing::after{content:"";width:26px;height:26px;border-radius:50%;border:3px solid #ffffff40;border-top-color:#fff;animation:launcher-spin .9s linear infinite}
+@keyframes launcher-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.launcher-installing::after{animation-duration:2.4s}}
+#preview-stage.apk-dragging .android-screen{outline:3px solid #7c93ff;outline-offset:3px}
+/* Launch screen: only the app's icon, centred, like Android's splash screen. What is happening is written in the status line under the device, so the bar and the caption are
+   not drawn (the caption stays in the page for screen readers: the overlay is a live status region). */
+.boot-app-icon{width:112px;height:112px;border-radius:26px;object-fit:cover;box-shadow:0 6px 22px #0007}.boot-app-icon[hidden]{display:none}
+.boot-overlay.has-app-icon .boot-logo{display:none}
+.boot-overlay .boot-bar{display:none}
+.boot-overlay .boot-caption{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}

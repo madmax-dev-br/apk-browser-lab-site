@@ -6,7 +6,8 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=ee4847240266">
+  <link rel="stylesheet" href="./site-pages.css?v=94fc4dedf7f2">
+  <link rel="stylesheet" href="./lab-tokens.css?v=94fc4dedf7f2">
 </head>
 <body>
   <header class="topbar">
@@ -850,13 +851,30 @@ lab.watch({ static: 'com.exemplo.Sessao' }, 'atual.usuario', v =&gt; lab.ui.json
       <section id="mcp" aria-labelledby="h-mcp">
         <h2 id="h-mcp">MCP: o Claude usando esta página</h2>
         <p>Um cliente MCP (Claude Code, Claude Desktop) pode usar a página do lab aberta no seu navegador: tirar print da tela ou de um componente, ler a saída dos plugins, a árvore do Compose com os CompositionLocals de cada composable, ViewModels e estado estático, o Logcat e a rede. Uma página web não aceita conexões, então uma ponte pequena roda no seu computador entre os dois:</p>
-        <div class="code" data-name="caminho da conexão"><pre><code>cliente MCP  --stdio-->  lab-mcp.mjs (127.0.0.1:8790)  <--  esta página (Controles › MCP › Conectar)</code></pre></div>
+        <div class="code" data-name="caminho da conexão"><pre><code>cliente MCP  --HTTP (endereço) ou stdio-->  lab-mcp.mjs (127.0.0.1:8790)  <--  esta página (Controles › MCP › Conectar)</code></pre></div>
 
-        <h3 id="mcp-conectar">Conectar</h3>
+        <h3 id="mcp-endereco">Conectar por endereço (o jeito simples)</h3>
+        <p>A ponte fica rodando e o agente se conecta a ela por um endereço HTTP, com IP e porta. Em <b>Controles › MCP</b> a página mostra os dois textos prontos, já com o token de pareamento dela:</p>
         <ol>
-          <li><b>Baixe a ponte</b> (Node.js 22 ou mais novo, sem dependências) e informe onde a salvou em <b>Controles › MCP › Onde está a ponte</b>.
+          <li><b>Rode no terminal e deixe aberto</b> (Node.js 22 ou mais novo, sem dependências). O comando baixa a ponte e a inicia; ela mostra os endereços em que atende.
+            <div class="code" data-name="iniciar a ponte"><pre><code>curl -sO https://madmax-dev-br.github.io/apk-browser-lab-site/tools/lab-mcp.mjs &amp;&amp; node lab-mcp.mjs serve --token &lt;o token da página&gt;</code></pre></div></li>
+          <li><b>Conecte o agente ao endereço.</b> No Claude Code:
+            <div class="code" data-name="adicionar ao agente"><pre><code>claude mcp add --transport http apk-lab http://127.0.0.1:8790/mcp/&lt;o token da página&gt;</code></pre></div>
+            No Codex, em <code>~/.codex/config.toml</code>:
+            <div class="code" data-name="Codex"><pre><code>[mcp_servers.apk-lab]
+url = "http://127.0.0.1:8790/mcp/&lt;o token da página&gt;"</code></pre></div>
+            No Cursor, em <code>.cursor/mcp.json</code> (a página também oferece um link que adiciona com um clique):
+            <div class="code" data-name="Cursor"><pre><code>{ "mcpServers": { "apk-lab": { "url": "http://127.0.0.1:8790/mcp/&lt;o token da página&gt;" } } }</code></pre></div>
+            Em <b>Controles › MCP</b>, os botões <b>Claude</b>, <b>Codex</b> e <b>Cursor</b> mostram cada um desses textos já com o token. Outros clientes MCP aceitam o mesmo endereço como servidor HTTP (Streamable HTTP).</li>
+          <li><b>Clique em Conectar</b> na página.</li>
+        </ol>
+        <p><b>Agente em outra máquina da rede:</b> marque <b>Aceitar agentes de outras máquinas da rede</b> (o comando ganha <code>--host 0.0.0.0</code>) e use no agente o endereço com o IP local que a ponte mostrar, por exemplo <code>http://192.168.0.20:8790/mcp/&lt;token&gt;</code>. A página continua falando com a ponte por <code>127.0.0.1</code>, então ponte e navegador ficam no mesmo computador. Nesse modo quem estiver na rede alcança a porta: o token no endereço é a única proteção e o tráfego vai sem criptografia; use só em redes de confiança.</p>
+
+        <h3 id="mcp-conectar">Conectar pela configuração do cliente (o cliente inicia a ponte)</h3>
+        <ol>
+          <li><b>Baixe a ponte</b> (Node.js 22 ou mais novo, sem dependências) e troque <code>/caminho/para/lab-mcp.mjs</code> pelo lugar onde a salvou.
             <div class="code" data-name="baixar a ponte"><pre><code>curl -O https://madmax-dev-br.github.io/apk-browser-lab-site/tools/lab-mcp.mjs</code></pre></div></li>
-          <li><b>Copie a configuração.</b> A página gera um token de pareamento (192 bits aleatórios, guardado só neste navegador; <b>Mostrar</b> revela, <b>Gerar novo</b> troca) e monta o JSON do cliente MCP com ele. Clique em <b>Copiar</b> e cole no <code>.mcp.json</code> do seu projeto (Claude Code) ou em <code>claude_desktop_config.json</code> (Claude Desktop); se o arquivo já tem <code>mcpServers</code>, junte a entrada <code>apk-lab</code> às outras. Reinicie o cliente: ele inicia a ponte sozinho.
+          <li><b>Copie a configuração.</b> Use o token de pareamento da página (192 bits aleatórios, guardado só neste navegador; <b>Mostrar</b> revela, <b>Gerar novo</b> troca) no JSON abaixo e cole no <code>.mcp.json</code> do seu projeto (Claude Code) ou em <code>claude_desktop_config.json</code> (Claude Desktop); se o arquivo já tem <code>mcpServers</code>, junte a entrada <code>apk-lab</code> às outras. Reinicie o cliente: ele inicia a ponte sozinho.
             <div class="code" data-name="configuração do cliente MCP"><pre><code>{
   "mcpServers": {
     "apk-lab": {
@@ -1255,6 +1273,6 @@ lab.ui.kv({ recortes: variante.images.length, 'tela parada': variante.settled, '
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=ee4847240266"></script>
+  <script type="module" src="./site-pages.js?v=94fc4dedf7f2"></script>
 </body>
 </html>

@@ -1,12 +1,12 @@
-import { APKError } from './apk-error.js?v=ee4847240266';
-import { throwNew } from './java-throw.js?v=ee4847240266';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=ee4847240266';
-import { networkOf, isIpLiteral } from './network-native.js?v=ee4847240266';
-import { Blocked } from './scheduler.js?v=ee4847240266';
-import { installUdp } from './udp-native.js?v=ee4847240266';
-import { createLoopback } from './loopback-socket.js?v=ee4847240266';
-import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=ee4847240266';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=ee4847240266';
+import { APKError } from './apk-error.js?v=94fc4dedf7f2';
+import { throwNew } from './java-throw.js?v=94fc4dedf7f2';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=94fc4dedf7f2';
+import { networkOf, isIpLiteral } from './network-native.js?v=94fc4dedf7f2';
+import { Blocked } from './scheduler.js?v=94fc4dedf7f2';
+import { installUdp } from './udp-native.js?v=94fc4dedf7f2';
+import { createLoopback } from './loopback-socket.js?v=94fc4dedf7f2';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=94fc4dedf7f2';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=94fc4dedf7f2';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -363,14 +363,23 @@ export function createLibcoreIoNativeBindings() {
   const hostOf = (runtime, address) => runtime.stringCharacters(runtime.dispatch({ owner: INET, name: 'getHostAddress', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [address], 'virtual'));
   // java.net.SocketInputStream.socketRead0 / SocketOutputStream.socketWrite0 (libcore's OpenJdk natives): the streams of Socket.getInputStream/getOutputStream; `timeout` is SO_TIMEOUT in ms (0 = none)
   const SIS = 'Ljava/net/SocketInputStream;', SOS = 'Ljava/net/SocketOutputStream;';
+  // A descriptor that is gone (the socket was closed, often by another thread while this one was about to read or write): SocketInputStream.c / SocketOutputStream.c throw
+  // java.net.SocketException("Socket closed") for a null descriptor and for EBADF. It must be an IOException: the callers (and every HTTP client above them) catch IOException,
+  // and an android.system.ErrnoException here escaped them all and ended the thread as an uncaught exception.
+  const streamSocket = (runtime, fdRef) => {
+    const entry = fdRef === null || fdRef === undefined || fdRef === 0 ? null : state(runtime).table.get(fdNumber(runtime, fdRef));
+    if (!entry || entry.desc.kind === 'closed') throwNew(runtime, 'Ljava/net/SocketException;', 'Socket closed');
+    if (entry.desc.kind !== 'socket') throwNew(runtime, 'Ljava/net/SocketException;', 'Socket operation on non-socket');
+    return entry.desc;
+  };
   add(SIS, 'socketRead0(Ljava/io/FileDescriptor;[BIII)I', (runtime, [, fdRef, buffer, offset, length, timeout]) => {
-    const desc = entryOf(runtime, 'read', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'read', 'ENOTSOCK');
+    const desc = streamSocket(runtime, fdRef);
     const cells = runtime.object(buffer).elements;
     if (offset < 0 || length < 0 || offset > cells.length - length) runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `length=${cells.length}; regionStart=${offset}; regionLength=${length}`);
     return readSocket(runtime, desc, length, timeout, bytes => { for (let i = 0; i < bytes.length; i++) cells[offset + i] = (bytes[i] << 24) >> 24; return bytes.length; }, [buffer]);
   });
   add(SOS, 'socketWrite0(Ljava/io/FileDescriptor;[BII)V', (runtime, [, fdRef, buffer, offset, length]) => {
-    const desc = entryOf(runtime, 'write', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'write', 'ENOTSOCK');
+    const desc = streamSocket(runtime, fdRef);
     const cells = runtime.object(buffer).elements;
     if (offset < 0 || length < 0 || offset > cells.length - length) runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `length=${cells.length}; regionStart=${offset}; regionLength=${length}`);
     const result = writeSocket(runtime, desc, Uint8Array.from(cells.slice(offset, offset + length), v => v & 255), { all: true });

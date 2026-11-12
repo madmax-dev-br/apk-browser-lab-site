@@ -1,9 +1,9 @@
-import { unsignedBytes } from './java-arrays.js?v=ee4847240266';
-import { APKError } from './apk-error.js?v=ee4847240266';
-import { APKArchive } from './apk-loader.js?v=ee4847240266';
-import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=ee4847240266';
-import { createHostRegistry } from './host-contract.js?v=ee4847240266';
-import { normalizePath } from './virtual-fs.js?v=ee4847240266';
+import { unsignedBytes } from './java-arrays.js?v=94fc4dedf7f2';
+import { APKError } from './apk-error.js?v=94fc4dedf7f2';
+import { APKArchive } from './apk-loader.js?v=94fc4dedf7f2';
+import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=94fc4dedf7f2';
+import { createHostRegistry } from './host-contract.js?v=94fc4dedf7f2';
+import { normalizePath } from './virtual-fs.js?v=94fc4dedf7f2';
 
 // dalvik.system.{BaseDexClassLoader, InMemoryDexClassLoader, DexClassLoader, PathClassLoader, DexFile}: code that is only available at run time
 // (decrypted payloads, downloaded plugins). The DEX bytes are parsed by the same DexFile reader as APK classes and joined to the single VM class

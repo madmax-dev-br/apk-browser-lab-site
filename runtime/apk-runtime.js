@@ -1,32 +1,32 @@
-import { VMClock } from './vm-clock.js?v=ee4847240266';
-import { overrideHit } from './method-overrides.js?v=ee4847240266';
-import { OperationMonitor } from './operation-monitor.js?v=ee4847240266';
-import { ExecutionProfile } from './execution-profile.js?v=ee4847240266';
-import { SamplingProfiler } from './sampling-profiler.js?v=ee4847240266';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=ee4847240266';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=ee4847240266';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=ee4847240266';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=ee4847240266';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=ee4847240266';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=ee4847240266';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=ee4847240266';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=ee4847240266';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=ee4847240266';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=ee4847240266';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=ee4847240266';
-import { APKError } from './apk-error.js?v=ee4847240266';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=ee4847240266';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=ee4847240266';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=ee4847240266';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=ee4847240266';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=ee4847240266';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=ee4847240266';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=ee4847240266';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=ee4847240266';
+import { VMClock } from './vm-clock.js?v=94fc4dedf7f2';
+import { overrideHit } from './method-overrides.js?v=94fc4dedf7f2';
+import { OperationMonitor } from './operation-monitor.js?v=94fc4dedf7f2';
+import { ExecutionProfile } from './execution-profile.js?v=94fc4dedf7f2';
+import { SamplingProfiler } from './sampling-profiler.js?v=94fc4dedf7f2';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=94fc4dedf7f2';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=94fc4dedf7f2';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=94fc4dedf7f2';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=94fc4dedf7f2';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=94fc4dedf7f2';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=94fc4dedf7f2';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=94fc4dedf7f2';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=94fc4dedf7f2';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=94fc4dedf7f2';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=94fc4dedf7f2';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=94fc4dedf7f2';
+import { APKError } from './apk-error.js?v=94fc4dedf7f2';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=94fc4dedf7f2';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=94fc4dedf7f2';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=94fc4dedf7f2';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=94fc4dedf7f2';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=94fc4dedf7f2';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=94fc4dedf7f2';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=94fc4dedf7f2';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=94fc4dedf7f2';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=ee4847240266';
-import { bootClassLacksMember } from './boot-class-members.js?v=ee4847240266';
-export { APKError } from './apk-error.js?v=ee4847240266';
+import { Scheduler, Blocked } from './scheduler.js?v=94fc4dedf7f2';
+import { bootClassLacksMember } from './boot-class-members.js?v=94fc4dedf7f2';
+export { APKError } from './apk-error.js?v=94fc4dedf7f2';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1144,11 +1144,11 @@ export const LATE_RUNTIME_PROPERTIES = Object.freeze([
   'loadTiming', 'rasterStats', 'rasterCache', 'rasterCacheBytes', 'threadGroups', 'systemThreadGroup', 'mainThreadGroup', 'uncaughtHook', 'themeLightingCache', 'gcDeferral', 'gcDeferralStats', 'gcMarkChunks',
   'gcHeavyPaths', 'gcTopRoots', 'gcFreedRing', 'gcPhases', 'gcNextAt', 'gcMinAlloc', 'gcOldSize', 'gcMinorMs', 'gcPressure', 'gcCellPressure', 'gcLastNextId', 'arrayBytes', 'gcStats', 'gcLastEnd',
   'gcLastMs', 'gcTotalMs', 'gcMinorHeld', 'gcMinorStats', 'gcNurseryNow', 'gcSafepointTries', 'libcoreIo', 'hostStaticValues', 'rasterCacheDisabled', 'rasterCacheVerify', 'strictCrash',
-  'androidxVersions', 'reactNativeVersion', 'hermesBytecodeVersion', 'apkSigningCertificates', 'apkFileSource', 'gcExtraRoots', 'gcEnabled', 'propertyValuesHolderJni', 'pointerGesture',
+  'androidxVersions', 'packagedBuildIds', 'reactNativeVersion', 'hermesBytecodeVersion', 'apkSigningCertificates', 'apkFileSource', 'gcExtraRoots', 'gcEnabled', 'propertyValuesHolderJni', 'pointerGesture',
   'lastPointerTime',
 ]);
 export class APKRuntime {
-  constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off', engine = 'js' } = {}) {
+  constructor(dex, { apkEntries = new Set(), apkReader = null, apkEntryRange = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off', engine = 'js' } = {}) {
     if (!Number.isInteger(maxCallDepth) || maxCallDepth < 16 || maxCallDepth > 100000) fail('VM maxCallDepth must be an integer from 16 to 100000');
     // The engine (docs/WASM-CORE-PLANO.md, decision 1): 'js' is this VM; 'wasm' keeps this runtime as the host side (class model, bridges, platform) of core.wasm, which holds the Java heap,
     // the frames and the interpreter. vmcore/js/host-bridge.js attachWasmEngine(runtime) attaches the core to a runtime created with 'wasm' before anything runs, and redirects the entry points
@@ -1156,7 +1156,7 @@ export class APKRuntime {
     if (engine !== 'js' && engine !== 'wasm') fail("VM engine must be 'js' or 'wasm'");
     this.engine = engine;
     if(!Number.isInteger(maxHeapObjects)||maxHeapObjects<1024||maxHeapObjects>2097152)fail('VM maxHeapObjects must be an integer from 1024 to 2097152');
-    this.maxHeapObjects=maxHeapObjects; { const scale = Math.max(1, maxHeapObjects / 262144); this.maxFieldSlots = Math.round(3000000 * scale); this.maxArrayCells = Math.round(8000000 * scale); this.maxCollectionCells = Math.round(8000000 * scale); } /* storage budgets grow with the object limit: about 11 field slots, 30 array cells and 30 collection cells per object (a Kotlin/Compose object carries many fields; the old 3.8 slots per object made the field budget run out at half the object limit) */ this.gcSafepointFloor=Math.floor(maxHeapObjects*0.25); this.apkEntries=apkEntries; this.apkReader=apkReader;
+    this.maxHeapObjects=maxHeapObjects; { const scale = Math.max(1, maxHeapObjects / 262144); this.maxFieldSlots = Math.round(3000000 * scale); this.maxArrayCells = Math.round(8000000 * scale); this.maxCollectionCells = Math.round(8000000 * scale); } /* storage budgets grow with the object limit: about 11 field slots, 30 array cells and 30 collection cells per object (a Kotlin/Compose object carries many fields; the old 3.8 slots per object made the field budget run out at half the object limit) */ this.gcSafepointFloor=Math.floor(maxHeapObjects*0.25); this.apkEntries=apkEntries; this.apkReader=apkReader; this.apkEntryRange = apkEntryRange;
     // Opt-in tolerant mode for platform methods the lab does not implement: 'void' skips void ones; 'primitives' also answers
     // boolean/byte/short/char/int/long/float/double methods with 0/false; 'all' also answers object methods with null. Every stubbed call is counted and traced (STUB-VOID / STUB-RETURN), so the run
     // doubles as the to-do list of missing bridges; a run that stubbed anything is never treated as validated. The default stays strict.
@@ -1827,8 +1827,12 @@ export class APKRuntime {
     if (!this.platform?.back) fail('Back navigation is not implemented for this runtime');
     this.steps = 0; this.platform.back(this); return this.snapshot();
   }
+  /** Home / recents: the task leaves the screen (onUserLeaveHint, onPause, onStop) and stays alive in the background. */
+  home() { this.platform?.looperHost?.hostEventRan(this); this.platform?.noteInput?.(); this.steps = 0; this.platform.goHome(this); return this.snapshot(); }
+  /** The user picks the task again (launcher icon, recents card): onRestart, onStart, onResume. */
+  resumeTask() { this.platform?.looperHost?.hostEventRan(this); this.platform?.noteInput?.(); this.steps = 0; this.platform.resumeTask(this); return this.snapshot(); }
   snapshot() {
-    const navigation = this.platform?.navigationState?.(this) ?? {};
+    const navigation = this.platform?.navigationState?.(this) ?? {}; navigation.taskInBackground = !!this.platform?.taskInBackground;
     if (this.platform?.taskClosed) return { activityName: null, views: [], texts: [], counters: {}, trace: [...this.trace], clicks: this.clicks, closed: true, canGoBack: false, navigation, ...this.executionSnapshot() };
     if (!this.root && this.platform?.launchPending?.()) return { activityName: null, views: [], texts: [], counters: {}, trace: [...this.trace], clicks: this.clicks, closed: false, canGoBack: false, navigation, ...this.executionSnapshot() };   // between a content-less caller and the Activity it queued
     if (!this.root) fail('No content view');
@@ -1866,6 +1870,7 @@ export class APKRuntime {
         foregroundBounds: v.foregroundBounds ?? null,
         contentRaster: v.contentRaster ? { ...v.contentRaster } : null,   // a copy: the transport (src/raster-cache.js) rewrites the raster object of the message, not the View's
          canvasChildrenCaptured: !!v.canvasChildrenCaptured,
+        textInContent: !!(v.contentRaster && v.nativeCanvasText),   // the View drew its own text on the Canvas that became contentRaster (a TextView/EditText subclass with its own onDraw): the page must not draw the text again
         transformMatrix: this.platform?.viewTransformHost?.snapshot(this, value) ?? null,
         shadow: this.platform?.viewTransformHost?.shadow?.(this, value) ?? null,
         contentDescription: v.contentDescription ?? null,

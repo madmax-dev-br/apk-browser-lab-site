@@ -1,53 +1,57 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=ee4847240266';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=ee4847240266';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=ee4847240266';
-import { initCollapsibleSections } from './panel-sections.js?v=ee4847240266';
-import { warmupLabel } from './warmup.js?v=ee4847240266';
-import { initHelpTips } from './help-tips.js?v=ee4847240266';
-import { createToolDock } from './tool-dock.js?v=ee4847240266';
-import { createPermissionsPanel } from './permissions-panel.js?v=ee4847240266';
-import { createOverridesPanel } from './overrides-panel.js?v=ee4847240266';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=ee4847240266';
-import { createHostMapPanel } from './host-map-panel.js?v=ee4847240266';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=ee4847240266';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=ee4847240266';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=ee4847240266';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=ee4847240266';
-import { createDeviceView, createViewState } from './device-view.js?v=ee4847240266';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=ee4847240266';
-import { formatApiGapReport } from './api-gap-scan.js?v=ee4847240266';
-import { createLogcatPanel } from './logcat-panel.js?v=ee4847240266';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=ee4847240266';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=ee4847240266';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=ee4847240266';
-import { captureImage } from './screen-capture.js?v=ee4847240266';
-import { createPluginsPanel } from './plugins-panel.js?v=ee4847240266';
-import { createMcpTools } from './mcp-tools.js?v=ee4847240266';
-import { createMcpLink, generateMcpToken, mcpClientConfig, mcpBridgePort } from './mcp-link.js?v=ee4847240266';
-import { createModalHost } from './lab-modal.js?v=ee4847240266';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=ee4847240266';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=ee4847240266';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=ee4847240266';
-import { createDragLayer } from './lab-drag.js?v=ee4847240266';
-import { createLabScroll } from './lab-scroll.js?v=ee4847240266';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=ee4847240266';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=ee4847240266';
+import { APKWorkerClient } from './apk-worker-client.js?v=94fc4dedf7f2';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=94fc4dedf7f2';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=94fc4dedf7f2';
+import { initCollapsibleSections } from './panel-sections.js?v=94fc4dedf7f2';
+import { warmupLabel } from './warmup.js?v=94fc4dedf7f2';
+import { initHelpTips } from './help-tips.js?v=94fc4dedf7f2';
+import { createToolDock } from './tool-dock.js?v=94fc4dedf7f2';
+import { createPermissionsPanel } from './permissions-panel.js?v=94fc4dedf7f2';
+import { createOverridesPanel } from './overrides-panel.js?v=94fc4dedf7f2';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=94fc4dedf7f2';
+import { createHostMapPanel } from './host-map-panel.js?v=94fc4dedf7f2';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=94fc4dedf7f2';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=94fc4dedf7f2';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=94fc4dedf7f2';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=94fc4dedf7f2';
+import { createDeviceView, createViewState } from './device-view.js?v=94fc4dedf7f2';
+import { createTaskSwitcher } from './task-switcher.js?v=94fc4dedf7f2';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=94fc4dedf7f2';
+import { formatApiGapReport } from './api-gap-scan.js?v=94fc4dedf7f2';
+import { createLogcatPanel } from './logcat-panel.js?v=94fc4dedf7f2';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=94fc4dedf7f2';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=94fc4dedf7f2';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=94fc4dedf7f2';
+import { captureImage } from './screen-capture.js?v=94fc4dedf7f2';
+import { createPluginsPanel } from './plugins-panel.js?v=94fc4dedf7f2';
+import { createMcpTools } from './mcp-tools.js?v=94fc4dedf7f2';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=94fc4dedf7f2';
+import { createModalHost } from './lab-modal.js?v=94fc4dedf7f2';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=94fc4dedf7f2';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=94fc4dedf7f2';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=94fc4dedf7f2';
+import { createDragLayer } from './lab-drag.js?v=94fc4dedf7f2';
+import { createLabScroll } from './lab-scroll.js?v=94fc4dedf7f2';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=94fc4dedf7f2';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=94fc4dedf7f2';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
+let taskSwitcher = null;   // SystemUI navigation of the device (src/task-switcher.js), created once the device view exists
 const params = new URLSearchParams(location.search);
 if (params.get('embed') === '1') document.body.classList.add('is-embedded');
 
 function notifyParent(type, data = {}) {
   if (window.parent !== window) window.parent.postMessage({ type, ...data }, location.origin);
 }
+/** The empty stage's hint. The published site carries no example APKs (no catalog): there the hint does not point at an Exemplos tab that is not there. */
+function emptyPreviewHint() { return state.noBundledApks ? 'Selecione um APK e clique em Executar.' : 'Selecione um APK e clique em Executar.<br>Ou escolha um dos exemplos na aba Exemplos, na barra de baixo.'; }
 function setStatus(message, kind = '') {
   $('status-text').textContent = message;
   $('status-dot').className = kind;
   notifyParent('apk-lab-state', { mode: state.mode, status: message, running: kind === 'ok' });
 }
 // "Recriar" / "Reabrir" the Activity: shown while an APK runs (an Activity is on screen), disabled while the VM is busy.
-function syncReloadButton() { for (const id of ['recreate-activity', 'reopen-activity']) { const button = $(id); if (!button) continue; button.hidden = state.mode !== 'apk' || !state.apkRunning || !state.runtime; button.disabled = state.busy || !state.runtime || !state.apkRunning; } }
+function syncReloadButton() { for (const id of ['reopen-activity']) { const button = $(id); if (!button) continue; button.hidden = state.mode !== 'apk' || !state.apkRunning || !state.runtime; button.disabled = state.busy || !state.runtime || !state.apkRunning; } }
 // "Tela pronta" (src/screen-ready.js): the Activity and its fragments loaded and the screen is still; the title says what it still waits for.
 function showScreenReady(ready) {
   const chip = $('screen-ready'); if (!chip) return;
@@ -163,7 +167,7 @@ function reportAPKError(error, title) {
   state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
   $('android-content').inert = true; $('android-window-layer').inert = true;
   if (error.navigation) state.canGoBack = !!error.navigation.canGoBack;
-  if (!apkVM.worker) { state.runtime = null; state.apkRunning = false; $('android-device').hidden = true; }
+  if (!apkVM.worker) { state.runtime = null; state.apkRunning = false; }
   $('back-button').hidden = state.mode !== 'apk' || !state.canGoBack;
   $('back-button').disabled = state.busy || !state.runtime || !state.canGoBack; syncReloadButton();
   if (state.mode === 'apk') showError(error, title);
@@ -176,18 +180,27 @@ function sizeBootOverlay() {
   overlay.style.setProperty('--boot-w', String(w)); overlay.style.setProperty('--boot-h', String(h)); overlay.style.setProperty('--boot-scale', scale.toFixed(4));
 }
 // The caption sits in a box of fixed height under the logo (styles.css .boot-caption): a longer or shorter status never moves the logo; the full text is the tooltip.
+/** No app window on screen: the device shows its launcher. 'idle' (nothing opened yet), 'installing' (the package is being read) or 'installed' (tap the icon to start). */
+function showDeviceHome(mode = state.homeMode ?? 'idle', label = '') {
+  if (!taskSwitcher || !deviceView) return;
+  state.homeMode = mode; const d = resolveDevice(deviceState.settings), buttons = d.navigation === 'buttons';
+  if (!state.apkRunning) deviceView.renderSystemBars({ widthDp: d.widthDp, heightDp: d.heightDp, status: { height: 24, visible: true, color: 0, light: false }, nav: { mode: buttons ? 'buttons' : 'gesture', thickness: buttons ? 48 : 24, side: 'bottom', visible: true, color: 0, light: false }, contentFrame: { left: 0, top: 0, right: d.widthDp, bottom: d.heightDp } });
+  $('android-device').hidden = false; $('android-device').inert = false; $('empty-preview').hidden = true;
+  taskSwitcher.home(mode, { label, key: mode === 'installed' ? state.inventory : null });
+}
 function setBootCaption(text) { const caption = $('boot-caption'); if (!caption) return; caption.textContent = text; caption.title = text; }
 function showBoot(caption) {
   const overlay = $('boot-overlay'); if (!overlay) return;
-  clearTimeout(state.bootTimer); sizeBootOverlay(); setBootCaption(caption); overlay.classList.remove('fading', 'idle'); overlay.hidden = false; $('empty-preview').hidden = true; state.bootVisible = true;
+  clearTimeout(state.bootTimer); sizeBootOverlay(); setBootCaption(caption); overlay.classList.remove('fading', 'idle'); overlay.hidden = false;
+  { const icon = $('boot-app-icon'), url = taskSwitcher?.icon?.() ?? null; if (icon) { icon.hidden = !url; if (url) icon.src = url; else icon.removeAttribute?.('src'); overlay.classList.toggle('has-app-icon', !!url); } }   // the app's own icon, like Android's splash screen; the Android mark only when the package has none to show $('empty-preview').hidden = true; state.bootVisible = true;
 }
 function hideBoot({ force = false } = {}) {
   const overlay = $('boot-overlay'); if (!overlay || !state.bootVisible) return;
   // An APK that is loaded but not running keeps the phone frame on screen, idle, with the one thing the user can do next; the frame only goes away when the app
   // draws its first frame (force) or when there is no APK (an error, a closed file).
-  if (!force && state.currentSource && !state.apkRunning && !state.lastAPKError && state.mode === 'apk') { overlay.classList.add('idle'); overlay.classList.remove('fading'); setBootCaption('APK pronto. Clique em Executar APK para iniciar.'); $('empty-preview').hidden = true; return; }
+  if (!force && state.currentSource && !state.apkRunning && !state.lastAPKError && state.mode === 'apk') { state.bootVisible = false; overlay.hidden = true; overlay.classList.remove('fading', 'idle'); showDeviceHome(state.runtime ? 'installed' : state.homeMode); return; }   // loaded but not running: the launcher with the app's icon
   state.bootVisible = false; overlay.classList.add('fading'); overlay.classList.remove('idle'); clearTimeout(state.bootTimer);
-  state.bootTimer = setTimeout(() => { overlay.hidden = true; overlay.classList.remove('fading'); if (!state.apkRunning && state.mode === 'apk') $('empty-preview').hidden = false; }, 380);
+  state.bootTimer = setTimeout(() => { overlay.hidden = true; overlay.classList.remove('fading'); if (!state.apkRunning && state.mode === 'apk') showDeviceHome(); }, 380);
 }
 function beginOperation(message) {
   const token = ++state.operation;
@@ -217,7 +230,7 @@ function showLoadTimes() {
   if (times.launchMs !== undefined) parts.push(`abertura da Activity ${times.launchMs} ms`);
   const total = times.loadMs + (times.launchMs ?? 0);
   $('load-times').hidden = false;
-  $('load-times').textContent = `${times.prepared ? 'Arquivo preparado (.apklab) · ' : ''}${times.launchMs !== undefined ? 'Do arquivo à tela' : 'Carregado'} em ${(total / 1000).toFixed(2)} s · ${parts.join(' · ')}`;
+  $('load-times').textContent = `${times.launchMs !== undefined ? 'Do arquivo à tela' : 'Carregado'} em ${(total / 1000).toFixed(2)} s · ${parts.join(' · ')}`;
 }
 function onWorkerProgress(progress = {}) {
   notePhase(progress.phase);
@@ -233,7 +246,7 @@ function cancelOperation() {
   ++state.operation; state.abortController?.abort(); apkVM.cancel(); state.apiGaps = null; pluginHost.vmChanged();
   state.viewSession++; resetWebViews(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear(); state.runtime = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true; syncReloadButton(); state.lastAPKError = null;
   clearInterval(state.operationTimer); $('operation-panel').hidden = true;
-  $('android-device').hidden = true; $('empty-preview').hidden = state.mode !== 'apk';
+  state.homeMode = 'idle'; showDeviceHome('idle');
   setBusy(false);
   if (state.mode === 'apk') { hideError(); setStatus('VM encerrada · reabra o APK para continuar'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> CANCELADO'; }
 }
@@ -404,7 +417,7 @@ function showInventory(inventory) {
   $('class-count').title = inventory.classes == null ? 'Classes DEX não inspecionadas' : 'Classes presentes no DEX';
   $('activity-count').textContent = inventory.activities?.length || 0;
   $('dependency-count').textContent = inventory.dependencies?.length || 0;
-  $('inspection-badge').textContent = inventory.inspectionComplete === false ? 'INSPEÇÃO PARCIAL' : inventory.compose ? 'COMPOSE APK' : 'ANALISADO';
+  $('inspection-badge').textContent = inventory.inspectionComplete === false ? 'Inspeção parcial' : inventory.compose ? 'Compose APK' : 'Analisado';
   const unsupported = inventory.unsupportedFeatures || [];
   $('unsupported-notice').hidden = !unsupported.length;
   $('unsupported-list').replaceChildren(...unsupported.map((item) => { const li = document.createElement('li'); li.textContent = item; return li; }));
@@ -479,18 +492,18 @@ async function importSource(source, autoRun = false) {
   // A new run (another APK, or Executar APK again) starts clean: the Worker of the previous run is terminated by apkVM.load, and what the page still shows of it goes too
   // (Logcat, network requests, memory meter, error report, last frame and heartbeat). App data follows the "Manter dados do app" option; the panel settings are kept.
   logcatPanel.reset(); netlogPanel.reset(); composeInspector.reset(); state.oomSeen = 0; state.lastVmHealth = null; state.lastSnapshot = null; state.errorReport = null; apkVM.lastHeartbeat = null; apkVM.lastScreenSnapshot = null; if ($('memory-meter')) $('memory-meter').hidden = true;
-  switchMode('apk'); hideError(); state.runtime = null; state.inventory = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true;
-  $('empty-preview').querySelector('h2').textContent = 'Seu aplicativo começa aqui.'; $('empty-preview').querySelector('p').innerHTML = 'Selecione um APK e clique em Executar.<br>Ou rode a demonstração para testar.';
-  showBoot('Abrindo o APK…'); const token = beginOperation('Lendo o arquivo APK…');
-  $('native-inspection').hidden = true; $('native-result').hidden = true; $('unsupported-notice').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('inspection-badge').textContent = 'ANALISANDO';
+  taskSwitcher?.reset(); switchMode('apk'); hideError(); state.runtime = null; state.inventory = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true;
+  $('empty-preview').querySelector('h2').textContent = 'Seu aplicativo começa aqui.'; $('empty-preview').querySelector('p').innerHTML = emptyPreviewHint();
+  const token = beginOperation('Lendo o arquivo APK…');
+  $('native-inspection').hidden = true; $('native-result').hidden = true; $('unsupported-notice').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('inspection-badge').textContent = 'Analisando';
   $('file-info').hidden = false; $('file-name').textContent = source.name; $('file-size').textContent = source.file ? `${formatSize(source.file.size)} · arquivo local` : 'APK de teste hospedado localmente';
   $('reopen-file').hidden = false; $('preview-name').textContent = source.name;
-  $('android-device').hidden = true; $('empty-preview').hidden = false;
+  showDeviceHome('installing', source.name);   // the app shows up on the launcher at once, under a spinner, while the package is read
   state.trace = []; appendTrace(`Abrindo ${source.name} em Web Worker isolado. Sem upload.`);
   setStatus('Lendo o arquivo APK…');
   try {
-    let buffer; state.loadTimes = { startedAt: performance.now(), phases: [], readMs: 0, loadMs: 0, prepared: /\.apklab$/i.test(source.name ?? '') };
-    $('load-times').hidden = true; $('prepare-file').hidden = true;
+    let buffer; state.loadTimes = { startedAt: performance.now(), phases: [], readMs: 0, loadMs: 0 };
+    $('load-times').hidden = true;
     if (source.file) buffer = await source.file.arrayBuffer();
     else {
       state.abortController = new AbortController();
@@ -507,10 +520,9 @@ async function importSource(source, autoRun = false) {
     if (token !== state.operation) return;
     state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);
     { const times = state.loadTimes, last = times.phases.at(-1); if (last && !last.ms) last.ms = Math.round(performance.now() - last.at); times.loadMs = Math.round(performance.now() - times.startedAt); times.done = true; times.prepared = !!result.inventory.prepared;
-      showLoadTimes(); appendTrace(`Carregado em ${times.loadMs} ms${times.prepared ? ' (arquivo preparado .apklab)' : ''}: ${times.phases.filter(item => item.ms > 0).map(item => `${item.phase} ${item.ms} ms`).join(', ')}`);
-      $('prepare-file').hidden = times.prepared || !!result.inventory.unsupportedFeatures?.length; }
+      showLoadTimes(); appendTrace(`Carregado em ${times.loadMs} ms: ${times.phases.filter(item => item.ms > 0).map(item => `${item.phase} ${item.ms} ms`).join(', ')}`); }
     await permissionsPanel.attach(result.inventory); await overridesPanel.attach(result.inventory); await ignoredPanel.attach(result.inventory); await mocksPanel.attach(result.inventory); pluginHost.vmChanged(); if (logcatPanelOpen || pluginHost.wantsLogs) syncLogcatStreaming(true).catch(() => {});   // before any app code runs: permission state, simulated location, method return overrides, ignored Activities, endpoint mocks
-    showInventory(result.inventory);
+    showInventory(result.inventory); showDeviceHome('installed');
     appendTrace(`Pacote: ${result.inventory.packageName || '(não identificado)'}`);
     if (state.mode === 'apk') {
       setStatus(result.inventory.unsupportedFeatures?.length ? 'Arquivo inspecionado · veja os limites de arquivo' : 'Inspecionado · tentativa de execução disponível', result.inventory.unsupportedFeatures?.length ? 'error' : '');
@@ -518,14 +530,14 @@ async function importSource(source, autoRun = false) {
     }
   } catch (error) {
     if (token !== state.operation) return;
-    $('inspection-badge').textContent = 'ERRO'; reportAPKError(error, 'Não foi possível inspecionar o APK');
+    $('inspection-badge').textContent = 'Erro'; state.homeMode = 'idle'; showDeviceHome('idle'); reportAPKError(error, 'Não foi possível inspecionar o APK');
   } finally { finishOperation(token); }
   if (token === state.operation && autoRun && state.runtime && !state.inventory?.unsupportedFeatures?.length) await runAPK();
 }
 async function chooseFile(file) {
   if (!file || state.busy) return;
   if (file.size > 1024 * 1024 * 1024) { switchMode('apk'); showError(new Error('O limite deste laboratório é 1 GiB por APK. Escolha um arquivo menor para continuar.'), 'APK acima do limite de tamanho'); return; }
-  if (!/\.(apk|apklab)$/i.test(file.name)) { switchMode('apk'); showError(new Error('Escolha um arquivo .apk ou um arquivo preparado .apklab.'), 'Formato de arquivo inválido'); return; }
+  if (!/\.apk$/i.test(file.name)) { switchMode('apk'); showError(new Error('Escolha um arquivo .apk.'), 'Formato de arquivo inválido'); return; }
   await importSource({ file, name: file.name });
 }
 // Memory readout in the status bar: live VM objects against the object budget (the OutOfMemoryError threshold), an estimate of what they cost (bytesPerObject, sent by the Worker, is the measured
@@ -630,24 +642,36 @@ mcpLink = createMcpLink({ execute: (tool, args) => mcpTools.execute(tool, args),
   syncLogcatStreaming().catch(() => {});   // Logcat lines reach the page while the MCP client may ask for them
 } });
 // Pairing: the token is generated here (or one pasted from an older setup is kept), saved in this browser, and goes into the JSON for the MCP client's configuration
-const saveMcp = () => { try { globalThis.localStorage?.setItem(MCP_KEY, JSON.stringify({ url: $('mcp-url').value, token: $('mcp-token').value, script: $('mcp-script').value })); } catch { /* the fields last for this page */ } };
-const mcpConfigText = masked => { const token = $('mcp-token').value.trim(); return JSON.stringify(mcpClientConfig({ token: masked ? '•'.repeat(Math.min(token.length, 32)) : token, scriptPath: $('mcp-script').value, port: mcpBridgePort($('mcp-url').value), origin: location.origin }), null, 2); };
-const renderMcpConfig = () => { $('mcp-config-json').textContent = mcpConfigText($('mcp-token').type === 'password'); };
-try { const saved = JSON.parse(globalThis.localStorage?.getItem(MCP_KEY) ?? 'null'); if (saved?.url) $('mcp-url').value = saved.url; if (saved?.token) $('mcp-token').value = saved.token; if (saved?.script) $('mcp-script').value = saved.script; } catch { /* storage unavailable */ }
-try { $('mcp-download').textContent = `curl -O ${new URL('tools/lab-mcp.mjs', location.href).href}`; } catch { /* keeps the short form */ }
+let mcpAgent = 'claude';   // which agent's setup step 2 shows (Claude, Codex or Cursor)
+const saveMcp = () => { try { globalThis.localStorage?.setItem(MCP_KEY, JSON.stringify({ url: $('mcp-url').value, token: $('mcp-token').value, lan: $('mcp-lan').checked, agent: mcpAgent })); } catch { /* the fields last for this page */ } };
+// The two things the user copies: the terminal command that starts the bridge with this page's token, and the address (inside the Claude Code command) the agent connects to.
+const mcpTexts = masked => {
+  const raw = $('mcp-token').value.trim(), token = raw, port = mcpBridgePort($('mcp-url').value), lan = $('mcp-lan').checked, hide = text => masked && raw ? text.replaceAll(encodeURIComponent(raw), '•'.repeat(12)).replaceAll(raw, '•'.repeat(12)) : text;
+  let scriptUrl = 'tools/lab-mcp.mjs'; try { scriptUrl = new URL('tools/lab-mcp.mjs', location.href).href; } catch { /* keeps the relative form */ }
+  const setup = mcpAgentSetup(mcpAgent, { token, port, host: lan ? '<IP local que a ponte mostrar>' : '127.0.0.1' });
+  return { serve: hide(mcpServeCommand({ token, port, origin: location.origin, lan, scriptUrl })), agent: hide(setup.text), where: setup.where, link: lan ? null : setup.link };   // the one-click link needs a real address, so not in the network mode
+};
+const renderMcpConfig = () => {
+  const texts = mcpTexts($('mcp-token').type === 'password'); $('mcp-config-json').textContent = texts.serve; $('mcp-agent-command').textContent = texts.agent; $('mcp-agent-where').textContent = texts.where;
+  for (const button of [...($('mcp-agent-pick').querySelectorAll?.('button') ?? [])]) button.setAttribute('aria-pressed', String(button.dataset.agent === mcpAgent));
+  const link = $('mcp-agent-link'), real = mcpTexts(false).link; link.hidden = !real; if (real) link.href = real; else link.removeAttribute?.('href');
+};
+$('mcp-agent-pick').addEventListener('click', event => { const agent = event.target.closest?.('button')?.dataset.agent; if (!MCP_AGENTS.includes(agent)) return; mcpAgent = agent; saveMcp(); renderMcpConfig(); });
+try { const saved = JSON.parse(globalThis.localStorage?.getItem(MCP_KEY) ?? 'null'); if (saved?.url) $('mcp-url').value = saved.url; if (saved?.token) $('mcp-token').value = saved.token; $('mcp-lan').checked = !!saved?.lan; if (MCP_AGENTS.includes(saved?.agent)) mcpAgent = saved.agent; } catch { /* storage unavailable */ }
 if (!$('mcp-token').value.trim()) { try { $('mcp-token').value = generateMcpToken(); saveMcp(); } catch (error) { $('mcp-status').textContent = String(error?.message ?? error); } }
 renderMcpConfig();
-for (const id of ['mcp-token', 'mcp-script', 'mcp-url']) $(id).addEventListener('input', () => { saveMcp(); renderMcpConfig(); });
+for (const id of ['mcp-token', 'mcp-url']) $(id).addEventListener('input', () => { saveMcp(); renderMcpConfig(); });
+$('mcp-lan').addEventListener('change', () => { saveMcp(); renderMcpConfig(); });
 $('mcp-token-show').addEventListener('click', () => { const show = $('mcp-token').type === 'password'; $('mcp-token').type = show ? 'text' : 'password'; $('mcp-token-show').textContent = show ? 'Ocultar' : 'Mostrar'; $('mcp-token-show').setAttribute('aria-pressed', String(show)); renderMcpConfig(); });
 $('mcp-token-new').addEventListener('click', () => {
   if (mcpLink.connected || mcpLink.state.state === 'conectando') mcpLink.disconnect();
   $('mcp-token').value = generateMcpToken(); saveMcp(); renderMcpConfig();
-  $('mcp-status').textContent = 'Token novo gerado: copie o JSON de novo para a configuração do cliente MCP e reinicie o servidor MCP antes de conectar (a ponte recusa o token antigo).'; $('mcp-status').dataset.state = '';
+  $('mcp-status').textContent = 'Token novo gerado: pare a ponte, rode o comando de novo e atualize o endereço no agente (a ponte recusa o token antigo).'; $('mcp-status').dataset.state = '';
 });
-$('mcp-copy').addEventListener('click', async () => {
-  const text = mcpConfigText(false), button = $('mcp-copy');
+for (const [buttonId, codeId, pick] of [['mcp-copy', 'mcp-config-json', 'serve'], ['mcp-copy-agent', 'mcp-agent-command', 'agent']]) $(buttonId).addEventListener('click', async () => {
+  const text = mcpTexts(false)[pick], button = $(buttonId);
   let copied = false; try { await navigator.clipboard.writeText(text); copied = true; } catch { /* no clipboard permission: select the text instead */ }
-  if (!copied) { const range = document.createRange(); $('mcp-config-json').textContent = text; range.selectNodeContents($('mcp-config-json')); const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range); }
+  if (!copied) { const range = document.createRange(); $(codeId).textContent = text; range.selectNodeContents($(codeId)); const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range); }
   button.textContent = copied ? 'Copiado' : 'Selecionado: Ctrl+C'; setTimeout(() => { button.textContent = 'Copiar'; }, 1800);
 });
 $('mcp-connect').addEventListener('click', () => {
@@ -659,6 +683,7 @@ const toolDock = createToolDock({ root: $('tool-dock'), tools: [
   { id: 'trace', label: 'Log de execução', icon: '☰', details: $('trace'), count: $('trace-count') },
   { id: 'logcat', label: 'Logcat', icon: '▤', details: $('logcat'), count: $('logcat')?.querySelector?.('.logcat-count') },
   { id: 'netlog', label: 'Rede', icon: '⇅', details: $('netlog'), count: $('netlog')?.querySelector?.('.netlog-count') },
+  { id: 'examples', label: 'Exemplos', icon: '▤', details: $('scenario-catalog'), count: $('catalog-count') },   // the bundled test APKs: a dock tab, so the page itself does not scroll
   { id: 'compose', label: 'Compose', icon: '◫', details: $('compose-inspector'), count: $('compose-inspector')?.querySelector?.('.ci-count') },
   { id: 'plugins', label: 'Plugins', icon: '⧉', details: $('plugins-output'), count: $('plugins-output')?.querySelector?.('.po-count') },
 ] });
@@ -668,21 +693,26 @@ const hostMapPanel = createHostMapPanel({ $, get: () => deviceState.settings.net
 const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, notifyParent, clickView: id => clickView(id), hooks: {
   navigationChanged(canGoBack) { $('back-button').disabled = state.busy || !canGoBack; $('back-button').hidden = state.mode !== 'apk' || !canGoBack; syncReloadButton(); },
   closed() {
-    $('empty-preview').hidden = state.mode !== 'apk';
-    $('empty-preview').querySelector('h2').textContent = 'Activity encerrada.'; $('empty-preview').querySelector('p').textContent = 'A pilha de Activities está vazia. Reabra o APK para iniciar uma nova execução.';
+    taskSwitcher?.closed();   // the device shows its launcher: the app's icon starts it again
     if (state.mode === 'apk') { setStatus('Aplicativo encerrado · nenhuma Activity ativa'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENCERRADO'; }
   },
   rendered(snapshot, composeReady) {
-    syncReloadButton(); showScreenReady(snapshot.screenReady); showWarmup(snapshot.warmup);
+    syncReloadButton(); showScreenReady(snapshot.screenReady); showWarmup(snapshot.warmup); taskSwitcher?.sync(snapshot, state.inventory);
     overridesPanel.hits(snapshot.methodOverrides); ignoredPanel.hits(snapshot.ignoredActivities); mocksPanel.hits(snapshot.endpointMocks); hostMapPanel.hits(snapshot.hostMap);
     hideBoot({ force: true }); $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth); showCoreUsage(snapshot.vmHealth); state.lastSnapshot = snapshot; redrawLayoutBounds(); if (snapshot.vmHealth) state.lastVmHealth = snapshot.vmHealth; if (snapshot.vmHealth?.renderer) showRendererStatus(snapshot.vmHealth.renderer, true); composeInspector.rendered(snapshot); pluginHost.snapshot(snapshot);
     if (snapshot.droppedEvent) appendTrace(`Evento descartado: a View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) já não existe na VM.`);
     // The VM raised java.lang.OutOfMemoryError (even if the app caught it): never silent.
     if ((snapshot.vmHealth?.oomCount ?? 0) > (state.oomSeen ?? 0)) { state.oomSeen = snapshot.vmHealth.oomCount; appendTrace(`OutOfMemoryError: ${snapshot.vmHealth.lastOom?.reason} (${snapshot.vmHealth.liveObjects} objetos vivos)`); setStatus(`java.lang.OutOfMemoryError na VM (${snapshot.vmHealth.liveObjects} objetos vivos, limite ${snapshot.vmHealth.limit})`, 'error'); }
     if (state.mode === 'apk') { $('runtime-badge').className = 'runtime-badge running'; $('runtime-badge').innerHTML = '<span></span> EM EXECUÇÃO'; $('preview-name').textContent = snapshot.activityName?.split('.').pop() || state.inventory?.packageName || 'APK local'; if (composeReady === false) { $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> INICIALIZADO'; setStatus('Activity iniciada · composição ainda sem conteúdo acessível e desenhado'); } else setStatus('Activity em execução · interaja com a interface', 'ok'); }
+    taskSwitcher?.restate();
   },
 } });
 const { renderSnapshot, flushPendingInputs, updateSystemBarIcons } = deviceView; deviceView.bindVM(apkVM);
+taskSwitcher = createTaskSwitcher({ $, vm: () => state.runtime, render: snapshot => renderSnapshot(snapshot), back: () => backAPK(), relaunch: () => runAPK(), canGoBack: () => !!state.canGoBack, busy: () => state.busy || !state.runtime,
+  begin: message => beginOperation(message), finish: token => finishOperation(token), report: (message, error) => { if (error) reportAPKError(error, 'Navegação do dispositivo'); else appendTrace(message); },
+  announce: mode => { if (state.mode !== 'apk' || !['overview', 'home', 'closed'].includes(mode)) return; setStatus(mode === 'closed' ? 'Aplicativo encerrado · toque no ícone para abrir de novo' : 'Aplicativo em segundo plano (onPause, onStop) · toque para voltar'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = mode === 'closed' ? '<span></span> ENCERRADO' : '<span></span> EM PAUSA'; } });
+// The stage changes size when the window does or a dock panel opens (the workspace fills the viewport above the dock): the device is fitted again.
+if (typeof ResizeObserver === 'function' && $('preview-stage')) new ResizeObserver(() => { const stage = $('preview-stage'); stage.style.setProperty('--stage-h', `${stage.clientHeight}px`); sizeBootOverlay(); if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); }).observe($('preview-stage'));
 createDeviceFullscreen({ stage: $('preview-stage'), openButton: $('fullscreen-button'), closeButton: $('fullscreen-close'), deviceState, refit: () => { if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); } });   // "Tela cheia" (src/device-fullscreen.js): CSS scale only
 const customScreenPanel = createCustomScreenPanel({ $ });   // "Tela" -> "Personalizado" (src/custom-screen-panel.js)
 // ---- Virtual device settings panel ("Dispositivo virtual") ----
@@ -893,7 +923,6 @@ async function runDemo() {
 async function inspectCatalogAPK(entry) {
   if (state.busy) return;
   await importSource({ name: entry.file, url: new URL(`./fixtures/${encodeURIComponent(entry.file)}`, import.meta.url).href });
-  $('inspection-panel').open = true;   // "Inspecionar" asks to see the package: the section opens (collapsed by default)
   $('inspection-badge').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' });
 }
 async function loadScenarioCatalog() {
@@ -901,10 +930,11 @@ async function loadScenarioCatalog() {
   try {
     const response = await fetch(new URL('./fixtures/catalog.json', import.meta.url), { cache: 'no-store' });
     // A build without bundled APKs (the public site: scripts/publish-site.mjs leaves them out) has no catalog: the page is only for the user's own APKs, so the library and the demo go away.
-    if (response.status === 404) { state.noBundledApks = true; $('scenario-catalog').hidden = true; document.querySelector('.demo-row')?.setAttribute('hidden', ''); return; }
+    if (response.status === 404) { state.noBundledApks = true; $('scenario-catalog').hidden = true; document.querySelector('.demo-row')?.setAttribute('hidden', ''); if (!state.currentSource) $('empty-preview').querySelector('p').innerHTML = emptyPreviewHint(); return; }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const catalog = await response.json();
     if (!Array.isArray(catalog.scenarios)) throw new Error('Formato de catálogo inválido');
+    if ($('catalog-count')) $('catalog-count').textContent = String(catalog.scenarios.length);
     const cards = catalog.scenarios.map((entry) => {
       // The catalog names packaged fixtures; it never supplies runtime data or behavior.
       if (!/^[a-z0-9-]+\.apk$/i.test(entry.file)) throw new Error('Nome de APK inválido no catálogo');
@@ -913,18 +943,18 @@ async function loadScenarioCatalog() {
       const top = document.createElement('div'); top.className = 'scenario-card-top';
       const icon = document.createElement('span'); icon.className = 'scenario-file-icon'; icon.textContent = 'APK';
       const badge = document.createElement('span'); badge.className = `scenario-badge${entry.executionValidated ? ' supported' : ''}`;
-      badge.textContent = available ? entry.executionValidated ? 'EXECUÇÃO VALIDADA' : 'TENTATIVA EXPERIMENTAL' : 'EM BUILD';
+      badge.textContent = available ? entry.executionValidated ? 'Validado' : 'Experimental' : 'Em build';
       top.append(icon, badge);
       const title = document.createElement('h3'); title.textContent = entry.title;
       const description = document.createElement('p'); description.textContent = entry.description;
       const tags = document.createElement('div'); tags.className = 'scenario-tags';
       (entry.tags || []).forEach((text) => { const tag = document.createElement('span'); tag.textContent = text; tags.append(tag); });
-      const file = document.createElement('div'); file.className = 'scenario-filename'; file.textContent = `${entry.file}${entry.sizeBytes ? ` · ${formatSize(entry.sizeBytes)}` : ''}`;
+      const file = document.createElement('div'); file.className = 'scenario-filename'; file.textContent = entry.file; if (entry.sizeBytes) { const size = document.createElement('span'); size.className = 'scenario-size'; size.textContent = formatSize(entry.sizeBytes); file.append(' ', size); }
       const actions = document.createElement('div'); actions.className = 'scenario-actions';
       const inspect = document.createElement('button'); inspect.type = 'button'; inspect.textContent = 'Inspecionar';
       inspect.dataset.inspectApk = entry.id; inspect.dataset.available = String(available); inspect.disabled = state.busy || !available;
-      inspect.addEventListener('click', () => inspectCatalogAPK(entry));
-      const download = document.createElement('a'); download.textContent = 'Baixar APK ↓';
+      inspect.addEventListener('click', () => { if (toolDock.active === 'examples') toolDock.close(); inspectCatalogAPK(entry); });   // the list is a dock tab: it gets out of the way of the device
+      const download = document.createElement('a'); download.textContent = 'Baixar';
       if (available) { download.href = new URL(`./fixtures/${encodeURIComponent(entry.file)}`, import.meta.url).href; download.download = entry.file; }
       else { download.setAttribute('aria-disabled', 'true'); download.title = 'Este APK ainda está em build'; }
       actions.append(inspect, download); card.append(top, title, description, tags, file, actions); return card;
@@ -938,8 +968,7 @@ async function loadScenarioCatalog() {
 function switchMode() {
   state.mode = 'apk';
   $('back-button').hidden = !state.canGoBack; syncReloadButton();
-  $('android-device').hidden = !state.apkRunning; $('android-device').inert = false;
-  $('empty-preview').hidden = state.apkRunning;
+  if (!state.apkRunning) showDeviceHome(); else { $('android-device').hidden = false; $('android-device').inert = false; $('empty-preview').hidden = true; }
   hideError();
   $('execution-engine').textContent = '411 × 840 dp · DENSIDADE 1';
   $('preview-name').textContent = state.inventory?.packageName || 'Prévia do aplicativo';
@@ -953,24 +982,15 @@ $('apk-file').addEventListener('change', (event) => { chooseFile(event.target.fi
 $('drop-zone').addEventListener('dragover', (event) => { event.preventDefault(); if (!state.busy) $('drop-zone').classList.add('dragging'); });
 $('drop-zone').addEventListener('dragleave', () => $('drop-zone').classList.remove('dragging'));
 $('drop-zone').addEventListener('drop', (event) => { event.preventDefault(); $('drop-zone').classList.remove('dragging'); chooseFile(event.dataTransfer.files?.[0]); });
+// The device takes an APK too: dropped on the stage it is installed like one dropped on the panel.
+{ const stage = $('preview-stage'), hasFiles = event => [...(event.dataTransfer?.types ?? [])].includes('Files');
+  stage.addEventListener('dragover', event => { if (!hasFiles(event)) return; event.preventDefault(); if (!state.busy) stage.classList.add('apk-dragging'); });
+  stage.addEventListener('dragleave', event => { if (!stage.contains(event.relatedTarget)) stage.classList.remove('apk-dragging'); });
+  stage.addEventListener('drop', event => { if (!hasFiles(event)) return; event.preventDefault(); stage.classList.remove('apk-dragging'); chooseFile(event.dataTransfer.files?.[0]); }); }
+showDeviceHome(state.homeMode ?? 'idle');   // by default the stage shows the Android device on its launcher
 $('run-button').addEventListener('click', runAPK);
-// "⇩ Baixar arquivo preparado (.apklab)" (in the file card): made in the Worker from the loaded APK's bytes (src/apklab-file.js) and saved by the browser; open it later in place of the APK
-$('prepare-file').addEventListener('click', async () => {
-  if (!apkVM.worker) return;
-  for (let waited = 0; state.busy && waited < 30000; waited += 50) await new Promise(resolve => setTimeout(resolve, 50));   // a click right as a load ends waits for it instead of being lost
-  if (state.busy || !apkVM.worker) return;
-  const button = $('prepare-file'), name = `${String(state.currentSource?.name ?? 'app').replace(/\.(apk|apklab)$/i, '')}.apklab`;
-  button.disabled = true; button.textContent = 'Gerando…';
-  try {
-    const started = performance.now(), { bytes, descriptor } = await apkVM.prepareFile({ name: state.currentSource?.name ?? null, revision: document.querySelector?.('script[src*="app.js"]')?.src?.split('v=')[1] ?? null });
-    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' })), link = document.createElement('a'); link.href = url; link.download = name; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
-    appendTrace(`Arquivo preparado ${name}: ${formatSize(bytes.length)} (${descriptor.entries} arquivos do APK, já descompactados), gerado em ${Math.round(performance.now() - started)} ms`);
-    setStatus(`${name} gerado (${formatSize(bytes.length)}). Abra-o no lugar do APK.`, 'ok');
-  } catch (error) { setStatus(`Não foi possível gerar o arquivo preparado: ${error?.message ?? error}`, 'error'); }
-  finally { button.disabled = false; button.textContent = '⇩ Baixar arquivo preparado (.apklab)'; }
-});
 $('back-button').addEventListener('click', backAPK);
-$('recreate-activity').addEventListener('click', () => reloadActivity('recreate'));
+$('recreate-activity')?.addEventListener('click', () => reloadActivity('recreate'));   // the toolbar no longer has this button; lab.reloadActivity still recreates
 $('reopen-activity').addEventListener('click', () => reloadActivity('reopen'));
 $('cancel-operation').addEventListener('click', cancelOperation);
 $('stop-vm').addEventListener('click', cancelOperation);

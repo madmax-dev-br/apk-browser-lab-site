@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=ee4847240266';
-import { gcRoot } from './heap-gc.js?v=ee4847240266';
-import { APKError } from './apk-error.js?v=ee4847240266';
+import { createHostRegistry } from './host-contract.js?v=94fc4dedf7f2';
+import { gcRoot } from './heap-gc.js?v=94fc4dedf7f2';
+import { APKError } from './apk-error.js?v=94fc4dedf7f2';
 
 // Public android.widget.TextView API (API 33) beyond what the platform's native text model carries, with the semantics of android-13.0.0_r1 TextView.java.
 // The lab renders TextView / Button / EditText text through its native SkParagraph path (view-layout-host measure, compose-canvas-host draw), which honours the text, size, colour, typeface,
@@ -429,6 +429,12 @@ export function createTextViewApiHost(platform) {
     if (s.autoLinkMask !== 0 && flag(callStatic(r, 'Landroid/text/util/Linkify;', 'addLinks', [SPANNABLE, 'I'], 'Z', [current, s.autoLinkMask])) && s.linksClickable && !s.textIsSelectable && nullish(call(r, self, TEXT, 'getMovementMethod', [], MOVEMENT))) call(r, self, TEXT, 'setMovementMethod', [MOVEMENT], 'V', [callStatic(r, 'Landroid/text/method/LinkMovementMethod;', 'getInstance', [], MOVEMENT)]);
   });
   const spannableText = (r, self) => { const text = call(r, self, TEXT, 'getText', [], CHARS); return !nullish(text) && typeof text !== 'string' && r.isSubtype(r.object(text).type, SPANNABLE) ? text : null; };
+  // EditText's selection methods (frameworks/base EditText.java): thin wrappers over android.text.Selection on the view's Editable
+  const EDIT_TEXT = 'Landroid/widget/EditText;', editable = (r, self) => call(r, self, TEXT, 'getText', [], CHARS);
+  def(EDIT_TEXT, 'setSelection', '(II)V', (r, _m, [self, start, stop]) => callStatic(r, 'Landroid/text/Selection;', 'setSelection', [SPANNABLE, 'I', 'I'], 'V', [editable(r, self), start, stop]));
+  def(EDIT_TEXT, 'setSelection', '(I)V', (r, _m, [self, index]) => callStatic(r, 'Landroid/text/Selection;', 'setSelection', [SPANNABLE, 'I'], 'V', [editable(r, self), index]));
+  def(EDIT_TEXT, 'selectAll', '()V', (r, _m, [self]) => callStatic(r, 'Landroid/text/Selection;', 'selectAll', [SPANNABLE], 'V', [editable(r, self)]));
+  def(EDIT_TEXT, 'extendSelection', '(I)V', (r, _m, [self, index]) => callStatic(r, 'Landroid/text/Selection;', 'extendSelection', [SPANNABLE, 'I'], 'V', [editable(r, self), index]));
   def(TEXT, 'getSelectionStart', '()I', (r, _m, [self]) => callStatic(r, 'Landroid/text/Selection;', 'getSelectionStart', [CHARS], 'I', [call(r, self, TEXT, 'getText', [], CHARS) ?? '']));
   def(TEXT, 'getSelectionEnd', '()I', (r, _m, [self]) => callStatic(r, 'Landroid/text/Selection;', 'getSelectionEnd', [CHARS], 'I', [call(r, self, TEXT, 'getText', [], CHARS) ?? '']));
   def(TEXT, 'hasSelection', '()Z', (r, _m, [self]) => { const a = call(r, self, TEXT, 'getSelectionStart', [], 'I'), b = call(r, self, TEXT, 'getSelectionEnd', [], 'I'); return a >= 0 && a !== b ? 1 : 0; });
@@ -527,7 +533,7 @@ export function createTextViewApiHost(platform) {
     let width = Math.max(0, layoutWidth(r, self));
     const text = call(r, self, TEXT, 'getText', [], CHARS), shown = nullish(text) || csString(r, text) === '' ? (view.hint ?? '') : text;
     const singleLine = !!view.singleLine || !!view.horizontallyScrolling; if (singleLine) width = Math.max(width, 1024 * 1024);
-    const key = JSON.stringify([csString(r, shown), width, s.lineSpacingExtra, s.lineSpacingMult, s.breakStrategy, s.hyphenationFrequency, s.justificationMode, s.letterSpacing, s.includeFontPadding, s.fallbackLineSpacing, view.maxLines ?? null, view.textSize ?? null, gravityOf(r, self), view.layoutDirection ?? 0, !!s.ellipsize, view.textColor ?? null]);
+    const key = JSON.stringify([csString(r, shown), width, s.lineSpacingExtra, s.lineSpacingMult, s.breakStrategy, s.hyphenationFrequency, s.justificationMode, s.letterSpacing, s.includeFontPadding, s.fallbackLineSpacing, view.maxLines ?? null, view.textSize ?? null, gravityOf(r, self), view.layoutDirection ?? 0, !!s.ellipsize, view.textColor ?? null, typeof shown === 'object' && shown !== null ? shown.ref ?? null : null]);   // the CharSequence itself too: the same characters with other spans are another layout
     if (s.layoutKey === key && s.layout) return s.layout;
     syncPaint(r, self);
     const paint = paintOf(r, self), len = csString(r, shown).length, gravityH = gravityOf(r, self) & 0x800007, rtl = call(r, self, VIEW, 'getLayoutDirection', [], 'I') === 1;

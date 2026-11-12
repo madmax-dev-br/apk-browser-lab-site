@@ -554,6 +554,133 @@
           ]
         }
       }
+    },
+    "libimagepipeline.so": {
+      "soname": "libimagepipeline.so",
+      "abi": "wasm32",
+      "file": "libimagepipeline.wasm",
+      "bytes": 3082,
+      "sha256": "0314ca2bb3b035b8b629f3ef3c4020de8a7cea969084c4c8325808c46a08113f",
+      "needed": [
+        "liblog.so",
+        "libc++_shared.so"
+      ],
+      "upstream": "https://github.com/facebook/fresco",
+      "tag": "v3.6.0",
+      "commit": "ba4654541385c844f95ec6471efbc0b241213de0",
+      "license": "licenses/fresco-MIT.txt",
+      "sources": [
+        "imagepipeline-native/src/main/jni/imagepipeline/init.cpp",
+        "imagepipeline-native/src/main/jni/imagepipeline/exceptions.cpp",
+        "imagepipeline-native/src/main/jni/bitmaps/Bitmaps.c",
+        "imagepipeline-native/src/main/jni/memchunk/NativeMemoryChunk.c"
+      ],
+      "ports": [
+        "scripts/wasm/ports/include/android/bitmap.h: declarations of AndroidBitmap_lockPixels/AndroidBitmap_unlockPixels only. DT_NEEDED libjnigraphics.so is NOT linked (the lab has none): Bitmaps.nativeCopyBitmap and DalvikPurgeableDecoder.nativePinBitmap fail with an explicit undefined-symbol error when called; the NativeMemoryChunk natives are unaffected",
+        "scripts/wasm/ports/include/android/log.h and liblog.so (lab port): __android_log_print"
+      ],
+      "requires": {
+        "fresco": {
+          "artifact": "com.facebook.fresco:imagepipeline-native",
+          "versions": [
+            "3.4.0",
+            "3.5.0",
+            "3.6.0",
+            "3.7.0",
+            "3.8.0",
+            "3.9.0"
+          ],
+          "buildIds": {
+            "254b589785d2aadd": {
+              "abi": "arm64-v8a",
+              "versions": [
+                "3.4.0"
+              ]
+            },
+            "b79df1565cdf601d": {
+              "abi": "armeabi-v7a",
+              "versions": [
+                "3.4.0"
+              ]
+            },
+            "1e8efdd8c4b2f27b": {
+              "abi": "x86",
+              "versions": [
+                "3.4.0"
+              ]
+            },
+            "b45754e695539650": {
+              "abi": "x86_64",
+              "versions": [
+                "3.4.0"
+              ]
+            },
+            "d0f121db897acfc4": {
+              "abi": "arm64-v8a",
+              "versions": [
+                "3.5.0",
+                "3.6.0",
+                "3.7.0",
+                "3.8.0"
+              ]
+            },
+            "855a324a6e6bf304": {
+              "abi": "armeabi-v7a",
+              "versions": [
+                "3.5.0",
+                "3.6.0",
+                "3.7.0",
+                "3.8.0"
+              ]
+            },
+            "ed3c61b231439405": {
+              "abi": "x86",
+              "versions": [
+                "3.5.0",
+                "3.6.0",
+                "3.7.0",
+                "3.8.0"
+              ]
+            },
+            "ee33ae98d4a96b96": {
+              "abi": "x86_64",
+              "versions": [
+                "3.5.0",
+                "3.6.0",
+                "3.7.0",
+                "3.8.0"
+              ]
+            },
+            "cd6885f134d87e64": {
+              "abi": "arm64-v8a",
+              "versions": [
+                "3.9.0"
+              ]
+            },
+            "6da0e929c597b4ba": {
+              "abi": "armeabi-v7a",
+              "versions": [
+                "3.9.0"
+              ]
+            },
+            "b973dd3fcce71925": {
+              "abi": "x86",
+              "versions": [
+                "3.9.0"
+              ]
+            },
+            "ffebc48b475c8672": {
+              "abi": "x86_64",
+              "versions": [
+                "3.9.0"
+              ]
+            }
+          },
+          "reactNative": {
+            "0.79.4": "3.6.0"
+          }
+        }
+      }
     }
   }
 }

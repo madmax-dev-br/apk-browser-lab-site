@@ -1,9 +1,9 @@
-import { resolveIntentFields } from './intent-resolver.js?v=ee4847240266';
-import { APKError } from './apk-error.js?v=ee4847240266';
-import { registerPackageValueFields } from './package-value-fields.js?v=ee4847240266';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=ee4847240266';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=ee4847240266';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ee4847240266';
+import { resolveIntentFields } from './intent-resolver.js?v=94fc4dedf7f2';
+import { APKError } from './apk-error.js?v=94fc4dedf7f2';
+import { registerPackageValueFields } from './package-value-fields.js?v=94fc4dedf7f2';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=94fc4dedf7f2';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=94fc4dedf7f2';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=94fc4dedf7f2';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -841,7 +841,19 @@ export function createAppServicesHost(platform) {
   const assetEntry = (r, name) => { const n = text(r, name).replace(/^\/+/, ''); return { n, entry: 'assets/' + n }; };
   const openAsset = (r, _m, [, name]) => { const { n, entry } = assetEntry(r, name); if (!r.apkEntries.has(entry)) r.throwJava('Ljava/io/FileNotFoundException;', n); return platform.javaIo.apkResourceStream(r, entry); };
   def(ASSETS, 'open', `(${STRING})Ljava/io/InputStream;`, openAsset); def(ASSETS, 'open', `(${STRING}I)Ljava/io/InputStream;`, openAsset);
-  def(ASSETS, 'openFd', `(${STRING})Landroid/content/res/AssetFileDescriptor;`, (r, _m, [, name]) => { const { n, entry } = assetEntry(r, name); if (!r.apkEntries.has(entry)) r.throwJava('Ljava/io/FileNotFoundException;', 'This file can not be opened as a file descriptor; it is probably compressed or missing: ' + n); throw new APKError(`AssetManager.openFd(${n}): file descriptors for APK assets are not implemented`, { kind: 'asset-fd-unsupported' }); });
+  // A file descriptor over a package entry (AssetManager.openFd / openNonAssetFd, Resources.openRawResourceFd): the installed APK file itself, with the offset and length of the entry's data.
+  // Only an entry stored without compression can be read in place; a compressed one is the FileNotFoundException Android throws (aapt stores media, fonts and already-compressed formats).
+  const ENTRY_AFD = 'Landroid/content/res/AssetFileDescriptor;', ENTRY_PFD = 'Landroid/os/ParcelFileDescriptor;', ENTRY_FILE = 'Ljava/io/File;';
+  const NOT_FD = 'This file can not be opened as a file descriptor; it is probably compressed';
+  const entryFd = (r, entry) => {
+    const range = r.apkEntryRange?.(entry); if (!range || !range.stored) return null;
+    const file = r.allocate(ENTRY_FILE); r.dispatch({ owner: ENTRY_FILE, name: '<init>', parameters: [STRING], result: 'V', signature: `(${STRING})V` }, [file, `${platform.javaIo.fs().codePath}/base.apk`], 'direct');
+    const pfd = r.dispatch({ owner: ENTRY_PFD, name: 'open', parameters: [ENTRY_FILE, 'I'], result: ENTRY_PFD, signature: `(${ENTRY_FILE}I)${ENTRY_PFD}` }, [file, 0x10000000], 'static');   // MODE_READ_ONLY
+    const afd = r.allocate(ENTRY_AFD); r.dispatch({ owner: ENTRY_AFD, name: '<init>', parameters: [ENTRY_PFD, 'J', 'J'], result: 'V', signature: `(${ENTRY_PFD}JJ)V` }, r.argumentWords([ENTRY_PFD, 'J', 'J'], [pfd, BigInt(range.start), BigInt(range.length)], { receiver: afd }), 'direct');
+    return afd;
+  };
+  def(ASSETS, 'openFd', `(${STRING})${ENTRY_AFD}`, (r, _m, [, name]) => { const { n, entry } = assetEntry(r, name), fd = r.apkEntries.has(entry) ? entryFd(r, entry) : null; if (fd === null) r.throwJava('Ljava/io/FileNotFoundException;', NOT_FD + ': ' + n); return fd; });
+  def(ASSETS, 'openNonAssetFd', `(${STRING})${ENTRY_AFD}`, (r, _m, [, name]) => { const n = text(r, name), fd = r.apkEntries.has(n) ? entryFd(r, n) : null; if (fd === null) r.throwJava('Ljava/io/FileNotFoundException;', NOT_FD + ': ' + n); return fd; });
   def(ASSETS, 'list', `(${STRING})[${STRING}`, (r, _m, [, path]) => {
     const prefix = 'assets/' + text(r, path).replace(/^\/+|\/+$/g, ''), base = prefix === 'assets/' ? 'assets/' : prefix + '/', names = new Set();
     for (const e of r.apkEntries) if (e.startsWith(base) && e.length > base.length) names.add(e.slice(base.length).split('/')[0]);
@@ -873,6 +885,8 @@ export function createAppServicesHost(platform) {
     if (value.kind === 'unresolved' || typeof value.value !== 'string' || !r.apkEntries.has(value.value)) r.throwJava('Landroid/content/res/Resources$NotFoundException;', `Resource ID #0x${(id >>> 0).toString(16)}`);
     return value.value;
   };
+  // Resources.openRawResourceFd: the same entry as a descriptor; a compressed entry is Resources.NotFoundException, as AssetManager's FileNotFoundException is wrapped on Android
+  def('Landroid/content/res/Resources;', 'openRawResourceFd', `(I)${ENTRY_AFD}`, (r, _m, [, id]) => { const entry = rawEntry(r, id), fd = entryFd(r, entry); if (fd === null) r.throwJava('Landroid/content/res/Resources$NotFoundException;', `File ${entry} from resource ID #0x${(id >>> 0).toString(16)}: ${NOT_FD}`); return fd; });
   def('Landroid/content/res/Resources;', 'openRawResource', '(I)Ljava/io/InputStream;', (r, _m, [, id]) => platform.javaIo.apkResourceStream(r, rawEntry(r, id)));
   def('Landroid/content/res/Resources;', 'openRawResource', '(ILandroid/util/TypedValue;)Ljava/io/InputStream;', (r, _m, [, id]) => platform.javaIo.apkResourceStream(r, rawEntry(r, id)));
 

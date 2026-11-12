@@ -7,6 +7,10 @@
 //
 //   node lab-mcp.mjs                      run by the MCP client, configured with the JSON the page shows in Controles › MCP:
 //                                         { "mcpServers": { "apk-lab": { "command": "node", "args": ["/caminho/lab-mcp.mjs"], "env": { "APK_WEB_LAB_MCP_TOKEN": "<token da página>" } } } }
+//   node lab-mcp.mjs serve --token <t>    the simple way: stays running and serves MCP over HTTP at http://<host>:<port>/mcp/<token> (Streamable HTTP, JSON responses), so the
+//                                         client only needs that address (claude mcp add --transport http apk-lab <url>). --host 127.0.0.1 by default; --host 0.0.0.0 (or a
+//                                         local IP) also accepts MCP clients from other machines of the network: the token in the address is then the only protection and the
+//                                         traffic is plain HTTP, so use it on networks you trust. The page always reaches the bridge on this machine (127.0.0.1).
 //   node lab-mcp.mjs token                prints the token of ~/.apk-web-lab-mcp-token (only used when neither --token nor APK_WEB_LAB_MCP_TOKEN is given)
 //   options: --port 8790  --origin <lab origin> (repeatable)  --token <token>  --timeout-ms 60000
 //
@@ -19,6 +23,7 @@ import http from 'node:http';
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { networkInterfaces } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -96,13 +101,34 @@ export function readOrCreateToken(file = tokenFile()) {
 }
 
 /** The bridge: an HTTP side for the page and an MCP side (handle(message) -> response or null). */
-export function createBridge({ port = DEFAULT_PORT, origins = DEFAULT_ORIGINS, token, timeoutMs = 60000, log = message => process.stderr.write(`[lab-mcp] ${message}\n`) } = {}) {
+export function createBridge({ port = DEFAULT_PORT, host = '127.0.0.1', origins = DEFAULT_ORIGINS, token, timeoutMs = 60000, log = message => process.stderr.write(`[lab-mcp] ${message}\n`) } = {}) {
   if (!TOKEN_PATTERN.test(String(token ?? ''))) throw new Error('lab-mcp: a ponte precisa de um token (16 ou mais letras, números, _ ou -)');
   const allowed = new Set(origins), pending = new Map(); let page = null, nextId = 1, server = null, refused = null, refusedLogged = 0;
   const cors = (origin, res, extra = {}) => { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); for (const [name, value] of Object.entries(extra)) res.setHeader(name, value); };
   const send = (res, status, body, origin) => { if (origin) cors(origin, res); res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
+  /** MCP over HTTP (Streamable HTTP, JSON responses only): POST /mcp/<token> with one JSON-RPC message or a batch. A browser page of another site is refused by its Origin;
+   *  clients that are not browsers send none, and the token in the address (or Authorization: Bearer) is what admits them. */
+  function onMcp(req, res, url, origin) {
+    const plain = (status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers }); res.end(body === null ? '' : JSON.stringify(body)); };
+    if (origin && !allowed.has(origin)) { plain(403, { error: `origem não permitida: ${origin}` }); return; }
+    if (origin) cors(origin, res);
+    if (req.method === 'OPTIONS') { res.writeHead(204, { 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] ?? 'content-type, authorization, mcp-protocol-version' }); res.end(); return; }
+    let given = ''; try { given = decodeURIComponent(url.pathname.split('/')[2] ?? ''); } catch { /* refused below */ }
+    if (!given) given = /^Bearer (.+)$/i.exec(req.headers.authorization ?? '')?.[1] ?? '';
+    if (!tokenMatches(given, token)) { plain(401, { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'token recusado: use o endereço que a ponte mostrou ao iniciar (…/mcp/<token>)' } }); return; }
+    if (req.method !== 'POST') { plain(405, { jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Method Not Allowed: esta ponte responde a POST (sem fluxo iniciado pelo servidor)' } }, { allow: 'POST' }); return; }
+    let size = 0; const chunks = [];
+    req.on('data', chunk => { size += chunk.length; if (size > 4 * 1024 * 1024) { req.destroy(); return; } chunks.push(chunk); });
+    req.on('end', async () => {
+      let message; try { message = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { plain(400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }); return; }
+      const one = async item => { try { return await handle(item); } catch (error) { return { jsonrpc: '2.0', id: item?.id ?? null, error: { code: -32603, message: String(error?.message ?? error) } }; } };
+      if (Array.isArray(message)) { const answers = (await Promise.all(message.map(one))).filter(Boolean); if (answers.length) plain(200, answers); else plain(202, null); return; }
+      const answer = await one(message); if (answer) plain(200, answer); else plain(202, null);   // a notification or a response from the client: accepted, nothing to say
+    });
+  }
   function onRequest(req, res) {
     const origin = req.headers.origin ?? null, url = new URL(req.url, 'http://127.0.0.1');
+    if (url.pathname === '/mcp' || url.pathname.startsWith('/mcp/')) { onMcp(req, res, url, origin); return; }
     if (!origin || !allowed.has(origin)) { send(res, 403, { error: `origem não permitida: ${origin ?? '(nenhuma)'}; rode com --origin ${origin ?? '<origem do lab>'}` }); return; }
     if (req.method === 'OPTIONS') {
       cors(origin, res, { 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] ?? 'content-type', 'Access-Control-Max-Age': '600', ...(req.headers['access-control-request-private-network'] ? { 'Access-Control-Allow-Private-Network': 'true' } : {}) });
@@ -112,8 +138,8 @@ export function createBridge({ port = DEFAULT_PORT, origins = DEFAULT_ORIGINS, t
     let given = ''; try { given = decodeURIComponent(key ?? ''); } catch { /* malformed: refused below */ }
     if (!tokenMatches(given, token)) {
       refused = { at: Date.now(), origin };
-      if (Date.now() - refusedLogged > 5000) { refusedLogged = Date.now(); log(`página recusada (${origin}): o token dela é diferente do desta ponte. Copie de novo o JSON de Controles › MCP para a configuração do cliente MCP e reinicie o servidor MCP.`); }
-      send(res, 401, { error: 'token recusado: o token desta página é diferente do configurado na ponte. Copie de novo o JSON de Controles › MCP para a configuração do seu cliente MCP e reinicie o servidor MCP.', code: 'bad-token' }, origin); return;
+      if (Date.now() - refusedLogged > 5000) { refusedLogged = Date.now(); log(`página recusada (${origin}): o token dela é diferente do desta ponte. Pare a ponte e rode de novo o comando de Controles › MCP (ou copie de novo a configuração, se o cliente MCP inicia a ponte).`); }
+      send(res, 401, { error: 'token recusado: o token desta página é diferente do configurado na ponte. Pare a ponte e rode de novo o comando de Controles › MCP (ou copie de novo a configuração, se o cliente MCP inicia a ponte).', code: 'bad-token' }, origin); return;
     }
     if (req.method === 'GET' && action === 'events') {
       cors(origin, res); res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
@@ -140,7 +166,7 @@ export function createBridge({ port = DEFAULT_PORT, origins = DEFAULT_ORIGINS, t
   /** Sends one tool call to the page; resolves with { content, isError }. */
   function callPage(name, args) {
     if (!page) {
-      const mismatch = refused && Date.now() - refused.at < 10 * 60 * 1000 ? ` Uma página (${refused.origin}) tentou conectar há ${Math.round((Date.now() - refused.at) / 1000)} s com outro token e foi recusada: copie de novo o JSON de Controles › MCP (o token mudou?) para a configuração do cliente MCP e reinicie o servidor MCP.` : '';
+      const mismatch = refused && Date.now() - refused.at < 10 * 60 * 1000 ? ` Uma página (${refused.origin}) tentou conectar há ${Math.round((Date.now() - refused.at) / 1000)} s com outro token e foi recusada: rode de novo o comando de Controles › MCP (o token mudou?) para a configuração do cliente MCP e reinicie o servidor MCP.` : '';
       return Promise.resolve({ isError: true, content: [{ type: 'text', text: `A página do APK Web Lab não está conectada. Abra o lab no navegador, carregue o APK e em Controles › MCP clique em Conectar.${mismatch}` }] });
     }
     const id = nextId++, wait = name === 'wait_ready' ? Math.max(timeoutMs, Number(args?.timeout_ms ?? 15000) + 5000) : timeoutMs;
@@ -169,9 +195,15 @@ export function createBridge({ port = DEFAULT_PORT, origins = DEFAULT_ORIGINS, t
   }
   return {
     handle, callPage, get connected() { return !!page; },
-    listen: () => new Promise((resolve, reject) => { server = http.createServer(onRequest); server.once('error', reject); server.listen(port, '127.0.0.1', () => { log(`ouvindo a página em http://127.0.0.1:${server.address().port} (origens: ${[...allowed].join(', ')})`); resolve(server.address().port); }); }),
+    listen: () => new Promise((resolve, reject) => { server = http.createServer(onRequest); server.once('error', reject); server.listen(port, host, () => { log(`ouvindo a página em http://127.0.0.1:${server.address().port} (origens: ${[...allowed].join(', ')})`); resolve(server.address().port); }); }),
     close: () => new Promise(resolve => { for (const waiter of pending.values()) clearTimeout(waiter.timer); pending.clear(); page?.res.end(); if (server) server.close(() => resolve()); else resolve(); }),
   };
+}
+
+/** The addresses an MCP client can use for a bridge bound to `host`: the loopback one, and for 0.0.0.0 every local IPv4 of this machine. */
+export function mcpAddresses(host, port, token, interfaces = networkInterfaces()) {
+  const hosts = host === '0.0.0.0' ? ['127.0.0.1', ...Object.values(interfaces).flat().filter(entry => entry && entry.family === 'IPv4' && !entry.internal).map(entry => entry.address)] : [host];
+  return [...new Set(hosts)].map(name => `http://${name}:${port}/mcp/${encodeURIComponent(token)}`);
 }
 
 /** MCP over stdio: one JSON-RPC message per line on stdin, responses on stdout. */
@@ -190,23 +222,28 @@ export function serveStdio(bridge, { input = process.stdin, output = process.std
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const args = process.argv.slice(2), options = { port: DEFAULT_PORT, origins: [...DEFAULT_ORIGINS], token: null, timeoutMs: 60000 };
+  const args = process.argv.slice(2), options = { port: DEFAULT_PORT, host: '127.0.0.1', serve: false, origins: [...DEFAULT_ORIGINS], token: null, timeoutMs: 60000 };
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === 'token') { console.log(readOrCreateToken()); process.exit(0); }
+    else if (arg === 'serve') options.serve = true;
+    else if (arg === '--host') options.host = String(args[++i]);
     else if (arg === '--port') options.port = Number(args[++i]);
     else if (arg === '--origin') options.origins.push(String(args[++i]).replace(/\/$/, ''));
     else if (arg === '--token') options.token = String(args[++i]);
     else if (arg === '--timeout-ms') options.timeoutMs = Number(args[++i]);
-    else if (arg === '--help' || arg === '-h') { console.error('node lab-mcp.mjs [token] [--port 8790] [--origin <origem do lab>]... [--token <token>] [--timeout-ms 60000]  (ou o token em APK_WEB_LAB_MCP_TOKEN, como no JSON de Controles › MCP)'); process.exit(0); }
+    else if (arg === '--help' || arg === '-h') { console.error('node lab-mcp.mjs [serve] [token] [--host 127.0.0.1] [--port 8790] [--origin <origem do lab>]... [--token <token>] [--timeout-ms 60000]  (ou o token em APK_WEB_LAB_MCP_TOKEN, como no JSON de Controles › MCP)'); process.exit(0); }
   }
   const chosen = resolveToken({ argToken: options.token, env: process.env });
   if (chosen.error) { process.stderr.write(`[lab-mcp] ${chosen.error}\n`); process.exit(1); }
   options.token = chosen.token;
   const bridge = createBridge(options);
   process.stderr.write(`[lab-mcp] token de pareamento: ${chosen.source}${chosen.source === tokenFile() ? ' (node lab-mcp.mjs token; cole em Controles › MCP › Token)' : ''}\n`);
-  bridge.listen().then(() => {
-    serveStdio(bridge);
+  bridge.listen().then(port => {
+    if (!options.serve) { serveStdio(bridge); return; }
+    for (const address of mcpAddresses(options.host, port, options.token)) process.stderr.write(`[lab-mcp] MCP: ${address}\n`);
+    process.stderr.write('[lab-mcp] no agente: claude mcp add --transport http apk-lab <um dos endereços acima>   ·   na página: Controles › MCP › Conectar   ·   Ctrl+C encerra\n');
   }, error => { process.stderr.write(`[lab-mcp] não abriu a porta ${options.port}: ${error.message}\n`); process.exit(1); });
-  process.stdin.on('end', () => bridge.close().then(() => process.exit(0)));
+  if (!options.serve) process.stdin.on('end', () => bridge.close().then(() => process.exit(0)));
+  else for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => bridge.close().then(() => process.exit(0)));
 }

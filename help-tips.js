@@ -17,6 +17,16 @@ function makeTip(doc, content, { warning = false, label = 'Ajuda' } = {}) {
   // inside a <label> or a <summary> a click must not toggle the control or the section; Escape hides the bubble
   button.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); button.focus(); });
   button.addEventListener('keydown', event => { if (event.key === 'Escape') button.blur(); });
+  // The bubble is fixed to the viewport next to its icon: the panel it lives in scrolls (overflow), which would clip an absolutely positioned one.
+  // Below the icon when it fits, above it otherwise; kept inside the window sideways.
+  const place = () => {
+    const view = doc.defaultView; if (!view || typeof button.getBoundingClientRect !== 'function') return;
+    const icon = button.getBoundingClientRect(), box = bubble.getBoundingClientRect(), margin = 8;
+    const left = Math.max(margin, Math.min(icon.left - 8, view.innerWidth - box.width - margin));
+    const below = icon.bottom + 4, top = below + box.height + margin <= view.innerHeight ? below : Math.max(margin, icon.top - 4 - box.height);
+    bubble.style.left = `${Math.round(left)}px`; bubble.style.top = `${Math.round(top)}px`;
+  };
+  for (const type of ['mouseenter', 'focusin']) wrap.addEventListener(type, () => { place(); doc.defaultView?.requestAnimationFrame?.(place); });   // again once it is laid out (its height is known only when shown)
   wrap.append(button, bubble);
   return wrap;
 }

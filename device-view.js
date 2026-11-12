@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=ee4847240266';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=ee4847240266';
-import { isTrustedRasterURL } from './raster-cache.js?v=ee4847240266';
+import { updateWebViewSlot } from './webview-slot.js?v=94fc4dedf7f2';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=94fc4dedf7f2';
+import { isTrustedRasterURL } from './raster-cache.js?v=94fc4dedf7f2';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -143,6 +143,16 @@ const PNG_DATA_URL = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/;
 const pngURLOk = url => typeof url === 'string' && (isTrustedRasterURL(url) || (url.length <= 24 * 1024 * 1024 && PNG_DATA_URL.test(url)));
 const cssColor = (argb) => /^#[0-9a-f]{8}$/i.test(argb || '') ? `#${argb.slice(3)}${argb.slice(1, 3)}` : '';
 
+/** The navigation bar's background and icon colour. The gesture handle follows the app's light/dark request as on Android. The three buttons must stay usable whatever the app
+ * painted: over an opaque bar colour the icons take the contrasting tone of that colour (an app that paints a white bar without asking for dark icons would hide them),
+ * and over a transparent bar they sit on a dark scrim. */
+function navBarPaint(nav) {
+  const argb = nav.color >>> 0, alpha = (argb >>> 24) / 255;
+  if (nav.mode !== 'buttons') return { background: argbToCSS(argb), foreground: nav.light ? '#1b1b1f' : '#ffffff', adaptive: alpha < 0.5 };   // over a transparent bar the handle takes its tone from what is behind it, as SystemUI samples the content (styles.css .adaptive)
+  if (alpha < 0.5) return { background: 'rgba(0,0,0,0.4)', foreground: '#ffffff' };
+  const luminance = (0.2126 * ((argb >>> 16) & 255) + 0.7152 * ((argb >>> 8) & 255) + 0.0722 * (argb & 255)) / 255;
+  return { background: argbToCSS(argb), foreground: luminance > 0.55 ? '#1b1b1f' : '#ffffff' };
+}
 const argbToCSS = argb => { const a = argb >>> 0; return `rgba(${(a >>> 16) & 255},${(a >>> 8) & 255},${a & 255},${((a >>> 24) / 255).toFixed(3)})`; };
 function formatClock(date = new Date()) {
   const settings = deviceState.settings;
@@ -170,7 +180,7 @@ function renderSystemBars(bars) {
   const status = $('sysbar-status'), nav = $('sysbar-nav'), content = $('android-content');
   device.style.setProperty('--status-h', String(bars.status.height)); device.style.setProperty('--nav-h', String(bars.nav.thickness));
   status.hidden = !bars.status.visible; status.style.setProperty('--sb-bg', argbToCSS(bars.status.color)); device.style.setProperty('--sb-fg', bars.status.light ? '#1b1b1f' : '#ffffff'); device.style.setProperty('--sb-bg', argbToCSS(bars.status.color));
-  nav.hidden = !bars.nav.visible; nav.classList.toggle('buttons', bars.nav.mode === 'buttons'); nav.classList.toggle('side-right', bars.nav.side === 'right'); device.style.setProperty('--nav-bg', argbToCSS(bars.nav.color)); device.style.setProperty('--nav-fg', bars.nav.light ? '#1b1b1f' : '#ffffff');
+  nav.hidden = !bars.nav.visible; nav.classList.toggle('buttons', bars.nav.mode === 'buttons'); nav.classList.toggle('side-right', bars.nav.side === 'right'); { const paint = navBarPaint(bars.nav); device.style.setProperty('--nav-bg', paint.background); device.style.setProperty('--nav-fg', paint.foreground); nav.classList.toggle('adaptive', !!paint.adaptive); }
   const frame = bars.contentFrame; Object.assign(content.style, { left: `${frame.left}px`, top: `${frame.top}px`, width: `${frame.right - frame.left}px`, height: `${frame.bottom - frame.top}px` });
   if (!deviceState.clockTimer) startClock(); else updateSystemBarIcons();
 }
@@ -229,6 +239,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   const focused = document.activeElement === element, signature = viewSignature(view, parentKind, parentLaidOut, clipOwnBounds, renderChildren, focused && (state.pendingInputs.has(view.id) || state.inputInFlight === view.id));
   if (element._signature !== signature) {
   if (kind === 'button' || kind === 'text') element.textContent = view.displayText ?? view.text ?? '';
+  if (view.textInContent) element.dataset.textInContent = 'true'; else delete element.dataset.textInContent;   // the glyphs are in the content raster: the element keeps its text for accessibility and typing, transparent (styles.css)
   if (kind === 'button') element.disabled = view.clickable === false || view.enabled === false;
   if (kind === 'text' || kind === 'image' || kind === 'view') { element.dataset.clickable = String(!!view.clickable && view.enabled !== false); element.tabIndex = view.clickable && view.enabled !== false ? 0 : -1; if (view.clickable) element.setAttribute('role', 'button'); else element.removeAttribute('role'); }
   if (kind === 'button' || view.clickable && ['text','view'].includes(kind)) element.setAttribute('aria-label', view.contentDescription || view.displayText || view.text || `Ação ${view.androidId || view.id}`);
@@ -284,7 +295,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
     element.style.backgroundRepeat = 'no-repeat'; element.style.color = 'transparent'; element.style.textShadow = 'none';
   }
   const gravity = view.gravity > 0 ? view.gravity : 0;
-  if (gravity & 1) { element.style.textAlign = 'center'; if (kind === 'linear') element.style.alignItems = 'center'; }
+  if ((gravity & 7) === 1) { element.style.textAlign = 'center'; if (kind === 'linear') element.style.alignItems = 'center'; }
   if ((gravity & 7) === 5) { element.style.textAlign = 'right'; if (kind === 'linear') element.style.alignItems = 'flex-end'; }
   if ((gravity & 0x70) === 0x10 && kind === 'linear') element.style.justifyContent = 'center';
   if ((gravity & 0x70) === 0x50 && kind === 'linear') element.style.justifyContent = 'flex-end';
@@ -315,8 +326,10 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   }
   if (view.canvasChildrenCaptured && !view.contentRaster) throw new Error('A captura Canvas não retornou uma imagem de conteúdo.');
   if (view.contentRaster) {
-    if (kind === 'input' || kind === 'progress') throw new Error('Canvas sobre controle HTML exige um contêiner.');
     const drawing = view.contentRaster;
+    // An <input>/<progress> cannot hold a layer. A subclass that draws itself (its onDraw ran on a Canvas, with the text/track the superclass draws) is shown by that drawing, as the
+    // element's background; the control stays on top for typing, focus and accessibility, with its own glyphs transparent so nothing is drawn twice.
+    const replaced = kind === 'input' || kind === 'progress';
     if (drawing.kind === 'rgba-raster') paintRgbaContentLayer(element, drawing, runtimeFrames);   // raw pixels from the VM (src/raster-cache.js): put on a canvas, no PNG decode
     else if (drawing.kind === 'bitmap-raster') paintBitmapContentLayer(element, drawing, runtimeFrames);   // GPU renderer (opt-in): an ImageBitmap drawn on the same canvas layer
     else {
@@ -325,9 +338,15 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
       if (layer._url !== drawing.dataURL) { layer.src = drawing.dataURL; layer._url = drawing.dataURL; layer.alt = ''; layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-canvas-content'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0'; }
     }
     const layer = element._contentLayer;
-    if (!element.style.position) element.style.position = 'relative';
-    if (layer.parentNode !== element) element.append(layer);
-  } else element._contentLayer?.remove();
+    if (replaced) {
+      const source = layer.tagName === 'CANVAS' ? layer._image : layer._url;
+      if (element._backgroundSource !== source) { element._backgroundSource = source; element._backgroundURL = `url("${layer.tagName === 'CANVAS' ? layer.toDataURL('image/png') : layer._url}")`; }
+      if (element.style.backgroundImage !== element._backgroundURL) { element.style.backgroundImage = element._backgroundURL; element.style.backgroundSize = '100% 100%'; element.style.backgroundRepeat = 'no-repeat'; }   // a `background` shorthand written by the styling above resets the image
+    } else {
+      if (!element.style.position) element.style.position = 'relative';
+      if (layer.parentNode !== element) element.append(layer);
+    }
+  } else { element._contentLayer?.remove(); if (element._backgroundSource !== undefined) { element._backgroundSource = undefined; element.style.backgroundImage = ''; } }
   if (view.foregroundSVG) {
     if (kind === 'input' || kind === 'progress') throw new Error('Foreground sobre este controle nativo HTML exige um contêiner de desenho.');
     const drawing = view.foregroundSVG, layer = element._foregroundLayer ||= document.createElement('img');
@@ -755,7 +774,7 @@ function renderSnapshot(snapshot) {
   state.lastAPKError = null; state.canGoBack = !!snapshot.canGoBack; hooks.navigationChanged?.(state.canGoBack);
   if (snapshot.closed) {
     $('android-action-mode-layer')?.replaceChildren();
-    state.apkRunning = false; $('android-device').hidden = true; hideError();
+    state.apkRunning = false; hideError();   // the device stays: its launcher shows the app (hooks.closed)
     updateTrace(snapshot); hooks.closed?.(snapshot); return;
   }
   if (!Array.isArray(snapshot?.views) || !snapshot.views.length) throw new Error('A Activity executou sem produzir uma interface Android Views suportada. Consulte o log de execução.');

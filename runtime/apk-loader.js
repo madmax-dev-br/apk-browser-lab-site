@@ -1,16 +1,17 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=ee4847240266';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=ee4847240266';
-import { inspectELF } from './native-inspector.js?v=ee4847240266';
-import { inflateRaw } from './inflate.js?v=ee4847240266';
-import { resolveDevice } from './device-profile.js?v=ee4847240266';
-import { resourceProfileFor } from './device-configuration.js?v=ee4847240266';
-import { JniBridge } from './jni-host.js?v=ee4847240266';
-import { providerForApk } from './native-provider-variants.js?v=ee4847240266';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=ee4847240266';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=ee4847240266';
-import { AndroidResources } from './android-resources.js?v=ee4847240266';
-import { AndroidPlatform } from './android-platform.js?v=ee4847240266';
-import { FrameworkProvider } from './framework-provider.js?v=ee4847240266';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=94fc4dedf7f2';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=94fc4dedf7f2';
+import { inspectELF } from './native-inspector.js?v=94fc4dedf7f2';
+import { elfBuildId } from './elf-build-id.js?v=94fc4dedf7f2';
+import { inflateRaw } from './inflate.js?v=94fc4dedf7f2';
+import { resolveDevice } from './device-profile.js?v=94fc4dedf7f2';
+import { resourceProfileFor } from './device-configuration.js?v=94fc4dedf7f2';
+import { JniBridge } from './jni-host.js?v=94fc4dedf7f2';
+import { providerForApk } from './native-provider-variants.js?v=94fc4dedf7f2';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=94fc4dedf7f2';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=94fc4dedf7f2';
+import { AndroidResources } from './android-resources.js?v=94fc4dedf7f2';
+import { AndroidPlatform } from './android-platform.js?v=94fc4dedf7f2';
+import { FrameworkProvider } from './framework-provider.js?v=94fc4dedf7f2';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -74,15 +75,9 @@ export class APKArchive {
     }
     if (p !== start + directorySize) fail('Malformed APK central directory length');
     this.directoryStart = start;
-    // A prepared file (.apklab, src/apklab-file.js): the APK's entries, decompressed and CRC-checked when the file was made, under apk/. The archive then reads as that APK.
-    this.prepared = null;
-    if (this.entries.has('apklab.json') && [...this.entries.keys()].some(key => key.startsWith('apk/'))) {
-      let descriptor; try { descriptor = JSON.parse(utf8.decode(this.readEntrySync('apklab.json', 1024 * 1024))); } catch (error) { fail(`Arquivo preparado (.apklab) ilegível: ${error.message}`); }
-      if (descriptor?.format !== 'apk-web-lab-prepared' || descriptor.version !== 1) fail(`Arquivo preparado de formato desconhecido (${descriptor?.format ?? '?'} v${descriptor?.version ?? '?'})`);
-      const remapped = new Map();
-      for (const [key, entry] of this.entries) if (key.startsWith('apk/') && key.length > 4) remapped.set(key.slice(4), { ...entry, name: key.slice(4), localName: key, trusted: descriptor.crcVerified === true && entry.method === 0 });
-      this.entries = remapped; this.prepared = descriptor;
-    }
+    // The prepared file (.apklab: the APK's entries stored decompressed under apk/) was withdrawn: it saved about 0.1 s of a load, weighed up to 2.5 times the APK and
+    // gave the app a different base.apk. It is refused by name instead of failing as a damaged APK.
+    if (this.entries.has('apklab.json') && !this.entries.has('AndroidManifest.xml')) fail('Arquivos preparados (.apklab) não são mais aceitos: abra o APK original.');
   }
   payload(name) {
     const e = this.entries.get(name), b = this.reader;
@@ -92,11 +87,13 @@ export class APKArchive {
     if (b.u32(e.offset) !== 0x04034b50 || b.u16(e.offset + 8) !== e.method || (b.u16(e.offset + 6) & 1))
       fail(`Malformed APK local entry: ${name}`);
     const nameSize = b.u16(e.offset + 26), extra = b.u16(e.offset + 28);
-    if (utf8.decode(b.slice(e.offset + 30, nameSize)) !== (e.localName ?? name)) fail(`APK local filename mismatch: ${name}`);
+    if (utf8.decode(b.slice(e.offset + 30, nameSize)) !== name) fail(`APK local filename mismatch: ${name}`);
     const start = e.offset + 30 + nameSize + extra;
     if (start + e.compressed > this.directoryStart) fail(`APK entry overlaps central directory: ${name}`);
-    return { entry: e, compressed: b.slice(start, e.compressed) };
+    return { entry: e, compressed: b.slice(start, e.compressed), start };
   }
+  /** Where an entry's data sits in the archive file: { stored, start, length }. A stored (uncompressed) entry can be read in place, which is what a file descriptor over it needs (AssetManager.openFd). */
+  entryRange(name) { const { entry, start } = this.payload(name); return { stored: entry.method === 0, start, length: entry.compressed }; }
   /** Synchronous variant for the run-time VM (Class.getResource, AssetManager.open): same bounds and CRC checks as extract(). */
   /** Bounded read for load-time inspection (profile selection): the same checks as extractSync, not counted as resource preparation. */
   inspectSync(name, limit) { return this.readEntrySync(name, limit); }
@@ -110,7 +107,7 @@ export class APKArchive {
     let data;
     if (e.method === 0) data = compressed.slice();
     else { try { data = inflateRaw(compressed, e.size); } catch (error) { fail(`Unable to decompress ${name}: ${error.message}`); } }
-    if (data.length !== e.size || (!e.trusted && crc32(data) !== e.crc)) fail(`APK entry size/CRC mismatch: ${name}`);
+    if (data.length !== e.size || crc32(data) !== e.crc) fail(`APK entry size/CRC mismatch: ${name}`);
     return data;
   }
   async extract(name, limit) {
@@ -141,7 +138,7 @@ export class APKArchive {
       let p = 0;
       for (const chunk of chunks) { data.set(chunk, p); p += chunk.length; }
     }
-    if (data.length !== e.size || (!e.trusted && crc32(data) !== e.crc)) fail(`APK entry size/CRC mismatch: ${name}`);
+    if (data.length !== e.size || crc32(data) !== e.crc) fail(`APK entry size/CRC mismatch: ${name}`);
     return data;
   }
   /** Header-only probe: bounded output, deliberately does not claim full-entry CRC validation. */
@@ -654,7 +651,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // PackageManagerService: an APK that needs a newer platform than the device's SDK_INT cannot be installed.
   const deviceSdk = options.apiLevel ?? 33, minSdk = Number(manifest.usesSdk?.minSdkVersion ?? 1);
   if (Number.isFinite(minSdk) && minSdk > deviceSdk) throw new APKError(`INSTALL_FAILED_OLDER_SDK: Requires newer sdk version #${minSdk} (current version is #${deviceSdk})`, { kind: 'install-failed-older-sdk', minSdkVersion: minSdk, deviceSdk });
-  const runtime = new APKRuntime(program, { apkEntries: new Set(names), apkReader: name => archive.extractSync(name, 256 * 1024 * 1024), launcherActivity: manifest.launcherActivity, unsupportedFeatures,
+  const runtime = new APKRuntime(program, { apkEntries: new Set(names), apkReader: name => archive.extractSync(name, 256 * 1024 * 1024), apkEntryRange: name => archive.entryRange(name), launcherActivity: manifest.launcherActivity, unsupportedFeatures,
     maxInstructionsPerEvent: options.maxInstructionsPerEvent, maxEventWallMs: options.maxEventWallMs,
     maxCallDepth: options.maxCallDepth,
     maxHeapObjects: options.maxHeapObjects, apiLevel: deviceSdk, engine: options.engine ?? 'js', tolerateMissingVoid: !!options.tolerateMissingVoid, tolerateMissing: options.tolerateMissing ?? (options.tolerateMissingVoid ? 'void' : 'off'),
@@ -675,6 +672,18 @@ export async function loadAPK(arrayBuffer, options = {}) {
     for (const name of archive.entries.keys()) {
       const m = /^META-INF\/(androidx\.[\w.-]+?)\.version$/.exec(name); if (!m) continue;
       try { const text = new TextDecoder().decode(archive.extractSync(name, 256)).trim(); if (/^[\w.+-]{1,40}$/.test(text)) runtime.androidxVersions[m[1]] = text; } catch { /* unreadable entry: that artifact stays unidentified */ }
+    }
+  }
+  if (nativeLibraryProvider) {   // open-source libraries whose artifact carries no version are recognised by the GNU build-id of the copy the APK packages (lib/<abi>/<soname>)
+    runtime.packagedBuildIds = Object.create(null);
+    for (const [soname, entry] of nativeLibraryProvider.modules) {
+      if (!entry.requires?.fresco?.buildIds) continue;
+      for (const library of nativeLibraryDetails) {
+        if (library.basename !== soname || library.abi === 'unclassified' || library.bytes > 16 * 1024 * 1024) continue;
+        let buildId = null;
+        try { buildId = elfBuildId(archive.extractSync(library.path, 16 * 1024 * 1024)); } catch { /* unreadable entry: that copy stays unidentified */ }
+        (runtime.packagedBuildIds[soname] ??= []).push({ abi: library.abi, buildId });
+      }
     }
   }
   if (nativeLibraryProvider) { // the lab's React Native libraries are built for one RN version: record the app's (from its DEX) and Hermes bytecode version (from its bundle) for the provider's gate
@@ -713,8 +722,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     dexFiles, dexSummaries, totalDexBytes, nativeLibraries, nativeLibraryDetails, nativeByABI, nativeSummary,
     resourceSummary: resources.summary,
     kotlin, compose, embeddedFrameworks, bundles, dependencies: dependencyOwners.map(dottedName),
-    unsupportedFeatures, warnings, nativeInspection: { requested: false, inspected: 0, skipped: nativeLibraries.length, bytes: 0 },
-    prepared: archive.prepared ? { source: archive.prepared.source ?? null, createdAt: archive.prepared.createdAt ?? null, entries: archive.prepared.entries ?? null } : null };
+    unsupportedFeatures, warnings, nativeInspection: { requested: false, inspected: 0, skipped: nativeLibraries.length, bytes: 0 } };
 
   /** Lazy ELF metadata inspection. Accept exact archive paths; never resolves or calls JNI. */
   const inspectNativeLibraries = async (paths = nativeLibraries, limits = {}) => {
