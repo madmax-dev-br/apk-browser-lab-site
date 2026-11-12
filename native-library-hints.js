@@ -4,7 +4,7 @@
 //   contains : substrings of exported/imported symbol names (C++ mangled namespaces)
 //   banners  : ASCII strings a build of that project embeds
 // A library that only IMPORTS a project's symbols is reported as "usa", not as "parece".
-import { inspectELF } from './native-inspector.js?v=e0bbabac13b9';
+import { inspectELF } from './native-inspector.js?v=a9e9656b8d6c';
 export const LIBRARY_HINTS = [
   { id: 'mcrypt', label: 'libmcrypt', provides: ['mcrypt_', 'mdecrypt_'], banners: ['libmcrypt'] },
   { id: 'sqlite', label: 'SQLite', provides: ['sqlite3_'], banners: ['SQLite format 3', 'SQLite version '] },

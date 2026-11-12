@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=e0bbabac13b9';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=e0bbabac13b9';
-import { isTrustedRasterURL } from './raster-cache.js?v=e0bbabac13b9';
+import { updateWebViewSlot } from './webview-slot.js?v=a9e9656b8d6c';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=a9e9656b8d6c';
+import { isTrustedRasterURL } from './raster-cache.js?v=a9e9656b8d6c';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -181,7 +181,7 @@ function startClock() { clearInterval(deviceState.clockTimer); updateSystemBarIc
 /** Scale the whole device to the preview stage (CSS transform) and expose the screen extent in dp. */
 function fitDevice(widthDp, heightDp) {
   const device = $('android-device'), stage = $('preview-stage'); if (!device || !stage) return;
-  const available = { w: Math.max(120, stage.clientWidth - (deviceState.stagePadding ?? 24)), h: Math.max(160, stage.clientHeight - (deviceState.stagePadding ? deviceState.stagePadding / 2 : 16)) }, scale = Math.min(deviceState.maxScale ?? 0.7, available.w / (widthDp + 10), available.h / (heightDp + 10));
+  const available = { w: Math.max(120, stage.clientWidth - (deviceState.stagePadding ?? 24)), h: Math.max(160, stage.clientHeight - (deviceState.stagePadding ? deviceState.stagePadding / 2 : 16)) }, fitted = Math.min(deviceState.maxScale ?? 0.7, available.w / (widthDp + 10), available.h / (heightDp + 10)), zoom = deviceState.zoom, scale = Number.isFinite(zoom) && zoom > 0 && !stage.classList.contains('device-fullscreen') ? zoom : fitted;   // a zoom chosen on the stage (src/device-zoom.js) is absolute; fullscreen always fits
   device.style.setProperty('--screen-w', String(widthDp)); device.style.setProperty('--screen-h', String(heightDp)); device.style.setProperty('--scale', scale.toFixed(4));
 }
 function renderSystemBars(bars) {

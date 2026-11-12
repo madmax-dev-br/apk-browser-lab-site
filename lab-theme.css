@@ -679,3 +679,14 @@ span.files-thumb svg{width:22px;height:22px;fill:currentColor}
 .cam-ui-shutter.review{background-color:transparent;border-style:dashed}
 .cam-ui-shutter:hover{background-color:#e5e7eb}.cam-ui-shutter.review:hover{background-color:#374151}
 .cam-ui-side:focus-visible,.cam-ui-shutter:focus-visible{outline:3px solid #8ab4f8;outline-offset:2px}
+
+/* Device zoom (src/device-zoom.js): over the stage's top right corner; a chosen zoom lets the stage scroll around a device larger than it */
+.preview{position:relative}
+.stage-zoom{position:absolute;right:16px;z-index:5;display:flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--line-strong);border-radius:999px;background-color:var(--surface);box-shadow:0 2px 8px rgba(19,26,43,.12)}
+.stage-zoom button{min-width:32px;height:28px;padding:0 8px;border:0;border-radius:999px;background:transparent;color:var(--ink);font:500 14px/28px var(--sans);font-variant-numeric:tabular-nums;cursor:pointer}
+.stage-zoom button:hover:not(:disabled){background-color:var(--accent-soft)}
+.stage-zoom button:disabled{opacity:.35;cursor:default}
+.stage-zoom button[aria-pressed=false]{color:var(--accent-ink)}
+.has-device-fullscreen .stage-zoom{display:none}
+#preview-stage[data-zoomed]{overflow:auto;justify-content:safe center;align-items:safe center}
+#preview-stage[data-zoomed] .stage-callouts{display:none}

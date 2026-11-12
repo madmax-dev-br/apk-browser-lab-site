@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=e0bbabac13b9';
-import { APKError } from './apk-error.js?v=e0bbabac13b9';
+import { createHostRegistry } from './host-contract.js?v=a9e9656b8d6c';
+import { APKError } from './apk-error.js?v=a9e9656b8d6c';
 
 // android.content.pm.PackageManager public API (API 33) that the package model of app-services-host does not answer yet, ported from android-13.0.0_r1 PackageManager.java /
 // ApplicationPackageManager.java for a device with this app and the system packages of that model. Flag-holder overloads (ComponentInfoFlags / PackageInfoFlags / ResolveInfoFlags) forward to the

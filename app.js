@@ -1,40 +1,41 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=e0bbabac13b9';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=e0bbabac13b9';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=e0bbabac13b9';
-import { initCollapsibleSections } from './panel-sections.js?v=e0bbabac13b9';
-import { warmupLabel } from './warmup.js?v=e0bbabac13b9';
-import { initHelpTips } from './help-tips.js?v=e0bbabac13b9';
-import { createToolDock } from './tool-dock.js?v=e0bbabac13b9';
-import { createPermissionsPanel } from './permissions-panel.js?v=e0bbabac13b9';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=e0bbabac13b9';
-import { createCameraLab } from './camera-lab.js?v=e0bbabac13b9';
-import { createOverridesPanel } from './overrides-panel.js?v=e0bbabac13b9';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=e0bbabac13b9';
-import { createHostMapPanel } from './host-map-panel.js?v=e0bbabac13b9';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=e0bbabac13b9';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=e0bbabac13b9';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=e0bbabac13b9';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=e0bbabac13b9';
-import { createDeviceView, createViewState } from './device-view.js?v=e0bbabac13b9';
-import { createTaskSwitcher } from './task-switcher.js?v=e0bbabac13b9';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=e0bbabac13b9';
-import { formatApiGapReport } from './api-gap-scan.js?v=e0bbabac13b9';
-import { createLogcatPanel } from './logcat-panel.js?v=e0bbabac13b9';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=e0bbabac13b9';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=e0bbabac13b9';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=e0bbabac13b9';
-import { captureImage } from './screen-capture.js?v=e0bbabac13b9';
-import { createPluginsPanel } from './plugins-panel.js?v=e0bbabac13b9';
-import { createMcpTools } from './mcp-tools.js?v=e0bbabac13b9';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=e0bbabac13b9';
-import { createModalHost } from './lab-modal.js?v=e0bbabac13b9';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=e0bbabac13b9';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=e0bbabac13b9';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=e0bbabac13b9';
-import { createDragLayer } from './lab-drag.js?v=e0bbabac13b9';
-import { createLabScroll } from './lab-scroll.js?v=e0bbabac13b9';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=e0bbabac13b9';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=e0bbabac13b9';
+import { APKWorkerClient } from './apk-worker-client.js?v=a9e9656b8d6c';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=a9e9656b8d6c';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=a9e9656b8d6c';
+import { initCollapsibleSections } from './panel-sections.js?v=a9e9656b8d6c';
+import { warmupLabel } from './warmup.js?v=a9e9656b8d6c';
+import { initHelpTips } from './help-tips.js?v=a9e9656b8d6c';
+import { createToolDock } from './tool-dock.js?v=a9e9656b8d6c';
+import { createPermissionsPanel } from './permissions-panel.js?v=a9e9656b8d6c';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=a9e9656b8d6c';
+import { createCameraLab } from './camera-lab.js?v=a9e9656b8d6c';
+import { createOverridesPanel } from './overrides-panel.js?v=a9e9656b8d6c';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=a9e9656b8d6c';
+import { createHostMapPanel } from './host-map-panel.js?v=a9e9656b8d6c';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=a9e9656b8d6c';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=a9e9656b8d6c';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=a9e9656b8d6c';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=a9e9656b8d6c';
+import { createDeviceView, createViewState } from './device-view.js?v=a9e9656b8d6c';
+import { createTaskSwitcher } from './task-switcher.js?v=a9e9656b8d6c';
+import { createDeviceZoom } from './device-zoom.js?v=a9e9656b8d6c';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=a9e9656b8d6c';
+import { formatApiGapReport } from './api-gap-scan.js?v=a9e9656b8d6c';
+import { createLogcatPanel } from './logcat-panel.js?v=a9e9656b8d6c';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=a9e9656b8d6c';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=a9e9656b8d6c';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=a9e9656b8d6c';
+import { captureImage } from './screen-capture.js?v=a9e9656b8d6c';
+import { createPluginsPanel } from './plugins-panel.js?v=a9e9656b8d6c';
+import { createMcpTools } from './mcp-tools.js?v=a9e9656b8d6c';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=a9e9656b8d6c';
+import { createModalHost } from './lab-modal.js?v=a9e9656b8d6c';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=a9e9656b8d6c';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=a9e9656b8d6c';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=a9e9656b8d6c';
+import { createDragLayer } from './lab-drag.js?v=a9e9656b8d6c';
+import { createLabScroll } from './lab-scroll.js?v=a9e9656b8d6c';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=a9e9656b8d6c';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=a9e9656b8d6c';
 const apkVM = new APKWorkerClient();
 const $ = (id) => document.getElementById(id);
 const state = { mode: 'apk', runtime: null, inventory: null, apkRunning: false, canGoBack: false, busy: false, trace: [], composeStarted: false, composeReady: false, composeTimer: null, catalogLoading: false, currentSource: null, launchAttempted: false, operation: 0, operationTimer: null, abortController: null, lastAPKError: null, ...createViewState() };
@@ -178,7 +179,7 @@ function reportAPKError(error, title) {
 // Boot screen: the phone frame appears in the click's own frame (before the Worker answers), shows the phase text, and fades out when the first real frame is drawn (or the operation ends without one).
 function sizeBootOverlay() {
   const stage = $('preview-stage'), overlay = $('boot-overlay'); if (!stage || !overlay) return;
-  const d = resolveDevice(deviceState.settings), w = d.widthDp, h = d.heightDp, scale = Math.min(0.7, Math.max(120, stage.clientWidth - 24) / (w + 10), Math.max(160, stage.clientHeight - 16) / (h + 10));
+  const d = resolveDevice(deviceState.settings), w = d.widthDp, h = d.heightDp, fitted = Math.min(0.7, Math.max(120, stage.clientWidth - 24) / (w + 10), Math.max(160, stage.clientHeight - 16) / (h + 10)), scale = Number.isFinite(deviceState.zoom) && deviceState.zoom > 0 ? deviceState.zoom : fitted;   // the launch screen follows the stage zoom
   overlay.style.setProperty('--boot-w', String(w)); overlay.style.setProperty('--boot-h', String(h)); overlay.style.setProperty('--boot-scale', scale.toFixed(4));
 }
 // The caption sits in a box of fixed height under the logo (styles.css .boot-caption): a longer or shorter status never moves the logo; the full text is the tooltip.
@@ -718,7 +719,10 @@ taskSwitcher = createTaskSwitcher({ $, vm: () => state.runtime, render: snapshot
   begin: message => beginOperation(message), finish: token => finishOperation(token), report: (message, error) => { if (error) reportAPKError(error, 'Navegação do dispositivo'); else appendTrace(message); },
   announce: mode => { if (state.mode !== 'apk' || !['overview', 'home', 'closed'].includes(mode)) return; setStatus(mode === 'closed' ? 'Aplicativo encerrado · toque no ícone para abrir de novo' : 'Aplicativo em segundo plano (onPause, onStop) · toque para voltar'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = mode === 'closed' ? '<span></span> ENCERRADO' : '<span></span> EM PAUSA'; } });
 // The stage changes size when the window does or a dock panel opens (the workspace fills the viewport above the dock): the device is fitted again.
-if (typeof ResizeObserver === 'function' && $('preview-stage')) new ResizeObserver(() => { const stage = $('preview-stage'); stage.style.setProperty('--stage-h', `${stage.clientHeight}px`); sizeBootOverlay(); if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); }).observe($('preview-stage'));
+// "−  70%  +" over the stage's top right corner (src/device-zoom.js): the device's scale on the stage; the label resets to "fit".
+const refitDevice = () => { sizeBootOverlay(); if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); else { const d = resolveDevice(deviceState.settings); deviceView.fitDevice(d.widthDp, d.heightDp); } };
+const deviceZoom = createDeviceZoom({ stage: $('preview-stage'), deviceState, refit: refitDevice, shownScale: () => Number($('android-device')?.style?.getPropertyValue?.('--scale')) || 0.7 });
+if (typeof ResizeObserver === 'function' && $('preview-stage')) new ResizeObserver(() => { const stage = $('preview-stage'); stage.style.setProperty('--stage-h', `${stage.clientHeight}px`); sizeBootOverlay(); deviceZoom?.sync(); if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); }).observe($('preview-stage'));
 createDeviceFullscreen({ stage: $('preview-stage'), openButton: $('fullscreen-button'), closeButton: $('fullscreen-close'), deviceState, refit: () => { if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); } });   // "Tela cheia" (src/device-fullscreen.js): CSS scale only
 const customScreenPanel = createCustomScreenPanel({ $ });   // "Tela" -> "Personalizado" (src/custom-screen-panel.js)
 // ---- Virtual device settings panel ("Dispositivo virtual") ----

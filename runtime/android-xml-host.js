@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=e0bbabac13b9';
+import { APKError } from './apk-runtime.js?v=a9e9656b8d6c';
 const PARSER = 'Landroid/content/res/XmlBlock$Parser;', PULL = 'Lorg/xmlpull/v1/XmlPullParser;', ATTRS = 'Landroid/util/AttributeSet;', RES_PARSER = 'Landroid/content/res/XmlResourceParser;';
 const ANDROID = 'http://schemas.android.com/apk/res/android';
 const methods = [
