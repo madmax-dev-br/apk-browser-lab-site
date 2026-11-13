@@ -1,7 +1,7 @@
 // The "Permissões" section of the Controles panel and the permission dialog shown over the phone screen. State per package lives in localStorage (key with the package name, every access
 // guarded); the simulated location lives in the device settings. The rules (what a request does, rationale, "don't ask again") are src/runtime-permissions.js, shared with the VM.
-import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=07ce22d2e253';
-export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=07ce22d2e253';
+import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=5553a52fdbbb';
+export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=5553a52fdbbb';
 
 const KEY_PREFIX = 'apkweb-permissions-v1:';
 export const PERMISSION_ICONS = {
@@ -145,6 +145,16 @@ export function createPermissionsPanel({ $, vm, location }) {
     /** The VM went away (reopen, stop): a dialog that waited for it has nothing to answer. */
     detach() { if (S.open) closeDialog(); S.queue.length = 0; },
     refreshLocation: writeLocation,
+    /** The runtime permissions of the open APK as the panel shows them: { name, state: 'ask'|'allow'|'deny', granted, applicable } (MCP permissions). */
+    list() { const granted = computeGranted(S.config, S.manifest); return S.list.map(entry => ({ name: entry.name, state: S.config.states[entry.name] ?? 'ask', granted: granted.has(entry.name), applicable: !!entry.applicable })); },
+    /** What a change of the panel's select does, by name (a short name such as CAMERA is android.permission.CAMERA). */
+    set(name, state) {
+      if (!['ask', 'allow', 'deny'].includes(state)) throw new Error('state é ask, allow ou deny');
+      const full = String(name).includes('.') ? String(name) : `android.permission.${name}`, entry = S.list.find(item => item.name === full);
+      if (!entry) throw new Error(`${full} não é uma permissão de execução declarada por este APK (há: ${S.list.map(item => item.name).join(', ') || 'nenhuma'})`);
+      if (!entry.applicable) throw new Error(`${full} não se aplica a este app (targetSdk / versão)`);
+      change(entry, state); return this.list();
+    },
     get state() { return S; },
   };
 }

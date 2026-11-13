@@ -3,9 +3,14 @@
 // File System Access, from a drop or from the file picker), the handle is stored too: opening the icon then reads the file again from where it is on disk (a rebuilt APK at the
 // same path is the new build), after the browser asks once per session for permission to read it; without the handle, or when the file is gone or the permission refused,
 // the copy stored at the last open is used. Browsers never reveal a file's path: the handle is how a page remembers "where the file is".
-// One entry per package (a new build of an app replaces its entry); an APK whose package is not known yet is keyed by its file name. DOM-free apart from the IndexedDB backend.
+// One entry per package and file name: two APKs of the same package under different file names (two flavours, two versions kept side by side) are two icons, each keeping its
+// own label and icon; a new build saved under the same file name replaces its entry. An APK whose package is not known yet is keyed by its file name alone, and an entry of the
+// earlier one-per-package format (keyed by the package alone) is taken over by the same package and file name. DOM-free apart from the IndexedDB backend.
 
 export const SHELF_LIMIT = 24;   // entries kept; the least recently opened go first beyond it
+
+/** The key of a saved APK: its package and its file name (the file name alone while the package is not known). */
+export function shelfKey(packageName, name) { return name ? (packageName ? `${packageName}\u0000${name}` : name) : packageName || null; }
 
 /** The shelf over a backend { all(), get(id), put(entry), delete(id) } (async). Entries: { id, name, packageName, label, icon: { bytes, mime } | null, size, addedAt, openedAt,
  *  blob (the APK bytes at the last open), handle (FileSystemFileHandle | null) }. */
@@ -16,7 +21,9 @@ export function createApkShelf(backend, { now = () => Date.now() } = {}) {
     async list() { return (await backend.all()).sort((a, b) => a.addedAt - b.addedAt || String(a.id).localeCompare(String(b.id))).map(summary); },
     /** Stores an APK that was just opened. `previousId` (the file-name key used before the package was known) is merged into the package's entry. Returns its summary. */
     async save({ id, name, packageName = null, blob, handle = null, previousId = null }) {
-      const key = packageName || id || name; if (!key || !blob) throw new Error('An APK shelf entry needs a key and the APK bytes');
+      const key = shelfKey(packageName, name) ?? id; if (!key || !blob) throw new Error('An APK shelf entry needs a key and the APK bytes');
+      const legacy = packageName ? await backend.get(packageName) : null;   // the one-per-package format: the same app under the same file name is this entry
+      if (legacy && legacy.name === name && !previousId) previousId = packageName;
       const old = await backend.get(key) ?? (previousId && previousId !== key ? await backend.get(previousId) : null), time = now();
       const entry = { ...(old ?? {}), id: key, name: name ?? old?.name ?? key, packageName: packageName ?? old?.packageName ?? null, blob, size: blob.size ?? old?.size ?? 0, handle: handle ?? old?.handle ?? null, addedAt: old?.addedAt ?? time, openedAt: time };
       await backend.put(entry); if (previousId && previousId !== key) await backend.delete(previousId);

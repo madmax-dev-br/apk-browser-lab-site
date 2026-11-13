@@ -25,7 +25,7 @@ const scrollTargetOf = args => args.element_key || args.test_tag || args.text ||
  * instances, referrers, compositionLocals, findCompositionLocal). plugins(): the host's read model of the plugins. logcat() / network(): the entries of the page stores.
  * status(): what the page knows about the loaded APK. clickButton(pluginId, buttonId): a click on a plugin's button (lab.button), resolved when its handler finished. sleep(ms).
  */
-export function createMcpTools({ query, plugins = () => [], clickButton = null, logcat = () => [], network = () => [], status = () => ({}), actions = null, input = null, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
+export function createMcpTools({ controls = null, query, plugins = () => [], clickButton = null, logcat = () => [], network = () => [], status = () => ({}), actions = null, input = null, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
   async function waitReady(timeoutMs = 15000) {
     const until = now() + bounded(timeoutMs, 15000, 100, 120000);
     for (;;) {
@@ -172,6 +172,34 @@ export function createMcpTools({ query, plugins = () => [], clickButton = null, 
     async scroll_info(args) { if (!input?.scrollInfo) throw fail('Entrada não disponível nesta página.'); return [text(await input.scrollInfo({ target: scrollTargetOf(args) }))]; },
     async back(args) { if (!input?.back) throw fail('Entrada não disponível nesta página.'); return afterInput(await input.back(args), args); },
     async reload(args) { if (!actions?.reload) throw fail('Recarregar não está disponível nesta página.'); return [text(await actions.reload(args.mode === 'reopen' ? 'reopen' : 'recreate'))]; },
+    // ---- the Controles panel (controls: src/app.js mcpControls) ----
+    async app_data(args) {
+      if (!controls?.appData) throw fail('Dados do app não estão disponíveis nesta página.');
+      if (args.prefs) return [text(await controls.appData({ op: 'prefs', name: String(args.prefs) }))];
+      if (args.db && args.table) return [text(await controls.appData({ op: 'rows', db: String(args.db), table: String(args.table), offset: bounded(args.offset, 0, 0, 1e9), limit: bounded(args.limit, 100, 1, 500) }))];
+      return [text(await controls.appData({ op: 'overview' }))];
+    },
+    async set_preferences(args) {
+      if (!controls?.appData) throw fail('Dados do app não estão disponíveis nesta página.');
+      if (!args.name || !Array.isArray(args.changes) || !args.changes.length) throw fail('name e changes ([{ key, type, value } ou { key, remove: true }]) são obrigatórios.');
+      return [text(await controls.appData({ op: 'edit-prefs', name: String(args.name), changes: args.changes }))];
+    },
+    async edit_row(args) {
+      if (!controls?.appData) throw fail('Dados do app não estão disponíveis nesta página.');
+      if (!args.db || !args.table) throw fail('db e table são obrigatórios.');
+      const change = { rowid: args.rowid ?? null, key: args.key ?? null, set: args.set ?? null, insert: args.insert ?? null, remove: args.remove === true };
+      return [text(await controls.appData({ op: 'edit-row', db: String(args.db), table: String(args.table), change }))];
+    },
+    async sql(args) {
+      if (!controls?.appData) throw fail('Dados do app não estão disponíveis nesta página.');
+      if (!args.db || !args.sql) throw fail('db e sql são obrigatórios.');
+      return [text(await controls.appData({ op: 'sql', db: String(args.db), sql: String(args.sql), params: Array.isArray(args.params) ? args.params : [], limit: bounded(args.limit, 200, 1, 500) }))];
+    },
+    async device(args) { if (!controls?.device) throw fail('Ajustes do dispositivo não estão disponíveis nesta página.'); return [text(controls.device(args.set ?? null))]; },
+    async apps(args) { if (!controls?.apps) throw fail('Apps salvos não estão disponíveis nesta página.'); const result = await controls.apps(args.action ?? 'list', args.id ?? null); if ((args.action ?? 'list') === 'list') return [text(result)]; const ready = await waitReady(args.wait_ms ?? 15000); return [text({ ...result, ready: ready.ready })]; },
+    async open_link(args) { if (!controls?.openLink) throw fail('Deep links não estão disponíveis nesta página.'); if (!args.link && !args.component) throw fail('link (ou component) é obrigatório.'); return [text(await controls.openLink({ link: String(args.link ?? ''), action: String(args.action ?? ''), component: String(args.component ?? '') }))]; },
+    async host_redirects(args) { if (!controls?.hostRedirects) throw fail('Redirecionar hosts não está disponível nesta página.'); return [text(controls.hostRedirects(Array.isArray(args.rules) ? args.rules : null))]; },
+    async permissions(args) { if (!controls?.permissions) throw fail('Permissões não estão disponíveis nesta página.'); return [text(controls.permissions(args.name ?? null, args.state ?? null))]; },
     async wait_ready(args) { const result = await waitReady(args.timeout_ms); return [text({ ready: result.ready, activity: result.screen?.activity ?? null, waitingFor: result.screen?.ready?.waitingFor ?? [] })]; },
   };
   return {

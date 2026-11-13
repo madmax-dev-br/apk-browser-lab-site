@@ -579,6 +579,7 @@ body.lab-dragging{user-select:none;-webkit-user-select:none}
 .launcher-icon img{width:100%;height:100%;display:block;object-fit:cover}.launcher-icon.generic{background:#fff;color:#3ddc84}.launcher-icon svg{width:36px;height:36px}
 .launcher-label{font-size:12px;line-height:15px;max-width:76px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 2px #000a}
 .launcher-hint{display:none}
+.launcher-file{font-size:10px;line-height:12px;margin-top:-5px;max-width:76px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ffffffb3;text-shadow:0 1px 2px #000a}
 .android-screen[data-task=overview]>.android-content,.android-screen[data-task=dragging]>.android-content{box-shadow:0 18px 50px #000a;overflow:hidden}
 .android-screen[data-task=overview]>.android-content,.android-screen[data-task=overview]>.android-window-layer,.android-screen[data-task=home]>.android-content,.android-screen[data-task=home]>.android-window-layer,.android-screen[data-task=closed]>.android-content,.android-screen[data-task=closed]>.android-window-layer{pointer-events:none}
 .android-screen[data-task=overview] .sysbar-status,.android-screen[data-task=home] .sysbar-status,.android-screen[data-task=closed] .sysbar-status,.android-screen[data-task=dragging] .sysbar-status{background:transparent!important;color:#fff}
@@ -613,3 +614,28 @@ body.lab-dragging{user-select:none;-webkit-user-select:none}
 .boot-overlay.has-app-icon .boot-logo{display:none}
 .boot-overlay .boot-bar{display:none}
 .boot-overlay .boot-caption{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+/* "Internet" in the preview bar (src/app.js syncNetworkToggle): marked while the device is offline. */
+.network-toggle.offline{background:#7a1f1f;border-color:#b84a4a;color:#fff}
+
+/* "Dados do app" (src/app-data-panel.js): the list in Controles and the SharedPreferences / SQLite modals. */
+.appdata-list{list-style:none;margin:6px 0;padding:0;display:grid;gap:4px}.appdata-list:empty{display:none}
+.appdata-item{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel,#fff)}
+.appdata-item:hover{border-color:var(--accent,#3b5bdb)}.appdata-item:focus-visible{outline:2px solid var(--accent,#3b5bdb);outline-offset:1px}
+.appdata-item strong{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.appdata-item small{grid-column:2;color:var(--muted,#5c6370);font-size:12px}
+.appdata-kind{grid-row:1/3;font-size:10px;font-weight:600;padding:2px 6px;border-radius:5px;background:#e7f5ec;color:#1f6b3a}.appdata-kind.db{background:#e8eefc;color:#2a4cb3}
+.appdata-modal{display:flex;flex-direction:column;gap:10px;min-height:0;height:100%;font-size:13px}
+.appdata-table{border-collapse:collapse;width:100%;font-size:12.5px}.appdata-table th,.appdata-table td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.appdata-table thead th{position:sticky;top:0;background:#f4f6fb;z-index:1;font-weight:600}.appdata-table td.null{color:#9aa1ad;font-style:italic}
+.appdata-table input,.appdata-table select,.appdata-table textarea{font:inherit;width:100%;box-sizing:border-box;padding:3px 6px;border:1px solid var(--line);border-radius:5px}.appdata-table textarea{white-space:pre;resize:vertical}
+.appdata-table tbody td:not(.appdata-actions){cursor:default}.appdata-actions{white-space:nowrap;width:1%}.appdata-actions .cp-button{margin-left:4px}
+.appdata-new td{background:#fafbfe}.cp-button.danger{color:#a32020}
+.appdata-status{min-height:18px;margin:0;color:var(--muted,#5c6370)}
+.appdata-db-main{display:grid;grid-template-columns:200px 1fr;gap:12px;min-height:0;flex:1}
+.appdata-side h3,.appdata-sql h3{font-size:12px;margin:0 0 6px;text-transform:none}.appdata-tables{list-style:none;margin:0;padding:0;display:grid;gap:3px;overflow:auto;max-height:100%}
+.appdata-tables button{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;flex-direction:column;padding:5px 8px;border-radius:6px}.appdata-tables button:hover{background:#f1f3f9}
+.appdata-tables button[aria-current=true]{background:#e8eefc;color:#2a4cb3}.appdata-tables small{color:var(--muted,#5c6370);font-size:11px}
+.appdata-content{display:flex;flex-direction:column;gap:6px;min-width:0;min-height:0}.appdata-grid{overflow:auto;min-height:0;border:1px solid var(--line);border-radius:8px;max-height:52vh}
+.appdata-pager{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.appdata-pager small{color:var(--muted,#5c6370)}
+.appdata-sql textarea{width:100%;box-sizing:border-box;font:12.5px ui-monospace,Menlo,monospace;padding:6px 8px;border:1px solid var(--line);border-radius:6px}
+@media (max-width:700px){.appdata-db-main{grid-template-columns:1fr}}

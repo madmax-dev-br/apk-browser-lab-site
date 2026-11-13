@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=07ce22d2e253") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=07ce22d2e253">
-  <link rel="stylesheet" href="./lab-theme.css?v=07ce22d2e253">
-  <meta name="apk-browser-build" content="07ce22d2e253">
+  <style>@import url("./styles.css?v=5553a52fdbbb") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=5553a52fdbbb">
+  <link rel="stylesheet" href="./lab-theme.css?v=5553a52fdbbb">
+  <meta name="apk-browser-build" content="5553a52fdbbb">
 </head>
 <body>
   <header class="topbar">
@@ -65,12 +65,13 @@
                 <label for="dev-dark">Tema escuro</label><input id="dev-dark" type="checkbox">
                 <label for="dev-layout-bounds" title="Opção de desenvolvedor do Android: contorna os limites de cada View e nó do Compose (azul), margens (magenta) e padding (verde)">Mostrar limites de layout</label><input id="dev-layout-bounds" type="checkbox">
                 <label for="dev-font">Escala da fonte <output id="dev-font-out">1,00×</output></label><input id="dev-font" type="range" min="0.85" max="2" step="0.05">
-                <label for="dev-locale">Idioma e região</label><select id="dev-locale"></select>
+                <label for="dev-locale">Idioma</label><select id="dev-locale"></select>
+                <label for="dev-region">Região</label><select id="dev-region" title="O país do locale do aparelho (Locale.getDefault, Configuration.locale): datas, números, moeda e recursos -rBR. O chip do emulador (TelephonyManager) continua sendo o dos EUA, como no emulador do Android"></select>
                 <label for="dev-orientation">Orientação</label><select id="dev-orientation"><option value="portrait">Retrato</option><option value="landscape">Paisagem</option></select>
                 <label for="dev-screen">Tela</label><select id="dev-screen"></select>
                 <div id="dev-custom-screen" class="cp-custom-screen" hidden><div class="cp-custom-row"><label for="dev-custom-w">Largura</label><input id="dev-custom-w" type="number" min="1" max="4096" step="1" inputmode="numeric"><span aria-hidden="true">×</span><label for="dev-custom-h">Altura</label><input id="dev-custom-h" type="number" min="1" max="4096" step="1" inputmode="numeric"><select id="dev-custom-unit" aria-label="Unidade"><option value="dp">dp</option><option value="px">px</option></select></div><p id="dev-custom-msg" class="cp-note" role="status" aria-live="polite"></p></div>
                 <label for="dev-nav">Navegação</label><select id="dev-nav"><option value="gesture">Gestos</option><option value="buttons">3 botões</option></select>
-                <label for="dev-animator">Escala de animação</label><select id="dev-animator"><option value="0">Desligada</option><option value="0.5">0,5×</option><option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select>
+                <label for="dev-animator">Escala de animação</label><select id="dev-animator"><option value="0">Desligada</option><option value="0.5">0,5×</option><option value="1">1× (padrão)</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select>
               </div>
             </div></details>
             <details class="cp-group" id="cp-sec-device" data-section="device">
@@ -108,6 +109,13 @@
               <ul id="files-list" class="files-list" aria-labelledby="cp-files-title" hidden></ul>
               <p id="files-note" class="cp-note" role="status" aria-live="polite"></p>
               <button id="files-clear" class="cp-button" type="button" disabled>Remover todos</button>
+            </div></details>
+            <details class="cp-group" id="cp-sec-appdata" data-section="appdata">
+              <summary><h3 id="cp-appdata-title">Dados do app</h3><span id="appdata-summary" class="cp-badge">—</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <p class="cp-note">As SharedPreferences e os bancos SQLite que o app guardou. Toque num item para ver e editar.</p>
+              <ul id="appdata-list" class="appdata-list" aria-labelledby="cp-appdata-title"></ul>
+              <p id="appdata-note" class="cp-note" role="status" aria-live="polite">Abra e inicie um app para ver os dados que ele guardou.</p>
+              <button id="appdata-refresh" class="cp-button" type="button" disabled>Atualizar</button>
             </div></details>
             <details class="cp-group" id="cp-sec-camera" data-section="camera">
               <summary><h3 id="cp-camera-title">Câmera</h3><span id="cam-summary" class="cp-badge">padrão de teste</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
@@ -208,7 +216,7 @@
         </section>
       </aside>
       <section class="preview" aria-label="Aplicativo em execução">
-        <div class="preview-bar"><div class="preview-title"><span id="preview-name">Prévia do aplicativo</span></div><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reabrir: como fechar e abrir de novo a mesma tela. Nova instância com o mesmo Intent, sem estado salvo e com ViewModels novos: o conteúdo é carregado de novo">Reabrir</button><button id="back-button" class="back-button" hidden>Voltar</button><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Tela cheia: mostra o dispositivo ampliado sobre a página (Esc fecha). A resolução da VM não muda" aria-pressed="false">Tela cheia</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Botões de plugins" hidden></span><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inativo</span></div>
+        <div class="preview-bar"><div class="preview-title"><span id="preview-name">Prévia do aplicativo</span></div><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reabrir: como fechar e abrir de novo a mesma tela. Nova instância com o mesmo Intent, sem estado salvo e com ViewModels novos: o conteúdo é carregado de novo">Reabrir</button><button id="back-button" class="back-button" hidden>Voltar</button><button id="network-toggle" class="back-button network-toggle" type="button" aria-pressed="false" title="Internet do aparelho: desligada, o app vê o aparelho sem conexão (ConnectivityManager sem rede, toda conexão falha), como no modo avião. É a opção Conectividade de Controles › Dispositivo; vale na hora">Internet</button><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Tela cheia: mostra o dispositivo ampliado sobre a página (Esc fecha). A resolução da VM não muda" aria-pressed="false">Tela cheia</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Botões de plugins" hidden></span><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inativo</span></div>
         <div class="preview-stage" id="preview-stage">
           <button id="fullscreen-close" class="fullscreen-close" type="button" hidden title="Fechar tela cheia (Esc)" aria-label="Fechar tela cheia">✕</button>
           <div id="stage-callouts" class="stage-callouts" aria-hidden="true" hidden><div class="callout callout-w"><span id="callout-w"></span></div><div class="callout callout-h"><span id="callout-h"></span></div><p id="callout-note" class="callout-note"></p></div>
@@ -262,7 +270,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=07ce22d2e253"></script>
+  <script type="module" src="./app.js?v=5553a52fdbbb"></script>
   <script>
   // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
   // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.

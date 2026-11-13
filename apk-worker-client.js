@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=07ce22d2e253';
-import { createRasterReceiver } from './raster-cache.js?v=07ce22d2e253';
+import { createWebAudioPlayer } from './web-audio-player.js?v=5553a52fdbbb';
+import { createRasterReceiver } from './raster-cache.js?v=5553a52fdbbb';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=07ce22d2e253', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=5553a52fdbbb', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -203,6 +203,8 @@ export class APKWorkerClient {
   }
   async home({ onProgress } = {}) { return (await this.request('home', {}, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot; }
   async resumeTask({ onProgress } = {}) { return (await this.request('resume-task', {}, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot; }
+  /** "Dados do app" (src/app-storage.js): { op: 'overview' | 'prefs' | 'edit-prefs' | 'rows' | 'edit-row' | 'sql', ... } -> { appData, snapshot? } (a change answers a fresh snapshot). */
+  async appStorage(payload) { const response = await this.request('app-data', payload, { timeoutMs: this.eventTimeoutMs }); return { appData: response.appData, snapshot: response.snapshot ?? null }; }
   async launcherInfo() { return (await this.request('launcher-info', {}, { timeoutMs: this.eventTimeoutMs })).launcher; }
   async back({ onProgress } = {}) {
     return (await this.request('back', {}, { onProgress, timeoutMs: this.eventTimeoutMs })).snapshot;

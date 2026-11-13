@@ -39,13 +39,18 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
   const renderShelf = () => {
     for (const node of shelfButtons) node.remove(); shelfButtons = []; for (const url of shelfURLs.splice(0)) URL.revokeObjectURL(url);
     let placed = false;
+    // two saved APKs of the same app (the same label) also show their file names, so they can be told apart
+    const nameOf = item => item.label || String(item.name).replace(/\.apk$/i, ''), seen = new Map();
+    for (const item of shelfItems) seen.set(nameOf(item), (seen.get(nameOf(item)) ?? 0) + 1);
+    const fileLine = (button, item) => { button.querySelector('.launcher-file')?.remove(); if ((seen.get(nameOf(item)) ?? 0) > 1) { const line = el('span', 'launcher-file', button); line.textContent = String(item.name).replace(/\.apk$/i, ''); } };
+    app.querySelector('.launcher-file')?.remove();
     for (const item of shelfItems) {
-      if (item.id === shelfCurrent) { launcher.append(app); placed = true; continue; }
+      if (item.id === shelfCurrent) { launcher.append(app); fileLine(app, item); placed = true; continue; }
       const button = el('button', 'launcher-app', launcher), box = el('span', 'launcher-icon', button), text = el('span', 'launcher-label', button), name = item.label || String(item.name).replace(/\.apk$/i, '');
       button.type = 'button'; button.dataset.state = 'saved'; button.dataset.shelfId = item.id; text.textContent = name;
       if (item.icon?.bytes) { const url = URL.createObjectURL(new Blob([item.icon.bytes], { type: item.icon.mime || 'image/png' })), img = doc.createElement('img'); shelfURLs.push(url); img.alt = ''; img.src = url; img.draggable = false; box.append(img); }
       else { box.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${ANDROID_HEAD}"/></svg>`; box.classList.add('generic'); }
-      button.setAttribute('aria-label', `Abrir ${name}`);
+      fileLine(button, item); button.setAttribute('aria-label', `Abrir ${name}`);
       button.title = `${name}\n${item.packageName ?? item.name}${item.hasHandle ? '\nAbre o arquivo de onde ele está no disco (a versão mais nova)' : '\nAbre a cópia salva neste navegador'}\nBotão direito: remover da tela inicial`;
       button.addEventListener('click', () => { if (!working) shelfActions.open?.(item.id); });   // the page decides (busy() also means "no app loaded", the very case a saved app is opened in)
       button.addEventListener('contextmenu', event => { event.preventDefault(); shelfActions.remove?.(item); });

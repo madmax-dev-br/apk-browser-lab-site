@@ -1,10 +1,10 @@
-import { coreMemorySetting } from './core-memory.js?v=07ce22d2e253';
-import { isMemoryStep } from './memory-budget.js?v=07ce22d2e253';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=07ce22d2e253';
-import { sanitizeHostMap } from './host-map.js?v=07ce22d2e253';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=07ce22d2e253';
-import { sanitizeLocation } from './runtime-permissions.js?v=07ce22d2e253';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=07ce22d2e253';
+import { coreMemorySetting } from './core-memory.js?v=5553a52fdbbb';
+import { isMemoryStep } from './memory-budget.js?v=5553a52fdbbb';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=5553a52fdbbb';
+import { sanitizeHostMap } from './host-map.js?v=5553a52fdbbb';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=5553a52fdbbb';
+import { sanitizeLocation } from './runtime-permissions.js?v=5553a52fdbbb';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=5553a52fdbbb';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -48,14 +48,15 @@ export function sanitizeSettings(input = {}) {
   return out;
 }
 /** A new user's device reaches every host (allowedHosts = ['*']); sanitizeSettings({}) alone stays the closed policy so embedders that pass no network config keep it. */
-/** The lab page's defaults: every host allowed, animations off (animator scale 0); every frame drawn at full resolution, moving or new (raster: motionScale 1, navigation off). */
-export function defaultDeviceSettings() { return sanitizeSettings({ network: { allowedHosts: ['*'] }, animatorScale: 0 }); }
+/** The lab page's defaults: every host allowed, animations at 1× (as a device ships), every frame drawn at full resolution, moving or new (raster: motionScale 1, navigation off). */
+export function defaultDeviceSettings() { return sanitizeSettings({ network: { allowedHosts: ['*'] }, animatorScale: 1 }); }
 /** Stored-settings format: 2 since the "allow every host" option became the default; a record without the marker was saved by a page that only knew the closed allow list.
  * 3 since the engine and the renderer are choices of the Execução panel with new defaults (the WebAssembly core, the GPU): an older record held the old defaults, not a choice.
  * 4 since animations are off and the moving screen is drawn at 35% by default: an older record held the old defaults (1× and 50%), not a choice.
  * 5 since every frame is drawn at full resolution by default (moving screens at 100%, a new screen not started at the motion resolution): an older record held 35% and the reduced
- *   first frame as defaults, not a choice. */
-export const SETTINGS_VERSION = 5;
+ *   first frame as defaults, not a choice.
+ * 6 since animations are back at 1× by default: an older record held 0 (off) as the default, not a choice. */
+export const SETTINGS_VERSION = 6;
 export function loadDeviceSettings() {
   try {
     const text = globalThis.localStorage?.getItem(KEY); if (!text) return defaultDeviceSettings();
@@ -64,7 +65,7 @@ export function loadDeviceSettings() {
     // option shown as the default): it takes the default, like a new user; a list the user typed is kept.
     if (stored && typeof stored === 'object' && !(stored.version >= 2) && !sanitizeHosts(stored.network?.allowedHosts).length) stored.network = { ...(stored.network ?? {}), allowedHosts: ['*'] };
     if (stored && typeof stored === 'object' && !(stored.version >= 3)) { delete stored.engine; delete stored.renderer; }   // the old defaults were stored with every record: the new ones apply
-    if (stored && typeof stored === 'object' && !(stored.version >= 4)) stored.animatorScale = 0;   // the new defaults apply once; what the user picks afterwards is kept
+    if (stored && typeof stored === 'object' && !(stored.version >= 6)) stored.animatorScale = 1;   // the defaults of each version apply once; what the user picks afterwards is kept
     if (stored && typeof stored === 'object' && !(stored.version >= 5)) stored.raster = { ...(stored.raster ?? {}), motionScale: 1, navigation: false };
     return sanitizeSettings(stored);
   } catch { return defaultDeviceSettings(); }

@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=07ce22d2e253';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=07ce22d2e253';
-import { installNetworkCallbacks } from './network-callbacks.js?v=07ce22d2e253';
-import { createHostRegistry } from './host-contract.js?v=07ce22d2e253';
-import { resolveDevice } from './device-profile.js?v=07ce22d2e253';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=07ce22d2e253';
-import { gcRoot } from './heap-gc.js?v=07ce22d2e253';
+import { APKError } from './apk-error.js?v=5553a52fdbbb';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=5553a52fdbbb';
+import { installNetworkCallbacks } from './network-callbacks.js?v=5553a52fdbbb';
+import { createHostRegistry } from './host-contract.js?v=5553a52fdbbb';
+import { resolveDevice } from './device-profile.js?v=5553a52fdbbb';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=5553a52fdbbb';
+import { gcRoot } from './heap-gc.js?v=5553a52fdbbb';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
