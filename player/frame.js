@@ -1,14 +1,14 @@
 // Entry of dist/player/frame.html: device frame + system bars + rendering, driven by postMessage from the embedding page.
-import { APKWorkerClient } from '../apk-worker-client.js?v=dfac552890d0';
-import { createDeviceView, createViewState } from '../device-view.js?v=dfac552890d0';
-import { sanitizeSettings } from '../device-settings.js?v=dfac552890d0';
-import { createFrameController } from './frame-controller.js?v=dfac552890d0';
-import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=dfac552890d0';
-import { createPluginHost } from '../plugin-host.js?v=dfac552890d0';
-import { captureImage } from '../screen-capture.js?v=dfac552890d0';
-import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=dfac552890d0';
-import { PERMISSION_ICONS } from '../permissions-panel.js?v=dfac552890d0';
-import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=dfac552890d0';
+import { APKWorkerClient } from '../apk-worker-client.js?v=92e21e72be68';
+import { createDeviceView, createViewState } from '../device-view.js?v=92e21e72be68';
+import { sanitizeSettings } from '../device-settings.js?v=92e21e72be68';
+import { createFrameController } from './frame-controller.js?v=92e21e72be68';
+import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=92e21e72be68';
+import { createPluginHost } from '../plugin-host.js?v=92e21e72be68';
+import { captureImage } from '../screen-capture.js?v=92e21e72be68';
+import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=92e21e72be68';
+import { PERMISSION_ICONS } from '../permissions-panel.js?v=92e21e72be68';
+import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=92e21e72be68';
 
 const parentOrigin = new URLSearchParams(location.search).get('parent');
 const $ = id => document.getElementById(id) ?? (frameStub[id] ??= Object.assign(document.createElement('div'), { id }));
@@ -20,7 +20,7 @@ const query = new URLSearchParams(location.search);
 // ?raster=full replays every frame at full density (measurement); the default replays moving frames at a reduced scale and refines the settled screen (src/motion-raster.js).
 const deviceState = { settings: sanitizeSettings({}), clockTimer: null, pointerClicks: query.get('pointerClicks') === 'real' ? true : query.get('pointerClicks') === 'semantic' ? false : undefined, maxScale: query.get('scale') === 'actual' ? 1 : 4, stagePadding: 8, motionRaster: query.get('raster') !== 'full' };
 const vm = new APKWorkerClient();
-setTimeout(() => vm.prewarm(), 0);   // the VM Worker fetches and compiles the lab's assets while the page sends (and the frame downloads) the APK (src/apk-worker-client.js prewarm)
+setTimeout(() => vm.prewarm?.(), 0);   // the VM Worker fetches and compiles the lab's assets while the page sends (and the frame downloads) the APK (src/apk-worker-client.js prewarm)
 let lastReport = '';
 // Copy the shared plain-text report. Clipboard API first (needs permission in some embeds), then execCommand, then the report is shown selected for Cmd/Ctrl+C.
 document.getElementById('player-error-copy')?.addEventListener('click', async event => {

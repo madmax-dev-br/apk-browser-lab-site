@@ -3,7 +3,7 @@
 // constants) -- and the app feels slow until that tapers off. Both engines already time that work (src/time-breakdown.js: the DECODE, COMPILE and INIT buckets; the core charges
 // its linker to DECODE). The tracker looks at the share of the last WARM_WINDOW_MS of wall time spent there: warming while it is at least WARM_SHARE, warm once a whole window
 // stayed below it, and warmAfterMs is when the first-time work stopped (the end of the last busy interval), not the end of that confirming window. A new screen brings new classes and methods, so the state can go back to warming: `episodes` counts those. DOM-free, no process.*.
-import { BUCKET } from './time-breakdown.js?v=dfac552890d0';
+import { BUCKET } from './time-breakdown.js?v=92e21e72be68';
 
 export const WARM_WINDOW_MS = 3000, WARM_SHARE = 0.03, WARM_POLL_MS = 500, WARM_HOT = 8;   // WARM_HOT: methods compiled within a window that still count as warming
 
