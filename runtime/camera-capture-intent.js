@@ -1,4 +1,4 @@
-import { IntCells } from './java-arrays.js?v=ddd036d06d3d';
+import { IntCells } from './java-arrays.js?v=d1b40b8dc64a';
 
 // The camera capture Intents (android-13.0.0_r1 MediaStore.java ACTION_IMAGE_CAPTURE / ACTION_IMAGE_CAPTURE_SECURE / ACTION_VIDEO_CAPTURE; the contract a camera app follows is the one of
 // AOSP's Camera2 PhotoModule.onCaptureDone and VideoModule.doReturnToCaller). On a phone another app answers them; in the lab the page is that app: it shows a minimal camera screen over the device (live preview of the camera source,

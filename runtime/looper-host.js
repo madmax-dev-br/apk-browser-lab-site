@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=ddd036d06d3d';
-import { GC_ROOTS } from './heap-gc.js?v=ddd036d06d3d';
-import { LooperYield } from './message-queue-native.js?v=ddd036d06d3d';
-import { APKError } from './apk-error.js?v=ddd036d06d3d';
+import { createHostRegistry } from './host-contract.js?v=d1b40b8dc64a';
+import { GC_ROOTS } from './heap-gc.js?v=d1b40b8dc64a';
+import { LooperYield } from './message-queue-native.js?v=d1b40b8dc64a';
+import { APKError } from './apk-error.js?v=d1b40b8dc64a';
 
 // The main thread's Looper, MessageQueue, Handler and Message are the original android-13.0.0_r1 classes in framework.dex. This file is what surrounds them on the host side.
 //

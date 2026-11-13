@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=ddd036d06d3d';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=ddd036d06d3d';
-import { isTrustedRasterURL } from './raster-cache.js?v=ddd036d06d3d';
+import { updateWebViewSlot } from './webview-slot.js?v=d1b40b8dc64a';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=d1b40b8dc64a';
+import { isTrustedRasterURL } from './raster-cache.js?v=d1b40b8dc64a';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -335,12 +335,17 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
       // dispatchDraw clips only children, preserving the parent's background.
       const layer = element._childLayer ||= document.createElement('div');
       layer.className = 'android-child-layer'; layer.style.cssText = `position:absolute;inset:0;clip-path:inset(${padding.top || 0}px ${padding.right || 0}px ${padding.bottom || 0}px ${padding.left || 0}px)`;
-      reconcileChildren(layer, children); reconcileChildren(element, [layer, element._contentLayer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
-    } else reconcileChildren(element, [...children, element._contentLayer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
+      reconcileChildren(layer, children); reconcileChildren(element, [element._contentLayer, layer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
+    } else reconcileChildren(element, [element._contentLayer, ...children, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
   }
   if (view.canvasChildrenCaptured && !view.contentRaster) throw new Error('A captura Canvas não retornou uma imagem de conteúdo.');
-  if (view.contentRaster) {
-    const drawing = view.contentRaster;
+  // The View's own Canvas content (its onDraw) goes under its children, as View.draw orders it (onDraw, then dispatchDraw, then the foreground): the content layer is the
+  // element's first child. A recording with no draw at all (a ViewGroup whose onDraw drew nothing, typically the window's root) gets no layer: a transparent composited canvas
+  // stretched over the whole subtree is a layer the browser has to keep in step with everything under it, and the screen was seen keeping an old picture under one until
+  // something else repainted that area (a hover, a resize).
+  const contentDrawing = view.contentRaster && view.contentRaster.drawCalls !== 0 ? view.contentRaster : null;
+  if (contentDrawing) {
+    const drawing = contentDrawing;
     // An <input>/<progress> cannot hold a layer. A subclass that draws itself (its onDraw ran on a Canvas, with the text/track the superclass draws) is shown by that drawing, as the
     // element's background; the control stays on top for typing, focus and accessibility, with its own glyphs transparent so nothing is drawn twice.
     const replaced = kind === 'input' || kind === 'progress';
@@ -358,9 +363,9 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
       if (element.style.backgroundImage !== element._backgroundURL) { element.style.backgroundImage = element._backgroundURL; element.style.backgroundSize = '100% 100%'; element.style.backgroundRepeat = 'no-repeat'; }   // a `background` shorthand written by the styling above resets the image
     } else {
       if (!element.style.position) element.style.position = 'relative';
-      if (layer.parentNode !== element) element.append(layer);
+      if (layer.parentNode !== element) element.insertBefore(layer, element.firstChild ?? element.children[0] ?? null);
     }
-  } else { element._contentLayer?.remove(); if (element._backgroundSource !== undefined) { element._backgroundSource = undefined; element.style.backgroundImage = ''; } }
+  } else { element._contentLayer?.remove(); element._contentLayer = null; if (element._backgroundSource !== undefined) { element._backgroundSource = undefined; element.style.backgroundImage = ''; } }
   if (view.foregroundSVG) {
     if (kind === 'input' || kind === 'progress') throw new Error('Foreground sobre este controle nativo HTML exige um contêiner de desenho.');
     const drawing = view.foregroundSVG, layer = element._foregroundLayer ||= document.createElement('img');

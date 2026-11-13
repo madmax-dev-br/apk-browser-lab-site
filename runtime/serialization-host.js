@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=ddd036d06d3d';
-import { APKError } from './apk-error.js?v=ddd036d06d3d';
-import { createHostRegistry, floatBits } from './host-contract.js?v=ddd036d06d3d';
-import { DIGESTS } from './crypto-host.js?v=ddd036d06d3d';
+import { gcRoot } from './heap-gc.js?v=d1b40b8dc64a';
+import { APKError } from './apk-error.js?v=d1b40b8dc64a';
+import { createHostRegistry, floatBits } from './host-contract.js?v=d1b40b8dc64a';
+import { DIGESTS } from './crypto-host.js?v=d1b40b8dc64a';
 
 // java.io.ObjectOutputStream / ObjectInputStream: the Java Object Serialization Stream Protocol (JDK 8 ObjectStreamConstants, protocol version 5) for the types a VM app
 // serializes through Parcel.writeSerializable, Bundle/Intent extras, WorkManager's Data, caches and Externalizable models: String, boxed primitives, primitive and reference
