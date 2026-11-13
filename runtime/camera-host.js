@@ -1,10 +1,10 @@
-import { createHostRegistry, floatBits } from './host-contract.js?v=0ed57297cd19';
-import { APKError } from './apk-error.js?v=0ed57297cd19';
-import KEY_DATA from './camera-metadata-keys-data.js?v=0ed57297cd19';
-import { CAMERAS, cameraById, FORMAT, STREAM_SIZES, SENSOR_ARRAY, supportsSize, roundStreamSize } from './camera-frames.js?v=0ed57297cd19';
-import { installCameraSurfaces, SURFACE, IMAGE_READER, SURFACE_TEXTURE } from './camera-surface-host.js?v=0ed57297cd19';
-import { installCaptureIntents } from './camera-capture-intent.js?v=0ed57297cd19';
-import { installMediaCodecs } from './media-codec-host.js?v=0ed57297cd19';
+import { createHostRegistry, floatBits } from './host-contract.js?v=e0da55c6005f';
+import { APKError } from './apk-error.js?v=e0da55c6005f';
+import KEY_DATA from './camera-metadata-keys-data.js?v=e0da55c6005f';
+import { CAMERAS, cameraById, FORMAT, STREAM_SIZES, SENSOR_ARRAY, supportsSize, roundStreamSize } from './camera-frames.js?v=e0da55c6005f';
+import { installCameraSurfaces, SURFACE, IMAGE_READER, SURFACE_TEXTURE } from './camera-surface-host.js?v=e0da55c6005f';
+import { installCaptureIntents } from './camera-capture-intent.js?v=e0da55c6005f';
+import { installMediaCodecs } from './media-codec-host.js?v=e0da55c6005f';
 
 // android.hardware.camera2 for the browser VM (android-13.0.0_r1: CameraManager.java, impl/CameraDeviceImpl.java, impl/CameraCaptureSessionImpl.java, CaptureRequest.java,
 // CaptureResult.java, params/StreamConfigurationMap.java, params/OutputConfiguration.java, params/SessionConfiguration.java) and the camera capture Intents
