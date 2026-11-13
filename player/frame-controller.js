@@ -5,20 +5,20 @@
 // device settings -> setDevice, "Tempo máximo por evento" -> setTimeLimits, "Retornos de métodos" -> setMethodOverrides, "Activities ignoradas" -> setIgnoredActivities,
 // "Mock de endpoints" -> setEndpointMocks, "Permissões" / location / dialog -> setPermissions + permissionResponse, "Abrir" -> startIntent, Logcat -> setLogcatStreaming,
 // Compose -> inspectCompose, plugins -> src/plugin-host.js. The host page is another origin: everything it sends is validated here before it reaches the VM.
-import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=79ac9440027a';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=79ac9440027a';
-import { formatApiGapReport } from '../api-gap-scan.js?v=79ac9440027a';
-import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=79ac9440027a';
-import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=79ac9440027a';
-import { parseMethodSpec } from '../method-overrides.js?v=79ac9440027a';
-import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=79ac9440027a';
-import { normalizeIntentRequest } from '../intent-resolver.js?v=79ac9440027a';
-import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=79ac9440027a';
-import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=79ac9440027a';
-import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=79ac9440027a';
-import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=79ac9440027a';
-import { rowToEntry } from '../logcat.js?v=79ac9440027a';
-import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=79ac9440027a';
+import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=a742e061d321';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=a742e061d321';
+import { formatApiGapReport } from '../api-gap-scan.js?v=a742e061d321';
+import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=a742e061d321';
+import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=a742e061d321';
+import { parseMethodSpec } from '../method-overrides.js?v=a742e061d321';
+import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=a742e061d321';
+import { normalizeIntentRequest } from '../intent-resolver.js?v=a742e061d321';
+import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=a742e061d321';
+import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=a742e061d321';
+import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=a742e061d321';
+import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=a742e061d321';
+import { rowToEntry } from '../logcat.js?v=a742e061d321';
+import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=a742e061d321';
 
 export const SCREENSHOT_GAP_MS = 250, PLUGIN_OUTPUT_MS = 100, MAX_STREAM_BATCH = MAX_LOG_BATCH;
 const LAB_LIVE = ['methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog'];
@@ -29,7 +29,8 @@ const shortText = (value, max, what) => { if (value === undefined || value === n
 /**
  * @param createPluginHost (callbacks) -> a src/plugin-host.js host; called once, on the first plugins call (the frame passes one bound to its VM and screen capture)
  * @param captureImage     ({ snapshot, element, maxWidth, type }) -> Promise<{ blob, width, height, notes }> (src/screen-capture.js bound to the frame's views)
- * @param hooks            error, interrupted, settingsChanged, destroyed, rendered(snapshot, settings) (layout bounds overlay), permissionDialog(request) -> Promise<answers|null>
+ * @param hooks            error, cleared (the error shown belongs to a run that is over), stopped, interrupted, settingsChanged, destroyed, rendered(snapshot, settings) (layout bounds
+ *                         overlay), permissionDialog(request) -> Promise<answers|null>
  */
 export function createFrameController({ vm, state, deviceState, post, fetchImpl = globalThis.fetch?.bind(globalThis), hooks = {}, createPluginHost = null, captureImage = null, now = () => (globalThis.performance?.now?.() ?? Date.now()) }) {
   let view = null, source = null, config = {}, lastActivity = null, destroyed = false, chain = Promise.resolve(), inflight = 0, oomSeen = 0, lastStubs = { void: [], returns: [], classes: [] }, packageName = '', tolerateRunning = 'off'; const dropped = [];
@@ -54,6 +55,8 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     return { id, stubs: lastStubs, tolerateMissing: tolerateRunning, packageName, report: text.slice(0, 65000) };
   };
   const clearPending = () => { state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear(); };
+  /** A new run (restart, clear data) or a stop: the error on screen belonged to the old run, including a background thread's failure, which otherwise stays until the next run (stickyError). */
+  const clearShownError = () => { state.stickyError = false; state.lastAPKError = null; hooks.cleared?.(); };
   const enqueue = work => { inflight++; chain = chain.then(() => (destroyed ? undefined : work())).catch(error => fail(error, 'operation')).finally(() => { inflight--; }); return chain; };
   /** Like enqueue, but the caller gets the work's own result or error (calls that answer the host). */
   const serial = work => { inflight++; const result = chain.then(() => { if (destroyed) throw callError('destroyed', 'The player was destroyed.'); return work(); }); chain = result.catch(() => {}).finally(() => { inflight--; }); return result; };
@@ -217,7 +220,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
   vm.onAppData = reportData;
   async function load(buffer, activity, dataOptions = {}) {
     state.viewSession++; clearPending(); state.runtime = null; state.apkRunning = false; lastActivity = null; oomSeen = 0; lastStubs = { void: [], returns: [], classes: [] }; packageName = ''; tolerateRunning = tolerate(); lastError = null; lastSnapshot = null; lastScreenKey = null; inventory = null;
-    pendingPermissions.clear(); statuses = { methodOverrides: [], ignoredActivities: [], endpointMocks: [] }; pluginHost?.vmChanged();
+    pendingPermissions.clear(); statuses = { methodOverrides: [], ignoredActivities: [], endpointMocks: [] }; pluginHost?.vmChanged(); clearShownError();
     const token = operations.beginOperation();
     try {
       const keep = buffer.slice(0); source.bytes = keep;
@@ -264,7 +267,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
       const category = args.category ?? args.categories; if (category !== undefined && !(typeof category === 'string' ? category.length <= 512 : Array.isArray(category) && category.length <= 16 && category.every(item => typeof item === 'string' && item.length <= 512))) throw callError('bad-args', 'category must be a string or at most 16 strings');
       if (args.extras !== undefined && !(isPlain(args.extras) && Object.keys(args.extras).length <= 64 && Object.entries(args.extras).every(([key, value]) => key.length <= 256 && (typeof value !== 'string' || value.length <= 4096)))) throw callError('bad-args', 'extras must be an object of at most 64 string, number or boolean values');
       let request;
-      try { request = normalizeIntentRequest({ ...buildDeepLinkRequest({ link: data ?? '', action: action ?? DEFAULT_ACTION, component: component ?? '' }), type, category, extras: args.extras }); }
+      try { request = normalizeIntentRequest({ ...buildDeepLinkRequest({ link: data ?? '', action: action ?? DEFAULT_ACTION, component: component ?? '', type: type ?? '' }), type, category, extras: args.extras }); }
       catch (error) { throw callError('bad-args', String(error?.message ?? error)); }
       return serial(async () => {
         requireRunning(); await waitIdle(); await view?.flushPendingInputs(); const token = operations.beginOperation();
@@ -350,7 +353,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     /** "Parar VM": terminate the Worker now (a wedged app); restart() starts it again from the retained bytes. */
     stop() {
       state.operation++; state.busy = false; try { vm.cancel(); } catch { /* already gone */ } setTimeout(() => { if (!destroyed) vm.prewarm?.(); }, 0);   // restart() then finds a Worker already warming
-      state.runtime = null; state.apkRunning = false; clearPending(); pendingPermissions.clear(); pluginHost?.vmChanged(); send('stopped');
+      state.runtime = null; state.apkRunning = false; clearPending(); pendingPermissions.clear(); pluginHost?.vmChanged(); clearShownError(); hooks.stopped?.(); send('stopped');
       return { stopped: true };
     },
   };

@@ -29,13 +29,13 @@
 //   - One flag and one set of monitors: Thread.interrupted of a VMThread is the record's word (thr_interrupt also takes the thread out of Object.wait); the runtime's monitor
 //     entry points used by host code (monitorTryEnter, monitorExit, monitorFree, monitorEnter, ownsMonitor) are the core's lock words; a thread that ends wakes whoever waits on
 //     its Thread object (ART's notifyAll at thread exit).
-import { Blocked } from '../../runtime/scheduler.js?v=79ac9440027a';
+import { Blocked } from '../../runtime/scheduler.js?v=a742e061d321';
 const MAX_LIVE_THREADS = 1000;   // threads.h: tids 1..1022, the collector's thread table holds 1024 (host-bridge.js)
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=79ac9440027a';
-import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=79ac9440027a';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=a742e061d321';
+import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=a742e061d321';
 
 export const CORE_STATUS = Object.freeze({ OK: 0, OUT_OF_MEMORY: 5, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81, HOST_THROW: 0x7fff0110 });
-const S = CORE_STATUS;
+const S = CORE_STATUS, CORE_UNSUPPORTED = 6;   // vmcore/abi.h: also what resume/resume_host answer for a record with nothing to resume (detail 0)
 const T = { status: 12, detail: 16, steps: 32, result: 48, calls: 56, stackTop: 2128, frame: 2132, pc: 2136, depth: 2140, throwing: 2144, maxDepth: 2148,
   tid: 2152, state: 2156, flags: 2160, blockWord: 2164, blockValue: 2168, blockedOn: 2172, waitNext: 2176, waitState: 2180, waitMonitor: 2184, waitCount: 2188, waitPhase: 2192,
   interrupted: 2196, gcSeen: 2200, waitMillis: 2204 };
@@ -226,13 +226,27 @@ export class CoreThreads {
   /** The run of the thread's top step ended with `status`: the record is the caller's again, and the value or the exception goes on through the steps below. */
   leave(thread, status) {
     const engine = this.engine, t = thread.core.t, view = engine.view, u32 = this.u32, entry = thread.core.steps.pop();
-    if (entry === undefined || entry.kind !== 'run' || entry.t !== t) throw new APKError(`vmcore: a run of ${thread.name} ended (status ${status}) and no host step started it`);
+    if (entry === undefined || entry.kind !== 'run' || entry.t !== t) {
+      if (entry !== undefined) thread.core.steps.push(entry);
+      throw new APKError(`vmcore: a run of ${thread.name} ended, but no run of a host step was in progress on its record to take the outcome (${this.describeStop(thread, status, entry)})`);
+    }
     const raw = view.getBigUint64(t + T.result, true), detail = u32[(t + T.detail) >> 2], saved = entry.saved;
     u32[(t + T.frame) >> 2] = saved.frame; u32[(t + T.pc) >> 2] = saved.pc; u32[(t + T.depth) >> 2] = saved.depth; u32[(t + T.stackTop) >> 2] = saved.stackTop;
     u32[(t + T.throwing) >> 2] = saved.throwing; u32[(t + T.status) >> 2] = saved.status; u32[(t + T.detail) >> 2] = saved.detail; view.setBigUint64(t + T.result, saved.result, true);
     if (status === S.OK) return this.pump(thread, () => engine.valueOf(entry.result, raw));
     if (status === S.UNCAUGHT) return this.pump(thread, () => { const address = Number(raw & 0xffffffffn); throw new JavaException(engine.refValue(address), engine.messageOf(address)); });
     throw engine.stopError(status, detail);
+  }
+  /** What a run that ended with nothing to take its outcome says: the status (the stop error a run gives, with its last calls), the record, and the thread's steps (top last). */
+  describeStop(thread, status, entry) {
+    const t = thread.core.t, u32 = this.u32, frame = u32[(t + T.frame) >> 2], detail = u32[(t + T.detail) >> 2];
+    let what;
+    if (status === S.OK) what = 'it returned normally';
+    else if (status === S.UNCAUGHT) what = 'it threw';
+    else if (status === CORE_UNSUPPORTED && detail === 0 && frame === 0) what = 'the core was asked to resume a record with no frame (unsupported, nothing to resume)';
+    else { try { what = this.engine.stopError(status, detail).message; } catch (error) { what = `status ${status}, detail ${detail} (${error?.message ?? error})`; } }
+    const steps = thread.core.steps.map(step => step.kind === 'wait' ? `wait:${step.wait.kind}` : step.kind === 'run' && step.t !== t ? `run(record ${step.t})` : step.kind);
+    return `${what}; record ${t}, frame ${frame ? 'live' : 'none'}, wait ${thread.coreWait?.kind ?? 'none'}, state ${thread.state}; steps ${steps.join(' > ') || 'none'}${entry !== undefined && entry.kind === 'run' ? `; the run on top belongs to record ${entry.t}` : ''}`;
   }
   /** The thread's work (Scheduler.start's driver, as the JavaScript interpreter's pump asks it): DONE, PARKED, null (ask again), or the status of the run it started. */
   drive(thread) {

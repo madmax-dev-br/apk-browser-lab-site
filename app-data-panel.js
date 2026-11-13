@@ -2,7 +2,7 @@
 // Editor and the framework's SQLiteDatabase). The section only says what there is and has one button; the data opens in a modal (src/lab-modal.js) with two tabs, SharedPreferences
 // and SQLite, each a row of its files or databases above the editor of the chosen one: a SharedPreferences file as a table of typed keys to edit, remove and add; a database as its
 // tables, a page of rows whose cells are edited in place (by rowid), rows added and removed, and a SQL console. A change answers a fresh snapshot, which the page renders.
-import { formatBytes } from './shared-files-panel.js?v=79ac9440027a';
+import { formatBytes } from './shared-files-panel.js?v=a742e061d321';
 
 export const PREF_TYPES = ['string', 'int', 'long', 'float', 'boolean', 'set'];
 const PAGE = 100;

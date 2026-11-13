@@ -1,15 +1,15 @@
 // Entry of dist/player/frame.html: device frame + system bars + rendering, driven by postMessage from the embedding page.
-import { APKWorkerClient } from '../apk-worker-client.js?v=79ac9440027a';
-import { createDeviceView, createViewState } from '../device-view.js?v=79ac9440027a';
-import { createGlSurfaces } from '../gl-surfaces.js?v=79ac9440027a';
-import { sanitizeSettings } from '../device-settings.js?v=79ac9440027a';
-import { createFrameController } from './frame-controller.js?v=79ac9440027a';
-import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=79ac9440027a';
-import { createPluginHost } from '../plugin-host.js?v=79ac9440027a';
-import { captureImage } from '../screen-capture.js?v=79ac9440027a';
-import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=79ac9440027a';
-import { PERMISSION_ICONS } from '../permissions-panel.js?v=79ac9440027a';
-import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=79ac9440027a';
+import { APKWorkerClient } from '../apk-worker-client.js?v=a742e061d321';
+import { createDeviceView, createViewState } from '../device-view.js?v=a742e061d321';
+import { createGlSurfaces } from '../gl-surfaces.js?v=a742e061d321';
+import { sanitizeSettings } from '../device-settings.js?v=a742e061d321';
+import { createFrameController } from './frame-controller.js?v=a742e061d321';
+import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=a742e061d321';
+import { createPluginHost } from '../plugin-host.js?v=a742e061d321';
+import { captureImage } from '../screen-capture.js?v=a742e061d321';
+import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=a742e061d321';
+import { PERMISSION_ICONS } from '../permissions-panel.js?v=a742e061d321';
+import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=a742e061d321';
 
 const parentOrigin = new URLSearchParams(location.search).get('parent');
 const $ = id => document.getElementById(id) ?? (frameStub[id] ??= Object.assign(document.createElement('div'), { id }));
@@ -82,6 +82,8 @@ const controller = createFrameController({ vm, state, deviceState, post, createP
     document.getElementById('player-error-report').hidden = true; document.getElementById('player-error-copy').textContent = 'Copiar diagnóstico';
     document.getElementById('player-error').hidden = false; status('');
   },
+  cleared() { document.getElementById('player-error').hidden = true; status('Loading the APK…'); },   // a stop says so right after (stopped)
+  stopped() { document.getElementById('android-device').hidden = true; status('The VM is stopped. Restart opens the app again.'); },
   interrupted() { $('android-content').inert = true; $('android-window-layer').inert = true; },
   settingsChanged() { view.updateSystemBarIcons(); },
   destroyed() { document.getElementById('android-device').hidden = true; status(''); },

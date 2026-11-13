@@ -31,9 +31,9 @@
 // Threads (vmcore/threads.h, vmcore/js/threads.js): the linker lives in one thread, its owner; Workers send their env.resolve requests to it through a slot in ThreadsState.
 // Whatever a reader tests to see a record as published (a constant's `a`, Method.kind, the class and string counts) is written last, with Atomics.store.
 
-import { CORE_NATIVES, HOST_VIRTUALS, HOST_INTERFACE_METHODS, STRING_CONSTRUCTORS } from './natives.js?v=79ac9440027a';
-import { CLASS_STRING, STRING_LAYOUT, literalBytes, writeLiteral } from './strings.js?v=79ac9440027a';
-import { WELL_KNOWN, RESOLVE_WELL_KNOWN } from './exceptions.js?v=79ac9440027a';
+import { CORE_NATIVES, HOST_VIRTUALS, HOST_INTERFACE_METHODS, STRING_CONSTRUCTORS } from './natives.js?v=a742e061d321';
+import { CLASS_STRING, STRING_LAYOUT, literalBytes, writeLiteral } from './strings.js?v=a742e061d321';
+import { WELL_KNOWN, RESOLVE_WELL_KNOWN } from './exceptions.js?v=a742e061d321';
 
 export const CLASS = { super: 0, instanceSize: 4, refMap: 8, flags: 12, depth: 16, display: 20, vtable: 24, vtableLength: 28, itable: 32, itableLength: 36, statics: 40, staticRefMap: 44,
   initState: 48, initThread: 52, initList: 56, clinit: 60, component: 64, accessFlags: 68, id: 72, SIZE: 76 };

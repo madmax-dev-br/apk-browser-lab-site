@@ -1,5 +1,5 @@
-import { FrameworkXmlProvider } from './framework-xml-provider.js?v=79ac9440027a';
-import { AndroidResources } from './android-resources.js?v=79ac9440027a';
+import { FrameworkXmlProvider } from './framework-xml-provider.js?v=a742e061d321';
+import { AndroidResources } from './android-resources.js?v=a742e061d321';
 
 const MAX_DATA_BYTES = 64 * 1024 * 1024;
 const utf8 = new TextDecoder('utf-8', { fatal: true });

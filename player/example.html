@@ -6,8 +6,8 @@
   <title>APK Player · integração</title>
   <meta name="description" content="Documentação do componente APK Player: incorporar, carregar um APK, configurar o dispositivo e todos os recursos do laboratório, plugins, eventos e segurança, com demonstração ao vivo.">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
-  <link rel="stylesheet" href="../site-pages.css?v=79ac9440027a">
-  <link rel="stylesheet" href="../lab-tokens.css?v=79ac9440027a">
+  <link rel="stylesheet" href="../site-pages.css?v=a742e061d321">
+  <link rel="stylesheet" href="../lab-tokens.css?v=a742e061d321">
   <style>
     /* The live demo: the player's slot and its controls. Everything else comes from site-pages.css. */
     .demo{display:grid;grid-template-columns:minmax(280px,400px) minmax(0,1fr);gap:20px;margin-top:16px}
@@ -89,6 +89,14 @@
             <li><a href="#cors-mock-de-endpoints">Mock de endpoints</a></li>
             <li><a href="#cors-redirecionar-para-um-servidor-seu-que-responda-cors">Redirecionar para um servidor seu que responda CORS</a></li>
             <li><a href="#cors-rodar-a-vm-no-servidor">Rodar a VM no servidor</a></li>
+          </ol>
+        </li>
+        <li><a href="#backend">Seu backend (Node, Micronaut)</a>
+          <ol>
+            <li><a href="#backend-player">No player</a></li>
+            <li><a href="#backend-node">Node</a></li>
+            <li><a href="#backend-micronaut">Micronaut</a></li>
+            <li><a href="#backend-conferir">Conferir</a></li>
           </ol>
         </li>
         <li><a href="#plugins">Plugins</a></li>
@@ -501,27 +509,107 @@ await player.configure({ network: { allowedHosts: ['*'], proxyUrl: 'http://127.0
     <h3 id="cors-redirecionar-para-um-servidor-seu-que-responda-cors">3. Redirecionar para um servidor seu que responda CORS</h3>
     <p>Aponte o host do app para um servidor que você controla (por exemplo o backend de desenvolvimento) e faça esse servidor autorizar a origem do runtime. O app continua vendo a URL original. (Com relay ligado, o relay repete o destino já redirecionado.)</p>
     <div class="code"><pre><code>await player.configure({ hostMap: [{ from: 'api.exemplo.com', to: 'localhost:8080' }], allowedHosts: ['api.exemplo.com', 'localhost:8080'] });</code></pre></div>
-    <p>Cabeçalhos que o servidor precisa enviar (troque a origem pela do seu runtime):</p>
-    <div class="code"><pre><code>// Node (http): CORS para a origem do runtime, preflight respondido
-const ORIGEM = 'https://madmax-dev-br.github.io';
-http.createServer((req, res) =&gt; {
-  if (req.headers.origin === ORIGEM) {
-    res.setHeader('Access-Control-Allow-Origin', ORIGEM);
-    res.setHeader('Vary', 'Origin');
-    res.setHeader('Access-Control-Expose-Headers', 'ETag, Location, X-Request-Id');   // os que o app lê
-  }
-  if (req.method === 'OPTIONS') {                                     // preflight
+    <p>O backend precisa responder CORS para a origem do runtime, inclusive o preflight, e liberar o acesso à rede local. <a href="#backend">Integrar com o seu backend</a> traz um servidor Node e um Micronaut completos.</p>
+    <p><code>Access-Control-Allow-Credentials</code> não é preciso: o lab nunca manda credenciais do navegador.</p>
+    <h3 id="cors-rodar-a-vm-no-servidor">4. Rodar a VM no servidor</h3>
+    <p>Fora do navegador não há CORS: os serviços Node do repositório público <code>apk-lab-node-service</code> rodam a mesma VM em Node, e lá as requisições do app saem direto do servidor, com cookies, <code>User-Agent</code> e redirecionamentos como num aparelho. É o caminho para automação ou para apps cujos servidores não podem ser alcançados de uma página.</p>
+
+    <h2 id="backend">Integrar com o seu backend (Node e Micronaut)</h2>
+    <p>Quando o app fala com uma API que você desenvolve, o caminho mais direto é apontá-lo para o backend que roda no seu computador e fazer esse backend aceitar o runtime do player. São três partes: o redirecionamento no player, CORS no backend e a permissão de rede local. Os dois exemplos abaixo fazem as três coisas e expõem a mesma API pequena: <code>GET /v1/hello</code> e <code>POST /v1/echo</code>.</p>
+    <h3 id="backend-player">No player: redirecionar o host da API</h3>
+    <p>O app continua usando a URL de produção; só a troca de rede vai para o seu servidor. Um destino em <code>localhost</code> sem esquema vira <code>http://</code>, então o backend local não precisa de TLS. O app vê a conexão como HTTPS com o certificado do lab, o que funciona com OkHttp e <code>HttpURLConnection</code>; um app que fixa (pinning) o certificado do servidor real recusa essa conexão, como recusaria num proxy.</p>
+    <div class="code"><pre><code>await player.configure({
+  hostMap: [{ from: 'api.exemplo.com', to: 'localhost:8080' }],   // o app continua pedindo https://api.exemplo.com
+});
+// app feito para o emulador, que chama http://10.0.2.2:8080:
+await player.configure({ hostMap: [{ from: '10.0.2.2', to: 'localhost' }] });
+// ou no elemento: &lt;apk-player src="app.apk" host-map="api.exemplo.com -&gt; localhost:8080"&gt;&lt;/apk-player&gt;</code></pre></div>
+    <p>A origem que o backend precisa aceitar é a do runtime, a de <code>player/frame.html</code>, e não a da sua página: <code>https://madmax-dev-br.github.io</code> para o player publicado, ou a origem de onde você serve uma cópia dele.</p>
+    <h3 id="backend-node">Node</h3>
+    <p>Sem dependências (Node 18 ou mais novo). Salve como <code>servidor.mjs</code> e rode <code>node servidor.mjs</code>; <code>ORIGENS</code> aceita várias origens separadas por vírgula, e <code>PORTA</code> muda a porta.</p>
+    <div class="code"><pre><code>// Backend de desenvolvimento para um app rodando no APK Player: CORS para a origem do runtime, preflight e acesso à rede local.
+import http from 'node:http';
+import { randomUUID } from 'node:crypto';
+
+const PORTA = Number(process.env.PORTA ?? 8080);
+const ORIGENS = (process.env.ORIGENS ?? 'https://madmax-dev-br.github.io').split(',');   // a origem de player/frame.html
+
+function cors(req, res) {
+  const origem = req.headers.origin;
+  if (!ORIGENS.includes(origem)) return;
+  res.setHeader('Access-Control-Allow-Origin', origem);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Expose-Headers', 'X-Request-Id');   // os cabeçalhos da resposta que o app lê
+  if (req.method === 'OPTIONS') {                                   // preflight: Authorization, Content-Type: application/json, PUT, DELETE...
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE');
     res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] ?? '');
     if (req.headers['access-control-request-private-network']) res.setHeader('Access-Control-Allow-Private-Network', 'true');
     res.setHeader('Access-Control-Max-Age', '600');
-    res.writeHead(204); return res.end();
   }
-  // … a resposta normal
-}).listen(8080);</code></pre></div>
-    <p><code>Access-Control-Allow-Credentials</code> não é preciso: o lab nunca manda credenciais do navegador.</p>
-    <h3 id="cors-rodar-a-vm-no-servidor">4. Rodar a VM no servidor</h3>
-    <p>Fora do navegador não há CORS: os serviços Node do repositório público <code>apk-lab-node-service</code> rodam a mesma VM em Node, e lá as requisições do app saem direto do servidor, com cookies, <code>User-Agent</code> e redirecionamentos como num aparelho. É o caminho para automação ou para apps cujos servidores não podem ser alcançados de uma página.</p>
+}
+
+const json = (res, status, valor) =&gt; { res.writeHead(status, { 'Content-Type': 'application/json', 'X-Request-Id': randomUUID() }); res.end(JSON.stringify(valor)); };
+
+http.createServer(async (req, res) =&gt; {
+  cors(req, res);
+  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+  const { pathname } = new URL(req.url, 'http://localhost');
+  if (req.method === 'GET' &amp;&amp; pathname === '/v1/hello') return json(res, 200, { mensagem: 'Olá do Node' });
+  if (req.method === 'POST' &amp;&amp; pathname === '/v1/echo') {
+    let corpo = ''; for await (const parte of req) corpo += parte;
+    return json(res, 200, JSON.parse(corpo || '{}'));
+  }
+  json(res, 404, { erro: `${req.method} ${pathname} não existe` });
+}).listen(PORTA, '127.0.0.1', () =&gt; console.log(`http://127.0.0.1:${PORTA} (origens: ${ORIGENS.join(', ')})`));</code></pre></div>
+    <h3 id="backend-micronaut">Micronaut</h3>
+    <p>Testado com Micronaut 4.10 e Java 21, num projeto do <a href="https://micronaut.io/launch">Micronaut Launch</a> (Java, Gradle). O filtro de CORS do próprio Micronaut responde o preflight; <code>allow-private-network</code> (desde a 4.3) acrescenta o cabeçalho de rede local. O controlador:</p>
+    <div class="code"><pre><code>package exemplo;
+
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.serde.annotation.Serdeable;
+import java.util.UUID;
+
+@Controller("/v1")
+public class ExemploController {
+
+    @Serdeable
+    public record Mensagem(String mensagem) {}
+
+    @Get("/hello")
+    public HttpResponse&lt;Mensagem&gt; hello() {
+        return HttpResponse.ok(new Mensagem("Olá do Micronaut"))
+                .header("X-Request-Id", UUID.randomUUID().toString());
+    }
+
+    @Post(value = "/echo", consumes = MediaType.APPLICATION_JSON, produces = MediaType.APPLICATION_JSON)
+    public String echo(@Body String corpo) {
+        return corpo;
+    }
+}</code></pre></div>
+    <p>E em <code>src/main/resources/application.properties</code>:</p>
+    <div class="code"><pre><code>micronaut.server.port=8080
+micronaut.server.cors.enabled=true
+# a origem do runtime (player/frame.html); acrescente a de uma cópia local do lab, se usar
+micronaut.server.cors.configurations.lab.allowed-origins[0]=https://madmax-dev-br.github.io
+micronaut.server.cors.configurations.lab.exposed-headers[0]=X-Request-Id
+micronaut.server.cors.configurations.lab.allow-private-network=true
+micronaut.server.cors.configurations.lab.max-age=600</code></pre></div>
+    <p>Rode com <code>./gradlew run</code>. O Micronaut só responde o preflight de rotas que existem: uma requisição com cabeçalho próprio (que pede preflight) para um caminho sem rota recebe 403 no <code>OPTIONS</code>, e o app vê <code>ConnectException</code> em vez de um 404.</p>
+    <h3 id="backend-conferir">Conferir</h3>
+    <p>Antes de abrir o app, confira o preflight que o navegador vai mandar:</p>
+    <div class="code"><pre><code>curl -si -X OPTIONS http://localhost:8080/v1/echo \
+  -H 'Origin: https://madmax-dev-br.github.io' \
+  -H 'Access-Control-Request-Method: POST' \
+  -H 'Access-Control-Request-Headers: content-type' \
+  -H 'Access-Control-Request-Private-Network: true'
+# espere 200 ou 204 com Access-Control-Allow-Origin: https://madmax-dev-br.github.io,
+# Access-Control-Allow-Headers com content-type e Access-Control-Allow-Private-Network: true</code></pre></div>
+    <p>Com o app rodando, o log de rede (painel <b>Rede</b>, ou <code>player.network.subscribe</code>) mostra cada requisição com a URL original e o destino em <code>mappedUrl</code>, e o Resumo do diagnóstico conta as respostas de cada regra. Se o app receber <code>java.net.ConnectException</code>, o console do navegador diz a causa: “blocked by CORS policy” é a origem ou um cabeçalho faltando no preflight; um bloqueio de rede local é o <code>Access-Control-Allow-Private-Network</code> ausente ou a permissão de rede local negada no navegador.</p>
 
     <h2 id="plugins">Plugins no player</h2>
     <p>Os plugins do laboratório (<code>docs/PLUGINS.md</code>) também rodam no player, com a mesma API <code>lab</code>: <code>lab.on('screen' | 'log' | 'network')</code>, <code>lab.screen()</code>, <code>lab.composeTree()</code>, <code>lab.viewModels()</code>, <code>lab.layoutBounds()</code>, <code>lab.screenshot()</code> e <code>lab.ui.text/kv/table/json/image/badge/clear</code>. Cada plugin roda no próprio Web Worker, criado numa <b>origem opaca</b> (um iframe em sandbox dentro do frame): o código que sua página envia não ganha a origem do runtime (nem os dados guardados de outros apps). A saída chega à sua página no evento <code>plugin-output</code>, para você mostrar como quiser (use <code>textContent</code>; imagens chegam como <code>Blob</code>).</p>
@@ -581,7 +669,7 @@ await player.plugins.stop('componentes');</code></pre></div>
     </nav>
   </main>
 </div>
-<script type="module" src="../site-pages.js?v=79ac9440027a"></script>
+<script type="module" src="../site-pages.js?v=a742e061d321"></script>
 <script type="module">
   import { ApkPlayer } from './apk-player.js';
   const $ = id => document.getElementById(id);
