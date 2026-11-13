@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=a742e061d321';
-import { APKError } from './apk-error.js?v=a742e061d321';
+import { createHostRegistry } from './host-contract.js?v=ddd036d06d3d';
+import { APKError } from './apk-error.js?v=ddd036d06d3d';
 
 // Data classes of the platform API that apps build and hand back to the framework: android.app.RemoteInput (+Builder), android.location.Address and
 // android.app.ActivityOptions. Validation follows android-13.0.0_r1 (RemoteInput.Builder / ActivityOptions); the values are held as the app set them. RemoteInput results travel in
