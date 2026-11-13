@@ -5,8 +5,8 @@
 // parameter type. A Java exception the method throws is answered as { exception } (the snapshot after the call still goes to the page). Framework classes the lab implements
 // itself (android.app.Activity, java.lang.Integer, android.widget.TextView, ...) have no DEX to read: they are not listed, and a call of one of their methods names it by its
 // JVM signature, which the runtime then dispatches like any call site of the app would. No process.*.
-import { PluginQueryError, parseHandle, handleOf, typeName, dotted, createHeapReader, classDescriptor } from './plugin-queries.js?v=d1b40b8dc64a';
-import { parseSignature, floatBits, doubleBits } from './host-contract.js?v=d1b40b8dc64a';
+import { PluginQueryError, parseHandle, handleOf, typeName, dotted, createHeapReader, classDescriptor } from './plugin-queries.js?v=da7619ccc1f1';
+import { parseSignature, floatBits, doubleBits } from './host-contract.js?v=da7619ccc1f1';
 
 export const INVOKE_LIMITS = Object.freeze({ methods: 200, maxMethods: 2000, args: 32, string: 100_000 });
 const ACC = { PUBLIC: 0x1, PRIVATE: 0x2, PROTECTED: 0x4, STATIC: 0x8, BRIDGE: 0x40, ABSTRACT: 0x400, SYNTHETIC: 0x1000, CONSTRUCTOR: 0x10000 };

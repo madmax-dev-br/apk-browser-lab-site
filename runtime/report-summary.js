@@ -1,11 +1,11 @@
 // The compact block at the very top of "Copiar diagnóstico" and "Estado da tela": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=d1b40b8dc64a';
-import { staticRetentionLines } from './heap-gc.js?v=d1b40b8dc64a';
-import { overrideSummaryLines } from './method-overrides.js?v=d1b40b8dc64a';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=d1b40b8dc64a';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=d1b40b8dc64a';
-import { hostMapSummaryLines } from './host-map.js?v=d1b40b8dc64a';
+import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=da7619ccc1f1';
+import { staticRetentionLines } from './heap-gc.js?v=da7619ccc1f1';
+import { overrideSummaryLines } from './method-overrides.js?v=da7619ccc1f1';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=da7619ccc1f1';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=da7619ccc1f1';
+import { hostMapSummaryLines } from './host-map.js?v=da7619ccc1f1';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
