@@ -1,7 +1,8 @@
 // "Dados do app" in the Controles panel: the running app's SharedPreferences files and SQLite databases (read and edited in the Worker by src/app-storage.js, through the app's own
-// Editor and the framework's SQLiteDatabase). Each opens a modal (src/lab-modal.js): a SharedPreferences file as a table of typed keys to edit, remove and add; a database as its
+// Editor and the framework's SQLiteDatabase). The section only says what there is and has one button; the data opens in a modal (src/lab-modal.js) with two tabs, SharedPreferences
+// and SQLite, each a row of its files or databases above the editor of the chosen one: a SharedPreferences file as a table of typed keys to edit, remove and add; a database as its
 // tables, a page of rows whose cells are edited in place (by rowid), rows added and removed, and a SQL console. A change answers a fresh snapshot, which the page renders.
-import { formatBytes } from './shared-files-panel.js?v=48a82b9f9397';
+import { formatBytes } from './shared-files-panel.js?v=79ac9440027a';
 
 export const PREF_TYPES = ['string', 'int', 'long', 'float', 'boolean', 'set'];
 const PAGE = 100;
@@ -21,37 +22,78 @@ export function cellValue(textValue, columnType = '') {
 }
 
 export function createAppDataPanel({ $, doc = globalThis.document, vm, modals, ready = () => true, render = () => {}, report = () => {} }) {
-  const list = $('appdata-list'), note = $('appdata-note'), summary = $('appdata-summary'), refreshButton = $('appdata-refresh');
-  let overview = null, loading = null;
-  const el = (tag, props = {}, ...children) => { const node = doc.createElement(tag); for (const [key, value] of Object.entries(props)) { if (key === 'class') node.className = value; else if (key === 'text') node.textContent = value; else if (key.startsWith('on')) node.addEventListener(key.slice(2), value); else if (value !== null && value !== undefined && value !== false) node.setAttribute(key, value === true ? '' : value); } node.append(...children.filter(Boolean)); return node; };
+  const note = $('appdata-note'), summary = $('appdata-summary'), openButton = $('appdata-open');
+  let overview = null, loading = null, view = null, lastTab = 'prefs';
+  const el = (tag, props = {}, ...children) => { const node = doc.createElement(tag); for (const [key, value] of Object.entries(props)) { if (key === 'class') { if (value) node.className = value; } else if (key === 'text') node.textContent = value; else if (key.startsWith('on')) node.addEventListener(key.slice(2), value); else if (value !== null && value !== undefined && value !== false) node.setAttribute(key, value === true ? '' : value); } node.append(...children.filter(Boolean)); return node; };
   const setNote = text => { if (note) note.textContent = text; };
   /** A request to the Worker; a change's snapshot is rendered. Errors become the note (and the modal's message). */
   const ask = async payload => { const { appData, snapshot } = await vm.appStorage(payload); if (snapshot) render(snapshot); return appData; };
 
+  const countText = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   async function refresh() {
-    if (!list) return null;
-    if (!ready()) { list.replaceChildren(); summary.textContent = '—'; setNote('Abra e inicie um app para ver os dados que ele guardou.'); refreshButton.disabled = true; return null; }
-    refreshButton.disabled = false;
+    if (!ready()) { overview = null; if (summary) summary.textContent = '—'; setNote('Abra e inicie um app para ver os dados que ele guardou.'); if (openButton) openButton.disabled = true; return null; }
+    if (openButton) openButton.disabled = false;
     return loading ??= (async () => {
       try {
         overview = await ask({ op: 'overview' });
-        const items = [];
-        for (const prefs of overview.prefs) items.push(el('li', {}, el('button', { type: 'button', class: 'appdata-item', onclick: () => openPrefs(prefs.name) }, el('span', { class: 'appdata-kind', text: 'Prefs' }), el('strong', { text: prefs.name }), el('small', { text: prefs.error ? prefs.error : `${prefs.entries.length} ${prefs.entries.length === 1 ? 'chave' : 'chaves'}` }))));
-        for (const db of overview.databases) items.push(el('li', {}, el('button', { type: 'button', class: 'appdata-item', onclick: () => openDatabase(db.name) }, el('span', { class: 'appdata-kind db', text: 'SQLite' }), el('strong', { text: db.name }), el('small', { text: db.error ? db.error : `${db.tables.filter(t => t.type === 'table').length} tabelas${db.size !== null ? ` · ${formatBytes(db.size)}` : ''}` }))));
-        list.replaceChildren(...items);
-        summary.textContent = `${overview.prefs.length} prefs · ${overview.databases.length} bancos`;
-        setNote(items.length ? 'Toque para ver e editar. As mudanças passam pelo próprio app: SharedPreferences pelo Editor dele (com os listeners), SQLite por uma segunda conexão ao banco.' : 'O app ainda não guardou SharedPreferences nem bancos SQLite.');
+        if (summary) summary.textContent = `${overview.prefs.length} prefs · ${overview.databases.length} bancos`;
+        setNote(overview.prefs.length || overview.databases.length ? `${countText(overview.prefs.length, 'arquivo', 'arquivos')} de SharedPreferences e ${countText(overview.databases.length, 'banco', 'bancos')} SQLite.` : 'O app ainda não guardou SharedPreferences nem bancos SQLite.');
+        view?.update(overview);
         return overview;
       } catch (error) { setNote(String(error?.message ?? error)); return null; }
       finally { loading = null; }
     })();
   }
-  refreshButton?.addEventListener('click', () => refresh());
+  openButton?.addEventListener('click', () => open());
 
-  // ---- SharedPreferences modal
-  async function openPrefs(name) {
+  // ---- the modal: two tabs (SharedPreferences, SQLite), each a row of its files above the editor of the chosen one
+  const TABS = [{ id: 'prefs', label: 'SharedPreferences', items: o => o.prefs, describe: item => item.error ?? countText(item.entries.length, 'chave', 'chaves'), render: (name, pane) => renderPrefs(name, pane) },
+    { id: 'sqlite', label: 'SQLite', items: o => o.databases, describe: item => item.error ?? `${countText(item.tables.filter(t => t.type === 'table').length, 'tabela', 'tabelas')}${item.size !== null && item.size !== undefined ? ` · ${formatBytes(item.size)}` : ''}`, render: (name, pane) => renderDatabase(name, pane) }];
+  /** Opens the data modal ({ tab: 'prefs' | 'sqlite', name }: a file or database to show at once). */
+  async function open({ tab = lastTab, name = null } = {}) {
+    if (view) { view.select(tab, name); return view.modal; }
+    const serial = Math.random().toString(36).slice(2, 8), tablist = el('div', { class: 'appdata-tabs', role: 'tablist', 'aria-label': 'Dados do app' }), panels = {}, buttons = {}, chosen = {};
+    const refreshAll = el('button', { type: 'button', class: 'cp-button appdata-refresh', text: 'Atualizar', onclick: () => refresh() });
+    for (const t of TABS) {
+      buttons[t.id] = el('button', { type: 'button', role: 'tab', id: `appdata-tab-${t.id}-${serial}`, 'aria-controls': `appdata-panel-${t.id}-${serial}`, class: 'appdata-tab', onclick: () => select(t.id) });
+      const files = el('div', { class: 'appdata-files', role: 'group', 'aria-label': t.id === 'prefs' ? 'Arquivos' : 'Bancos' }), pane = el('div', { class: 'appdata-pane' });
+      panels[t.id] = { root: el('section', { role: 'tabpanel', id: `appdata-panel-${t.id}-${serial}`, 'aria-labelledby': `appdata-tab-${t.id}-${serial}`, class: 'appdata-panel', tabindex: '0' }, files, pane), files, pane };
+      tablist.append(buttons[t.id]);
+    }
+    tablist.addEventListener('keydown', event => {
+      const ids = TABS.map(t => t.id), at = ids.indexOf(lastTab), next = event.key === 'ArrowRight' ? ids[(at + 1) % ids.length] : event.key === 'ArrowLeft' ? ids[(at + ids.length - 1) % ids.length] : event.key === 'Home' ? ids[0] : event.key === 'End' ? ids.at(-1) : null;
+      if (!next) return; event.preventDefault(); select(next); buttons[next].focus();
+    });
+    const body = el('div', { class: 'appdata-modal appdata-browser' }, el('div', { class: 'appdata-tabbar' }, tablist, refreshAll), ...TABS.map(t => panels[t.id].root));
+    const modal = modals.open({ title: 'Dados do app', size: 'full', content: body, label: 'Dados do app', onClose: () => { view = null; } });
+    function paintFiles(t) {
+      const items = overview ? t.items(overview) : [], panel = panels[t.id];
+      buttons[t.id].textContent = `${t.label} (${items.length})`;
+      panel.files.replaceChildren(...items.map(item => el('button', { type: 'button', class: 'appdata-file', 'aria-pressed': String(chosen[t.id] === item.name), onclick: () => show(t, item.name) }, el('strong', { text: item.name }), el('small', { text: t.describe(item) }))));
+      if (!items.length) panel.pane.replaceChildren(el('p', { class: 'cp-note', text: overview ? (t.id === 'prefs' ? 'O app ainda não guardou SharedPreferences.' : 'O app ainda não abriu bancos SQLite.') : 'Carregando…' }));
+      return items;
+    }
+    function show(t, name) {
+      chosen[t.id] = name; for (const button of panels[t.id].files.children) button.setAttribute('aria-pressed', String(button.querySelector('strong')?.textContent === name));
+      t.render(name, panels[t.id].pane);
+    }
+    const labels = () => { for (const t of TABS) buttons[t.id].textContent = `${t.label} (${overview ? t.items(overview).length : '…'})`; };
+    function select(id, name = null) {
+      lastTab = id; labels();
+      for (const t of TABS) { const on = t.id === id; buttons[t.id].setAttribute('aria-selected', String(on)); buttons[t.id].tabIndex = on ? 0 : -1; panels[t.id].root.hidden = !on; }
+      const t = TABS.find(item => item.id === id), items = paintFiles(t), wanted = name ?? chosen[id] ?? items[0]?.name ?? null;
+      if (wanted && items.some(item => item.name === wanted) && (name || chosen[id] !== wanted || !panels[id].pane.childElementCount)) show(t, wanted);
+    }
+    view = { modal, select, update() { for (const t of TABS) { const items = paintFiles(t); if (chosen[t.id] && !items.some(item => item.name === chosen[t.id])) chosen[t.id] = null; } select(lastTab); } };
+    select(tab, name);
+    if (!overview) await refresh();
+    return modal;
+  }
+
+  // ---- a SharedPreferences file (the editor inside the SharedPreferences tab)
+  async function renderPrefs(name, container) {
     const status = el('p', { class: 'appdata-status', role: 'status', 'aria-live': 'polite' }), body = el('div', { class: 'appdata-modal' }), table = el('table', { class: 'appdata-table' });
-    const modal = modals.open({ title: `SharedPreferences · ${name}`, size: 'full', content: body, label: 'Dados do app' });
+    container.replaceChildren(body);
     const typeSelect = value => el('select', { 'aria-label': 'Tipo' }, ...PREF_TYPES.map(type => el('option', { value: type, text: type, selected: type === value })));
     const valueInput = (type, value) => type === 'boolean' ? el('select', { 'aria-label': 'Valor' }, el('option', { value: 'true', text: 'true', selected: value === true }), el('option', { value: 'false', text: 'false', selected: value === false }))
       : type === 'set' ? el('textarea', { rows: Math.min(6, Math.max(2, (value?.length ?? 0) + 1)), 'aria-label': 'Valores, um por linha' }, (value ?? []).join('\n')) : Object.assign(el('input', { type: 'text', 'aria-label': 'Valor', spellcheck: 'false' }), { value: value === null || value === undefined ? '' : String(value) });
@@ -74,16 +116,16 @@ export function createAppDataPanel({ $, doc = globalThis.document, vm, modals, r
       const add = el('button', { type: 'button', class: 'cp-button primary', text: 'Adicionar', onclick: () => { if (!newKey.value.trim()) { status.textContent = 'Escreva a chave.'; return; } apply([{ key: newKey.value.trim(), type: newType, value: readValue(newType, newInput) }], `${newKey.value.trim()} adicionada.`); } });
       table.replaceChildren(el('thead', {}, el('tr', {}, el('th', { text: 'Chave' }), el('th', { text: 'Tipo' }), el('th', { text: 'Valor' }), el('th', { text: '' }))), el('tbody', {}, ...rows, el('tr', { class: 'appdata-new' }, el('td', {}, newKey), el('td', {}, newTypeBox), newValueCell, el('td', { class: 'appdata-actions' }, add))));
     };
-    body.append(el('p', { class: 'cp-note', text: 'Cada mudança é um Editor do próprio app: putX ou remove, depois commit(). O app vê o valor novo na próxima leitura, e os listeners que ele registrou são avisados.' }), table, status);
+    body.append(el('p', { class: 'cp-note', text: 'Cada mudança é um Editor do próprio app: putX ou remove, depois commit(). O app vê o valor novo na próxima leitura, e os listeners que ele registrou são avisados.' }), el('div', { class: 'appdata-grid' }, table), status);
     try { paint((await ask({ op: 'prefs', name })).entries); } catch (error) { status.textContent = String(error?.message ?? error); }
-    return modal;
+    return body;
   }
 
-  // ---- SQLite modal
-  async function openDatabase(name) {
+  // ---- a SQLite database (the editor inside the SQLite tab)
+  async function renderDatabase(name, container) {
     const body = el('div', { class: 'appdata-modal appdata-db' }), tables = el('ul', { class: 'appdata-tables', 'aria-label': 'Tabelas' }), grid = el('div', { class: 'appdata-grid' }), status = el('p', { class: 'appdata-status', role: 'status', 'aria-live': 'polite' });
     const pager = el('div', { class: 'appdata-pager' }), sqlBox = el('textarea', { rows: 3, spellcheck: 'false', 'aria-label': 'Comando SQL', placeholder: 'SELECT * FROM tabela WHERE …   (um comando; ? com parâmetros não é usado aqui)' }), sqlOut = el('div', { class: 'appdata-grid' });
-    const modal = modals.open({ title: `SQLite · ${name}`, size: 'full', content: body, label: 'Dados do app' });
+    container.replaceChildren(body);
     let current = null, offset = 0, info = [];
     const resultTable = (result, editable) => {
       const columns = result.columns, head = el('tr', {}, ...columns.map(c => el('th', { text: c })), editable ? el('th', { text: '' }) : null);
@@ -151,8 +193,9 @@ export function createAppDataPanel({ $, doc = globalThis.document, vm, modals, r
       el('div', { class: 'appdata-sql' }, el('h3', { text: 'SQL' }), sqlBox, el('div', { class: 'em-actions' }, run), sqlOut), status,
       el('p', { class: 'cp-note', text: 'Uma segunda conexão ao banco do app (como o sqlite3 do adb): o app vê as mudanças na próxima consulta; observadores que ele mantém na própria conexão (Room) não são avisados — use Reabrir para recarregar a tela.' }));
     try { await load(); const first = info.find(t => t.type === 'table' && t.name !== 'android_metadata') ?? info[0]; if (first) await showTable(first.name); else status.textContent = 'Banco sem tabelas.'; } catch (error) { status.textContent = String(error?.message ?? error); }
-    return modal;
+    return body;
   }
 
-  return { refresh, openPrefs, openDatabase, reset() { overview = null; list?.replaceChildren(); if (summary) summary.textContent = '—'; setNote('Abra e inicie um app para ver os dados que ele guardou.'); } };
+  return { refresh, open, openPrefs: name => open({ tab: 'prefs', name }), openDatabase: name => open({ tab: 'sqlite', name }),
+    reset() { overview = null; view?.modal?.close?.('reset'); view = null; if (summary) summary.textContent = '—'; if (openButton) openButton.disabled = true; setNote('Abra e inicie um app para ver os dados que ele guardou.'); } };
 }

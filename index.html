@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=48a82b9f9397") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=48a82b9f9397">
-  <link rel="stylesheet" href="./lab-theme.css?v=48a82b9f9397">
-  <meta name="apk-browser-build" content="48a82b9f9397">
+  <style>@import url("./styles.css?v=79ac9440027a") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=79ac9440027a">
+  <link rel="stylesheet" href="./lab-theme.css?v=79ac9440027a">
+  <meta name="apk-browser-build" content="79ac9440027a">
 </head>
 <body>
   <header class="topbar">
@@ -112,10 +112,8 @@
             </div></details>
             <details class="cp-group" id="cp-sec-appdata" data-section="appdata">
               <summary><h3 id="cp-appdata-title">Dados do app</h3><span id="appdata-summary" class="cp-badge">—</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <p class="cp-note">As SharedPreferences e os bancos SQLite que o app guardou. Toque num item para ver e editar.</p>
-              <ul id="appdata-list" class="appdata-list" aria-labelledby="cp-appdata-title"></ul>
               <p id="appdata-note" class="cp-note" role="status" aria-live="polite">Abra e inicie um app para ver os dados que ele guardou.</p>
-              <button id="appdata-refresh" class="cp-button" type="button" disabled>Atualizar</button>
+              <button id="appdata-open" class="cp-button primary" type="button" aria-haspopup="dialog" disabled>Abrir dados do app</button>
             </div></details>
             <details class="cp-group" id="cp-sec-camera" data-section="camera">
               <summary><h3 id="cp-camera-title">Câmera</h3><span id="cam-summary" class="cp-badge">padrão de teste</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
@@ -271,7 +269,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=48a82b9f9397"></script>
+  <script type="module" src="./app.js?v=79ac9440027a"></script>
   <script>
   // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
   // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.
