@@ -115,7 +115,9 @@ export function createBridge({ port = DEFAULT_PORT, host = '127.0.0.1', origins 
     if (req.method === 'OPTIONS') { res.writeHead(204, { 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] ?? 'content-type, authorization, mcp-protocol-version' }); res.end(); return; }
     let given = ''; try { given = decodeURIComponent(url.pathname.split('/')[2] ?? ''); } catch { /* refused below */ }
     if (!given) given = /^Bearer (.+)$/i.exec(req.headers.authorization ?? '')?.[1] ?? '';
-    if (!tokenMatches(given, token)) { plain(401, { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'token recusado: use o endereço que a ponte mostrou ao iniciar (…/mcp/<token>)' } }); return; }
+    // 403, never 401: to an MCP client a 401 means "log in with OAuth" (MCP authorization), and clients such as Cursor then start an OAuth flow this bridge does not have and
+    // wait there. The token is in the address: a wrong or missing one is simply refused, with the reason.
+    if (!tokenMatches(given, token)) { plain(403, { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'token recusado: use o endereço que a ponte mostrou ao iniciar (…/mcp/<token>), com o token da página (Controles › MCP)' } }); return; }
     if (req.method !== 'POST') { plain(405, { jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Method Not Allowed: esta ponte responde a POST (sem fluxo iniciado pelo servidor)' } }, { allow: 'POST' }); return; }
     let size = 0; const chunks = [];
     req.on('data', chunk => { size += chunk.length; if (size > 4 * 1024 * 1024) { req.destroy(); return; } chunks.push(chunk); });
@@ -129,6 +131,8 @@ export function createBridge({ port = DEFAULT_PORT, host = '127.0.0.1', origins 
   function onRequest(req, res) {
     const origin = req.headers.origin ?? null, url = new URL(req.url, 'http://127.0.0.1');
     if (url.pathname === '/mcp' || url.pathname.startsWith('/mcp/')) { onMcp(req, res, url, origin); return; }
+    // OAuth discovery (RFC 9728 protected-resource and RFC 8414 server metadata, which MCP clients look up): none here, said plainly, so a client goes on without OAuth
+    if (url.pathname.startsWith('/.well-known/')) { res.writeHead(404, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify({ error: 'esta ponte não usa OAuth: o token vai no endereço (…/mcp/<token>)' })); return; }
     if (!origin || !allowed.has(origin)) { send(res, 403, { error: `origem não permitida: ${origin ?? '(nenhuma)'}; rode com --origin ${origin ?? '<origem do lab>'}` }); return; }
     if (req.method === 'OPTIONS') {
       cors(origin, res, { 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] ?? 'content-type', 'Access-Control-Max-Age': '600', ...(req.headers['access-control-request-private-network'] ? { 'Access-Control-Allow-Private-Network': 'true' } : {}) });

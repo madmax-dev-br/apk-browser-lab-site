@@ -20,9 +20,9 @@ export function backPull(dx) {
   return { offset: pull * 0.75, grow: Math.min(1, 0.55 + progress * 0.45), armed: dx >= BACK_COMMIT, edge: BACK_EDGE };
 }
 
-export function createTaskSwitcher({ document: doc = document, $, vm, render, back, relaunch, canGoBack, busy, begin, finish, report, announce = () => {} }) {
+export function createTaskSwitcher({ document: doc = document, $, vm, render, back, relaunch, canGoBack, busy, begin, finish, report, announce = () => {}, shelf: shelfActions = {}, onInfo = () => {} }) {
   const screen = $('android-screen');
-  if (!screen || typeof screen.prepend !== 'function' || typeof screen.querySelector !== 'function') return { sync() {}, closed() {}, home() {}, restate() {}, reset() {}, icon: () => null, state: () => 'foreground' };   // no device on this page (or a host without a full DOM): nothing to navigate
+  if (!screen || typeof screen.prepend !== 'function' || typeof screen.querySelector !== 'function') return { sync() {}, closed() {}, home() {}, restate() {}, reset() {}, setShelf() {}, infoSettled: async () => {}, icon: () => null, state: () => 'foreground' };   // no device on this page (or a host without a full DOM): nothing to navigate
   const el = (tag, className, parent) => { const node = doc.createElement(tag); node.className = className; parent?.append(node); return node; };
   const launcher = el('div', 'launcher-layer'); launcher.hidden = true; screen.prepend(launcher);
   const wall = el('div', 'launcher-hint', launcher); wall.textContent = 'Solte um APK aqui para instalar';
@@ -34,13 +34,33 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
   const bubble = el('div', 'task-back-bubble'); bubble.hidden = true; bubble.setAttribute('aria-hidden', 'true'); bubble.innerHTML = '<svg viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'; screen.append(bubble);
   const targets = () => [$('android-content'), $('android-window-layer'), $('android-action-mode-layer')].filter(Boolean);
   let mode = 'foreground', info = null, infoFor = null, iconURL = null, drag = null, working = false, pendingLabel = '';
+  // the saved apps (src/apk-shelf.js), one beside the other in the order they were added; the app of this run keeps its own icon (`app`) at its place among them
+  let shelfItems = [], shelfCurrent = null, shelfButtons = [], shelfURLs = [];
+  const renderShelf = () => {
+    for (const node of shelfButtons) node.remove(); shelfButtons = []; for (const url of shelfURLs.splice(0)) URL.revokeObjectURL(url);
+    let placed = false;
+    for (const item of shelfItems) {
+      if (item.id === shelfCurrent) { launcher.append(app); placed = true; continue; }
+      const button = el('button', 'launcher-app', launcher), box = el('span', 'launcher-icon', button), text = el('span', 'launcher-label', button), name = item.label || String(item.name).replace(/\.apk$/i, '');
+      button.type = 'button'; button.dataset.state = 'saved'; button.dataset.shelfId = item.id; text.textContent = name;
+      if (item.icon?.bytes) { const url = URL.createObjectURL(new Blob([item.icon.bytes], { type: item.icon.mime || 'image/png' })), img = doc.createElement('img'); shelfURLs.push(url); img.alt = ''; img.src = url; img.draggable = false; box.append(img); }
+      else { box.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${ANDROID_HEAD}"/></svg>`; box.classList.add('generic'); }
+      button.setAttribute('aria-label', `Abrir ${name}`);
+      button.title = `${name}\n${item.packageName ?? item.name}${item.hasHandle ? '\nAbre o arquivo de onde ele está no disco (a versão mais nova)' : '\nAbre a cópia salva neste navegador'}\nBotão direito: remover da tela inicial`;
+      button.addEventListener('click', () => { if (!working) shelfActions.open?.(item.id); });   // the page decides (busy() also means "no app loaded", the very case a saved app is opened in)
+      button.addEventListener('contextmenu', event => { event.preventDefault(); shelfActions.remove?.(item); });
+      shelfButtons.push(button);
+    }
+    if (!placed) wall.after(app);   // an app that is not saved (a demo, a hosted example) leads the row
+    wall.hidden = !(mode === 'idle' && shelfButtons.length === 0);
+  };
   const away = () => mode === 'home' || mode === 'closed' || mode === 'idle' || mode === 'installing' || mode === 'installed';   // the launcher is on screen, no app window
 
   const setTransform = (scale, lift, animate) => { for (const node of targets()) { node.style.transition = animate ? 'transform .26s cubic-bezier(.2,.8,.2,1), border-radius .26s, opacity .2s' : 'none'; node.style.transformOrigin = '50% 50%'; node.style.transform = scale === 1 && lift === 0 ? '' : `translateY(${-lift}px) scale(${scale})`; node.style.borderRadius = scale === 1 ? '' : '28px'; node.style.opacity = ''; } };
   const show = next => {
     mode = next; const height = screen.offsetHeight, launcherOnly = next === 'idle' || next === 'installing' || next === 'installed';
     screen.dataset.task = launcherOnly ? 'home' : next; screen.dataset.launcher = launcherOnly ? next : next === 'closed' ? 'installed' : '';   // the page styles the three launcher-only states as the home screen
-    launcher.hidden = next === 'foreground'; hit.hidden = next !== 'overview'; app.hidden = next === 'idle'; app.disabled = next === 'installing'; wall.hidden = next !== 'idle';
+    launcher.hidden = next === 'foreground'; hit.hidden = next !== 'overview'; app.hidden = next === 'idle'; app.disabled = next === 'installing'; wall.hidden = next !== 'idle' || shelfButtons.length > 0;
     if (next === 'foreground') setTransform(1, 0, true);
     else if (next === 'overview') setTransform(CARD_SCALE, height * CARD_LIFT, true);
     else { setTransform(0.2, height * 0.02, true); for (const node of targets()) node.style.opacity = '0'; }   // home / closed: the window shrank into the launcher
@@ -53,9 +73,11 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     else { iconBox.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${ANDROID_HEAD}"/></svg>`; iconBox.classList.add('generic'); }
     app.setAttribute('aria-label', mode === 'installing' ? `Instalando ${label.textContent}` : `Abrir ${label.textContent}`);
   };
-  const loadInfo = async key => {
+  let infoPending = Promise.resolve();   // the launcher-info request in flight: a launch started right after a load waits for it (the client takes one VM request at a time)
+  const loadInfo = key => infoPending = loadInfoOnce(key);
+  const loadInfoOnce = async key => {
     if (infoFor === key) return; infoFor = key;
-    try { const got = await vm().launcherInfo(); if (infoFor !== key) return; info = got; if (iconURL) URL.revokeObjectURL(iconURL); iconURL = got?.icon?.bytes ? URL.createObjectURL(new Blob([got.icon.bytes], { type: got.icon.mime || 'image/png' })) : null; paintIcon(); if (!got?.icon) for (const problem of got?.problems ?? []) report?.(`Launcher: ${problem}`); }
+    try { const got = await vm().launcherInfo(); if (infoFor !== key) return; info = got; onInfo(got); if (iconURL) URL.revokeObjectURL(iconURL); iconURL = got?.icon?.bytes ? URL.createObjectURL(new Blob([got.icon.bytes], { type: got.icon.mime || 'image/png' })) : null; paintIcon(); if (!got?.icon) for (const problem of got?.problems ?? []) report?.(`Launcher: ${problem}`); }
     catch (error) { report?.(`Launcher: ${error?.message ?? error}`); paintIcon(); }
   };
   const run = async (message, action) => {
@@ -129,6 +151,8 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
 
   return {
     state: () => mode,
+    /** Settles once the launcher's label and icon request (a VM request) is answered: the page waits for it before sending the next one. */
+    infoSettled: () => infoPending.catch(() => {}),
     /** The app's launcher icon as a URL (null until it is known, or when the package has none the page can show). */
     icon: () => iconURL,
     /** Every rendered snapshot: the launcher data for this run, and the VM's own word on whether the task is in the background (an app can call moveTaskToBack itself). */
@@ -146,6 +170,8 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
       if (next === 'installing') { info = null; infoFor = null; if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; } pendingLabel = String(text ?? '').replace(/\.apk$/i, ''); }
       show(next); if (next !== 'idle') paintIcon(); if (next === 'installed' && key) loadInfo(key);
     },
+    /** The saved apps to show on the launcher (src/apk-shelf.js list()), and which of them is the app of this run (its icon is the live one: running, closed, installing). */
+    setShelf(items, currentId = null) { shelfItems = Array.isArray(items) ? items : []; shelfCurrent = currentId; renderShelf(); },
     /** After a render repainted the page's status: say again that the app is in the background. */
     restate() { if (mode === 'overview' || mode === 'home') announce(mode); },
     reset() { drag = null; pull = null; bubble.hidden = true; working = false; info = null; infoFor = null; pendingLabel = ''; delete screen.dataset.launcher; if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; } mode = 'foreground'; delete screen.dataset.task; launcher.hidden = true; hit.hidden = true; for (const node of targets()) { node.style.transition = 'none'; node.style.transform = ''; node.style.borderRadius = ''; node.style.opacity = ''; } },

@@ -10,8 +10,8 @@
 // The report holds ONLY framework/JDK names and counts (and the native library file names the user asked for): app class names, method names and strings never
 // enter it, so it can be pasted into a chat. DOM-free and process-free: it runs in the Worker and in Node.
 
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=92e21e72be68';
-import { describeNativeLibrary } from './native-library-hints.js?v=92e21e72be68';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=07ce22d2e253';
+import { describeNativeLibrary } from './native-library-hints.js?v=07ce22d2e253';
 
 export const FRAMEWORK = /^L(android|java|javax|dalvik|libcore|sun|org\/(json|xml|w3c))\//;
 const SDK_INT_FIELD = 'Landroid/os/Build$VERSION;->SDK_INT:I';
@@ -91,11 +91,10 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
   // ---- phase 2: ask the runtime about each referenced framework method / class
   const framework = type => FRAMEWORK.test(type) && !isApp(type);
   const classKnown = (type, kind = 0) => { try { return kind === 0x22 ? runtime.allocatable(type) : runtime.classResolvable(type); } catch { return true; } };
-  let frameworkNames = null;   // every method name some framework class declares: an app-owner reference is reportable only under such a name (an app-defined name never is)
-  const isFrameworkName = name => {
-    if (!frameworkNames) { frameworkNames = new Set(); for (const [type, cls] of runtime.classes) if (!isApp(type)) for (const key of cls.methods.keys()) frameworkNames.add(key.slice(0, key.indexOf('('))); }
-    return frameworkNames.has(name);
-  };
+  // every method name some framework class declares: an app-owner reference is reportable only under such a name (an app-defined name never is); built in slices, a class at a time
+  const frameworkNames = new Set();
+  for (const [type, cls] of runtime.classes) { if (cancelled()) return null; if (isApp(type)) continue; for (const key of cls.methods.keys()) frameworkNames.add(key.slice(0, key.indexOf('('))); await tick(); }
+  const isFrameworkName = name => frameworkNames.has(name);
   const rejected = ref => {   // the framework owner that lacks the method, or null when it can run (or is not a framework API)
     let owner = ref.owner;
     if (owner[0] === '[') return null;
@@ -122,6 +121,7 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
   for (const [dex, state] of perDex) {
     if (cancelled()) return null;
     for (const [idx, counts] of state.methodCounts) {
+      await tick();   // a large app references tens of thousands of methods: one slice per DEX file was one long task (~150 ms) right when the app's first screen is scrolled
       const ref = idx < dex.methods.length ? dex.method(idx) : null; if (!ref) continue;
       referenced++;
       const owner = rejected(ref); if (!owner) continue;
@@ -135,6 +135,7 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
       if (!classKnown(owner)) e.missingClass = true;
     }
     for (const [key, counts] of state.typeCounts) {
+      await tick();
       const [kind, idx] = key.split(':').map(Number), type = dex.types[idx];
       if (!type || type[0] === '[' || !framework(type) || classKnown(type, kind)) continue;
       const e = entry(type); e.missingClass = true; e.kinds.add({ 0x22: 'new', 0x1c: 'class' }[kind]);
