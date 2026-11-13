@@ -1,5 +1,5 @@
-import { createHostRegistry, floatBits } from './host-contract.js?v=d2dd099a76f6';
-import { GC_ROOTS } from './heap-gc.js?v=d2dd099a76f6';
+import { createHostRegistry, floatBits } from './host-contract.js?v=dfac552890d0';
+import { GC_ROOTS } from './heap-gc.js?v=dfac552890d0';
 
 // android.view.Display of the virtual device (android-13.0.0_r1 Display.java): the one built-in display, sized and oriented by the device profile (160 dpi, so dp == px) and
 // reporting the same metrics Resources and WindowManager report. The viewport has no system bars or cutout of its own (src/window-insets-host.js), so the real size and the
@@ -35,6 +35,12 @@ export function createDisplayHost(platform) {
   def(DISPLAY, 'isMinimalPostProcessingSupported', '()Z', () => 0);
   def(DISPLAY, 'getDeviceProductInfo', '()Landroid/hardware/display/DeviceProductInfo;', () => null);
   def(DISPLAY, 'getCutout', '()Landroid/view/DisplayCutout;', () => null);   // no notch or punch-hole
+  // Display.getRoundedCorner(position) (API 31): RoundedCorners.getRoundedCorner reads mRoundedCorners[position] and answers null for an empty corner. The virtual panel's
+  // corners are square (the device profile declares no radius), so every corner is empty; a position outside POSITION_TOP_LEFT..POSITION_BOTTOM_LEFT fails at the array index.
+  def(DISPLAY, 'getRoundedCorner', '(I)Landroid/view/RoundedCorner;', (r, _m, [, position]) => {
+    if (position < 0 || position > 3) r.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `Index ${position} out of bounds for length 4`);
+    return null;
+  });
   def(DISPLAY, 'getPresentationDeadlineNanos', '()J', () => 1000000000n / BigInt(REFRESH_RATE) / 2n);
   def(DISPLAY, 'getAppVsyncOffsetNanos', '()J', () => 1000000n);
   def(DISPLAY, 'getWidth', '()I', () => size().width);

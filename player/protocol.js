@@ -1,10 +1,10 @@
 // Versioned host <-> frame message schema and the <apk-player> configuration model. No DOM: shared by the host script, the frame and the tests.
-import { checkCoreMemory } from '../core-memory.js?v=d2dd099a76f6';
-import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=d2dd099a76f6';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=d2dd099a76f6';
-import { parseRule } from '../host-map.js?v=d2dd099a76f6';
-import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=d2dd099a76f6';
-import { isMemoryStep } from '../memory-budget.js?v=d2dd099a76f6';
+import { checkCoreMemory } from '../core-memory.js?v=dfac552890d0';
+import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=dfac552890d0';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=dfac552890d0';
+import { parseRule } from '../host-map.js?v=dfac552890d0';
+import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=dfac552890d0';
+import { isMemoryStep } from '../memory-budget.js?v=dfac552890d0';
 export const PROTOCOL = 'apk-player';
 /** Envelope version: every message carries it; a frame or host of another version is refused. Unchanged since the first release, so old hosts keep working. */
 export const VERSION = 1;

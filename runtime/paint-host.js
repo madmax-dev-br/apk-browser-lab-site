@@ -1,5 +1,6 @@
-import { APKError } from './apk-error.js?v=d2dd099a76f6';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=d2dd099a76f6';
+import { APKError } from './apk-error.js?v=dfac552890d0';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=dfac552890d0';
+import { colorLongToArgb } from './color-long.js?v=dfac552890d0';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -23,7 +24,7 @@ const keys = new Set([
   '<init>()V', '<init>(I)V', `<init>(${PAINT})V`, 'reset()V', `set(${PAINT})V`,
   'getNativeInstance()J', 'getTextLocale()Ljava/util/Locale;', 'getTextLocales()Landroid/os/LocaleList;', 'setTextLocale(Ljava/util/Locale;)V', 'setTextLocales(Landroid/os/LocaleList;)V',
   'getBlendMode()Landroid/graphics/BlendMode;', 'setBlendMode(Landroid/graphics/BlendMode;)V',
-  'getColor()I', 'setColor(I)V', 'getAlpha()I', 'setAlpha(I)V', 'getFlags()I', 'setFlags(I)V',
+  'getColor()I', 'setColor(I)V', 'setColor(J)V', 'getColorLong()J', 'getAlpha()I', 'setAlpha(I)V', 'getFlags()I', 'setFlags(I)V',
   'clearShadowLayer()V', 'setShadowLayer(FFFI)V', 'hasShadowLayer()Z',
   'getHinting()I', 'setHinting(I)V', 'getStartHyphenEdit()I', 'getEndHyphenEdit()I', 'setStartHyphenEdit(I)V', 'setEndHyphenEdit(I)V',
   'getTextBounds(Ljava/lang/String;IILandroid/graphics/Rect;)V', 'getTextBounds([CIILandroid/graphics/Rect;)V', 'getTextBounds(Ljava/lang/CharSequence;IILandroid/graphics/Rect;)V',
@@ -302,11 +303,23 @@ export function createPaintHost() {
         fail('Paint.setShadowLayer with a positive radius is not implemented (the Skia canvas model has no shadow-layer looper)');
       }
       if (name === 'getColor') return paint.color;
-      if (name === 'setColor') { paint.color = args[1] | 0; return; }
+      // Paint.setColor(@ColorLong long) (API 29) keeps the long it was given (getColorLong answers it, as mColor does) and draws its sRGB 8-bit value, Color.toArgb(long)
+      // (src/color-long.js). Every other color setter replaces it, so getColorLong then packs the int color.
+      if (name === 'setColor' && method.parameters[0] === 'J') {
+        const packed = BigInt.asIntN(64, BigInt(args[1])), argb = colorLongToArgb(packed);
+        if (argb === null) fail(`Paint.setColor(long) with ColorSpace id ${Number(BigInt.asUintN(64, packed) & 63n)} is not implemented (sRGB, linear sRGB and their extended variants are)`);
+        paint.color = argb; paint.colorLong = packed; return;
+      }
+      if (name === 'getColorLong') return paint.colorLong ?? BigInt.asIntN(64, BigInt(paint.color >>> 0) << 32n);   // Color.pack(int): sRGB, the int in the upper half
+      if (name === 'setColor') { paint.color = args[1] | 0; paint.colorLong = null; return; }
       if (name === 'getAlpha') return paint.color >>> 24;
       if (name === 'setAlpha') {
         if (args[1] < 0 || args[1] > 255) fail('Software Paint alpha must be in [0,255]');
-        paint.color = (paint.color & 0xffffff) | (args[1] << 24); return;
+        paint.color = (paint.color & 0xffffff) | (args[1] << 24);
+        // AOSP setAlpha repacks mColor in its own ColorSpace with alpha a / 255f: for a non-sRGB long only its 10 alpha bits change (Color.pack: (int) (a * 1023 + 0.5) at bit 6)
+        if (paint.colorLong != null && (BigInt(paint.colorLong) & 63n) !== 0n) paint.colorLong = BigInt.asIntN(64, (BigInt.asUintN(64, BigInt(paint.colorLong)) & ~(0x3ffn << 6n)) | (BigInt(Math.floor(args[1] / 255 * 1023 + 0.5)) << 6n));
+        else paint.colorLong = null;
+        return;
       }
       if (name === 'getFlags') return paint.flags;
       if (name === 'setFlags') { paint.flags = args[1]; return; }
