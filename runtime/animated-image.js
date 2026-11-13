@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=e0da55c6005f';
+import { APKError } from './apk-error.js?v=48a82b9f9397';
 
 // Animated images (GIF, animated WebP) for android.graphics.drawable.AnimatedImageDrawable and android.graphics.Movie (src/animated-image-host.js).
 // The frames come from Skia's SkAnimatedImage, the class Android's own AnimatedImageDrawable is built on, through the pinned CanvasKit (MakeAnimatedImageFromEncoded): it composes

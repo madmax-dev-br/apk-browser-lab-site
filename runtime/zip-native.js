@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=e0da55c6005f';
-import { throwNew } from './java-throw.js?v=e0da55c6005f';
-import { readNativeBytes } from './unsafe-native.js?v=e0da55c6005f';
+import { APKError } from './apk-error.js?v=48a82b9f9397';
+import { throwNew } from './java-throw.js?v=48a82b9f9397';
+import { readNativeBytes } from './unsafe-native.js?v=48a82b9f9397';
 
 // Natives of java.util.zip behind the original libcore classes (android-13.0.0_r1):
 //   Inflater / Deflater / CRC32 / Adler32  -- Android's external/zlib compiled to WebAssembly (vendor/zlib); the wrappers follow ojluni Inflater.c, Deflater.c, CRC32.c, Adler32.c

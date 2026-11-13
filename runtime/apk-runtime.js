@@ -1,32 +1,32 @@
-import { VMClock } from './vm-clock.js?v=e0da55c6005f';
-import { overrideHit } from './method-overrides.js?v=e0da55c6005f';
-import { OperationMonitor } from './operation-monitor.js?v=e0da55c6005f';
-import { ExecutionProfile } from './execution-profile.js?v=e0da55c6005f';
-import { SamplingProfiler } from './sampling-profiler.js?v=e0da55c6005f';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=e0da55c6005f';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=e0da55c6005f';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=e0da55c6005f';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=e0da55c6005f';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e0da55c6005f';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=e0da55c6005f';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=e0da55c6005f';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=e0da55c6005f';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=e0da55c6005f';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=e0da55c6005f';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=e0da55c6005f';
-import { APKError } from './apk-error.js?v=e0da55c6005f';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=e0da55c6005f';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=e0da55c6005f';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=e0da55c6005f';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=e0da55c6005f';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=e0da55c6005f';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=e0da55c6005f';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=e0da55c6005f';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=e0da55c6005f';
+import { VMClock } from './vm-clock.js?v=48a82b9f9397';
+import { overrideHit } from './method-overrides.js?v=48a82b9f9397';
+import { OperationMonitor } from './operation-monitor.js?v=48a82b9f9397';
+import { ExecutionProfile } from './execution-profile.js?v=48a82b9f9397';
+import { SamplingProfiler } from './sampling-profiler.js?v=48a82b9f9397';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=48a82b9f9397';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=48a82b9f9397';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=48a82b9f9397';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=48a82b9f9397';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=48a82b9f9397';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=48a82b9f9397';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=48a82b9f9397';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=48a82b9f9397';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=48a82b9f9397';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=48a82b9f9397';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=48a82b9f9397';
+import { APKError } from './apk-error.js?v=48a82b9f9397';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=48a82b9f9397';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=48a82b9f9397';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=48a82b9f9397';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=48a82b9f9397';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=48a82b9f9397';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=48a82b9f9397';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=48a82b9f9397';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=48a82b9f9397';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=e0da55c6005f';
-import { bootClassLacksMember } from './boot-class-members.js?v=e0da55c6005f';
-export { APKError } from './apk-error.js?v=e0da55c6005f';
+import { Scheduler, Blocked } from './scheduler.js?v=48a82b9f9397';
+import { bootClassLacksMember } from './boot-class-members.js?v=48a82b9f9397';
+export { APKError } from './apk-error.js?v=48a82b9f9397';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -410,7 +410,7 @@ export class DexProgram {
       if (bootBytes > 128 * 1024 * 1024) fail('Framework DEX layer exceeds 128 MiB');
       this.bootFiles.push({ filename, dex }); this.bootDexes.add(dex);
       for (const name of dex.classes.keys()) {
-        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/w3c\/dom\/|org\/apache\/harmony\/xml\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore|services)\/|com\/(?:android\/(?:internal|icu|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/collect|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
+        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/w3c\/dom\/|org\/apache\/harmony\/xml\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore|services)\/|com\/(?:android\/(?:internal|icu|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/(?:collect|gles_jni)|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
         if (this.bootClasses.has(name)) fail(`Duplicate framework class: ${name}`);
         this.bootClasses.set(name, dex);
       }
@@ -1867,7 +1867,8 @@ export class APKRuntime {
         scrollX: v.fields.get('Landroid/view/View;->mScrollX:I') ?? 0, scrollY: v.fields.get('Landroid/view/View;->mScrollY:I') ?? 0,
         drawableSVG: v.drawableSVG ?? null,
         webview: this.platform?.webView?.nodeState?.(this, v) ?? null,
-        cameraSurface: this.platform?.camera?.nodeState?.(this, v),   // a TextureView / SurfaceView: the camera stream the page draws in its box (undefined for every other View)
+        cameraSurface: this.platform?.camera?.nodeState?.(this, v),
+        glSurface: this.platform?.gles?.nodeState?.(this, v),   // a SurfaceView an EGL window surface draws into (src/gles-native.js): the page draws its frames in the box   // a TextureView / SurfaceView: the camera stream the page draws in its box (undefined for every other View)
         buttonSVG: v.buttonSVG ?? null, buttonBounds: v.buttonBounds ?? null, compoundPadding: v.compoundPadding ?? null,
         foregroundSVG: v.foregroundSVG ?? null,
         foregroundBounds: v.foregroundBounds ?? null,

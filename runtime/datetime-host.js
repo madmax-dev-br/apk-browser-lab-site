@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=e0da55c6005f';
-import { gcRoot } from './heap-gc.js?v=e0da55c6005f';
-import { createHostRegistry, parseSignature } from './host-contract.js?v=e0da55c6005f';
-import { JavaException } from './apk-runtime.js?v=e0da55c6005f';
+import { APKError } from './apk-error.js?v=48a82b9f9397';
+import { gcRoot } from './heap-gc.js?v=48a82b9f9397';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=48a82b9f9397';
+import { JavaException } from './apk-runtime.js?v=48a82b9f9397';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).
@@ -307,6 +307,12 @@ export function createDateTimeHost(platform) {
     catch (error) { if (!(error instanceof SoftParseFailure)) throw error; callV(r, position, POSITION, 'setErrorIndex', ['I'], 'V', [error.at]); return null; }
   });
   def(SDF, 'getCalendar', '()Ljava/util/Calendar;', (r, _m, [self]) => { const f = sdf(r, self), locale = r.dispatch({ owner: LOCALE_TYPE, name: 'forLanguageTag', parameters: [STRING], result: LOCALE_TYPE, signature: `(${STRING})${LOCALE_TYPE}` }, [f.tag], 'static'); return r.dispatch({ owner: 'Ljava/util/Calendar;', name: 'getInstance', parameters: [ZONE, LOCALE_TYPE], result: 'Ljava/util/Calendar;', signature: `(${ZONE}${LOCALE_TYPE})Ljava/util/Calendar;` }, [zone(r, f.zone), locale], 'static'); });
+  // setCalendar: the format takes the calendar's zone and leniency (what DateFormat.calendar carries in libcore; the calendar system is the proleptic Gregorian one, see Calendar below)
+  def(SDF, 'setCalendar', '(Ljava/util/Calendar;)V', (r, _m, [self, calendar]) => {
+    if (calendar === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    const c = r.object(calendar).cal; if (!c) throw new APKError(`SimpleDateFormat.setCalendar(${r.typeOf(calendar)}): only the lab's Gregorian calendar is modelled`, { kind: 'unsupported-dateformat' });
+    const f = sdf(r, self); f.zone = c.zone; f.lenient = c.lenient !== false;
+  });
   def(SDF, 'formatToCharacterIterator', `(${OBJECT})Ljava/text/AttributedCharacterIterator;`, () => { throw new APKError('DateFormat.formatToCharacterIterator: field attributes are not modelled', { kind: 'unsupported-dateformat' }); });
   def(PARSE, '<init>', `(${STRING}I)V`, (r, _m, [self, message, offset]) => { Object.assign(r.object(self), { message, errorOffset: offset }); });
   def(PARSE, 'getErrorOffset', '()I', (r, _m, [self]) => r.object(self).errorOffset ?? 0);
@@ -445,6 +451,16 @@ export function createDateTimeHost(platform) {
   def(GREGORIAN, '<init>', `(${LOCALE_T})V`, (r, _m, [self]) => { const fresh = newCalendar(r, GREGORIAN); r.object(self).cal = r.object(fresh).cal; });
   def(GREGORIAN, '<init>', `(${ZONE}${LOCALE_T})V`, (r, _m, [self, z]) => { const fresh = newCalendar(r, GREGORIAN, z ? zid(r, z) : undefined); r.object(self).cal = r.object(fresh).cal; });
   for (const signature of ['(III)V', '(IIIII)V', '(IIIIII)V']) def(GREGORIAN, '<init>', signature, (r, _m, [self, y, mo, d, h = 0, mi = 0, se = 0]) => { const fresh = newCalendar(r, GREGORIAN); const c = r.object(fresh).cal; c.time = wallToEpoch(c.zone, y, mo, d, h, mi, se, 0); r.object(self).cal = c; });
+  // The Julian cutover: the model is the proleptic Gregorian calendar, so the pure Gregorian change (Long.MIN_VALUE: what code that wants ISO dates for any year sets, e.g. serializers
+  // of timestamps) is exactly this model and is accepted; any real cutover would need Julian dates, which are not modelled, and fails naming it. The default (1582-10-15) is reported.
+  const GREGORIAN_CUTOVER = -12219292800000n, PURE_GREGORIAN = -(2n ** 63n);
+  def(GREGORIAN, 'setGregorianChange', `(${DATE})V`, (r, _m, [self, date]) => {
+    if (date === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    const millis = BigInt(time(r, date));
+    if (millis !== PURE_GREGORIAN && millis !== GREGORIAN_CUTOVER) throw new APKError(`GregorianCalendar.setGregorianChange(${millis}): a Julian cutover other than the pure Gregorian calendar is not modelled (the lab's calendar is proleptic Gregorian)`, { kind: 'unsupported-calendar' });
+    r.object(self).gregorianChange = millis;
+  });
+  def(GREGORIAN, 'getGregorianChange', `()${DATE}`, (r, _m, [self]) => { const d = r.allocate(DATE); r.object(d).dateMillis = r.object(self).gregorianChange ?? GREGORIAN_CUTOVER; return d; });
   def(GREGORIAN, 'isLeapYear', '(I)Z', (r, _m, [, year]) => ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) ? 1 : 0);
   def(GREGORIAN, 'toZonedDateTime', `()Ljava/time/ZonedDateTime;`, (r, _m, [self]) => call(r, 'Ljava/time/ZonedDateTime;', 'ofInstant', `(${INSTANT}${ZONE_ID})Ljava/time/ZonedDateTime;`, [call(r, INSTANT, 'ofEpochMilli', `(J)${INSTANT}`, [BigInt(settle(r, self).time)]), call(r, 'Ljava/time/ZoneId;', 'of', `(${STRING})${ZONE_ID}`, [cal(r, self).zone])]));
   return { ...registry, interfaces: registry.interfacesOf };

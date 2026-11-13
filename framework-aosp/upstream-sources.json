@@ -31808,5 +31808,295 @@
     "sha256": "d4ee27c0da64100774a19841fb0751a14919de27de5b927be5efe7b2ff844749",
     "bytes": 3937,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/android/opengl/GLSurfaceView.java",
+    "localPath": "framework-aosp/upstream/android/opengl/GLSurfaceView.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/android/opengl/GLSurfaceView.java?format=TEXT",
+    "sha256": "4003421fa122c514d7f376d19831f0685ef4e903cdb3a1c3269aa17c0051ffb9",
+    "bytes": 76811,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/android/opengl/EGL14.java",
+    "localPath": "framework-aosp/upstream/android/opengl/EGL14.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/android/opengl/EGL14.java?format=TEXT",
+    "sha256": "508ee638d6e57ada3db0f37ef860353cacd70d8e6793320c63d9a356a3bc97d8",
+    "bytes": 18069,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/android/opengl/EGLConfig.java",
+    "localPath": "framework-aosp/upstream/android/opengl/EGLConfig.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/android/opengl/EGLConfig.java?format=TEXT",
+    "sha256": "9860741f20eda4a63062a2752d0e591d8017a3117f6396d212cc18e3fd490052",
+    "bytes": 1068,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/android/opengl/EGLContext.java",
+    "localPath": "framework-aosp/upstream/android/opengl/EGLContext.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/android/opengl/EGLContext.java?format=TEXT",
+    "sha256": "091c00830f0afad48d0b25d4499d40b2d0e9a3851e37b75f662f6bd269d4463d",
+    "bytes": 1074,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/android/opengl/EGLDisplay.java",
+    "localPath": "framework-aosp/upstream/android/opengl/EGLDisplay.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/android/opengl/EGLDisplay.java?format=TEXT",
+    "sha256": "789b574d672f2102a79dd3af995c6b5b39c5c54ed11b9b619abcfc85dba9cad2",
+    "bytes": 1074,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/android/opengl/EGLSurface.java",
+    "localPath": "framework-aosp/upstream/android/opengl/EGLSurface.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/android/opengl/EGLSurface.java?format=TEXT",
+    "sha256": "a2b77c3b8fabb673248def0f7d0a4a13ff8852a751c3f1a5bd4a7aa9540da206",
+    "bytes": 1074,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/android/opengl/EGLObjectHandle.java",
+    "localPath": "framework-aosp/upstream/android/opengl/EGLObjectHandle.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/android/opengl/EGLObjectHandle.java?format=TEXT",
+    "sha256": "e5a104f1f6542d44ddb5a9fe4fc1f8ff3b076f112930a708e706f36e42764a24",
+    "bytes": 2087,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/android/opengl/GLES20.java",
+    "localPath": "framework-aosp/upstream/android/opengl/GLES20.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/android/opengl/GLES20.java?format=TEXT",
+    "sha256": "aeb1c32996b6840d9b06723cd2af44f69e76cd98eea4a8afde7f1de3619c1365",
+    "bytes": 67452,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/android/opengl/GLES30.java",
+    "localPath": "framework-aosp/upstream/android/opengl/GLES30.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/android/opengl/GLES30.java?format=TEXT",
+    "sha256": "06f97ccf18659422bda14da7d707a63240f8a22090dcf1ab560a927d69ae92ca",
+    "bytes": 67766,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/android/opengl/GLUtils.java",
+    "localPath": "framework-aosp/upstream/android/opengl/GLUtils.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/android/opengl/GLUtils.java?format=TEXT",
+    "sha256": "4e248e12af739c467cf3f7a7e5c8652519fca33b9ac98011273d5af1f0af0246",
+    "bytes": 10038,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/javax/microedition/khronos/egl/EGL.java",
+    "localPath": "framework-aosp/upstream/javax/microedition/khronos/egl/EGL.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/javax/microedition/khronos/egl/EGL.java?format=TEXT",
+    "sha256": "10f40a2630c178ec3cf666dd024aa4b443971cac29ac1dd641968a690c1dd7ce",
+    "bytes": 688,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/javax/microedition/khronos/egl/EGL10.java",
+    "localPath": "framework-aosp/upstream/javax/microedition/khronos/egl/EGL10.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/javax/microedition/khronos/egl/EGL10.java?format=TEXT",
+    "sha256": "f5f7b277e13e0f439c638285668701cf97ed6fcb31e2261c62ac03fecad2382d",
+    "bytes": 6483,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/javax/microedition/khronos/egl/EGL11.java",
+    "localPath": "framework-aosp/upstream/javax/microedition/khronos/egl/EGL11.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/javax/microedition/khronos/egl/EGL11.java?format=TEXT",
+    "sha256": "e5f9ddc2b603a48dba9858443fad0c4e24777d21559943202f207eb22e6b2a78",
+    "bytes": 753,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/javax/microedition/khronos/egl/EGLConfig.java",
+    "localPath": "framework-aosp/upstream/javax/microedition/khronos/egl/EGLConfig.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/javax/microedition/khronos/egl/EGLConfig.java?format=TEXT",
+    "sha256": "f029fd976b8c3dc96d8338814b0f831cceeace22d2cbc09cb2f5ebb2cc39985b",
+    "bytes": 698,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/javax/microedition/khronos/egl/EGLContext.java",
+    "localPath": "framework-aosp/upstream/javax/microedition/khronos/egl/EGLContext.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/javax/microedition/khronos/egl/EGLContext.java?format=TEXT",
+    "sha256": "1944df3df4fb257375de7d2f25f677c05d5dbab1d13281d1f56da45f4f9d2328",
+    "bytes": 940,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/javax/microedition/khronos/egl/EGLDisplay.java",
+    "localPath": "framework-aosp/upstream/javax/microedition/khronos/egl/EGLDisplay.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/javax/microedition/khronos/egl/EGLDisplay.java?format=TEXT",
+    "sha256": "b04982614fe9df3a8071e4328ceb54371062ab2b014d9bbb24f8b5719e64001a",
+    "bytes": 699,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/javax/microedition/khronos/egl/EGLSurface.java",
+    "localPath": "framework-aosp/upstream/javax/microedition/khronos/egl/EGLSurface.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/javax/microedition/khronos/egl/EGLSurface.java?format=TEXT",
+    "sha256": "fb4cbb518956c0acd8c32279aa29d992419a86079143f036313eea6772b74675",
+    "bytes": 699,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/javax/microedition/khronos/opengles/GL.java",
+    "localPath": "framework-aosp/upstream/javax/microedition/khronos/opengles/GL.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/javax/microedition/khronos/opengles/GL.java?format=TEXT",
+    "sha256": "400bd0f6c9f441dc27a49165b028ca9aba4575e0f7b30f7d9bd1d2e28430781e",
+    "bytes": 764,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/javax/microedition/khronos/opengles/GL10.java",
+    "localPath": "framework-aosp/upstream/javax/microedition/khronos/opengles/GL10.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/javax/microedition/khronos/opengles/GL10.java?format=TEXT",
+    "sha256": "676f01e69386b138b2b3d397c11952c7cc73271cd42a29a9ed29304fa7889bb6",
+    "bytes": 25429,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/javax/microedition/khronos/opengles/GL10Ext.java",
+    "localPath": "framework-aosp/upstream/javax/microedition/khronos/opengles/GL10Ext.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/javax/microedition/khronos/opengles/GL10Ext.java?format=TEXT",
+    "sha256": "eb103edcab50fdd6fb7fa1027d583547d9a9acb112258d0d0efef92be09216cf",
+    "bytes": 1079,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/javax/microedition/khronos/opengles/GL11.java",
+    "localPath": "framework-aosp/upstream/javax/microedition/khronos/opengles/GL11.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/javax/microedition/khronos/opengles/GL11.java?format=TEXT",
+    "sha256": "d89e78cdcfdbfaed2563153576274e25d75437cfe71564a7b7de987a3b325577",
+    "bytes": 14927,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/javax/microedition/khronos/opengles/GL11Ext.java",
+    "localPath": "framework-aosp/upstream/javax/microedition/khronos/opengles/GL11Ext.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/javax/microedition/khronos/opengles/GL11Ext.java?format=TEXT",
+    "sha256": "045b01e9adb0c86b916ed5c97097bd0c2e72c662f1f7d92d537d25ea9f96f5d0",
+    "bytes": 3619,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/javax/microedition/khronos/opengles/GL11ExtensionPack.java",
+    "localPath": "framework-aosp/upstream/javax/microedition/khronos/opengles/GL11ExtensionPack.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/javax/microedition/khronos/opengles/GL11ExtensionPack.java?format=TEXT",
+    "sha256": "f3772af4e3fedd618739d038bde5e94f68898862e8fe8b20f618c691024a6ed9",
+    "bytes": 12355,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/com/google/android/gles_jni/EGLImpl.java",
+    "localPath": "framework-aosp/upstream/com/google/android/gles_jni/EGLImpl.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/com/google/android/gles_jni/EGLImpl.java?format=TEXT",
+    "sha256": "549cab3a2f0bc503e4cee46f9981f2f443ef26878290cac8c98e1bbb4e4f5288",
+    "bytes": 7646,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/com/google/android/gles_jni/EGLConfigImpl.java",
+    "localPath": "framework-aosp/upstream/com/google/android/gles_jni/EGLConfigImpl.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/com/google/android/gles_jni/EGLConfigImpl.java?format=TEXT",
+    "sha256": "b024385a5e6efb50a24515099ce2acfed7ef72533fbcdb6b89f284ea82d30e2f",
+    "bytes": 903,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/com/google/android/gles_jni/EGLContextImpl.java",
+    "localPath": "framework-aosp/upstream/com/google/android/gles_jni/EGLContextImpl.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/com/google/android/gles_jni/EGLContextImpl.java?format=TEXT",
+    "sha256": "86ba2121511997743bb3718b63fa8f2eeed438cbdcae6850e97ee52a5ea2b705",
+    "bytes": 1607,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/com/google/android/gles_jni/EGLDisplayImpl.java",
+    "localPath": "framework-aosp/upstream/com/google/android/gles_jni/EGLDisplayImpl.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/com/google/android/gles_jni/EGLDisplayImpl.java?format=TEXT",
+    "sha256": "9327f39ee7fb847523282220469c7f6786dff5afe4fa07a5d7f9afc1d9109166",
+    "bytes": 1423,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/com/google/android/gles_jni/EGLSurfaceImpl.java",
+    "localPath": "framework-aosp/upstream/com/google/android/gles_jni/EGLSurfaceImpl.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/com/google/android/gles_jni/EGLSurfaceImpl.java?format=TEXT",
+    "sha256": "6544c86105d9337befa177f8e6ddfbbb7a7ed6eb5988adf5db85e35601fc9a3a",
+    "bytes": 1491,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/com/google/android/gles_jni/GLImpl.java",
+    "localPath": "framework-aosp/upstream/com/google/android/gles_jni/GLImpl.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/com/google/android/gles_jni/GLImpl.java?format=TEXT",
+    "sha256": "c7328d3c1741f508c9124ed674702843e0ebb1817370c4d2d040c44c64503356",
+    "bytes": 54028,
+    "license": "Apache-2.0"
   }
 ]

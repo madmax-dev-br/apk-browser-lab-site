@@ -1,14 +1,15 @@
 // Entry of dist/player/frame.html: device frame + system bars + rendering, driven by postMessage from the embedding page.
-import { APKWorkerClient } from '../apk-worker-client.js?v=e0da55c6005f';
-import { createDeviceView, createViewState } from '../device-view.js?v=e0da55c6005f';
-import { sanitizeSettings } from '../device-settings.js?v=e0da55c6005f';
-import { createFrameController } from './frame-controller.js?v=e0da55c6005f';
-import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=e0da55c6005f';
-import { createPluginHost } from '../plugin-host.js?v=e0da55c6005f';
-import { captureImage } from '../screen-capture.js?v=e0da55c6005f';
-import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=e0da55c6005f';
-import { PERMISSION_ICONS } from '../permissions-panel.js?v=e0da55c6005f';
-import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=e0da55c6005f';
+import { APKWorkerClient } from '../apk-worker-client.js?v=48a82b9f9397';
+import { createDeviceView, createViewState } from '../device-view.js?v=48a82b9f9397';
+import { createGlSurfaces } from '../gl-surfaces.js?v=48a82b9f9397';
+import { sanitizeSettings } from '../device-settings.js?v=48a82b9f9397';
+import { createFrameController } from './frame-controller.js?v=48a82b9f9397';
+import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=48a82b9f9397';
+import { createPluginHost } from '../plugin-host.js?v=48a82b9f9397';
+import { captureImage } from '../screen-capture.js?v=48a82b9f9397';
+import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=48a82b9f9397';
+import { PERMISSION_ICONS } from '../permissions-panel.js?v=48a82b9f9397';
+import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=48a82b9f9397';
 
 const parentOrigin = new URLSearchParams(location.search).get('parent');
 const $ = id => document.getElementById(id) ?? (frameStub[id] ??= Object.assign(document.createElement('div'), { id }));
@@ -20,6 +21,8 @@ const query = new URLSearchParams(location.search);
 // ?raster=full replays every frame at full density (measurement); the default replays moving frames at a reduced scale and refines the settled screen (src/motion-raster.js).
 const deviceState = { settings: sanitizeSettings({}), clockTimer: null, pointerClicks: query.get('pointerClicks') === 'real' ? true : query.get('pointerClicks') === 'semantic' ? false : undefined, maxScale: query.get('scale') === 'actual' ? 1 : 4, stagePadding: 8, motionRaster: query.get('raster') !== 'full' };
 const vm = new APKWorkerClient();
+const glSurfaces = createGlSurfaces();   // OpenGL ES window surfaces of the app (src/gles-native.js): their frames drawn in the SurfaceView's box
+vm.onGlFrame = frame => glSurfaces.frame(frame);
 setTimeout(() => vm.prewarm?.(), 0);   // the VM Worker fetches and compiles the lab's assets while the page sends (and the frame downloads) the APK (src/apk-worker-client.js prewarm)
 let lastReport = '';
 // Copy the shared plain-text report. Clipboard API first (needs permission in some embeds), then execCommand, then the report is shown selected for Cmd/Ctrl+C.
@@ -86,7 +89,7 @@ const controller = createFrameController({ vm, state, deviceState, post, createP
 const view = createDeviceView({ $, state, deviceState, hideError() { document.getElementById('player-error').hidden = true; }, appendTrace() {}, updateTrace() {}, notifyParent() {},
   reportAPKError: (error, title) => controller.operations.reportAPKError(error, title), beginOperation: () => controller.operations.beginOperation(), finishOperation: token => controller.operations.finishOperation(token),
   clickView: id => controller.operations.clickView(id),
-  hooks: { navigationChanged: value => controller.operations.navigationChanged(value), closed: snapshot => { status('Activity stack is empty.'); controller.operations.closed(snapshot); }, rendered: snapshot => { status(''); lastPendingDelay = snapshot.pendingEventDelay ?? null; lastHealth = snapshot.vmHealth; lastRenderAt = performance.now(); lastReduced = snapshot.rasterReduced === true; controller.operations.snapshotRendered(snapshot); } } });
+  hooks: { glSurface: (element, info) => glSurfaces.bind(element, info), navigationChanged: value => controller.operations.navigationChanged(value), closed: snapshot => { status('Activity stack is empty.'); controller.operations.closed(snapshot); }, rendered: snapshot => { status(''); lastPendingDelay = snapshot.pendingEventDelay ?? null; lastHealth = snapshot.vmHealth; lastRenderAt = performance.now(); lastReduced = snapshot.rasterReduced === true; controller.operations.snapshotRendered(snapshot); } } });
 controller.attach(view); view.bindVM(vm);
 let lastPendingDelay = null, lastRenderAt = 0, lastHealth = null, lastReduced = false;   // the VM's next scheduled event (see apk-worker currentSnapshot): a near event means the screen is about to change; lastReduced: the frame shown is a reduced-scale replay, the full-density one is still to come
 // The host element can change size without the iframe window being resized by anything else (CSS, containers): refit the device, never relaunch the VM.

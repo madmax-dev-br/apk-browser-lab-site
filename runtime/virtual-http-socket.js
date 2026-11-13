@@ -14,6 +14,8 @@
 // This module is VM-free: the network bridge (`net`) is passed in and the failures are plain JavaScript errors the natives (src/libcore-io-native.js) turn into Java exceptions.
 
 export const HIGH_WATER = 256 * 1024, CHUNK = 64 * 1024, MAX_HEAD = 64 * 1024, MAX_BODY = 128 * 1024 * 1024;
+import { websocketRequest, acceptKey, FrameDecoder, encodeFrame, closePayload, OPCODE } from './websocket-bridge.js?v=48a82b9f9397';
+const TUNNEL_PREFIX = 64 * 1024;   // the bytes kept until the first request is recognised: a conversation that is not HTTP/1.1 starts the tunnel with them
 const encoder = new TextEncoder();
 const latin1 = bytes => { let text = ''; for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode(...bytes.subarray(i, i + 8192)); return text; };
 const bytesOf = text => { const out = new Uint8Array(text.length); for (let i = 0; i < text.length; i++) out[i] = text.charCodeAt(i) & 255; return out; };
@@ -191,13 +193,20 @@ export function targetUrl(request, peer, { https, sni }) {
 
 let socketCounter = 0;
 /** One socket descriptor's HTTP conversation. */
+/** The 101 response the lab sends for a WebSocket the browser opened. */
+function switchingProtocols(upgrade, protocol) {
+  const lines = ['HTTP/1.1 101 Switching Protocols', 'Upgrade: websocket', 'Connection: Upgrade', `Sec-WebSocket-Accept: ${acceptKey(upgrade.key)}`];
+  if (protocol) lines.push(`Sec-WebSocket-Protocol: ${protocol}`);
+  return encoder.encode(lines.join('\r\n') + '\r\n\r\n');
+}
+
 export class VirtualHttpSocket {
   /** @param net the NetworkBridge; @param peer { host (policy name), literal (address text), port }; @param clock { now() } */
   constructor({ net, peer, local }) {
     this.net = net; this.peer = peer; this.local = local; this.id = ++socketCounter; this.parser = new RequestParser();
     this.https = false; this.sni = null; this.alpn = 'http/1.1';
     this.requests = []; this.exchange = null; this.out = []; this.outBytes = 0;
-    this.eof = false; this.error = null; this.errorDelivered = false; this.closed = false; this.readShut = false; this.writeShut = false; this.served = 0; this.closing = false;
+    this.eof = false; this.error = null; this.errorDelivered = false; this.closed = false; this.readShut = false; this.writeShut = false; this.served = 0; this.closing = false; this.prefix = new Uint8Array(0); this.raw = null; this.ws = null;
   }
   get label() { return `${this.peer.host}:${this.peer.port}`; }
   /** The browser does the TLS: the socket's requests are https from now on. `host` is the SNI name. */
@@ -207,10 +216,21 @@ export class VirtualHttpSocket {
   write(bytes) {
     if (this.closed) throw new SocketFailure('Ljava/net/SocketException;', 'Socket closed');
     if (this.writeShut) throw new SocketFailure('Ljava/net/SocketException;', 'Socket output is shutdown');
+    if (this.ws) return this.writeFrames(bytes);   // upgraded to a WebSocket: the bytes are frames, not HTTP
+    if (this.raw) { this.raw.send(bytes); return this.pumpRaw(); }   // a TCP tunnel through the relay: the bytes go as they are
     if (this.eof && !this.exchange) throw new SocketFailure('Ljava/net/SocketException;', 'sendto failed: EPIPE (Broken pipe)');
-    for (const event of this.parser.push(bytes)) {
+    if (this.prefix !== null && this.prefix.length < TUNNEL_PREFIX) this.prefix = concat(this.prefix, bytes);
+    let events;
+    try { events = this.parser.push(bytes); }
+    catch (failure) {
+      // Not HTTP/1.1 from the first byte on (HTTP/2 with prior knowledge, a binary protocol): through the relay's TCP tunnel when one is configured, else the explicit failure.
+      if (!(failure instanceof NotServed) || this.served || this.exchange || this.requests.length || this.prefix === null || typeof this.net.openTunnel !== 'function') throw failure;
+      const session = this.net.openTunnel({ host: this.peer.host, port: this.peer.port, tls: this.https, alpn: this.alpnOffered ?? [] }); if (!session) throw failure;
+      this.raw = session; session.send(this.prefix); this.prefix = null; return this.pumpRaw();
+    }
+    for (const event of events) {
       if (event.type === 'continue') this.append(CONTINUE);
-      else this.requests.push(event);
+      else { this.requests.push(event); this.prefix = null; }
     }
     this.pump(true);
   }
@@ -219,7 +239,7 @@ export class VirtualHttpSocket {
     if (how === SHUT_WR || how === 2) { this.writeShut = true; if (!this.exchange && !this.requests.length) this.eof = true; }
   }
   dispose() {
-    if (this.closed) return; this.closed = true;
+    if (this.closed) return; this.closed = true; this.ws?.session.dispose(); this.raw?.dispose();
     if (this.exchange) { this.net.discard(this.exchange.op); this.exchange = null; }
     this.requests = []; this.out = []; this.outBytes = 0;
   }
@@ -251,6 +271,8 @@ export class VirtualHttpSocket {
   /** Moves the conversation forward. A request that cannot start (refused host, not servable) throws when the app's own write caused it (`throwing`), else the failure waits in `error` for the app's next read. */
   pump(throwing = false) {
     if (this.closed) return;
+    if (this.ws) return this.pumpWebSocket();
+    if (this.raw) return this.pumpRaw();
     for (let guard = 0; guard < 64; guard++) {
       if (!this.exchange) {
         if (this.error !== null || this.eof) return;
@@ -261,6 +283,7 @@ export class VirtualHttpSocket {
           this.error = failure instanceof SocketFailure ? { type: failure.javaType, message: failure.message } : { notServed: failure }; this.eof = true; this.requests = []; return;
         }
       }
+      if (this.ws) return this.pumpWebSocket();   // the request was a WebSocket upgrade: no HTTP exchange from here on
       const ex = this.exchange, op = ex.op, net = this.net;
       net.refresh(op);
       if (!ex.headSent && op.head) {
@@ -291,9 +314,41 @@ export class VirtualHttpSocket {
       return;
     }
   }
+  // ---- a TCP tunnel through the relay (src/tcp-tunnel.js)
+  pumpRaw() {
+    const session = this.raw;
+    while (session.queue.length) { const bytes = session.queue.shift(); session.queued -= bytes.length; this.append(bytes); }
+    if (session.error && !session.connected) { this.error = { type: session.error.type, message: session.error.message }; this.eof = true; return; }
+    if (session.closed && !session.queue.length) this.eof = true;
+  }
+  // ---- an upgraded WebSocket (src/websocket-bridge.js)
+  pumpWebSocket() {
+    const ws = this.ws, session = ws.session;
+    if (!ws.switched) {
+      if (session.error) { this.error = { type: session.error.type, message: session.error.message }; this.eof = true; return; }
+      if (!session.open) return;
+      ws.switched = true; this.append(switchingProtocols(ws.upgrade, session.protocol));
+    }
+    while (session.queue.length) { const frame = session.queue.shift(); session.queued -= frame.length; this.append(frame); }
+    if (session.closed && !session.queue.length) this.eof = true;
+  }
+  writeFrames(bytes) {
+    const ws = this.ws, session = ws.session;
+    if (!ws.switched) throw new SocketFailure('Ljava/net/SocketException;', 'WebSocket frames written before the server switched protocols');
+    let messages;
+    try { messages = ws.decoder.push(bytes); }
+    catch (error) { session.close(1002, 'protocol error'); throw new NotServed(`a WebSocket conversation the lab cannot serve: ${error.message}`); }
+    for (const { opcode, payload } of messages) {
+      if (opcode === OPCODE.TEXT || opcode === OPCODE.BINARY) session.send(opcode, payload);
+      else if (opcode === OPCODE.PING) this.append(encodeFrame(OPCODE.PONG, payload));   // the lab is the app's peer: it answers the ping (the browser keeps the real connection alive)
+      else if (opcode === OPCODE.CLOSE) { const code = payload.length >= 2 ? (payload[0] << 8) | payload[1] : 1005, reason = new TextDecoder().decode(payload.subarray(2)); session.close(code, reason); if (!session.open || session.closed) { this.append(encodeFrame(OPCODE.CLOSE, closePayload(code === 1005 ? 0 : code))); this.eof = true; } }
+    }
+    this.pumpWebSocket();
+  }
   begin(request) {
     const net = this.net;
     const url = targetUrl(request, this.peer, { https: this.https, sni: this.sni });
+    const upgrade = websocketRequest(request);
     const port = Number(url.port || (url.protocol === 'https:' ? 443 : 80)), host = url.hostname;
     const headers = request.headers.filter(([name]) => name.toLowerCase() !== 'host');
     const mock = net.matchMock?.({ method: request.method, url: url.href, body: request.body }) ?? null;   // "Mock de endpoints" (src/endpoint-mocks.js): answered by the lab, before the policy
@@ -301,6 +356,13 @@ export class VirtualHttpSocket {
       net.stats.denied++; if (!net.online) net.stats.offlineRejections++;
       net.logRefusal({ api: 'Socket', method: request.method, url: url.href, host, port, headers, bytes: request.body.length });
       throw new SocketFailure('Ljava/net/SocketException;', 'sendto failed: ENETUNREACH (Network is unreachable)');
+    }
+    if (upgrade) {   // RFC 6455 handshake: the browser's WebSocket stands for the TCP stream (src/websocket-bridge.js); the 101 goes out once it is open
+      if (typeof net.openWebSocket !== 'function') throw new NotServed(`a WebSocket upgrade to ${url.href} (this network has no WebSocket)`);
+      const session = net.openWebSocket({ url: url.href, headers: request.headers, protocols: upgrade.protocols });
+      this.ws = { session, upgrade, decoder: new FrameDecoder(), switched: false, closeQueued: false };
+      if (this.requests.length) throw new NotServed('bytes after a WebSocket upgrade request, before the server answered it');
+      return;
     }
     net.noteHost(host);
     // redirect: 1 -- a Socket client applies its own redirect rules; where the transport can show 3xx responses (outside a browser) it does, and a browser follows them (it hides them).

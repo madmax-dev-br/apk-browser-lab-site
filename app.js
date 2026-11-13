@@ -1,45 +1,46 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=e0da55c6005f';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=e0da55c6005f';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=e0da55c6005f';
-import { initCollapsibleSections } from './panel-sections.js?v=e0da55c6005f';
-import { warmupLabel } from './warmup.js?v=e0da55c6005f';
-import { createApkShelf, indexedDbShelfBackend } from './apk-shelf.js?v=e0da55c6005f';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=e0da55c6005f';
-import { initHelpTips } from './help-tips.js?v=e0da55c6005f';
-import { createToolDock } from './tool-dock.js?v=e0da55c6005f';
-import { createPermissionsPanel } from './permissions-panel.js?v=e0da55c6005f';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=e0da55c6005f';
-import { createAppDataPanel } from './app-data-panel.js?v=e0da55c6005f';
-import { createCameraLab } from './camera-lab.js?v=e0da55c6005f';
-import { createOverridesPanel } from './overrides-panel.js?v=e0da55c6005f';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=e0da55c6005f';
-import { createHostMapPanel } from './host-map-panel.js?v=e0da55c6005f';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=e0da55c6005f';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=e0da55c6005f';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=e0da55c6005f';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=e0da55c6005f';
-import { createDeviceView, createViewState } from './device-view.js?v=e0da55c6005f';
-import { createTaskSwitcher } from './task-switcher.js?v=e0da55c6005f';
-import { createDeviceZoom } from './device-zoom.js?v=e0da55c6005f';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=e0da55c6005f';
-import { formatApiGapReport } from './api-gap-scan.js?v=e0da55c6005f';
-import { createLogcatPanel } from './logcat-panel.js?v=e0da55c6005f';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=e0da55c6005f';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=e0da55c6005f';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=e0da55c6005f';
-import { captureImage } from './screen-capture.js?v=e0da55c6005f';
-import { createPluginsPanel } from './plugins-panel.js?v=e0da55c6005f';
-import { createMcpTools } from './mcp-tools.js?v=e0da55c6005f';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=e0da55c6005f';
-import { createModalHost } from './lab-modal.js?v=e0da55c6005f';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=e0da55c6005f';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=e0da55c6005f';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=e0da55c6005f';
-import { createDragLayer } from './lab-drag.js?v=e0da55c6005f';
-import { createLabScroll } from './lab-scroll.js?v=e0da55c6005f';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=e0da55c6005f';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=e0da55c6005f';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=e0da55c6005f';
+import { APKWorkerClient } from './apk-worker-client.js?v=48a82b9f9397';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=48a82b9f9397';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=48a82b9f9397';
+import { initCollapsibleSections } from './panel-sections.js?v=48a82b9f9397';
+import { warmupLabel } from './warmup.js?v=48a82b9f9397';
+import { createApkShelf, indexedDbShelfBackend } from './apk-shelf.js?v=48a82b9f9397';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=48a82b9f9397';
+import { initHelpTips } from './help-tips.js?v=48a82b9f9397';
+import { createToolDock } from './tool-dock.js?v=48a82b9f9397';
+import { createPermissionsPanel } from './permissions-panel.js?v=48a82b9f9397';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=48a82b9f9397';
+import { createAppDataPanel } from './app-data-panel.js?v=48a82b9f9397';
+import { createCameraLab } from './camera-lab.js?v=48a82b9f9397';
+import { createOverridesPanel } from './overrides-panel.js?v=48a82b9f9397';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=48a82b9f9397';
+import { createHostMapPanel } from './host-map-panel.js?v=48a82b9f9397';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=48a82b9f9397';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=48a82b9f9397';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=48a82b9f9397';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=48a82b9f9397';
+import { createDeviceView, createViewState } from './device-view.js?v=48a82b9f9397';
+import { createTaskSwitcher } from './task-switcher.js?v=48a82b9f9397';
+import { createDeviceZoom } from './device-zoom.js?v=48a82b9f9397';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=48a82b9f9397';
+import { formatApiGapReport } from './api-gap-scan.js?v=48a82b9f9397';
+import { createLogcatPanel } from './logcat-panel.js?v=48a82b9f9397';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=48a82b9f9397';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=48a82b9f9397';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=48a82b9f9397';
+import { captureImage } from './screen-capture.js?v=48a82b9f9397';
+import { createPluginsPanel } from './plugins-panel.js?v=48a82b9f9397';
+import { createMcpTools } from './mcp-tools.js?v=48a82b9f9397';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=48a82b9f9397';
+import { createModalHost } from './lab-modal.js?v=48a82b9f9397';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=48a82b9f9397';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=48a82b9f9397';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=48a82b9f9397';
+import { createDragLayer } from './lab-drag.js?v=48a82b9f9397';
+import { createLabScroll } from './lab-scroll.js?v=48a82b9f9397';
+import { createGlSurfaces } from './gl-surfaces.js?v=48a82b9f9397';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=48a82b9f9397';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=48a82b9f9397';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=48a82b9f9397';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -413,6 +414,8 @@ const netlogPanel = createNetlogPanel({ root: $('netlog'), getPackage: () => sta
     hostMapPanel.addRule(`${entry.scheme ? entry.scheme + '://' : ''}${entry.host}${entry.port && ![80, 443].includes(Number(entry.port)) ? ':' + entry.port : ''}`);
   } });   // src/netlog-panel.js; "Permitir" types the host into the Dispositivo field, the same path as typing it
 apkVM.onNetlog = message => { netlogPanel.push(message); pluginHost.netlog(message); };
+const glSurfaces = createGlSurfaces();   // OpenGL ES window surfaces of the app (src/gles-native.js -> src/gl-surfaces.js)
+apkVM.onGlFrame = frame => glSurfaces.frame(frame);
 window.apkLabNetlog = netlogPanel;   // test and console access: .store.entries
 window.apkLabLogcat = logcatPanel;   // test and console access: .store.entries
 try { if (localStorage.getItem('apkweb.keepAppData') === '0') $('keep-app-data').checked = false; } catch { /* storage may be blocked */ }
@@ -549,7 +552,7 @@ async function inspectSelectedNative() {
 async function importSource(source, autoRun = false) {
   if (state.busy) return;
   state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.stickyError = false; state.needsRestart = false; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer', 'android-action-mode-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
-  permissionsPanel?.detach(); filesPanel?.detach(); appDataPanel?.reset(); cameraLab?.detach(); overridesPanel?.detach(); ignoredPanel?.detach(); mocksPanel?.detach(); hostMapPanel?.resetHits(); pluginHost.vmChanged();
+  glSurfaces.reset(); permissionsPanel?.detach(); filesPanel?.detach(); appDataPanel?.reset(); cameraLab?.detach(); overridesPanel?.detach(); ignoredPanel?.detach(); mocksPanel?.detach(); hostMapPanel?.resetHits(); pluginHost.vmChanged();
   // A new run (another APK, or Executar APK again) starts clean: the Worker of the previous run is terminated by apkVM.load, and what the page still shows of it goes too
   // (Logcat, network requests, memory meter, error report, last frame and heartbeat). App data follows the "Manter dados do app" option; the panel settings are kept.
   logcatPanel.reset(); netlogPanel.reset(); composeInspector.reset(); state.oomSeen = 0; state.lastVmHealth = null; state.lastSnapshot = null; state.errorReport = null; apkVM.lastHeartbeat = null; apkVM.lastScreenSnapshot = null; if ($('memory-meter')) $('memory-meter').hidden = true;
@@ -799,6 +802,7 @@ const mocksPanel = createEndpointMocksPanel({ $, vm: apkVM });   // "Mock de end
 const hostMapPanel = createHostMapPanel({ $, get: () => deviceState.settings.network.hostMap ?? [], set: rules => applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, network: { ...deviceState.settings.network, hostMap: rules } })) });   // "Redirecionar hosts" (src/host-map.js): device settings, applied live
 const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, notifyParent, clickView: id => clickView(id), hooks: {
   cameraSurface(element, info) { cameraLab.bindSurface(element, info); },
+  glSurface(element, info) { glSurfaces.bind(element, info); },
   navigationChanged(canGoBack) { $('back-button').disabled = state.busy || !canGoBack; $('back-button').hidden = state.mode !== 'apk' || !canGoBack; syncReloadButton(); },
   closed() {
     taskSwitcher?.closed();   // the device shows its launcher: the app's icon starts it again

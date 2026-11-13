@@ -1,14 +1,16 @@
-import { APKError } from './apk-error.js?v=e0da55c6005f';
-import { throwNew } from './java-throw.js?v=e0da55c6005f';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=e0da55c6005f';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=e0da55c6005f';
-import { Blocked } from './scheduler.js?v=e0da55c6005f';
-import { captureBody } from './network-capture.js?v=e0da55c6005f';
-import { OS_CONSTANTS } from './os-constants-data.js?v=e0da55c6005f';
-import { openExchange, describeFailure } from './network-transport.js?v=e0da55c6005f';
-import { WorkerExecutor } from './network-worker-executor.js?v=e0da55c6005f';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=e0da55c6005f';
-import { TransportAuthority } from './transport-ca.js?v=e0da55c6005f';
+import { APKError } from './apk-error.js?v=48a82b9f9397';
+import { throwNew } from './java-throw.js?v=48a82b9f9397';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=48a82b9f9397';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=48a82b9f9397';
+import { Blocked } from './scheduler.js?v=48a82b9f9397';
+import { captureBody } from './network-capture.js?v=48a82b9f9397';
+import { OS_CONSTANTS } from './os-constants-data.js?v=48a82b9f9397';
+import { openExchange, describeFailure } from './network-transport.js?v=48a82b9f9397';
+import { WorkerExecutor } from './network-worker-executor.js?v=48a82b9f9397';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=48a82b9f9397';
+import { TransportAuthority } from './transport-ca.js?v=48a82b9f9397';
+import { openWebSocketSession } from './websocket-bridge.js?v=48a82b9f9397';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=48a82b9f9397';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -154,6 +156,47 @@ export class NetworkBridge {
     if (op.executor === 'worker') { try { (this.worker ??= new WorkerExecutor(this)).start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [] }); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
     else this.run(op).catch(error => { op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => { this.observe(op); this.signal(); });
     return op;
+  }
+  /**
+   * A WebSocket the app asked for over a virtual HTTP socket (src/websocket-bridge.js): the browser's WebSocket to the same URL (ws:// for http, wss:// for https), after the
+   * "Redirecionar hosts" rules. Not an exchange of `ops` (an open WebSocket is not a pending request: the screen may be ready while it stays open); its arrivals wake the VM
+   * through signal(). The network log gets one entry: 101 when it opened, then the messages and bytes both ways, and how it ended.
+   */
+  openWebSocket({ url, headers = [], protocols = [] }) {
+    const mapped = this.redirectFor(url), target = new URL(mapped?.url ?? url); target.protocol = target.protocol === 'https:' ? 'wss:' : 'ws:';
+    const Socket = this.policy.WebSocket ?? globalThis.WebSocket;
+    const entry = this.log?.begin({ method: 'GET', url, headers, body: null }, { api: 'WebSocket', mapped }) ?? null, record = { head: null, error: null, ended: false, closed: false, received: 0 };
+    this.stats.requests++; this.noteHost(new URL(url).hostname);
+    if (mapped) { const counted = noteRedirect(this.runtime, this.redirects, mapped, { method: 'GET', url }); counted.responses++; }   // counted as a response of its rule (a WebSocket has no HTTP response the rule could settle later)
+    const session = openWebSocketSession({ url: target.href, protocols, create: Socket ? (u, p) => new Socket(u, p) : () => { throw new Error('this realm has no WebSocket'); }, signal: () => this.signal(),
+      onLog: (what, code) => {
+        if (what === 'open') record.head = { status: 101, reason: 'Switching Protocols', headers: [['upgrade', 'websocket'], ['connection', 'Upgrade']] };
+        if (what === 'closed') { record.received = session.bytesIn; if (session.error) record.error = session.error; else record.ended = true; }
+        this.log?.observe(entry, record);
+      } });
+    if (session.error) { record.error = session.error; this.log?.observe(entry, record); }
+    session.logEntry = entry; session.record = record; return session;
+  }
+  /**
+   * A TCP stream through the APK Lab Relay (src/tcp-tunnel.js) for a socket whose conversation is not HTTP/1.1, or null when no relay is configured (the socket then fails
+   * explicitly, as without this). "Redirecionar hosts" rules apply to host:port. Like a WebSocket it is not a pending request; the network log has one CONNECT entry.
+   */
+  openTunnel({ host, port, tls = false, alpn = [] }) {
+    const endpoint = tunnelEndpoint(this.policy); if (!endpoint) return null;
+    const original = `${tls ? 'https' : 'http'}://${host}:${port}/`, mapped = this.redirectFor(original), target = new URL(mapped?.url ?? original);
+    const targetPort = Number(target.port || (target.protocol === 'https:' ? 443 : 80)), Socket = this.policy.WebSocket ?? globalThis.WebSocket;
+    const entry = this.log?.begin({ method: 'CONNECT', url: `tcp://${host}:${port}`, headers: [], body: null }, { api: 'Tunnel', mapped }) ?? null, record = { head: null, error: null, ended: false, closed: false, received: 0 };
+    this.stats.requests++; this.noteHost(host);
+    if (mapped) { const counted = noteRedirect(this.runtime, this.redirects, mapped, { method: 'CONNECT', url: original }); counted.responses++; }
+    const session = openTunnelSession({ endpoint, host: target.hostname, port: targetPort, tls, alpn, create: Socket ? url => new Socket(url) : () => { throw new Error('this realm has no WebSocket'); },
+      signal: () => {
+        if (session?.connected && !record.head) { record.head = { status: 200, reason: 'Connected (relay tunnel)', headers: session.alpn ? [['alpn', session.alpn]] : [] }; this.log?.observe(entry, record); }
+        if (session?.error && !record.error) { record.error = session.error; this.log?.observe(entry, record); }
+        if (session?.closed && !record.ended && !record.error) { record.received = session.bytesIn; record.ended = true; this.log?.observe(entry, record); }
+        this.signal();
+      } });
+    if (session.error) { record.error = session.error; this.log?.observe(entry, record); }
+    return session;
   }
   /** A request a mock answers: the operation is filled by deliverMock() once the mock's delay has passed on the VM clock; no executor, no fetch. */
   startMock(op, record) {

@@ -1,17 +1,17 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=e0da55c6005f';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=e0da55c6005f';
-import { inspectELF } from './native-inspector.js?v=e0da55c6005f';
-import { elfBuildId } from './elf-build-id.js?v=e0da55c6005f';
-import { inflateRaw } from './inflate.js?v=e0da55c6005f';
-import { resolveDevice } from './device-profile.js?v=e0da55c6005f';
-import { resourceProfileFor } from './device-configuration.js?v=e0da55c6005f';
-import { JniBridge } from './jni-host.js?v=e0da55c6005f';
-import { providerForApk } from './native-provider-variants.js?v=e0da55c6005f';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=e0da55c6005f';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=e0da55c6005f';
-import { AndroidResources } from './android-resources.js?v=e0da55c6005f';
-import { AndroidPlatform } from './android-platform.js?v=e0da55c6005f';
-import { FrameworkProvider } from './framework-provider.js?v=e0da55c6005f';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=48a82b9f9397';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=48a82b9f9397';
+import { inspectELF } from './native-inspector.js?v=48a82b9f9397';
+import { elfBuildId } from './elf-build-id.js?v=48a82b9f9397';
+import { inflateRaw } from './inflate.js?v=48a82b9f9397';
+import { resolveDevice } from './device-profile.js?v=48a82b9f9397';
+import { resourceProfileFor } from './device-configuration.js?v=48a82b9f9397';
+import { JniBridge } from './jni-host.js?v=48a82b9f9397';
+import { providerForApk } from './native-provider-variants.js?v=48a82b9f9397';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=48a82b9f9397';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=48a82b9f9397';
+import { AndroidResources } from './android-resources.js?v=48a82b9f9397';
+import { AndroidPlatform } from './android-platform.js?v=48a82b9f9397';
+import { FrameworkProvider } from './framework-provider.js?v=48a82b9f9397';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -542,6 +542,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     while(type){if(type==='Landroidx/appcompat/app/AppCompatActivity;')return true;if(seen.has(type)||seen.size>=128)fail('Invalid/excessive Activity superclass chain');seen.add(type);type=apkSuperclass(type);}return false;
   });
   const usesWindowSurfaces=files.some(file=>file.dex.types.some(type=>['Landroid/app/Dialog;','Landroid/view/WindowManager;'].includes(type)));
+  const usesSurfaceViews=files.some(file=>file.dex.types.some(type=>['Landroid/view/SurfaceView;','Landroid/opengl/GLSurfaceView;','Landroid/view/TextureView;'].includes(type)));   // a surface's size is its View's: measured and laid out in the VM, as a producer (EGL, the camera) sizes its buffers from it
   // Gravity-dependent drawables (LayerDrawable, InsetDrawable, ScaleDrawable, ClipDrawable, RippleDrawable) need the original View/Gravity layer of the layouts profile: load it when the code names
   // those classes or a drawable/mipmap XML of the APK uses one of their tags (the tag is a whole string of the compiled XML string pool, UTF-8 or UTF-16).
   const gravityDrawableTypes=new Set(['LayerDrawable','InsetDrawable','ScaleDrawable','ClipDrawable','RippleDrawable','TransitionDrawable'].map(name=>`Landroid/graphics/drawable/${name};`));
@@ -555,7 +556,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const usesConfiguration=files.some(file=>file.dex.types.includes('Landroid/content/res/Configuration;'));
   const baseFrameworkFiles = framework ? [...framework.files] : []; let verifiedBaseFrameworkHash = null;
   const profiles=[
-    {name:'layouts',explicit:options.enableLayoutProfile,automatic:appCompatActivity||usesWindowSurfaces||usesGravityDrawables,reason:appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':usesWindowSurfaces?'APK-references-Dialog-or-WindowManager':'APK-uses-Gravity-dependent-drawables'},
+    {name:'layouts',explicit:options.enableLayoutProfile,automatic:appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables,reason:appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':usesWindowSurfaces?'APK-references-Dialog-or-WindowManager':usesSurfaceViews?'APK-uses-SurfaceView-or-TextureView':'APK-uses-Gravity-dependent-drawables'},
     {name:'configuration',explicit:options.enableConfigurationProfile,automatic:usesConfiguration,reason:'APK-references-android.content.res.Configuration'},
   ];
   for(const selection of profiles){
