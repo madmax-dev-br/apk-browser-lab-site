@@ -122,9 +122,14 @@ export function pluginWorkerMain(scope) {
     clear: () => pushUi({ op: 'clear' }),
     badge: text => pushUi({ op: 'badge', text: clip(textOf(text ?? '')).slice(0, 40) }),
   });
-  const wrapError = error => Object.assign(new Error(error?.message ?? 'Falha na consulta.'), { code: error?.code ?? 'failed' });
+  const wrapError = error => Object.assign(new Error(error?.message ?? 'Falha na consulta.'), { code: error?.code ?? 'failed' }, error?.exception ? { exception: error.exception } : {});
   const watches = new Set(), readyWrappers = new Map(), modals = new Map(); let modalSubscribed = false;
   const tabs = new Map(); let tabSubscribed = false;
+  const overlays = new Map(); let overlaySubscribed = false;   // lab.overlay: id -> { message: Set, close: Set, state }
+  const tracks = new Map(); let trackSubscribed = false;       // lab.track: id -> fn
+  const overlayConfig = options => { const out = {}; for (const key of ['anchor', 'placement', 'align', 'offset', 'width', 'height', 'maxWidth', 'interactive', 'flip', 'title']) if (options?.[key] !== undefined) out[key] = options[key]; if (out.anchor !== undefined && out.anchor !== 'screen' && out.anchor !== 'window') out.anchor = 'target'; return out; };
+  // an argument of lab.invoke: JSON values, a handle ('h12.x'), { handle } / an element of lab.viewModels(), or { long: '123' } / BigInt for a long beyond 2^53
+  const invokeArg = value => typeof value === 'bigint' ? { long: String(value) } : value && typeof value === 'object' && !Array.isArray(value) && typeof value.handle === 'string' && value.long === undefined ? { handle: value.handle } : value;
   const buttons = new Map();   // button id -> { handlers: Set, handle }: the plugin's buttons (lab.button); the page keeps their state and sends { t: 'click', id }
   const buttonConfig = options => { const out = {}; for (const key of ['id', 'label', 'icon', 'title', 'variant', 'disabled', 'placement']) if (options?.[key] !== undefined) out[key] = options[key]; return out; };
   async function runClick(data) {
@@ -175,7 +180,7 @@ export function pluginWorkerMain(scope) {
         lab.screen().then(screen => { if (screen?.ready?.ready && !was) { was = true; fn(screen); } }).catch(() => {});
         return () => { readyWrappers.delete(fn); off(); };
       }
-      if (!['screen', 'log', 'network', 'refresh', 'modal', 'tab'].includes(name)) throw new TypeError(`Evento desconhecido: ${name} (use 'screen', 'ready', 'log', 'network' ou 'refresh')`);
+      if (!['screen', 'log', 'network', 'refresh', 'frame', 'modal', 'tab', 'overlay', 'track'].includes(name)) throw new TypeError(`Evento desconhecido: ${name} (use 'screen', 'ready', 'log', 'network', 'refresh' ou 'frame')`);
       let set = handlers.get(name); if (!set) { set = new Set(); handlers.set(name, set); post({ t: 'sub', name, on: true }); }
       set.add(fn); return () => lab.off(name, fn);
     },
@@ -268,6 +273,70 @@ export function pluginWorkerMain(scope) {
         remove: () => call('highlight', { op: 'remove', id }) });
     },
     highlights: Object.freeze({ list: () => call('highlight', { op: 'list' }), clear: () => call('highlight', { op: 'clear' }) }),
+    // ---- the device on the page (src/lab-overlays.js): its position and size, components followed frame by frame, the plugin's HTML beside or over it ----
+    /** Where the device's screen is on the page and its size: { visible, screen, window, scale, device, windowDp, viewport, orientation } (page px; device and windowDp in dp). */
+    frame: () => call('frame', {}),
+    /**
+     * Follows the components a target names, frame by frame: fn({ id, visible, matches, elements: [{ key, kind, name, testTag, viewId, texts, bounds (window dp), rect (page px) }] })
+     * each time one moved, resized, appeared or left the screen (and when the device moved on the page). -> the stop function (with .id).
+     */
+    async track(target, fn, options = {}) {
+      if (typeof fn !== 'function') throw new TypeError('lab.track(alvo, função)');
+      if (!trackSubscribed) { trackSubscribed = true; lab.on('track', event => { const handler = tracks.get(event?.id); if (handler) handler(event); }); }
+      const { id } = await call('track', { op: 'start', target: targetArg(target), id: options?.id ?? null, all: options?.all === true });
+      tracks.set(id, value => { try { const result = fn(value); if (result && typeof result.then === 'function') result.then(undefined, error => reportError(error, 'track')); } catch (error) { reportError(error, 'track'); } });
+      const stop = () => { if (!tracks.delete(id)) return Promise.resolve({ removed: false }); return call('track', { op: 'stop', id }); };
+      return Object.assign(stop, { id });
+    },
+    overlay: Object.freeze({
+      /**
+       * HTML of the plugin beside or over the device, in an isolated frame the lab keeps in place: open({ html, anchor: 'screen' | 'window' | alvo, placement: 'over' | 'top' |
+       * 'bottom' | 'left' | 'right' | 'center', align: 'start' | 'center' | 'end', offset, width, height ('auto' | 'anchor' | px), maxWidth, interactive, flip, title, id })
+       * -> { id, state, update, post, close, onMessage, onClose }. Inside the frame: window.lab.post / on / onAnchor / anchor.
+       */
+      async open(options = {}) {
+        if (!overlaySubscribed) {
+          overlaySubscribed = true;
+          lab.on('overlay', event => {
+            const entry = overlays.get(event?.id); if (!entry) return;
+            if (event.type === 'closed') { overlays.delete(event.id); fire(entry.close, 'overlay.onClose', event.reason); }
+            else if (event.type === 'message') fire(entry.message, 'overlay.onMessage', event.data);
+          });
+        }
+        const anchor = options?.anchor ?? 'screen', target = anchor === 'screen' || anchor === 'window' ? null : targetArg(anchor);
+        const reply = await call('overlay', { op: 'open', id: options?.id ?? null, config: overlayConfig({ ...options, anchor }), target, html: String(options?.html ?? ''), required: options?.required === true });
+        const id = reply.id; let entry = overlays.get(id); if (!entry) { entry = { message: new Set(), close: new Set(), state: null }; overlays.set(id, entry); }
+        entry.state = reply.state;
+        const listen = set => fn => { if (typeof fn !== 'function') throw new TypeError('Passe uma função.'); set.add(fn); return () => set.delete(fn); };
+        return Object.freeze({ id, get state() { return entry.state; },
+          /** Changes the anchor, placement, size or HTML: update({ html, anchor, placement, ... }). */
+          update: async (changes = {}) => {
+            const next = changes?.anchor, config = overlayConfig(changes);
+            const reply = await call('overlay', { op: 'update', id, ...(Object.keys(config).length ? { config } : {}), ...(next !== undefined && next !== 'screen' && next !== 'window' ? { target: targetArg(next) } : {}), ...(changes?.html !== undefined ? { html: String(changes.html) } : {}) });
+            entry.state = reply.state; return reply.state;
+          },
+          /** Where the overlay is now: { visible, rect, placement, anchor, element }. */
+          refresh: async () => { const reply = await call('overlay', { op: 'state', id }); entry.state = reply.state; return reply.state; },
+          post: data => call('overlay', { op: 'post', id, data }),
+          close: () => call('overlay', { op: 'close', id }),
+          onMessage: listen(entry.message), onClose: listen(entry.close) });
+      },
+      list: () => call('overlay', { op: 'list' }),
+    }),
+    // ---- the app's own methods (src/app-invoke.js) ----
+    /**
+     * The methods of an object's class (and its superclasses) or of a class: methods(handle | { static: 'pacote.Classe' } | 'pacote.Classe', { match, parameters, static, inherited, limit })
+     * -> { className, methods: [{ name, signature, parameters, returns, static, visibility, declaredIn, abstract }] }. Read from the DEX; nothing runs.
+     */
+    methods: (target, options = {}) => call('methods', { ...(typeof target === 'string' && !/^h\d+\./.test(target) ? { className: target } : target && typeof target === 'object' && target.static ? { className: String(target.static) } : { handle: String(target?.handle ?? target ?? '') }),
+      match: options?.match === undefined ? undefined : String(options.match), parameters: Number.isFinite(options?.parameters) ? options.parameters : undefined, static: options?.static, inherited: options?.inherited, limit: options?.limit }),
+    /**
+     * Calls a method of the app on its main thread, as one operation of the lab (like a click): invoke(handle | { static: 'pacote.Classe' }, 'nome', [args], { signature: '(I)V' })
+     * -> { value, returns, method, ms }. What it schedules (a coroutine, a Handler message, a recomposition) runs and the device shows the result. A Java exception rejects
+     * with code 'exception' (and `exception: { type, message, stack }`).
+     */
+    invoke: (target, name, args = [], options = {}) => call('invoke', { ...(target && typeof target === 'object' && target.static ? { className: String(target.static) } : { handle: String(target?.handle ?? target ?? '') }),
+      method: String(name ?? ''), args: (Array.isArray(args) ? args : [args]).map(invokeArg), signature: options?.signature === undefined ? undefined : String(options.signature) }),
     renderVariant: (options = {}) => call('renderVariant', options ?? {}),   // a background instance of the current screen with other endpoint mocks, as images and data (docs/RENDER-VARIANT.md)
     viewModels: () => call('viewModels', {}),
     fragments: () => call('fragments', {}),

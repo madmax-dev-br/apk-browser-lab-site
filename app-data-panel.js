@@ -1,7 +1,7 @@
 // "Dados do app" in the Controles panel: the running app's SharedPreferences files and SQLite databases (read and edited in the Worker by src/app-storage.js, through the app's own
 // Editor and the framework's SQLiteDatabase). Each opens a modal (src/lab-modal.js): a SharedPreferences file as a table of typed keys to edit, remove and add; a database as its
 // tables, a page of rows whose cells are edited in place (by rowid), rows added and removed, and a SQL console. A change answers a fresh snapshot, which the page renders.
-import { formatBytes } from './shared-files-panel.js?v=5553a52fdbbb';
+import { formatBytes } from './shared-files-panel.js?v=0ed57297cd19';
 
 export const PREF_TYPES = ['string', 'int', 'long', 'float', 'boolean', 'set'];
 const PAGE = 100;

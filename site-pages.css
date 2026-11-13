@@ -261,3 +261,6 @@ figcaption strong{color:var(--ink)}
 @media(max-width:640px){.limits li,.tools li{grid-template-columns:minmax(0,1fr)}}
 
 .foot{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
+/* the picture of a plugin example (plugins.html#exemplos, scripts/capture-plugin-examples.mjs) */
+.ex-shot{margin:-8px 0 32px}.ex-shot img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}.ex-shot figcaption{margin-top:8px;font-size:13px;line-height:1.5;color:var(--soft)}
+.ex-shot.anim img{width:auto;max-width:100%;border-radius:12px}

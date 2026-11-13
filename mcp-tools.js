@@ -89,6 +89,10 @@ export function createMcpTools({ controls = null, query, plugins = () => [], cli
     async view_models() { return [text(await query('viewModels', {}))]; },
     async inspect(args) { return [text(await query('inspect', { handle: String(args.handle ?? ''), options: { depth: bounded(args.depth, 2, 0, 6) } }))]; },
     async field(args) { return [text(await query('field', { handle: String(args.handle ?? ''), path: Array.isArray(args.path) ? args.path.map(String) : String(args.path ?? ''), options: { depth: bounded(args.depth, 1, 0, 6) } }))]; },
+    async methods(args) { return [text(await query('methods', { ...(args.class_name ? { className: String(args.class_name) } : { handle: String(args.handle ?? '') }), match: args.match === undefined ? undefined : String(args.match), parameters: Number.isFinite(args.parameters) ? args.parameters : undefined, static: typeof args.static === 'boolean' ? args.static : undefined }))]; },
+    async invoke_method(args) {   // lab.invoke: a page operation like a click (src/app-invoke.js); a Java exception comes back as an error with its type and message
+      return [text(await query('invoke', { ...(args.class_name ? { className: String(args.class_name) } : { handle: String(args.handle ?? '') }), method: String(args.method ?? ''), args: Array.isArray(args.args) ? args.args : [], signature: args.signature === undefined ? undefined : String(args.signature) }))];
+    },
     async statics(args) { return [text(await query('statics', { className: String(args.class_name ?? '') }))]; },
     async static_field(args) { return [text(await query('staticField', { className: String(args.class_name ?? ''), path: Array.isArray(args.path) ? args.path.map(String) : String(args.path ?? '') }))]; },
     async classes(args) { return [text(await query('classes', { match: String(args.match ?? ''), limit: 100, initialized: !!args.initialized }))]; },

@@ -7,18 +7,21 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=5553a52fdbbb';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=5553a52fdbbb';
-import { encodeVariantImages } from './render-variant-image.js?v=5553a52fdbbb';
-import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=5553a52fdbbb';
-import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=5553a52fdbbb';
+import { pluginWorkerSource } from './plugin-runtime.js?v=0ed57297cd19';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=0ed57297cd19';
+import { encodeVariantImages } from './render-variant-image.js?v=0ed57297cd19';
+import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=0ed57297cd19';
+import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=0ed57297cd19';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
 const ACTION_METHODS = new Set(['reload', 'mock', 'unmock', 'mocks', 'modal']);
 for (const method of ['scrollTo', 'scrollInfo', 'tab']) ACTION_METHODS.add(method);   // scrolling the app to a position / percentage (src/lab-scroll.js) and the side tabs (src/lab-side-tabs.js)
+for (const method of ['frame', 'invoke']) ACTION_METHODS.add(method);   // where the device is on the page (src/lab-overlays.js) and a call of one of the app's methods (src/app-invoke.js), a page operation like a click
+/** The events a plugin can listen to ('frame': the device moved or resized; 'modal' / 'tab' / 'overlay' / 'track': the runtime's own, for the handles of lab.modal, lab.tab, lab.overlay, lab.track). */
+export const PLUGIN_EVENTS = Object.freeze(['screen', 'log', 'network', 'refresh', 'frame', 'modal', 'tab', 'overlay', 'track']);
 const UNCACHED_VM_METHODS = new Set(['scrollState']);   // read again on every call: lab.scrollTo steers by it between two scroll steps, and an animated scroll moves without a new answer of the cache's frame
-const VM_METHODS = new Set(['scrollState', 'resourceIds', 'viewModels', 'fragments', 'activity', 'inspect', 'field', 'composeTree', 'statics', 'staticField', 'classes', 'instances', 'referrers', 'compositionLocals', 'findCompositionLocal']);
+const VM_METHODS = new Set(['methods', 'scrollState', 'resourceIds', 'viewModels', 'fragments', 'activity', 'inspect', 'field', 'composeTree', 'statics', 'staticField', 'classes', 'instances', 'referrers', 'compositionLocals', 'findCompositionLocal']);
 
 /** The screen as the 'screen' event and lab.screen() give it, from the snapshot the page drew. */
 export function screenFromSnapshot(snapshot, { packageName = null, frame = 0 } = {}) {
@@ -92,7 +95,7 @@ function defaultCreateWorker(name) {
  * @param onChange       (pluginId) -> void: a plugin's status or output changed (the panel coalesces renders)
  */
 export function createPluginHost({ vm = null, createWorker = defaultCreateWorker, now = () => performance.now(), setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = id => clearTimeout(id),
-  onLogStreaming = () => {}, onChange = () => {}, getPackage = () => null, captureImage = null, actions = null } = {}) {
+  onLogStreaming = () => {}, onFrameWatch = () => {}, onChange = () => {}, getPackage = () => null, captureImage = null, actions = null } = {}) {
   const plugins = new Map();   // id -> runtime record of a plugin the panel knows
   let lastSnapshot = null, frame = 0, screen = null, screenSig = null, wantsLogs = false, lastLogSeq = -1;
   let logBuffer = [], logDropped = 0, netPending = new Map(), eventTimer = null;
@@ -103,6 +106,8 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
   const subscribed = name => running().filter(plugin => plugin.subs.has(name));
   const changed = plugin => { try { onChange(plugin.id); } catch { /* the panel's problem */ } };
   const currentScreen = () => { if (!screen || screen.frame !== frame) { screen = screenFromSnapshot(lastSnapshot, { packageName: getPackage() ?? null, frame }); } return screen; };
+  let wantsFrame = false;
+  const updateFrameWanted = () => { const wanted = subscribed('frame').length > 0; if (wanted !== wantsFrame) { wantsFrame = wanted; try { onFrameWatch(wanted); } catch { /* best effort */ } } };
   const updateLogWanted = () => { const wanted = subscribed('log').length > 0; if (wanted !== wantsLogs) { wantsLogs = wanted; if (!wanted) { logBuffer = []; logDropped = 0; } try { onLogStreaming(wanted); } catch { /* best effort */ } } };
   const send = (plugin, message) => { try { plugin.worker?.postMessage(message); } catch { /* terminated */ } };
   const record = (plugin, list, item, max) => { list.push(item); if (list.length > max) list.splice(0, list.length - max); };
@@ -184,6 +189,18 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
   async function serve(plugin, method, args) {
     if (method === 'screen') return currentScreen();
     if (method === 'button') { if (plugin === pageCaller) throw Object.assign(new Error('Botões são de um plugin.'), { code: 'unsupported' }); return buttonCall(plugin, args ?? {}); }
+    if (method === 'overlay' || method === 'track') {   // lab.overlay / lab.track (src/lab-overlays.js): HTML beside or over the device, a component followed frame by frame
+      const action = actions?.[method]; if (typeof action !== 'function') throw Object.assign(new Error(`lab.${method} não está disponível aqui.`), { code: 'unsupported' });
+      const caller = { id: plugin.id, name: plugin.name }, op = String(args?.op ?? (method === 'track' ? 'start' : 'open'));
+      const anchor = method === 'overlay' ? args?.config?.anchor : 'target', target = method === 'overlay' ? args?.target : args?.target;
+      if ((op === 'open' || op === 'update' || op === 'start') && anchor !== undefined && anchor !== 'screen' && anchor !== 'window' && target !== undefined && target !== null) {
+        const found = await targetsFor(plugin, target);   // a component by id (src/lab-target.js); a selector by composable name follows the keys it matched now
+        if (!found.matches.length && args?.required === true) throw targetNotFound(found.selector);
+        const keys = found.selector.name !== null ? found.matches.map(element => element.key) : null;
+        return action(caller, { ...args, op, selector: found.selector, keys, matches: found.matches.length });
+      }
+      return action(caller, { ...args, op });
+    }
     if (ACTION_METHODS.has(method)) {   // the lab's own controls (reload, endpoint mocks, modals): only where the page provides them (not in the embedded player or a backend)
       const action = actions?.[method]; if (typeof action !== 'function') throw Object.assign(new Error(`lab.${method} não está disponível aqui.`), { code: 'unsupported' });
       return action({ id: plugin.id, name: plugin.name }, args ?? {});
@@ -268,16 +285,17 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
         finishClicks(plugin, id, { ok: data.ok !== false, handlers: Number(data.handlers) || 0, ms: Math.round(now() - started), ...(data.ok === false ? { error: clipText(data.error, 400) } : {}) }); changed(plugin); return;
       }
       case 'sub': {
-        const name = String(data.name); if (!['screen', 'log', 'network', 'refresh', 'modal', 'tab'].includes(name)) return;
+        const name = String(data.name); if (!PLUGIN_EVENTS.includes(name)) return;
         if (data.on) plugin.subs.add(name); else plugin.subs.delete(name);
         if (name === 'log') updateLogWanted();
+        if (name === 'frame') updateFrameWanted();
         return;
       }
       case 'call': {
         const id = data.id; if (!Number.isSafeInteger(id)) return;
         if (plugin.pendingCalls >= MAX_PENDING_CALLS) { send(plugin, { t: 'reply', id, ok: false, error: { code: 'busy', message: `Mais de ${MAX_PENDING_CALLS} consultas pendentes neste plugin; aguarde as respostas.` } }); return; }
         plugin.pendingCalls++;
-        serve(plugin, String(data.method), data.args).then(value => send(plugin, { t: 'reply', id, ok: true, value }), error => send(plugin, { t: 'reply', id, ok: false, error: { code: error?.code ?? 'failed', message: clipText(error?.message ?? error, 400) } }))
+        serve(plugin, String(data.method), data.args).then(value => send(plugin, { t: 'reply', id, ok: true, value }), error => send(plugin, { t: 'reply', id, ok: false, error: { code: error?.code ?? 'failed', message: clipText(error?.message ?? error, 400), ...(error?.exception && typeof error.exception === 'object' ? { exception: { type: clipText(error.exception.type, 200), message: clipText(error.exception.message, 1000), stack: (Array.isArray(error.exception.stack) ? error.exception.stack : []).slice(0, 12).map(line => clipText(line, 200)), cause: error.exception.cause ? clipText(error.exception.cause, 400) : null } } : {}) } }))
           .finally(() => { plugin.pendingCalls--; });
         return;
       }
@@ -301,7 +319,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     if (worker) { plugin.worker = null; try { worker.terminate(); } catch { /* already gone */ } plugin.release?.(); plugin.release = null; }
     plugin.subs = new Set(); plugin.pendingCalls = 0; plugin.status = status;
     plugin.buttons = []; plugin.clickStarted = new Map(); finishClicks(plugin, null, { ok: false, reason: 'stopped' });   // a stopped plugin offers no button
-    updateLogWanted(); changed(plugin);
+    updateLogWanted(); updateFrameWanted(); changed(plugin);
   }
   const normalize = item => ({ id: String(item.id), name: String(item.name ?? 'Plugin').slice(0, 120), code: String(item.code ?? ''), enabled: !!item.enabled, packageFilter: String(item.packageFilter ?? '') });
   function blank(item) {
@@ -371,6 +389,9 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       const next = currentScreen(), sig = screenKey(next);
       if (sig !== screenSig) { screenSig = sig; for (const plugin of subscribed('screen')) send(plugin, { t: 'event', name: 'screen', data: next }); stats.events++; }
     },
+    /** The device moved or resized on the page (src/lab-overlays.js, only while some plugin listens to 'frame'): the geometry goes to those plugins. */
+    frame(geometry) { if (!plugins.size) return; const list = subscribed('frame'); if (!list.length) return; for (const plugin of list) send(plugin, { t: 'event', name: 'frame', data: geometry }); stats.events++; },
+    get wantsFrame() { return wantsFrame; },
     /** A Logcat batch from the Worker (the same message the Logcat panel gets). */
     logcat(message) {
       if (!wantsLogs || !Array.isArray(message?.rows) || message.count) return;

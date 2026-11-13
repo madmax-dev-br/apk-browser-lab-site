@@ -1,4 +1,4 @@
-import { createServiceKit, OBJECT, STRING, CONTEXT } from './service-kit.js?v=5553a52fdbbb';
+import { createServiceKit, OBJECT, STRING, CONTEXT } from './service-kit.js?v=0ed57297cd19';
 
 // The web side of the in-process system_server (docs/SERVICES.md). The services themselves are Java in framework.dex (framework-aosp/lab-java-services: the registry
 // dev.apkweb.services.LabServiceManager and one class per service over the original generated AIDL Stub); the managers apps get from Context.getSystemService are the ORIGINAL

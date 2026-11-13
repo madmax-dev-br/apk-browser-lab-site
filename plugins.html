@@ -6,8 +6,8 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=5553a52fdbbb">
-  <link rel="stylesheet" href="./lab-tokens.css?v=5553a52fdbbb">
+  <link rel="stylesheet" href="./site-pages.css?v=0ed57297cd19">
+  <link rel="stylesheet" href="./lab-tokens.css?v=0ed57297cd19">
 </head>
 <body>
   <header class="topbar">
@@ -49,6 +49,8 @@
               <li><a href="#h-aba">Aba lateral</a></li>
               <li><a href="#h-arrastar">Arrastar para o aparelho</a></li>
               <li><a href="#h-botoes">Botões do plugin</a></li>
+              <li><a href="#h-sobreposicoes">Sobreposições e posição do aparelho</a></li>
+              <li><a href="#h-metodos">Chamar um método do app</a></li>
               <li><a href="#api-saida">Saída e utilidades</a></li>
             </ol>
           </li>
@@ -119,7 +121,7 @@
         <ol>
           <li>Abra <b>Controles › Plugins</b>.</li>
           <li>Clique em <b>+ Adicionar</b>. O diálogo abre em branco, com um link para os exemplos: <b>Nome</b>, as opções de saída e <b>Código</b>. No editor, Tab insere dois espaços e Esc fecha.</li>
-          <li>Escreva o código, ou copie um dos <a href="#exemplos">exemplos</a> (Tela atual, Logs filtrados, Observar ViewModel, Componentes da tela, Árvore Compose resumida, Print na tela pronta, Botões do plugin e outros).</li>
+          <li>Escreva o código, ou copie um dos <a href="#exemplos">exemplos</a> (Tela atual, Logs filtrados, Observar ViewModel, Componentes da tela, Árvore Compose resumida, Print na tela pronta, Botões do plugin, Botão de recarregar ao lado do aparelho, Dica sobre um componente e outros).</li>
           <li>Clique em <b>Salvar</b>. O plugin novo já vem ligado, vale para qualquer app e começa a rodar quando há um APK aberto.</li>
         </ol>
         <p>O código é o corpo de uma função assíncrona: use <code>await</code> no topo à vontade. <code>import</code> estático não funciona; <code>await import(url)</code> funciona. O objeto global <code>lab</code> é a API.</p>
@@ -278,6 +280,23 @@
               <li><a href="#api-button-click"><code>aoClicar</code></a></li>
               <li><a href="#api-button-handle"><code>b.update</code>, <code>b.remove</code>…</a></li>
               <li><a href="#api-buttons"><code>buttons.list</code>, <code>buttons.clear</code></a></li>
+            </ul>
+          </div>
+          <div>
+            <a class="api-index-group" href="#h-sobreposicoes">Sobreposições</a>
+            <ul>
+              <li><a href="#api-frame"><code>frame</code>, <code>on('frame')</code></a></li>
+              <li><a href="#api-overlay-open"><code>overlay.open</code></a></li>
+              <li><a href="#api-overlay-handle"><code>o.update</code>, <code>o.post</code>…</a></li>
+              <li><a href="#api-overlay-frame">No HTML: <code>lab.onAnchor</code></a></li>
+              <li><a href="#api-track"><code>track</code></a></li>
+            </ul>
+          </div>
+          <div>
+            <a class="api-index-group" href="#h-metodos">Métodos do app</a>
+            <ul>
+              <li><a href="#api-methods"><code>methods</code></a></li>
+              <li><a href="#api-invoke"><code>invoke</code></a></li>
             </ul>
           </div>
           <div>
@@ -754,6 +773,84 @@
           </dl>
         </div>
 
+        <h3 id="h-sobreposicoes">Sobreposições e posição do aparelho</h3>
+        <p>Um plugin pode desenhar HTML próprio ao lado do aparelho ou por cima dele, e saber onde o aparelho e cada componente estão na página. O HTML roda num iframe isolado (como o da <a href="#h-aba">aba lateral</a>) que o laboratório mantém no lugar: quando o aparelho muda de escala, entra em tela cheia ou o componente rola, a sobreposição vai junto, no mesmo quadro. Um componente desenhado pelo Skia (Compose, uma View com raster) é acompanhado pelos limites do quadro que a página desenhou, sem consulta à VM.</p>
+        <p>Sem sobreposição, acompanhamento ou ouvinte de <code>'frame'</code>, nada disso roda. Com eles, a página lê o retângulo da tela do aparelho uma vez por quadro de animação e só faz o resto quando ele mudou ou um quadro novo foi desenhado.</p>
+
+        <div class="api" id="api-frame">
+          <h4 class="api-sig"><code>await lab.frame()</code><code>lab.on('frame', fn)</code></h4>
+          <p>Onde a tela do aparelho está na página e o tamanho dela. <code>'frame'</code> chama <code>fn(frame)</code> cada vez que isso muda (o aparelho mudou de lugar, de escala, entrou ou saiu da tela cheia, a janela do navegador mudou de tamanho).</p>
+          <dl class="facts">
+            <div><dt>Devolve</dt><dd><code class="shape">{ visible, screen: { x, y, width, height }, window: { x, y, width, height }, scale, device: { width, height }, windowDp: { left, top, right, bottom }, viewport: { width, height }, orientation }</code></dd></div>
+            <div><dt>Unidades</dt><dd><code>screen</code> e <code>window</code> (a janela do app, sem as barras do sistema) em px da página, contados do canto da área visível; <code>device</code> e <code>windowDp</code> em dp do aparelho; <code>scale</code> = px da página por dp.</dd></div>
+            <div><dt>Componente</dt><dd>Um retângulo de <code>layoutBounds</code> (dp da janela) fica na página em <code>x = screen.x + (windowDp.left + bounds.left) × scale</code>, <code>y = screen.y + (windowDp.top + bounds.top) × scale</code>. <code>lab.track</code> já entrega essa conta pronta.</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-overlay-open">
+          <h4 class="api-sig"><code>const o = await lab.overlay.open({ html, anchor, placement, align, offset, width, height, maxWidth, interactive, flip, title, id })</code></h4>
+          <p>Abre uma sobreposição com o HTML do plugin.</p>
+          <dl class="facts">
+            <div><dt>Opções</dt><dd>
+              <ul class="params">
+                <li><code>anchor</code>: <code>'screen'</code> (a tela do aparelho, o padrão), <code>'window'</code> (a janela do app) ou um <a href="#api-find">alvo</a> (<code>'salvar'</code>, <code>{ testTag }</code>, <code>{ viewId }</code>, <code>{ text }</code>…). Ancorada num componente, a sobreposição o segue e some enquanto ele não está na tela.</li>
+                <li><code>placement</code>: <code>'right'</code> (padrão com a tela), <code>'top'</code> (padrão com um componente), <code>'bottom'</code>, <code>'left'</code>, <code>'over'</code> (por cima, do tamanho da âncora) ou <code>'center'</code>.</li>
+                <li><code>align</code>: <code>'start'</code>, <code>'center'</code> ou <code>'end'</code> ao longo do lado.</li>
+                <li><code>offset</code>: a distância da âncora em px (padrão 12 com a tela, 6 com um componente, 0 por cima).</li>
+                <li><code>width</code>, <code>height</code>: px, <code>'auto'</code> (o tamanho do conteúdo, o padrão) ou <code>'anchor'</code> (o da âncora). <code>maxWidth</code>: a largura máxima do conteúdo em <code>'auto'</code> (padrão 320).</li>
+                <li><code>interactive: false</code>: o ponteiro atravessa a sobreposição e chega ao app (uma dica que não atrapalha o toque).</li>
+                <li><code>flip</code> (padrão <code>true</code>): sem espaço do lado pedido, usa o lado oposto, e a caixa fica dentro da área visível.</li>
+                <li><code>id</code>: o mesmo <code>id</code> de novo atualiza aquela sobreposição.</li>
+              </ul>
+            </dd></div>
+            <div><dt>Isolamento</dt><dd>O HTML roda num iframe <code>sandbox="allow-scripts allow-forms"</code>, com origem opaca e fundo transparente.</dd></div>
+            <div><dt>Limite</dt><dd>Até 8 sobreposições por plugin e 32 na página; todas fecham quando o plugin para.</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-overlay-handle">
+          <h4 class="api-sig"><code>o.update({ html, anchor, placement, … })</code><code>o.post(dados)</code><code>o.onMessage(fn)</code><code>o.onClose(fn)</code><code>await o.refresh()</code><code>o.close()</code></h4>
+          <p>Muda a âncora, o lugar, o tamanho ou o HTML; manda dados JSON ao HTML; recebe o que o HTML manda com <code>lab.post</code>; avisa quando fecha. <code>o.state</code> (e <code>o.refresh()</code>, que lê de novo) é <code class="shape">{ visible, rect, placement, anchor, element }</code>: onde a sobreposição está, o lado usado e a âncora, em px da página. <code>lab.overlay.list()</code> lista as do plugin.</p>
+        </div>
+
+        <div class="api" id="api-overlay-frame">
+          <h4 class="api-sig"><code>lab.post(dados)</code><code>lab.on(fn)</code><code>lab.onAnchor(fn)</code><code>lab.anchor</code></h4>
+          <p>Dentro do HTML da sobreposição: manda e recebe mensagens do plugin; <code>onAnchor(fn)</code> recebe <code class="shape">{ visible, rect, anchor, placement, element }</code> a cada vez que a sobreposição muda de lugar (por exemplo para virar a seta de uma dica quando ela passa para baixo do componente).</p>
+        </div>
+
+        <div class="api" id="api-track">
+          <h4 class="api-sig"><code>const parar = await lab.track(alvo, fn, { all, id })</code></h4>
+          <p>Acompanha os componentes que um <a href="#api-find">alvo</a> nomeia, quadro a quadro. <code>fn</code> roda quando algum se moveu, mudou de tamanho, apareceu ou saiu da tela, e quando o aparelho mudou de lugar na página.</p>
+          <dl class="facts">
+            <div><dt>Recebe</dt><dd><code class="shape">{ id, visible, matches, elements: [{ key, kind, name, testTag, viewId, texts, bounds, rect }] }</code>: <code>bounds</code> em dp da janela, <code>rect</code> em px da página. Só o primeiro que casa, ou todos com <code>all: true</code>.</dd></div>
+            <div><dt>Devolve</dt><dd>A função que para (com <code>parar.id</code>). Até 16 acompanhamentos por plugin.</dd></div>
+          </dl>
+        </div>
+
+        <h3 id="h-metodos">Chamar um método do app</h3>
+        <p>As consultas só leem. Para agir pelo código do próprio app (um botão que chama o <code>recarregar()</code> do ViewModel, um atalho que aprova um pedido) existe <code>lab.invoke</code>: ele chama um método do app na thread principal da VM, como uma operação do laboratório, igual a um clique. O método é o bytecode do app, executado como está; o que ele agenda (uma mensagem de Handler, uma corrotina na thread principal, uma recomposição) roda antes da resposta, e o aparelho mostra o resultado. A chamada aparece no log de execução.</p>
+
+        <div class="api" id="api-methods">
+          <h4 class="api-sig"><code>await lab.methods(handle | 'pacote.Classe' | { static: 'pacote.Classe' }, { match, parameters, static, inherited, limit })</code></h4>
+          <p>Os métodos da classe de um objeto (e das superclasses do app), lidos do DEX: nada roda.</p>
+          <dl class="facts">
+            <div><dt>Devolve</dt><dd><code class="shape">{ className, methods: [{ name, signature, parameters, returns, static, visibility, declaredIn, abstract, suspend }], more, labImplemented }</code></dd></div>
+            <div><dt>Filtros</dt><dd><code>match</code>: parte do nome ou <code>/regex/</code>; <code>parameters</code>: quantos parâmetros; <code>static</code>: <code>true</code> ou <code>false</code>; <code>inherited</code>: <code>true</code> (as classes do app acima dela, o padrão), <code>'all'</code> (também as do framework que têm DEX) ou <code>false</code>.</dd></div>
+            <div><dt>Framework</dt><dd><code>labImplemented</code> nomeia a primeira superclasse que o laboratório implementa por conta própria (<code>android.app.Activity</code>, por exemplo): os métodos dela existem, mas não há DEX para listar, então são chamados com <code>{ signature }</code>.</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-invoke">
+          <h4 class="api-sig"><code>await lab.invoke(handle | { static: 'pacote.Classe' }, 'nome', [args], { signature })</code></h4>
+          <p>Chama o método e devolve o retorno.</p>
+          <dl class="facts">
+            <div><dt>Devolve</dt><dd><code class="shape">{ value, returns, method, static, ms, handle }</code>: <code>value</code> no formato de <a href="#valores">Valores</a> (um objeto também traz o <code>handle</code>).</dd></div>
+            <div><dt>Argumentos</dt><dd>Em JSON, convertidos pelos tipos dos parâmetros: números para <code>int</code>, <code>double</code> e os outros primitivos (inteiros conferidos), <code>true</code>/<code>false</code>, texto para <code>String</code> e <code>char</code>, um <code>long</code> além de 2<sup>53</sup> como <code>BigInt</code> ou <code>{ long: '…' }</code>, e um objeto pelo handle (de <code>viewModels</code>, <code>instances</code>, <code>field(…).$handle</code>), conferido contra o tipo do parâmetro.</dd></div>
+            <div><dt>Escolha</dt><dd>Pelo nome e pela quantidade de argumentos; com sobrecarga, passe <code>signature</code> (<code>'(ILjava/lang/String;)V'</code>). Uma sobrescrita da subclasse vale, como numa chamada do próprio app.</dd></div>
+            <div><dt>Erros</dt><dd><code>no-method</code> (com os que existem), <code>bad-args</code>, <code>ambiguous</code>, <code>busy</code>, <code>unsupported</code> (uma função <code>suspend</code> do Kotlin: chame a que faz o <code>launch</code>); uma exceção Java do método rejeita com <code>code: 'exception'</code> e <code>error.exception = { type, message, stack, cause }</code>.</dd></div>
+          </dl>
+        </div>
+
         <h3 id="api-saida">Saída e utilidades</h3>
         <p>Cada chamada de <code>lab.ui</code> acrescenta um bloco. Um bloco com o mesmo <code>id</code> é substituído no lugar, o que permite atualizar um valor sem empilhar saída. Texto é sempre mostrado como texto, nunca como HTML.</p>
         <div class="table-scroll"><table class="ref">
@@ -800,8 +897,8 @@
       <section id="nao-permitido" aria-labelledby="h-nao">
         <h2 id="h-nao">O que não é permitido</h2>
         <ul>
-          <li><b>Escrever no app.</b> Não há API para mudar campos, estado ou arquivos do app. As ações de <a href="#api">Agir no lab</a> usam os controles do laboratório (recarregar a tela, mocks, janelas), que você vê em Controles.</li>
-          <li><b>Chamar métodos.</b> Nenhuma consulta executa código do app ou de bibliotecas. Os valores são lidos dos campos que os objetos já têm, como num heap dump: uma consulta não cria estado (um getter que criaria um objeto não é chamado; o campo é lido).</li>
+          <li><b>Escrever no app por fora.</b> Não há API para mudar campos, estado ou arquivos do app diretamente. As ações de <a href="#api">Agir no lab</a> usam os controles do laboratório (recarregar a tela, mocks, janelas), que você vê em Controles.</li>
+          <li><b>Consultas que executam código.</b> Nenhuma consulta executa código do app ou de bibliotecas. Os valores são lidos dos campos que os objetos já têm, como num heap dump: uma consulta não cria estado (um getter que criaria um objeto não é chamado; o campo é lido). A única forma de rodar código do app é pedir explicitamente, com <a href="#h-metodos"><code>lab.invoke</code></a>: uma operação do laboratório, como um clique, que roda o método do próprio app e aparece no log de execução.</li>
           <li><b>Mexer em nativos protegidos.</b> Plugins não têm acesso a código nativo.</li>
         </ul>
         <p>Para mudar o comportamento do app há ferramentas próprias, que deixam rastro no Logcat e no Resumo: Retornos de métodos, Activities ignoradas, Redirecionar hosts e Mock de endpoints, em Controles.</p>
@@ -917,6 +1014,11 @@ url = "http://127.0.0.1:8790/mcp/&lt;o token da página&gt;"</code></pre></div>
           <p>As mesmas leituras somente leitura dos plugins.</p>
         </div>
 
+        <div class="api" id="mcp-metodos">
+          <h4 class="api-sig names"><code>methods</code><code>invoke_method</code></h4>
+          <p>Os métodos de um objeto ou classe, lidos do DEX; e a chamada de um deles na thread principal da VM, como <a href="#h-metodos"><code>lab.invoke</code></a>: o que o método agenda roda e a tela atualiza; uma exceção Java volta como erro com o tipo e a mensagem.</p>
+        </div>
+
         <div class="api" id="mcp-plugins">
           <h4 class="api-sig names"><code>plugins</code></h4>
           <p>A saída de cada plugin (texto, tabelas, JSON, imagens), estado, erros e os botões dele.</p>
@@ -992,6 +1094,10 @@ url = "http://127.0.0.1:8790/mcp/&lt;o token da página&gt;"</code></pre></div>
           <li><a href="#ex-botoes">Botões do plugin</a></li>
           <li><a href="#ex-arrastar">Paleta de arrastar</a></li>
           <li><a href="#ex-paleta">Paleta de componentes da tela</a></li>
+          <li><a href="#ex-moldura">Moldura do aparelho</a></li>
+          <li><a href="#ex-recarregar">Botão de recarregar ao lado do aparelho</a></li>
+          <li><a href="#ex-dica">Dica sobre um componente</a></li>
+          <li><a href="#ex-nota">Nota que rola junto com um item</a></li>
         </ul>
 
         <h3 id="ex-tela-atual">Tela atual</h3>
@@ -1007,6 +1113,7 @@ url = "http://127.0.0.1:8790/mcp/&lt;o token da página&gt;"</code></pre></div>
 }
 lab.on('screen', mostrar);
 mostrar(await lab.screen());</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-tela-atual.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Tela atual rodando no laboratório, no app de exemplo de aprovações"><figcaption>A Activity, a pilha e as janelas da tela atual no cartão do plugin.</figcaption></figure>
 
         <h3 id="ex-print">Print quando a tela fica pronta</h3>
         <p>Espera a Activity e os fragments terminarem de carregar e tira o print da tela inteira a cada tela nova.</p>
@@ -1017,6 +1124,7 @@ mostrar(await lab.screen());</code></pre></div>
 });
 const tela = await lab.waitReady({ timeoutMs: 20000 }).catch(erro =&gt; { lab.ui.text(erro.message, { id: 'espera' }); return null; });
 if (tela) lab.ui.image(await lab.screenshot({ maxWidth: 360 }), { id: 'tela', caption: tela.activity + ' · pronta' });</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-print.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Print quando a tela fica pronta rodando no laboratório, no app de exemplo de aprovações"><figcaption>O print tirado quando a tela ficou pronta.</figcaption></figure>
 
         <h3 id="ex-logs">Logs filtrados</h3>
         <p>Guarda as últimas 100 linhas do Logcat cuja tag ou mensagem casa com uma expressão regular.</p>
@@ -1035,6 +1143,7 @@ lab.on('log', lote => {
   lab.ui.table(linhas.slice().reverse(), ['hora', 'nível', 'tag', 'mensagem'], { id: 'linhas' });
 });
 lab.ui.text('Esperando linhas que casem com ' + FILTRO + '…', { id: 'linhas' });</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-logs.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Logs filtrados rodando no laboratório, no app de exemplo de aprovações"><figcaption>As linhas do Logcat que casam com o filtro.</figcaption></figure>
 
         <h3 id="ex-viewmodel">Observar um campo de ViewModel</h3>
         <p>Pega o primeiro ViewModel do app na tela e mostra um campo ao vivo. Quando o objeto é coletado ou a tela muda, procura de novo.</p>
@@ -1054,6 +1163,7 @@ async function conectar() {
 }
 lab.on('screen', () => conectar().catch(erro => lab.ui.text(erro.message, { id: 'erro' })));
 await conectar();</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-viewmodel.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Observar um campo de ViewModel rodando no laboratório, no app de exemplo de aprovações"><figcaption>O primeiro pedido do ViewModel do app de exemplo, ao vivo (aqui <code>CAMPO = 'orders.0'</code>).</figcaption></figure>
 
         <h3 id="ex-arvore-compose">Árvore Compose resumida</h3>
         <p>Lista só os nós do Compose com texto, papel ou testTag. A árvore custa dezenas de milissegundos na VM, por isso é lida a cada mudança de tela e no máximo a cada 2 s.</p>
@@ -1072,6 +1182,7 @@ await conectar();</code></pre></div>
 lab.on('screen', () => mostrar().catch(() => {}));
 setInterval(() => mostrar().catch(() => {}), 2000);
 await mostrar();</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-arvore-compose.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Árvore Compose resumida rodando no laboratório, no app de exemplo de aprovações"><figcaption>Os nós do Compose com texto, papel ou testTag.</figcaption></figure>
 
         <h3 id="ex-recortes">Recortes dos componentes</h3>
         <p>Lista as caixas do Compose com nome e posição e mostra o recorte das primeiras. Como cada recorte espera 500 ms pela vez, só as primeiras ganham imagem.</p>
@@ -1092,6 +1203,7 @@ async function mostrar() {
 }
 lab.on('screen', () => mostrar().catch(erro => lab.ui.text(erro.message, { id: 'erro' })));
 await mostrar();</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-recortes.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Recortes dos componentes rodando no laboratório, no app de exemplo de aprovações"><figcaption>As caixas do Compose com posição e os recortes das primeiras.</figcaption></figure>
       
         <h3 id="ex-por-id">Destacar e capturar por id</h3>
         <p>Troque os ids pelos do seu app: um <code>testTag</code> do Compose ou o <code>android:id</code> de uma View. O limite fica desenhado no aparelho e acompanha o componente; o print aparece no cartão.</p>
@@ -1112,6 +1224,7 @@ async function mostrar() {
 }
 lab.on('ready', () => mostrar().catch(erro => lab.ui.text(erro.message, { id: 'erro' })));
 await lab.button({ label: 'Limpar destaques', icon: '✕' }, () => lab.highlights.clear());</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-por-id.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Destacar e capturar por id rodando no laboratório, no app de exemplo de aprovações"><figcaption>Dois componentes destacados no aparelho e capturados (aqui <code>IDS = ['search', 'tab-orders']</code>).</figcaption></figure>
 
         <h3 id="ex-componentes">Componentes da tela</h3>
         <p>As caixas de &quot;Mostrar limites de layout&quot; com nome, posição e o recorte de cada uma.</p>
@@ -1133,6 +1246,7 @@ async function mostrar() {
 lab.on('screen', () =&gt; mostrar().catch(erro =&gt; lab.ui.text(erro.message, { id: 'erro' })));
 await mostrar();
 </code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-componentes.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Componentes da tela rodando no laboratório, no app de exemplo de aprovações"><figcaption>As caixas de “Mostrar limites de layout” com o recorte de cada uma.</figcaption></figure>
       
         <h3 id="ex-janela">Painel em janela</h3>
         <p>Abre uma janela pequena com um layout próprio: o print da tela, os ViewModels e um botão que recarrega a tela. O HTML conversa com o plugin por mensagens.</p>
@@ -1149,6 +1263,7 @@ async function desenhar() {
 }
 janela.onMessage(async pedido =&gt; { if (pedido === 'recarregar') { await lab.reload('recreate'); await desenhar(); } });
 await desenhar();</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-janela.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Painel em janela rodando no laboratório, no app de exemplo de aprovações"><figcaption>A janela do plugin com o print da tela, os ViewModels e o botão de recarregar.</figcaption></figure>
 
         <h3 id="ex-mock">Mock pelo plugin</h3>
         <p>Responde um endpoint sem ir à rede e recarrega a tela para o app buscar de novo.</p>
@@ -1156,6 +1271,7 @@ await desenhar();</code></pre></div>
   headers: { 'Content-Type': 'application/json' }, body: { nome: 'Ana', plano: 'premium' } });
 await lab.reload('reopen');
 lab.ui.kv({ mock: id, ativos: (await lab.mocks()).length });</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-mock.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Mock pelo plugin rodando no laboratório, no app de exemplo de aprovações"><figcaption>O mock criado e a tela reaberta.</figcaption></figure>
 
         <h3 id="ex-rolar">Rolar até a metade ou até uma posição</h3>
         <p>Rola a lista principal até 50 % e depois até 300 px do início, pela rolagem do próprio app, e mostra onde parou. No lab, 1 px = 1 dp.</p>
@@ -1167,6 +1283,7 @@ const ponto = await lab.scrollTo({ y: 300 });
 lab.ui.kv({ posição: `${ponto.y} px`, chegou: ponto.reached, via: ponto.via }, { id: 'ponto' });
 // Atualizar no cartão mostra onde a rolagem está agora
 lab.on('refresh', async () =&gt; lab.ui.json(await lab.scrollInfo(), { id: 'agora' }));</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-rolar.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Rolar até a metade ou até uma posição rodando no laboratório, no app de exemplo de aprovações"><figcaption>A lista rolada até a metade e depois até 300 px.</figcaption></figure>
 
         <h3 id="ex-aba">Aba lateral</h3>
         <p>Uma lingueta à direita com botões que rolam o app. O painel é HTML seu e conversa com o plugin por mensagens; a aba lembra se ficou aberta.</p>
@@ -1181,6 +1298,7 @@ aba.onMessage(async porcentagem =&gt; {
   await aba.post(onde.erro ?? `${onde.element}: ${onde.percentY} %`);
 });
 aba.onToggle((aberta, por) =&gt; lab.ui.text(`aba ${aberta ? 'aberta' : 'recolhida'} (${por})`, { id: 'aba' }));</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-aba.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Aba lateral rodando no laboratório, no app de exemplo de aprovações"><figcaption>A aba lateral aberta à direita, com os botões de rolagem.</figcaption></figure>
 
         <h3 id="ex-botoes">Botões do plugin</h3>
         <p>Três botões sem nenhum HTML: dois no cartão do plugin (e na linha dele em Controles › Plugins), um que rola a lista até o fim e outro que tira um print e diz o tamanho, e um na barra do aparelho que troca o próprio texto a cada clique.</p>
@@ -1198,6 +1316,7 @@ await lab.button({ id: 'alternar', label: 'Modo: desligado', icon: '○', placem
   ligado = !ligado;
   await button.update({ label: `Modo: ${ligado ? 'ligado' : 'desligado'}`, icon: ligado ? '●' : '○' });
 });</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-botoes.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Botões do plugin rodando no laboratório, no app de exemplo de aprovações"><figcaption>Os botões do plugin no cartão e na barra do aparelho, depois de um clique em Print.</figcaption></figure>
 
         <h3 id="ex-arrastar">Paleta de arrastar</h3>
         <p>Uma aba com itens que você arrasta até o aparelho; o plugin recebe onde cada um caiu, em px, dp e porcentagem da tela, e o componente que estava embaixo. Cada item tem um campo <code>thumb</code> para uma miniatura (uma <code>data:</code> URL): aqui a do primeiro item vem de um recorte da tela, e qualquer outra imagem do componente entra no mesmo campo.</p>
@@ -1226,6 +1345,7 @@ aba.onDrop(solto =&gt; lab.ui.kv({ item: solto.payload.id, 'na tela': solto.insi
 // Miniatura do primeiro item: um recorte do primeiro componente clicável da tela
 const clicavel = (await lab.layoutBounds({ names: false })).find(e =&gt; e.actions.includes('OnClick'));
 if (clicavel) { itens[0].thumb = await lab.dataUrl(await lab.screenshot({ key: clicavel.key, maxWidth: 64 })); await aba.post(itens); }</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-arrastar.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Paleta de arrastar rodando no laboratório, no app de exemplo de aprovações"><figcaption>A paleta aberta à esquerda, com a miniatura recortada da tela.</figcaption></figure>
 
         <h3 id="ex-paleta">Paleta de componentes da tela</h3>
         <p>Uma aba cujos itens são componentes reais da tela: <code>lab.renderVariant</code> renderiza a tela atual numa segunda instância em segundo plano (com outros mocks de endpoint, se você quiser outro estado) e devolve um recorte por componente. Cada recorte vira um item que você arrasta até o aparelho, com a própria imagem seguindo o ponteiro; a aba mostra onde ele caiu. Um recorte sem imagem aparece com o motivo.</p>
@@ -1264,6 +1384,91 @@ for (const recorte of variante.images.slice(0, LIMITE)) itens.push({
 });
 await aba.post(itens);
 lab.ui.kv({ recortes: variante.images.length, 'tela parada': variante.settled, 'tempo (ms)': variante.ms.total }, { id: 'paleta' });</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-paleta.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Paleta de componentes da tela rodando no laboratório, no app de exemplo de aprovações"><figcaption>Os componentes recortados de uma segunda renderização da tela, prontos para arrastar.</figcaption></figure>
+
+        <h3 id="ex-moldura">Moldura do aparelho</h3>
+        <p>Uma etiqueta sob o aparelho com o tamanho e a escala, posta na página pelo laboratório. Ela acompanha o aparelho quando ele muda de escala ou entra em tela cheia; o cartão mostra onde a tela está na página, a cada mudança (<code>lab.on('frame')</code>).</p>
+        <div class="code" data-name="Moldura do aparelho"><pre><code>// Uma etiqueta sob o aparelho com o tamanho e a escala; ela acompanha o aparelho, e o cartão mostra a posição na página
+const etiqueta = await lab.overlay.open({ id: 'moldura', anchor: 'screen', placement: 'bottom', align: 'center', offset: 10, interactive: false, html: `
+  &lt;style&gt;body{font:600 12px system-ui;color:#fff;background:#3b5bdb;padding:5px 12px;border-radius:999px;white-space:nowrap}&lt;/style&gt;
+  &lt;span id="texto"&gt;…&lt;/span&gt;
+  &lt;script&gt;lab.on(f =&gt; { document.getElementById('texto').textContent = f.device.width + ' × ' + f.device.height + ' dp · escala ' + Math.round(f.scale * 100) + ' %'; });&lt;/script&gt;` });
+function mostrar(f) {
+  if (!f.visible) return lab.ui.text('O aparelho não está na página.', { id: 'moldura' });
+  etiqueta.post(f);
+  lab.ui.kv({ aparelho: `${f.device.width} × ${f.device.height} dp`, 'na página': `${Math.round(f.screen.width)} × ${Math.round(f.screen.height)} px em ${Math.round(f.screen.x)}, ${Math.round(f.screen.y)}`,
+    'janela do app': `${Math.round(f.window.width)} × ${Math.round(f.window.height)} px`, escala: f.scale, orientação: f.orientation }, { id: 'moldura' });
+}
+lab.on('frame', mostrar);   // o aparelho mudou de lugar ou de tamanho (zoom, tela cheia, a janela do navegador)
+mostrar(await lab.frame());</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-moldura.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Moldura do aparelho rodando no laboratório, no app de exemplo de aprovações"><figcaption>A etiqueta sob o aparelho e, no cartão, onde a tela está na página.</figcaption></figure>
+
+        <h3 id="ex-recarregar">Botão de recarregar ao lado do aparelho</h3>
+        <p>Um botão de HTML seu, ao lado do aparelho, que chama um método do ViewModel da tela pelo próprio código do app (<code>lab.invoke</code>). Troque <code>METODO</code> e <code>ARGS</code> pelos do seu app; se o método não existir, o painel lista os que dá para chamar.</p>
+        <div class="code" data-name="Botão de recarregar ao lado do aparelho"><pre><code>// O método do ViewModel da tela que recarrega os dados no seu app, e os argumentos dele
+const METODO = 'recarregar', ARGS = [];
+const painel = await lab.overlay.open({ id: 'recarregar', anchor: 'screen', placement: 'right', align: 'start', offset: 14, html: `
+  &lt;style&gt;body{font:13px system-ui} button{font:600 13px system-ui;padding:9px 14px;border:0;border-radius:10px;background:#2f9e44;color:#fff;cursor:pointer}
+    button:disabled{opacity:.6} p{margin:6px 2px 0;max-width:230px;padding:6px 8px;border-radius:8px;background:#fff;color:#333;font-size:11px;box-shadow:0 1px 4px #0002}
+    p:empty{display:none}&lt;/style&gt;
+  &lt;button id="botao"&gt;↻ Recarregar&lt;/button&gt;&lt;p id="estado"&gt;&lt;/p&gt;
+  &lt;script&gt;
+    const botao = document.getElementById('botao'), estado = document.getElementById('estado');
+    botao.onclick = () =&gt; { botao.disabled = true; estado.textContent = 'Chamando…'; lab.post('recarregar'); };
+    lab.on(texto =&gt; { botao.disabled = false; estado.textContent = texto; });
+  &lt;/script&gt;` });
+painel.onMessage(async () =&gt; {
+  const [vm] = (await lab.viewModels()).filter(item =&gt; !item.library);
+  if (!vm) return painel.post('Nenhum ViewModel do app nesta tela.');
+  const classe = vm.className.split('.').pop();
+  try {
+    const feito = await lab.invoke(vm.handle, METODO, ARGS);   // o bytecode do app, na thread principal, como um clique
+    painel.post(`${classe}.${METODO}() em ${feito.ms} ms`);
+    lab.ui.kv({ chamado: feito.method, retorno: JSON.stringify(feito.value), ms: feito.ms }, { id: 'ultimo' });
+  } catch (erro) {
+    if (erro.code !== 'no-method' &amp;&amp; erro.code !== 'bad-args') return painel.post(erro.message);
+    const { methods } = await lab.methods(vm.handle);   // o que dá para chamar nesse ViewModel
+    painel.post(`${classe} não tem ${METODO}(${ARGS.length ? '…' : ''}). Há: ${methods.map(m =&gt; `${m.name}(${m.parameters.map(t =&gt; t.split('.').pop()).join(', ')})`).join(', ')}`);
+  }
+});</code></pre></div>
+        <figure class="ex-shot"><img src="./plugin-examples/ex-recarregar.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="O exemplo Botão de recarregar ao lado do aparelho rodando no laboratório, no app de exemplo de aprovações"><figcaption>O botão ao lado do aparelho depois de um clique: no app de exemplo, <code>METODO = 'approve'</code> e <code>ARGS = [1, 'Aprovado pelo plugin']</code>, e o primeiro pedido passou a Aprovado.</figcaption></figure>
+
+        <h3 id="ex-dica">Dica sobre um componente</h3>
+        <p>Uma dica acima de um componente desenhado pelo Skia (Compose), que o acompanha quando a lista rola e some quando ele sai da tela. O texto da dica vem de <code>lab.track</code>: o tamanho e a posição do componente a cada quadro. Com <code>interactive: false</code> o toque atravessa a dica e chega ao app.</p>
+        <div class="code" data-name="Dica sobre um componente"><pre><code>const ALVO = 'search';   // o componente: um testTag, um android:id, { text: '…' }, { role: 'Button' }…
+const dica = await lab.overlay.open({ id: 'dica', anchor: ALVO, placement: 'top', interactive: false, html: `
+  &lt;style&gt;body{font:12px system-ui;color:#fff;background:#202124;padding:6px 10px;border-radius:7px;white-space:nowrap} b{color:#8ab4f8}&lt;/style&gt;
+  &lt;b id="nome"&gt;&lt;/b&gt; &lt;span id="medidas"&gt;&lt;/span&gt;
+  &lt;script&gt;lab.on(e =&gt; { document.getElementById('nome').textContent = e.nome; document.getElementById('medidas').textContent = e.medidas; });&lt;/script&gt;` });
+// A dica segue o componente sozinha; o acompanhamento traz as medidas para o texto dela e para o cartão
+await lab.track(ALVO, ({ visible, elements: [e] }) =&gt; {
+  if (!visible) return lab.ui.text(`${ALVO}: fora da tela`, { id: 'onde' });
+  const b = e.bounds;
+  dica.post({ nome: e.testTag ?? e.name ?? e.key, medidas: `${b.right - b.left} × ${b.bottom - b.top} dp · y ${b.top}` });
+  lab.ui.kv({ componente: e.key, janela: `${b.left}, ${b.top} → ${b.right}, ${b.bottom} dp`, página: `${Math.round(e.rect.x)}, ${Math.round(e.rect.y)} px` }, { id: 'onde' });
+});</code></pre></div>
+        <figure class="ex-shot anim"><img src="./plugin-examples/ex-dica.gif" width="320" height="672" loading="lazy" decoding="async" alt="O exemplo Dica sobre um componente rodando no laboratório, no app de exemplo de aprovações"><figcaption>A dica sobre o campo de busca, com o tamanho e a posição dele, depois de rolar a lista.</figcaption></figure>
+
+        <h3 id="ex-nota">Nota que rola junto com um item</h3>
+        <p>Uma nota de HTML seu presa a um item da lista do app, na margem ao lado dele. Ela rola junto com o item, no mesmo quadro, some quando ele sai da tela e volta com ele; o que você digita na nota chega ao plugin. O item é qualquer <a href="#api-find">alvo</a>: o texto dele, um <code>testTag</code>, um <code>android:id</code>.</p>
+        <div class="code" data-name="Nota que rola junto com um item"><pre><code>// Uma nota presa a um item da lista: ela rola junto com o item, some quando ele sai da tela e volta com ele
+const ITEM = { text: 'Pedido 42' };   // o item: o texto dele, um testTag, { viewId: '…' }, { role: 'Button', index: 2 }
+const nota = await lab.overlay.open({ id: 'nota', anchor: ITEM, placement: 'right', align: 'center', offset: 20, html: `
+  &lt;style&gt;body{font:12px system-ui} .nota{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:4px 10px 10px 4px;background:#ffd43b;color:#3d2c00;box-shadow:0 2px 6px #0003}
+    input{font:inherit;width:120px;border:0;background:transparent;color:inherit;outline:none}&lt;/style&gt;
+  &lt;div class="nota"&gt;📌 &lt;input id="texto" placeholder="Anote aqui…"&gt;&lt;/div&gt;
+  &lt;script&gt;
+    const texto = document.getElementById('texto');
+    texto.oninput = () =&gt; lab.post(texto.value);    // o que você digita vai para o plugin
+    lab.on(valor =&gt; { texto.value = valor; });      // e o plugin pode preencher a nota
+  &lt;/script&gt;` });
+nota.onMessage(valor =&gt; lab.ui.kv({ nota: valor }, { id: 'nota' }));
+await nota.post('revisar o valor');
+// A nota segue o item sozinha, quadro a quadro; o acompanhamento só mostra no cartão onde ele está
+await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
+  item: visible ? `y ${e.bounds.top} dp na janela · ${Math.round(e.rect.y)} px na página` : 'fora da tela',
+}, { id: 'onde' }));</code></pre></div>
+        <figure class="ex-shot anim"><img src="./plugin-examples/ex-nota.gif" width="520" height="672" loading="lazy" decoding="async" alt="O exemplo Nota que rola junto com um item rodando no laboratório, no app de exemplo de aprovações"><figcaption>A nota presa ao pedido “Monitor para QA” depois de rolar a lista (aqui <code>ITEM = { text: 'Monitor para QA' }</code>): a lista rola para baixo e volta, e a nota acompanha o item.</figcaption></figure>
       </section>
 
       <nav class="see-also" aria-label="Continue lendo">
@@ -1273,6 +1478,6 @@ lab.ui.kv({ recortes: variante.images.length, 'tela parada': variante.settled, '
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=5553a52fdbbb"></script>
+  <script type="module" src="./site-pages.js?v=0ed57297cd19"></script>
 </body>
 </html>
