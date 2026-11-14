@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=d8fff06341bc';
-import { getVectorGraphics } from './vector-native.js?v=d8fff06341bc';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=d8fff06341bc';
+import { APKError } from './apk-error.js?v=1727a869a704';
+import { getVectorGraphics } from './vector-native.js?v=1727a869a704';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=1727a869a704';
 
 // The RenderThread animation system behind android.graphics.animation.RenderNodeAnimator (hwui BaseRenderNodeAnimator / CanvasPropertyPrimitiveAnimator /
 // CanvasPropertyPaintAnimator / RenderPropertyAnimator and the NativeInterpolatorFactory interpolators). The original Java (RenderNodeAnimator, FallbackLUTInterpolator,
@@ -71,8 +71,11 @@ export function createRenderThreadAnimators(platform) {
     const done = [];
     for (const id of [...animators.keys()]) {
       const a = live(id); if (!a || a.state !== 'running') continue;
-      if (a.startTime === null) { a.startTime = frameTimeMs; a.from = a.startValue ?? read(runtime, a); }
+      if (a.startTime === null) a.startTime = frameTimeMs;
       const elapsed = frameTimeMs - a.startTime - a.delay; if (elapsed < 0) continue;
+      // hwui BaseRenderNodeAnimator::updatePlayTime: without nSetStartValue the start value is the property's value at the first frame past the start delay, not at
+      // staging (an animator delayed behind another one of the same property continues from where that one left it).
+      if (!a.hasFrom) { a.from = a.startValue ?? read(runtime, a); a.hasFrom = true; }
       const fraction = a.duration > 0 ? Math.min(1, elapsed / a.duration) : 1;
       write(runtime, a, fraction >= 1 ? a.finalValue : a.from + (a.finalValue - a.from) * a.interpolator(fraction));
       if (fraction >= 1) done.push(a);

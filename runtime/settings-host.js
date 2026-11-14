@@ -1,5 +1,5 @@
-import { createHostRegistry, floatBits } from './host-contract.js?v=d8fff06341bc';
-import { DIGESTS } from './crypto-host.js?v=d8fff06341bc';
+import { createHostRegistry, floatBits } from './host-contract.js?v=1727a869a704';
+import { DIGESTS } from './crypto-host.js?v=1727a869a704';
 
 // android.provider.Settings.Secure / Global / System as an app (not a system app) sees them: reads of the keys a stock Android 13 device exposes, taken from the virtual device
 // (font scale, animation scale, 24-hour clock, airplane mode follow the Dispositivo panel), ANDROID_ID derived per (package, device) like Android 8+'s per-app-signing-key value,
