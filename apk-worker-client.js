@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=352c1cd2699a';
-import { createRasterReceiver } from './raster-cache.js?v=352c1cd2699a';
+import { createWebAudioPlayer } from './web-audio-player.js?v=34c9ffd7a60c';
+import { createRasterReceiver } from './raster-cache.js?v=34c9ffd7a60c';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=352c1cd2699a', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=34c9ffd7a60c', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -226,6 +226,6 @@ export class APKWorkerClient {
       const reject = this.pending.reject; this.pending = null;
       if (!error) { error = new Error('Operação cancelada. O Worker foi encerrado; reabra o APK para continuar.'); error.name = 'AbortError'; }
       reject(error);
-    }
+    } else if (error) this.onRuntimeError?.(error);   // the Worker died between requests (a module or memory failure): the page hears of it as of any asynchronous VM error
   }
 }

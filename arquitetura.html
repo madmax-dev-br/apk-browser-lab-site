@@ -6,8 +6,8 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Arquitetura da VM · APK Browser Lab</title>
   <meta name="description" content="Como o APK Browser Lab executa um APK Android no navegador: do arquivo à tela, threads e tempo, memória, renderização, rede, código nativo, ferramentas e limitações.">
-  <link rel="stylesheet" href="./site-pages.css?v=352c1cd2699a">
-  <link rel="stylesheet" href="./lab-tokens.css?v=352c1cd2699a">
+  <link rel="stylesheet" href="./site-pages.css?v=34c9ffd7a60c">
+  <link rel="stylesheet" href="./lab-tokens.css?v=34c9ffd7a60c">
 </head>
 <body>
   <header class="topbar">
@@ -118,7 +118,7 @@
 
       <section id="carregar-executar" aria-labelledby="h-carregar">
         <h2 id="h-carregar">Carregar e Executar fazem coisas diferentes</h2>
-        <p>Escolher um APK e apertar <b>Executar</b> são duas mensagens diferentes ao Worker. A primeira, <code>load</code>, prepara tudo sem rodar nenhuma linha do app. A segunda, <code>launch</code>, começa o processo do app.</p>
+        <p>Escolher um APK manda duas mensagens diferentes ao Worker, uma depois da outra. A primeira, <code>load</code>, prepara tudo sem rodar nenhuma linha do app. A segunda, <code>launch</code>, começa o processo do app; é a mesma que um toque no ícone do app na tela inicial do dispositivo manda depois.</p>
         <figure class="diagram">
           <div class="lanes">
             <div class="lane load">
@@ -135,14 +135,14 @@
             </div>
             <div class="lane run">
               <h3>Executar</h3>
-              <p class="when">Ao apertar Executar (mensagem <code>launch</code>)</p>
+              <p class="when">Logo depois de Carregar, ou ao tocar no ícone do app na tela inicial (mensagem <code>launch</code>)</p>
               <ol>
                 <li>A <code>Application</code> declarada é criada; <code>attachBaseContext</code> e <code>onCreate</code> rodam.</li>
                 <li>A Activity escolhida (a launcher, por padrão) passa por <code>onCreate</code>, <code>onStart</code> e <code>onResume</code>.</li>
                 <li>Primeiro layout e primeiro desenho; o primeiro snapshot chega à página.</li>
                 <li>Daí em diante o pump de eventos mantém o app vivo: mensagens, quadros, threads de fundo, rede.</li>
                 <li>Depois da primeira tentativa de execução começa, em segundo plano, a estimativa estática de APIs ausentes do APK.</li>
-                <li>Executar de novo reimporta o APK (passa outra vez por Carregar) para um início limpo.</li>
+                <li>Abrir de novo pelo ícone reimporta o APK (passa outra vez por Carregar) para um início limpo. Uma falha do app ou da VM fecha o app: a janela de erro mostra o diagnóstico e o ícone continua na tela inicial.</li>
               </ol>
             </div>
           </div>
@@ -334,6 +334,6 @@ Vary: Origin</code></pre></div>
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=352c1cd2699a"></script>
+  <script type="module" src="./site-pages.js?v=34c9ffd7a60c"></script>
 </body>
 </html>

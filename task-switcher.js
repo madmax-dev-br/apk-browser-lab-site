@@ -79,7 +79,7 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     app.setAttribute('aria-label', mode === 'installing' ? `Instalando ${label.textContent}` : `Abrir ${label.textContent}`);
   };
   let infoPending = Promise.resolve();   // the launcher-info request in flight: a launch started right after a load waits for it (the client takes one VM request at a time)
-  const loadInfo = key => infoPending = loadInfoOnce(key);
+  const loadInfo = key => infoFor === key ? infoPending : (infoPending = loadInfoOnce(key));   // asked again for the same package (the launcher shown twice during a restart): the request in flight is the one to wait for
   const loadInfoOnce = async key => {
     if (infoFor === key) return; infoFor = key;
     try { const got = await vm().launcherInfo(); if (infoFor !== key) return; info = got; onInfo(got); if (iconURL) URL.revokeObjectURL(iconURL); iconURL = got?.icon?.bytes ? URL.createObjectURL(new Blob([got.icon.bytes], { type: got.icon.mime || 'image/png' })) : null; paintIcon(); if (!got?.icon) for (const problem of got?.problems ?? []) report?.(`Launcher: ${problem}`); }
@@ -156,6 +156,8 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
 
   return {
     state: () => mode,
+    /** Keyboard focus on the app's launcher icon (after the error window closes: Enter opens the app again); false when the launcher does not show it. */
+    focusApp: () => { if (!away() || app.hidden || app.disabled) return false; app.focus?.(); return true; },
     /** Settles once the launcher's label and icon request (a VM request) is answered: the page waits for it before sending the next one. */
     infoSettled: () => infoPending.catch(() => {}),
     /** The app's launcher icon as a URL (null until it is known, or when the package has none the page can show). */

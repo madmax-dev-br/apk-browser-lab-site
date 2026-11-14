@@ -50,8 +50,8 @@
 /* values that are code: URIs, hosts, class and file names */
 #deeplink-input,#deeplink-component,#dev-hosts,#dev-proxy,#mcp-script,#mcp-url,#mcp-token,#em-url,#em-body,#em-body-contains,.ov-method,.ov-value,.ia-name,.hm-from,.hm-to,.em-header input,.pl-code,#ov-search,#ia-filter{font-family:var(--mono);font-size:12px}
 /* primary actions */
-.run-button,.cp-button.primary,.pb-button.pb-primary{background-color:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:500}
-.run-button:hover:not(:disabled),.cp-button.primary:hover:not(:disabled),.pb-button.pb-primary:hover:not(:disabled){background-color:var(--accent-hover);border-color:var(--accent-hover)}
+.cp-button.primary,.pb-button.pb-primary{background-color:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:500}
+.cp-button.primary:hover:not(:disabled),.pb-button.pb-primary:hover:not(:disabled){background-color:var(--accent-hover);border-color:var(--accent-hover)}
 .pb-button.pb-danger{border-color:var(--warn);color:var(--warn)}
 /* the disclosure mark: a drawn chevron instead of a glyph */
 .trace-chevron{flex:none;width:8px;height:8px;margin:0 4px 3px auto;font-size:0;border:solid var(--muted);border-width:0 1.5px 1.5px 0;transform:rotate(45deg);transition:transform .15s}
@@ -93,10 +93,10 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .file-info{margin:16px 0 0;padding:10px 12px;gap:8px 10px;flex-wrap:wrap;border:1px solid var(--line);border-radius:var(--r-control);background-color:transparent}
 .file-icon{padding:2px 6px;border-radius:4px;background-color:var(--accent-soft);color:var(--accent-ink);font:500 12px/16px var(--mono)}
 .file-info>div{flex:1 1 calc(100% - 64px);min-width:0}
-.file-info strong,.file-info:has(.stop-vm:not([hidden])) strong{max-width:none;font:500 12px/18px var(--mono);color:var(--ink)}
+.file-info strong{max-width:none;font:500 12px/18px var(--mono);color:var(--ink)}
 .file-info>div>span{margin-top:0;font-size:12px;color:var(--muted)}
 .file-info button{font-size:12px;line-height:16px;padding:3px 10px;margin:0}
-.stop-vm{color:var(--warn);border-color:var(--line-strong)}
+
 .prepare-file{order:99;flex:1 0 100%;font-weight:500;color:var(--ink)}
 .operation-panel{margin:16px 0 0;padding:12px;border:1px solid var(--line);border-radius:var(--r-control);background-color:var(--surface-2)}
 .operation-panel>div{gap:8px}
@@ -146,9 +146,6 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .unsupported-notice p{margin:6px 0;font-size:14px;line-height:1.45}
 .unsupported-notice ul{padding-left:18px;font:400 12px/1.6 var(--mono)}
 .unsupported-notice button{margin-top:10px}
-.run-button{display:block;width:100%;padding:9px 16px;text-align:center;font-size:14px;line-height:20px}
-.run-button kbd{display:none}   /* app.js writes the busy mark into it; the disabled state already says busy */
-.run-button:disabled{background-color:var(--surface-2);border-color:var(--line);color:var(--muted);opacity:1}
 .support-note{display:block;margin:12px 0 0;font-size:12px;line-height:1.5;color:var(--muted)}
 
 /* Controles */

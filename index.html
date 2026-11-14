@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=352c1cd2699a") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=352c1cd2699a">
-  <link rel="stylesheet" href="./lab-theme.css?v=352c1cd2699a">
-  <meta name="apk-browser-build" content="352c1cd2699a">
+  <style>@import url("./styles.css?v=34c9ffd7a60c") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=34c9ffd7a60c">
+  <link rel="stylesheet" href="./lab-theme.css?v=34c9ffd7a60c">
+  <meta name="apk-browser-build" content="34c9ffd7a60c">
 </head>
 <body>
   <header class="topbar">
@@ -26,7 +26,8 @@
           </label>
           <input id="apk-file" type="file" accept=".apk,application/vnd.android.package-archive" class="visually-hidden">
           <div class="demo-row"><span>Sem um APK à mão?</span><button id="demo-button">Rodar demo</button></div>
-          <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div><button id="stop-vm" class="stop-vm" aria-label="Encerrar VM e cancelar callbacks" hidden>Encerrar</button><button id="reopen-file" class="reopen-file" hidden>Reabrir</button></div>
+          <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div></div>
+          <div id="load-times" class="load-times" role="status" hidden></div>
           <div id="operation-panel" class="operation-panel" hidden><div><span class="spinner"></span><strong id="operation-message">Processando no Web Worker…</strong><button id="cancel-operation">Cancelar</button></div><progress id="operation-progress" max="1"></progress><small id="operation-detail">A página continua respondendo. A inspeção tem limite de 120 s.</small></div>
           <details id="inspection-panel" class="inspection-panel">
           <summary class="inspection-label"><h2 class="rail-title">Pacote</h2><span id="inspection-badge" class="quiet-badge">Aguardando</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
@@ -34,13 +35,12 @@
           <div id="inventory" class="inventory" hidden>
             <div class="inventory-heading"><span class="tiny-label">Nome do pacote</span><strong id="package-name"></strong></div>
             <div class="stats"><div><strong id="class-count">0</strong><span>Classes DEX</span></div><div><strong id="activity-count">0</strong><span>Activities</span></div><div><strong id="dependency-count">0</strong><span>Dependências</span></div></div>
-            <label class="activity-label" for="activity-select">Activity inicial</label><select id="activity-select"></select>
-            <div id="load-times" class="load-times" role="status" hidden></div><div id="archive-summary" class="archive-summary" hidden></div><details class="findings"><summary>Classes e dependências <span class="trace-chevron" aria-hidden="true">⌄</span></summary><div id="inventory-details"></div></details>
+            <label class="activity-label" for="activity-select">Activity inicial <small>(ao abrir pelo ícone na tela inicial)</small></label><select id="activity-select"></select>
+            <div id="archive-summary" class="archive-summary" hidden></div><details class="findings"><summary>Classes e dependências <span class="trace-chevron" aria-hidden="true">⌄</span></summary><div id="inventory-details"></div></details>
           </div>
           <details id="native-inspection" class="native-inspection" hidden><summary>Analisar bibliotecas nativas <span>ELF</span></summary><p>Inspeção de metadados de uma biblioteca por vez, até 32 MiB. Não executa código nativo nem implementa JNI.</p><label for="native-abi">ABI</label><select id="native-abi"></select><label for="native-library">Biblioteca</label><select id="native-library"></select><button id="inspect-native-button">Analisar biblioteca</button><pre id="native-result" hidden></pre></details>
           </details>
           <div id="unsupported-notice" class="unsupported-notice" role="status" hidden><strong>Este APK ainda não pode ser executado</strong><p>O relatório indica limites de arquivo que impedem a tentativa. Veja os detalhes abaixo; uma inspeção parcial não comprova compatibilidade.</p><ul id="unsupported-list"></ul></div>
-          <button id="run-button" class="run-button" disabled>Executar APK <kbd aria-hidden="true">RUN</kbd></button>
           <p class="support-note">VM experimental para Android Views e bytecode DEX. Multidex é inspecionado no Worker; Android, Compose e JNI ainda podem exigir APIs não implementadas.</p>
         </section>
         <section class="controls controls-card" aria-label="Controles">
@@ -221,7 +221,7 @@
           <button id="fullscreen-close" class="fullscreen-close" type="button" hidden title="Fechar tela cheia (Esc)" aria-label="Fechar tela cheia">✕</button>
           <div id="lab-overlay-layer" class="lab-overlay-layer"></div>
           <div id="stage-callouts" class="stage-callouts" aria-hidden="true" hidden><div class="callout callout-w"><span id="callout-w"></span></div><div class="callout callout-h"><span id="callout-h"></span></div><p id="callout-note" class="callout-note"></p></div>
-          <div id="empty-preview" class="empty-preview"><h2>Seu aplicativo começa aqui.</h2><p>Selecione um APK e clique em Executar.<br>Ou escolha um dos exemplos na aba Exemplos, na barra de baixo.</p></div>
+          <div id="empty-preview" class="empty-preview"><h2>Seu aplicativo começa aqui.</h2><p>Selecione um APK: ele é instalado e aberto na hora.<br>Ou escolha um dos exemplos na aba Exemplos, na barra de baixo.</p></div>
           <div id="boot-overlay" class="boot-overlay" hidden role="status" aria-live="polite"><div class="boot-screen"><img id="boot-app-icon" class="boot-app-icon" alt="" hidden><svg class="boot-logo" viewBox="0 0 24 24" width="84" height="84" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85-.29-.15-.65-.06-.83.22l-1.88 3.24a11.463 11.463 0 00-8.94 0L5.65 5.67c-.19-.29-.58-.38-.87-.2-.28.18-.37.54-.22.83L6.4 9.48A10.78 10.78 0 001 18h22a10.78 10.78 0 00-5.4-8.52zM7 15.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm10 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"/></svg><div class="boot-bar"><i></i></div><p id="boot-caption" class="boot-caption">Iniciando…</p></div></div>
           <div id="android-device" class="android-device" hidden>
             <div id="android-screen" class="android-screen">
@@ -237,7 +237,7 @@
               </div>
             </div>
           </div>
-          <div id="error-panel" class="error-panel" role="alert" hidden><span class="error-icon">!</span><h2 id="error-title">Não foi possível executar</h2><p id="error-message"></p><details id="error-diagnostics" hidden><summary>Detalhes técnicos da execução</summary><pre id="error-detail" hidden></pre></details><button id="error-copy" type="button">Copiar diagnóstico</button> <button id="error-summary" type="button" title="Mostra só o resumo (memória, quem retém, exceções, thread principal) em letras grandes: uma foto basta">Mostrar resumo</button></div>
+          <div id="error-panel" class="error-panel" role="alert" hidden><span class="error-icon">!</span><h2 id="error-title">Não foi possível executar</h2><p id="error-message"></p><details id="error-diagnostics" hidden><summary>Detalhes técnicos da execução</summary><pre id="error-detail" hidden></pre></details><button id="error-close" type="button" title="Fecha esta janela; o app fica na tela inicial do dispositivo para abrir de novo (Esc)">Fechar</button> <button id="error-copy" type="button">Copiar diagnóstico</button> <button id="error-summary" type="button" title="Mostra só o resumo (memória, quem retém, exceções, thread principal) em letras grandes: uma foto basta">Mostrar resumo</button></div>
         </div>
         <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Aguardando um aplicativo</span></span><span id="memory-meter" class="memory-meter" role="status" hidden><i></i><span></span></span><span id="execution-engine">411 × 914 dp · densidade 1</span></div>
         <details id="trace" class="trace"><summary><span>Log de execução</span><span id="trace-count">0 eventos</span><span class="trace-actions"><button id="screen-state-summary" type="button" title="Mostra só o resumo (memória, quem retém, exceções, thread principal) em letras grandes: uma foto basta">Resumo</button><button id="screen-state-copy" type="button" title="Copia um resumo do que a VM mostra (Activities, árvore de views, Compose, quadros, fila, threads, memória) mesmo sem erro">Estado</button></span><span class="trace-chevron">⌄</span></summary><pre id="trace-output">O log aparecerá após a execução.</pre></details>
@@ -271,7 +271,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=352c1cd2699a"></script>
+  <script type="module" src="./app.js?v=34c9ffd7a60c"></script>
   <script>
   // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
   // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.
