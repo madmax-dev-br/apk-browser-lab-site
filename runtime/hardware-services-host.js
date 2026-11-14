@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=a6c2214802a2';
-import { gcRoot } from './heap-gc.js?v=a6c2214802a2';
-import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=a6c2214802a2';
-import { createHostRegistry, doubleBits, floatBits } from './host-contract.js?v=a6c2214802a2';
-import { GC_ROOTS } from './heap-gc.js?v=a6c2214802a2';
+import { APKError } from './apk-error.js?v=352c1cd2699a';
+import { gcRoot } from './heap-gc.js?v=352c1cd2699a';
+import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=352c1cd2699a';
+import { createHostRegistry, doubleBits, floatBits } from './host-contract.js?v=352c1cd2699a';
+import { GC_ROOTS } from './heap-gc.js?v=352c1cd2699a';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
 // contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes
@@ -21,7 +21,9 @@ export function createHardwareServicesHost(platform) {
   };
   const call = (r, receiver, owner, name, parameters, result, args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...args], 'virtual');
   const text = (r, v) => v === null ? null : r.stringCharacters(v);
-  const holds = (r, permission) => platform.holdsPermission?.(r, permission) ?? false;
+  // The permission of the calling package (LocationManagerService checks the caller's uid): the app's, or a companion package's when its code is the caller.
+  const holds = (r, permission) => platform.packages?.multi ? platform.appServices.holdsFor(r, platform.packages.callerEntry(r), permission) : platform.holdsPermission?.(r, permission) ?? false;
+  const callerUid = r => platform.packages?.multi ? platform.packages.callerEntry(r).uid : platform.virtualProcess?.uid ?? 10000;
   const emptyList = r => { const list = r.allocate('Ljava/util/ArrayList;'); r.dispatch({ owner: 'Ljava/util/ArrayList;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [list], 'direct'); return list; };
   const stringArray = (r, items) => { const a = r.newArray('[Ljava/lang/String;', items.length); r.array(a).elements = items; return a; };
   const device = () => platform.device ?? {};
@@ -61,7 +63,7 @@ export function createHardwareServicesHost(platform) {
   const iae = (r, m) => r.throwJava('Ljava/lang/IllegalArgumentException;', m);
   const provider_ = (r, v) => { if (v === null || v === 0) iae(r, 'invalid provider: null'); return text(r, v); };
   const enforce = (r, provider) => {
-    const fine = holds(r, 'android.permission.ACCESS_FINE_LOCATION'), coarse = holds(r, 'android.permission.ACCESS_COARSE_LOCATION'), uid = platform.virtualProcess?.uid ?? 10000;
+    const fine = holds(r, 'android.permission.ACCESS_FINE_LOCATION'), coarse = holds(r, 'android.permission.ACCESS_COARSE_LOCATION'), uid = callerUid(r);
     if (FINE_ONLY.has(provider)) { if (!fine) r.throwJava('Ljava/lang/SecurityException;', `uid ${uid} does not have android.permission.ACCESS_FINE_LOCATION.`); }
     else if (!fine && !coarse) r.throwJava('Ljava/lang/SecurityException;', `uid ${uid} does not have android.permission.ACCESS_COARSE_LOCATION or android.permission.ACCESS_FINE_LOCATION.`);
   };

@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=a6c2214802a2';
-import { APKError } from './apk-error.js?v=a6c2214802a2';
-import { gcRoot } from './heap-gc.js?v=a6c2214802a2';
+import { createHostRegistry } from './host-contract.js?v=352c1cd2699a';
+import { APKError } from './apk-error.js?v=352c1cd2699a';
+import { gcRoot } from './heap-gc.js?v=352c1cd2699a';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -492,7 +492,17 @@ export function createActivityApiHost(platform) {
   defContext('getDisplay', '()Landroid/view/Display;', (r) => platform.displayHost.get(r));
   defContext('isUiContext', '()Z', (r, _m, [self]) => r.isSubtype(r.object(self).type, ACTIVITY) ? 1 : 0);
   defContext('getParams', '()Landroid/content/ContextParams;', () => null);   // a Context not made by createContext(ContextParams) has no params
-  defContext('getAttributionSource', '()Landroid/content/AttributionSource;', () => unsupported('Context.getAttributionSource: android.content.AttributionSource is not part of the lab framework', 'attribution-source-unsupported'));
+  // ContextImpl.getAttributionSource: the Context's AttributionSource (the original class), made once per Context as ContextImpl.createAttributionSource does:
+  // new AttributionSource(Process.myUid(), getOpPackageName(), getAttributionTag(), renouncedPermissions = null, next = null). The uid and package are the Context's package's.
+  const ATTRIBUTION = 'Landroid/content/AttributionSource;';
+  const attributionTagOf = (r, context) => { for (let c = context, depth = 0; c && typeof c === 'object' && depth < 64; depth++) { const o = r.object(c); if (o.attributionTag !== undefined) return o.attributionTag; c = o.outerContext ?? o.baseContext ?? null; } return null; };
+  defContext('getAttributionSource', `()${ATTRIBUTION}`, (r, _m, [self]) => {
+    const o = r.object(self); if (o.attributionSource) return o.attributionSource;
+    const P = platform.packages, entry = P?.multi ? P.contextEntry(r, self) : null, uid = entry && !entry.main ? entry.uid : platform.virtualProcess.uid;
+    const source = r.allocate(ATTRIBUTION);
+    r.dispatch({ owner: ATTRIBUTION, name: '<init>', parameters: ['I', STRING, STRING, 'Ljava/util/Set;', ATTRIBUTION], result: 'V', signature: `(I${STRING}${STRING}Ljava/util/Set;${ATTRIBUTION})V` }, [source, uid, platform.contextPackageName(r, self), attributionTagOf(r, self), null, null], 'direct');
+    o.attributionSource = source; return source;
+  });
   for (const name of ['getWallpaper', 'peekWallpaper']) defContext(name, '()Landroid/graphics/drawable/Drawable;', () => null);   // no wallpaper is set on the virtual device (WallpaperManager reports none either)
   defContext('getWallpaperDesiredMinimumWidth', '()I', () => platform.device.widthDp * ((platform.device.densityDpi ?? 160) / 160) | 0);
   defContext('getWallpaperDesiredMinimumHeight', '()I', () => platform.device.heightDp * ((platform.device.densityDpi ?? 160) / 160) | 0);
@@ -507,9 +517,18 @@ export function createActivityApiHost(platform) {
   defContext('createAttributionContext', `(${STRING})Landroid/content/Context;`, (r, _m, [self, tag]) => derived(r, self, { attributionTag: tag }));
   defContext('createContext', '(Landroid/content/ContextParams;)Landroid/content/Context;', () => unsupported('Context.createContext(ContextParams): android.content.ContextParams is not part of the lab framework', 'context-params-unsupported'));
   defContext('createContextForSplit', `(${STRING})Landroid/content/Context;`, (r) => r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', 'Split name null'));
-  defContext('createPackageContext', `(${STRING}I)Landroid/content/Context;`, (r, _m, [self, name]) => {
+  defContext('createPackageContext', `(${STRING}I)Landroid/content/Context;`, (r, _m, _args) => { const [self, name] = _args;
     if (nullish(name)) npe(r);
-    if (text(r, name) !== platform.packageName) r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', `Application package ${text(r, name)} not found`);   // the virtual device cannot load another package's code or resources
+    const P = platform.packages, wanted = text(r, name);
+    if (P?.multi && P.byName(wanted) && P.contextEntry(r, self) !== P.byName(wanted)) {   // another installed package (src/package-registry.js): ContextImpl.createPackageContextAsUser
+      const caller = P.contextEntry(r, self), target = P.byName(wanted), flags = _args[2] | 0;   // CONTEXT_INCLUDE_CODE = 1, CONTEXT_IGNORE_SECURITY = 2
+      if (!P.visible(r, caller, target)) r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', `Application package ${wanted} not found`);
+      if ((flags & 1) && !(flags & 2) && target.uid !== caller.uid) r.throwJava('Ljava/lang/SecurityException;', `Requesting code from ${wanted} (with uid ${target.uid}) to be run in process ${caller.name} (with uid ${caller.uid})`);
+      if (target.main) return derived(r, platform.application);
+      const context = P.newContext(r, target); r.object(context).packageCodeIncluded = (flags & 1) !== 0;
+      return context;
+    }
+    if (wanted !== platform.packageName) r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', `Application package ${wanted} not found`);   // a package that is not installed
     return derived(r, self);
   });
   // URI permissions: the app is the only package, so its own URIs are always granted, a foreign content URI is not, and granting to another package is allowed for providers that grant URI permissions.

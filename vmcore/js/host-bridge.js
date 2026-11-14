@@ -59,20 +59,20 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=a6c2214802a2';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=a6c2214802a2';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=a6c2214802a2';
-import { HandleTable } from './handles.js?v=a6c2214802a2';
-import { Exceptions } from './exceptions.js?v=a6c2214802a2';
-import { coreImports } from './boundary-imports.js?v=a6c2214802a2';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=a6c2214802a2';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=a6c2214802a2';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=a6c2214802a2';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=a6c2214802a2';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=a6c2214802a2';
-import { Blocked } from '../../runtime/scheduler.js?v=a6c2214802a2';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=a6c2214802a2';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=a6c2214802a2';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=352c1cd2699a';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=352c1cd2699a';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=352c1cd2699a';
+import { HandleTable } from './handles.js?v=352c1cd2699a';
+import { Exceptions } from './exceptions.js?v=352c1cd2699a';
+import { coreImports } from './boundary-imports.js?v=352c1cd2699a';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=352c1cd2699a';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=352c1cd2699a';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=352c1cd2699a';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=352c1cd2699a';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=352c1cd2699a';
+import { Blocked } from '../../runtime/scheduler.js?v=352c1cd2699a';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=352c1cd2699a';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=352c1cd2699a';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -432,9 +432,10 @@ export class WasmEngine {
     if (parked !== null) { owner.blocked = null; owner.state = 'runnable'; owner.coreWait = null; }
     if (++rt.nestedRuns === 1) sched.beginEvent(rt);
     owner.nestedDepth++;
+    const cut = rt.coreCut; rt.coreCut = false;   // a nested run has an owner: it never yields to the slice deadline (CoreThreads.mustYield), so its quantum is not cut for it either
     try { return this.runOn(owner, id, words, result, initClass, uncount, parked); }
     finally {
-      owner.nestedDepth--; rt.nestedRuns--; rt.thread = owner;
+      rt.coreCut = cut; owner.nestedDepth--; rt.nestedRuns--; rt.thread = owner;
       if (giveBack !== null) giveBack();
       if (parked !== null) { owner.blocked = parked.blocked; owner.state = parked.state; owner.timedOut = parked.timedOut; owner.coreWait = parked.coreWait; }
       if (rt.nestedRuns === 0 && owner === sched.main) rt.platform?.looperHost?.hostEventRan(rt);
@@ -596,7 +597,7 @@ export class WasmEngine {
       const hostMark = rt.hostAllocs.length, outcome = this.bridgeBody(rt, bridge, args, site.mode); rt.hostCall = null;
       // A background thread in a slice with a deadline: its quantum is counted in polls, so one holding several long host calls (image decodes) ran them all before the deadline
       // was seen and held the next frame back by their sum. A host call that returns past the deadline ends the quantum at the next poll (Thread.quantumCut, abi.h).
-      if (rt.sliceDeadline !== 0 && rt.sliceDeadline !== undefined && rt.thread !== null && rt.thread.coreQuantum > 0 && performance.now() > rt.sliceDeadline) this.u32[(this.t + THREAD.quantumCut) >>> 2] = 1;
+      if (rt.coreCut === true && rt.sliceDeadline !== 0 && performance.now() > rt.sliceDeadline) this.u32[(this.t + THREAD.quantumCut) >>> 2] = 1;
       if (rt.hostAllocs.length > hostMark && !(outcome instanceof Blocked || outcome instanceof Invoke)) rt.releaseHostAllocs(hostMark);
       return outcome;
     }

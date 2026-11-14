@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 8400416,
-  "sha256": "725805eaa64297d93c6663c212fb3da1df133f8157584940acf16d476f8029b1",
-  "classCount": 6456,
+  "bytes": 8417048,
+  "sha256": "ad2b6e00b30be3643eccd1c44232bf88ef7a76c2e0eae3dc6e9c5bb8682eea2d",
+  "classCount": 6474,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -662,6 +662,12 @@
     "Landroid/compat/Compatibility$OverrideCallbacks;",
     "Landroid/compat/Compatibility;",
     "Landroid/content/ActivityNotFoundException;",
+    "Landroid/content/AttributionSource$1;",
+    "Landroid/content/AttributionSource$Builder;",
+    "Landroid/content/AttributionSource$ScopedParcelState;",
+    "Landroid/content/AttributionSource;",
+    "Landroid/content/AttributionSourceState$1;",
+    "Landroid/content/AttributionSourceState;",
     "Landroid/content/ClipData$1;",
     "Landroid/content/ClipData$Item;",
     "Landroid/content/ClipData;",
@@ -1482,6 +1488,14 @@
     "Landroid/os/PowerSaveState$1;",
     "Landroid/os/PowerSaveState$Builder;",
     "Landroid/os/PowerSaveState;",
+    "Landroid/os/RemoteCallbackList$Callback;",
+    "Landroid/os/RemoteCallbackList;",
+    "Landroid/os/ResultReceiver$1;",
+    "Lcom/android/internal/os/IResultReceiver;",
+    "Lcom/android/internal/os/IResultReceiver$Stub;",
+    "Landroid/os/ResultReceiver$MyResultReceiver;",
+    "Landroid/os/ResultReceiver$MyRunnable;",
+    "Landroid/os/ResultReceiver;",
     "Landroid/os/ServiceManager$ServiceNotFoundException;",
     "Landroid/os/ServiceSpecificException;",
     "Landroid/os/SharedMemory$1;",
@@ -2531,6 +2545,9 @@
     "Lcom/android/internal/R$styleable;",
     "Lcom/android/internal/R;",
     "Lcom/android/internal/logging/EventLogTags;",
+    "Lcom/android/internal/os/IResultReceiver$Default;",
+    "Lcom/android/internal/os/IResultReceiver$Stub$Proxy;",
+    "Lcom/android/internal/os/IResultReceiver$_Parcel;",
     "Lcom/android/internal/policy/PhoneLayoutInflater;",
     "Lcom/android/internal/util/AnnotationValidations;",
     "Lcom/android/internal/util/ArrayUtils;",
@@ -4271,6 +4288,7 @@
     "Ldev/apkweb/services/refusals/RefusingThermalService;",
     "Ldev/apkweb/services/LabThermalService;",
     "Ldev/apkweb/services/refusals/RefusingAlarmListener;",
+    "Ldev/apkweb/services/refusals/RefusingResultReceiver;",
     "Ldev/apkweb/services/refusals/RefusingThermalEventListener;",
     "Ldev/apkweb/services/refusals/RefusingThermalStatusListener;",
     "Ldev/apkweb/services/refusals/RefusingWakeLockCallback;",
@@ -38810,6 +38828,66 @@
       "sha256": "c7328d3c1741f508c9124ed674702843e0ebb1817370c4d2d040c44c64503356",
       "bytes": 54028,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/content/AttributionSource.java",
+      "localPath": "framework-aosp/upstream/android/content/AttributionSource.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/AttributionSource.java?format=TEXT",
+      "sha256": "7c0f5a9b5ea1d4eb11c8e59798f269e2e491a2c9707ef307beb93236f7d82d14",
+      "bytes": 26478,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/ResultReceiver.java",
+      "localPath": "framework-aosp/upstream/android/os/ResultReceiver.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/ResultReceiver.java?format=TEXT",
+      "sha256": "7b9e6f5df9b9073c406fe5ac3ae90e13d6b19bd720f062f20a597eb54cc41f6f",
+      "bytes": 4661,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/RemoteCallbackList.java",
+      "localPath": "framework-aosp/upstream/android/os/RemoteCallbackList.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/RemoteCallbackList.java?format=TEXT",
+      "sha256": "e04e7cd32ad9667f38a9602181a04985ec757789ea3042635840ea1ba3d689f6",
+      "bytes": 17609,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/com/android/internal/os/IResultReceiver.aidl",
+      "localPath": "framework-aosp/upstream/com/android/internal/os/IResultReceiver.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/os/IResultReceiver.aidl?format=TEXT",
+      "sha256": "26c4144debcb5666f7c995c26100afb10fe78660ed643882628030eb3654f151",
+      "bytes": 853,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/native",
+      "tag": "android-13.0.0_r1",
+      "path": "libs/permission/aidl/android/content/AttributionSourceState.aidl",
+      "localPath": "framework-aosp/upstream/android/content/AttributionSourceState.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/native/+/android-13.0.0_r1/libs/permission/aidl/android/content/AttributionSourceState.aidl?format=TEXT",
+      "sha256": "0921d1b7d5cafc2a3498595569f357c7b3bb69d2887118c6f04ba1127fefbc4b",
+      "bytes": 1675,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/Bundle.aidl",
+      "localPath": "framework-aosp/upstream/android/os/Bundle.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/Bundle.aidl?format=TEXT",
+      "sha256": "c4a7a65e8e2ab4579854d41159ec8a6449872ddbeb0e4f48b89c735f82e38015",
+      "bytes": 712,
+      "license": "Apache-2.0"
     }
   ],
   "algorithmPatches": [],
@@ -39620,6 +39698,10 @@
         "sha256": "7bfda2fd00e60ec1ae94dda90bbfb7e77e69f906ea316dcbc59da406bc38e0ab"
       },
       {
+        "path": "framework-aosp/generated-services/android/content/AttributionSourceState.java",
+        "sha256": "3f7001e179c215966f0c29320cc386b848f69353d648775429341cc942da0749"
+      },
+      {
         "path": "framework-aosp/generated-services/android/os/IDeviceIdleController.java",
         "sha256": "0f38fc491b0b750560bbb00374d67ef25a0c58ae5bc49d21dc1acfe945b85596"
       },
@@ -39644,6 +39726,10 @@
         "sha256": "e6759fcc77bf0c596fa43485255c0c45fe10f11c2431f83c3192fd24f5d2b45d"
       },
       {
+        "path": "framework-aosp/generated-services/com/android/internal/os/IResultReceiver.java",
+        "sha256": "4cf63c14cbc6bb2f99719c0e59148d4cc778c6120c41d9379bc4620912f726e2"
+      },
+      {
         "path": "framework-aosp/generated-services/dev/apkweb/services/refusals/RefusingAlarmCompleteListener.java",
         "sha256": "ab93f59705eff668a4ba6bfd1919370367435d374feecca7e2db8169d3f7ad28"
       },
@@ -39662,6 +39748,10 @@
       {
         "path": "framework-aosp/generated-services/dev/apkweb/services/refusals/RefusingPowerManager.java",
         "sha256": "405d7c31d7b5912783a62bb6d0014abfac68842ef52ea223bbc74d843fac65c0"
+      },
+      {
+        "path": "framework-aosp/generated-services/dev/apkweb/services/refusals/RefusingResultReceiver.java",
+        "sha256": "aecbe43677c409ddbeef95f960e471bfcee18dba0ae2f53ad86caa0a67815562"
       },
       {
         "path": "framework-aosp/generated-services/dev/apkweb/services/refusals/RefusingThermalEventListener.java",

@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=a6c2214802a2';
-import { APKError } from './apk-error.js?v=a6c2214802a2';
+import { createHostRegistry } from './host-contract.js?v=352c1cd2699a';
+import { APKError } from './apk-error.js?v=352c1cd2699a';
 
 // android.content.ContentResolver (android-13.0.0_r1 ContentResolver.java) and the default bodies of android.content.ContentProvider for the virtual device. The device has one package, so a
 // content authority resolves to a provider this app declares and installed at start (ActivityThread.installContentProviders); the ContentResolver calls it directly on the calling thread, which is what
@@ -24,7 +24,37 @@ export function createContentResolverApiHost(platform) {
   const authorityOf = (r, uri) => text(r, call(r, uri, URI, 'getAuthority', [], STRING));
   const schemeOf = (r, uri) => text(r, call(r, uri, URI, 'getScheme', [], STRING));
   // A content authority is one of this app's providers, else one of the device's shared-storage providers (MediaStore, the documents providers: src/shared-storage-host.js).
-  const byAuthority = (r, authority) => platform.appServices.providerByAuthority(authority) ?? platform.sharedStorage?.provider(r, authority) ?? null;
+  // With a companion package installed (src/package-registry.js, docs/MULTI-PACKAGE.md), an authority may belong to another package: ContentProviderHelper.getContentProviderImpl starts
+  // that package's process, checkContentProviderPermission refuses a provider that is not exported or for which the caller holds neither the read nor the write permission, and a package
+  // the caller cannot see (API 30 visibility) has no provider. Each call then runs as a transaction from the caller (ContentProvider.Transport: enforceReadPermission / enforceWritePermission).
+  const packageProvider = (r, authority) => {
+    const P = platform.packages; if (!P?.multi) return undefined;
+    const found = P.providerFor(authority); if (!found) return undefined;
+    const caller = P.callerEntry(r), owner = found.entry, detail = found.detail;
+    if (owner === caller) { if (caller.main) return undefined; P.ensureProcess(r, owner); return P.providerInstance(r, owner, detail); }
+    if (!P.visible(r, caller, owner)) { r.record(`CONTENT ${authority}: provider of ${owner.name} is not visible to ${caller.name}`); return null; }
+    const from = `ProcessRecord{${caller.pid}:${caller.name}/u0a${caller.uid - 10000}} (pid=${caller.pid}, uid=${caller.uid})`;
+    if (!P.exported(owner, detail)) r.throwJava('Ljava/lang/SecurityException;', `Permission Denial: opening provider ${detail.name} from ${from} that is not exported from UID ${owner.uid}`);
+    const read = detail.readPermission ?? detail.permission, write = detail.writePermission ?? detail.permission;
+    if (read && !P.holds(r, caller, read) && write && !P.holds(r, caller, write)) r.throwJava('Ljava/lang/SecurityException;', `Permission Denial: opening provider ${detail.name} from ${from} requires ${read} or ${write}`);
+    P.ensureProcess(r, owner); P.grant(owner, caller);
+    return P.providerInstance(r, owner, detail);
+  };
+  const byAuthority = (r, authority) => { const other = packageProvider(r, authority); if (other !== undefined) return other; return platform.appServices.providerByAuthority(authority) ?? platform.sharedStorage?.provider(r, authority) ?? null; };
+  const READS = new Set(['query', 'canonicalize', 'uncanonicalize', 'refresh', 'openAssetFile', 'openTypedAssetFile']), WRITES = new Set(['insert', 'bulkInsert', 'update', 'delete']);
+  /** A provider call: plain within one package; from another package, the Transport's permission check, then the call with the caller's Binder identity. */
+  const pcall = (r, provider, name, parameters, result, args = []) => {
+    const P = platform.packages, owner = P?.multi ? r.object(provider).providerPackage ?? null : null, caller = owner ? P.callerEntry(r) : null;
+    if (!owner || caller === owner) return call(r, provider, PROVIDER, name, parameters, result, args);
+    const detail = (owner.manifest.providerDetails ?? []).find(d => owner.main ? platform.appServices.providerByAuthority(String(d.authorities).split(';')[0])?.ref === provider.ref : owner.providers.get(d.name)?.ref === provider.ref);
+    const mode = name === 'openFile' || name === 'openAssetFile' ? text(r, args[1]) ?? 'r' : null;
+    const access = name === 'openFile' ? (mode.includes('w') ? 'write' : 'read') : mode !== null ? (mode.includes('w') ? 'write' : 'read') : READS.has(name) ? 'read' : WRITES.has(name) ? 'write' : null;
+    if (access && detail) {
+      const permission = access === 'read' ? detail.readPermission ?? detail.permission : detail.writePermission ?? detail.permission;
+      if (permission && !P.holds(r, caller, permission)) r.throwJava('Ljava/lang/SecurityException;', `Permission Denial: ${access === 'read' ? 'reading' : 'writing'} ${detail.name} uri ${uriText(r, args[0])} from pid=${caller.pid}, uid=${caller.uid} requires ${permission}, or grantUriPermission()`);
+    }
+    return P.withCaller(r, caller, () => call(r, provider, PROVIDER, name, parameters, result, args));
+  };
   const providerOf = (r, uri) => { if (nullish(uri)) npe(r, 'uri'); const authority = authorityOf(r, uri); return authority === null ? null : byAuthority(r, authority); };
   const unknown = (r, uri) => r.throwJava('Ljava/lang/IllegalArgumentException;', `Unknown URL ${uriText(r, uri)}`);
   const noProvider = (r, uri) => r.throwJava('Ljava/io/FileNotFoundException;', `No content provider: ${uriText(r, uri)}`);
@@ -41,32 +71,32 @@ export function createContentResolverApiHost(platform) {
   });
   def(RESOLVER, 'query', `(${URI}${STRINGS}${BUNDLE}${SIGNAL})${CURSOR}`, (r, _m, [, uri, projection, bundle, signal]) => {
     const provider = providerOf(r, uri); if (provider === null) { r.record(`CONTENT Failed to find provider info for ${authorityOf(r, uri)}`); return null; }
-    return call(r, provider, PROVIDER, 'query', [URI, STRINGS, BUNDLE, SIGNAL], CURSOR, [uri, projection, bundle, signal]);
+    return pcall(r, provider, 'query', [URI, STRINGS, BUNDLE, SIGNAL], CURSOR, [uri, projection, bundle, signal]);
   });
-  def(RESOLVER, 'getType', `(${URI})${STRING}`, (r, _m, [, uri]) => { const provider = providerOf(r, uri); return provider === null ? null : call(r, provider, PROVIDER, 'getType', [URI], STRING, [uri]); });
-  def(RESOLVER, 'getStreamTypes', `(${URI}${STRING})${STRINGS}`, (r, _m, [, uri, filter]) => { if (nullish(filter)) npe(r, 'mimeTypeFilter'); const p = providerOf(r, uri); return p === null ? null : call(r, p, PROVIDER, 'getStreamTypes', [URI, STRING], STRINGS, [uri, filter]); });
+  def(RESOLVER, 'getType', `(${URI})${STRING}`, (r, _m, [, uri]) => { const provider = providerOf(r, uri); return provider === null ? null : pcall(r, provider, 'getType', [URI], STRING, [uri]); });
+  def(RESOLVER, 'getStreamTypes', `(${URI}${STRING})${STRINGS}`, (r, _m, [, uri, filter]) => { if (nullish(filter)) npe(r, 'mimeTypeFilter'); const p = providerOf(r, uri); return p === null ? null : pcall(r, p, 'getStreamTypes', [URI, STRING], STRINGS, [uri, filter]); });
   def(RESOLVER, 'insert', `(${URI}${VALUES})${URI}`, (r, _m, [self, uri, values]) => call(r, self, RESOLVER, 'insert', [URI, VALUES, BUNDLE], URI, [uri, values, null]));
-  def(RESOLVER, 'insert', `(${URI}${VALUES}${BUNDLE})${URI}`, (r, _m, [, uri, values, extras]) => { const p = providerOf(r, uri); if (p === null) unknown(r, uri); return call(r, p, PROVIDER, 'insert', [URI, VALUES, BUNDLE], URI, [uri, values, extras]); });
-  def(RESOLVER, 'bulkInsert', `(${URI}[${VALUES})I`, (r, _m, [, uri, values]) => { const p = providerOf(r, uri); if (p === null) unknown(r, uri); return call(r, p, PROVIDER, 'bulkInsert', [URI, `[${VALUES}`], 'I', [uri, values]); });
+  def(RESOLVER, 'insert', `(${URI}${VALUES}${BUNDLE})${URI}`, (r, _m, [, uri, values, extras]) => { const p = providerOf(r, uri); if (p === null) unknown(r, uri); return pcall(r, p, 'insert', [URI, VALUES, BUNDLE], URI, [uri, values, extras]); });
+  def(RESOLVER, 'bulkInsert', `(${URI}[${VALUES})I`, (r, _m, [, uri, values]) => { const p = providerOf(r, uri); if (p === null) unknown(r, uri); return pcall(r, p, 'bulkInsert', [URI, `[${VALUES}`], 'I', [uri, values]); });
   def(RESOLVER, 'delete', `(${URI}${STRING}${STRINGS})I`, (r, _m, [self, uri, where, args]) => {
     const bundle = construct(r, BUNDLE, [], []); if (!nullish(where)) call(r, bundle, BUNDLE, 'putString', [STRING, STRING], 'V', ['android:query-arg-sql-selection', where]); if (!nullish(args)) call(r, bundle, BUNDLE, 'putStringArray', [STRING, STRINGS], 'V', ['android:query-arg-sql-selection-args', args]);
     return call(r, self, RESOLVER, 'delete', [URI, BUNDLE], 'I', [uri, bundle]);
   });
-  def(RESOLVER, 'delete', `(${URI}${BUNDLE})I`, (r, _m, [, uri, extras]) => { const p = providerOf(r, uri); if (p === null) unknown(r, uri); return call(r, p, PROVIDER, 'delete', [URI, BUNDLE], 'I', [uri, extras]); });
+  def(RESOLVER, 'delete', `(${URI}${BUNDLE})I`, (r, _m, [, uri, extras]) => { const p = providerOf(r, uri); if (p === null) unknown(r, uri); return pcall(r, p, 'delete', [URI, BUNDLE], 'I', [uri, extras]); });
   def(RESOLVER, 'update', `(${URI}${VALUES}${STRING}${STRINGS})I`, (r, _m, [self, uri, values, where, args]) => {
     const bundle = construct(r, BUNDLE, [], []); if (!nullish(where)) call(r, bundle, BUNDLE, 'putString', [STRING, STRING], 'V', ['android:query-arg-sql-selection', where]); if (!nullish(args)) call(r, bundle, BUNDLE, 'putStringArray', [STRING, STRINGS], 'V', ['android:query-arg-sql-selection-args', args]);
     return call(r, self, RESOLVER, 'update', [URI, VALUES, BUNDLE], 'I', [uri, values, bundle]);
   });
-  def(RESOLVER, 'update', `(${URI}${VALUES}${BUNDLE})I`, (r, _m, [, uri, values, extras]) => { const p = providerOf(r, uri); if (p === null) unknown(r, uri); return call(r, p, PROVIDER, 'update', [URI, VALUES, BUNDLE], 'I', [uri, values, extras]); });
-  def(RESOLVER, 'call', `(${URI}${STRING}${STRING}${BUNDLE})${BUNDLE}`, (r, _m, [, uri, method, arg, extras]) => { if (nullish(method)) npe(r, 'method'); const p = providerOf(r, uri); if (p === null) unknown(r, uri); return call(r, p, PROVIDER, 'call', [STRING, STRING, STRING, BUNDLE], BUNDLE, [authorityOf(r, uri), method, arg, extras]); });
+  def(RESOLVER, 'update', `(${URI}${VALUES}${BUNDLE})I`, (r, _m, [, uri, values, extras]) => { const p = providerOf(r, uri); if (p === null) unknown(r, uri); return pcall(r, p, 'update', [URI, VALUES, BUNDLE], 'I', [uri, values, extras]); });
+  def(RESOLVER, 'call', `(${URI}${STRING}${STRING}${BUNDLE})${BUNDLE}`, (r, _m, [, uri, method, arg, extras]) => { if (nullish(method)) npe(r, 'method'); const p = providerOf(r, uri); if (p === null) unknown(r, uri); return pcall(r, p, 'call', [STRING, STRING, STRING, BUNDLE], BUNDLE, [authorityOf(r, uri), method, arg, extras]); });
   def(RESOLVER, 'call', `(${STRING}${STRING}${STRING}${BUNDLE})${BUNDLE}`, (r, _m, [, authority, method, arg, extras]) => {
     if (nullish(authority)) npe(r, 'authority'); if (nullish(method)) npe(r, 'method');
     const p = byAuthority(r, text(r, authority)); if (p === null) r.throwJava('Ljava/lang/IllegalArgumentException;', `Unknown authority ${text(r, authority)}`);
-    return call(r, p, PROVIDER, 'call', [STRING, STRING, STRING, BUNDLE], BUNDLE, [authority, method, arg, extras]);
+    return pcall(r, p, 'call', [STRING, STRING, STRING, BUNDLE], BUNDLE, [authority, method, arg, extras]);
   });
-  def(RESOLVER, 'canonicalize', `(${URI})${URI}`, (r, _m, [, uri]) => { const p = providerOf(r, uri); return p === null ? null : call(r, p, PROVIDER, 'canonicalize', [URI], URI, [uri]); });
-  def(RESOLVER, 'uncanonicalize', `(${URI})${URI}`, (r, _m, [, uri]) => { const p = providerOf(r, uri); return p === null ? uri : call(r, p, PROVIDER, 'uncanonicalize', [URI], URI, [uri]); });
-  def(RESOLVER, 'refresh', `(${URI}${BUNDLE}${SIGNAL})Z`, (r, _m, [, uri, extras, signal]) => { const p = providerOf(r, uri); return p === null ? 0 : call(r, p, PROVIDER, 'refresh', [URI, BUNDLE, SIGNAL], 'Z', [uri, extras, signal]); });
+  def(RESOLVER, 'canonicalize', `(${URI})${URI}`, (r, _m, [, uri]) => { const p = providerOf(r, uri); return p === null ? null : pcall(r, p, 'canonicalize', [URI], URI, [uri]); });
+  def(RESOLVER, 'uncanonicalize', `(${URI})${URI}`, (r, _m, [, uri]) => { const p = providerOf(r, uri); return p === null ? uri : pcall(r, p, 'uncanonicalize', [URI], URI, [uri]); });
+  def(RESOLVER, 'refresh', `(${URI}${BUNDLE}${SIGNAL})Z`, (r, _m, [, uri, extras, signal]) => { const p = providerOf(r, uri); return p === null ? 0 : pcall(r, p, 'refresh', [URI, BUNDLE, SIGNAL], 'Z', [uri, extras, signal]); });
   def(RESOLVER, 'notifyChange', `(${URI}Landroid/database/ContentObserver;I)V`, (r, _m, [self, uri, observer, flags]) => call(r, self, RESOLVER, 'notifyChange', [URI, 'Landroid/database/ContentObserver;', 'Z'], 'V', [uri, observer, (flags & 1) !== 0 ? 1 : 0]));   // NOTIFY_SYNC_TO_NETWORK = 1
   def(RESOLVER, 'notifyChange', `(Ljava/util/Collection;Landroid/database/ContentObserver;I)V`, (r, _m, [self, uris, observer, flags]) => {
     if (nullish(uris)) npe(r, 'uris'); const it = call(r, uris, 'Ljava/util/Collection;', 'iterator', [], 'Ljava/util/Iterator;');
@@ -90,7 +120,7 @@ export function createContentResolverApiHost(platform) {
       return call(r, resources, 'Landroid/content/res/Resources;', 'openRawResource', ['I'], INPUT, [id]);
     }
     const p = providerOf(r, uri); if (p === null) noProvider(r, uri);
-    const pfd = call(r, p, PROVIDER, 'openFile', [URI, STRING], PFD, [uri, output ? (mode ?? 'w') : (mode ?? 'r')]);
+    const pfd = pcall(r, p, 'openFile', [URI, STRING], PFD, [uri, output ? (mode ?? 'w') : (mode ?? 'r')]);
     if (nullish(pfd)) noProvider(r, uri);
     return construct(r, output ? 'Landroid/os/ParcelFileDescriptor$AutoCloseOutputStream;' : 'Landroid/os/ParcelFileDescriptor$AutoCloseInputStream;', [PFD], [pfd]);
   };
@@ -102,7 +132,7 @@ export function createContentResolverApiHost(platform) {
     const scheme = schemeOf(r, uri), modeText = text(r, mode);
     if (scheme === 'file') return callStatic(r, PFD, 'open', ['Ljava/io/File;', 'I'], PFD, [construct(r, 'Ljava/io/File;', [STRING], [text(r, call(r, uri, URI, 'getPath', [], STRING))]), callStatic(r, PFD, 'parseMode', [STRING], 'I', [mode])]);
     const p = providerOf(r, uri); if (p === null) noProvider(r, uri);
-    return call(r, p, PROVIDER, 'openFile', [URI, STRING, SIGNAL], PFD, [uri, mode, signal]);
+    return pcall(r, p, 'openFile', [URI, STRING, SIGNAL], PFD, [uri, mode, signal]);
   };
   def(RESOLVER, 'openFileDescriptor', `(${URI}${STRING})${PFD}`, (r, _m, [, uri, mode]) => openFile(r, uri, mode, null));
   def(RESOLVER, 'openFileDescriptor', `(${URI}${STRING}${SIGNAL})${PFD}`, (r, _m, [, uri, mode, signal]) => openFile(r, uri, mode, signal));
@@ -130,7 +160,7 @@ export function createContentResolverApiHost(platform) {
     if (scheme === 'android.resource') unsupported('ContentResolver.openAssetFileDescriptor(android.resource://...): raw resources are compressed inside the APK and have no file descriptor here; use openInputStream', 'asset-file-descriptor-unsupported');
     if (scheme === 'file' || scheme === null) return toAfd(r, openFile(r, uri, mode, signal));
     const p = providerOf(r, uri); if (p === null) noProvider(r, uri);
-    return call(r, p, PROVIDER, 'openAssetFile', [URI, STRING, SIGNAL], AFD, [uri, mode, signal]);
+    return pcall(r, p, 'openAssetFile', [URI, STRING, SIGNAL], AFD, [uri, mode, signal]);
   };
   def(RESOLVER, 'openAssetFileDescriptor', `(${URI}${STRING})${AFD}`, (r, _m, [, uri, mode]) => openAsset(r, uri, mode, null));
   def(RESOLVER, 'openAssetFileDescriptor', `(${URI}${STRING}${SIGNAL})${AFD}`, (r, _m, [, uri, mode, signal]) => openAsset(r, uri, mode, signal));
@@ -139,7 +169,7 @@ export function createContentResolverApiHost(platform) {
     if (nullish(uri)) npe(r, 'uri'); if (nullish(type)) npe(r, 'mimeType'); const scheme = schemeOf(r, uri);
     if (scheme === 'file' || scheme === null) return toAfd(r, openFile(r, uri, 'r', signal));
     const p = providerOf(r, uri); if (p === null) noProvider(r, uri);
-    return call(r, p, PROVIDER, 'openTypedAssetFile', [URI, STRING, BUNDLE, SIGNAL], AFD, [uri, type, opts, signal]);
+    return pcall(r, p, 'openTypedAssetFile', [URI, STRING, BUNDLE, SIGNAL], AFD, [uri, type, opts, signal]);
   };
   def(RESOLVER, 'openTypedAssetFileDescriptor', `(${URI}${STRING}${BUNDLE})${AFD}`, (r, _m, [, uri, type, opts]) => openTyped(r, uri, type, opts, null));
   def(RESOLVER, 'openTypedAssetFileDescriptor', `(${URI}${STRING}${BUNDLE}${SIGNAL})${AFD}`, (r, _m, [, uri, type, opts, signal]) => openTyped(r, uri, type, opts, signal));

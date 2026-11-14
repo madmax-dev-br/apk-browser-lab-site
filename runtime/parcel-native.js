@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=a6c2214802a2';
-import { throwNew } from './java-throw.js?v=a6c2214802a2';
+import { APKError } from './apk-error.js?v=352c1cd2699a';
+import { throwNew } from './java-throw.js?v=352c1cd2699a';
 
 // android.os.Parcel natives (android_os_Parcel.cpp over libbinder's Parcel.cpp, android-13.0.0_r1) behind the ORIGINAL Parcel.java in framework.dex.
 //
@@ -106,11 +106,14 @@ export function createParcelNativeBindings() {
   });
 
   // ---- reading
-  const readInt = (runtime, p) => { need(runtime, p, 4); const value = p.view.getInt32(p.position, true); p.position += 4; return value; };
+  // libbinder Parcel::readAligned: a primitive read past the end of the data answers 0 and leaves the position (readInt32/readInt64/readFloat/readDouble never fail in Java), which
+  // is what Parcel.readException sees in the empty reply of a call to a oneway method.
+  const short = (p, length) => p.position + length > p.size;
+  const readInt = (runtime, p) => { if (short(p, 4)) return 0; const value = p.view.getInt32(p.position, true); p.position += 4; return value; };
   add('nativeReadInt(J)I', (runtime, [pointer]) => readInt(runtime, parcel(runtime, pointer)));
-  add('nativeReadLong(J)J', (runtime, [pointer]) => { const p = parcel(runtime, pointer); need(runtime, p, 8); const value = p.view.getBigInt64(p.position, true); p.position += 8; return value; });
+  add('nativeReadLong(J)J', (runtime, [pointer]) => { const p = parcel(runtime, pointer); if (short(p, 8)) return 0n; const value = p.view.getBigInt64(p.position, true); p.position += 8; return value; });
   add('nativeReadFloat(J)F', (runtime, [pointer]) => readInt(runtime, parcel(runtime, pointer)));
-  add('nativeReadDouble(J)D', (runtime, [pointer]) => { const p = parcel(runtime, pointer); need(runtime, p, 8); const value = p.view.getBigInt64(p.position, true); p.position += 8; return value; });
+  add('nativeReadDouble(J)D', (runtime, [pointer]) => { const p = parcel(runtime, pointer); if (short(p, 8)) return 0n; const value = p.view.getBigInt64(p.position, true); p.position += 8; return value; });
   const readPadded = (runtime, p, length) => { const padded = (length + 3) & ~3; need(runtime, p, padded); const at = p.position; p.position += padded; return at; };
   const javaBytes = (p, at, length) => p.bytes.subarray(at, at + length);   // copied into the byte[] by arrayOf
   add('nativeCreateByteArray(J)[B', (runtime, [pointer]) => {
@@ -128,16 +131,16 @@ export function createParcelNativeBindings() {
     const at = readPadded(runtime, p, length); return runtime.arrayOf('[B', javaBytes(p, at, length));
   });
   const readString16 = (runtime, p) => {
-    const length = readInt(runtime, p); if (length < 0) return null;
+    const length = readInt(runtime, p); if (length < 0 || short(p, ((length + 1) * 2 + 3) & ~3)) return null;   // readString16Inplace: not enough data is null
     const at = readPadded(runtime, p, (length + 1) * 2); let text = ''; for (let i = 0; i < length; i++) text += String.fromCharCode(p.view.getUint16(at + i * 2, true)); return text;
   };
   add('nativeReadString16(J)Ljava/lang/String;', (runtime, [pointer]) => readString16(runtime, parcel(runtime, pointer)));
   add('nativeReadString8(J)Ljava/lang/String;', (runtime, [pointer]) => {
-    const p = parcel(runtime, pointer), length = readInt(runtime, p); if (length < 0) return null;
+    const p = parcel(runtime, pointer), length = readInt(runtime, p); if (length < 0 || short(p, (length + 4) & ~3)) return null;
     const at = readPadded(runtime, p, length + 1); return decoder.decode(p.bytes.subarray(at, at + length));
   });
   add('nativeReadStrongBinder(J)Landroid/os/IBinder;', (runtime, [pointer]) => {
-    const p = parcel(runtime, pointer); need(runtime, p, BINDER_OBJECT_SIZE); const at = p.position;
+    const p = parcel(runtime, pointer); if (short(p, BINDER_OBJECT_SIZE)) return null; const at = p.position;   // readNullableStrongBinder past the end: null
     if (p.view.getUint32(at, true) !== BINDER_TYPE_BINDER) bad(runtime, 'Parcel: not a binder object at this position');
     p.position += BINDER_OBJECT_SIZE; return p.objects.get(at) ?? null;
   });

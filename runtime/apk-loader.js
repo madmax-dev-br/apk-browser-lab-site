@@ -1,18 +1,19 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=a6c2214802a2';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=a6c2214802a2';
-import { inspectELF } from './native-inspector.js?v=a6c2214802a2';
-import { elfBuildId } from './elf-build-id.js?v=a6c2214802a2';
-import { inflateRaw } from './inflate.js?v=a6c2214802a2';
-import { crc32, inflateEntry } from './zip-entry.js?v=a6c2214802a2';
-import { resolveDevice } from './device-profile.js?v=a6c2214802a2';
-import { resourceProfileFor } from './device-configuration.js?v=a6c2214802a2';
-import { JniBridge } from './jni-host.js?v=a6c2214802a2';
-import { providerForApk } from './native-provider-variants.js?v=a6c2214802a2';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=a6c2214802a2';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=a6c2214802a2';
-import { AndroidResources } from './android-resources.js?v=a6c2214802a2';
-import { AndroidPlatform } from './android-platform.js?v=a6c2214802a2';
-import { FrameworkProvider } from './framework-provider.js?v=a6c2214802a2';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=352c1cd2699a';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=352c1cd2699a';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=352c1cd2699a';
+import { inspectELF } from './native-inspector.js?v=352c1cd2699a';
+import { elfBuildId } from './elf-build-id.js?v=352c1cd2699a';
+import { inflateRaw } from './inflate.js?v=352c1cd2699a';
+import { crc32, inflateEntry } from './zip-entry.js?v=352c1cd2699a';
+import { resolveDevice } from './device-profile.js?v=352c1cd2699a';
+import { resourceProfileFor } from './device-configuration.js?v=352c1cd2699a';
+import { JniBridge } from './jni-host.js?v=352c1cd2699a';
+import { providerForApk } from './native-provider-variants.js?v=352c1cd2699a';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=352c1cd2699a';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=352c1cd2699a';
+import { AndroidResources } from './android-resources.js?v=352c1cd2699a';
+import { AndroidPlatform } from './android-platform.js?v=352c1cd2699a';
+import { FrameworkProvider } from './framework-provider.js?v=352c1cd2699a';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -161,7 +162,7 @@ export class APKArchive {
 /** Reads binary Android XML launcher declarations; no Android process or remote service. */
 // AOSP frameworks/base/core/res/res/values/public-final.xml (api 1-34) ids for the AndroidManifest attributes this loader reads.
 // Production bundles blank the attribute-name strings; Android's XmlBlock then resolves them from the RES_XML_RESOURCE_MAP chunk.
-const MANIFEST_ATTRIBUTE_IDS = new Map(Object.entries({ scheme: 0x01010027, host: 0x01010028, autoVerify: 0x010104ee, theme: 0x01010000, label: 0x01010001, icon: 0x01010002, name: 0x01010003, permission: 0x01010006, enabled: 0x0101000e, exported: 0x01010010, process: 0x01010011, authorities: 0x01010018, initOrder: 0x0101001a, multiprocess: 0x01010013, grantUriPermissions: 0x0101001b, launchMode: 0x0101001d, taskAffinity: 0x01010012, finishOnTaskLaunch: 0x01010014, clearTaskOnLaunch: 0x01010015, excludeFromRecents: 0x01010017, alwaysRetainTaskState: 0x01010203, allowTaskReparenting: 0x01010204, noHistory: 0x0101022d, documentLaunchMode: 0x01010445, autoRemoveFromRecents: 0x01010447, screenOrientation: 0x0101001e, configChanges: 0x0101001f, value: 0x01010024, resource: 0x01010025, targetActivity: 0x01010202, minSdkVersion: 0x0101020c, versionCode: 0x0101021b, versionName: 0x0101021c, windowSoftInputMode: 0x0101022b, targetSdkVersion: 0x01010270, maxSdkVersion: 0x01010271, allowBackup: 0x01010280, parentActivityName: 0x010103a7, appComponentFactory: 0x0101057a, extractNativeLibs: 0x010104ea, usesCleartextTraffic: 0x010104ec, enableOnBackInvokedCallback: 0x0101066c, networkSecurityConfig: 0x01010527, foregroundServiceType: 0x01010599 }).map(([name, id]) => [id, name]));
+const MANIFEST_ATTRIBUTE_IDS = new Map(Object.entries({ scheme: 0x01010027, host: 0x01010028, autoVerify: 0x010104ee, theme: 0x01010000, label: 0x01010001, icon: 0x01010002, name: 0x01010003, permission: 0x01010006, readPermission: 0x01010007, writePermission: 0x01010008, protectionLevel: 0x01010009, enabled: 0x0101000e, exported: 0x01010010, process: 0x01010011, authorities: 0x01010018, initOrder: 0x0101001a, multiprocess: 0x01010013, grantUriPermissions: 0x0101001b, launchMode: 0x0101001d, taskAffinity: 0x01010012, finishOnTaskLaunch: 0x01010014, clearTaskOnLaunch: 0x01010015, excludeFromRecents: 0x01010017, alwaysRetainTaskState: 0x01010203, allowTaskReparenting: 0x01010204, noHistory: 0x0101022d, documentLaunchMode: 0x01010445, autoRemoveFromRecents: 0x01010447, screenOrientation: 0x0101001e, configChanges: 0x0101001f, value: 0x01010024, resource: 0x01010025, targetActivity: 0x01010202, minSdkVersion: 0x0101020c, versionCode: 0x0101021b, versionName: 0x0101021c, windowSoftInputMode: 0x0101022b, targetSdkVersion: 0x01010270, maxSdkVersion: 0x01010271, allowBackup: 0x01010280, parentActivityName: 0x010103a7, appComponentFactory: 0x0101057a, extractNativeLibs: 0x010104ea, usesCleartextTraffic: 0x010104ec, enableOnBackInvokedCallback: 0x0101066c, networkSecurityConfig: 0x01010527, foregroundServiceType: 0x01010599 }).map(([name, id]) => [id, name]));
 export function parseManifest(data) {
   const b = new BinaryReader(data);
   let resourceMap = null;
@@ -169,7 +170,8 @@ export function parseManifest(data) {
   let strings = null, packageName = null, applicationName = null;
   const activities = [], services = [], providers = [], receivers = [], providerDetails = [], componentDetails = [], stack = [], autoVerifyHosts = new Set();
   let application = {}, usesSdk = {}, manifestAttrs = {};
-  const usesPermissions = [], declaredPermissions = [];   // <uses-permission>/<uses-permission-sdk-23> names and the app's own <permission> declarations
+  const usesPermissions = [], declaredPermissions = [];
+  const queries = { packages: [], actions: [], authorities: [] };   // <queries> (API 30 package visibility): the packages, intent actions and provider authorities this package declares it interacts with   // <uses-permission>/<uses-permission-sdk-23> names and the app's own <permission> declarations
   const str = i => { if (!strings || i >= strings.length) fail('Invalid AXML string reference'); return strings[i]; };
   const resolveName = name => name.startsWith('.') ? packageName + name : name.includes('.') ? name : `${packageName}.${name}`;
   for (let p = b.u16(2); p < b.length;) {
@@ -221,10 +223,16 @@ export function parseManifest(data) {
       if (name === 'uses-sdk') usesSdk = { ...attrs };
       if ((name === 'uses-permission' || name === 'uses-permission-sdk-23') && typeof attrs.name === 'string') usesPermissions.push({ name: attrs.name, maxSdkVersion: attrs.maxSdkVersion ?? null });
       if (name === 'permission' && typeof attrs.name === 'string') declaredPermissions.push({ name: attrs.name, protectionLevel: attrs.protectionLevel ?? 0 });
+      if (stack.some(n => n.name === 'queries')) {
+        if (name === 'package' && typeof attrs.name === 'string') queries.packages.push(attrs.name);
+        if (name === 'action' && typeof attrs.name === 'string') queries.actions.push(attrs.name);
+        if (name === 'provider' && typeof attrs.authorities === 'string') queries.authorities.push(...attrs.authorities.split(';'));
+        stack.push(node); p += size; continue;
+      }
       const components = { service: services, provider: providers, receiver: receivers };
       if (components[name] && typeof attrs.name === 'string') components[name].push(resolveName(attrs.name));
       if (components[name] || name === 'application') node.component = name === 'application' ? { metaData: (application.metaData ??= []) } : { metaData: [] };
-      if (components[name] && typeof attrs.name === 'string') { const detail = { kind: name, name: resolveName(attrs.name), authorities: attrs.authorities ?? null, exported: attrs.exported, enabled: attrs.enabled, process: attrs.process ?? null, initOrder: attrs.initOrder ?? 0, multiprocess: attrs.multiprocess, directBootAware: attrs.directBootAware, grantUriPermissions: attrs.grantUriPermissions, permission: attrs.permission ?? null, foregroundServiceType: attrs.foregroundServiceType ?? 0, metaData: node.component.metaData, order: componentDetails.length }; node.component.detail = detail; componentDetails.push(detail); if (name === 'provider') providerDetails.push(detail); }
+      if (components[name] && typeof attrs.name === 'string') { const detail = { kind: name, name: resolveName(attrs.name), authorities: attrs.authorities ?? null, exported: attrs.exported, enabled: attrs.enabled, process: attrs.process ?? null, initOrder: attrs.initOrder ?? 0, multiprocess: attrs.multiprocess, directBootAware: attrs.directBootAware, grantUriPermissions: attrs.grantUriPermissions, permission: attrs.permission ?? null, readPermission: attrs.readPermission ?? null, writePermission: attrs.writePermission ?? null, foregroundServiceType: attrs.foregroundServiceType ?? 0, metaData: node.component.metaData, order: componentDetails.length }; node.component.detail = detail; componentDetails.push(detail); if (name === 'provider') providerDetails.push(detail); }
       if (name === 'action' && typeof attrs.name === 'string') { const owner = [...stack].reverse().find(n => n.component)?.component; if (owner?.detail) (owner.detail.actions ??= []).push(attrs.name); }
       if (name === 'meta-data') { const owner = [...stack].reverse().find(n => n.component)?.component; if (owner && typeof attrs.name === 'string') owner.metaData.push({ name: attrs.name, value: attrs.value, valueType: attrTypes.value, resource: attrs.resource }); }
       if (name === 'activity' || name === 'activity-alias') {
@@ -267,7 +275,7 @@ export function parseManifest(data) {
     else deduplicated.set(a.name, { ...a, descriptor: `L${a.name.replaceAll('.', '/')};` });
   }
   const launchers = [...deduplicated.values()].filter(a => a.launcher);
-  return { packageName, applicationName, application, usesSdk, usesPermissions, declaredPermissions, activities: [...deduplicated.values()], services, providers, receivers, providerDetails, componentDetails, manifestAttrs, autoVerifyHosts: [...autoVerifyHosts],
+  return { packageName, applicationName, application, usesSdk, usesPermissions, declaredPermissions, queries, activities: [...deduplicated.values()], services, providers, receivers, providerDetails, componentDetails, manifestAttrs, autoVerifyHosts: [...autoVerifyHosts],
     componentCounts: { activities: deduplicated.size, services: services.length, providers: providers.length, receivers: receivers.length },
     launcherActivity: launchers.length === 1 ? launchers[0].name : null };
 }
@@ -470,6 +478,29 @@ export function holdUntilReleased(work, { onProgress = null, warnings }) {
     },
   };
 }
+/**
+ * A companion package: a second APK installed on the virtual device next to the app being run, in the same VM (docs/MULTI-PACKAGE.md). Its manifest is read and its
+ * DEX files are found here (the same discovery and limits as the base APK, the same INSTALL_FAILED_OLDER_SDK rule); its code is defined later, in its own class loader,
+ * when its process starts. Its resources.arsc is not prepared (Context.getResources of the companion fails explicitly), and its native libraries are not offered to JNI.
+ */
+export function prepareCompanionPackage(input, { apiLevel = 33 } = {}) {
+  if (!(input instanceof ArrayBuffer) && !(input instanceof Uint8Array)) fail('A companion package must be APK bytes (ArrayBuffer or Uint8Array)');
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input), archive = new APKArchive(bytes), names = [...archive.entries.keys()];
+  if (!archive.entries.has('AndroidManifest.xml')) fail('Companion APK has no AndroidManifest.xml');
+  if (!archive.entries.has('classes.dex')) fail('Companion APK has no root classes.dex');
+  const manifest = parseManifest(archive.extractSync('AndroidManifest.xml', 2 * 1024 * 1024));
+  const dexFiles = ['classes.dex'];
+  for (let index = 2; archive.entries.has(`classes${index}.dex`); index++) { if (dexFiles.length >= MAX_DEX_FILES) fail(`Companion APK ${manifest.packageName} exceeds ${MAX_DEX_FILES} root DEX files`); dexFiles.push(`classes${index}.dex`); }
+  let total = 0;
+  for (const name of dexFiles) { const size = archive.entries.get(name).size; if (size > MAX_DEX) fail(`${manifest.packageName}: ${name} exceeds 64 MiB DEX limit (${size} bytes)`); total += size; }
+  if (total > MAX_DEX_TOTAL) fail(`${manifest.packageName}: DEX files exceed the combined ${MAX_DEX_TOTAL / 1048576} MiB limit`);
+  const minSdk = Number(manifest.usesSdk?.minSdkVersion ?? 1);
+  if (Number.isFinite(minSdk) && minSdk > apiLevel) throw new APKError(`INSTALL_FAILED_OLDER_SDK: ${manifest.packageName} requires newer sdk version #${minSdk} (current version is #${apiLevel})`, { kind: 'install-failed-older-sdk', minSdkVersion: minSdk, deviceSdk: apiLevel });
+  let certificates;
+  return { packageName: manifest.packageName, manifest, archive, bytes, entries: new Set(names), dexFiles, dexBytes: total,
+    nativeLibraries: names.filter(name => name.endsWith('.so')).sort(), hasResources: archive.entries.has('resources.arsc'),
+    signingCertificates: () => certificates ??= apkSigningCertificates(archive), reader: name => archive.extractSync(name, 256 * 1024 * 1024), entryRange: name => archive.entryRange(name) };
+}
 let defaultFrameworkProvider = null;
 /** Node tests: a factory of the framework provider loadAPK uses when the caller names none (the browser Worker always passes its own). */
 export function setDefaultFrameworkProvider(factory) { defaultFrameworkProvider = factory; }
@@ -637,13 +668,16 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // the resources prepared since the manifest was read (above): their progress reports and warnings take their place here, in their order, and so do their errors
   const { frameworkResources, resourceConfiguration, resources } = await resourcesReady.release();
   let icuBreakBackend=options.icuBreakBackend??null;
-  if(!icuBreakBackend&&options.icuBreakProvider&&program.types.some(type=>['Ljava/text/BreakIterator;','Landroid/icu/text/BreakIterator;','Ljava/util/regex/Pattern;','Ljava/util/regex/Matcher;'].includes(type)||type.startsWith('Landroid/database/')||type.startsWith('Ljava/time/')||type.startsWith('Ljava/math/'))){ // android.database.sqlite's own SQLiteDatabaseConfiguration compiles a java.util.regex.Pattern
+  // A companion package's code (options.companionPackages, the microG option) is not scanned at load: it may need any of the lazily chosen backends below, so with one installed
+  // every one of them is prepared (a device with the app alone decides by the app's types, as before).
+  const backendTypes = (options.companionPackages?.length ?? 0) > 0 || options.microg ? { some: () => true } : program.types;
+  if(!icuBreakBackend&&options.icuBreakProvider&&backendTypes.some(type=>['Ljava/text/BreakIterator;','Landroid/icu/text/BreakIterator;','Ljava/util/regex/Pattern;','Ljava/util/regex/Matcher;'].includes(type)||type.startsWith('Landroid/database/')||type.startsWith('Ljava/time/')||type.startsWith('Ljava/math/'))){ // android.database.sqlite's own SQLiteDatabaseConfiguration compiles a java.util.regex.Pattern
     const provider=options.icuBreakProvider;icuBreakBackend=typeof provider==='function'?await provider():await provider.load();
     if(typeof icuBreakBackend?.breaks!=='function')fail('Invalid original ICU break-analysis provider');
   }
   // Android 13 SQLite (Wasm) for the framework's SQLiteConnection/CursorWindow natives; loaded only when the app references android.database.*.
   let sqliteBackend=options.sqliteBackend??null;
-  if(!sqliteBackend&&options.sqliteProvider&&program.types.some(type=>type.startsWith('Landroid/database/'))){
+  if(!sqliteBackend&&options.sqliteProvider&&backendTypes.some(type=>type.startsWith('Landroid/database/'))){
     const provider=options.sqliteProvider;sqliteBackend=typeof provider==='function'?await provider():await provider.load();
     if(!sqliteBackend?.module)fail('Invalid Android SQLite provider');
   }
@@ -658,21 +692,38 @@ export async function loadAPK(arrayBuffer, options = {}) {
   {const javacrypto=options.javacryptoProvider??getDefaultJavacryptoProvider();if(javacrypto)nativeLibraryProvider=javacrypto.compose(nativeLibraryProvider);}
   // IANA tz database (AOSP tzdata2022a compiled to java.time ZoneRules) for the original java.time sources; loaded when the app can reach java.time.
   let tzdata=options.tzdata??null;
-  if(!tzdata&&options.tzdataProvider&&program.types.some(type=>type.startsWith('Ljava/time/')||['Ljava/util/Date;','Ljava/util/TimeZone;','Ljava/util/GregorianCalendar;'].includes(type))){
+  if(!tzdata&&options.tzdataProvider&&backendTypes.some(type=>type.startsWith('Ljava/time/')||['Ljava/util/Date;','Ljava/util/TimeZone;','Ljava/util/GregorianCalendar;'].includes(type))){
     const provider=options.tzdataProvider;tzdata=typeof provider==='function'?await provider():await provider.load();
     if(!tzdata?.bytes)fail('Invalid tz database provider');
   }
   // zlib + zip_util (Wasm) for the original java.util.zip classes; loaded when the app can reach them.
   let zlibBackend=options.zlibBackend??null;
-  if(!zlibBackend&&options.zlibProvider&&program.types.some(type=>type.startsWith('Ljava/util/zip/')||type.startsWith('Ljava/util/jar/'))){
+  if(!zlibBackend&&options.zlibProvider&&backendTypes.some(type=>type.startsWith('Ljava/util/zip/')||type.startsWith('Ljava/util/jar/'))){
     const provider=options.zlibProvider;zlibBackend=typeof provider==='function'?await provider():await provider.load();
     if(!zlibBackend?.module)fail('Invalid zlib provider');
   }
   // ICU4C converters (Wasm) behind the original java.nio.charset coders (CharsetDecoderICU/EncoderICU); needed by anything that encodes/decodes through a Charset object.
   let icuConverterBackend=options.icuConverterBackend??null;
-  if(!icuConverterBackend&&options.icuConverterProvider&&program.types.some(type=>type.startsWith('Ljava/nio/charset/')||type.startsWith('Ljava/util/zip/')||/^Ljava\/io\/(InputStreamReader|OutputStreamWriter|PrintStream|PrintWriter|FileReader|FileWriter|LineNumberReader|StreamTokenizer);/.test(type))){
+  if(!icuConverterBackend&&options.icuConverterProvider&&backendTypes.some(type=>type.startsWith('Ljava/nio/charset/')||type.startsWith('Ljava/util/zip/')||/^Ljava\/io\/(InputStreamReader|OutputStreamWriter|PrintStream|PrintWriter|FileReader|FileWriter|LineNumberReader|StreamTokenizer);/.test(type))){
     const provider=options.icuConverterProvider;icuConverterBackend=typeof provider==='function'?await provider():await provider.load();
     if(!icuConverterBackend?.module)fail('Invalid ICU converter provider');
+  }
+  // Companion packages (options.companionPackages: APK bytes): parsed now, so a broken or duplicate one fails the load before anything runs; installed once the platform exists.
+  const companions = (options.companionPackages ?? []).map(bytes => prepareCompanionPackage(bytes, { apiLevel: options.apiLevel ?? 33 }));
+  // The "com microG" device option (src/microg-device.js): options.microg = { version, packages: [APK bytes of com.google.android.gms, com.android.vending] }. Its packages are
+  // preinstalled companions flagged with the option, the only packages whose reported signature the option changes. Absent = off: the device has no Play services.
+  if (options.microg) {
+    const { version, packages } = options.microg;
+    if (typeof version !== 'string' || !Array.isArray(packages) || packages.length !== MICROG_PACKAGES.length) fail(`The microG option needs its version and the ${MICROG_PACKAGES.length} packages ${MICROG_PACKAGES.join(', ')}`);
+    for (const bytes of packages) {
+      const companion = prepareCompanionPackage(bytes, { apiLevel: options.apiLevel ?? 33 });
+      if (!MICROG_PACKAGES.includes(companion.packageName)) fail(`The microG option installs ${MICROG_PACKAGES.join(' and ')} only, not ${companion.packageName}`);
+      companions.push({ ...companion, system: true, deviceOption: 'microg', buildSigner: `microg-${version}` });
+    }
+  }
+  for (const [index, companion] of companions.entries()) {
+    if (companion.packageName === manifest.packageName) fail(`Companion package ${companion.packageName} has the same package name as the app (INSTALL_FAILED_DUPLICATE_PACKAGE)`);
+    if (companions.findIndex(other => other.packageName === companion.packageName) !== index) fail(`Companion package ${companion.packageName} is given twice (INSTALL_FAILED_DUPLICATE_PACKAGE)`);
   }
   // PackageManagerService: an APK that needs a newer platform than the device's SDK_INT cannot be installed.
   const deviceSdk = options.apiLevel ?? 33, minSdk = Number(manifest.usesSdk?.minSdkVersion ?? 1);
@@ -688,6 +739,11 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // Canvas raster cache (src/skia-canvas-host.js): on by default; `rasterCache: false` switches it off for A/B comparison, `rasterCacheVerify: true` re-rasters every hit and fails on a difference.
   runtime.rasterCacheDisabled = options.rasterCache === false; runtime.rasterCacheVerify = options.rasterCacheVerify === true;
   runtime.strictCrash = options.strictCrash === true;   // an uncaught exception ends the app run (Android) instead of only the thread that failed
+  for (const companion of companions) {
+    runtime.platform.packages.install(companion);
+    if (companion.nativeLibraries.length) warnings.push(`Companion package ${companion.packageName} packages ${companion.nativeLibraries.length} native files; they are not offered to JNI (a companion's System.loadLibrary fails naming the library)`);
+  }
+  if (options.microg) enableMicrog(runtime, { version: options.microg.version });   // the signer hook, the locked settings file, the refused permissions; before any app code runs
   runtime.platform.resourceSelector = resourceConfiguration ?? null; // live device changes re-select resources through the same original ResTable_config matcher
   if (nativeLibraryProvider && [...nativeLibraryProvider.modules.values()].some(entry => entry.apkSha256)) {
     // libraries scoped to one APK (its own generated native code) are offered only to that APK: compared by the SHA-256 of the file
@@ -748,7 +804,9 @@ export async function loadAPK(arrayBuffer, options = {}) {
     dexFiles, dexSummaries, totalDexBytes, nativeLibraries, nativeLibraryDetails, nativeByABI, nativeSummary,
     resourceSummary: resources.summary,
     kotlin, compose, embeddedFrameworks, bundles, dependencies: dependencyOwners.map(dottedName),
-    unsupportedFeatures, warnings, nativeInspection: { requested: false, inspected: 0, skipped: nativeLibraries.length, bytes: 0 } };
+    unsupportedFeatures, warnings, nativeInspection: { requested: false, inspected: 0, skipped: nativeLibraries.length, bytes: 0 },
+    microg: options.microg ? { version: options.microg.version, packages: companions.filter(c => c.deviceOption === 'microg').map(c => c.packageName) } : null,
+    companionPackages: companions.map(c => ({ packageName: c.packageName, deviceOption: c.deviceOption ?? null, versionName: c.manifest.manifestAttrs?.versionName ?? null, versionCode: c.manifest.manifestAttrs?.versionCode ?? null, dexFiles: c.dexFiles, dexBytes: c.dexBytes, services: c.manifest.services.length, providers: c.manifest.providers.length, nativeFiles: c.nativeLibraries.length, resources: c.hasResources })) };
 
   /** Lazy ELF metadata inspection. Accept exact archive paths; never resolves or calls JNI. */
   const inspectNativeLibraries = async (paths = nativeLibraries, limits = {}) => {

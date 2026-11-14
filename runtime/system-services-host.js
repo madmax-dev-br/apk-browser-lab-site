@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=a6c2214802a2';
-import { APKError } from './apk-error.js?v=a6c2214802a2';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=a6c2214802a2';
+import { gcRoot } from './heap-gc.js?v=352c1cd2699a';
+import { APKError } from './apk-error.js?v=352c1cd2699a';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=352c1cd2699a';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -152,7 +152,7 @@ export function createSystemServicesHost(platform) {
   const THROWABLE = 'Ljava/lang/Throwable;', STE = 'Ljava/lang/StackTraceElement;';
   registry.type(STE, 'Ljava/lang/Object;', [], { allocatable: true });
   def(THROWABLE, 'getLocalizedMessage', '()Ljava/lang/String;', (r, _m, [self]) => r.dispatch({ owner: THROWABLE, name: 'getMessage', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [self], 'virtual'));
-  const dotted = type => type.slice(1, -1).replace(/\//g, '.');
+  const dotted = type => type.replace(/\$\$ldr\d+;$/, ';').slice(1, -1).replace(/\//g, '.');   // a companion's class is named without its loader alias
   const traceElements = (r, self) => {
     const o = r.object(self); if (o.stackElements) return o.stackElements;
     return o.stackElements = (o.stack ?? []).map(method => { const e = r.makeObject(STE); r.object(e).ste = { cls: dotted(method.owner), method: method.name, file: null, line: -1 }; return e; });
@@ -193,9 +193,15 @@ export function createSystemServicesHost(platform) {
   //      real IPC to other processes (there are none), so it fails explicitly. -------------------------------------------------------------------
   const BINDER = 'Landroid/os/Binder;', IINTERFACE = 'Landroid/os/IInterface;';
   registry.type(BINDER, 'Ljava/lang/Object;', ['Landroid/os/IBinder;'], { allocatable: true }); registry.interfaces.set('Landroid/os/IBinder;', []); registry.parents.set('Landroid/os/IBinder;', 'Ljava/lang/Object;');
-  def(BINDER, '<init>', '()V', () => {}); def(BINDER, '<init>', '(Ljava/lang/String;)V', (r, _m, [self, d]) => { r.object(self).binderDescriptor = d; });
+  // With a companion package installed (src/package-registry.js, docs/MULTI-PACKAGE.md) every Binder records the package whose code created it. To another package it behaves as
+  // a remote binder does: queryLocalInterface answers null (an AIDL Stub.asInterface builds its Proxy, so arguments really travel in the Parcel), and transact runs onTransact
+  // as a transaction from the calling package (Binder.getCallingUid/Pid answer the caller's ids), a oneway one as a message on the main Looper over a copy of the data.
+  const P = () => platform.packages?.multi ? platform.packages : null;
+  const ownBinder = (r, self) => { const registry = P(); if (registry) r.object(self).binderPackage = registry.callerEntry(r); };
+  const foreign = (r, self) => { const registry = P(); if (!registry) return null; const owner = r.object(self).binderPackage; if (!owner) return null; const caller = registry.callerEntry(r); return caller === owner ? null : { caller, owner }; };
+  def(BINDER, '<init>', '()V', (r, _m, [self]) => ownBinder(r, self)); def(BINDER, '<init>', '(Ljava/lang/String;)V', (r, _m, [self, d]) => { r.object(self).binderDescriptor = d; ownBinder(r, self); });
   def(BINDER, 'attachInterface', `(${IINTERFACE}Ljava/lang/String;)V`, (r, _m, [self, owner, descriptor]) => { const o = r.object(self); o.binderOwner = owner; o.binderDescriptor = descriptor; });
-  def(BINDER, 'queryLocalInterface', `(Ljava/lang/String;)${IINTERFACE}`, (r, _m, [self, descriptor]) => { const o = r.object(self); return o.binderDescriptor !== undefined && o.binderDescriptor !== null && descriptor !== null && r.stringCharacters(o.binderDescriptor) === r.stringCharacters(descriptor) ? o.binderOwner ?? null : null; });
+  def(BINDER, 'queryLocalInterface', `(Ljava/lang/String;)${IINTERFACE}`, (r, _m, [self, descriptor]) => { const o = r.object(self); if (foreign(r, self)) return null; return o.binderDescriptor !== undefined && o.binderDescriptor !== null && descriptor !== null && r.stringCharacters(o.binderDescriptor) === r.stringCharacters(descriptor) ? o.binderOwner ?? null : null; });
   def(BINDER, 'getInterfaceDescriptor', '()Ljava/lang/String;', (r, _m, [self]) => r.object(self).binderDescriptor ?? null);
   def(BINDER, 'pingBinder', '()Z', () => 1); def(BINDER, 'isBinderAlive', '()Z', () => 1);
   // Local Binder transactions (Binder.transact -> execTransact -> onTransact): the VM is one process, so every Binder an app sees is a local object (AIDL Stub.asInterface returns the
@@ -208,6 +214,8 @@ export function createSystemServicesHost(platform) {
     return 0;
   });
   def(BINDER, 'transact', `(I${PARCEL_T}${PARCEL_T}I)Z`, (r, _m, [self, code, data, reply, flags]) => {
+    const cross = foreign(r, self);
+    if (cross) return crossTransact(r, self, code, data, reply, flags, cross);
     if (data) vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [data, 0]);
     let result;
     try { result = vcall(r, r.typeOf(self), 'onTransact', ['I', PARCEL_T, PARCEL_T, 'I'], 'Z', [self, code, data, reply, flags]); }
@@ -219,11 +227,36 @@ export function createSystemServicesHost(platform) {
     if (reply) vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [reply, 0]);
     return result ? 1 : 0;
   });
+  /** A transaction from another installed package: synchronous on the calling thread with the caller's identity; FLAG_ONEWAY (1) posts it to the main Looper over a copy of the data. */
+  const crossTransact = (r, self, code, data, reply, flags, { caller, owner }) => {
+    // Binder.execTransact in the callee's process always hands onTransact a reply Parcel (a oneway transaction's reply is discarded), so a Stub that writes a reply for a method
+    // the caller's interface declares oneway still works; for a oneway call an exception is only logged, never written back.
+    const obtain = () => r.dispatch({ owner: PARCEL_T, name: 'obtain', parameters: [], result: PARCEL_T, signature: `()${PARCEL_T}` }, [], 'static');
+    const registry = platform.packages, serve = (input, given) => registry.withCaller(r, caller, () => {
+      if (input) vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [input, 0]);
+      const output = given ?? obtain(), oneway = !given;
+      try { return vcall(r, r.typeOf(self), 'onTransact', ['I', PARCEL_T, PARCEL_T, 'I'], 'Z', [self, code, input, output, flags]) ? 1 : 0; }
+      catch (error) {
+        const value = error?.value; if (!value || !(r.isSubtype(r.typeOf(value), 'Ljava/lang/RuntimeException;') || r.isSubtype(r.typeOf(value), 'Landroid/os/RemoteException;'))) throw error;
+        if (oneway) { let where = ''; try { where = traceLines(r, value).slice(0, 4).join(' | '); } catch { /* no trace */ } r.record(`BINDER oneway call to ${owner.name} threw ${r.typeOf(value)}${where ? ': ' + where : ''}`); return 1; }
+        vcall(r, PARCEL_T, 'setDataSize', ['I'], 'V', [output, 0]); vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [output, 0]); vcall(r, PARCEL_T, 'writeException', ['Ljava/lang/Exception;'], 'V', [output, value]); return 1;
+      } finally { if (!given) vcall(r, PARCEL_T, 'recycle', [], 'V', [output]); }
+    });
+    if (flags & 1) {
+      const copy = r.dispatch({ owner: PARCEL_T, name: 'obtain', parameters: [], result: PARCEL_T, signature: `()${PARCEL_T}` }, [], 'static');
+      if (data) vcall(r, PARCEL_T, 'appendFrom', [PARCEL_T, 'I', 'I'], 'V', [copy, data, 0, vcall(r, PARCEL_T, 'dataSize', [], 'I', [data])]);
+      platform.queueTask(() => { try { serve(copy, null); } finally { vcall(r, PARCEL_T, 'recycle', [], 'V', [copy]); } }, 0, [self, copy]);
+      return 1;
+    }
+    const result = serve(data, reply);
+    if (reply) vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [reply, 0]);
+    return result;
+  };
   def(BINDER, 'allowBlocking', `(${'Landroid/os/IBinder;'})Landroid/os/IBinder;`, (r, _m, [binder]) => binder, { static: true });
   def(BINDER, 'linkToDeath', '(Landroid/os/IBinder$DeathRecipient;I)V', () => {}); def(BINDER, 'unlinkToDeath', '(Landroid/os/IBinder$DeathRecipient;I)Z', () => 1);
   def(BINDER, 'flushPendingCommands', '()V', () => {}, { static: true });
-  def(BINDER, 'getCallingPid', '()I', r => r.platform.virtualProcess.pid, { static: true }); def(BINDER, 'getCallingUid', '()I', r => r.platform.virtualProcess.uid, { static: true });
-  def(BINDER, 'clearCallingIdentity', '()J', () => 0n, { static: true }); def(BINDER, 'restoreCallingIdentity', '(J)V', () => {}, { static: true });
+  def(BINDER, 'getCallingPid', '()I', r => P() ? P().callingIdentity(r).pid : r.platform.virtualProcess.pid, { static: true }); def(BINDER, 'getCallingUid', '()I', r => P() ? P().callingIdentity(r).uid : r.platform.virtualProcess.uid, { static: true });
+  def(BINDER, 'clearCallingIdentity', '()J', r => P() ? P().clearCallingIdentity(r) : 0n, { static: true }); def(BINDER, 'restoreCallingIdentity', '(J)V', (r, _m, [token]) => { P()?.restoreCallingIdentity(r, token); }, { static: true });
 
   // ---- java.lang.Number conversions (byteValue/shortValue/intValue/longValue/floatValue/doubleValue between all numeric boxes, Java narrowing rules) ------
   const NUMBER_BOXES = { 'Ljava/lang/Byte;': 'B', 'Ljava/lang/Short;': 'S', 'Ljava/lang/Integer;': 'I', 'Ljava/lang/Long;': 'J', 'Ljava/lang/Float;': 'F', 'Ljava/lang/Double;': 'D' };
@@ -439,10 +472,13 @@ export function createSystemServicesHost(platform) {
   // ---- android.os.Messenger over the process-local Handler (frameworks/base/core/java/android/os/Messenger.java + Handler.MessengerImpl): a Messenger made from a Handler
   // delivers send(Message) to that handler's queue after stamping Message.sendingUid with Binder.getCallingUid(). Remote messengers (Messenger(IBinder), Parcel
   // transport) need a Binder driver and are not available; they fail explicitly.
-  const MESSENGER = 'Landroid/os/Messenger;', MESSENGER_IMPL = 'Landroid/os/Handler$MessengerImpl;', HANDLER_TYPE = 'Landroid/os/Handler;', MESSAGE_TYPE = 'Landroid/os/Message;', IBINDER = 'Landroid/os/IBinder;';
+  const IMESSENGER = 'android.os.IMessenger', MESSENGER = 'Landroid/os/Messenger;', MESSENGER_IMPL = 'Landroid/os/Handler$MessengerImpl;', HANDLER_TYPE = 'Landroid/os/Handler;', MESSAGE_TYPE = 'Landroid/os/Message;', IBINDER = 'Landroid/os/IBinder;';
   registry.type(MESSENGER, 'Ljava/lang/Object;', ['Landroid/os/Parcelable;'], { allocatable: true }); registry.type(MESSENGER_IMPL, 'Landroid/os/Binder;', [IBINDER], { allocatable: true });
+  // Handler.MessengerImpl extends IMessenger.Stub (the framework's class tables name that superclass): the Stub is a Binder implementing IMessenger, so the WebAssembly core lays
+  // MessengerImpl out with IBinder in its interfaces (an invoke-interface IBinder.getInterfaceDescriptor on it dispatches).
+  registry.type('Landroid/os/IMessenger$Stub;', 'Landroid/os/Binder;', ['Landroid/os/IMessenger;', IBINDER]); registry.interfaces.set('Landroid/os/IMessenger;', ['Landroid/os/IInterface;']);
   const messengerTarget = (runtime, self) => runtime.object(self).messengerTarget ?? runtime.throwJava('Ljava/lang/IllegalStateException;', 'Messenger used before construction');
-  const impl = (runtime, handler) => { const object = runtime.object(handler); if (!object.messengerImpl) { object.messengerImpl = runtime.allocate(MESSENGER_IMPL); runtime.object(object.messengerImpl).messengerHandler = handler; } return object.messengerImpl; };
+  const impl = (runtime, handler) => { const object = runtime.object(handler); if (!object.messengerImpl) { object.messengerImpl = runtime.allocate(MESSENGER_IMPL); runtime.object(object.messengerImpl).messengerHandler = handler; runtime.object(object.messengerImpl).binderDescriptor = IMESSENGER; ownBinder(runtime, object.messengerImpl); } return object.messengerImpl; };
   def(MESSENGER, '<init>', `(${HANDLER_TYPE})V`, (r, _m, [self, handler]) => { if (handler === null) r.throwJava('Ljava/lang/NullPointerException;', null); r.object(self).messengerTarget = handler; });
   // Messenger(IBinder) = IMessenger.Stub.asInterface(target): a binder from this process (another Messenger's getBinder(), e.g. a bound
   // service's onBind result) answers queryLocalInterface with its Handler, so send() posts to it directly; only remote binders need a driver.
@@ -452,11 +488,16 @@ export function createSystemServicesHost(platform) {
     if (handler) { r.object(self).messengerTarget = handler; return; }
     throw new APKError('android.os.Messenger(IBinder): remote messengers need a Binder driver, which the browser VM does not have', { kind: 'binder-unavailable' });
   });
+  // Messenger.send is IMessenger.send, a oneway transaction: to a Messenger of another installed package it runs as a transaction from the calling package (the receiving
+  // Handler's sendMessageAtTime sees Binder.getCallingUid() of the caller), and Message.sendingUid is the caller's uid, as MessengerImpl.send stamps it.
   def(MESSENGER, 'send', `(${MESSAGE_TYPE})V`, (r, _m, [self, message]) => {
     if (message === null) r.throwJava('Ljava/lang/NullPointerException;', null);
-    r.storeField(r.object(message).fields, `${MESSAGE_TYPE}->sendingUid:I`, platform.virtualProcess.uid);
-    r.dispatch({ owner: HANDLER_TYPE, name: 'sendMessage', parameters: [MESSAGE_TYPE], result: 'Z', signature: `(${MESSAGE_TYPE})Z` }, [messengerTarget(r, self), message], 'virtual');
+    const target = messengerTarget(r, self), cross = P() ? foreign(r, impl(r, target)) : null;
+    r.storeField(r.object(message).fields, `${MESSAGE_TYPE}->sendingUid:I`, cross ? cross.caller.uid : P() ? P().callerEntry(r).uid : platform.virtualProcess.uid);
+    const post = () => r.dispatch({ owner: HANDLER_TYPE, name: 'sendMessage', parameters: [MESSAGE_TYPE], result: 'Z', signature: `(${MESSAGE_TYPE})Z` }, [target, message], 'virtual');
+    if (cross) P().withCaller(r, cross.caller, post); else post();
   });
+  def(MESSENGER_IMPL, 'getInterfaceDescriptor', '()Ljava/lang/String;', () => IMESSENGER);
   def(MESSENGER, 'getBinder', `()${IBINDER}`, (r, _m, [self]) => impl(r, messengerTarget(r, self)));
   def(MESSENGER, 'equals', '(Ljava/lang/Object;)Z', (r, _m, [self, other]) => other !== null && typeof other === 'object' && r.typeOf(other) === MESSENGER && messengerTarget(r, self) === messengerTarget(r, other) ? 1 : 0);
   def(MESSENGER, 'hashCode', '()I', (r, _m, [self]) => r.object(impl(r, messengerTarget(r, self))).id | 0);

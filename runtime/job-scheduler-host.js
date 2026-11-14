@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=a6c2214802a2';
-import { createHostRegistry } from './host-contract.js?v=a6c2214802a2';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=a6c2214802a2';
+import { APKError } from './apk-error.js?v=352c1cd2699a';
+import { createHostRegistry } from './host-contract.js?v=352c1cd2699a';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=352c1cd2699a';
 
 // android.app.job: JobScheduler, JobInfo (+ Builder), JobParameters and the JobService base class, with the scheduling rules of Android 13's JobSchedulerService for the
 // constraints a virtual device can answer. AOSP references: frameworks/base/apex/jobscheduler (JobSchedulerService.validateJob, JobStatus.isReady / wouldBeReadyWithConstraint,
@@ -193,7 +193,7 @@ export function createJobSchedulerHost(platform) {
   // ---- android.app.Service / JobService base classes ---------------------------------------------------------------------------------------------
   def(SERVICE, '<init>', '()V', () => {}); def(SERVICE, 'onCreate', '()V', () => {}); def(SERVICE, 'onDestroy', '()V', () => {});
   def(SERVICE, 'onBind', '(Landroid/content/Intent;)Landroid/os/IBinder;', () => null); def(SERVICE, 'onUnbind', '(Landroid/content/Intent;)Z', () => 0);
-  def(SERVICE, 'getApplication', '()Landroid/app/Application;', () => platform.application);
+  def(SERVICE, 'getApplication', '()Landroid/app/Application;', (r, _m, [self]) => r.object(self).serviceApplication ?? platform.application);   // a companion package's Service: its own package's Application
   def(SERVICE, 'stopSelf', '()V', (r, _m, [self]) => { platform.serviceControl?.stopSelf(r, self); }); def(SERVICE, 'stopSelf', '(I)V', (r, _m, [self, startId]) => { platform.serviceControl?.stopSelf(r, self, startId); });
   // Foreground services (Service.java): startForeground needs android.permission.FOREGROUND_SERVICE on API 28+ and a Notification; the state is kept on the Service.
   const NOTIFICATION = 'Landroid/app/Notification;';

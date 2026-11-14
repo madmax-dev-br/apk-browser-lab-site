@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=a6c2214802a2") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=a6c2214802a2">
-  <link rel="stylesheet" href="./lab-theme.css?v=a6c2214802a2">
-  <meta name="apk-browser-build" content="a6c2214802a2">
+  <style>@import url("./styles.css?v=352c1cd2699a") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=352c1cd2699a">
+  <link rel="stylesheet" href="./lab-theme.css?v=352c1cd2699a">
+  <meta name="apk-browser-build" content="352c1cd2699a">
 </head>
 <body>
   <header class="topbar">
@@ -85,7 +85,9 @@
                 <label for="dev-hosts-all">Permitir todos os hosts</label><input id="dev-hosts-all" type="checkbox" aria-describedby="dev-hosts-note">
                 <label for="dev-hosts">Hosts permitidos na rede</label><input id="dev-hosts" type="text" spellcheck="false" autocomplete="off" placeholder="api.exemplo.com, *.cdn.exemplo.com" aria-describedby="dev-hosts-note">
                 <label for="dev-proxy">Proxy (opcional)</label><input id="dev-proxy" type="text" spellcheck="false" autocomplete="off" placeholder="https://relay.exemplo.com/?url={url}">
+                <label for="dev-microg">Com microG <em id="dev-microg-hint" class="vm-memory-hint" role="status" hidden>reabra o APK para aplicar</em></label><input id="dev-microg" type="checkbox" aria-describedby="dev-microg-note">
               </div>
+              <p id="dev-microg-note" class="cp-note">Com microG: o aparelho ganha o microG 0.3.18 (substituto de código aberto do Google Play services, compilado aqui do código-fonte) e a Play Store dele. Apps que usam o Play services passam a encontrá-lo e recebem as respostas locais do microG (disponibilidade, App Set ID, ID de publicidade, localização). Continuam indisponíveis, com erro explícito: registro do aparelho, login com conta Google, push (FCM), SafetyNet, Play Integrity e DroidGuard. Desligado (padrão), o aparelho não tem Play services. Vale ao reabrir o APK.</p>
               <p id="dev-hosts-note" class="cp-note">Com "Permitir todos os hosts" ligado (padrão) qualquer nome pode ser acessado, ainda sujeito a CORS no servidor (ou a um proxy seu). Desligado, só os hosts da lista são acessíveis e, sem hosts na lista, todo nome falha como em um telefone offline.</p>
             </div></details>
             <details class="cp-group" id="cp-sec-perms" data-section="perms">
@@ -269,7 +271,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=a6c2214802a2"></script>
+  <script type="module" src="./app.js?v=352c1cd2699a"></script>
   <script>
   // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
   // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.

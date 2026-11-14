@@ -32098,5 +32098,65 @@
     "sha256": "c7328d3c1741f508c9124ed674702843e0ebb1817370c4d2d040c44c64503356",
     "bytes": 54028,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/content/AttributionSource.java",
+    "localPath": "framework-aosp/upstream/android/content/AttributionSource.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/AttributionSource.java?format=TEXT",
+    "sha256": "7c0f5a9b5ea1d4eb11c8e59798f269e2e491a2c9707ef307beb93236f7d82d14",
+    "bytes": 26478,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/ResultReceiver.java",
+    "localPath": "framework-aosp/upstream/android/os/ResultReceiver.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/ResultReceiver.java?format=TEXT",
+    "sha256": "7b9e6f5df9b9073c406fe5ac3ae90e13d6b19bd720f062f20a597eb54cc41f6f",
+    "bytes": 4661,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/RemoteCallbackList.java",
+    "localPath": "framework-aosp/upstream/android/os/RemoteCallbackList.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/RemoteCallbackList.java?format=TEXT",
+    "sha256": "e04e7cd32ad9667f38a9602181a04985ec757789ea3042635840ea1ba3d689f6",
+    "bytes": 17609,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/com/android/internal/os/IResultReceiver.aidl",
+    "localPath": "framework-aosp/upstream/com/android/internal/os/IResultReceiver.aidl",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/os/IResultReceiver.aidl?format=TEXT",
+    "sha256": "26c4144debcb5666f7c995c26100afb10fe78660ed643882628030eb3654f151",
+    "bytes": 853,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/native",
+    "tag": "android-13.0.0_r1",
+    "path": "libs/permission/aidl/android/content/AttributionSourceState.aidl",
+    "localPath": "framework-aosp/upstream/android/content/AttributionSourceState.aidl",
+    "url": "https://android.googlesource.com/platform/frameworks/native/+/android-13.0.0_r1/libs/permission/aidl/android/content/AttributionSourceState.aidl?format=TEXT",
+    "sha256": "0921d1b7d5cafc2a3498595569f357c7b3bb69d2887118c6f04ba1127fefbc4b",
+    "bytes": 1675,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/os/Bundle.aidl",
+    "localPath": "framework-aosp/upstream/android/os/Bundle.aidl",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/Bundle.aidl?format=TEXT",
+    "sha256": "c4a7a65e8e2ab4579854d41159ec8a6449872ddbeb0e4f48b89c735f82e38015",
+    "bytes": 712,
+    "license": "Apache-2.0"
   }
 ]

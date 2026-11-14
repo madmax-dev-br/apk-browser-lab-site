@@ -1,10 +1,10 @@
-import { coreMemorySetting } from './core-memory.js?v=a6c2214802a2';
-import { isMemoryStep } from './memory-budget.js?v=a6c2214802a2';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=a6c2214802a2';
-import { sanitizeHostMap } from './host-map.js?v=a6c2214802a2';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=a6c2214802a2';
-import { sanitizeLocation } from './runtime-permissions.js?v=a6c2214802a2';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=a6c2214802a2';
+import { coreMemorySetting } from './core-memory.js?v=352c1cd2699a';
+import { isMemoryStep } from './memory-budget.js?v=352c1cd2699a';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=352c1cd2699a';
+import { sanitizeHostMap } from './host-map.js?v=352c1cd2699a';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=352c1cd2699a';
+import { sanitizeLocation } from './runtime-permissions.js?v=352c1cd2699a';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=352c1cd2699a';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -42,6 +42,7 @@ export function sanitizeSettings(input = {}) {
   out.engine = input.engine === 'wasm' || input.engine === 'js' ? input.engine : DEFAULT_ENGINE;   // the VM engine: 'wasm' (default: the WebAssembly core, docs/WASM-CORE-PLANO.md) or 'js' (the JavaScript VM); applies at the next load, never part of the device model the app sees
   out.coreMemory = coreMemorySetting(input.coreMemory);   // "Memória do núcleo Wasm" { heapMiB, metaMiB, threads } (src/core-memory.js): the sizes of the WebAssembly core's memory; applies at the next load, only with engine 'wasm', never part of the device model the app sees
   out.layoutBounds = input.layoutBounds === true;   // page-only developer option ("Mostrar limites de layout"); the VM never sees it
+  out.microg = input.microg === true;   // "Com microG" (src/microg-device.js, docs/MICROG.md): off by default; read by the next load (the Worker installs the microG packages), never applied live
   if (typeof input.locale === 'string' && /^[a-z]{2}-[A-Z]{2}$/.test(input.locale)) out.locale = input.locale;
   if (typeof input.timeZone === 'string' && input.timeZone.length < 64) { try { if (input.timeZone) new Intl.DateTimeFormat('en-US', { timeZone: input.timeZone }); out.timeZone = input.timeZone; } catch { /* unknown zone: keep default */ } }
   if (input.battery && typeof input.battery === 'object') { out.battery.level = Math.min(100, Math.max(0, Math.round(Number(input.battery.level) || 0))); out.battery.charging = !!input.battery.charging; }
@@ -74,4 +75,4 @@ export function saveDeviceSettings(settings) { try { globalThis.localStorage?.se
 export { resolveDevice, checkCustomScreen };
 
 /** The device model the VM gets: the page-only blocks (simulated location) are left out so they never count as a device change. */
-export function deviceForVM(settings) { const { location, renderer, ...device } = settings; return device; }
+export function deviceForVM(settings) { const { location, renderer, microg, ...device } = settings; return device; }   // microg: a load option (the installed packages), not part of the device model

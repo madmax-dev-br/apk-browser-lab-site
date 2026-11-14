@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=a6c2214802a2';
-import { createHostRegistry } from './host-contract.js?v=a6c2214802a2';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=a6c2214802a2';
+import { APKError } from './apk-error.js?v=352c1cd2699a';
+import { createHostRegistry } from './host-contract.js?v=352c1cd2699a';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=352c1cd2699a';
 
 // android.app.PendingIntent (android-13.0.0_r1 PendingIntent.java + ActivityManagerService.getIntentSenderLocked): tokens are identified by (kind, package, requestCode, Intent.filterEquals),
 // FLAG_NO_CREATE / FLAG_CANCEL_CURRENT / FLAG_UPDATE_CURRENT / FLAG_ONE_SHOT behave as documented, and apps targeting API 31+ must say FLAG_IMMUTABLE or FLAG_MUTABLE.
@@ -53,6 +53,23 @@ export function createPendingIntentHost(platform) {
   };
   def(PENDING, 'getActivities', `(${CONTEXT}I[${INTENT}I)${PENDING}`, getMany, { static: true }); def(PENDING, 'getActivities', `(${CONTEXT}I[${INTENT}I${BUNDLE})${PENDING}`, (r, m, args) => getMany(r, m, args.slice(0, 4)), { static: true });
   def(PENDING, 'getActivity', `(${CONTEXT}I${INTENT}I${BUNDLE})${PENDING}`, (r, m, args) => get(KIND.activity)(r, m, args.slice(0, 4)), { static: true });
+  // Parcel: PendingIntent.writeToParcel writes the strong binder of its IIntentSender; the VM is one process, so the binder written is the PendingIntent's own token object and
+  // reading it back (CREATOR, readPendingIntentOrNullFromParcel) gives the same PendingIntent, as two references to one IIntentSender compare equal on Android.
+  const PARCEL = 'Landroid/os/Parcel;', IBINDER = 'Landroid/os/IBinder;', CREATOR = 'Landroid/os/Parcelable$Creator;', PENDING_CREATOR = 'Landroid/app/PendingIntent$1;';
+  type(PENDING_CREATOR, 'Ljava/lang/Object;', [CREATOR], { allocatable: true });
+  const writePending = (r, pending, out) => call(r, PARCEL, 'writeStrongBinder', [IBINDER], 'V', [out, pending === null || pending === 0 ? null : pending]);
+  const readPending = (r, input) => {
+    const value = call(r, PARCEL, 'readStrongBinder', [], IBINDER, [input]); if (value === null || value === 0) return null;
+    if (!r.isSubtype(r.object(value).type, PENDING)) throw new APKError('PendingIntent from a Parcel: the binder read is not a PendingIntent of this device (a remote IIntentSender needs a Binder driver)', { kind: 'pending-intent-parcel' });
+    return value;
+  };
+  def(PENDING, 'writeToParcel', `(${PARCEL}I)V`, (r, _m, [self, out]) => writePending(r, self, out));
+  def(PENDING, 'describeContents', '()I', () => 0);
+  def(PENDING, 'writePendingIntentOrNullToParcel', `(${PENDING}${PARCEL})V`, (r, _m, [pending, out]) => writePending(r, pending, out), { static: true });
+  def(PENDING, 'readPendingIntentOrNullFromParcel', `(${PARCEL})${PENDING}`, (r, _m, [input]) => readPending(r, input), { static: true });
+  def(PENDING_CREATOR, 'createFromParcel', `(${PARCEL})Ljava/lang/Object;`, (r, _m, [, input]) => readPending(r, input));
+  def(PENDING_CREATOR, 'newArray', '(I)[Ljava/lang/Object;', (r, _m, [, size]) => r.newArray(`[${PENDING}`, size));
+  registry.staticField(PENDING, 'CREATOR', CREATOR, r => r.allocate(PENDING_CREATOR));
   const tokenOf = (r, self) => tokens.get(r.object(self).tokenKey);
   def(PENDING, 'cancel', '()V', (r, _m, [self]) => { const token = tokenOf(r, self); if (token) { token.canceled = true; tokens.delete(r.object(self).tokenKey); } });
   const send = (r, self, code = 0, extra = null) => {

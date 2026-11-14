@@ -29,10 +29,10 @@
 //   - One flag and one set of monitors: Thread.interrupted of a VMThread is the record's word (thr_interrupt also takes the thread out of Object.wait); the runtime's monitor
 //     entry points used by host code (monitorTryEnter, monitorExit, monitorFree, monitorEnter, ownsMonitor) are the core's lock words; a thread that ends wakes whoever waits on
 //     its Thread object (ART's notifyAll at thread exit).
-import { Blocked } from '../../runtime/scheduler.js?v=a6c2214802a2';
+import { Blocked } from '../../runtime/scheduler.js?v=352c1cd2699a';
 const MAX_LIVE_THREADS = 1000;   // threads.h: tids 1..1022, the collector's thread table holds 1024 (host-bridge.js)
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=a6c2214802a2';
-import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=a6c2214802a2';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=352c1cd2699a';
+import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=352c1cd2699a';
 
 export const CORE_STATUS = Object.freeze({ OK: 0, OUT_OF_MEMORY: 5, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81, HOST_THROW: 0x7fff0110 });
 const S = CORE_STATUS, CORE_UNSUPPORTED = 6;   // vmcore/abi.h: also what resume/resume_host answer for a record with nothing to resume (detail 0)
@@ -348,10 +348,11 @@ export class CoreThreads {
     const rt = this.rt, previous = rt.thread;
     if (thread !== this.last) this.sched.switching(rt, this.last, thread);
     this.last = thread; rt.thread = thread; this.stats.slices++;
-    this.quantumFor(thread, owner === null && rt.sliceDeadline !== 0 && rt.sliceDeadline !== undefined);
+    const sliced = owner === null && rt.sliceDeadline !== 0 && rt.sliceDeadline !== undefined, cut = rt.coreCut;
+    this.quantumFor(thread, sliced); rt.coreCut = sliced && thread.coreQuantum > 0;   // host-bridge.js cuts the quantum at the deadline only here, where the yield it causes ends the slice
     try { return this.advance(thread, owner, this.resume(thread)); }
     catch (error) { if (thread !== this.sched.mainThread()) rt.noteThreadFailure(thread, error); throw error; }   // a lab error on a background thread: recorded where it happens, whoever catches it
-    finally { rt.thread = previous; }
+    finally { rt.thread = previous; rt.coreCut = cut; }
   }
   /** runtime.runThreads(): one scheduling slice without an owner (the event pump's background work, Scheduler.resolveNested). */
   slice() {

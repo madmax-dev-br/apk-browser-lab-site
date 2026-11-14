@@ -1,9 +1,9 @@
-import { resolveIntentFields } from './intent-resolver.js?v=a6c2214802a2';
-import { APKError } from './apk-error.js?v=a6c2214802a2';
-import { registerPackageValueFields } from './package-value-fields.js?v=a6c2214802a2';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=a6c2214802a2';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=a6c2214802a2';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=a6c2214802a2';
+import { resolveIntentFields } from './intent-resolver.js?v=352c1cd2699a';
+import { APKError } from './apk-error.js?v=352c1cd2699a';
+import { registerPackageValueFields } from './package-value-fields.js?v=352c1cd2699a';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=352c1cd2699a';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=352c1cd2699a';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=352c1cd2699a';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -75,7 +75,10 @@ export function parsePreferences(text) {
 
 export function createAppServicesHost(platform) {
   const registry = createHostRegistry(), { def, type } = registry;
-  const pkg = () => platform.packageName ?? 'app', fs = () => platform.javaIo.fs();
+  // The package a Context API answers for: the app, or the companion package (src/package-registry.js) whose Context the call was made on.
+  const appPkg = () => platform.packageName ?? 'app', fs = () => platform.javaIo.fs(), pkgs = () => platform.packages;
+  const contextOwner = () => pkgs()?.multi && currentRuntime && currentContext ? pkgs().contextEntry(currentRuntime, currentContext) : null;
+  const pkg = () => { const owner = contextOwner(); return owner && !owner.main ? owner.name : appPkg(); };
   // The context a file/preference API was called on decides credential-protected (/data/user/0) vs device-protected (/data/user_de/0) storage.
   let currentContext = null;
   const protectedContext = r => { for (let c = currentContext, depth = 0; c && depth < 32; depth++) { const o = r.object(c); if (o.deviceProtected) return true; c = o.baseContext; } return false; };
@@ -99,23 +102,122 @@ export function createAppServicesHost(platform) {
   const holdsPermission = (r, permission) => {
     const manifest = platform.manifest ?? {}, sdk = r.apiLevel ?? 33, requested = (manifest.usesPermissions ?? []).find(entry => entry.name === permission && (entry.maxSdkVersion === null || Number(entry.maxSdkVersion) >= sdk));
     if (!requested) return false;
+    if (pkgs()?.refusedPermissions?.has(permission)) return false;   // a device policy grants it to no package (src/microg-device.js); an app cannot redeclare it either
     if (platform.grantedPermissions?.has(permission)) return true;
-    const own = (manifest.declaredPermissions ?? []).find(entry => entry.name === permission), level = String(own ? 'normal' : FRAMEWORK_PERMISSIONS[permission] ?? '').split('|')[0];   // a permission the app declares itself is held by its own signature
+    const own = (manifest.declaredPermissions ?? []).find(entry => entry.name === permission);
+    let level = String(own ? 'normal' : FRAMEWORK_PERMISSIONS[permission] ?? '').split('|')[0];   // a permission the app declares itself is held by its own signature
+    if (!own && !level && pkgs()?.multi) level = pkgs().levelFor(r, pkgs().main, permission) ?? '';   // a permission a companion package declares: its protection level (signature: same signers)
     return level === 'normal';
   };
   platform.holdsPermission = holdsPermission;   // the network layer answers getaddrinfo with EACCES when the app lacks INTERNET
   const needPermission = (r, permission) => { if (permission === null) r.throwJava('Ljava/lang/IllegalArgumentException;', 'permission is null'); return r.stringCharacters(permission); };
-  const check = (r, permission) => holdsPermission(r, needPermission(r, permission)) ? PERMISSION_GRANTED : PERMISSION_DENIED;
-  const enforce = (r, permission, result, selfToo, message) => {
-    if (result !== PERMISSION_GRANTED) r.throwJava('Ljava/lang/SecurityException;', `${message === null ? '' : r.stringCharacters(message) + ': '}${selfToo ? `Neither user ${platform.virtualProcess.uid} nor current process has ` : `uid ${platform.virtualProcess.uid} does not have `}${r.stringCharacters(permission)}.`);
+  /** The package a Context permission check is made for: the companion whose Context it is, else the app (null). */
+  const selfEntry = () => { const owner = contextOwner(); return owner && !owner.main ? owner : null; };
+  const holdsFor = (r, entry, permission) => entry && !entry.main ? pkgs().holds(r, entry, permission) : holdsPermission(r, permission);
+  const check = (r, permission) => holdsFor(r, selfEntry(), needPermission(r, permission)) ? PERMISSION_GRANTED : PERMISSION_DENIED;
+  /** Inside a Binder transaction from another package (src/package-registry.js): that package; else null (the calling process is this one). */
+  const callingEntry = r => pkgs()?.multi && pkgs().callingPackage(r) !== null ? pkgs().callingIdentity(r).entry : null;
+  const checkUid = (r, permission, pid, uid) => {
+    const name = needPermission(r, permission), entry = pkgs()?.multi ? pkgs().byUid(uid) : null;
+    if (entry && !entry.main) return entry.pid === pid && pkgs().holds(r, entry, name) ? PERMISSION_GRANTED : PERMISSION_DENIED;
+    return pid === platform.virtualProcess.pid && uid === platform.virtualProcess.uid ? (holdsPermission(r, name) ? PERMISSION_GRANTED : PERMISSION_DENIED) : PERMISSION_DENIED;
   };
-  // Service binding (ContextImpl.bindServiceCommon / ActiveServices): an implicit Intent is refused on API 21+; a service in another
-  // package cannot be bound because the virtual device has no other packages (no Google Play services), so bindService returns false
-  // as Android does for a missing service. This app's own declared services are bound in-process: created once (BIND_AUTO_CREATE),
+  const enforce = (r, permission, result, selfToo, message, uid = (selfEntry() ?? platform.virtualProcess).uid) => {
+    if (result !== PERMISSION_GRANTED) r.throwJava('Ljava/lang/SecurityException;', `${message === null ? '' : r.stringCharacters(message) + ': '}${selfToo ? `Neither user ${uid} nor current process has ` : `uid ${uid} does not have `}${r.stringCharacters(permission)}.`);
+  };
+  // Service binding (ContextImpl.bindServiceCommon / ActiveServices): an implicit Intent is refused on API 21+; a service of a package that
+  // is not installed (by default the virtual device has no other package) cannot be bound, so bindService returns false as Android does
+  // for a missing service; an installed companion package's services are bound below (docs/MULTI-PACKAGE.md). This app's own declared services are bound in-process: created once (BIND_AUTO_CREATE),
   // onCreate, onBind once, and ServiceConnection.onServiceConnected (or onNullBinding) posted to the main thread; the last unbind runs
   // onUnbind and onDestroy. Started services (startService) are not covered here.
   const INTENT = 'Landroid/content/Intent;', COMPONENT = 'Landroid/content/ComponentName;', SERVICE_CONNECTION = 'Landroid/content/ServiceConnection;';
   const boundServices = gcRoot(new Map()), boundConnections = new Map();
+  // Services of another installed package, and a companion package's own services (src/package-registry.js, docs/MULTI-PACKAGE.md): ActiveServices.retrieveServiceLocked
+  // resolves the component (explicit, or by package and action), refuses a service that is not exported or whose android:permission the caller does not hold (SecurityException,
+  // as ContextImpl.bindServiceCommon / startServiceCommon throw), and a package the caller cannot see (API 30 visibility) is absent. The service's process is started on demand;
+  // onCreate, onBind and onServiceConnected follow on the main thread, as in the other process. Records share boundServices under the key "package/class".
+  const packageConnections = new Map();   // connection ref -> { key, caller }
+  const intentText = (r, intent) => {   // Intent.toString's short form (act, cat, dat, typ, pkg, cmp), as ActiveServices puts it in its SecurityException
+    const f = platform.intentFields(r, r.object(intent)), parts = [], component = intentCall(r, intent, 'getComponent', COMPONENT);
+    if (f.action) parts.push(`act=${f.action}`); if (f.categories.length) parts.push(`cat=[${f.categories.join(',')}]`); if (f.data) parts.push(`dat=${f.data}`); if (f.type) parts.push(`typ=${f.type}`); if (f.package) parts.push(`pkg=${f.package}`);
+    if (component !== null) { const c = r.object(component), short = c.className.startsWith(c.packageName + '.') ? c.className.slice(c.packageName.length) : c.className; parts.push(`cmp=${c.packageName}/${short}`); }
+    return `Intent { ${parts.join(' ')} }`;
+  };
+  const componentOf = (r, packageName, className) => { const c = r.allocate(COMPONENT); call(r, COMPONENT, '<init>', [STRING, STRING], 'V', [c, packageName, className], 'direct'); return c; };
+  const serviceKey = (entry, className) => entry.main ? className : `${entry.name}/${className}`;
+  const resolvePackageService = (r, caller, target, intent, component, verb) => {
+    const P = pkgs(); let detail;
+    if (component !== null) { const className = r.stringCharacters(call(r, COMPONENT, 'getClassName', [], STRING, [component])); detail = P.detailsOf(target, 'service').find(d => d.name === className); }
+    else { const action = intentCall(r, intent, 'getAction', STRING); detail = action === null ? undefined : P.detailsOf(target, 'service').find(d => d.actions?.includes(r.stringCharacters(action))); }
+    if (!detail || isFalse(detail.enabled)) { r.record(`SERVICE ${verb} ${target.name}: no service matches ${intentText(r, intent)}`); return null; }
+    if (caller !== target) {
+      const denied = !P.exported(target, detail) ? `not exported from uid ${target.uid}` : detail.permission && !P.holds(r, caller, detail.permission) ? detail.permission : null;
+      if (denied !== null) {
+        r.record(`LOG W ActivityManager: Permission Denial: Accessing service ${target.name}/${detail.name} from pid=${caller.pid}, uid=${caller.uid} ${denied === detail.permission ? 'requires ' + denied : 'that is ' + denied}`);
+        r.throwJava('Ljava/lang/SecurityException;', verb === 'bind' ? `Not allowed to bind to service ${intentText(r, intent)}` : denied === detail.permission ? `Not allowed to ${verb} service ${intentText(r, intent)} without permission ${denied}` : `Unable to ${verb} service ${intentText(r, intent)}: ${denied}`);
+      }
+    }
+    return { entry: target, className: detail.name, key: serviceKey(target, detail.name) };
+  };
+  const createPackageService = (r, target) => {
+    const P = pkgs(); P.ensureProcess(r, target.entry);
+    if (target.entry.main) return createService(r, target.className, `L${target.className.replaceAll('.', '/')};`);
+    const descriptor = P.typeIn(r, target.entry, target.className);
+    if (!descriptor) throw new APKError(`Unable to instantiate service ${target.entry.name}/${target.className}: the class is not in the package`, { kind: 'package-service-class' });
+    const ref = r.allocate(descriptor); call(r, descriptor, '<init>', [], 'V', [ref], 'direct');
+    const o = r.object(ref); o.baseContext = P.newContext(r, target.entry); o.serviceApplication = P.application(target.entry);
+    r.record(`SERVICE create ${target.key} (uid ${target.entry.uid})`);
+    call(r, descriptor, 'onCreate', [], 'V', [ref]);
+    const service = { ref, binder: null, bound: false, started: false, startId: 0, intent: null, component: null, connections: new Set(), since: platform.clock.now() };
+    boundServices.set(target.key, service); return service;
+  };
+  const bindPackageService = (r, caller, target, intent, component, connection, flags) => {
+    const resolved = resolvePackageService(r, caller, target, intent, component, 'bind'); if (!resolved) return 0;
+    pkgs().grant(target, caller);   // AppsFilter.grantImplicitAccess: the service's package can see its client from now on
+    const name = componentOf(r, target.name, resolved.className), key = resolved.key;
+    packageConnections.set(connection.ref, { key, caller });
+    if (!boundServices.has(key) && !(flags & 1)) { r.record(`SERVICE bind ${key}: not running and no BIND_AUTO_CREATE`); return 1; }
+    r.record(`SERVICE bind ${key} from ${caller.name} (uid ${caller.uid})`);
+    platform.queueTask(() => {
+      if (packageConnections.get(connection.ref)?.key !== key) return;   // unbound before the service's process got to it
+      const service = boundServices.get(key) ?? createPackageService(r, resolved);
+      if (!service.bound) { service.bound = true; service.intent = intent; service.component = name; service.binder = call(r, r.typeOf(service.ref), 'onBind', [INTENT], 'Landroid/os/IBinder;', [service.ref, intent]); }
+      service.connections.add(connection.ref);
+      if (service.binder === null) call(r, SERVICE_CONNECTION, 'onNullBinding', [COMPONENT], 'V', [connection, name]);
+      else call(r, SERVICE_CONNECTION, 'onServiceConnected', [COMPONENT, 'Landroid/os/IBinder;'], 'V', [connection, name, service.binder]);
+    }, 0, [connection, intent, name]);
+    return 1;
+  };
+  const unbindPackageService = (r, connection) => {
+    const binding = packageConnections.get(connection.ref); packageConnections.delete(connection.ref);
+    const service = boundServices.get(binding.key); if (!service) return;
+    service.connections.delete(connection.ref);
+    if (!service.connections.size && service.bound) platform.queueTask(() => {
+      if (service.connections.size || !service.bound || boundServices.get(binding.key) !== service) return;
+      const descriptor = r.typeOf(service.ref); service.bound = false;
+      call(r, descriptor, 'onUnbind', [INTENT], 'Z', [service.ref, service.intent]);
+      if (!service.started) { boundServices.delete(binding.key); call(r, descriptor, 'onDestroy', [], 'V', [service.ref]); r.record(`SERVICE unbind+destroy ${binding.key}`); }
+    }, 0, [service.ref]);
+  };
+  const startPackageService = (r, caller, target, intent, component) => {
+    const resolved = resolvePackageService(r, caller, target, intent, component, 'start'); if (!resolved) return null;
+    pkgs().grant(target, caller);
+    const name = componentOf(r, target.name, resolved.className);
+    platform.queueTask(() => {
+      const service = boundServices.get(resolved.key) ?? createPackageService(r, resolved);
+      service.started = true; const startId = ++service.startId; r.record(`SERVICE start ${resolved.key} #${startId}`);
+      call(r, r.typeOf(service.ref), 'onStartCommand', [INTENT, 'I', 'I'], 'I', [service.ref, intent, 0, startId]);
+    }, 0, [intent]);
+    return name;
+  };
+  /** The caller and target packages of a Context service call when a companion package is involved; null for the app's own services (the original single-package path). */
+  const crossTarget = (r, self, targetPackage) => {
+    const P = pkgs(); if (!P?.multi) return null;
+    const caller = P.contextEntry(r, self);
+    if (caller.main && targetPackage === caller.name) return null;
+    const target = P.byName(targetPackage);
+    return { caller, target: target && P.visible(r, caller, target) ? target : null };
+  };
   const createService = (r, className, descriptor) => {
     const ref = r.allocate(descriptor); call(r, descriptor, '<init>', [], 'V', [ref], 'direct'); r.object(ref).baseContext = platform.application;
     call(r, descriptor, 'onCreate', [], 'V', [ref]);
@@ -124,6 +226,12 @@ export function createAppServicesHost(platform) {
   };
   // Context.startService / startForegroundService / stopService and Service.stopSelf (ActiveServices): the Service is created once, onStartCommand follows on the main thread for every start with a growing
   // startId, and it is destroyed by stopService/stopSelf once no connection keeps it bound. Background-start limits do not apply: the lab's app is always in the foreground.
+  const explicitTarget = (r, intent) => {
+    const component = intentCall(r, intent, 'getComponent', 'Landroid/content/ComponentName;'), explicitPackage = intentCall(r, intent, 'getPackage', STRING);
+    const targetPackage = component !== null ? r.stringCharacters(call(r, COMPONENT, 'getPackageName', [], STRING, [component])) : explicitPackage === null ? null : r.stringCharacters(explicitPackage);
+    if (targetPackage === null) r.throwJava('Ljava/lang/IllegalArgumentException;', `Service Intent must be explicit: ${r.stringCharacters(call(r, 'Ljava/lang/Object;', 'toString', [], STRING, [intent]))}`);
+    return targetPackage;
+  };
   const serviceTarget = (r, intent, verb) => {
     const component = intentCall(r, intent, 'getComponent', 'Landroid/content/ComponentName;'), explicitPackage = intentCall(r, intent, 'getPackage', STRING);
     const targetPackage = component !== null ? r.stringCharacters(call(r, COMPONENT, 'getPackageName', [], STRING, [component])) : explicitPackage === null ? null : r.stringCharacters(explicitPackage);
@@ -134,7 +242,9 @@ export function createAppServicesHost(platform) {
     if (!(platform.manifest?.services ?? []).includes(className) || !r.classes.has(descriptor)) { r.record(`SERVICE ${verb} ${className}: not declared`); return null; }
     return { component, className, descriptor };
   };
-  const startService = (r, intent) => {
+  const startService = (r, intent, self = null) => {
+    const cross = self === null ? null : crossTarget(r, self, explicitTarget(r, intent));
+    if (cross) { if (!cross.target) { r.record(`SERVICE start ${explicitTarget(r, intent)}: package not installed`); return null; } return startPackageService(r, cross.caller, cross.target, intent, intentCall(r, intent, 'getComponent', COMPONENT)); }
     const target = serviceTarget(r, intent, 'start'); if (!target) return null;
     const service = boundServices.get(target.className) ?? createService(r, target.className, target.descriptor);
     service.started = true; const startId = ++service.startId; r.record(`SERVICE start ${target.className} #${startId}`);
@@ -149,16 +259,22 @@ export function createAppServicesHost(platform) {
   };
   const classNameOf = ref => { for (const [name, service] of boundServices) if (service.ref.ref === ref.ref) return name; return null; };
   platform.serviceControl = { stopSelf: (r, self, startId = null) => { const name = classNameOf(self); if (name === null) return 0; const service = boundServices.get(name); if (startId !== null && startId !== service.startId) return 0; return stopServiceNamed(r, name); } };
-  defContext('startService', `(${INTENT})Landroid/content/ComponentName;`, (r, _m, [, intent]) => startService(r, intent));
-  defContext('startForegroundService', `(${INTENT})Landroid/content/ComponentName;`, (r, _m, [, intent]) => startService(r, intent));
-  defContext('stopService', `(${INTENT})Z`, (r, _m, [, intent]) => { const target = serviceTarget(r, intent, 'stop'); return target ? stopServiceNamed(r, target.className) : 0; });   // className -> { ref, binder, intent, component, connections:Set<ref> }; connection ref -> className
+  defContext('startService', `(${INTENT})Landroid/content/ComponentName;`, (r, _m, [self, intent]) => startService(r, intent, self));
+  defContext('startForegroundService', `(${INTENT})Landroid/content/ComponentName;`, (r, _m, [self, intent]) => startService(r, intent, self));
+  defContext('stopService', `(${INTENT})Z`, (r, _m, [self, intent]) => {
+    const cross = pkgs()?.multi ? crossTarget(r, self, explicitTarget(r, intent)) : null;
+    if (cross) { if (!cross.target) return 0; const resolved = resolvePackageService(r, cross.caller, cross.target, intent, intentCall(r, intent, 'getComponent', COMPONENT), 'stop'); return resolved ? stopServiceNamed(r, resolved.key) : 0; }
+    const target = serviceTarget(r, intent, 'stop'); return target ? stopServiceNamed(r, target.className) : 0;
+  });   // className -> { ref, binder, intent, component, connections:Set<ref> }; connection ref -> className
   const call = (r, owner, name, parameters, result, args, mode = 'virtual') => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, args, mode);
   const intentCall = (r, intent, name, result) => r.dispatch({ owner: INTENT, name, parameters: [], result, signature: `()${result}` }, [intent], 'virtual');
-  defContext('bindService', `(${INTENT}Landroid/content/ServiceConnection;I)Z`, (r, _m, [, intent, connection, flags]) => {
+  defContext('bindService', `(${INTENT}Landroid/content/ServiceConnection;I)Z`, (r, _m, [self, intent, connection, flags]) => {
     if (connection === null) r.throwJava('Ljava/lang/IllegalArgumentException;', 'connection is null');
     const component = intentCall(r, intent, 'getComponent', 'Landroid/content/ComponentName;'), explicitPackage = intentCall(r, intent, 'getPackage', STRING);
     const targetPackage = component !== null ? r.stringCharacters(r.dispatch({ owner: 'Landroid/content/ComponentName;', name: 'getPackageName', parameters: [], result: STRING, signature: `()${STRING}` }, [component], 'virtual')) : explicitPackage === null ? null : r.stringCharacters(explicitPackage);
     if (targetPackage === null) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Service Intent must be explicit');
+    const cross = crossTarget(r, self, targetPackage);
+    if (cross) { if (!cross.target) { r.record(`SERVICE bind ${targetPackage}: package not installed`); return 0; } return bindPackageService(r, cross.caller, cross.target, intent, component, connection, flags); }
     if (targetPackage !== pkg()) { r.record(`SERVICE bind ${targetPackage}: package not installed`); return 0; }
     if (component === null) throw new APKError('Context.bindService by package and action inside this app is not resolved yet; pass a ComponentName', { kind: 'service-binding-unsupported' });
     const className = r.stringCharacters(call(r, COMPONENT, 'getClassName', [], STRING, [component])), descriptor = `L${className.replaceAll('.', '/')};`;
@@ -178,6 +294,7 @@ export function createAppServicesHost(platform) {
     return 1;
   });
   defContext('unbindService', '(Landroid/content/ServiceConnection;)V', (r, _m, [, connection]) => {
+    if (packageConnections.has(connection?.ref)) return unbindPackageService(r, connection);
     const className = boundConnections.get(connection?.ref);
     if (className === undefined) r.throwJava('Ljava/lang/IllegalArgumentException;', `Service not registered: ${r.typeOf(connection).slice(1, -1).replaceAll('/', '.')}`);
     boundConnections.delete(connection.ref); const service = boundServices.get(className); service.connections.delete(connection.ref);
@@ -188,16 +305,19 @@ export function createAppServicesHost(platform) {
     }
   });
   // Context.getAttributionTag() (API 30): null unless the Context came from createAttributionContext, which the lab does not create.
-  defContext('getAttributionTag', `()${STRING}`, () => null);
+  // the tag of createAttributionContext(tag) along the Context chain; a plain Context has none
+  defContext('getAttributionTag', `()${STRING}`, (r, _m, [self]) => { for (let c = self, depth = 0; c && typeof c === 'object' && depth < 64; depth++) { const o = r.object(c); if (o.attributionTag !== undefined) return o.attributionTag; c = o.outerContext ?? o.baseContext ?? null; } return null; });
   // Activity.getTaskId(): the id of the task (platform.tasks, see activity-starter.js) the Activity lives in; the app's first task is 1.
   def('Landroid/app/Activity;', 'getTaskId', '()I', (r, _m, [self]) => platform.taskOf(platform.frame(r, self))?.id ?? -1);
   defContext('checkSelfPermission', `(${STRING})I`, (r, _m, [, permission]) => check(r, permission));
-  defContext('checkPermission', `(${STRING}II)I`, (r, _m, [, permission, pid, uid]) => pid === platform.virtualProcess.pid && uid === platform.virtualProcess.uid ? check(r, permission) : (needPermission(r, permission), PERMISSION_DENIED));   // no other process exists
-  defContext('checkCallingPermission', `(${STRING})I`, (r, _m, [, permission]) => { needPermission(r, permission); return PERMISSION_DENIED; });   // not inside a Binder transaction: the calling pid is this process
-  defContext('checkCallingOrSelfPermission', `(${STRING})I`, (r, _m, [, permission]) => check(r, permission));
-  defContext('enforcePermission', `(${STRING}IILjava/lang/String;)V`, (r, _m, [self, permission, pid, uid, message]) => enforce(r, permission, pid === platform.virtualProcess.pid && uid === platform.virtualProcess.uid ? check(r, permission) : PERMISSION_DENIED, false, message));
-  defContext('enforceCallingPermission', `(${STRING}${STRING})V`, (r, _m, [, permission, message]) => enforce(r, permission, (needPermission(r, permission), PERMISSION_DENIED), false, message));
-  defContext('enforceCallingOrSelfPermission', `(${STRING}${STRING})V`, (r, _m, [, permission, message]) => enforce(r, permission, check(r, permission), true, message));
+  defContext('checkPermission', `(${STRING}II)I`, (r, _m, [, permission, pid, uid]) => checkUid(r, permission, pid, uid));   // the app's process, or an installed companion package's (src/package-registry.js)
+  // checkCallingPermission: inside a Binder transaction from another installed package, that package's permissions; otherwise the calling pid is this process, which ContextImpl refuses
+  const callingCheck = (r, permission) => { const name = needPermission(r, permission), caller = callingEntry(r); return caller && holdsFor(r, caller, name) ? PERMISSION_GRANTED : PERMISSION_DENIED; };
+  defContext('checkCallingPermission', `(${STRING})I`, (r, _m, [, permission]) => callingCheck(r, permission));
+  defContext('checkCallingOrSelfPermission', `(${STRING})I`, (r, _m, [, permission]) => callingEntry(r) ? callingCheck(r, permission) : check(r, permission));
+  defContext('enforcePermission', `(${STRING}IILjava/lang/String;)V`, (r, _m, [self, permission, pid, uid, message]) => enforce(r, permission, checkUid(r, permission, pid, uid), false, message, uid));
+  defContext('enforceCallingPermission', `(${STRING}${STRING})V`, (r, _m, [, permission, message]) => enforce(r, permission, callingCheck(r, permission), false, message, callingEntry(r)?.uid));
+  defContext('enforceCallingOrSelfPermission', `(${STRING}${STRING})V`, (r, _m, [, permission, message]) => enforce(r, permission, callingEntry(r) ? callingCheck(r, permission) : check(r, permission), true, message, callingEntry(r)?.uid));
 
   // ---- Context directories and files (ContextImpl.getDataDir/getFilesDir/..., ensurePrivateDirExists) -------------------------------------------
   const ensure = (r, path) => { const result = fs().mkdirs(path); if (result !== 'ok' && result !== 'EEXIST') r.record(`LOG W ContextImpl: Failed to ensure ${path}: ${result}`); return file(r, path); };
@@ -277,6 +397,15 @@ export function createAppServicesHost(platform) {
       const ref = r.allocate(SP_IMPL), state = { path, map: loadMap(r, path), listeners: [], generation: 0, writes: 0 };
       r.object(ref).prefs = state; instances.set(path, ref);
     }
+    return instances.get(path);
+  });
+  // The hidden ContextImpl.getSharedPreferences(File, int) (reached by reflection): the preferences stored in that file, one instance per path (sSharedPrefsCache), the same
+  // mode checks. A file that does not exist is an empty map; a file on a read-only partition (/system/etc/...) can be read, and a commit to it fails as a write there does.
+  defContext('getSharedPreferences', `(${FILE}I)${SP}`, (r, _m, [, target, mode]) => {
+    if (target === null) r.throwJava('Ljava/lang/NullPointerException;', 'file');
+    if (mode & 3 && Number(platform.manifest?.usesSdk?.targetSdkVersion ?? 28) >= 24) r.throwJava('Ljava/lang/SecurityException;', (mode & 1) ? 'MODE_WORLD_READABLE no longer supported' : 'MODE_WORLD_WRITEABLE no longer supported');
+    const path = text(r, call(r, FILE, 'getAbsolutePath', [], STRING, [target]));
+    if (!instances.has(path)) { const ref = r.allocate(SP_IMPL); r.object(ref).prefs = { path, map: loadMap(r, path), listeners: [], generation: 0, writes: 0 }; instances.set(path, ref); }
     return instances.get(path);
   });
   defContext('deleteSharedPreferences', `(${STRING})Z`, (r, _m, [, name]) => { const path = prefsPath(text(r, name)); instances.delete(path); fs().delete(path + '.bak'); return fs().delete(path) === 'ok' ? 1 : 0; });
@@ -374,14 +503,14 @@ export function createAppServicesHost(platform) {
     [COMPONENT_INFO, 'enabled', 'Z'], [COMPONENT_INFO, 'exported', 'Z'], [COMPONENT_INFO, 'directBootAware', 'Z'], [PROVIDER_INFO, 'authority', STRING], [PROVIDER_INFO, 'readPermission', STRING], [PROVIDER_INFO, 'writePermission', STRING],
     [PROVIDER_INFO, 'grantUriPermissions', 'Z'], [PROVIDER_INFO, 'multiprocess', 'Z'], [PROVIDER_INFO, 'initOrder', 'I'], [PROVIDER_INFO, 'flags', 'I']]) registry.instanceField(owner, name, ftype, { reflect: true });
   const dispatchBundle = (r, bundle, name, parameters, args) => r.dispatch({ owner: BUNDLE, name, parameters, result: 'V', signature: `(${parameters.join('')})V` }, [bundle, ...args], 'virtual');
-  function metaDataBundle(r, entries) {
+  function metaDataBundle(r, entries, resolveResource = id => platform.resource(id)) {   // resolveResource: a companion package resolves android:value="@type/name" in its own table
     if (!entries?.length) return null;
     const bundle = platform.bundle(r);
     for (const { name, value, valueType, resource } of entries) {
       if (resource !== undefined) { dispatchBundle(r, bundle, 'putInt', [STRING, 'I'], [name, resource | 0]); continue; }
       if (valueType === 3) dispatchBundle(r, bundle, 'putString', [STRING, STRING], [name, value]);
       else if (valueType === 1) {   // android:value="@type/name": PackageParser reads the final typed value (TypedArray.peekValue resolves the reference), then stores it by its type
-        const resolved = platform.resource(value), data = resolved.rawData ?? resolved.data, type = resolved.dataType;
+        const resolved = resolveResource(value), data = resolved.rawData ?? resolved.data, type = resolved.dataType;
         if (type === 3) dispatchBundle(r, bundle, 'putString', [STRING, STRING], [name, resolved.value]);          // TYPE_STRING
         else if (type === 0x12) dispatchBundle(r, bundle, 'putBoolean', [STRING, 'Z'], [name, (data | 0) !== 0 ? 1 : 0]);                              // TYPE_INT_BOOLEAN
         else if (type === 4) dispatchBundle(r, bundle, 'putFloat', [STRING, 'F'], [name, bitsFloat(data | 0)]);                                                   // TYPE_FLOAT
@@ -394,17 +523,19 @@ export function createAppServicesHost(platform) {
     return bundle;
   }
   // The app's process: android:process on <application> (":name" is private to the package, as in PackageParser), else the package name.
-  const processName = () => { const process = platform.manifest?.application?.process; return process ? (process.startsWith(':') ? pkg() + process : process) : pkg(); };
-  function makeProviderInfo(r, detail, withMeta) {
-    const info = r.allocate(PROVIDER_INFO), put = (owner, name, ftype, value) => r.storeField(r.object(info).fields, `${owner}->${name}:${ftype}`, value);
-    put(ITEM_INFO, 'name', STRING, detail.name); put(ITEM_INFO, 'packageName', STRING, pkg()); put(ITEM_INFO, 'metaData', BUNDLE, withMeta ? metaDataBundle(r, detail.metaData) : null);
-    put(COMPONENT_INFO, 'applicationInfo', APPLICATION_INFO, platform.applicationInfo(r)); put(COMPONENT_INFO, 'processName', STRING, providerProcess(detail));
+  const processName = () => { const process = platform.manifest?.application?.process; return process ? (process.startsWith(':') ? appPkg() + process : process) : appPkg(); };
+  /** `owner`: the package that declares the component (src/package-registry.js entry); the app when null. */
+  const companionOf = owner => owner && !owner.main ? owner : null;
+  function makeProviderInfo(r, detail, withMeta, owner = null) {
+    const info = r.allocate(PROVIDER_INFO), put = (owner, name, ftype, value) => r.storeField(r.object(info).fields, `${owner}->${name}:${ftype}`, value), other = companionOf(owner);
+    put(ITEM_INFO, 'name', STRING, detail.name); put(ITEM_INFO, 'packageName', STRING, other ? other.name : appPkg()); put(ITEM_INFO, 'metaData', BUNDLE, withMeta ? (other ? pkgs().metaData(r, other, detail.metaData ?? []) : metaDataBundle(r, detail.metaData)) : null);
+    put(COMPONENT_INFO, 'applicationInfo', APPLICATION_INFO, other ? pkgs().applicationInfoFor(r, other) : platform.applicationInfo(r)); put(COMPONENT_INFO, 'processName', STRING, other ? pkgs().processOf(other, detail) : providerProcess(detail));
     put(COMPONENT_INFO, 'enabled', 'Z', isFalse(detail.enabled) ? 0 : 1); put(COMPONENT_INFO, 'exported', 'Z', isTrue(detail.exported) ? 1 : 0); put(COMPONENT_INFO, 'directBootAware', 'Z', isTrue(detail.directBootAware) ? 1 : 0);
-    put(PROVIDER_INFO, 'authority', STRING, detail.authorities); put(PROVIDER_INFO, 'readPermission', STRING, detail.permission); put(PROVIDER_INFO, 'writePermission', STRING, detail.permission);
+    put(PROVIDER_INFO, 'authority', STRING, detail.authorities); put(PROVIDER_INFO, 'readPermission', STRING, detail.readPermission ?? detail.permission); put(PROVIDER_INFO, 'writePermission', STRING, detail.writePermission ?? detail.permission);   // android:readPermission / writePermission, else android:permission (PackageParser)
     put(PROVIDER_INFO, 'grantUriPermissions', 'Z', isTrue(detail.grantUriPermissions) ? 1 : 0); put(PROVIDER_INFO, 'multiprocess', 'Z', isTrue(detail.multiprocess) ? 1 : 0); put(PROVIDER_INFO, 'initOrder', 'I', Number(detail.initOrder) | 0); put(PROVIDER_INFO, 'flags', 'I', 0);
     return info;
   }
-  const providerProcess = detail => detail.process ? (detail.process.startsWith(':') ? pkg() + detail.process : detail.process) : processName();
+  const providerProcess = detail => detail.process ? (detail.process.startsWith(':') ? appPkg() + detail.process : detail.process) : processName();
 
   type(CP, OBJECT, ['Landroid/content/ComponentCallbacks2;'], { allocatable: true });
   def(CP, '<init>', '()V', () => {});
@@ -416,7 +547,7 @@ export function createAppServicesHost(platform) {
   def(CP, 'attachInfo', `(${CONTEXT}${PROVIDER_INFO})V`, attach); def(CP, 'attachInfo', `(${CONTEXT}${PROVIDER_INFO}Z)V`, attach);
   def(CP, 'getContext', `()${CONTEXT}`, (r, _m, [self]) => r.object(self).providerContext ?? null);
   def(CP, 'isTemporary', '()Z', () => 0);
-  def(CP, 'getCallingPackage', `()${STRING}`, () => null); // outside a Binder transaction there is no caller
+  def(CP, 'getCallingPackage', `()${STRING}`, r => pkgs()?.multi ? pkgs().callingPackage(r) : null); // the package of the cross-package call being served; outside one there is no caller
   for (const name of ['onLowMemory']) def(CP, name, '()V', () => {}); // ContentProvider's own empty ComponentCallbacks bodies
   def(CP, 'onTrimMemory', '(I)V', () => {}); def(CP, 'onConfigurationChanged', '(Landroid/content/res/Configuration;)V', () => {});
   def(CP, 'shutdown', '()V', r => r.record('LOG W ContentProvider: implement shutdown() only for tests'));
@@ -662,8 +793,9 @@ export function createAppServicesHost(platform) {
   def('Landroid/app/Application;', 'getProcessName', `()${STRING}`, () => processName(), { static: true });
   def(ACTIVITY_MANAGER, 'getRunningAppProcesses', '()Ljava/util/List;', r => {
     const list = newEmptyList(r), info = r.allocate(PROC_INFO), put = (name, ftype, value) => r.storeField(r.object(info).fields, `${PROC_INFO}->${name}:${ftype}`, value), packages = r.newArray('[Ljava/lang/String;', 1);
-    r.array(packages).elements = [pkg()];
-    put('processName', STRING, processName()); put('pid', 'I', platform.virtualProcess.pid); put('uid', 'I', platform.virtualProcess.uid); put('importance', 'I', 100); put('importanceReasonCode', 'I', 0); put('pkgList', '[Ljava/lang/String;', packages);
+    const self = pkgs()?.multi ? pkgs().callerEntry(r) : null, other = self && !self.main ? self : null;   // ActivityManagerService: a normal app is shown its own process only; a companion's code sees its own
+    r.array(packages).elements = [other ? other.name : appPkg()];
+    put('processName', STRING, other ? pkgs().processOf(other) : processName()); put('pid', 'I', other ? other.pid : platform.virtualProcess.pid); put('uid', 'I', other ? other.uid : platform.virtualProcess.uid); put('importance', 'I', 100); put('importanceReasonCode', 'I', 0); put('pkgList', '[Ljava/lang/String;', packages);
     r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, info], 'virtual'); return list;
   });
   def(ACTIVITY_MANAGER, 'getMemoryInfo', `(${MEM_INFO})V`, (r, _m, [, info]) => {
@@ -687,7 +819,7 @@ export function createAppServicesHost(platform) {
   for (const [name, ftype] of [['dalvikPss', 'I'], ['dalvikPrivateDirty', 'I'], ['dalvikSharedDirty', 'I'], ['nativePss', 'I'], ['nativePrivateDirty', 'I'], ['nativeSharedDirty', 'I'], ['otherPss', 'I'], ['otherPrivateDirty', 'I'], ['otherSharedDirty', 'I']]) registry.instanceField(MEMORY_INFO, name, ftype, { reflect: true });
   const putField = (r, ref, owner, name, ftype, value) => r.storeField(r.object(ref).fields, r.resolveField({ owner, name, type: ftype, key: `${owner}->${name}:${ftype}` }).key, value);   // stored under the declaring class
   const addTo = (r, list, item) => r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, item], 'virtual');
-  const componentFor = (r, className) => { const c = r.allocate(COMPONENT_NAME_T); call(r, COMPONENT_NAME_T, '<init>', [STRING, STRING], 'V', [c, pkg(), className], 'direct'); return c; };
+  const componentFor = (r, className) => { const c = r.allocate(COMPONENT_NAME_T); call(r, COMPONENT_NAME_T, '<init>', [STRING, STRING], 'V', [c, appPkg(), className], 'direct'); return c; };
   def(ACTIVITY_MANAGER, 'getRunningServices', '(I)Ljava/util/List;', (r, _m, [, maxNum]) => {
     const list = newEmptyList(r); if (maxNum <= 0) return list;
     for (const [className, service] of boundServices) {
@@ -750,11 +882,11 @@ export function createAppServicesHost(platform) {
   const SERVICE_INFO = 'Landroid/content/pm/ServiceInfo;';
   type(SERVICE_INFO, COMPONENT_INFO, [], { allocatable: true });
   for (const [name, ftype] of [['permission', STRING], ['flags', 'I'], ['foregroundServiceType', 'I']]) registry.instanceField(SERVICE_INFO, name, ftype, { reflect: true });
-  function fillComponentInfo(r, info, detail, withMeta) {
-    const put = (owner, name, ftype, value) => r.storeField(r.object(info).fields, `${owner}->${name}:${ftype}`, value);
-    put(ITEM_INFO, 'name', STRING, detail.name); put(ITEM_INFO, 'packageName', STRING, pkg()); put(ITEM_INFO, 'metaData', BUNDLE, withMeta ? metaDataBundle(r, detail.metaData) : null);
-    put(COMPONENT_INFO, 'applicationInfo', APPLICATION_INFO, platform.applicationInfo(r)); put(COMPONENT_INFO, 'processName', STRING, providerProcess(detail));
-    put(COMPONENT_INFO, 'enabled', 'Z', isFalse(detail.enabled) ? 0 : 1); put(COMPONENT_INFO, 'exported', 'Z', isTrue(detail.exported) ? 1 : 0); put(COMPONENT_INFO, 'directBootAware', 'Z', isTrue(detail.directBootAware) ? 1 : 0);
+  function fillComponentInfo(r, info, detail, withMeta, owner = null) {
+    const put = (owner, name, ftype, value) => r.storeField(r.object(info).fields, `${owner}->${name}:${ftype}`, value), other = companionOf(owner);
+    put(ITEM_INFO, 'name', STRING, detail.name); put(ITEM_INFO, 'packageName', STRING, other ? other.name : appPkg()); put(ITEM_INFO, 'metaData', BUNDLE, withMeta ? (other ? pkgs().metaData(r, other, detail.metaData ?? []) : metaDataBundle(r, detail.metaData)) : null);
+    put(COMPONENT_INFO, 'applicationInfo', APPLICATION_INFO, other ? pkgs().applicationInfoFor(r, other) : platform.applicationInfo(r)); put(COMPONENT_INFO, 'processName', STRING, other ? pkgs().processOf(other, detail) : providerProcess(detail));
+    put(COMPONENT_INFO, 'enabled', 'Z', isFalse(detail.enabled) ? 0 : 1); put(COMPONENT_INFO, 'exported', 'Z', (other ? pkgs().exported(other, detail) : isTrue(detail.exported)) ? 1 : 0); put(COMPONENT_INFO, 'directBootAware', 'Z', isTrue(detail.directBootAware) ? 1 : 0);
     return put;
   }
   // ---- component enabled state (ApplicationPackageManager.setComponentEnabledSetting): an app may toggle its own components; state lives for the VM's lifetime like a user-0 package setting.
@@ -766,19 +898,29 @@ export function createAppServicesHost(platform) {
     if (component === null || component === 0) r.throwJava('Ljava/lang/NullPointerException;', 'componentName');
     if (![0, 1, 2, 3, 4].includes(state)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Invalid new component state: ' + state);
     const c = r.object(component), declared = (platform.manifest?.componentDetails ?? []).some(detail => KNOWN_KINDS.has(detail.kind) && detail.name === c.className) || (platform.manifest?.activities ?? []).includes(c.className);
-    if (c.packageName !== pkg() || !declared) r.throwJava('Ljava/lang/IllegalArgumentException;', `Unknown component: ComponentInfo{${c.packageName}/${c.className}}`);
+    if (c.packageName !== appPkg() || !declared) r.throwJava('Ljava/lang/IllegalArgumentException;', `Unknown component: ComponentInfo{${c.packageName}/${c.className}}`);
     if (state === 0) COMPONENT_STATES.delete(componentKey(r, component)); else COMPONENT_STATES.set(componentKey(r, component), state);
     r.record(`PM setComponentEnabledSetting ${c.className} state=${state} flags=${flags}`);
   });
   def(PACKAGE_MANAGER, 'getComponentEnabledSetting', '(Landroid/content/ComponentName;)I', (r, _m, [, component]) => {
     if (component === null || component === 0) r.throwJava('Ljava/lang/NullPointerException;', 'componentName');
     const c = r.object(component), declared = (platform.manifest?.componentDetails ?? []).some(detail => KNOWN_KINDS.has(detail.kind) && detail.name === c.className) || (platform.manifest?.activities ?? []).includes(c.className);
-    if (c.packageName !== pkg() || !declared) r.throwJava('Ljava/lang/IllegalArgumentException;', `Unknown component: ComponentInfo{${c.packageName}/${c.className}}`);
+    if (c.packageName !== appPkg() || !declared) r.throwJava('Ljava/lang/IllegalArgumentException;', `Unknown component: ComponentInfo{${c.packageName}/${c.className}}`);
     return COMPONENT_STATES.get(componentKey(r, component)) ?? 0;
   });
   for (const [name, value] of Object.entries({ COMPONENT_ENABLED_STATE_DEFAULT: 0, COMPONENT_ENABLED_STATE_ENABLED: 1, COMPONENT_ENABLED_STATE_DISABLED: 2, COMPONENT_ENABLED_STATE_DISABLED_USER: 3, COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED: 4, DONT_KILL_APP: 1, SYNCHRONOUS: 4 })) registry.staticField(PACKAGE_MANAGER, name, 'I', () => value);
+  /** A component of a visible companion package (or, for a companion's code, of the app): { owner, detail }, else null (the app's own lookups keep their original path). */
+  const packageComponent = (r, c, kind) => {
+    if (!pkgs()?.multi) return null;
+    const found = packages(r).find(e => e.name === c.packageName && e.entry); if (!found) return null;
+    const owner = found.entry; if (owner.main && pmCaller(r).main) return null;
+    const detail = kind === 'provider' ? (owner.manifest.providerDetails ?? []).find(p => p.name === c.className) : (owner.manifest.componentDetails ?? []).find(p => p.kind === kind && p.name === c.className);
+    if (!detail) r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', `ComponentInfo{${c.packageName}/${c.className}}`);
+    return { owner, detail };
+  };
   def(PACKAGE_MANAGER, 'getServiceInfo', `(Landroid/content/ComponentName;I)${SERVICE_INFO}`, (r, _m, [, component, flags]) => {
-    const c = r.object(component), detail = (platform.manifest?.componentDetails ?? []).find(p => p.kind === 'service' && p.name === c.className);
+    const c = r.object(component), found = packageComponent(r, c, 'service'); if (found) return makeInfo(r, found.detail, 'service', (flags & 128) !== 0, found.owner);
+    const detail = (platform.manifest?.componentDetails ?? []).find(p => p.kind === 'service' && p.name === c.className);
     if (c.packageName !== pkg() || !detail) r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', `ComponentInfo{${c.packageName}/${c.className}}`);
     const info = r.allocate(SERVICE_INFO), put = fillComponentInfo(r, info, detail, (flags & 128) !== 0);
     put(SERVICE_INFO, 'permission', STRING, detail.permission); put(SERVICE_INFO, 'flags', 'I', 0); put(SERVICE_INFO, 'foregroundServiceType', 'I', Number(detail.foregroundServiceType) | 0);
@@ -792,9 +934,9 @@ export function createAppServicesHost(platform) {
   type(RESOLVE_INFO, OBJECT, [], { allocatable: true });
   for (const [name, ftype] of [['activityInfo', ACTIVITY_INFO_TYPE], ['serviceInfo', SERVICE_INFO], ['providerInfo', PROVIDER_INFO], ['priority', 'I'], ['preferredOrder', 'I'], ['match', 'I'], ['specificIndex', 'I'], ['isDefault', 'Z'], ['resolvePackageName', STRING], ['labelRes', 'I'], ['icon', 'I']]) registry.instanceField(RESOLVE_INFO, name, ftype, { reflect: true });
   def(RESOLVE_INFO, '<init>', '()V', (r, _m, [self]) => { r.storeField(r.object(self).fields, `${RESOLVE_INFO}->specificIndex:I`, -1); });
-  const makeInfo = (r, detail, kind, withMeta) => {
-    if (kind === 'service') { const info = r.allocate(SERVICE_INFO), put = fillComponentInfo(r, info, detail, withMeta); put(SERVICE_INFO, 'permission', STRING, detail.permission); put(SERVICE_INFO, 'flags', 'I', 0); put(SERVICE_INFO, 'foregroundServiceType', 'I', Number(detail.foregroundServiceType) | 0); return info; }
-    const info = r.makeObject(ACTIVITY_INFO_TYPE), put = fillComponentInfo(r, info, detail, withMeta); put(ACTIVITY_INFO_TYPE, 'permission', STRING, detail.permission ?? null); put(ACTIVITY_INFO_TYPE, 'flags', 'I', 0); return info;
+  const makeInfo = (r, detail, kind, withMeta, owner = null) => {
+    if (kind === 'service') { const info = r.allocate(SERVICE_INFO), put = fillComponentInfo(r, info, detail, withMeta, owner); put(SERVICE_INFO, 'permission', STRING, detail.permission); put(SERVICE_INFO, 'flags', 'I', 0); put(SERVICE_INFO, 'foregroundServiceType', 'I', Number(detail.foregroundServiceType) | 0); return info; }
+    const info = r.makeObject(ACTIVITY_INFO_TYPE), put = fillComponentInfo(r, info, detail, withMeta, owner); put(ACTIVITY_INFO_TYPE, 'permission', STRING, detail.permission ?? null); put(ACTIVITY_INFO_TYPE, 'flags', 'I', 0); return info;
   };
   const matchingComponents = (r, intent, kind, flags = 0) => {
     const call = (name, result) => r.dispatch({ owner: INTENT_TYPE, name, parameters: [], result, signature: `()${result}` }, [intent], 'virtual');
@@ -813,17 +955,37 @@ export function createAppServicesHost(platform) {
     const categories = call('getCategories', 'Ljava/util/Set;'), asArray = categories === null ? null : r.dispatch({ owner: 'Ljava/util/Set;', name: 'toArray', parameters: [], result: '[Ljava/lang/Object;', signature: '()[Ljava/lang/Object;' }, [categories], 'interface'), wanted = asArray === null ? [] : r.array(asArray).elements.map(c => r.stringCharacters(c));
     return action === null ? [] : details.filter(d => d.actions?.includes(r.stringCharacters(action)) && (kind !== 'activity' || wanted.every(c => d.categories?.includes(c))));
   };
+  /** Services / receivers of the visible companion packages (and, for a companion's code, of the app) an Intent matches: [{ detail, owner }]. */
+  const packageMatches = (r, intent, kind) => {
+    if (!pkgs()?.multi || kind === 'activity') return [];
+    const caller = pmCaller(r), call = (name, result) => r.dispatch({ owner: INTENT_TYPE, name, parameters: [], result, signature: `()${result}` }, [intent], 'virtual');
+    const component = call('getComponent', COMPONENT_NAME), wanted = call('getPackage', STRING), action = call('getAction', STRING), out = [];
+    for (const e of packages(r)) {
+      const owner = e.entry; if (!owner || (owner.main && caller.main)) continue;
+      const details = (owner.manifest.componentDetails ?? []).filter(d => d.kind === kind && !isFalse(d.enabled));
+      if (component !== null) { const c = r.object(component); if (c.packageName === owner.name) out.push(...details.filter(d => d.name === c.className).map(detail => ({ detail, owner }))); continue; }
+      if (wanted !== null && r.stringCharacters(wanted) !== owner.name) continue;
+      if (action !== null) out.push(...details.filter(d => d.actions?.includes(r.stringCharacters(action))).map(detail => ({ detail, owner })));
+    }
+    return out;
+  };
   const resolveInfos = (r, intent, kind, withMeta, flags = 0) => {
-    const list = newEmptyList(r), details = matchingComponents(r, intent, kind, flags);
+    const own = !pkgs()?.multi || pmCaller(r).main, list = newEmptyList(r), details = own ? matchingComponents(r, intent, kind, flags) : [];
     if (kind === 'activity' && !details.length) { const system = platform.sharedStorage?.systemActivity(r, intent) ?? platform.camera?.systemActivity?.(r, intent) ?? null; if (system !== null) r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, system], 'virtual'); }   // the device's file pickers (src/shared-storage-host.js) and its camera app (src/camera-capture-intent.js)
     for (const detail of details) {
       const resolved = r.allocate(RESOLVE_INFO); r.dispatch({ owner: RESOLVE_INFO, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [resolved], 'direct');
       r.storeField(r.object(resolved).fields, kind === 'service' ? `${RESOLVE_INFO}->serviceInfo:${SERVICE_INFO}` : `${RESOLVE_INFO}->activityInfo:${ACTIVITY_INFO_TYPE}`, makeInfo(r, detail, kind, withMeta));
       r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, resolved], 'virtual');
     }
+    for (const { detail, owner } of packageMatches(r, intent, kind)) {
+      const resolved = r.allocate(RESOLVE_INFO); r.dispatch({ owner: RESOLVE_INFO, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [resolved], 'direct');
+      r.storeField(r.object(resolved).fields, kind === 'service' ? `${RESOLVE_INFO}->serviceInfo:${SERVICE_INFO}` : `${RESOLVE_INFO}->activityInfo:${ACTIVITY_INFO_TYPE}`, makeInfo(r, detail, kind, withMeta, owner));
+      r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, resolved], 'virtual');
+    }
     return list;
   };
   def(PACKAGE_MANAGER, 'getReceiverInfo', `(${COMPONENT_NAME}I)${ACTIVITY_INFO_TYPE}`, (r, _m, [, component, flags]) => {
+    const found = packageComponent(r, r.object(component), 'receiver'); if (found) return makeInfo(r, found.detail, 'receiver', (flags & 128) !== 0, found.owner);
     const c = r.object(component), detail = (platform.manifest?.componentDetails ?? []).find(p => p.kind === 'receiver' && p.name === c.className);
     if (c.packageName !== pkg() || !detail) r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', `ComponentInfo{${c.packageName}/${c.className}}`);
     return makeInfo(r, detail, 'receiver', (flags & 128) !== 0);
@@ -841,10 +1003,18 @@ export function createAppServicesHost(platform) {
   // ---- AssetManager over the APK's assets/ tree -----------------------------------------------------------------------------------------------
   const ASSETS = 'Landroid/content/res/AssetManager;'; type(ASSETS, OBJECT, ['Ljava/lang/AutoCloseable;'], { allocatable: true });
   const assetManager = r => platform.assetManager ??= r.allocate(ASSETS);
-  defContext('getAssets', `()${ASSETS}`, r => assetManager(r));
+  // A companion package's AssetManager reads that package's APK (src/package-registry.js); the app's reads the app's.
+  const packageAssets = (r, entry) => { if (!entry.assetManager) { entry.assetManager = r.allocate(ASSETS); r.object(entry.assetManager).packageEntry = entry; pkgs().refs.set(`${entry.name}:assets`, entry.assetManager); } return entry.assetManager; };
+  defContext('getAssets', `()${ASSETS}`, r => { const self = selfEntry(); return self ? packageAssets(r, self) : assetManager(r); });
+  const assetPackage = (r, self) => (self && typeof self === 'object' ? r.object(self).packageEntry : null) ?? null;
+  const entriesOf = (r, self) => assetPackage(r, self)?.entries ?? r.apkEntries;
   def('Landroid/content/res/Resources;', 'getAssets', `()${ASSETS}`, r => assetManager(r));
   const assetEntry = (r, name) => { const n = text(r, name).replace(/^\/+/, ''); return { n, entry: 'assets/' + n }; };
-  const openAsset = (r, _m, [, name]) => { const { n, entry } = assetEntry(r, name); if (!r.apkEntries.has(entry)) r.throwJava('Ljava/io/FileNotFoundException;', n); return platform.javaIo.apkResourceStream(r, entry); };
+  const openAsset = (r, _m, [self, name]) => {
+    const { n, entry } = assetEntry(r, name), owner = assetPackage(r, self);
+    if (!entriesOf(r, self).has(entry)) r.throwJava('Ljava/io/FileNotFoundException;', n);
+    return owner ? platform.javaIo.bytesStream(r, owner.reader(entry)) : platform.javaIo.apkResourceStream(r, entry);
+  };
   def(ASSETS, 'open', `(${STRING})Ljava/io/InputStream;`, openAsset); def(ASSETS, 'open', `(${STRING}I)Ljava/io/InputStream;`, openAsset);
   // A file descriptor over a package entry (AssetManager.openFd / openNonAssetFd, Resources.openRawResourceFd): the installed APK file itself, with the offset and length of the entry's data.
   // Only an entry stored without compression can be read in place; a compressed one is the FileNotFoundException Android throws (aapt stores media, fonts and already-compressed formats).
@@ -857,11 +1027,11 @@ export function createAppServicesHost(platform) {
     const afd = r.allocate(ENTRY_AFD); r.dispatch({ owner: ENTRY_AFD, name: '<init>', parameters: [ENTRY_PFD, 'J', 'J'], result: 'V', signature: `(${ENTRY_PFD}JJ)V` }, r.argumentWords([ENTRY_PFD, 'J', 'J'], [pfd, BigInt(range.start), BigInt(range.length)], { receiver: afd }), 'direct');
     return afd;
   };
-  def(ASSETS, 'openFd', `(${STRING})${ENTRY_AFD}`, (r, _m, [, name]) => { const { n, entry } = assetEntry(r, name), fd = r.apkEntries.has(entry) ? entryFd(r, entry) : null; if (fd === null) r.throwJava('Ljava/io/FileNotFoundException;', NOT_FD + ': ' + n); return fd; });
+  def(ASSETS, 'openFd', `(${STRING})${ENTRY_AFD}`, (r, _m, [self, name]) => { if (assetPackage(r, self)) throw new APKError(`AssetManager.openFd of companion package ${assetPackage(r, self).name} is not supported (open() is)`, { kind: 'package-assets-unsupported' }); const { n, entry } = assetEntry(r, name), fd = r.apkEntries.has(entry) ? entryFd(r, entry) : null; if (fd === null) r.throwJava('Ljava/io/FileNotFoundException;', NOT_FD + ': ' + n); return fd; });
   def(ASSETS, 'openNonAssetFd', `(${STRING})${ENTRY_AFD}`, (r, _m, [, name]) => { const n = text(r, name), fd = r.apkEntries.has(n) ? entryFd(r, n) : null; if (fd === null) r.throwJava('Ljava/io/FileNotFoundException;', NOT_FD + ': ' + n); return fd; });
-  def(ASSETS, 'list', `(${STRING})[${STRING}`, (r, _m, [, path]) => {
+  def(ASSETS, 'list', `(${STRING})[${STRING}`, (r, _m, [self, path]) => {
     const prefix = 'assets/' + text(r, path).replace(/^\/+|\/+$/g, ''), base = prefix === 'assets/' ? 'assets/' : prefix + '/', names = new Set();
-    for (const e of r.apkEntries) if (e.startsWith(base) && e.length > base.length) names.add(e.slice(base.length).split('/')[0]);
+    for (const e of entriesOf(r, self)) if (e.startsWith(base) && e.length > base.length) names.add(e.slice(base.length).split('/')[0]);
     const array = r.newArray('[Ljava/lang/String;', names.size); r.array(array).elements = [...names]; return array;
   });
   def(ASSETS, 'close', '()V', () => {});
@@ -901,7 +1071,7 @@ export function createAppServicesHost(platform) {
   const bytesOf = (r, self) => r.object(self).signatureBytes ?? r.throwJava('Ljava/lang/IllegalStateException;', 'Signature has no bytes');
   const byteArray = (r, bytes) => { const array = r.newArray('[B', bytes.length); r.array(array).elements = Array.from(bytes, v => (v << 24) >> 24); return array; };
   const newSignature = (r, bytes) => { const signature = r.allocate(SIGNATURE); r.object(signature).signatureBytes = Int8Array.from(bytes, v => (v << 24) >> 24); return signature; };
-  const signatureArray = r => { const certificates = r.apkSigningCertificates?.() ?? [], array = r.newArray(SIGNATURES, certificates.length); r.array(array).elements = certificates.map(der => newSignature(r, der)); return array; };
+  const signatureArray = (r, chosen = null) => { const certificates = chosen ?? r.apkSigningCertificates?.() ?? [], array = r.newArray(SIGNATURES, certificates.length); r.array(array).elements = certificates.map(der => newSignature(r, der)); return array; };
   const hex = bytes => Array.from(bytes, v => (v & 0xff).toString(16).padStart(2, '0')).join('');
   def(SIGNATURE, '<init>', '([B)V', (r, _m, [self, bytes]) => { if (bytes === null) r.throwJava('Ljava/lang/NullPointerException;', null); r.object(self).signatureBytes = Int8Array.from(r.array(bytes).elements); });
   def(SIGNATURE, '<init>', `(${STRING})V`, (r, _m, [self, text]) => {
@@ -921,7 +1091,7 @@ export function createAppServicesHost(platform) {
   // ---- PackageManager.getPackageInfo (only this package is installed; Play Services and every other package are NameNotFoundException) -----------
   const PACKAGE_INFO = 'Landroid/content/pm/PackageInfo;', installTime = Date.now();
   type(PACKAGE_INFO, OBJECT, [], { allocatable: true });
-  for (const [name, ftype] of [['packageName', STRING], ['versionName', STRING], ['versionCode', 'I'], ['longVersionCode', 'J'], ['firstInstallTime', 'J'], ['lastUpdateTime', 'J'], ['applicationInfo', APPLICATION_INFO], ['requestedPermissions', '[Ljava/lang/String;'], ['signatures', '[Landroid/content/pm/Signature;'], ['signingInfo', 'Landroid/content/pm/SigningInfo;']]) registry.instanceField(PACKAGE_INFO, name, ftype, { reflect: true });
+  for (const [name, ftype] of [['packageName', STRING], ['versionName', STRING], ['versionCode', 'I'], ['longVersionCode', 'J'], ['firstInstallTime', 'J'], ['lastUpdateTime', 'J'], ['applicationInfo', APPLICATION_INFO], ['requestedPermissions', '[Ljava/lang/String;'], ['signatures', '[Landroid/content/pm/Signature;'], ['signingInfo', 'Landroid/content/pm/SigningInfo;'], ['services', '[Landroid/content/pm/ServiceInfo;'], ['providers', '[Landroid/content/pm/ProviderInfo;']]) registry.instanceField(PACKAGE_INFO, name, ftype, { reflect: true });
   def(PACKAGE_INFO, 'getLongVersionCode', '()J', (r, _m, [self]) => r.object(self).fields.get(`${PACKAGE_INFO}->longVersionCode:J`) ?? 0n);
   // API 33 PackageManager.PackageInfoFlags.of(long) + getPackageInfo(String, PackageInfoFlags): the same lookup with the flag value taken from the holder.
   const INFO_FLAGS = 'Landroid/content/pm/PackageManager$PackageInfoFlags;'; type(INFO_FLAGS, OBJECT, [], { allocatable: true });
@@ -954,25 +1124,43 @@ export function createAppServicesHost(platform) {
     cache.set(entry.name, info); return info;
   };
   const targetSdk = () => Number(platform.manifest?.usesSdk?.targetSdkVersion ?? 1);
-  const seesAll = r => targetSdk() < 30 || holdsPermission(r, 'android.permission.QUERY_ALL_PACKAGES');
-  /** The installed, visible packages in install order: [{ name, system }]. */
-  const packages = r => [{ name: pkg(), system: null }, ...SYSTEM_PACKAGES.filter(entry => seesAll(r) || entry.always).map(entry => ({ name: entry.name, system: entry }))];
+  /** The package a PackageManager call is made for: the package whose code calls it (src/package-registry.js), the app when no companion is installed. */
+  const pmCaller = r => pkgs()?.multi ? pkgs().callerEntry(r) : null;
+  const seesAll = (r, caller = null) => caller && !caller.main ? pkgs().targetSdk(caller) < 30 || pkgs().holds(r, caller, 'android.permission.QUERY_ALL_PACKAGES') : targetSdk() < 30 || holdsPermission(r, 'android.permission.QUERY_ALL_PACKAGES');
+  /**
+   * The installed, visible packages in install order: [{ name, system, entry }] -- the caller, the system packages it can see, then the other installed packages
+   * (the app and the companions, src/package-registry.js) that package visibility lets it see.
+   */
+  const packages = r => {
+    const caller = pmCaller(r), own = caller ?? { name: appPkg(), main: true };
+    const list = [{ name: own.name, system: null, entry: caller }, ...SYSTEM_PACKAGES.filter(entry => seesAll(r, caller) || entry.always).map(entry => ({ name: entry.name, system: entry }))];
+    if (caller) for (const other of pkgs().entries()) if (other !== caller && pkgs().visible(r, caller, other)) list.push({ name: other.name, system: null, entry: other });
+    return list;
+  };
   const findPackage = (r, name) => packages(r).find(entry => entry.name === name) ?? r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', name);
-  const applicationInfoOf = (r, entry, meta) => entry.system ? systemApplicationInfo(r, entry.system) : platform.applicationInfo(r, meta);
+  const companionEntry = e => e.entry && !e.entry.main ? e.entry : null;
+  const applicationInfoOf = (r, entry, meta) => entry.system ? systemApplicationInfo(r, entry.system) : companionEntry(entry) ? pkgs().applicationInfoFor(r, entry.entry, meta) : platform.applicationInfo(r, meta);
   const holderValue = (r, holder) => holder === null ? 0n : r.object(holder).flagsValue ?? 0n;
   const getApplicationInfo = (r, name, flags) => { const n = text(r, name); return applicationInfoOf(r, findPackage(r, n), (Number(BigInt.asIntN(32, BigInt(flags))) & 128) !== 0); };
   def(PACKAGE_MANAGER, 'getApplicationInfo', `(${STRING}${APP_INFO_FLAGS})${APPLICATION_INFO}`, (r, _m, [, name, flags]) => getApplicationInfo(r, name, holderValue(r, flags)));
   def(PACKAGE_MANAGER, 'getApplicationInfo', `(${STRING}I)${APPLICATION_INFO}`, (r, _m, [, name, flags]) => getApplicationInfo(r, name, flags));
   const packageInfoFor = (r, entry, flags) => {
-    const info = r.allocate(PACKAGE_INFO), put = (name2, ftype, value) => r.storeField(r.object(info).fields, `${PACKAGE_INFO}->${name2}:${ftype}`, value), attrs = platform.manifest?.manifestAttrs ?? {};
+    const other = companionEntry(entry);
+    const info = r.allocate(PACKAGE_INFO), put = (name2, ftype, value) => r.storeField(r.object(info).fields, `${PACKAGE_INFO}->${name2}:${ftype}`, value), attrs = (other ? other.manifest : platform.manifest)?.manifestAttrs ?? {};
     const system = entry.system, code = system ? 33 : Number(attrs.versionCode ?? 0) | 0;
     put('packageName', STRING, entry.name); put('versionName', STRING, system ? '13' : typeof attrs.versionName === 'string' ? attrs.versionName : null); put('versionCode', 'I', code); put('longVersionCode', 'J', BigInt(code));
     put('installLocation', 'I', Number.isInteger(attrs.installLocation) && !system ? attrs.installLocation : -1);   // android:installLocation, else INSTALL_LOCATION_UNSPECIFIED
     put('firstInstallTime', 'J', BigInt(installTime)); put('lastUpdateTime', 'J', BigInt(installTime)); put('applicationInfo', APPLICATION_INFO, applicationInfoOf(r, entry, (flags & 128) !== 0));
     if (!system) {
       // GET_SIGNATURES (0x40) / GET_SIGNING_CERTIFICATES (0x08000000): the APK's real signer certificates (v3, v2 or v1 block).
-      if (flags & 0x40) put('signatures', SIGNATURES, signatureArray(r));
-      if (flags & 0x08000000) { const signing = r.allocate(SIGNING_INFO); r.object(signing).signers = signatureArray(r); put('signingInfo', SIGNING_INFO, signing); }
+      const certificates = other ? pkgs().signingCertificatesOf(r, other) : null;
+      if (flags & 0x40) put('signatures', SIGNATURES, signatureArray(r, certificates));
+      if (flags & 0x08000000) { const signing = r.allocate(SIGNING_INFO); r.object(signing).signers = signatureArray(r, certificates); put('signingInfo', SIGNING_INFO, signing); }
+      if (other) {   // GET_SERVICES (4) / GET_PROVIDERS (8) / GET_PERMISSIONS (0x1000) of a companion package
+        if (flags & 4) { const details = pkgs().detailsOf(other, 'service'), array = r.newArray(`[${SERVICE_INFO}`, details.length); r.array(array).elements = details.map(d => makeInfo(r, d, 'service', (flags & 128) !== 0, other)); put('services', `[${SERVICE_INFO}`, array); }
+        if (flags & 8) { const details = (other.manifest.providerDetails ?? []), array = r.newArray(`[${PROVIDER_INFO}`, details.length); r.array(array).elements = details.map(d => makeProviderInfo(r, d, (flags & 128) !== 0, other)); put('providers', `[${PROVIDER_INFO}`, array); }
+        if (flags & 0x1000) { const names = (other.manifest.usesPermissions ?? []).map(p => p.name), array = r.newArray('[Ljava/lang/String;', names.length); r.array(array).elements = names; put('requestedPermissions', '[Ljava/lang/String;', array); }
+      }
     }
     return info;
   };
@@ -1005,7 +1193,7 @@ export function createAppServicesHost(platform) {
   };
   def(PACKAGE_MANAGER, 'getPackagesHoldingPermissions', '([Ljava/lang/String;I)Ljava/util/List;', (r, _m, [, permissions, flags]) => holding(r, permissions, flags));
   def(PACKAGE_MANAGER, 'getPackagesHoldingPermissions', `([Ljava/lang/String;${INFO_FLAGS})Ljava/util/List;`, (r, _m, [, permissions, holder]) => holding(r, permissions, int32(holderValue(r, holder))));
-  const uidOf = (r, entry) => entry.system ? entry.system.uid(platform.virtualProcess.uid) : platform.virtualProcess.uid;
+  const uidOf = (r, entry) => entry.system ? entry.system.uid(platform.virtualProcess.uid) : entry.entry ? entry.entry.uid : platform.virtualProcess.uid;
   def(PACKAGE_MANAGER, 'getPackageUid', `(${STRING}I)I`, (r, _m, [, name]) => uidOf(r, findPackage(r, text(r, name))));
   def(PACKAGE_MANAGER, 'getPackageUid', `(${STRING}${INFO_FLAGS})I`, (r, _m, [, name]) => uidOf(r, findPackage(r, text(r, name))));
   def(PACKAGE_MANAGER, 'getPackagesForUid', '(I)[Ljava/lang/String;', (r, _m, [, uid]) => {
@@ -1022,18 +1210,22 @@ export function createAppServicesHost(platform) {
   }
 
   // The lab installs the APK itself: no store recorded it, so the installer package is null (what adb/sideloaded installs report).
-  def(PACKAGE_MANAGER, 'checkPermission', `(${STRING}${STRING})I`, (r, _m, [, permission, name]) => { const permissionName = needPermission(r, permission); if (name === null) r.throwJava('Ljava/lang/NullPointerException;', null); return text(r, name) === pkg() && holdsPermission(r, permissionName) ? PERMISSION_GRANTED : PERMISSION_DENIED; });   // other packages are not installed on the virtual device
+  def(PACKAGE_MANAGER, 'checkPermission', `(${STRING}${STRING})I`, (r, _m, [, permission, name]) => { const permissionName = needPermission(r, permission); if (name === null) r.throwJava('Ljava/lang/NullPointerException;', null); return (() => { const n = text(r, name), target = pkgs()?.multi ? packages(r).find(e => e.name === n && e.entry) : null; return target ? (holdsFor(r, target.entry, permissionName) ? PERMISSION_GRANTED : PERMISSION_DENIED) : n === appPkg() && holdsPermission(r, permissionName) ? PERMISSION_GRANTED : PERMISSION_DENIED; })(); });   // the app, or a visible companion package (src/package-registry.js)
   // PackageManager.getApplicationLabel / ApplicationInfo.loadLabel: nonLocalizedLabel, else the string behind labelRes, else the package name (ApplicationInfo.loadLabel in PackageItemInfo.java).
   const loadLabel = (r, info) => {
     const fields = r.object(info).fields, literal = fields.get(`${ITEM_INFO}->nonLocalizedLabel:Ljava/lang/CharSequence;`) ?? null, resource = fields.get(`${ITEM_INFO}->labelRes:I`) ?? 0;
     if (literal !== null && literal !== 0) return literal;
     if (resource) { try { const value = platform.resource(resource, ['string']).value; if (typeof value === 'string') return value; } catch { /* unresolvable label: fall through to the package name */ } }
-    return fields.get(`${ITEM_INFO}->packageName:Ljava/lang/String;`) ?? pkg();
+    return fields.get(`${ITEM_INFO}->packageName:Ljava/lang/String;`) ?? appPkg();
   };
   def(PACKAGE_MANAGER, 'isInstantApp', '()Z', () => 0); def(PACKAGE_MANAGER, 'isInstantApp', `(${STRING})Z`, () => 0);   // an installed APK is never an instant app
   def(PACKAGE_MANAGER, 'getApplicationLabel', `(${APPLICATION_INFO})Ljava/lang/CharSequence;`, (r, _m, [, info]) => { if (info === null) r.throwJava('Ljava/lang/NullPointerException;', null); return loadLabel(r, info); });
   def(APPLICATION_INFO, 'loadLabel', `(${PACKAGE_MANAGER})Ljava/lang/CharSequence;`, (r, _m, [info]) => loadLabel(r, info));
-  def(PACKAGE_MANAGER, 'getInstallerPackageName', `(${STRING})${STRING}`, (r, _m, [, name]) => { const n = text(r, name); if (n !== pkg()) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Unknown package: ' + n); return null; });
+  // The hidden partition queries of ApplicationInfo (isSystemApp: FLAG_SYSTEM; the rest read privateFlags PRIVATE_FLAG_PRIVILEGED/OEM/VENDOR/PRODUCT/SYSTEM_EXT/ODM, which no
+  // package of the virtual device has: every package is on the data partition, and a device option's preinstalled packages are not given partition flags either).
+  def(APPLICATION_INFO, 'isSystemApp', '()Z', (r, _m, [info]) => (Number(r.object(info).fields.get(`${APPLICATION_INFO}->flags:I`) ?? 0) & 1) ? 1 : 0);
+  for (const name of ['isPrivilegedApp', 'isOem', 'isVendor', 'isProduct', 'isSystemExt', 'isOdm']) def(APPLICATION_INFO, name, '()Z', () => 0);
+  def(PACKAGE_MANAGER, 'getInstallerPackageName', `(${STRING})${STRING}`, (r, _m, [, name]) => { const n = text(r, name); if (n !== appPkg() && !(pkgs()?.multi && packages(r).some(e => e.name === n && e.entry))) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Unknown package: ' + n); return null; });   // companions are installed by the lab too
 
   // PackageManager.queryIntentContentProviders: the virtual device has one installed package (this app), no Play Services and no system font
   // provider, so an action (e.g. androidx.content.action.FONT_PROVIDER) resolves only to providers this app declares for it.
@@ -1049,6 +1241,7 @@ export function createAppServicesHost(platform) {
 
   // ---- PackageManager.getProviderInfo ---------------------------------------------------------------------------------------------------------
   def(PACKAGE_MANAGER, 'getProviderInfo', `(Landroid/content/ComponentName;I)${PROVIDER_INFO}`, (r, _m, [, component, flags]) => {
+    const found = packageComponent(r, r.object(component), 'provider'); if (found) return makeProviderInfo(r, found.detail, (flags & 128) !== 0, found.owner);
     const c = r.object(component), detail = (platform.manifest?.providerDetails ?? []).find(p => p.name === c.className);
     if (c.packageName !== pkg() || !detail) r.throwJava('Landroid/content/pm/PackageManager$NameNotFoundException;', `ComponentInfo{${c.packageName}/${c.className}}`);
     return makeProviderInfo(r, detail, (flags & 128) !== 0);
@@ -1056,7 +1249,13 @@ export function createAppServicesHost(platform) {
 
   // PackageManager.resolveContentProvider(authority, flags): only this app's enabled providers exist on the virtual device (no system providers), so any other authority is null.
   def(PACKAGE_MANAGER, 'resolveContentProvider', `(${STRING}I)${PROVIDER_INFO}`, (r, _m, [, authority, flags]) => {
-    const wanted = text(r, authority), detail = (platform.manifest?.providerDetails ?? []).find(p => !isFalse(p.enabled) && String(p.authorities ?? '').split(';').includes(wanted));
+    const wanted = text(r, authority);
+    if (pkgs()?.multi) {   // every installed package's providers, as the caller can see them
+      const caller = pmCaller(r), found = pkgs().providerFor(wanted);
+      if (!found || !pkgs().visible(r, caller, found.entry)) return null;
+      return makeProviderInfo(r, found.detail, (flags & 128) !== 0, found.entry);
+    }
+    const detail = (platform.manifest?.providerDetails ?? []).find(p => !isFalse(p.enabled) && String(p.authorities ?? '').split(';').includes(wanted));
     return detail ? makeProviderInfo(r, detail, (flags & 128) !== 0) : null;
   });
 
@@ -1075,11 +1274,33 @@ export function createAppServicesHost(platform) {
       const className = 'L' + detail.name.replaceAll('.', '/') + ';';
       if (!runtime.classes.has(className) || !runtime.isSubtype(className, CP)) throw new APKError(`Unable to get provider ${detail.name}: class not found or not a ContentProvider`, { kind: 'provider-class' });
       const instance = runtime.allocate(className); installedProviders.set(detail.name, instance);
+      if (pkgs()?.multi) runtime.object(instance).providerPackage = pkgs().main;   // another installed package's calls to it are cross-package transactions (src/content-resolver-api-host.js)
       runtime.dispatch({ owner: className, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [instance], 'direct');
       runtime.record(`PROVIDERS attachInfo ${detail.name} (initOrder ${Number(detail.initOrder) | 0})`);
       runtime.dispatch({ owner: CP, name: 'attachInfo', parameters: [CONTEXT, PROVIDER_INFO], result: 'V', signature: `(${CONTEXT}${PROVIDER_INFO})V` }, [instance, platform.application, makeProviderInfo(runtime, detail, true)], 'virtual');
     }
   }
 
-  return { ...registry, [GC_ROOTS](visit) { visit(currentContext); }, interfaces: registry.interfacesOf, getService, metaDataBundle, serviceNameForClass: classType => serviceByClass.get(classType) ?? null, installContentProviders, providerByAuthority: authority => { const detail = (platform.manifest?.providerDetails ?? []).find(p => !isFalse(p.enabled) && String(p.authorities ?? '').split(';').includes(authority)); return detail ? installedProviders.get(detail.name) ?? null : null; }, preferenceInstances: instances, findPackage, packageNames: r => packages(r).map(entry => entry.name) };
+  /** installContentProviders for a companion package's process (src/package-registry.js ensureProcess): the same order, its class loader, its Application as Context. */
+  function installPackageProviders(runtime, entry) {
+    const details = (entry.manifest.providerDetails ?? []).filter(p => !isFalse(p.enabled));
+    details.sort((a, b) => (Number(b.initOrder) | 0) - (Number(a.initOrder) | 0) || a.order - b.order);
+    runtime.record(`PROVIDERS install ${details.length} of ${entry.name} in initOrder (one VM process for all its android:process names)`);
+    for (const detail of details) installPackageProvider(runtime, entry, detail);
+  }
+  /**
+   * ActivityThread.installProvider for one provider of a companion: instantiated once and kept (mLocalProvidersByName). A provider whose onCreate reaches a sibling provider
+   * of its own process that installContentProviders has not reached yet gets that sibling installed right then, and the later loop reuses the same instance.
+   */
+  function installPackageProvider(runtime, entry, detail) {
+    const existing = entry.providers.get(detail.name); if (existing) return existing;
+    const type = pkgs().typeIn(runtime, entry, detail.name);
+    if (!type || !runtime.isSubtype(type, CP)) throw new APKError(`Unable to get provider ${detail.name} of ${entry.name}: class not found or not a ContentProvider`, { kind: 'provider-class' });
+    const instance = runtime.allocate(type); entry.providers.set(detail.name, instance); pkgs().refs.set(`${entry.name}:provider:${detail.name}`, instance);
+    runtime.object(instance).providerPackage = entry;
+    runtime.dispatch({ owner: type, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [instance], 'direct');
+    runtime.dispatch({ owner: CP, name: 'attachInfo', parameters: [CONTEXT, PROVIDER_INFO], result: 'V', signature: `(${CONTEXT}${PROVIDER_INFO})V` }, [instance, pkgs().application(entry), makeProviderInfo(runtime, detail, true, entry)], 'virtual');
+    return instance;
+  }
+  return { ...registry, [GC_ROOTS](visit) { visit(currentContext); }, interfaces: registry.interfacesOf, getService, metaDataBundle, installPackageProviders, installPackageProvider, holdsFor, serviceNameForClass: classType => serviceByClass.get(classType) ?? null, installContentProviders, providerByAuthority: authority => { const detail = (platform.manifest?.providerDetails ?? []).find(p => !isFalse(p.enabled) && String(p.authorities ?? '').split(';').includes(authority)); return detail ? installedProviders.get(detail.name) ?? null : null; }, preferenceInstances: instances, findPackage, packageNames: r => packages(r).map(entry => entry.name) };
 }

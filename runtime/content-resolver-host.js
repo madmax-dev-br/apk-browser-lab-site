@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=a6c2214802a2';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=a6c2214802a2';
+import { APKError } from './apk-runtime.js?v=352c1cd2699a';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=352c1cd2699a';
 const RESOLVER = 'Landroid/content/ContentResolver;', URI = 'Landroid/net/Uri;', GLOBAL = 'Landroid/provider/Settings$Global;', OBSERVER = 'Landroid/database/ContentObserver;';
 const fail = message => { throw new APKError(message, { kind: 'virtual-content-provider-unsupported' }); };
 const keys = new Set();
@@ -109,8 +109,9 @@ export function createContentResolverHost(platform) {
     parent: type => [RESOLVER, URI, URI_BUILDER].includes(type) ? 'Ljava/lang/Object;' : null,
     invoke(runtime, method, args) {
       const { owner, name } = method;
-      if (owner === 'Landroid/os/Binder;') return platform.virtualProcess.uid;
-      if (owner === 'Landroid/os/Process;') return name === 'myPid' ? platform.virtualProcess.pid : platform.virtualProcess.uid;
+      // With a companion package installed (src/package-registry.js) the process is the package whose code runs, and the calling uid that of the transaction being served.
+      if (owner === 'Landroid/os/Binder;') return platform.packages?.multi ? platform.packages.callingIdentity(runtime).uid : platform.virtualProcess.uid;
+      if (owner === 'Landroid/os/Process;') { const self = platform.packages?.multi ? platform.packages.callerEntry(runtime) : platform.virtualProcess; return name === 'myPid' ? self.pid : self.uid; }
       if (owner === 'Landroid/app/compat/CompatChanges;') { if (args[0] !== 150939131n) fail(`Unmodeled compatibility change ${args[0]}`); runtime.record('COMPAT ContentObserver flags disabled in explicit API28 virtual profile'); return 0; }
       if (name === 'getContentResolver') { resolver ??= runtime.makeObject(RESOLVER); runtime.record(`CONTENT VM Settings provider, animator_duration_scale=${settings.get('animator_duration_scale')}; no host services`); return resolver; }
       if (owner === URI_BUILDER) {

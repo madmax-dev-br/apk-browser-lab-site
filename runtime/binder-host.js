@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=a6c2214802a2';
+import { createHostRegistry } from './host-contract.js?v=352c1cd2699a';
 
 // The platform side of android.os.Parcel (original Parcel.java in framework.dex, natives in parcel-native.js): hidden framework hooks Parcel calls around transactions, and the
 // Parcel serialisation of the VM's Bundle/PersistableBundle (BaseBundle.writeToParcelInner / readFromParcelInner wire format: length, BUNDLE_MAGIC, count, then key + typed value
@@ -60,6 +60,17 @@ export function createBinderHost(platform) {
     def(owner, 'writeToParcel', `(${PARCEL}I)V`, (r, _m, [self, parcel]) => writeBundle(r, self, parcel));
     def(owner, 'readFromParcel', `(${PARCEL})V`, (r, _m, [self, parcel]) => { const length = p(r, parcel, 'readInt', [], 'I'); readBundle(r, self, parcel, length, r.object(self).classLoader ?? null); });
     def(owner, 'describeContents', '()I', () => 0);
+  }
+  // Bundle.CREATOR / PersistableBundle.CREATOR (createFromParcel = Parcel.readBundle / readPersistableBundle: the length, then the entries), reached by SafeParcelable readers
+  // and by reflection over a Parcelable field's type.
+  const CREATOR = 'Landroid/os/Parcelable$Creator;';
+  for (const [owner, creator] of [[BUNDLE, 'Landroid/os/Bundle$1;'], [PERSISTABLE, 'Landroid/os/PersistableBundle$1;']]) {
+    registry.type(creator, 'Ljava/lang/Object;', [CREATOR], { allocatable: true });
+    def(creator, 'createFromParcel', `(${PARCEL})Ljava/lang/Object;`, (r, _m, [, parcel]) => {
+      const length = p(r, parcel, 'readInt', [], 'I'), bundle = r.makeObject(owner); r.object(bundle).extras = new Map(); readBundle(r, bundle, parcel, length, null); return bundle;
+    });
+    def(creator, 'newArray', '(I)[Ljava/lang/Object;', (r, _m, [, size]) => r.newArray(`[${owner}`, size));
+    registry.staticField(owner, 'CREATOR', CREATOR, r => r.allocate(creator));
   }
   return { ...registry };
 }

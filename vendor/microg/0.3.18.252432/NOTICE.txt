@@ -1,0 +1,6 @@
+microG GmsCore v0.3.18.252432 (commit f686900c68aa84d1605b52304f6615f3593c6f50), https://github.com/microg/GmsCore
+Copyright 2013-2025 microG Project Team. Licensed under the Apache License, Version 2.0 (LICENSE).
+Built from source by scripts/build-microg.sh with the transforms recorded in provenance.json. The APKs also contain Maven dependencies under their own
+licences, as each artifact's POM declares them (not audited one by one here): AndroidX, Kotlin, Wire, OkHttp, Guava, Tink, ZXing, Volley,
+Coil, Conscrypt (org.microg.gms:conscrypt-gmscore), Cronet (org.microg:cronet-*, built from Chromium): Apache-2.0; OpenCV 4: Apache-2.0;
+VTM (org.microg:vtm*, a fork of mapsforge VTM): GNU LGPL. The list of coordinates is in provenance.json (mavenRuntimeDependencies).

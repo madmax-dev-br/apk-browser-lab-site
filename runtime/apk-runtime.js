@@ -1,32 +1,32 @@
-import { VMClock } from './vm-clock.js?v=a6c2214802a2';
-import { overrideHit } from './method-overrides.js?v=a6c2214802a2';
-import { OperationMonitor } from './operation-monitor.js?v=a6c2214802a2';
-import { ExecutionProfile } from './execution-profile.js?v=a6c2214802a2';
-import { SamplingProfiler } from './sampling-profiler.js?v=a6c2214802a2';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=a6c2214802a2';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=a6c2214802a2';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=a6c2214802a2';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=a6c2214802a2';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=a6c2214802a2';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=a6c2214802a2';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=a6c2214802a2';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=a6c2214802a2';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=a6c2214802a2';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=a6c2214802a2';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=a6c2214802a2';
-import { APKError } from './apk-error.js?v=a6c2214802a2';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=a6c2214802a2';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=a6c2214802a2';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=a6c2214802a2';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=a6c2214802a2';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=a6c2214802a2';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=a6c2214802a2';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=a6c2214802a2';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=a6c2214802a2';
+import { VMClock } from './vm-clock.js?v=352c1cd2699a';
+import { overrideHit } from './method-overrides.js?v=352c1cd2699a';
+import { OperationMonitor } from './operation-monitor.js?v=352c1cd2699a';
+import { ExecutionProfile } from './execution-profile.js?v=352c1cd2699a';
+import { SamplingProfiler } from './sampling-profiler.js?v=352c1cd2699a';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=352c1cd2699a';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=352c1cd2699a';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=352c1cd2699a';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=352c1cd2699a';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=352c1cd2699a';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=352c1cd2699a';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=352c1cd2699a';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=352c1cd2699a';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=352c1cd2699a';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=352c1cd2699a';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=352c1cd2699a';
+import { APKError } from './apk-error.js?v=352c1cd2699a';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=352c1cd2699a';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=352c1cd2699a';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=352c1cd2699a';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=352c1cd2699a';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=352c1cd2699a';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=352c1cd2699a';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=352c1cd2699a';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=352c1cd2699a';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=a6c2214802a2';
-import { bootClassLacksMember } from './boot-class-members.js?v=a6c2214802a2';
-export { APKError } from './apk-error.js?v=a6c2214802a2';
+import { Scheduler, Blocked } from './scheduler.js?v=352c1cd2699a';
+import { bootClassLacksMember } from './boot-class-members.js?v=352c1cd2699a';
+export { APKError } from './apk-error.js?v=352c1cd2699a';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1313,7 +1313,7 @@ export class APKRuntime {
   executionSnapshot() {
     foldDirectCalls(this);
     return { framework: { ...(this.dex.frameworkSummary ?? { dexFiles: [], classes: 0, bytes: 0, shadowedAPKClasses: [], policy: 'no-boot-layer' }) },
-      missingVoid: [...this.missingVoid].map(([key, count]) => ({ key, count })), missingReturns: [...this.missingReturns].map(([key, count]) => ({ key, count })), missingClasses: [...this.missingClasses].map(([key, count]) => ({ key, count })), missingLibraries: [...this.missingLibraries].map(([key, count]) => ({ key, count })), executionByOrigin: { apk: { ...this.executionByOrigin.apk }, framework: { ...this.executionByOrigin.framework }, host: { ...this.executionByOrigin.host } }, callDepth: { limit: this.maxCallDepth, peak: this.peakCallDepth }, heapBudget: { oomCount: this.oomCount ?? 0, objects: this.heap.size, limit: this.maxHeapObjects, arrayCells: this.arrayCells, fieldSlots: this.fieldSlots, collectionCells: this.collectionCells, garbageCollection: !!this.gcEnabled, collections: this.gcStats?.collections ?? 0, freedObjects: this.gcStats?.freed ?? 0, peakLiveAfterCollection: this.gcStats?.peakLiveAfterGc ?? 0 }, instructionBudget: { limit: this.maxInstructionsPerEvent, currentEvent: this.steps }, unicodeCaseBackend: this.unicodeCaseBackend ?? null, methodEvidenceSummary:{uniqueMethods:this.methodEvidence?.size??0,truncated:!!this.methodEvidenceTruncated} };
+      missingVoid: [...this.missingVoid].map(([key, count]) => ({ key, count })), missingReturns: [...this.missingReturns].map(([key, count]) => ({ key, count })), missingClasses: [...this.missingClasses].map(([key, count]) => ({ key, count })), missingLibraries: [...this.missingLibraries].map(([key, count]) => ({ key, count })), executionByOrigin: { apk: { ...this.executionByOrigin.apk }, framework: { ...this.executionByOrigin.framework }, host: { ...this.executionByOrigin.host } }, callDepth: { limit: this.maxCallDepth, peak: this.peakCallDepth }, heapBudget: { oomCount: this.oomCount ?? 0, objects: this.heap.size, limit: this.maxHeapObjects, arrayCells: this.arrayCells, fieldSlots: this.fieldSlots, collectionCells: this.collectionCells, garbageCollection: !!this.gcEnabled, collections: this.gcStats?.collections ?? 0, freedObjects: this.gcStats?.freed ?? 0, peakLiveAfterCollection: this.gcStats?.peakLiveAfterGc ?? 0 }, instructionBudget: { limit: this.maxInstructionsPerEvent, currentEvent: this.steps }, unicodeCaseBackend: this.unicodeCaseBackend ?? null, deviceOptions: this.platform?.deviceOptionsSnapshot?.() ?? null, methodEvidenceSummary:{uniqueMethods:this.methodEvidence?.size??0,truncated:!!this.methodEvidenceTruncated} };
   }
   compactArguments(method, words, mode) {
     const staticCall = mode === 'static';
@@ -2355,6 +2355,7 @@ export class APKRuntime {
   nativeRequired(method, requestedLibrary = null) {
     const libraries = this.nativeLibraries.map(value => typeof value === 'string' ? value : value.path ?? value.name ?? value.basename ?? 'unknown');
     const basenames = [...new Set(libraries.map(path => path.split('/').pop()))];
+    if (requestedLibrary) this.platform?.onNativeLibraryUnavailable?.(this, requestedLibrary, null);   // a device component may need to make a swallowed failure visible (src/microg-device.js)
     const message = `JNI execution required: ${method}${requestedLibrary ? `; requested library ${requestedLibrary}` : ''}. This VM has no Android ELF/JNI execution backend; packaged ARM/x86 machine code cannot be executed directly. Packaged libraries: ${basenames.slice(0, 12).join(', ') || 'none'}${basenames.length > 12 ? ` (+${basenames.length - 12} more)` : ''}`;
     this.throwJava('Ljava/lang/UnsatisfiedLinkError;', message, { kind: 'jni-required', method, requestedLibrary, nativeLibraries: libraries });
   }
@@ -2587,13 +2588,20 @@ export class APKRuntime {
   classResolvable(component) {
     return !(!this.classes.has(component) && !BRIDGE_OWNERS.has(component) && !EXTERNAL_PARENTS.has(component) && !EXTERNAL_INTERFACE_NAMES.has(component) && !EXTERNAL_INTERFACES.has(component) && component.length !== 1 && !['Ljava/lang/Object;', 'Ljava/lang/CharSequence;'].includes(component) && !this.skiaHost?.parent?.(component) && !this.platform?.parent?.(component) && !this.platform?.fallbackParent?.(component) && !constantFields(component));   // an SDK class with compile-time constants exists on the device even without a body in the VM
   }
+  /** The defining loader of the code calling into the host now (the JavaScript VM's current frame; the core's frames through captureStack when no JavaScript frame is current). */
+  callerDefiningLoader() {
+    const current = this.currentMethod; if (current) return current.dex?.definingLoader ?? null;
+    if (!this.classOwners?.size) return null;
+    for (const method of this.captureStack?.() ?? []) { const owner = method?.owner; if (!owner) continue; if (this.classOwners.has(owner)) return this.classes.get(owner)?.dex?.definingLoader ?? this.classOwners.get(owner); if (this.classes.has(owner) && !this.dex?.bootClasses?.has(owner)) return null; }
+    return null;
+  }
   resolveClass(name, initialize = false, loader = undefined) {
     if (typeof name !== 'string') this.throwJava('Ljava/lang/NullPointerException;', 'null class name');
     let type = name.startsWith('[') ? name.replaceAll('.', '/') : descriptor(name);
     let component = type.replace(/^\[+/, '');
     if (this.classOwners?.size && component.length > 1) {
       // Class identity is (defining loader, name): resolve through the requesting loader's delegation chain (the caller's own loader unless one is given).
-      const mapped = this.platform.classLoaders.mapType(this, loader === undefined ? (this.currentMethod?.dex?.definingLoader ?? null) : loader, component);
+      const mapped = this.platform.classLoaders.mapType(this, loader === undefined ? this.callerDefiningLoader() : loader, component);
       if (mapped === false) this.throwJava('Ljava/lang/ClassNotFoundException;', name);
       if (mapped !== component) { type = type.slice(0, type.length - component.length) + mapped; component = mapped; }
     }
@@ -3235,6 +3243,10 @@ export class APKRuntime {
       if (isNull(requested)) this.throwJava('Ljava/lang/NullPointerException;', name === 'load' ? 'filename == null' : 'nativeLibraryName == null');
       const text = this.stringCharacters(requested);
       if (name === 'loadLibrary' && text.includes('/')) this.throwJava('Ljava/lang/UnsatisfiedLinkError;', 'Directory separator should not appear in library name: ' + text);
+      // A companion package's code (src/package-registry.js) never links the app's libraries, and its own are not offered to JNI.
+      // The class that calls System.loadLibrary decides whose library it is: framework code (Conscrypt's javacrypto, media_jni ...) loads the platform's own libraries for any package.
+      const directOwner = this.currentMethod?.owner, frameworkCaller = !!directOwner && this.platform?.packages?.multi && this.platform.packages.entryOfClass(this, directOwner) === null;
+      if (this.platform?.packages?.multi && !frameworkCaller) { const caller = this.platform.packages.callerEntry(this); if (!caller.main) { this.platform.onNativeLibraryUnavailable?.(this, text, caller.name); } if (!caller.main) this.throwJava('Ljava/lang/UnsatisfiedLinkError;', `${name === 'load' ? text : 'lib' + text + '.so'}: native libraries of companion package ${caller.name} are not supported in the browser VM`); }
       // A lab-supplied WebAssembly module (never APK bytes) satisfies the request through the JNI bridge; otherwise the genuine failure below stands.
       if (this.jni && (name === 'load' ? this.jni.loadPath(text) : this.jni.loadLibrary(text))) return undefined;
       if (name === 'loadLibrary' && text === 'media_jni' && this.currentMethod?.owner?.startsWith('Landroid/media/')) return undefined;   // the framework's own media JNI: the lab binds those natives itself (framework-provider.js: no DRM plugin installed)
