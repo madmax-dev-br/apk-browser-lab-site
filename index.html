@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=34c9ffd7a60c") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=34c9ffd7a60c">
-  <link rel="stylesheet" href="./lab-theme.css?v=34c9ffd7a60c">
-  <meta name="apk-browser-build" content="34c9ffd7a60c">
+  <style>@import url("./styles.css?v=6e2e49883bb2") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=6e2e49883bb2">
+  <link rel="stylesheet" href="./lab-theme.css?v=6e2e49883bb2">
+  <meta name="apk-browser-build" content="6e2e49883bb2">
 </head>
 <body>
   <header class="topbar">
@@ -75,7 +75,7 @@
               </div>
             </div></details>
             <details class="cp-group" id="cp-sec-device" data-section="device">
-              <summary><h3 id="cp-device-title">Dispositivo</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <summary><h3 id="cp-device-title">Dispositivo</h3><span id="dev-microg-summary" class="cp-badge" title="Opção &quot;Com microG&quot;, no fim desta seção">sem microG</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
               <div class="cp-grid">
                 <label for="dev-hour24">Relógio de 24 horas</label><input id="dev-hour24" type="checkbox">
                 <label for="dev-tz">Fuso horário</label><select id="dev-tz"></select>
@@ -271,7 +271,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=34c9ffd7a60c"></script>
+  <script type="module" src="./app.js?v=6e2e49883bb2"></script>
   <script>
   // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
   // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.

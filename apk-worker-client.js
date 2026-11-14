@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=34c9ffd7a60c';
-import { createRasterReceiver } from './raster-cache.js?v=34c9ffd7a60c';
+import { createWebAudioPlayer } from './web-audio-player.js?v=6e2e49883bb2';
+import { createRasterReceiver } from './raster-cache.js?v=6e2e49883bb2';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=34c9ffd7a60c', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=6e2e49883bb2', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -180,7 +180,7 @@ export class APKWorkerClient {
   async pointer(sample) { return (await this.request('pointer', sample, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   /** Wheel/trackpad scrolling of a RecyclerView (View.scrollBy, dispatched to the original RecyclerView code), in dp. */
   async scrollBy(id, dx, dy) { return (await this.request('scrollby', { id, dx, dy }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
-  async press(id, pressed) { return (await this.request('press', { id, pressed }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
+  async press(id, pressed, x, y) { return (await this.request('press', { id, pressed, x, y }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async focus(id, focused) { return (await this.request('focus', { id, focused }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async input(id, text) { return (await this.request('input', { id, text }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async check(id, checked) { return (await this.request('check', { id, checked }, { timeoutMs: this.eventTimeoutMs })).snapshot; }

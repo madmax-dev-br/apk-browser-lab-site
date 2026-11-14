@@ -1,4 +1,4 @@
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=34c9ffd7a60c';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=6e2e49883bb2';
 
 // The classic View touch pipeline: View.dispatchTouchEvent / onTouchEvent, ViewGroup.dispatchTouchEvent / onInterceptTouchEvent / requestDisallowInterceptTouchEvent and
 // View.setOnTouchListener, following android-13.0.0_r1 View.java and ViewGroup.java for a single pointer (the browser delivers one pointer per gesture). A real MotionEvent
@@ -79,6 +79,8 @@ export function createViewTouchHost(platform) {
     switch (action) {
       case DOWN: {
         // CheckForLongPress: after ViewConfiguration.getLongPressTimeout() (500 ms of VM time) a still-pressed View performs its long click; the following UP then does not click
+        // View.setPressed(true, x, y): the Drawables' hotspot is the touch point (a ripple starts under the finger), then the pressed state
+        call(r, self, VIEW, 'drawableHotspotChanged', ['F', 'F'], 'V', [event(r, ev, 'getX', 'F'), event(r, ev, 'getY', 'F')]);
         setPressed(true); view.touchWasPressed = true; view.hasPerformedLongPress = false;
         const token = view.longPressToken = (view.longPressToken ?? 0) + 1;
         if (flag(call(r, self, VIEW, 'isLongClickable', [], 'Z'))) platform.queueTask(() => {
@@ -99,6 +101,7 @@ export function createViewTouchHost(platform) {
       case CANCEL: setPressed(false); view.longPressToken++; view.hasPerformedLongPress = false; view.touchWasPressed = false; break;
       case MOVE: {
         const x = bitsFloat(event(r, ev, 'getX', 'F')), y = bitsFloat(event(r, ev, 'getY', 'F')), b = view.bounds;
+        call(r, self, VIEW, 'drawableHotspotChanged', ['F', 'F'], 'V', [floatBits(x), floatBits(y)]);   // View.onTouchEvent ACTION_MOVE: the hotspot follows the finger
         if (b && (x < 0 || y < 0 || x >= b.right - b.left || y >= b.bottom - b.top) && pressed()) { setPressed(false); view.longPressToken++; view.touchWasPressed = false; }
         break;
       }

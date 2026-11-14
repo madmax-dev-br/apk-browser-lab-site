@@ -1,32 +1,32 @@
-import { VMClock } from './vm-clock.js?v=34c9ffd7a60c';
-import { overrideHit } from './method-overrides.js?v=34c9ffd7a60c';
-import { OperationMonitor } from './operation-monitor.js?v=34c9ffd7a60c';
-import { ExecutionProfile } from './execution-profile.js?v=34c9ffd7a60c';
-import { SamplingProfiler } from './sampling-profiler.js?v=34c9ffd7a60c';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=34c9ffd7a60c';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=34c9ffd7a60c';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=34c9ffd7a60c';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=34c9ffd7a60c';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=34c9ffd7a60c';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=34c9ffd7a60c';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=34c9ffd7a60c';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=34c9ffd7a60c';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=34c9ffd7a60c';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=34c9ffd7a60c';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=34c9ffd7a60c';
-import { APKError } from './apk-error.js?v=34c9ffd7a60c';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=34c9ffd7a60c';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=34c9ffd7a60c';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=34c9ffd7a60c';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=34c9ffd7a60c';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=34c9ffd7a60c';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=34c9ffd7a60c';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=34c9ffd7a60c';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=34c9ffd7a60c';
+import { VMClock } from './vm-clock.js?v=6e2e49883bb2';
+import { overrideHit } from './method-overrides.js?v=6e2e49883bb2';
+import { OperationMonitor } from './operation-monitor.js?v=6e2e49883bb2';
+import { ExecutionProfile } from './execution-profile.js?v=6e2e49883bb2';
+import { SamplingProfiler } from './sampling-profiler.js?v=6e2e49883bb2';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=6e2e49883bb2';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=6e2e49883bb2';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=6e2e49883bb2';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=6e2e49883bb2';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=6e2e49883bb2';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=6e2e49883bb2';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=6e2e49883bb2';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=6e2e49883bb2';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=6e2e49883bb2';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=6e2e49883bb2';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=6e2e49883bb2';
+import { APKError } from './apk-error.js?v=6e2e49883bb2';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=6e2e49883bb2';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=6e2e49883bb2';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=6e2e49883bb2';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=6e2e49883bb2';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=6e2e49883bb2';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=6e2e49883bb2';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=6e2e49883bb2';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=6e2e49883bb2';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=34c9ffd7a60c';
-import { bootClassLacksMember } from './boot-class-members.js?v=34c9ffd7a60c';
-export { APKError } from './apk-error.js?v=34c9ffd7a60c';
+import { Scheduler, Blocked } from './scheduler.js?v=6e2e49883bb2';
+import { bootClassLacksMember } from './boot-class-members.js?v=6e2e49883bb2';
+export { APKError } from './apk-error.js?v=6e2e49883bb2';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1206,7 +1206,30 @@ export class APKRuntime {
     this.skia=skia;this.skiaHost=skia?.createHost?.(this)??null;
     this.icuBreakBackend=icuBreakBackend;this.sqliteBackend=sqliteBackend;this.tzdata=tzdata;this.zlibBackend=zlibBackend;this.icuConverterBackend=icuConverterBackend;
 
+    this.shadowDeviceClasses();
     for (const key of LATE_RUNTIME_PROPERTIES) if (!(key in this)) this[key] = undefined;   // one hidden class from the start (see LATE_RUNTIME_PROPERTIES)
+  }
+  /**
+   * Is `type` a class of the device itself: one the boot layer defines, or a platform class the hosts implement without a DEX definition (android.graphics.Paint, Shader...)?
+   * Android's loaders delegate parent-first (BaseDexClassLoader -> BootClassLoader), so such a name is always the device's class, whatever a DEX file of an APK defines under it.
+   * android.support.* was never on the boot class path, and org.apache.http and junit left it (optional libraries since API 28): an APK's own copies of those are its classes.
+   */
+  deviceProvidesClass(type) {
+    if (this.dex.bootClasses?.has(type)) return true;
+    if (!APKRuntime.isPlatformSpace(type) || /^L(?:android\/support|org\/apache\/http|junit)\//.test(type)) return false;
+    return !!(BRIDGE_OWNERS.has(type) || EXTERNAL_PARENTS.has(type) || EXTERNAL_INTERFACE_NAMES.has(type) || EXTERNAL_INTERFACES.has(type) || this.skiaHost?.parent?.(type) || this.platform?.parent?.(type) || this.platform?.fallbackParent?.(type));   // not constantFields: a table of an SDK class's constants is no implementation of it
+  }
+  /**
+   * Parent-first delegation for the classes the hosts implement: a definition the APK carries under the name of such a class is never loaded (the boot layer's DEX classes
+   * already win in DexProgram). Build tools emit these for library classes newer than the APK's minSdk, with an initializer that throws NoClassDefFoundError: on a device
+   * that has the class it must never run. A name the device lacks (a class of a newer API level) stays the APK's class.
+   */
+  shadowDeviceClasses() {
+    const apk = this.dex.classes, resolved = this.dex.resolvedClasses; if (!resolved || !apk || resolved === apk) return;
+    const shadowed = [];
+    for (const name of apk.keys()) if (APKRuntime.isPlatformSpace(name) && !this.dex.bootClasses.has(name) && resolved.dexOf(name) && this.deviceProvidesClass(name)) shadowed.push(name);
+    for (const name of shadowed) resolved.delete(name);
+    if (shadowed.length && this.dex.frameworkSummary) this.dex.frameworkSummary.shadowedAPKClasses = [...new Set([...this.dex.frameworkSummary.shadowedAPKClasses, ...shadowed])];
   }
   /** Superclass of `type` (DEX classes, then every host registry): memoised per class-graph epoch, since the lookup asks about thirty host registries and runs for every hashCode/equals/toString of a host object. */
   parent(type) {

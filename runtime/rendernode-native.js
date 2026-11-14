@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=34c9ffd7a60c';
-import {getVectorGraphics} from './vector-native.js?v=34c9ffd7a60c';
-import {getSolidPaintByHandle} from './paint-host.js?v=34c9ffd7a60c';
-import {createMatrixNativeBindings} from './matrix-native.js?v=34c9ffd7a60c';
+import {APKError} from './apk-error.js?v=6e2e49883bb2';
+import {getVectorGraphics} from './vector-native.js?v=6e2e49883bb2';
+import {getSolidPaintByHandle} from './paint-host.js?v=6e2e49883bb2';
+import {createMatrixNativeBindings} from './matrix-native.js?v=6e2e49883bb2';
 
 const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;',RECORD='Landroid/view/RecordingCanvas;';
 const NODE33='Landroid/graphics/RenderNode;',RC33='Landroid/graphics/RecordingCanvas;',BRC='Landroid/graphics/BaseRecordingCanvas;';
@@ -26,7 +26,10 @@ const copyClip=v=>{let copy=CLIP_COPIES.get(v);if(copy===undefined)CLIP_COPIES.s
 function copyCommand(c){return {...c,args:c.args?.slice(),matrix:c.matrix?.slice(),clips:c.clips?.map(copyClip),commands:c.commands?new Float32Array(c.commands):undefined,paint:c.paint?{...c.paint}:null};}
 function canvas(r,h){return getVectorGraphics(r).get(h,'canvas');}
 function storageBytes(commands){let bytes=0;for(const c of commands)bytes+=128+(c.commands?.byteLength??0)+(c.text?.length??0)*2+(c.raster?.dataURL?.length??0)+(c.clips??[]).reduce((n,v)=>n+64+(v.commands?.byteLength??0),0);return bytes;}
-function finish(r,h){const c=canvas(r,h);if(c.stack.length)fail('Unbalanced Canvas save/restore in RenderNode recording');const s=stateFor(r);if(s.recordings.size>=8192)fail('RenderNode display-list limit exceeded');let total=storageBytes(c.draws);for(const n of s.nodes.values())total+=storageBytes(n.displayList??[]);for(const list of s.recordings.values())total+=storageBytes(list);if(total>32*1024*1024)fail('RenderNode aggregate display-list storage limit32MiB exceeded');const id=s.next++;s.recordings.set(id,c.draws.map(copyCommand));return id;}
+// hwui ends a recording with restoreToCount(1) (android-13.0.0_r1 libs/hwui/pipeline/skia/SkiaRecordingCanvas.cpp finishRecording; RecordingCanvas::finishRecording in 9.0.0_r1):
+// saves still open -- a draw that an exception unwound past its restore, with RenderNode.endRecording in the caller's finally -- are closed (an open layer ends), never an error.
+function restoreToBase(r,h,c){while(c.stack.length){const previous=c.stack.pop();if(previous.layer)r.skiaHost.recordNative(h,{op:'layerEnd'});if(previous.saveMatrix!==false)c.matrix=previous.matrix??previous;if(previous.saveClips!==false)c.clips=previous.clips??[];}}
+function finish(r,h){const c=canvas(r,h);restoreToBase(r,h,c);const s=stateFor(r);if(s.recordings.size>=8192)fail('RenderNode display-list limit exceeded');let total=storageBytes(c.draws);for(const n of s.nodes.values())total+=storageBytes(n.displayList??[]);for(const list of s.recordings.values())total+=storageBytes(list);if(total>32*1024*1024)fail('RenderNode aggregate display-list storage limit32MiB exceeded');const id=s.next++;s.recordings.set(id,c.draws.map(copyCommand));return id;}
 function set(r,h,key,value){const n=node(r,h),old=n[key];n[key]=value;return old!==value?1:0;}
 function matrixFromHandle(r,h){if(!h)return null;const arr=r.newArray('[F',9);createMatrixNativeBindings().get('Landroid/graphics/Matrix;->nGetValues(J[F)V')(r,[h,arr]);return r.array(arr).elements.map(decode);}
 export function renderNodeTransform(r,n){const CK=r.skia?.CanvasKit;if(!CK)fail('RenderNode requires verified Skia');const surface=CK.MakeSurface(1,1);if(!surface)fail('RenderNode matrix scratch allocation failed');try{const c=surface.getCanvas(),px=n.pivotExplicit?n.pivotX:(n.right-n.left)/2,py=n.pivotExplicit?n.pivotY:(n.bottom-n.top)/2;c.translate(n.translationX,n.translationY);c.rotate(n.rotation,px,py);c.translate(px,py);c.scale(n.scaleX,n.scaleY);c.translate(-px,-py);return Array.from(c.getTotalMatrix());}finally{surface.dispose();}}

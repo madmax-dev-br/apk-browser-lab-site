@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=34c9ffd7a60c';
+import { APKError } from './apk-error.js?v=6e2e49883bb2';
 
 // The "com microG" device option (CLAUDE.md, docs/MICROG.md "Integration"): off by default. When on, the virtual device has the two microG packages built from the pinned
 // source (vendor/microg/<version>/) installed as preinstalled companion packages, and PackageManager reports for THOSE packages only the certificate each declares in its

@@ -1,11 +1,36 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=34c9ffd7a60c';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=34c9ffd7a60c';
-import { isTrustedRasterURL } from './raster-cache.js?v=34c9ffd7a60c';
+import { updateWebViewSlot } from './webview-slot.js?v=6e2e49883bb2';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=6e2e49883bb2';
+import { isTrustedRasterURL } from './raster-cache.js?v=6e2e49883bb2';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
+}
+// A View's Drawable layer is a CSS background, and a CSS background whose image is not loaded yet paints nothing: given the Blob URL of every new frame of an animated
+// Drawable (a ripple under a press, a state transition), the View lost its background for as long as the frames kept coming. The layer keeps the frame it shows until the
+// next one has loaded (an <img> does that by itself; a background does not). Loaded images are kept (bounded), so the
+// browser still has a frame that is shown again and the one a newer frame stands on.
+const LOADED_LAYERS = new Map(), LOADED_LAYER_LIMIT = 256;
+const layerLoaded = (url, image) => { LOADED_LAYERS.delete(url); LOADED_LAYERS.set(url, image); while (LOADED_LAYERS.size > LOADED_LAYER_LIMIT) LOADED_LAYERS.delete(LOADED_LAYERS.keys().next().value); };
+/** The URL to give the element's background now for the Drawable layer `url`: `url` itself when the browser has it (or nothing is shown yet), else the frame being shown, replaced in place once `url` has loaded
+ *  (a frame that loads after a newer one is shown is dropped). */
+export function layerURLToShow(element, url, { createImage = () => new Image() } = {}) {
+  const order = element._layerOrder = (element._layerOrder ?? 0) + 1;
+  if (!url.startsWith('blob:')) { element._layerShown = undefined; element._layerShownOrder = order; return url; }   // a data: URL is in the document itself
+  if (LOADED_LAYERS.has(url)) { layerLoaded(url, LOADED_LAYERS.get(url)); element._layerShown = url; element._layerShownOrder = order; return url; }
+  const previous = element._layerShown && element._layerShown !== url && LOADED_LAYERS.has(element._layerShown) ? element._layerShown : null;
+  if (previous === null) { element._layerShown = url; element._layerShownOrder = order; }
+  const image = createImage();
+  const settle = loaded => {
+    if (loaded) layerLoaded(url, image);
+    if (order <= element._layerShownOrder || element._layerShown === url) return;   // a newer frame is already shown
+    const shown = element._layerShown; element._layerShown = url; element._layerShownOrder = order;
+    if (shown && element.style.backgroundImage.includes(shown)) element.style.backgroundImage = element.style.backgroundImage.replace(shown, url);
+  };
+  image.src = url;
+  (typeof image.decode === 'function' ? image.decode() : new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; })).then(() => settle(true), () => settle(false));
+  return previous ?? url;
 }
 /** The CSS background-image of a View whose text is a raster: the text over the image already there (a background Drawable). After a `background` shorthand wrote a plain
  * colour the longhand reads back as a CSS-wide keyword ("initial") or "none": that is no layer, and listing it would make the whole value invalid (the text would not be drawn). */
@@ -226,9 +251,17 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
     else if (['linear', 'frame', 'scroll', 'text', 'image', 'group', 'view', 'webview'].includes(kind)) { element = document.createElement('div'); if (kind === 'text' || kind === 'image' || kind === 'view') { element.addEventListener('click', () => { if (element._session === state.viewSession && element.dataset.clickable === 'true') clickView(view.id); }); element.addEventListener('keydown', (event) => { if (element._session === state.viewSession && element.dataset.clickable === 'true' && ['Enter', ' '].includes(event.key)) { event.preventDefault(); clickView(view.id); } }); } }
     else throw new Error(`Tipo de interface não suportado pelo renderizador: ${view.type || kind}.`);
     // Touch/pointer down presses the View (drawable state + StateListAnimator elevation); up/cancel/leave releases it.
-    if (kind === 'button' || kind === 'check') for (const [event, pressed] of [['pointerdown', true], ['pointerup', false], ['pointercancel', false], ['pointerleave', false]]) element.addEventListener(event, () => {
-      if (session !== state.viewSession || element._pressed === pressed || element.disabled) return; element._pressed = pressed;
-      if (state.pendingFocus.length >= 128) return; state.pendingFocus.push({ id: view.id, pressed }); flushPendingInputs();
+    // A clickable View of another kind (a list row, a text, an image) is pressed the same way when the pointer goes down on it and not on a control inside it: the
+    // innermost clickable View takes the touch, as ViewGroup.dispatchTouchEvent gives it to the deepest child that handles it.
+    const ownControl = kind === 'button' || kind === 'check';
+    if (ownControl || ['linear', 'frame', 'group', 'text', 'image', 'view'].includes(kind)) for (const [event, pressed] of [['pointerdown', true], ['pointerup', false], ['pointercancel', false], ['pointerleave', false]]) element.addEventListener(event, pointer => {
+      if (session !== state.viewSession || !!element._pressed === pressed || element.disabled) return;
+      if (!ownControl && pressed) { if (element.dataset.clickable !== 'true' || pointer.button > 0) return; const control = pointer.target?.closest?.('button,input,[data-kind="check"],[data-clickable="true"]'); if (control && control !== element) return; if (insideComposeHost(pointer.target, element)) return; }
+      element._pressed = pressed;
+      if (state.pendingFocus.length >= 128) return;
+      // The touch point in the View's own pixels (the element may be shown scaled): the hotspot of the View's Drawables, where a ripple starts.
+      const rect = element.getBoundingClientRect(), scale = rect.width / (element.offsetWidth || rect.width) || 1, at = pressed && Number.isFinite(pointer?.clientX) ? { x: (pointer.clientX - rect.left) / scale, y: (pointer.clientY - rect.top) / scale } : {};
+      state.pendingFocus.push({ id: view.id, pressed, ...at }); flushPendingInputs();
     });
     // RecyclerView (and other lists scrolled by the VM, not by DOM overflow): the wheel becomes View.scrollBy in the original RecyclerView code.
     if (view.type?.endsWith('RecyclerView;') || view.type?.endsWith('/ListView;')) { element.dataset.listScroll = 'true'; element.addEventListener('wheel', event => {
@@ -291,8 +324,8 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
     const drawing = view.drawableSVG; let url;
     if (drawing.kind === 'raster') { url = drawing.dataURL; if (!pngURLOk(url)) throw new Error('Raster PNG inválido ou excessivo recebido da VM.'); }
     else { const svg = typeof drawing === 'string' ? drawing : drawing.svg; if (typeof svg !== 'string' || svg.length > 2 * 1024 * 1024 || !svg.trimStart().startsWith('<svg')) throw new Error('Estado de desenho vetorial inválido ou excessivo.'); url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; }
-    element.style.backgroundImage = `url("${url}")`; element.style.backgroundRepeat = 'no-repeat'; element.style.backgroundSize = '100% 100%';
-  }
+    element.style.backgroundImage = `url("${layerURLToShow(element, url)}")`; element.style.backgroundRepeat = 'no-repeat'; element.style.backgroundSize = '100% 100%';
+  } else element._layerShown = undefined;
   // The VM owns geometry: the page stylesheet's 48px minimums/web borders must not alter laid-out bounds, and a
   // VM-drawn background Drawable (original ripple/inset/9-patch DEX) replaces the web control's own decoration.
   if (view.laidOut && view.bounds) { element.style.minHeight = '0'; element.style.minWidth = '0'; }
@@ -646,7 +679,7 @@ async function flushPendingInputs() {
         finally { state.pointerInFlight = null; }
         continue;
       }
-      if (state.pendingFocus.length && (state.pendingFocus[0].focused || !state.pendingInputs.size)) { const event = state.pendingFocus.shift(); try { const snapshot = event.pressed !== undefined ? await state.runtime.press(event.id, event.pressed) : await state.runtime.focus(event.id, event.focused); if (token === state.operation) renderSnapshot(snapshot); } catch (error) { if (token === state.operation) reportAPKError(error, 'Callback de foco interrompido'); state.pendingFocus.length = 0; state.pendingInputs.clear(); break; } continue; }
+      if (state.pendingFocus.length && (state.pendingFocus[0].focused || !state.pendingInputs.size)) { const event = state.pendingFocus.shift(); try { const snapshot = event.pressed !== undefined ? await state.runtime.press(event.id, event.pressed, event.x, event.y) : await state.runtime.focus(event.id, event.focused); if (token === state.operation) renderSnapshot(snapshot); } catch (error) { if (token === state.operation) reportAPKError(error, 'Callback de foco interrompido'); state.pendingFocus.length = 0; state.pendingInputs.clear(); break; } continue; }
       if (!state.pendingInputs.size && state.pendingScrolls.size) {
         const [id, position] = state.pendingScrolls.entries().next().value; state.pendingScrolls.delete(id); state.scrollInFlight = id;
         try {

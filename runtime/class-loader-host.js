@@ -1,9 +1,9 @@
-import { unsignedBytes } from './java-arrays.js?v=34c9ffd7a60c';
-import { APKError } from './apk-error.js?v=34c9ffd7a60c';
-import { APKArchive } from './apk-loader.js?v=34c9ffd7a60c';
-import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=34c9ffd7a60c';
-import { createHostRegistry } from './host-contract.js?v=34c9ffd7a60c';
-import { normalizePath } from './virtual-fs.js?v=34c9ffd7a60c';
+import { unsignedBytes } from './java-arrays.js?v=6e2e49883bb2';
+import { APKError } from './apk-error.js?v=6e2e49883bb2';
+import { APKArchive } from './apk-loader.js?v=6e2e49883bb2';
+import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=6e2e49883bb2';
+import { createHostRegistry } from './host-contract.js?v=6e2e49883bb2';
+import { normalizePath } from './virtual-fs.js?v=6e2e49883bb2';
 
 // dalvik.system.{BaseDexClassLoader, InMemoryDexClassLoader, DexClassLoader, PathClassLoader, DexFile}: code that is only available at run time
 // (decrypted payloads, downloaded plugins). The DEX bytes are parsed by the same DexFile reader as APK classes and joined to the single VM class
@@ -54,10 +54,11 @@ export function createClassLoaderHost(platform) {
       for (const t of dex.types) {
         const component = t.slice(t.lastIndexOf('[') + 1);
         if (component[0] !== 'L' || rename.has(component) || boot?.has(component)) continue;
+        if ((packageClasses.has(component) || runtime.dex.classes.has(component)) && runtime.deviceProvidesClass(component)) continue;   // a platform class the hosts implement: the device's, like the boot layer's
         if (packageClasses.has(component)) rename.set(component, component.slice(0, -1) + ALIAS_SUFFIX(st.id));
         else if (runtime.dex.classes.has(component)) { rename.set(component, component.slice(0, -1) + ALIAS_SUFFIX(st.id)); hidden++; }
       }
-      for (const name of names) { if (boot?.has(name)) { skip.add(name); shadowed++; } else if (st.own.has(name)) skip.add(rename.get(name)); }   // parent-first; an earlier DEX file of the package wins
+      for (const name of names) { if (boot?.has(name) || runtime.deviceProvidesClass(name)) { skip.add(name); shadowed++; } else if (st.own.has(name)) skip.add(rename.get(name)); }   // parent-first; an earlier DEX file of the package wins
       dex = parse(rename); dex.definingLoader = owner;
       const added = runtime.dex.addDynamicFile(dex, label, { skip });
       for (const key of added) { st.own.set(key.replace(LOADER_ALIAS, ';'), key); runtime.classOwners.set(key, owner); }
@@ -69,7 +70,7 @@ export function createClassLoaderHost(platform) {
     const rename = new Map(), skip = new Set(), aliased = [], shadowed = [];
     for (const name of names) {
       let visible = null;
-      if (runtime.dex.bootClasses?.has(name)) visible = name;
+      if (runtime.deviceProvidesClass(name)) visible = name;   // the boot layer's classes and the platform classes the hosts implement: parent-first
       else { for (const ancestor of ancestors) if (ancestor.st.own.has(name)) { visible = ancestor.st.own.get(name); break; } }
       if (visible === null && st.own.has(name)) visible = st.own.get(name);
       if (visible === null && hasApp && runtime.classes.has(name) && !runtime.classOwners.has(name)) visible = name;

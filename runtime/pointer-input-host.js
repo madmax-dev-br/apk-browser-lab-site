@@ -26,6 +26,17 @@ function windowOffset(runtime, ownerViewId) {
 }
 const bits = value => { const view = new DataView(new ArrayBuffer(4)); view.setFloat32(0, value, true); return view.getInt32(0, true); };
 
+/**
+ * The page's press of a View's own control (pointer down / up on it): View.setPressed(pressed, x, y) -- the Drawables' hotspot is set to the touch point first
+ * (View.drawableHotspotChanged; a ripple starts under the finger and travels to the centre), then the pressed state. `x`, `y`: the point in the View's own pixels;
+ * without them (a key press, a tool) only the state changes and the Drawables keep the hotspot they have, as View.setPressed(boolean) does.
+ */
+export function pressView(runtime, { id, pressed, x, y }) {
+  const view = { ref: id }, call = (name, signature, parameters, values) => runtime.dispatch({ owner: 'Landroid/view/View;', name, signature, parameters, result: 'V' }, [view, ...values], 'virtual');
+  if (pressed && Number.isFinite(x) && Number.isFinite(y)) call('drawableHotspotChanged', '(FF)V', ['F', 'F'], [bits(x), bits(y)]);
+  call('setPressed', '(Z)V', ['Z'], [pressed ? 1 : 0]);
+}
+
 /** Delivers one pointer sample. Returns { handled, dropped?: reason }. Samples outside a gesture (MOVE/UP without DOWN, a different owner) are dropped like Android's input dispatcher does. */
 export function dispatchPointer(runtime, { ownerViewId, action, x, y, t = 0, dx = 0, dy = 0 }) {
   runtime.platform?.noteInput?.();   // the collector treats the main thread as in motion while input keeps arriving (heap-gc.js deferral)

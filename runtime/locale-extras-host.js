@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=34c9ffd7a60c';
-import { ISO_COUNTRIES, ISO_LANGUAGES } from './iso-codes-data.js?v=34c9ffd7a60c';
+import { createHostRegistry } from './host-contract.js?v=6e2e49883bb2';
+import { ISO_COUNTRIES, ISO_LANGUAGES } from './iso-codes-data.js?v=6e2e49883bb2';
 
 // java.util.Locale beyond the first host pass (libcore Locale.java, android-13.0.0_r1): the ISO code tables, 3-letter codes, extensions (BCP 47 -u- / -x- and any singleton),
 // stripExtensions, setDefault, and Locale.Builder with IllformedLocaleException; plus Calendar week dates and Calendar.Builder. Locale objects are the platform's (one per canonical language tag, platform.locale).

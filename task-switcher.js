@@ -3,6 +3,8 @@
 // recents is onUserLeaveHint, onPause, onStop (APKRuntime.home); coming back is onRestart, onStart, onResume (APKRuntime.resumeTask); a task that ended is started again by
 // the launcher icon. Before any app runs the device shows that launcher too: empty, then with the app being installed (a spinner over its icon while the
 // package is read) and installed (tap to start). While the finger only drags, the app stays resumed and the window just follows it; nothing is sent to the VM until the gesture commits.
+// The app is thrown away (its process is killed, as when Android removes a task from the recents) by dragging its recents card up and off, with the gesture or the three
+// buttons, or by holding the window with the swipe-up gesture and flinging it up.
 const COMMIT_FRACTION = 0.22;      // of the screen height: a shorter drag springs back, a longer one opens the recents
 const CARD_SCALE = 0.62, CARD_LIFT = 0.03;   // the recents card: scale of the app window and how far (of the screen height) its centre sits above the screen's (nearly centred)
 const BACK_EDGE = 14, BACK_COMMIT = 46, BACK_MAX = 72;   // the back gesture, in device px: width of the edge strips (styles.css), the pull that arms it, how far the bubble follows
@@ -14,13 +16,25 @@ export function dragTransform(dy, height) {
   // the window shrinks about its centre faster than it rises, so its top edge comes down from the top of the screen as soon as the drag starts (it never sticks to it)
   return { scale: Math.max(CARD_SCALE - 0.12, 1 - progress * 0.9), lift: travel * 0.25, commits: progress >= COMMIT_FRACTION, progress };
 }
+const FLING_SPEED = 1, FLING_HOLD_MS = 400;                // the swipe-up gesture: a release at least this fast (device px per ms, upwards) after holding the window this long throws the app away
+const CARD_DISMISS_FRACTION = 0.22, CARD_FLING_SPEED = 0.5, CARD_FLING_MIN = 24;   // the recents card: dragged this far up (of the screen height), or released this fast after at least this many px, it is thrown away
+/** Pure: whether releasing the swipe-up gesture throws the app away: the window was held (not a quick swipe, which opens the recents), is past the commit point, and is flung upwards. */
+export function flingDismisses({ velocity, heldMs, progress }) { return velocity >= FLING_SPEED && heldMs >= FLING_HOLD_MS && progress >= COMMIT_FRACTION; }
+/** Pure: whether releasing the recents card `dy` px above where it rests (upwards positive), moving at `velocity` px/ms upwards, throws the app away. */
+export function cardDismisses({ dy, velocity, height }) { return dy >= height * CARD_DISMISS_FRACTION || (velocity >= CARD_FLING_SPEED && dy >= CARD_FLING_MIN); }
+/** Pure: the upward speed (px per ms) at the end of `samples` ([{ t, y }], page px, oldest first), over about the last 100 ms, for a page scale of `scale`. */
+export function releaseVelocity(samples, scale = 1) {
+  if (samples.length < 2) return 0; const last = samples[samples.length - 1]; let from = samples[0];
+  for (let i = samples.length - 2; i >= 0; i--) { from = samples[i]; if (last.t - from.t >= 100) break; }
+  const dt = last.t - from.t; return dt > 0 ? (from.y - last.y) / scale / dt : 0;
+}
 /** Pure: the back bubble for a pull of `dx` px inwards from an edge: how far it sits from the edge, how grown it is, and whether releasing there goes back. */
 export function backPull(dx) {
   const pull = Math.max(0, Math.min(dx, BACK_MAX)), progress = pull / BACK_COMMIT;
   return { offset: pull * 0.75, grow: Math.min(1, 0.55 + progress * 0.45), armed: dx >= BACK_COMMIT, edge: BACK_EDGE };
 }
 
-export function createTaskSwitcher({ document: doc = document, $, vm, render, back, relaunch, canGoBack, busy, begin, finish, report, announce = () => {}, shelf: shelfActions = {}, onInfo = () => {} }) {
+export function createTaskSwitcher({ document: doc = document, $, vm, render, back, relaunch, canGoBack, busy, begin, finish, report, dismiss = () => {}, announce = () => {}, shelf: shelfActions = {}, onInfo = () => {} }) {
   const screen = $('android-screen');
   if (!screen || typeof screen.prepend !== 'function' || typeof screen.querySelector !== 'function') return { sync() {}, closed() {}, home() {}, restate() {}, reset() {}, setShelf() {}, infoSettled: async () => {}, icon: () => null, state: () => 'foreground' };   // no device on this page (or a host without a full DOM): nothing to navigate
   const el = (tag, className, parent) => { const node = doc.createElement(tag); node.className = className; parent?.append(node); return node; };
@@ -85,9 +99,22 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     try { const got = await vm().launcherInfo(); if (infoFor !== key) return; info = got; onInfo(got); if (iconURL) URL.revokeObjectURL(iconURL); iconURL = got?.icon?.bytes ? URL.createObjectURL(new Blob([got.icon.bytes], { type: got.icon.mime || 'image/png' })) : null; paintIcon(); if (!got?.icon) for (const problem of got?.problems ?? []) report?.(`Launcher: ${problem}`); }
     catch (error) { report?.(`Launcher: ${error?.message ?? error}`); paintIcon(); }
   };
-  const run = async (message, action) => {
-    if (working || busy()) return false; working = true; const token = begin(message);
-    try { const snapshot = await action(); if (snapshot) render(snapshot); return true; } catch (error) { report?.(error?.message ?? String(error), error); return false; } finally { finish(token); working = false; }
+  let settled = Promise.resolve();   // the navigation request in flight (leaving, resuming)
+  const run = (message, action) => {
+    if (working || busy()) return Promise.resolve(false); working = true; const token = begin(message);
+    const done = (async () => { try { const snapshot = await action(); if (snapshot) render(snapshot); return true; } catch (error) { report?.(error?.message ?? String(error), error); return false; } finally { finish(token); working = false; } })();
+    settled = done; return done;
+  };
+  // The app is thrown away: its window flies off the top, then the page kills its process (after the request that was taking it to the background, if one is in flight).
+  const now = () => globalThis.performance?.now?.() ?? Date.now();
+  let dismissing = false;
+  const throwAway = async () => {
+    if (dismissing || away()) return; dismissing = true; hit.hidden = true;
+    try {
+      const height = screen.offsetHeight; setTransform(CARD_SCALE, height * 1.1, true); for (const node of targets()) node.style.opacity = '0';
+      await settled; await new Promise(resolve => setTimeout(resolve, 180));
+      await dismiss();   // the page shows the launcher with the app's icon (closed())
+    } catch (error) { report?.(error?.message ?? String(error), error); } finally { dismissing = false; }
   };
   const leave = async next => { if (mode === 'foreground' || mode === 'dragging') { show(next); await run('Saindo do aplicativo…', () => vm().home()); announce(next); } else show(next); };   // announced again: the snapshot of the stopped app repainted the status line
   const resume = async () => { if (mode === 'installing' || mode === 'idle') return; if (mode === 'closed' || mode === 'installed') { show('foreground'); await relaunch(); return; } const ok = await run('Voltando ao aplicativo…', () => vm().resumeTask()); if (ok) show('foreground'); };
@@ -96,20 +123,23 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
   const pageScale = () => { const rect = screen.getBoundingClientRect(); return screen.offsetHeight > 0 && rect.height > 0 ? rect.height / screen.offsetHeight : 1; };
   zone.addEventListener('pointerdown', event => {
     if (event.button !== 0 || working || busy() || away() || $('sysbar-nav')?.classList.contains('buttons')) return;
-    drag = { id: event.pointerId, y: event.clientY, scale: pageScale(), from: mode, last: null }; try { zone.setPointerCapture(event.pointerId); } catch { /* released already */ }
+    drag = { id: event.pointerId, y: event.clientY, scale: pageScale(), from: mode, last: null, at: now(), samples: [{ t: now(), y: event.clientY }] }; try { zone.setPointerCapture(event.pointerId); } catch { /* released already */ }
     event.preventDefault(); event.stopPropagation();
   });
   zone.addEventListener('pointermove', event => {
     if (!drag || event.pointerId !== drag.id) return; const dy = (drag.y - event.clientY) / drag.scale, height = screen.offsetHeight;
+    drag.samples.push({ t: now(), y: event.clientY }); if (drag.samples.length > 24) drag.samples.shift();
     if (drag.from === 'overview') { drag.last = { commits: dy > height * 0.05, progress: 1 }; return; }
     const t = dragTransform(dy, height); drag.last = t; if (dy > 2) { if (mode !== 'dragging') { mode = 'dragging'; screen.dataset.task = 'dragging'; launcher.hidden = false; } setTransform(t.scale, t.lift, false); }
     event.preventDefault();
   });
   const end = event => {
-    if (!drag || event.pointerId !== drag.id) return; const { last, from } = drag; drag = null; try { zone.releasePointerCapture(event.pointerId); } catch { /* gone */ }
+    if (!drag || event.pointerId !== drag.id) return; const { last, from, at, samples, scale } = drag; drag = null; try { zone.releasePointerCapture(event.pointerId); } catch { /* gone */ }
+    samples.push({ t: now(), y: event.clientY });
     if (from === 'overview') { if (last?.commits) show('home'); return; }          // a second swipe up from the recents goes home
     if (mode !== 'dragging') return;
     if (event.type === 'pointercancel' || !last?.commits) { mode = 'foreground'; show('foreground'); return; }   // a short drag: the window springs back, the app never left
+    if (flingDismisses({ velocity: releaseVelocity(samples, scale), heldMs: now() - at, progress: last.progress })) { throwAway(); return; }   // held, then flung up: the app is thrown away
     mode = 'foreground'; leave('overview');
   };
   zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end);
@@ -144,7 +174,27 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
   }
 
   // ---- recents card, launcher icon, the three buttons ----------------------------------------------------------------------------------------------------------------------
+  // The recents card follows a drag upwards; released far enough up, or flung, the app is thrown away (with the gesture or the three buttons). A press that never moved is the click below.
+  let card = null, swallowClick = false;
+  const onCard = event => { const rect = screen.getBoundingClientRect(), x = (event.clientX - rect.left) / rect.width, y = (event.clientY - rect.top) / rect.height, half = CARD_SCALE / 2, centre = 0.5 - CARD_LIFT; return Math.abs(x - 0.5) <= half && Math.abs(y - centre) <= half; };
+  hit.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || mode !== 'overview' || dismissing || !onCard(event)) return; swallowClick = false;
+    card = { id: event.pointerId, y: event.clientY, scale: pageScale(), dy: 0, moved: false, samples: [{ t: now(), y: event.clientY }] }; try { hit.setPointerCapture(event.pointerId); } catch { /* released already */ }
+  });
+  hit.addEventListener('pointermove', event => {
+    if (!card || event.pointerId !== card.id) return; const height = screen.offsetHeight; card.dy = Math.max(0, (card.y - event.clientY) / card.scale);
+    card.samples.push({ t: now(), y: event.clientY }); if (card.samples.length > 24) card.samples.shift();
+    if (card.dy > 6) card.moved = true;
+    if (card.moved) { setTransform(CARD_SCALE, height * CARD_LIFT + card.dy, false); for (const node of targets()) node.style.opacity = String(Math.max(0.35, 1 - card.dy / (height * 0.6))); event.preventDefault(); }
+  });
+  const cardEnd = event => {
+    if (!card || event.pointerId !== card.id) return; const { dy, moved, samples, scale } = card; card = null; try { hit.releasePointerCapture(event.pointerId); } catch { /* gone */ }
+    if (!moved) return; swallowClick = true; samples.push({ t: now(), y: event.clientY }); for (const node of targets()) node.style.opacity = '';
+    if (event.type !== 'pointercancel' && cardDismisses({ dy, velocity: releaseVelocity(samples, scale), height: screen.offsetHeight })) throwAway(); else show('overview');   // not far enough: the card springs back
+  };
+  hit.addEventListener('pointerup', cardEnd); hit.addEventListener('pointercancel', cardEnd);
   hit.addEventListener('click', event => {
+    if (swallowClick) { swallowClick = false; return; }
     const rect = screen.getBoundingClientRect(), x = (event.clientX - rect.left) / rect.width, y = (event.clientY - rect.top) / rect.height, half = CARD_SCALE / 2, centre = 0.5 - CARD_LIFT;
     if (event.detail === 0 || (Math.abs(x - 0.5) <= half && Math.abs(y - centre) <= half)) resume(); else show('home');   // keyboard activation or a tap on the card resumes; a tap beside it goes home
   });
@@ -181,6 +231,6 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     setShelf(items, currentId = null) { shelfItems = Array.isArray(items) ? items : []; shelfCurrent = currentId; renderShelf(); },
     /** After a render repainted the page's status: say again that the app is in the background. */
     restate() { if (mode === 'overview' || mode === 'home') announce(mode); },
-    reset() { drag = null; pull = null; bubble.hidden = true; working = false; info = null; infoFor = null; pendingLabel = ''; delete screen.dataset.launcher; if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; } mode = 'foreground'; delete screen.dataset.task; launcher.hidden = true; hit.hidden = true; for (const node of targets()) { node.style.transition = 'none'; node.style.transform = ''; node.style.borderRadius = ''; node.style.opacity = ''; } },
+    reset() { drag = null; pull = null; card = null; swallowClick = false; dismissing = false; bubble.hidden = true; working = false; info = null; infoFor = null; pendingLabel = ''; delete screen.dataset.launcher; if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; } mode = 'foreground'; delete screen.dataset.task; launcher.hidden = true; hit.hidden = true; for (const node of targets()) { node.style.transition = 'none'; node.style.transform = ''; node.style.borderRadius = ''; node.style.opacity = ''; } },
   };
 }

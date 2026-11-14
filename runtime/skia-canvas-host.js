@@ -1,15 +1,15 @@
-import {APKError} from './apk-runtime.js?v=34c9ffd7a60c';
-import {getVectorGraphics} from './vector-native.js?v=34c9ffd7a60c';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=34c9ffd7a60c';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=34c9ffd7a60c';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=34c9ffd7a60c';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=34c9ffd7a60c';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=34c9ffd7a60c';
-import {createBitmapHost} from './bitmap-host.js?v=34c9ffd7a60c';
-import { gcRoot } from './heap-gc.js?v=34c9ffd7a60c';
-import {sha256Hex} from './sha256-sync.js?v=34c9ffd7a60c';
-import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=34c9ffd7a60c';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=34c9ffd7a60c';
+import {APKError} from './apk-runtime.js?v=6e2e49883bb2';
+import {getVectorGraphics} from './vector-native.js?v=6e2e49883bb2';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=6e2e49883bb2';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=6e2e49883bb2';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=6e2e49883bb2';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=6e2e49883bb2';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=6e2e49883bb2';
+import {createBitmapHost} from './bitmap-host.js?v=6e2e49883bb2';
+import { gcRoot } from './heap-gc.js?v=6e2e49883bb2';
+import {sha256Hex} from './sha256-sync.js?v=6e2e49883bb2';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=6e2e49883bb2';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=6e2e49883bb2';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -350,7 +350,9 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
  const run=(command,shadow=false)=>{
    if(command.op==='layerBegin'){
     const paint=command.paint?(command.paint.isLayerAlpha?(()=>{const p=new CK.Paint();p.setAlphaf(command.paint.alpha);return p;})():makePaint(CK,command.paint)):null;
-    if(command.bounds)canvas.saveLayer(paint,CK.LTRBRect(...command.bounds));else canvas.saveLayer(paint);paint?.delete();return;
+    // The bounds are in the coordinates of the matrix current at saveLayer; the replay keeps the canvas at the node's base matrix and gives each command its own, so the
+    // layer's bounds are mapped here (their bounding box under a rotation: Skia treats saveLayer bounds as a hint to size the layer, the clip is the commands' own).
+    if(command.bounds){const m=command.matrix??[1,0,0,1,0,0],[l,t,r2,b]=command.bounds,xs=[l,r2].flatMap(x=>[t,b].map(y=>m[0]*x+m[2]*y+m[4])),ys=[l,r2].flatMap(x=>[t,b].map(y=>m[1]*x+m[3]*y+m[5]));canvas.saveLayer(paint,CK.LTRBRect(Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)));}else canvas.saveLayer(paint);paint?.delete();return;
    }
    if(command.op==='layerEnd'){canvas.restore();return;}
    canvas.save();applyClips(CK,canvas,command.clips);canvas.concat(matrix(command.matrix));
