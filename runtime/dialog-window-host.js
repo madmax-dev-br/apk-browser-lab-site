@@ -1,6 +1,6 @@
-import { APKError } from './apk-runtime.js?v=da7619ccc1f1';
-import { getVectorGraphics } from './vector-native.js?v=da7619ccc1f1';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=da7619ccc1f1';
+import { APKError } from './apk-runtime.js?v=a104526a388b';
+import { getVectorGraphics } from './vector-native.js?v=a104526a388b';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=a104526a388b';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',FRAME='Landroid/widget/FrameLayout;',WINDOW='Landroid/view/Window;',PHONE='Lcom/android/internal/policy/PhoneWindow;',WM='Landroid/view/WindowManager;',WMI='Landroid/view/WindowManagerImpl;',LP='Landroid/view/WindowManager$LayoutParams;',VLP='Landroid/view/ViewGroup$LayoutParams;',CTX='Landroid/content/Context;',CTXW='Landroid/view/ContextThemeWrapper;',THEME='Landroid/content/res/Resources$Theme;',RECT='Landroid/graphics/Rect;',TOKEN='Lapkweb/bridge/WindowToken;',ACTIVITY='Landroid/app/Activity;',DIALOG='Landroid/app/Dialog;',TYPED='Landroid/util/TypedValue;';
 const floatBuffer=new DataView(new ArrayBuffer(4)),bits=value=>{floatBuffer.setFloat32(0,value,true);return floatBuffer.getInt32(0,true);},number=value=>{floatBuffer.setInt32(0,value,true);return floatBuffer.getFloat32(0,true);};
 const keys=new Set(),add=(owner,methods)=>methods.forEach(method=>keys.add(owner+'->'+method));

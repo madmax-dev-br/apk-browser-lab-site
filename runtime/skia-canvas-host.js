@@ -1,15 +1,15 @@
-import {APKError} from './apk-runtime.js?v=da7619ccc1f1';
-import {getVectorGraphics} from './vector-native.js?v=da7619ccc1f1';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=da7619ccc1f1';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=da7619ccc1f1';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText} from './skia-paragraph.js?v=da7619ccc1f1';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=da7619ccc1f1';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=da7619ccc1f1';
-import {createBitmapHost} from './bitmap-host.js?v=da7619ccc1f1';
-import { gcRoot } from './heap-gc.js?v=da7619ccc1f1';
-import {sha256Hex} from './sha256-sync.js?v=da7619ccc1f1';
-import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=da7619ccc1f1';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=da7619ccc1f1';
+import {APKError} from './apk-runtime.js?v=a104526a388b';
+import {getVectorGraphics} from './vector-native.js?v=a104526a388b';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=a104526a388b';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=a104526a388b';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=a104526a388b';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=a104526a388b';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=a104526a388b';
+import {createBitmapHost} from './bitmap-host.js?v=a104526a388b';
+import { gcRoot } from './heap-gc.js?v=a104526a388b';
+import {sha256Hex} from './sha256-sync.js?v=a104526a388b';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=a104526a388b';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=a104526a388b';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -92,11 +92,26 @@ export function measureSkiaText(backend,text,state={}){const made=makeFont(backe
    const run=measureSkiaShapedText(backend,text,{...state,weight:state.weight??400,italic:!!state.italic});
    return {width:run.width,metrics:mergeMetrics(face.getMetrics(),run.fontMetrics),glyphCount:run.glyphCount,source:'official-Skia-SkParagraph/Roboto+Android-fallback-chain'};}finally{face.delete();}}
  const {font,glyphs}=made;try{return {width:font.getGlyphWidths(glyphs).reduce((a,b)=>a+b,0),metrics:font.getMetrics(),glyphCount:glyphs.length,source:'official-Skia-Font/Roboto/simple-glyph-run'};}finally{font.delete();}}
-function applyClips(CK,canvas,clips){for(const clip of clips??[]){let path,builder;
+function applyClips(CK,canvas,clips){if(!clips?.length)return;for(const clip of clips)canvas.clipPath(clipShape(CK,clip),clip.difference?CK.ClipOp.Difference:CK.ClipOp.Intersect,!!clip.antiAlias);}
+/**
+ * The device-space path of a recorded clip (its rect or path under the matrix it was recorded with), made once per clip object: a clip object is immutable once recorded
+ * (Canvas.clip* pushes a new one; save copies the list, not the clips), and every draw recorded under it carries it again, so a replay applied the same clip once per draw
+ * and every clip query of the recording applied the whole clip list again, each time building the path twice in Skia. Bounded, oldest first; the path is the same one.
+ */
+const CLIP_SHAPES_MAX=8192,clipShapes=new WeakMap();
+function clipShape(CK,clip){
+ let cache=clipShapes.get(CK);if(cache===undefined)clipShapes.set(CK,cache=new Map());
+ let shape=cache.get(clip);if(shape!==undefined)return shape;
+ let path,builder;
  if(clip.commands)path=CK.Path.MakeFromCmds(clip.commands);else{builder=new CK.PathBuilder();builder.addRect(clip.rect);path=builder.snapshot();builder.delete();}
  if(clip.fillType!==undefined)path.setFillType({value:clip.fillType});
- const transformed=new CK.PathBuilder(path);transformed.transform(matrix(clip.matrix));const shape=transformed.snapshot();canvas.clipPath(shape,clip.difference?CK.ClipOp.Difference:CK.ClipOp.Intersect,!!clip.antiAlias);shape.delete();transformed.delete();path.delete();
-}}
+ const transformed=new CK.PathBuilder(path);transformed.transform(matrix(clip.matrix));shape=transformed.snapshot();transformed.delete();path.delete();
+ cache.set(clip,shape);
+ if(cache.size>CLIP_SHAPES_MAX){const [oldest,old]=cache.entries().next().value;cache.delete(oldest);old.delete();}   // a clip already applied keeps its effect: Skia copied the path into its clip stack
+ return shape;
+}
+/** Frees the clip paths kept for a CanvasKit instance (the Skia host is being disposed). */
+function disposeClipShapes(CK){const cache=clipShapes.get(CK);if(!cache)return;for(const shape of cache.values())shape.delete();clipShapes.delete(CK);}
 // VectorDrawable trim paths (VectorDrawable.cpp FullPath::getUpdatedPath / VFullPath.applyTrim): the first contour of the path, from (trimPathStart + trimPathOffset) to (trimPathEnd + trimPathOffset)
 // as fractions of its length modulo 1, wrapping through the contour end when start > end, taken with SkPathMeasure::getSegment (CanvasKit ContourMeasure).
 function trimVectorPath(CK,path,props){
@@ -281,14 +296,23 @@ export function rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,heig
  * only while the page still holds it. A GPU failure switches the session to CPU and the same raster is replayed on the CPU at once; a replay that fails on the CPU as well is
  * the recording's own error and propagates as on the CPU path.
  */
+// A GPU raster whose key missed the cache KEY_MISS_STREAK times in a row for its extent (a screen that scrolls or animates: its recording, nested RenderNode display lists included,
+// is new on every frame) skips the key for the next KEY_SKIPS rasters of that extent and is replayed without being cached: on a large screen the key alone took about a millisecond
+// per frame and never hit. The next raster after the skips computes the key again, and one hit ends the streak. The pixels are the same either way (the cache only returns the
+// raster of an identical recording); what changes is that a raster replayed while skipping is not kept for a later identical frame.
+const KEY_MISS_STREAK=3,KEY_SKIPS=12,KEY_STREAKS=new WeakMap();
+const keyStreak=(runtime,slot)=>{let streaks=KEY_STREAKS.get(runtime);if(streaks===undefined)KEY_STREAKS.set(runtime,streaks=new Map());let streak=streaks.get(slot);if(streak===undefined){if(streaks.size>=256)streaks.clear();streaks.set(slot,streak={misses:0,skips:0});}return streak;};
 function rasterizeSkiaCanvasGpu(runtime,backend,graphics,receiver,width,height,options){
  const gpu=runtime.gpuRaster,png=options.transport==='gpu-png',cpuOptions=png?(({transport,...rest})=>Object.keys(rest).length?rest:undefined)(options):{...options,transport:'rgba'};   // the CPU request this one stands for (same key as on a CPU session)
  if(gpu?.active!=='gpu'||!gpu.engine)return rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,cpuOptions);
  const stats=runtime.rasterStats??={calls:0,rasterized:0,hits:0,keyMs:0,replayMs:0,encodeMs:0};stats.calls++;
  const state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas');
+ const streak=keyStreak(runtime,png?`p${width}x${height}`:`g${width}x${height}`),skip=streak.misses>=KEY_MISS_STREAK&&streak.skips<KEY_SKIPS;
+ if(skip){streak.skips++;stats.keysSkipped=(stats.keysSkipped??0)+1;}
  const t0=performance.now();
- const body=runtime.rasterCacheDisabled?null:rasterKeyBody(runtime,graphics,state,width);stats.keyMs+=performance.now()-t0;
- const cache=runtime.rasterCache??=new Map(),usable=key=>cache.has(key)&&(png||bitmapRasterUsable(runtime,cache.get(key).result)),hit=key=>{const entry=cache.get(key);cache.delete(key);cache.set(key,entry);stats.hits++;return entry;};
+ const body=runtime.rasterCacheDisabled||skip?null:rasterKeyBody(runtime,graphics,state,width);stats.keyMs+=performance.now()-t0;
+ const cache=runtime.rasterCache??=new Map(),usable=key=>cache.has(key)&&(png||bitmapRasterUsable(runtime,cache.get(key).result)),hit=key=>{const entry=cache.get(key);cache.delete(key);cache.set(key,entry);stats.hits++;streak.misses=0;return entry;};
+ if(body!==null){streak.skips=0;streak.misses++;}   // a hit below sets it back to 0
  if(body!==null&&(options.scale??1)<1){const {scale,...rest}=options,fullKey=rasterKeyPrefix(width,height,rest)+body;if(usable(fullKey)){stats.fullForReduced=(stats.fullForReduced??0)+1;return {...hit(fullKey).result};}}
  const key=body===null?null:rasterKeyPrefix(width,height,options)+body;
  if(key!==null&&usable(key))return {...hit(key).result};
@@ -549,7 +573,7 @@ export function createSkiaCanvasHost(runtime,backend){
    return !!backend.fallback?.covers(text,{weight:face.weight,italic:face.italic});},
   measureText(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaText(backend,text,{...state,...faceState(face)});},
   readStatic(vm,field){const bitmapStatic=bitmaps.readStatic(field);if(bitmapStatic)return bitmapStatic;if(field.owner===OP&&OPS.includes(field.name))return{handled:true,value:bitmaps.enumValue(OP,OPS,field.name)};if(field.owner===TYPEFACE&&['DEFAULT','DEFAULT_BOLD','SANS_SERIF','SERIF','MONOSPACE'].includes(field.name))return{handled:true,value:makeTypeface(field.name==='SERIF'?'serif':field.name==='MONOSPACE'?'monospace':'sans-serif',field.name==='DEFAULT_BOLD'?1:0)};return null;},
-  dispose(){runtime.rasterCache?.clear();runtime.rasterCacheBytes=0;disposeDecodedImages(CK);for(const surface of scratchSurfaces.values())surface.dispose();scratchSurfaces.clear();for(const f of fontFiles.values())f.ck.delete();fontFiles.clear();for(const m of measures.values())releaseMeasure(m);measures.clear();for(const p of paths.values())p.builder.delete();paths.clear();pathHandles.clear();},
+  dispose(){runtime.rasterCache?.clear();runtime.rasterCacheBytes=0;disposeDecodedImages(CK);disposeShapedRuns(CK);disposeClipShapes(CK);for(const surface of scratchSurfaces.values())surface.dispose();scratchSurfaces.clear();for(const f of fontFiles.values())f.ck.delete();fontFiles.clear();for(const m of measures.values())releaseMeasure(m);measures.clear();for(const p of paths.values())p.builder.delete();paths.clear();pathHandles.clear();},
   invoke(vm,method,args){if(bitmaps.supports(method.owner+'->'+method.name+method.signature))return bitmaps.invoke(vm,method,args);if(matrixHost.supports(method.owner+'->'+method.name+method.signature))return matrixHost.invoke(vm,method,args);const name=method.name,receiver=args[0];
    if(method.owner===CANVAS&&name==='setCompatibilityVersion'){vm.canvasCompatibilityVersion=args[0]|0;vm.record(`CANVAS compatibility target=${vm.canvasCompatibilityVersion} [actual process graphics policy]`);return;}
    if(method.owner===TYPEFACE){

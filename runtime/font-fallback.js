@@ -1,5 +1,5 @@
-import {APKError} from './apk-runtime.js?v=da7619ccc1f1';
-import {DIGESTS} from './crypto-host.js?v=da7619ccc1f1';
+import {APKError} from './apk-runtime.js?v=a104526a388b';
+import {DIGESTS} from './crypto-host.js?v=a104526a388b';
 
 /** Android font fallback (Minikin FontCollection) over the vendored Android 13 fallback chain.
  *
@@ -26,7 +26,7 @@ const LAYOUT_CONTROL = c => c === 0x0a || c === 0x0d || c === 0x09 || c === 0x85
 const u = cp => 'U+' + cp.toString(16).toUpperCase().padStart(4, '0');
 
 export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTypeface}) {
-  let manifest = null, provider = null, lookup = null;
+  let manifest = null, provider = null, lookup = null, generation = 0;
   const loaded = new Set(), roboto = new Map(), stats = {loadedFiles: [], loadedBytes: 0};
   const load = () => {
     if (manifest) return manifest;
@@ -53,7 +53,7 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
     const entry = lookup.get(stem); if (!entry) fail('Unknown fallback font ' + stem);
     const bytes = readSync(new URL(entry.file, baseURL), MAX_FONT);
     if (bytes.length !== entry.bytes || hex(DIGESTS['SHA-256'].fn(bytes)) !== entry.sha256) fail('Fallback font integrity mismatch: ' + entry.file);
-    getProvider().registerFont(bytes, stem);
+    getProvider().registerFont(bytes, stem); generation++;
     loaded.add(stem); stats.loadedFiles.push(entry.file); stats.loadedBytes += bytes.length;
   };
   const primary = (weight, italic) => {
@@ -146,7 +146,9 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
       return true;
     },
     /** Registers app font bytes with the paragraph font provider under `name` (a content-derived family name), so a text style can list it ahead of Roboto. */
-    registerCustom(name, bytes) { getProvider().registerFont(bytes, name); },
+    registerCustom(name, bytes) { getProvider().registerFont(bytes, name); generation++; },
+    /** Fonts registered with the paragraph font provider so far (a shaping result cached under one value stays valid while it is the same: src/skia-paragraph.js). */
+    get generation() { return generation; },
     /** SkParagraph builder over the registered fonts (Roboto + every fallback file loaded so far). */
     makeBuilder(paragraphStyle) { return CK.ParagraphBuilder.MakeFromFontProvider(paragraphStyle, getProvider()); },
     /** Adds `text` to `builder`, one pushed text style per itemized run (`styleProps` is the TextStyle of the paragraph). */

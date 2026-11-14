@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=da7619ccc1f1';
-import { throwNew } from './java-throw.js?v=da7619ccc1f1';
-import { sharedAssetBytes } from './shared-asset-bytes.js?v=da7619ccc1f1';
+import { APKError } from './apk-error.js?v=a104526a388b';
+import { throwNew } from './java-throw.js?v=a104526a388b';
+import { sharedAssetBytes } from './shared-asset-bytes.js?v=a104526a388b';
 
 // com.android.icu.charset.NativeConverter converter natives (open/close/decode/encode/reset/callbacks) over the unmodified ICU4C 70.1 ucnv implementation compiled to
 // WebAssembly (vendor/icu/70.1/icu-converter.wasm, scripts/build-icu-converter.sh). The wrapper code follows external/icu android-13.0.0_r1
@@ -61,6 +61,20 @@ function maybeThrowIcu(runtime, c, functionName, error) {
 const floatBits = value => { const view = new DataView(new ArrayBuffer(4)); view.setFloat32(0, value); return view.getInt32(0); };
 const handleOf = (runtime, handle) => { const pointer = Number(handle); if (!pointer) maybeThrowIcu(runtime, converters(runtime), 'toUConverter', U_ILLEGAL_ARGUMENT_ERROR); return pointer; };
 
+// The Java arrays' cells are read once per call (each `elements` read checks the core's memory): a 255 KB InputStreamReader read was ~50 ms of element-by-element getters.
+/** byte[] cells [0, count) into the converter's memory at `at`, as unsigned bytes (cells past the array's end read as 0, as the element loop read them). */
+function copyBytesIn(memory, at, cells, count) {
+  if (ArrayBuffer.isView(cells) && cells.BYTES_PER_ELEMENT === 1 && count <= cells.length) { memory.set(new Uint8Array(cells.buffer, cells.byteOffset, count), at); return; }
+  for (let i = 0; i < count; i++) memory[at + i] = cells[i] & 0xff;
+}
+/** `count` UTF-16 units from the converter's output at `at` + 2 * from into char[] cells from `from` (the element loop's range and its silent drop past the array's end). */
+function copyCharsOut(view, at, cells, from, count) {
+  const base = at + from * 2;
+  if (ArrayBuffer.isView(cells) && cells.BYTES_PER_ELEMENT === 2 && count >= 0 && from >= 0 && from + count <= cells.length && (view.byteOffset + base) % 2 === 0 && base + count * 2 <= view.byteLength) {
+    cells.set(new Uint16Array(view.buffer, view.byteOffset + base, count), from); return;
+  }
+  for (let i = 0; i < count; i++) cells[from + i] = view.getUint16(base + i * 2, true);
+}
 export function closeConverterHandle(runtime, handle) { const pointer = Number(handle); if (pointer) converters(runtime).x.icu_cnv_close(pointer); }
 
 export function createIcuConverterNativeBindings() {
@@ -88,11 +102,11 @@ export function createIcuConverterNativeBindings() {
   add('decode(J[BI[CI[IZ)I', (runtime, [handle, input, inEnd, output, outEnd, data, flush]) => {
     const c = converters(runtime), pointer = handleOf(runtime, handle), source = runtime.array(input), target = runtime.array(output), state = runtime.array(data).elements;
     const sourcePtr = c.alloc(inEnd), targetPtr = c.alloc(outEnd * 2), dataPtr = c.alloc(12), flag = c.alloc(4);
-    const view = c.bytes(); for (let i = 0; i < inEnd; i++) view[sourcePtr + i] = source.elements[i] & 0xff;
+    copyBytesIn(c.bytes(), sourcePtr, source.elements, inEnd);
     const dv = c.view(); for (let i = 0; i < 3; i++) dv.setInt32(dataPtr + i * 4, state[i] | 0, true);
     const startOutput = state[1] | 0, error = c.x.icu_cnv_decode(pointer, sourcePtr, inEnd, targetPtr, outEnd, dataPtr, flush ? 1 : 0, flag);
     const dv2 = c.view(); for (let i = 0; i < 3; i++) state[i] = dv2.getInt32(dataPtr + i * 4, true);
-    for (let i = 0; i < state[1]; i++) target.elements[startOutput + i] = dv2.getUint16(targetPtr + (startOutput + i) * 2, true);
+    copyCharsOut(dv2, targetPtr, target.elements, startOutput, state[1]);
     const mustThrow = dv2.getInt32(flag, true); for (const p of [sourcePtr, targetPtr, dataPtr, flag]) c.x.free(p);
     if (mustThrow) maybeThrowIcu(runtime, c, 'ucnv_toUnicode', error);
     return error;
@@ -101,11 +115,11 @@ export function createIcuConverterNativeBindings() {
   add('encode(J[CI[BI[IZ)I', (runtime, [handle, input, inEnd, output, outEnd, data, flush]) => {
     const c = converters(runtime), pointer = handleOf(runtime, handle), source = runtime.array(input), target = runtime.array(output), state = runtime.array(data).elements;
     const sourcePtr = c.alloc(inEnd * 2), targetPtr = c.alloc(outEnd), dataPtr = c.alloc(12), flag = c.alloc(4);
-    const dv = c.view(); for (let i = 0; i < inEnd; i++) dv.setUint16(sourcePtr + i * 2, source.elements[i] & 0xffff, true);
+    const dv = c.view(), chars = source.elements; for (let i = 0; i < inEnd; i++) dv.setUint16(sourcePtr + i * 2, chars[i] & 0xffff, true);
     for (let i = 0; i < 3; i++) dv.setInt32(dataPtr + i * 4, state[i] | 0, true);
     const startOutput = state[1] | 0, error = c.x.icu_cnv_encode(pointer, sourcePtr, inEnd, targetPtr, outEnd, dataPtr, flush ? 1 : 0, flag);
-    const dv2 = c.view(), bytes = c.bytes(); for (let i = 0; i < 3; i++) state[i] = dv2.getInt32(dataPtr + i * 4, true);
-    for (let i = startOutput; i < state[1]; i++) target.elements[i] = (bytes[targetPtr + i] << 24) >> 24;
+    const dv2 = c.view(), bytes = c.bytes(), out = target.elements; for (let i = 0; i < 3; i++) state[i] = dv2.getInt32(dataPtr + i * 4, true);
+    for (let i = startOutput; i < state[1]; i++) out[i] = (bytes[targetPtr + i] << 24) >> 24;
     const mustThrow = dv2.getInt32(flag, true); for (const p of [sourcePtr, targetPtr, dataPtr, flag]) c.x.free(p);
     if (mustThrow) maybeThrowIcu(runtime, c, 'ucnv_fromUnicode', error);
     return error;

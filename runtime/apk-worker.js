@@ -1,69 +1,76 @@
-import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=da7619ccc1f1';
-import { launcherInfo } from './launcher-info.js?v=da7619ccc1f1';
-import { buildScreenState } from './screen-state.js?v=da7619ccc1f1';
-import { createLogcat } from './logcat.js?v=da7619ccc1f1';
-import { createNetlog } from './netlog.js?v=da7619ccc1f1';
-import { reportSummary } from './report-summary.js?v=da7619ccc1f1';
-import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=da7619ccc1f1';
-import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=da7619ccc1f1';
-import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=da7619ccc1f1';
-import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=da7619ccc1f1';
-import { describeRedirects } from './host-map.js?v=da7619ccc1f1';
-import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=da7619ccc1f1';
-import { createAppStorage } from './app-storage.js?v=da7619ccc1f1';
-import { listMethods, invokeAppMethod } from './app-invoke.js?v=da7619ccc1f1';
-import { createMessageSink } from './audio-native.js?v=da7619ccc1f1';
-import { loadAPK } from './apk-loader.js?v=da7619ccc1f1';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=da7619ccc1f1';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=da7619ccc1f1';
-import { createWebViewBackend } from './webview-backend.js?v=da7619ccc1f1';
-import { FrameworkProvider } from './framework-provider.js?v=da7619ccc1f1';
-import { createRasterSender } from './raster-cache.js?v=da7619ccc1f1';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=da7619ccc1f1';
-import { dispatchPointer } from './pointer-input-host.js?v=da7619ccc1f1';
-import { resolveDevice } from './device-profile.js?v=da7619ccc1f1';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=da7619ccc1f1';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=da7619ccc1f1';
-import { SkiaProvider } from './skia-provider.js?v=da7619ccc1f1';
-import { inspectCompose } from './compose-inspector.js?v=da7619ccc1f1';
-import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=da7619ccc1f1';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=da7619ccc1f1';
-import { readScrollInfo } from './scroll-info.js?v=da7619ccc1f1';
-import { SemanticsPacer } from './semantics-pacing.js?v=da7619ccc1f1';
-import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=da7619ccc1f1';
-import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=da7619ccc1f1';
-import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=da7619ccc1f1';
-import { WarmupTracker, firstTimeWork } from './warmup.js?v=da7619ccc1f1';
-import { disposeTextLayout } from './text-layout-native.js?v=da7619ccc1f1';
-import { IcuBreakProvider } from './icu-break-provider.js?v=da7619ccc1f1';
-import { SqliteProvider } from './sqlite-native.js?v=da7619ccc1f1';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=da7619ccc1f1';
-import { TzdataProvider } from './java-time-native.js?v=da7619ccc1f1';
-import { ZlibProvider } from './zip-native.js?v=da7619ccc1f1';
-import { IcuConverterProvider } from './icu-converter-native.js?v=da7619ccc1f1';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=da7619ccc1f1';
-import { JavacryptoProvider } from './javacrypto-native.js?v=da7619ccc1f1';
-import { disposeColorFilters } from './color-filter-native.js?v=da7619ccc1f1';
-import { disposeRegex } from './regex-native.js?v=da7619ccc1f1';
-import { disposeRenderNodes } from './rendernode-native.js?v=da7619ccc1f1';
-import { startDeepLink } from './deep-link-host.js?v=da7619ccc1f1';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=da7619ccc1f1';
-import { renderVariant, RenderVariantError } from './render-variant.js?v=da7619ccc1f1';
-import { probeWebCodecs } from './media-codec-backend.js?v=da7619ccc1f1';
+import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=a104526a388b';
+import { launcherInfo } from './launcher-info.js?v=a104526a388b';
+import { buildScreenState } from './screen-state.js?v=a104526a388b';
+import { createLogcat } from './logcat.js?v=a104526a388b';
+import { createNetlog } from './netlog.js?v=a104526a388b';
+import { reportSummary } from './report-summary.js?v=a104526a388b';
+import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=a104526a388b';
+import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=a104526a388b';
+import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=a104526a388b';
+import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=a104526a388b';
+import { describeRedirects } from './host-map.js?v=a104526a388b';
+import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=a104526a388b';
+import { InflatePool } from './zip-inflate-pool.js?v=a104526a388b';
+import { warmCrc32 } from './zip-entry.js?v=a104526a388b';
+import { createAppStorage } from './app-storage.js?v=a104526a388b';
+import { listMethods, invokeAppMethod } from './app-invoke.js?v=a104526a388b';
+import { createMessageSink } from './audio-native.js?v=a104526a388b';
+import { loadAPK } from './apk-loader.js?v=a104526a388b';
+import { AndroidPlatform } from './android-platform.js?v=a104526a388b';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=a104526a388b';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=a104526a388b';
+import { createWebViewBackend } from './webview-backend.js?v=a104526a388b';
+import { FrameworkProvider } from './framework-provider.js?v=a104526a388b';
+import { createRasterSender } from './raster-cache.js?v=a104526a388b';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=a104526a388b';
+import { dispatchPointer } from './pointer-input-host.js?v=a104526a388b';
+import { resolveDevice } from './device-profile.js?v=a104526a388b';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=a104526a388b';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=a104526a388b';
+import { SkiaProvider } from './skia-provider.js?v=a104526a388b';
+import { inspectCompose } from './compose-inspector.js?v=a104526a388b';
+import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=a104526a388b';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=a104526a388b';
+import { readScrollInfo } from './scroll-info.js?v=a104526a388b';
+import { SemanticsPacer } from './semantics-pacing.js?v=a104526a388b';
+import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=a104526a388b';
+import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=a104526a388b';
+import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=a104526a388b';
+import { WarmupTracker, firstTimeWork } from './warmup.js?v=a104526a388b';
+import { WorkerTaskLog } from './worker-task-log.js?v=a104526a388b';
+import { holdDelay } from './frame-flow.js?v=a104526a388b';
+import { disposeTextLayout } from './text-layout-native.js?v=a104526a388b';
+import { IcuBreakProvider } from './icu-break-provider.js?v=a104526a388b';
+import { SqliteProvider } from './sqlite-native.js?v=a104526a388b';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=a104526a388b';
+import { TzdataProvider } from './java-time-native.js?v=a104526a388b';
+import { ZlibProvider } from './zip-native.js?v=a104526a388b';
+import { IcuConverterProvider } from './icu-converter-native.js?v=a104526a388b';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=a104526a388b';
+import { JavacryptoProvider } from './javacrypto-native.js?v=a104526a388b';
+import { disposeColorFilters } from './color-filter-native.js?v=a104526a388b';
+import { disposeRegex } from './regex-native.js?v=a104526a388b';
+import { disposeRenderNodes } from './rendernode-native.js?v=a104526a388b';
+import { startDeepLink } from './deep-link-host.js?v=a104526a388b';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=a104526a388b';
+import { renderVariant, RenderVariantError } from './render-variant.js?v=a104526a388b';
+import { probeWebCodecs } from './media-codec-backend.js?v=a104526a388b';
 const hostCodecs = probeWebCodecs(self).catch(() => null);   // the device's video codecs are this Worker's WebCodecs (null: none); asked once, when the Worker starts
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=da7619ccc1f1';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=da7619ccc1f1';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=a104526a388b';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=a104526a388b';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=da7619ccc1f1';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=da7619ccc1f1';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=da7619ccc1f1';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'da7619ccc1f1';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=a104526a388b';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=a104526a388b';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=a104526a388b';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'a104526a388b';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
 let sharedLayoutProvider = null, sharedNativeLibraryProvider = null, sharedJavacryptoProvider = null;
 let sharedConfigurationProvider = null;
 let lastLoadTiming = null;   // the phases of the last load (src/time-breakdown.js createLoadTiming)
+const operationSpans = {};   // measurement aid (debug-exec, scripts/validation/profile-launch.mjs): wall-clock start/end (epoch ms) of the last load and launch requests, to cut a profile by operation
+const epochNow = () => (self.performance?.timeOrigin ?? 0) + performance.now();
 const netlog = createNetlog({ post: message => self.postMessage(message) });   // the app's network requests (src/netlog.js), batched to the page like the logcat
 const logcat = createLogcat({ post: message => self.postMessage(message), streaming: false });   // the app's logcat (src/logcat.js): batches go to the page on a 100 ms timer and at the end of every event batch / request, but only while the page's Logcat panel is open (logcat-stream); closed, a counter once a second
 let runtime = null, reportedCensus = 0;   // reportedCensus: the OutOfMemoryError whose heap census already reached the page
@@ -83,6 +90,8 @@ const pace = (name, ms) => { const { edges } = workerTiming.pacing; let i = 0; w
 let lastComposeSemantics = null;   // the tree of the last walk, reused by scheduled events inside the pacing gap (src/semantics-pacing.js)
 // Progressive raster (src/motion-raster.js): display rasters are replayed at a reduced scale while the screen is moving and at full density once it is still. `load { motionRaster: false }` turns it off.
 let motionRaster = new MotionRasterPolicy(), lastPointerAt = 0;
+// What the Worker did task by task (src/worker-task-log.js): a measurement aid read over the DevTools protocol (scripts/validation/profile-smoothness.mjs --hitches) to attribute a gap between frames
+const taskLog = new WorkerTaskLog(); Object.defineProperty(self, '__apkWorkerTasks', { value: taskLog, configurable: true });
 let warmTracker = new WarmupTracker();   // "Aquecendo" (src/warmup.js): snapshot.warmup, and a wake while warming so the flip to warm is posted when the app is idle
 let readyTracker = new ScreenReadyTracker();   // "Tela pronta" (src/screen-ready.js): snapshot.screenReady, and a wake when the quiet period ends
 /** What the VM knows about motion when a snapshot is taken: a pending Choreographer frame, a live pointer gesture, the request being answered (`'pointer-motion'`, `'scrollby'`). */
@@ -108,6 +117,7 @@ const motionSignal = (request = null) => ({ navigation: motionRaster.navigating(
  * ones of input in flight (`pacedSemantics`: a pointer MOVE of a drag, a wheel step), which come at the rate of the pointer and are followed by the gesture's end or by the
  * refresh the pacer owes. `request`: the page request this snapshot answers, for the motion signal. */
 function currentSnapshot({ paced = false, pacedSemantics = paced, request = null } = {}) {
+  lastSnapshotAt = performance.now();   // the page gets this one now (an event's or a reply's): src/frame-flow.js spaces the next event snapshot from it
   appData?.touch(); const snapshotStarted = performance.now();
   if (!paced) snapshotOwed = false;   // a reply to a page request carries the newest state: nothing is owed to the page anymore
   runtime.steps = 0; // A bounded inspection event, separate from the APK callback that just finished.
@@ -120,7 +130,7 @@ function currentSnapshot({ paced = false, pacedSemantics = paced, request = null
   const rasterReduced = reducedIds.length > 0; motionRaster.noteSnapshot(reducedIds); snapshot.rasterReduced = rasterReduced;   // the page's idle rule waits for the full-density refinement
   if (!snapshot.closed && composeSemantics) {
     const reuse = pacedSemantics && lastComposeSemantics && !semanticsPacer.take(signal.pendingFrames > 0 || signal.gestureActive || signal.inputMotion);
-    if (!reuse) { const startedAt = performance.now(); try { lastComposeSemantics = composeSemantics.snapshot(); } finally { semanticsPacer.taken(startedAt); workerTiming.semanticsWalks++; workerTiming.semanticsMs += performance.now() - startedAt; } } else workerTiming.semanticsReused++;
+    if (!reuse) { const startedAt = performance.now(); try { lastComposeSemantics = composeSemantics.snapshot(); } finally { semanticsPacer.taken(startedAt); workerTiming.semanticsWalks++; workerTiming.semanticsMs += performance.now() - startedAt; taskLog.note('semantics', performance.now() - startedAt); } } else workerTiming.semanticsReused++;
     snapshot.composeSemantics = lastComposeSemantics;
   }
   if (!snapshot.closed) try { snapshot.ime = runtime.platform.inputMethodService?.imeState?.(runtime) ?? null; } catch { snapshot.ime = null; }   // where the page's keyboard types: the served view and whether it has an InputConnection
@@ -148,11 +158,16 @@ const OPERATION_WALL_LIMIT_MS = 20000;
 // After the first frame of an operation is committed the Worker settles at most this long on work that is due right now; whatever is still scheduled (animations, polling, timers) continues as
 // ordinary events in later pumps (scheduleEvents), exactly as on a device, where nothing ever "waits for idle".
 const SETTLE_WINDOW_MS = 1500, FIRST_FRAME_SETTLE_MS = 8000;   // until the first frame is committed the settle window is longer: a launch returns with something drawn, not with the layout still queued
-function drainReadyEvents(maxMs = SETTLE_WINDOW_MS) {
-  let processed = 0, result; const started = performance.now();
+// `framePaced`: once the screen has frames, a pump that produced a new frame ends there, so the page is sent that frame before the next one is made. When frames cost more than a
+// vsync (a large app's first seconds: new composables, first image decodes) the next Choreographer frame is always due at once, and draining "while something is due" ran four or five
+// frames back to back in one 100-150 ms task with only the last one shown: the page saw a hitch while the VM produced frames at nearly full rate. The work still due runs in the
+// next pump, scheduled at once (scheduleEvents), after the snapshot. The VM's own order of events is unchanged: only where the Worker stops to show a frame.
+function drainReadyEvents(maxMs = SETTLE_WINDOW_MS, { framePaced = false } = {}) {
+  let processed = 0, result; const started = performance.now(), frames = () => runtime.platform.viewWindowHost?.frameState?.().framesRun ?? 0, framesBefore = framePaced ? frames() : 0;
   for (let round = 0; round < 32; round++) {
-    result = runtime.platform.drainEvents(runtime); processed += result.processed;
+    result = runtime.platform.drainEvents(runtime, { untilFrame: framePaced && framesBefore > 0 }); processed += result.processed;
     if (!result.processed || result.nextDelay !== 0) break;
+    if (framePaced && framesBefore > 0 && frames() > framesBefore) break;   // a new frame to show: the page gets it first
     if (performance.now() - started > ((runtime.platform.viewWindowHost?.frameState?.().framesRun ?? 1) > 0 ? maxMs : Math.max(maxMs, FIRST_FRAME_SETTLE_MS))) break;   // the rest is left queued for the next pump
   }
   return {...result, processed};
@@ -194,31 +209,44 @@ function monitored(name, body) {
   try { return body(); } finally { monitor.end(); }
 }
 // Page back-pressure (frame coalescing): every scheduled-event snapshot carries a sequence number and the page acknowledges the newest one it has drawn
-// (src/device-view.js flushRuntimeSnapshot). While the previous snapshot is still unacknowledged the Worker does not take the next one (that would replay and
+// (src/device-view.js flushRuntimeSnapshot). While FRAMES_IN_FLIGHT snapshots are still unacknowledged (src/frame-flow.js) the Worker does not take the next one (that would replay and
 // encode a frame the page would only replace before drawing it); the screen is owed one and it is sent when the ack arrives, or after FRAME_ACK_WAIT_MS
 // (a hidden tab or a page that dropped it never blocks the screen). Replies to page requests are never held back.
 const FRAME_ACK_WAIT_MS = 250;
-let eventSeq = 0, ackedSeq = 0, lastEventPostAt = 0, snapshotOwed = false, owedTimer = null;
+let eventSeq = 0, ackedSeq = 0, lastEventPostAt = 0, lastSnapshotAt = -Infinity, snapshotOwed = false, owedTimer = null;
 const frameStats = { sent: 0, held: 0, acks: 0, ackSent: 0, ackBusy: 0 };
-const pageBehind = () => eventSeq > ackedSeq && performance.now() - lastEventPostAt < FRAME_ACK_WAIT_MS;
+const frameHold = () => { const now = performance.now(); return holdDelay(eventSeq, ackedSeq, now - lastEventPostAt, now - lastSnapshotAt, FRAME_ACK_WAIT_MS); };   // src/frame-flow.js
+const pageBehind = () => frameHold() !== null;
 let lastFramePostedAt = 0;   // when the page was last sent a frame (the API-gap scan waits for a quiet moment: startApiGapScan)
 function postRuntimeEvent() {
   lastFramePostedAt = performance.now(); snapshotOwed = false; clearTimeout(owedTimer); owedTimer = null;
   // An APK that was opened but not started has no screen yet (no Activity called setContentView, none is queued, no task ended): a scheduled wake-up (warm-up or
   // screen-ready sampling, a timer of the Application) has nothing to show, and asking for a snapshot was reported to the page as an interrupted callback ("No content view").
   if (!runtime.root && !runtime.platform?.taskClosed && !runtime.platform?.launchPending?.()) { self.postMessage({ type: 'runtime-idle' }); return; }
-  const snapshot = currentSnapshot({ paced: true }); snapshot.vmHealth.frames = { ...frameStats };
-  lastEventPostAt = performance.now(); frameStats.sent++;
-  self.postMessage({ type: 'runtime-event', snapshot, seq: ++eventSeq }, rasterSender.takeTransfers());
+  taskLog.begin('snapshot', runtime);
+  try {
+    const snapshot = currentSnapshot({ paced: true }); snapshot.vmHealth.frames = { ...frameStats };
+    lastEventPostAt = performance.now(); frameStats.sent++;
+    self.postMessage({ type: 'runtime-event', snapshot, seq: ++eventSeq }, rasterSender.takeTransfers());
+  } finally { taskLog.end(runtime); }
 }
 function holdSnapshot() {
-  snapshotOwed = true; frameStats.held++;
-  if (owedTimer === null) owedTimer = setTimeout(() => { owedTimer = null; if (snapshotOwed && !busy && runtime) { busy = true; try { postRuntimeEvent(); } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); } finally { busy = false; scheduleEvents(); } } }, FRAME_ACK_WAIT_MS);
+  snapshotOwed = true; frameStats.held++; armOwedTimer();
+}
+/** The owed snapshot is sent once the hold is over (an acknowledgement may end it sooner: frameAcked); a Worker busy then leaves it to its next pump (snapshotOwed). */
+function armOwedTimer() {
+  const delay = frameHold(); clearTimeout(owedTimer); owedTimer = null; if (!snapshotOwed) return;
+  owedTimer = setTimeout(() => {
+    owedTimer = null; if (!snapshotOwed || busy || !runtime) return;
+    if (pageBehind()) { armOwedTimer(); return; }
+    busy = true; try { postRuntimeEvent(); } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); } finally { busy = false; scheduleEvents(); }
+  }, Math.max(1, Math.ceil(delay ?? 0)));
 }
 function frameAcked(seq) {
   frameStats.acks++; if (snapshotOwed && busy) frameStats.ackBusy++;
   if (Number.isSafeInteger(seq) && seq > ackedSeq) ackedSeq = Math.min(seq, eventSeq);
-  if (snapshotOwed && !busy && runtime && ackedSeq >= eventSeq) { frameStats.ackSent++; busy = true; try { postRuntimeEvent(); } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); } finally { busy = false; scheduleEvents(); } }
+  if (snapshotOwed && !busy && runtime && pageBehind()) { armOwedTimer(); return; }   // still within the spacing: the timer is re-armed to its end, not to the ack wait
+  if (snapshotOwed && !busy && runtime) { frameStats.ackSent++; busy = true; try { postRuntimeEvent(); } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); } finally { busy = false; scheduleEvents(); } }
 }
 /** A lab error ended a background thread (runtime.noteThreadFailure): the page is told on its own message, whatever became of the JavaScript exception -- the reply to the page
  * request that happened to be pumping, a scheduled event, or a catch that dropped it. Posted after that reply, so the page shows one error, and keeps this one on screen. */
@@ -250,7 +278,8 @@ function scheduleEvents() {
     busy = true; let succeeded = false;
     self.postMessage({ type: 'runtime-busy' });   // the page must not treat the screen as settled while a scheduled VM event is being processed
     try {
-      const started = performance.now(), drained = monitored('evento agendado', () => drainReadyEvents()); lastEventMs = Math.round(performance.now() - started); if (drained.processed) { workerTiming.scheduledBatches++; workerTiming.scheduledMs += performance.now() - started; pace('batch', performance.now() - started); if (lastBatchAt) pace('gap', started - lastBatchAt); lastBatchAt = started; }
+      taskLog.begin('events', runtime);
+      const started = performance.now(), drained = monitored('evento agendado', () => drainReadyEvents(SETTLE_WINDOW_MS, { framePaced: true })); lastEventMs = Math.round(performance.now() - started); if (drained.processed) { workerTiming.scheduledBatches++; workerTiming.scheduledMs += performance.now() - started; pace('batch', performance.now() - started); if (lastBatchAt) pace('gap', started - lastBatchAt); lastBatchAt = started; }
       logcat.flush(); netlog.flush();
       const refining = !drained.processed && !snapshotOwed && motionRaster.refinementDue(motionSignal()); if (refining) motionRaster.noteRefinement();   // the quiet period passed with the screen still: replay the last frame at full density
       const readyFlip = !drained.processed && readyTracker.flipDue(performance.now());   // nothing ran and the quiet period passed: a fresh snapshot carries screenReady.ready = true
@@ -258,7 +287,7 @@ function scheduleEvents() {
       if (drained.processed || snapshotOwed || refining || readyFlip || warmFlip || (semanticsPacer.stale && semanticsPacer.wait() <= 0)) { if (pageBehind()) holdSnapshot(); else postRuntimeEvent(); } else self.postMessage({ type: 'runtime-idle' });
       succeeded = true;
     } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); }
-    finally { busy = false; surfaceThreadFailure(); if (succeeded) scheduleEvents(); }
+    finally { taskLog.end(runtime); busy = false; surfaceThreadFailure(); if (succeeded) scheduleEvents(); }
   }, Math.min(2147483647, Math.max(0, delay)));
 }
 // The static API-gap estimate (src/api-gap-scan.js) runs once per opened APK, after its first launch attempt (successful or not), in slices that yield to the event loop so
@@ -275,7 +304,9 @@ function startApiGapScan() {
   setTimeout(async () => {
     try {
       await waitQuietForScan(cancelled);
-      const report = await scanApiGaps(target, { archive, nativeLibraries: inventory.nativeByABI, yieldFn: () => waitQuietForScan(cancelled), cancelled });
+      taskLog.begin('api-gap-scan', target);   // each slice between two yields is one task of the log
+      const report = await scanApiGaps(target, { archive, nativeLibraries: inventory.nativeByABI, yieldFn: async () => { if (taskLog.open?.kind === 'api-gap-scan') taskLog.end(target); await waitQuietForScan(cancelled); taskLog.begin('api-gap-scan', target); }, cancelled });
+      if (taskLog.open?.kind === 'api-gap-scan') taskLog.end(target);
       if (report && runtime === target) self.postMessage({ type: 'api-gaps', report: compactApiGapReport(report) });
     } catch { /* an estimate: nothing to report */ }
   }, 0);
@@ -309,7 +340,7 @@ function servePluginQuery() {
   const quietLeft = PLUGIN_INPUT_QUIET_MS - (now - Math.max(lastOperationAt, lastPointerAt)), spent = pluginWindowMs >= PLUGIN_MS_PER_SECOND;
   if (busy || quietLeft > 0 || spent) { pluginStats.deferred++; armPluginTimer(busy ? PLUGIN_RETRY_MS : Math.max(PLUGIN_RETRY_MS, quietLeft, spent ? pluginWindowAt + 1000 - now : 0)); return; }
   pluginJobs.shift();
-  const { requestId, data } = job, started = performance.now();
+  const { requestId, data } = job, started = performance.now(); taskLog.begin('plugin-query', runtime);
   try {
     if (!runtime) throw new PluginQueryError('no-apk', 'Nenhum APK em execução.');
     const args = data.args && typeof data.args === 'object' ? data.args : {};
@@ -333,7 +364,7 @@ function servePluginQuery() {
     const code = error?.name === 'PluginQueryError' ? error.code : error?.details?.kind === 'invalid-object-reference' ? 'collected' : 'failed';
     pluginError(requestId, code, String(error?.message ?? error).slice(0, 400));
   } finally {
-    const ms = performance.now() - started; pluginWindowMs += ms; pluginStats.served++; pluginStats.ms += ms; pluginStats.maxMs = Math.max(pluginStats.maxMs, ms);
+    taskLog.end(runtime); const ms = performance.now() - started; pluginWindowMs += ms; pluginStats.served++; pluginStats.ms += ms; pluginStats.maxMs = Math.max(pluginStats.maxMs, ms);
     if (pluginJobs.length) armPluginTimer(0);
   }
 }
@@ -350,6 +381,8 @@ function cameraMessage(message) {
 // The providers of the lab's own assets (framework DEX and resources, Skia, ICU, SQLite, tzdata, zlib, the platform's native libraries) for the next load. Their load() is memoized, so
 // warming them (`warmAssets`) and the load that follows share one fetch, check and compile. The page starts a new Worker for every APK; should one Worker load twice, the second load
 // gets new framework, framework-resource and resource-configuration providers (the load clears this), while Skia, ICU, SQLite, tzdata, zlib and the native libraries stay shared.
+let inflatePool;   // helper Workers that expand the APK's DEX files in parallel (src/zip-inflate-pool.js), started with the warming; null where the browser has no nested Workers
+const sharedInflatePool = () => inflatePool === undefined ? (inflatePool = (() => { try { return InflatePool.forBrowser()?.start() ?? null; } catch { return null; } })()) : inflatePool;
 let assetProviders = null;   // a promise: the prewarm and the load can ask at the same time, and must get the same providers
 function urlAssetProviders() { return assetProviders ??= createAssetProviders().catch(error => { assetProviders = null; throw error; }); }
 async function createAssetProviders() {
@@ -373,14 +406,34 @@ async function createAssetProviders() {
 /** Starts every asset load at once (they download, verify and compile in parallel; loadAPK then awaits them one by one) and the WebAssembly core's modules. Called when the page
  *  opens ('prewarm'), before an APK is chosen, so the downloads overlap the choice, and again at the load (every load() is memoized). Failures are left to the load to report. */
 async function warmAssets(wanted = {}) {   // wanted: { framework: false, ... } skips an asset the load brings its own bytes for
+  sharedInflatePool();
   const providers = await urlAssetProviders();
   for (const name of ['framework', 'layouts', 'configuration', 'skia', 'frameworkResources', 'resourceConfig', 'icuBreak', 'sqlite', 'tzdata', 'zlib', 'icuConverter']) if (wanted[name] !== false) providers[name]?.load?.()?.catch?.(() => {});
   providers.javacrypto?.prefetch(providers.nativeLibraries).catch(() => {});   // every launch links javacrypto (src/javacrypto-native.js prefetch): fetched, verified and compiled ahead, not inside the interpreter
-  import('../vmcore/js/attach.js?v=da7619ccc1f1').catch(() => {});
+  import('../vmcore/js/attach.js?v=a104526a388b').then(core => core.prepareCore?.()).catch(() => {});   // the core's modules, and core.wasm fetched and compiled
+  try { providers.skia?.prefetch?.(); } catch { /* the load reads them itself */ }   // image codec modules and the font fallback manifest: bytes only, checked where they are used
+  sharedAppDataBackend()?.warm?.();   // the app-data database opened (attachAppData reads it before the launch)
+  warmLoadCode();
   return providers;
 }
+let appDataBackend;   // one IndexedDB backend per Worker (src/app-data-store.js), opened by the warming
+const sharedAppDataBackend = () => appDataBackend === undefined ? (appDataBackend = defaultBackend()) : appDataBackend;
+// First-time work of the load path done while the Worker waits for an APK: the first AndroidPlatform constructed in a Worker cost ~25 ms (its ~130 host factories run, and are
+// compiled, for the first time); later ones ~4 ms. A throwaway platform with no APK, before any APK arrives; it starts no timer and registers nothing (tests/load-warmup.test.mjs). And crc32 brought to optimized code.
+let loadCodeWarmed = false;
+function warmLoadCode() {
+  if (loadCodeWarmed) return; loadCodeWarmed = true;
+  setTimeout(() => { if (runtime || busy) return; try { new AndroidPlatform({}); } catch { /* a warm-up only */ } }, 0);
+  for (const at of [0, 100, 200]) setTimeout(() => { if (!runtime && !busy) warmCrc32(); }, at);   // the manifest, resources.arsc and stored entries are checked here (src/zip-inflate-worker.js warms the helpers the same way)
+}
 
-self.onmessage = async ({ data }) => {
+// Every page request is one task of the log (src/worker-task-log.js), including the ones answered before the busy check (screen-state, status, plugin queries queued, ...)
+self.onmessage = async event => {
+  const data = event.data, kind = data && Number.isSafeInteger(data.requestId) ? 'request:' + data.type : null;
+  if (kind) taskLog.begin(kind, runtime);
+  try { await handleMessage(event); } finally { if (kind && taskLog.open?.kind === kind) taskLog.end(runtime); }
+};
+async function handleMessage({ data }) {
   if (data?.type === 'frame-ack') { frameAcked(data.seq); return; }
   if (data?.type === 'camera') { cameraMessage(data.message); return; }   // the page's camera source (src/camera-lab.js): frames and the camera screen's answers only queue VM tasks
   if (data?.type === 'prewarm') { warmAssets().catch(() => {}); return; }   // the page opened: fetch and compile the lab's assets while the user picks an APK
@@ -488,7 +541,20 @@ self.onmessage = async ({ data }) => {
   }
   if (type === 'debug-exec') {   // measurement aid (scripts/validation/bench-launch.mjs): the time breakdown of the last operation and the execution counters
     const biggest = runtime?.monitor?.biggestBreakdown ?? null;
-    send({ type: 'result', loadTiming: lastLoadTiming, breakdown: biggest, text: biggest ? TimeBreakdown.text(biggest) : null, execution: runtime?.executionByOrigin ?? null, callStats: runtime?.callStats ?? null, jitCompiled: runtime?.jitCompiled ?? null });
+    send({ type: 'result', loadTiming: lastLoadTiming, spans: operationSpans, breakdown: biggest, text: biggest ? TimeBreakdown.text(biggest) : null, execution: runtime?.executionByOrigin ?? null, callStats: runtime?.callStats ?? null, jitCompiled: runtime?.jitCompiled ?? null });
+    return;
+  }
+  if (type === 'debug-counters') {   // measurement aid (scripts/validation/profile-scroll.mjs --counters): cumulative counters of the core's boundary, and per call site key the calls the core
+    // handed to the host (env.bridge: bridged and dispatched) with their inclusive ms since `start`; counting wraps the engine's `call` until the Worker ends (it is a measurement run)
+    if (!runtime) { send({ type: 'error', error: { name: 'ProtocolError', message: 'Nenhum APK carregado.' } }); return; }
+    const engine = runtime.wasm, state = engine ? (engine.debugCounting ??= { counts: new Map() }) : null;
+    if (data.start && engine) {
+      state.counts = new Map();
+      // per key: calls, inclusive ms, and how many went through APKRuntime.dispatch (the site had no bridge remembered for this resolution epoch) instead of the bridge directly
+      if (!state.wrapped) { state.wrapped = true; const call = engine.call; engine.call = function (site, args) { const at = performance.now(), dispatched = site.bridge === null || site.bridgeEpoch !== runtime.resolveEpoch; try { return call.call(this, site, args); } finally { let entry = state.counts.get(site.key); if (entry === undefined) state.counts.set(site.key, entry = { n: 0, ms: 0, dispatched: 0 }); entry.n++; entry.ms += performance.now() - at; if (dispatched) entry.dispatched++; } }; }
+    }
+    const rows = [...(state?.counts ?? new Map())].sort((a, b) => b[1].n - a[1].n);
+    send({ type: 'result', core: runtime.wasm?.stats ? { ...runtime.wasm.stats } : null, hostCalls: rows.reduce((sum, [, v]) => sum + v.n, 0), hostMs: Math.round(rows.reduce((sum, [, v]) => sum + v.ms, 0)), byCount: rows.slice(0, data.top ?? 40).map(([key, v]) => [key, v.n, Math.round(v.ms * 10) / 10, v.dispatched]), byTime: [...rows].sort((a, b) => b[1].ms - a[1].ms).slice(0, data.top ?? 40).map(([key, v]) => [key, v.n, Math.round(v.ms * 10) / 10, v.dispatched]), dispatched: rows.reduce((sum, [, v]) => sum + v.dispatched, 0) });
     return;
   }
   if (type === 'debug-gc') {   // measurement aid (scripts/validation/bench-gc.mjs): keeps `live` small objects of mixed shapes reachable, then collects and reports the phase timings
@@ -527,7 +593,7 @@ self.onmessage = async ({ data }) => {
     return;
   }
   if (busy) { send({ type: 'error', error: { name: 'ProtocolError', message: 'A VM já está processando outra operação.' } }); return; }
-  busy = true; activeRequestId = requestId; let succeeded = false; clearTimeout(eventTimer);
+  busy = true; activeRequestId = requestId; let succeeded = false; clearTimeout(eventTimer); if (type === 'load' || type === 'launch') operationSpans[type] = { start: epochNow(), end: null }; taskLog.begin('request:' + type, runtime);
   try {
     if (type === 'load') {
       const loadTiming = createLoadTiming();   // where the time of this load went, by progress phase (the diagnostic summary and debug-exec report it)
@@ -548,11 +614,12 @@ self.onmessage = async ({ data }) => {
       // The browser product lays every APK's Views out in the VM (original AOSP LinearLayout/FrameLayout/ScrollView + Skia text), never with page CSS.
       // Lab-built wasm32 native libraries (libreactnative, Hermes, ...): provenance now, each module only when the app's SoLoader links it (javacrypto's, which every launch links, prefetched)
       const nativeLibraryProvider = shared.nativeLibraries, javacryptoProvider = shared.javacrypto;
-      const result = await loadAPK(data.buffer, { maxEventWallMs: timeLimitsFor(data.eventSeconds).eventWallMs ?? EVENT_WALL_LIMIT_MS, maxHeapObjects: heapLimitFor(data), nativeLibraryProvider, javacryptoProvider, device: resolveDevice(data.device || {}), engine: data.engine === 'wasm' ? 'wasm' : 'js', tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', strictCrash: data.strictCrash === true, enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => { loadTiming.mark(progress?.phase); self.postMessage({ type: 'progress', requestId: activeRequestId, progress }); } });
+      const result = await loadAPK(data.buffer, { inflatePool: sharedInflatePool(), maxEventWallMs: timeLimitsFor(data.eventSeconds).eventWallMs ?? EVENT_WALL_LIMIT_MS, maxHeapObjects: heapLimitFor(data), nativeLibraryProvider, javacryptoProvider, device: resolveDevice(data.device || {}), engine: data.engine === 'wasm' ? 'wasm' : 'js', tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', strictCrash: data.strictCrash === true, enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => { loadTiming.mark(progress?.phase); self.postMessage({ type: 'progress', requestId: activeRequestId, progress }); } });
       runtime = result.runtime; archive = result.archive;
-      runtime.platform.glPresent = frame => self.postMessage({ type: 'gl-frame', frame }, frame.bitmap ? [frame.bitmap] : []);   // eglSwapBuffers of a window surface (src/gles-native.js): the picture goes to the page as it is, transferred loadTiming.mark('core'); runtime.platform.camera?.attachCodecs(await hostCodecs);
+      runtime.platform.glPresent = frame => self.postMessage({ type: 'gl-frame', frame }, frame.bitmap ? [frame.bitmap] : []);   // eglSwapBuffers of a window surface (src/gles-native.js): the picture goes to the page as it is, transferred
+      loadTiming.mark('core'); runtime.platform.camera?.attachCodecs(await hostCodecs);
       if (runtime.engine === 'wasm') {   // the WebAssembly core (docs/WASM-CORE-PLANO.md), before anything runs. A core that cannot start fails the load naming the other engine; the JavaScript VM is never substituted silently
-        try { await (await import('../vmcore/js/attach.js?v=da7619ccc1f1')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
+        try { await (await import('../vmcore/js/attach.js?v=a104526a388b')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
         catch (error) { error.message = `${coreStartMessage(error)}`; throw error; }
       }
       if (Array.isArray(data.methodOverrides) && data.methodOverrides.length) applyMethodOverrides(result.runtime, data.methodOverrides); if (Array.isArray(data.ignoredActivities) && data.ignoredActivities.length) applyIgnoredActivities(result.runtime, data.ignoredActivities); if (Array.isArray(data.endpointMocks) && data.endpointMocks.length) applyEndpointMocks(result.runtime, data.endpointMocks); /* before any app code runs */
@@ -575,14 +642,14 @@ self.onmessage = async ({ data }) => {
       composeSemantics = createComposeSemanticsDriver(runtime); lastComposeSemantics = null; semanticsPacer.stale = false;
       runtime.gcEnabled = data.gc !== false;   // unreachable Java objects are reclaimed between events (src/heap-gc.js)
       // Stored app data goes back into the virtual filesystem before any app code runs (Application.onCreate happens at launch).
-      const attached = await attachAppData(runtime, { keep: data.keepData !== false, clear: data.clearData === true, onStatus: status => self.postMessage({ type: 'app-data', status }) });
+      const attached = await attachAppData(runtime, { backend: sharedAppDataBackend(), keep: data.keepData !== false, clear: data.clearData === true, onStatus: status => self.postMessage({ type: 'app-data', status }) });
       appData = attached.persistence; appDataInfo = attached.status; lastLoadTiming = loadTiming.finish(); runtime.loadTiming = lastLoadTiming;
       send({ type: 'result', inventory: result.inventory, appData: appDataInfo, renderer: rendererStatus(), loadTiming: lastLoadTiming });
     } else if (type === 'app-data-clear') {
       // Settings > Apps > Clear storage: the stored data is wiped and this process stops persisting; the page restarts the app.
       if (!runtime) throw new Error('Abra um APK antes de limpar os dados do app.');
       if (appData) appDataInfo = await appData.clear();
-      else { const backend = defaultBackend(); if (backend) { const { key } = await appKeyFor(runtime.platform.packageName, runtime.apkSigningCertificates?.() ?? []); await backend.clear(key); } appDataInfo = { ...(appDataInfo ?? {}), bytes: 0, files: 0 }; }
+      else { const backend = sharedAppDataBackend(); if (backend) { const { key } = await appKeyFor(runtime.platform.packageName, runtime.apkSigningCertificates?.() ?? []); await backend.clear(key); } appDataInfo = { ...(appDataInfo ?? {}), bytes: 0, files: 0 }; }
       send({ type: 'result', appData: appDataInfo });
     } else if (type === 'device') {
       // Virtual-device settings changed while an APK runs: Configuration/resources/lifecycle exactly like ActivityThread.handleConfigurationChanged.
@@ -695,7 +762,7 @@ self.onmessage = async ({ data }) => {
         deepLink = startDeepLink(runtime, data.intent || {});
       }
       else await (type === 'launch' ? runtime.launch(data.activity) : type === 'back' ? runtime.back() : type === 'home' ? runtime.home() : type === 'resume-task' ? runtime.resumeTask() : type === 'reload-activity' ? runtime.reloadActivity({ mode: data.mode === 'reopen' ? 'reopen' : 'recreate' }) : runtime.click(data.id));
-      drainReadyEvents();
+      drainReadyEvents(SETTLE_WINDOW_MS, { framePaced: type === 'pointer' || type === 'scrollby' || (type === 'compose-action' && data.action === 'ScrollBy') });   // input in motion: its reply carries the first new frame, the rest follows in scheduled pumps
       if (deepLink && !deepLink.ok && !runtime.activity) { send({ type: 'result', deepLink }); succeeded = true; return; }   // nothing matched and no Activity runs yet: there is no screen to snapshot
       const motionRequest = type === 'scrollby' ? 'scrollby' : type === 'pointer' && data.action !== 1 && data.action !== 3 ? 'pointer-motion' : null;   // input in flight: a wheel step, a pointer DOWN/MOVE (UP/CANCEL end the gesture)
       const resultSnapshot = currentSnapshot({ request: motionRequest, pacedSemantics: type === 'scrollby' || (type === 'pointer' && data.action === 2) }); if (deepLink) resultSnapshot.deepLink = deepLink; if (droppedComposeAction) resultSnapshot.droppedComposeAction = droppedComposeAction; if (droppedEvent) resultSnapshot.droppedEvent = droppedEvent; if (imeFallback) resultSnapshot.imeFallback = imeFallback;
@@ -709,6 +776,7 @@ self.onmessage = async ({ data }) => {
     // argument) leaves the VM as alive as it was: what was already due still is (Handler messages, animation frames, the full-density replay owed for a frame shown reduced,
     // src/motion-raster.js), and the next request would wake it anyway. Only a failed start (load, launch, intent, restart) leaves nothing to resume.
     const resumable = !['load', 'launch', 'intent', 'reload-activity', 'resume-task'].includes(type) && !!runtime?.activity;
-    runtime?.monitor?.end(); busy = false; surfaceThreadFailure(); if (succeeded || resumable) scheduleEvents(); if (type === 'launch' || type === 'intent') startApiGapScan();
+    if (operationSpans[type]?.end === null) operationSpans[type].end = epochNow();
+    taskLog.end(runtime); runtime?.monitor?.end(); busy = false; surfaceThreadFailure(); if (succeeded || resumable) scheduleEvents(); if (type === 'launch' || type === 'intent') startApiGapScan();
   }
-};
+}

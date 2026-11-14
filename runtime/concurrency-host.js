@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=da7619ccc1f1';
-import { createHostRegistry } from './host-contract.js?v=da7619ccc1f1';
-import { Blocked, VMThread } from './scheduler.js?v=da7619ccc1f1';
-import { Invoke } from './interpreter.js?v=da7619ccc1f1';
-import { GC_ROOTS } from './heap-gc.js?v=da7619ccc1f1';
+import { APKError } from './apk-error.js?v=a104526a388b';
+import { createHostRegistry } from './host-contract.js?v=a104526a388b';
+import { Blocked, VMThread } from './scheduler.js?v=a104526a388b';
+import { Invoke } from './interpreter.js?v=a104526a388b';
+import { GC_ROOTS } from './heap-gc.js?v=a104526a388b';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -105,10 +105,10 @@ export function createConcurrencyHost(platform) {
   def(THREAD, '<init>', `(Ljava/lang/ThreadGroup;${RUNNABLE})V`, (r, _m, [self, g, t]) => init(r, self, t, undefined, nullish(g) ? null : g));
   def(THREAD, 'run', '()V', (r, _m, [self]) => { const t = state(r, self).target; if (t !== null) return new Invoke(RUNNABLE_RUN, [t], 'virtual'); });   // a continuation: a target that blocks parks only this thread
   function runThread(r, ref) {
-    const st = state(r, ref), previous = current; current = ref;
+    const st = state(r, ref), previous = current; current = ref; r.threadIdentityChanged();
     try { vcall(r, ref, THREAD, 'run', [], 'V'); }
     catch (error) { if (!(error instanceof Object) || !error.value) throw error; uncaught(r, ref, error.value); }
-    finally { current = previous; if (!st.keepAlive) { st.finished = true; } }
+    finally { current = previous; r.threadIdentityChanged(); if (!st.keepAlive) { st.finished = true; } }
   }
   /** Thread.dispatchUncaughtException: the thread's own handler, else its ThreadGroup. */
   function uncaughtInvoke(r, ref, throwable) {

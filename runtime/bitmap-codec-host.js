@@ -1,9 +1,10 @@
-import { gcRoot } from './heap-gc.js?v=da7619ccc1f1';
-import { APKError } from './apk-error.js?v=da7619ccc1f1';
-import { createHostRegistry } from './host-contract.js?v=da7619ccc1f1';
-import { getVectorGraphics } from './vector-native.js?v=da7619ccc1f1';
-import { jpegNativeScale, sampledDimension, samplePixels } from './image-codecs.js?v=da7619ccc1f1';
-import { createBitmapOps } from './bitmap-ops-host.js?v=da7619ccc1f1';
+import { gcRoot } from './heap-gc.js?v=a104526a388b';
+import { APKError } from './apk-error.js?v=a104526a388b';
+import { createHostRegistry } from './host-contract.js?v=a104526a388b';
+import { getVectorGraphics } from './vector-native.js?v=a104526a388b';
+import { jpegNativeScale, sampledDimension, samplePixels } from './image-codecs.js?v=a104526a388b';
+import { createBitmapOps } from './bitmap-ops-host.js?v=a104526a388b';
+import { encodeOpaqueStoredPng } from './png-store.js?v=a104526a388b';
 
 // android.graphics.BitmapFactory (+ Options), Bitmap.CompressFormat and the Bitmap operations on top of the recorded-canvas Bitmap of bitmap-host.js: decoding PNG/JPEG/GIF/WebP/BMP
 // with the official Skia codecs (CanvasKit), inSampleSize / density scaling / inJustDecodeBounds / inBitmap reuse as in frameworks/base BitmapFactory.cpp, pixel access
@@ -15,7 +16,17 @@ const OPTIONS = 'Landroid/graphics/BitmapFactory$Options;', COMPRESS = 'Landroid
 const FORMATS = ['JPEG', 'PNG', 'WEBP', 'WEBP_LOSSY', 'WEBP_LOSSLESS'];
 const DENSITY_DEFAULT = 160, DENSITY_NONE = 0xffff, MAX_ENCODED = 64 * 1024 * 1024;
 const fail = (message, details = {}) => { throw new APKError(message, { kind: 'bitmap-codec-unsupported', ...details }); };
-const base64 = bytes => { let binary = ''; for (let at = 0; at < bytes.length; at += 16384) binary += String.fromCharCode(...bytes.subarray(at, at + 16384)); return btoa(binary); };
+// base64 through a 12-bit table into ASCII bytes, read back by TextDecoder (every base64 character is ASCII): the same text as btoa over a binary string, at a fraction of the cost
+// for the megabytes of a screen's first decoded images
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/', ASCII = new TextDecoder('ascii'), LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
+const B64_PAIRS = (() => { const t = new Uint16Array(4096); for (let i = 0; i < 4096; i++) { const hi = B64.charCodeAt(i >> 6), lo = B64.charCodeAt(i & 63); t[i] = LITTLE ? hi | (lo << 8) : (hi << 8) | lo; } return t; })();   // two output characters per entry, in memory order
+export const base64 = bytes => {
+  const n = bytes.length, out = new Uint8Array(4 * Math.ceil(n / 3)), pairs = new Uint16Array(out.buffer, 0, out.length >> 1); let i = 0, p = 0;
+  for (const end = n - (n % 3); i < end; i += 3) { const v = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2]; pairs[p++] = B64_PAIRS[v >>> 12]; pairs[p++] = B64_PAIRS[v & 4095]; }
+  const rest = n - i, at = 2 * p;
+  if (rest) { const v = (bytes[i] << 16) | (rest > 1 ? bytes[i + 1] << 8 : 0); out[at] = B64.charCodeAt(v >>> 18); out[at + 1] = B64.charCodeAt((v >>> 12) & 63); out[at + 2] = rest > 1 ? B64.charCodeAt((v >>> 6) & 63) : 61; out[at + 3] = 61; }
+  return ASCII.decode(out);
+};
 const bits = new DataView(new ArrayBuffer(4)), floatOf = raw => { bits.setInt32(0, raw | 0, true); return bits.getFloat32(0, true); };
 
 /** BitmapFactory's encoded-format sniffing (SkCodec signatures) -> Android mime type. */
@@ -79,7 +90,7 @@ export function createBitmapCodecHost(platform) {
   // ---- decoding -----------------------------------------------------------------------------------------------------------------------------
   /** Decodes encoded `bytes` the way BitmapFactory.cpp doDecode does; returns a Bitmap reference, or null when the data is not a supported image (or only the bounds were requested). */
   /** JPEG and WebP through the lab codec module (libjpeg-turbo / libwebp). Returns null when CanvasKit should decode (other formats, animated WebP), false when the codec rejects the data, else
-   *  { image, width, height, srcWidth, srcHeight, alpha, label }: `image` is a CanvasKit image already at the sampled size (null for justBounds), width/height are outWidth/outHeight before density scaling. */
+   *  { image, rgba, width, height, srcWidth, srcHeight, alpha, label }: `image` is a CanvasKit image already at the sampled size (null for justBounds) and `rgba` its pixels, width/height are outWidth/outHeight before density scaling. */
   const labDecoder = (r, bytes, mime, sample, justBounds) => {
     if (mime === 'image/heif') fail('HEIF/HEIC decoding is not available in the lab (it needs an HEVC decoder: libde265 is LGPL, Android uses MediaCodec); AVIF is supported', { mime });
     if (mime !== 'image/jpeg' && mime !== 'image/webp' && mime !== 'image/avif') return null;
@@ -92,7 +103,7 @@ export function createBitmapCodecHost(platform) {
       if (justBounds) return { ...base, image: null };
       const decoded = codecs.jpegDecode(bytes, native); if (!decoded) return false;
       const picked = samplePixels(decoded.rgba, decoded.width, decoded.height, rest);
-      return { ...base, image: canvasKit.MakeImage({ width: picked.width, height: picked.height, alphaType: canvasKit.AlphaType.Opaque, colorType: canvasKit.ColorType.RGBA_8888, colorSpace: canvasKit.ColorSpace.SRGB }, picked.rgba, picked.width * 4) };
+      return { ...base, image: canvasKit.MakeImage({ width: picked.width, height: picked.height, alphaType: canvasKit.AlphaType.Opaque, colorType: canvasKit.ColorType.RGBA_8888, colorSpace: canvasKit.ColorSpace.SRGB }, picked.rgba, picked.width * 4), rgba: picked.rgba };
     }
     if (mime === 'image/avif') {   // libavif + dav1d; the sampler does inSampleSize (SkAvifCodec has no native scaling)
       const info = codecs.avifInfo(bytes); if (!info) return false;
@@ -100,7 +111,7 @@ export function createBitmapCodecHost(platform) {
       if (justBounds) return { ...base, image: null };
       const decoded = codecs.avifDecode(bytes, true); if (!decoded) return false;
       const picked = samplePixels(decoded.rgba, decoded.width, decoded.height, sample);
-      return { ...base, image: canvasKit.MakeImage({ width: picked.width, height: picked.height, alphaType: info.hasAlpha ? canvasKit.AlphaType.Premul : canvasKit.AlphaType.Opaque, colorType: canvasKit.ColorType.RGBA_8888, colorSpace: canvasKit.ColorSpace.SRGB }, picked.rgba, picked.width * 4) };
+      return { ...base, image: canvasKit.MakeImage({ width: picked.width, height: picked.height, alphaType: info.hasAlpha ? canvasKit.AlphaType.Premul : canvasKit.AlphaType.Opaque, colorType: canvasKit.ColorType.RGBA_8888, colorSpace: canvasKit.ColorSpace.SRGB }, picked.rgba, picked.width * 4), rgba: picked.rgba };
     }
     const info = codecs.webpInfo(bytes); if (!info) return false;
     if (info.hasAnimation) return null;   // the first frame of an animated file: CanvasKit's decoder
@@ -108,7 +119,7 @@ export function createBitmapCodecHost(platform) {
     if (justBounds) return { ...base, image: null };
     const decoded = codecs.webpDecode(bytes, true); if (!decoded) return false;
     const picked = samplePixels(decoded.rgba, decoded.width, decoded.height, sample);
-    return { ...base, image: canvasKit.MakeImage({ width: picked.width, height: picked.height, alphaType: info.hasAlpha ? canvasKit.AlphaType.Premul : canvasKit.AlphaType.Opaque, colorType: canvasKit.ColorType.RGBA_8888, colorSpace: canvasKit.ColorSpace.SRGB }, picked.rgba, picked.width * 4) };
+    return { ...base, image: canvasKit.MakeImage({ width: picked.width, height: picked.height, alphaType: info.hasAlpha ? canvasKit.AlphaType.Premul : canvasKit.AlphaType.Opaque, colorType: canvasKit.ColorType.RGBA_8888, colorSpace: canvasKit.ColorSpace.SRGB }, picked.rgba, picked.width * 4), rgba: picked.rgba };
   };
   function decode(r, bytes, optionsRef, paddingRef = null, defaultDensity = {}) {
     const o = readOptions(r, optionsRef), host = bitmaps(r), canvasKit = CK(r);
@@ -137,7 +148,9 @@ export function createBitmapCodecHost(platform) {
       if (scaledWidth > 4096 || scaledHeight > 4096 || scaledWidth * scaledHeight > 4 * 1024 * 1024) fail(`Decoded image ${scaledWidth}x${scaledHeight} exceeds the VM bitmap limit (4096px/4Mpixel); use inSampleSize to decode a smaller version`, { width: scaledWidth, height: scaledHeight });
       // the pixels: the encoded PNG itself when no resampling is needed, otherwise a Skia rendering at the output size
       let png = mime === 'image/png' && !lab && scaledWidth === image.width() && scaledHeight === image.height() ? bytes : null;
-      if (!png && lab && scaledWidth === image.width() && scaledHeight === image.height()) png = image.encodeToBytes(canvasKit.ImageFormat.PNG, 100);
+      const encodedHere = png === null;   // the PNG below is Skia's encoding of N32 sRGB pixels (not the file's own bytes): for an opaque image, bitmap-host's plainRaster may use it as the bitmap's raster
+      // an opaque image is kept as a stored (uncompressed) PNG of the same pixels: Skia's deflate was most of a first decode's time (src/png-store.js)
+      if (!png && lab && scaledWidth === image.width() && scaledHeight === image.height()) png = (lab.rgba && encodeOpaqueStoredPng(lab.rgba, scaledWidth, scaledHeight)) ?? image.encodeToBytes(canvasKit.ImageFormat.PNG, 100);
       if (!png) {
         const surface = canvasKit.MakeSurface(scaledWidth, scaledHeight); if (!surface) fail('Skia raster allocation failed');
         try {
@@ -145,7 +158,10 @@ export function createBitmapCodecHost(platform) {
           canvas.clear(canvasKit.TRANSPARENT);
           canvas.drawImageRectOptions(image, canvasKit.LTRBRect(0, 0, image.width(), image.height()), canvasKit.LTRBRect(0, 0, scaledWidth, scaledHeight), requested > 1 && scale === 1 ? canvasKit.FilterMode.Nearest : canvasKit.FilterMode.Linear, canvasKit.MipmapMode.None, paint);
           paint.delete(); surface.flush(); const snapshot = surface.makeImageSnapshot();
-          try { png = snapshot.encodeToBytes(canvasKit.ImageFormat.PNG, 100); } finally { snapshot.delete(); }
+          try {
+            const opaque = !alpha ? snapshot.readPixels(0, 0, { width: scaledWidth, height: scaledHeight, colorType: canvasKit.ColorType.RGBA_8888, alphaType: canvasKit.AlphaType.Unpremul, colorSpace: canvasKit.ColorSpace.SRGB }) : null;
+            png = (opaque && encodeOpaqueStoredPng(opaque, scaledWidth, scaledHeight)) ?? snapshot.encodeToBytes(canvasKit.ImageFormat.PNG, 100);
+          } finally { snapshot.delete(); }
         } finally { surface.dispose(); }
       }
       let bitmap = o.inBitmap;
@@ -158,22 +174,25 @@ export function createBitmapCodecHost(platform) {
       const state = host.live(bitmap);
       if (hardware) host.makeHardware(state);
       state.density = scale !== 1 ? target : density || DENSITY_DEFAULT; r.storeField(r.object(bitmap).fields, `${BITMAP}->mDensity:I`, state.density);
-      host.recordNative(state.handle, { op: 'raster', raster: { kind: 'raster', dataURL: 'data:image/png;base64,' + base64(png), width: scaledWidth, height: scaledHeight }, args: [0, 0] });
+      host.recordNative(state.handle, { op: 'raster', raster: { kind: 'raster', dataURL: 'data:image/png;base64,' + base64(png), width: scaledWidth, height: scaledHeight, ...(encodedHere && !alpha && decoded === 'ARGB_8888' ? { opaqueN32: true } : {}) }, args: [0, 0] });
       r.record(`HOST BitmapFactory.decode ${mime} ${srcWidth}x${srcHeight} -> ${scaledWidth}x${scaledHeight} [${lab ? lab.label : 'official Skia codec'}]`);
       return bitmap;
     } finally { image?.delete(); }
   }
+  // A copy of `length` bytes of a byte[]'s elements from `offset`, as unsigned bytes: a byte-wide typed view (the WebAssembly core's cells) is copied as memory, anything else element by element
+  const copyBytes = (e, offset, length) => ArrayBuffer.isView(e) && e.BYTES_PER_ELEMENT === 1 ? new Uint8Array(e.buffer, e.byteOffset + offset, length).slice() : Uint8Array.from(e.slice(offset, offset + length), v => v & 255);
   const bytesOf = (r, array, offset, length) => {
     if (array === null) r.throwJava('Ljava/lang/NullPointerException;', null);
     const e = r.array(array).elements; if ((offset | length) < 0 || offset + length > e.length) r.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', null);
-    return Uint8Array.from(e.slice(offset, offset + length), v => v & 255);
+    return copyBytes(e, offset, length);
   };
   function readAll(r, stream) {
     const chunks = []; let total = 0;
+    const buffer = r.newArray('[B', 16384);   // one read buffer for the whole stream, as the native decoder reuses its own
     for (;;) {
-      const buffer = r.newArray('[B', 16384), got = vcall(r, stream, INPUT, 'read', ['[B', 'I', 'I'], 'I', [buffer, 0, 16384]);
+      const got = vcall(r, stream, INPUT, 'read', ['[B', 'I', 'I'], 'I', [buffer, 0, 16384]);
       if (got < 0) break; if (got === 0) continue;
-      chunks.push(Uint8Array.from(r.array(buffer).elements.slice(0, got), v => v & 255)); total += got; if (total > MAX_ENCODED) fail('Encoded image exceeds 64 MiB');
+      chunks.push(copyBytes(r.array(buffer).elements, 0, Math.min(got, 16384))); total += got; if (total > MAX_ENCODED) fail('Encoded image exceeds 64 MiB');
     }
     const all = new Uint8Array(total); let at = 0; for (const c of chunks) { all.set(c, at); at += c.length; } return all;
   }

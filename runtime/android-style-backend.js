@@ -1,7 +1,7 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=da7619ccc1f1';
-import { APKError } from './apk-runtime.js?v=da7619ccc1f1';
-import { ephemeronMap } from './heap-gc.js?v=da7619ccc1f1';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=da7619ccc1f1';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=a104526a388b';
+import { APKError } from './apk-runtime.js?v=a104526a388b';
+import { ephemeronMap } from './heap-gc.js?v=a104526a388b';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=a104526a388b';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -99,7 +99,7 @@ export class AndroidStyleBackend {
     return result;
   }
   /** The resource name of an attribute id for diagnostics ("attr/name"), or "(unnamed)". */
-  attributeName(id) { try { const table = this.platform.resources.table; for (const [name, value] of table.names) if (value === (id >>> 0) && name.startsWith('attr/')) return name; } catch { /* diagnostics only */ } return '(unnamed)'; }
+  attributeName(id) { try { const table = this.platform.resources.table; for (const [name, value] of table.names) if (value === (id >>> 0) && name.startsWith('attr/')) return name; } catch { /* diagnostics only */ } return '(unnamed)'; }   // diagnostics only: a scan of every name
   typedValue(runtime, ref, value) {
     for (const [name, type, data] of [['type', 'I', value.dataType || 0], ['data', 'I', value.rawData | 0], ['assetCookie', 'I', value.sourceCookie || 0], ['resourceId', 'I', value.resourceId || 0], ['changingConfigurations', 'I', value.changingConfigurations || 0], ['density', 'I', value.density || 0], ['sourceResourceId', 'I', value.sourceResourceId || 0], ['string', 'Ljava/lang/CharSequence;', value.kind === 'string' ? value.value : null]]) this.put(runtime, ref, VALUE, name, type, data);
   }
@@ -256,7 +256,9 @@ export class AndroidStyleBackend {
       if (name === 'getResources') return object.resources ?? this.resourceObject(runtime);
       if (name === 'resolveAttribute') {
         const found = this.platform.resources.table.getThemeAttribute(object.themeValues, args[1], !!args[3]);
-        runtime.lastResourceCall = `Resources$Theme.resolveAttribute(0x${(args[1] >>> 0).toString(16)}${this.platform.resources.table.names ? ' ' + this.attributeName(args[1]) : ''}, resolveRefs=${!!args[3]}) -> ${found ? `type ${found.value.dataType}, data 0x${(found.value.rawData >>> 0).toString(16)}, resourceId 0x${found.ref.toString(16)}` : 'false'}`;
+        // the diagnostic line (src/operation-monitor.js) is written when something reads it: a Compose frame resolves hundreds of attributes, and naming each one scanned the table
+        const id = args[1] >>> 0, resolveRefs = !!args[3];
+        runtime.lastResourceCall = () => `Resources$Theme.resolveAttribute(0x${id.toString(16)}${this.platform.resources.table.names ? ' ' + this.attributeName(id) : ''}, resolveRefs=${resolveRefs}) -> ${found ? `type ${found.value.dataType}, data 0x${(found.value.rawData >>> 0).toString(16)}, resourceId 0x${found.ref.toString(16)}` : 'false'}`;
         if (!found) return 0;
         this.typedValue(runtime, args[2], { ...found.value, resourceId: found.ref }); return 1;
       }

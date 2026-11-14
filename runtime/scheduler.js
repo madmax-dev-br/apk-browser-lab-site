@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=da7619ccc1f1';
+import { APKError } from './apk-error.js?v=a104526a388b';
 
 // Green-thread scheduler for the VM.
 //
@@ -20,6 +20,7 @@ export class VMThread {
   constructor(name = `Thread-${nextThreadId}`, javaObject = null, id = BigInt(nextThreadId++)) {
     this.id = id; this.name = name; this.javaObject = javaObject; this.frames = []; this.state = 'new';   // new | runnable | blocked | terminated
     this.blocked = null; this.blockKind = 'site'; this.nestedDepth = 0; this.nestedBlock = false; this.driver = null; this.lastOutcome = null; this.began = false; this.daemon = false; this.priority = 5;
+    this.coreQuantum = 0; this.coreQuantumSize = 0; this.coreQuantumAt = 0;   // the core's quantum for this thread in a slice (vmcore/js/core-threads.js quantumFor / sizeQuantum)
     this.interrupted = false; this.permit = false; this.waitingOn = null; this.finished = false; this.started = false; this.handler = null; this.target = null;
     this.contextLoader = undefined; this.idleParks = 0; this.blocker = null; this.uncaught = null;
   }
@@ -101,7 +102,7 @@ export class Scheduler {
       if (thread !== owner && thread.nestedDepth > 0) continue;   // suspended under the JavaScript stack of an outer run: only that run can resume it
       if (thread !== owner && this.waitingNested.has(thread)) continue;   // parked in a nested host wait (resolveNested) on the JavaScript stack: its own wait loop resumes it when wake() made it runnable, never a slice as a guest (that ran its frames twice and ended in a false deadlock)
       if (thread === this.main && thread !== owner && thread.frames.length === 0) continue;   // the main thread between events has no frames and no driver: it is the host event loop, not a guest to resume (running it ends it)
-      this.cursor = at;
+      this.cursor = at; this.lastPicked = thread;   // the thread a slice ran last (measurement: the Worker's task log names it)
       return { thread, earliest };
     }
     return { thread: null, earliest };

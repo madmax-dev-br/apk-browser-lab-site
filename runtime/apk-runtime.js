@@ -1,32 +1,32 @@
-import { VMClock } from './vm-clock.js?v=da7619ccc1f1';
-import { overrideHit } from './method-overrides.js?v=da7619ccc1f1';
-import { OperationMonitor } from './operation-monitor.js?v=da7619ccc1f1';
-import { ExecutionProfile } from './execution-profile.js?v=da7619ccc1f1';
-import { SamplingProfiler } from './sampling-profiler.js?v=da7619ccc1f1';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=da7619ccc1f1';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=da7619ccc1f1';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=da7619ccc1f1';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=da7619ccc1f1';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=da7619ccc1f1';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=da7619ccc1f1';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=da7619ccc1f1';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=da7619ccc1f1';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=da7619ccc1f1';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=da7619ccc1f1';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=da7619ccc1f1';
-import { APKError } from './apk-error.js?v=da7619ccc1f1';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=da7619ccc1f1';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=da7619ccc1f1';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=da7619ccc1f1';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=da7619ccc1f1';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=da7619ccc1f1';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=da7619ccc1f1';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=da7619ccc1f1';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=da7619ccc1f1';
+import { VMClock } from './vm-clock.js?v=a104526a388b';
+import { overrideHit } from './method-overrides.js?v=a104526a388b';
+import { OperationMonitor } from './operation-monitor.js?v=a104526a388b';
+import { ExecutionProfile } from './execution-profile.js?v=a104526a388b';
+import { SamplingProfiler } from './sampling-profiler.js?v=a104526a388b';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=a104526a388b';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=a104526a388b';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=a104526a388b';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=a104526a388b';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=a104526a388b';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=a104526a388b';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=a104526a388b';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=a104526a388b';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=a104526a388b';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=a104526a388b';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=a104526a388b';
+import { APKError } from './apk-error.js?v=a104526a388b';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=a104526a388b';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=a104526a388b';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=a104526a388b';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=a104526a388b';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=a104526a388b';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=a104526a388b';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=a104526a388b';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=a104526a388b';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=da7619ccc1f1';
-import { bootClassLacksMember } from './boot-class-members.js?v=da7619ccc1f1';
-export { APKError } from './apk-error.js?v=da7619ccc1f1';
+import { Scheduler, Blocked } from './scheduler.js?v=a104526a388b';
+import { bootClassLacksMember } from './boot-class-members.js?v=a104526a388b';
+export { APKError } from './apk-error.js?v=a104526a388b';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -74,28 +74,30 @@ export class BinaryReader {
   }
 }
 
+// Java chars to a JavaScript string. A typed run of 64 or more units goes through a UTF-16LE TextDecoder (about 17 times faster than String.fromCharCode over 8 KiB spreads: a
+// 1.6 MB asset read through a Reader appends ~200 such chunks to a StringBuilder): `fatal`, so a lone surrogate (which Java strings may hold and the decoder would replace with
+// U+FFFD) throws and takes the exact path below, and `ignoreBOM`, so a leading U+FEFF stays a char. The view is copied first (the core's memory is shared, which decode() refuses).
+const UTF16_DECODER = typeof TextDecoder === 'function' && new Uint8Array(new Uint16Array([1]).buffer)[0] === 1 ? new TextDecoder('utf-16le', { fatal: true, ignoreBOM: true }) : null;
 function utf16String(units) {
+  if (UTF16_DECODER !== null && units.length >= 64 && (units instanceof Uint16Array)) { try { return UTF16_DECODER.decode(units.slice()); } catch { /* a lone surrogate: unit by unit below */ } }
+  // fromCharCode.apply takes the units as an array-like: a spread walks a typed array through its iterator, about five times slower (StringBuilder.append(char[]) of a reader's buffers)
   let result = ''; const typed = ArrayBuffer.isView(units);
-  for (let i = 0; i < units.length; i += 8192) result += String.fromCharCode(...(typed ? units.subarray(i, i + 8192) : units.slice(i, i + 8192)));
+  for (let i = 0; i < units.length; i += 8192) result += String.fromCharCode.apply(null, typed ? units.subarray(i, i + 8192) : units.slice(i, i + 8192));
   return result;
 }
 /** A range of an array's storage: a view when the storage is typed (no copy), a copy otherwise (a reference array or a Proxy-backed view). */
 const cellRange = (cells, from, to) => ArrayBuffer.isView(cells) ? cells.subarray(from, to) : cells.slice(from, to);
 const methodKey = m => `${m.owner}->${m.name}${m.signature}`;
-const fieldKey = f => `${f.owner}->${f.name}:${f.type}`;
 /** A dense array of `n` nulls: the "not decoded yet" cache of a lazy table. Built by pushing so it is a packed array; `new Array(n)` above a few
  *  thousand elements is dictionary-mode in V8 and every index read on the interpreter's path would pay for it. */
 const nulls = n => { const a = []; for (let i = 0; i < n; i++) a.push(null); return a; };
 const dataProperty = (o, k, v) => { Object.defineProperty(o, k, { value: v, writable: true, enumerable: true, configurable: true }); return v; };
-// Derived strings of an id are own accessors that replace themselves with a data property on first read (docs/MEMORY-ON-DEMAND.md, A.4): a method id that
-// is only ever compared by owner/name never pays for its `owner->name(sig)` key, and after the first read the property costs exactly what the eager string did.
-// They stay enumerable so a spread ({ ...method }) or a deep comparison sees the computed value, as with the former data properties.
-const LAZY_METHOD = {
-  signature: { enumerable: true, configurable: true, get() { return dataProperty(this, 'signature', this.dex.proto(this.dex.reader.u16(this.dex.methodIdsOffset + this.index * 8 + 2)).signature); }, set(v) { dataProperty(this, 'signature', v); } },
-  key: { enumerable: true, configurable: true, get() { return dataProperty(this, 'key', this.dex.intern(methodKey(this))); }, set(v) { dataProperty(this, 'key', v); } },
-};
-const LAZY_FIELD = { key: { enumerable: true, configurable: true, get() { return dataProperty(this, 'key', this.dex.intern(fieldKey(this))); }, set(v) { dataProperty(this, 'key', v); } } };
-const LAZY_PROTO = { signature: { enumerable: true, configurable: true, get() { return dataProperty(this, 'signature', this.dex.intern(`(${this.parameters.join('')})${this.result}`)); }, set(v) { dataProperty(this, 'signature', v); } } };
+// A method id's `owner->name(sig)` key is an own accessor that replaces itself with a data property on first read (docs/MEMORY-ON-DEMAND.md, A.4): a method id
+// that is only ever compared by owner/name/signature never pays for it (on a large app's launch 2 % of the decoded method ids had their key read). It stays enumerable so
+// a spread ({ ...method }) or a deep comparison sees the computed value, as with the former data property. The signature of a method or proto and the key of a field
+// are data properties from the start: nearly every decoded one is read (99 % of method signatures, 97 % of field keys), and replacing an accessor with a data property
+// leaves V8 with a slow (dictionary) object, which was ~3 % of a large app's launch.
+const LAZY_METHOD_KEY = { enumerable: true, configurable: true, get() { return dataProperty(this, 'key', this.dex.intern(methodKey(this))); }, set(v) { dataProperty(this, 'key', v); } };
 
 /**
  * Class table of one DEX file: the class_def index by descriptor, with the class record (fields, methods Map, offsets) built on the first lookup of
@@ -247,23 +249,25 @@ export class DexFile {
   proto(i) { const p = this.protos[i]; return p != null ? p : this.decodeProto(i); }
   decodeProto(i) {
     if (!(i < this.protos.length)) fail(`Invalid DEX proto index ${i}`);
-    const b = this.reader, p = this.protoIdsOffset + i * 12, proto = { parameters: this.typeList(b.u32(p + 8)).slice(), result: this.type(b.u32(p + 4)) };
-    Object.defineProperties(proto, LAZY_PROTO); Object.defineProperty(proto, 'dex', { value: this });
+    const b = this.reader, p = this.protoIdsOffset + i * 12, parameters = this.typeList(b.u32(p + 8)).slice(), result = this.type(b.u32(p + 4));
+    const proto = { parameters, result, signature: this.intern(`(${parameters.join('')})${result}`) };
+    Object.defineProperty(proto, 'dex', { value: this });
     return this.protos[i] = proto;
   }
   field(i) { const f = this.fields[i]; return f != null ? f : this.decodeField(i); }
   decodeField(i) {
     if (!(i < this.fields.length)) fail(`Invalid DEX field index ${i}`);
-    const b = this.reader, p = this.fieldIdsOffset + i * 8, f = { owner: this.type(b.u16(p)), type: this.type(b.u16(p + 2)), name: this.string(b.u32(p + 4)) };
-    Object.defineProperties(f, LAZY_FIELD); Object.defineProperty(f, 'dex', { value: this }); Object.defineProperty(f, 'index', { value: i });
+    const b = this.reader, p = this.fieldIdsOffset + i * 8, owner = this.type(b.u16(p)), type = this.type(b.u16(p + 2)), name = this.string(b.u32(p + 4));
+    const f = { owner, type, name, key: this.intern(`${owner}->${name}:${type}`) };
+    Object.defineProperty(f, 'dex', { value: this }); Object.defineProperty(f, 'index', { value: i });
     return this.fields[i] = f;
   }
   method(i) { const m = this.methods[i]; return m != null ? m : this.decodeMethod(i); }
   decodeMethod(i) {
     if (!(i < this.methods.length)) fail(`Invalid DEX method index ${i}`);
     const b = this.reader, p = this.methodIdsOffset + i * 8, proto = this.proto(b.u16(p + 2));
-    const m = { owner: this.type(b.u16(p)), name: this.string(b.u32(p + 4)), parameters: proto.parameters, result: proto.result };
-    Object.defineProperties(m, LAZY_METHOD); Object.defineProperty(m, 'dex', { value: this }); Object.defineProperty(m, 'index', { value: i });
+    const m = { owner: this.type(b.u16(p)), name: this.string(b.u32(p + 4)), parameters: proto.parameters, result: proto.result, signature: proto.signature };
+    Object.defineProperty(m, 'key', LAZY_METHOD_KEY); Object.defineProperty(m, 'dex', { value: this }); Object.defineProperty(m, 'index', { value: i });
     return this.methods[i] = m;
   }
   /** Owner descriptor of a method / field id without decoding the id (inventory scans). */
@@ -933,6 +937,7 @@ const describeRegister = value => value === undefined ? 'an uninitialized regist
 const int = value => { if (typeof value !== 'number' || !Number.isInteger(value)) fail(`Expected int register, got ${describeRegister(value)}`); return value | 0; };
 // Dalvik keeps boolean/byte/short/char/int results as 32-bit ints; host bridges written in JS may answer
 // with true/false, so results are normalized by the method's declared return type at the boundary.
+export const FRAMEWORK_NATIVE_GONE = Symbol('framework native binding gone');
 const hostReturn = (method, value) => {
   const type = method?.result ?? method?.signature?.slice(method.signature.indexOf(')') + 1);
   return typeof value === 'boolean' && /^[ZBSCI]$/.test(type ?? '') ? (value ? 1 : 0) : value;
@@ -1139,7 +1144,7 @@ export const LOOPER_PLUMBING = /^Landroid\/os\/(?:Looper|MessageQueue|Handler|Me
 // monomorphic load. Added one by one while the app runs, each addition was a new hidden class, and the interpreter's loads on the runtime went megamorphic (about 14 % of the
 // interpreter's time on a Compose flow). tests/interpreter-fast-paths.test.mjs fails when a launch adds a property that is not listed. `key in runtime` is not used for any of them.
 export const LATE_RUNTIME_PROPERTIES = Object.freeze([
-  'subtypeEpoch', 'subtypeMemo', 'ancestorSets', 'ancestorEpoch', 'parentEpoch', 'parentMemo', 'overrideMemo', 'externalMemo', 'resolveEpoch', 'resolveCache', 'hostMethodRefs', 'methodEvidence',
+  'subtypeEpoch', 'subtypeMemo', 'ancestorSets', 'ancestorEpoch', 'parentEpoch', 'parentMemo', 'hostInterfacesEpoch', 'hostInterfacesMemo', 'overrideMemo', 'externalMemo', 'resolveEpoch', 'resolveCache', 'hostMethodRefs', 'methodEvidence',
   'traceMuted', 'allProgs', 'lastHostCall', 'mainThread', 'objectInitIsPlain', 'targetSdkVersion', 'canvasCompatibilityVersion', 'frameworkRuntimeConfigured', 'resolvableMemo',
   'dedupeHiddenApiWarnings', 'unicodeCaseBackend', 'traceDropped', 'constructedStringUnits', 'runtimeObject', 'internedStrings', 'nativeMemory', 'inheritableLocals', 'allocationSamples',
   'caughtExceptions', 'boxCache', 'activityType', 'ephemeronMaps', 'lastResourceCall', 'timeUnits', 'applicationClassLoader', 'methodEvidenceTruncated', 'icuRegexMetadata', 'icuBreakMetadata',
@@ -1147,7 +1152,7 @@ export const LATE_RUNTIME_PROPERTIES = Object.freeze([
   'gcHeavyPaths', 'gcTopRoots', 'gcFreedRing', 'gcPhases', 'gcNextAt', 'gcMinAlloc', 'gcOldSize', 'gcMinorMs', 'gcPressure', 'gcCellPressure', 'gcLastNextId', 'arrayBytes', 'gcStats', 'gcLastEnd',
   'gcLastMs', 'gcTotalMs', 'gcMinorHeld', 'gcMinorStats', 'gcNurseryNow', 'gcSafepointTries', 'libcoreIo', 'hostStaticValues', 'rasterCacheDisabled', 'rasterCacheVerify', 'strictCrash',
   'androidxVersions', 'packagedBuildIds', 'reactNativeVersion', 'hermesBytecodeVersion', 'apkSigningCertificates', 'apkFileSource', 'gcExtraRoots', 'gcEnabled', 'propertyValuesHolderJni', 'pointerGesture',
-  'lastPointerTime',
+  'lastPointerTime', 'sliceLog',
 ]);
 export class APKRuntime {
   constructor(dex, { apkEntries = new Set(), apkReader = null, apkEntryRange = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off', engine = 'js' } = {}) {
@@ -1197,7 +1202,7 @@ export class APKRuntime {
     this.depth = 0; this.steps = 0; this.trace = []; this.activity = null; this.root = null; this.clicks = 0;
     this.initialized = new Map(); this.staticFields = new Map(); this.classObjects = new Map(); this.arrayCells = 0; this.initDepth = 0;
     this.collectionCells = 0;
-    this.nativeArrays = new Map(); this.nextNativeArrayHandle = 0x100000000n; this.nativeRanges = []; this.nestedRuns = 0; this.maxNestedRuns = 160; this.scheduler = new Scheduler(this); this.callStats = { cached: 0, dispatched: 0, bridged: 0 }; this.lastBridge = null; this.lastBridgeDepth = -1; this.jit = true; this.fastCallPaths = true; this.jitThreshold = JIT_THRESHOLD; this.jitLoops = JIT_LOOPS; this.jitCompiled = 0; this.jitInstructions = 0; this.jitBridged = 0; this.jitPolymorphic = 0; this.q = 20000; this.jitDepth = 0; this.tier2 = TIER2; this.t2Threshold = TIER2 ? T2_THRESHOLD : 0; this.t2Compiled = 0; this.t2Deopts = 0; this.t2Slow = 0; this.t2Headroom = 0; this.t2Site = null; this.deoptNeed = false; this.dstart = 0; this.dlimit = 0; this.t2TooDeep = false; this.t2Dirty = []; this.thread = null; this.multiThreaded = false; this.monitors = new Map();
+    this.nativeArrays = new Map(); this.nextNativeArrayHandle = 0x100000000n; this.nativeRanges = []; this.nestedRuns = 0; this.maxNestedRuns = 160; this.scheduler = new Scheduler(this); this.callStats = { cached: 0, dispatched: 0, bridged: 0 }; this.lastBridge = null; this.lastBridgeDepth = -1; this.lastNative = null; this.lastNativeDepth = -1; this.jit = true; this.fastCallPaths = true; this.jitThreshold = JIT_THRESHOLD; this.jitLoops = JIT_LOOPS; this.jitCompiled = 0; this.jitInstructions = 0; this.jitBridged = 0; this.jitPolymorphic = 0; this.q = 20000; this.jitDepth = 0; this.tier2 = TIER2; this.t2Threshold = TIER2 ? T2_THRESHOLD : 0; this.t2Compiled = 0; this.t2Deopts = 0; this.t2Slow = 0; this.t2Headroom = 0; this.t2Site = null; this.deoptNeed = false; this.dstart = 0; this.dlimit = 0; this.t2TooDeep = false; this.t2Dirty = []; this.onThreadIdentity = null; this.threadSlot = null; this.multiThreaded = false; this.monitors = new Map();
     this.skia=skia;this.skiaHost=skia?.createHost?.(this)??null;
     this.icuBreakBackend=icuBreakBackend;this.sqliteBackend=sqliteBackend;this.tzdata=tzdata;this.zlibBackend=zlibBackend;this.icuConverterBackend=icuConverterBackend;
 
@@ -1214,7 +1219,16 @@ export class APKRuntime {
   parentUncached(type) { return type?.startsWith('[') ? 'Ljava/lang/Object;' : (this.classes.superclassOf ? this.classes.superclassOf(type) : this.classes.get(type)?.superclass) ?? this.skiaHost?.parent?.(type) ?? this.platform?.parent?.(type) ?? EXTERNAL_PARENTS.get(type) ?? this.platform?.fallbackParent?.(type) ?? (type === 'Ljava/lang/Object;' || type.length === 1 ? null : 'Ljava/lang/Object;'); }   // every reference type reaches Object (a host class declared without a parent, e.g. Resources$Theme, still answers Object.hashCode/equals)
   /** Whether `type` is an interface: a DEX interface, or a class without DEX code that some type names as its interface (EXTERNAL_INTERFACES; Class.isInterface answers the same). */
   isInterfaceType(type) { return ((this.classes.get(type)?.flags ?? 0) & 0x200) !== 0 || EXTERNAL_INTERFACE_NAMES.has(type); }
-  interfaces(type) { return (this.classes.interfacesOf ? this.classes.interfacesOf(type) : this.classes.get(type)?.interfaces) ?? [...new Set([...(EXTERNAL_INTERFACES.get(type) ?? []), ...(this.skiaHost?.interfaces?.(type) ?? []), ...(this.platform?.interfaces?.(type) ?? [])])]; }
+  /** The interfaces `type` declares: its DEX class's list, else what the host registries declare for it (memoised per class-graph epoch as parent() is: the registries are fixed
+   *  when the runtime is built, and asking every one of them was most of the subtype walks of a launch). Callers only read the list. */
+  interfaces(type) {
+    const declared = this.classes.interfacesOf ? this.classes.interfacesOf(type) : this.classes.get(type)?.interfaces; if (declared != null) return declared;
+    const epoch = this.dex.dynamicFiles?.length ?? 0;
+    if (this.hostInterfacesEpoch !== epoch) { this.hostInterfacesEpoch = epoch; this.hostInterfacesMemo = new Map(); }
+    let answer = this.hostInterfacesMemo.get(type);
+    if (answer === undefined) { answer = [...new Set([...(EXTERNAL_INTERFACES.get(type) ?? []), ...(this.skiaHost?.interfaces?.(type) ?? []), ...(this.platform?.interfaces?.(type) ?? [])])]; if (this.hostInterfacesMemo.size < 200000) this.hostInterfacesMemo.set(type, answer); }
+    return answer;
+  }
   /** Memoized subtype test (the class graph only grows when more DEX files are loaded, which clears the memo). */
   isSubtype(child, ancestor) {
     const epoch = this.dex.dynamicFiles?.length ?? 0;
@@ -1266,6 +1280,11 @@ export class APKRuntime {
     if (ring.length === 384) { ring.tail[ring.start] = line; ring.start = (ring.start + 1) % 384; this.traceDropped = (this.traceDropped ?? 0) + 1; return; }
     ring.tail[(ring.start + ring.length++) % 384] = line;
   }
+  /** The green thread running now (src/scheduler.js VMThread). Assigning another one tells `onThreadIdentity` (the WebAssembly core keeps what Thread.currentThread() answers). */
+  get thread() { return this.threadSlot; }
+  set thread(value) { if (value !== this.threadSlot) { this.threadSlot = value; if (this.onThreadIdentity !== null) this.onThreadIdentity(); } }
+  /** What Thread.currentThread() answers may have changed without a switch of `thread` (a host executor runs a task on behalf of a pool thread: src/concurrency-host.js). */
+  threadIdentityChanged() { if (this.onThreadIdentity !== null) this.onThreadIdentity(); }
   get trace() {
     const ring = this.traceRing; if (!ring) return [];
     const text = entry => typeof entry === 'string' ? entry : `DEX ${entry.method.key}${entry.origin === 'framework' ? ` [AOSP:${entry.method.dex.filename}]` : ''}`, out = ring.head.map(text);
@@ -1786,8 +1805,9 @@ export class APKRuntime {
   launchActivity(activity, { intent = null } = {}) {   // `intent`: the Intent the launcher Activity receives (a deep link) instead of the default one
     if (this.activity) fail('Activity already launched; load the APK again to restart');
     if (this.unsupportedFeatures.length) fail(`Unsupported APK: ${this.unsupportedFeatures.join('; ')}`);
-    const candidates = this.activities();
-    const selected = activity || this.launcherActivity || (candidates.length === 1 ? candidates[0] : null);
+    // the sole Activity of the APK only when neither the caller nor the manifest names one: finding it tests every class of the APK (38 000 subtype walks on a large app)
+    const sole = () => { const candidates = this.activities(); return candidates.length === 1 ? candidates[0] : null; };
+    const selected = activity || this.launcherActivity || sole();
     if (!selected) fail('Choose an Activity explicitly; no unique launcher was found');
     const type = descriptor(selected);
     if (!this.classes.has(type) || !this.isSubtype(type, 'Landroid/app/Activity;')) fail(`Activity absent or not supported: ${type}`);
@@ -2158,17 +2178,35 @@ export class APKRuntime {
           if (this.tolerateMissing === 'all' && this.missingLibraries.size && !this.refusedProtectedLibrary) return this.noteMissingStub(definition.method.key, definition.method.result);
           this.nativeRequired(definition.method.key);
         }
-        this.executionByOrigin.host.calls++;
-        this.record(`HOST ${definition.method.key} [AOSP:${definition.method.dex.filename}]`); this.lastHostCall = definition.method.key; this.monitor.hostEnter(definition.method.key, definition.method);
-        const tb = this.tb, previousBucket = tb.enter(BUCKET.HOST); let result; try { result = binding(this, this.hostArguments(definition.method, args, mode), definition.method); } finally { tb.leave(previousBucket); } this.hostCall = null;
-        if (result && typeof result.then === 'function') fail(`Framework native binding must be synchronous: ${definition.method.key}`);
-        return hostReturn(definition.method, result);
+        this.lastNative = resolution; this.lastNativeDepth = this.depth;   // a call site of the WebAssembly core remembers it (vmcore/js/host-bridge.js call)
+        return this.frameworkNative(resolution, binding, args, mode);
       }
       if (!definition.code) fail(`Unsupported abstract/missing-code method: ${definition.method.key}${mode === 'virtual' && args[0] && typeof args[0] === 'object' && args[0].ref !== undefined ? ` (receiver ${this.typeOf(args[0])})` : ''}`);
       this.recordMethod(definition.method);
       if (wantFrame) return new PendingCall(definition.method, definition.code, args, definition);   // the run loop pushes the frame itself
       return this.execute(definition.method, definition.code, args);
     } finally { this.depth--; }
+  }
+  /** A framework native with its curated host binding: what dispatchCore does once the resolution names one (`resolution.definition`, flags & 0x100). */
+  frameworkNative(resolution, binding, args, mode) {
+    const method = resolution.definition.method;
+    this.executionByOrigin.host.calls++;
+    this.record(resolution.hostText ??= `HOST ${method.key} [AOSP:${method.dex.filename}]`); this.lastHostCall = method.key; this.monitor.hostEnter(method.key, method);
+    const tb = this.tb, previousBucket = tb.enter(BUCKET.HOST), startedAt = tb.last; let result; try { result = binding(this, this.hostArguments(method, args, mode), method); } finally { tb.leave(previousBucket); tb.hostCall(method.key, tb.last - startedAt); } this.hostCall = null;   // a framework native counts in the host table as a bridged call does
+    if (result && typeof result.then === 'function') fail(`Framework native binding must be synchronous: ${method.key}`);
+    return hostReturn(method, result);
+  }
+  /**
+   * dispatchCore again for a call whose resolution a call site remembered (`resolution` named a framework native with a curated binding for the same receiver class, in the same
+   * resolution epoch, with no method overrides): its depth bookkeeping, the class initialization of a static call and the binding (looked up again: undefined when it is gone,
+   * and the caller then dispatches).
+   */
+  frameworkNativeAgain(resolution, args, mode) {
+    const binding = this.nativeBindings.get(resolution.definition.method.key); if (binding === undefined) return FRAMEWORK_NATIVE_GONE;
+    if (this.depth + currentThread(this).frames.length >= this.maxCallDepth) this.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
+    this.depth++;
+    try { if (mode === 'static') this.initialize(resolution.definition.method.owner); return this.frameworkNative(resolution, binding, args, mode); }
+    finally { this.depth--; }
   }
   /** The static Java helper (LAB_HELPERS) that implements `method` for `owner`, or null. */
   labHelper(helpers, owner, method, mode) {
@@ -2764,7 +2802,7 @@ export class APKRuntime {
         let host = resolution.contractHost; if (host === undefined) host = resolution.contractHost = this.platform.contractHosts?.find(candidate => candidate.supports(key)) ?? null;
         if (host !== null && host.callWith !== undefined) return host.callWith(this, method, args, resolution.contractFn ??= host.fnFor(key));
       }
-      return this.platform.invoke(this, method, args, mode);
+      return this.platform.invoke(this, method, args, mode, key);
     }
     // The former single if-chain is split into consecutive chunks (each returns BRIDGE_NEXT when none of its branches applies): V8 refuses to optimize a function this large,
     // which left every bridged call in the bytecode interpreter.

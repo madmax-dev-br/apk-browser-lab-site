@@ -59,20 +59,20 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=da7619ccc1f1';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS } from './natives.js?v=da7619ccc1f1';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=da7619ccc1f1';
-import { HandleTable } from './handles.js?v=da7619ccc1f1';
-import { Exceptions } from './exceptions.js?v=da7619ccc1f1';
-import { coreImports } from './boundary-imports.js?v=da7619ccc1f1';
-import { installHostLinking, methodReference } from './host-linking.js?v=da7619ccc1f1';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=da7619ccc1f1';
-import { APKError, JavaException, LOOPER_PLUMBING } from '../../runtime/apk-runtime.js?v=da7619ccc1f1';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=da7619ccc1f1';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=da7619ccc1f1';
-import { Blocked } from '../../runtime/scheduler.js?v=da7619ccc1f1';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=da7619ccc1f1';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=da7619ccc1f1';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=a104526a388b';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=a104526a388b';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=a104526a388b';
+import { HandleTable } from './handles.js?v=a104526a388b';
+import { Exceptions } from './exceptions.js?v=a104526a388b';
+import { coreImports } from './boundary-imports.js?v=a104526a388b';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=a104526a388b';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=a104526a388b';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=a104526a388b';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=a104526a388b';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=a104526a388b';
+import { Blocked } from '../../runtime/scheduler.js?v=a104526a388b';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=a104526a388b';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=a104526a388b';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -97,6 +97,7 @@ export const STATUS_NAMES = Object.freeze({ ...STATUS, 64: 'host step not suppor
 const METHOD_KIND_UNBOUND = 0x7fff0003;
 const TIME_SAMPLE = 16;   // one bridged call in 16 per bridge reads the clock (bridgeBody)
 const wordCount = parameters => parameters.reduce((n, type) => n + (type === 'J' || type === 'D' ? 2 : 1), 0);
+const OWN_STEP = Object.freeze({ kind: 'own', parked: null });   // CoreThreads' base step of a nested run with nothing parked (runOn)
 const VM_GC = 24, STRING = 'Ljava/lang/String;', CLASS_TYPE = 'Ljava/lang/Class;', CLASS_OBJECT_CLASS = 8, INITIALIZED = 2;
 const MODE = op => op === 0x71 || op === 0x77 ? 'static' : op === 0x6f || op === 0x75 ? 'super' : op === 0x70 || op === 0x76 ? 'direct' : 'virtual';
 const isNull = value => value === null || value === undefined || value === 0;
@@ -134,7 +135,7 @@ export class WasmEngine {
     this.exceptions = new Exceptions(this.linker);
     this.WIDE_HIGH = runtime.argumentWords(['J'], [0n])[1];   // the JavaScript VM's marker of a long/double's second register
     this.pins = []; this.pendingHost = []; this.patched = []; this.patchEpoch = 0; this.usedBridge = null; this.hostDepth = 0; this.sites = new Map(); this.methodInfos = new WeakMap(); this.lastError = null; this.stopReason = null; this.fieldSites = new Map(); this.parked = null;
-    this.stats = { bridged: 0, frames: 0, steps: 0, nested: 0, collections: 0, hostCollections: 0, markMs: 0, sweepMs: 0, companionScans: 0, pinsAtCollection: 0, rootIds: 0 };
+    this.stats = { bridged: 0, frames: 0, steps: 0, nested: 0, nativeSites: 0, collections: 0, hostCollections: 0, markMs: 0, sweepMs: 0, companionScans: 0, pinsAtCollection: 0, rootIds: 0 };
     installHostLinking(this.linker, runtime, { staticValue: (reference, slot) => this.writeValue(slot, reference.type, runtime.readStatic(reference)) });
   }
 
@@ -169,6 +170,7 @@ export class WasmEngine {
     handles.idOf = address => { const known = handles.idByAddress.get(address); if (known !== undefined || address === 0) return known ?? 0; const id = idOf(address); exports.gc_export(h, address); return id; };
     handles.handleOf = address => { if (address !== 0) engine.pins.push(address); return handleOf(address); };
     const space = this.space = new RecordSpace(memory, { handles, autoRebind: false });
+    space.markCard = address => this.dirty(address, 4);   // a reference payload's store (referenceFacade)
     space.layouts = new LazyLayouts(this);
     space.strings.bind({ classAddress: () => linker.stringClassAddress, allocate: length => this.allocString(length), exportRecord: address => exports.gc_export(h, address) });
     exceptions.decodeString = address => address === 0 ? null : space.strings.get(address);
@@ -221,6 +223,13 @@ export class WasmEngine {
     const kind = kindOf(type);
     if (kind === 'W') { this.view.setBigUint64(at, BigInt.asUintN(64, BigInt(value ?? 0n)), true); return; }
     this.w32(at, kind === 'L' ? this.refWord(value) : value === true ? 1 : value === false || value === undefined || value === null ? 0 : Number(value) | 0);
+  }
+  /** The JavaScript VM's form of the register value of `type` held at `at` (valueOf without the 64-bit word). */
+  valueAt(type, at) {
+    const kind = kindOf(type);
+    if (kind === 'W') return this.view.getBigInt64(at, true);
+    const low = this.u32[at >>> 2];
+    return kind === 'L' ? this.refValue(low) : low | 0;
   }
   /** The JavaScript VM's form of a register value of `type` from the 64-bit word `raw` (a BigInt). */
   valueOf(type, raw) {
@@ -311,12 +320,24 @@ export class WasmEngine {
     // path (its two constants are host-modelled statics).
     const boxPrimitive = proto.boxPrimitive;
     rt.boxPrimitive = (type, value) => { const kind = type.length === 1 ? BOX_LETTERS.indexOf(type) : -1; return kind > 0 ? engine.box(kind, value) : boxPrimitive.call(rt, type, value); };
+    // The thread identity of natives.h HostState (Thread.currentThread / getId in C): cleared whenever the runtime's running thread, or the thread a host executor runs a task
+    // for, changes; filled by the bridges' own answers (noteIdentity).
+    const identity = linker.hostState + HOST_STATE_THREAD.valid;
+    rt.onThreadIdentity = () => { engine.u32[identity >>> 2] = 0; };
+    rt.onThreadIdentity();
     // the time breakdown's buckets as the JavaScript VM charges them: Java run from host code is interpreter time (APKRuntime.execute), class initialization its own
-    rt.initialize = type => { const previous = tb.enter(BUCKET.INIT); try { return engine.initialize(type); } finally { tb.leave(previous); } };
+    // (an initialized class returns before the clock is read, as APKRuntime.initialize does)
+    rt.initialize = type => { if (engine.initialized(type)) return; const previous = tb.enter(BUCKET.INIT); try { return engine.initialize(type); } finally { tb.leave(previous); } };
     rt.execute = (method, code, args) => { const previous = tb.enter(BUCKET.INTERP); try { return engine.execute(method, args); } finally { tb.leave(previous); } };
     rt.readStatic = reference => engine.readStatic(reference, proto.readStatic);
     rt.writeStatic = (reference, value) => engine.writeStatic(reference, value, proto.writeStatic);
     rt.captureStack = () => engine.captureStack();
+    // A bridge host code reaches through APKRuntime.dispatch (its resolution in hand) keeps the time accounting of the core's own bridged calls (bridgeBody: every call counted,
+    // one in TIME_SAMPLE timed, every call of a bridge that runs Java timed) instead of two clock reads per call.
+    const bridge = proto.bridge;
+    rt.bridge = function (method, words, mode, knownKey, resolution) {
+      return resolution !== undefined && knownKey != null && resolution.key === knownKey && resolution.selected === method ? engine.bridgeBody(this, resolution, words, mode) : bridge.call(this, method, words, mode, knownKey, resolution);
+    };
     // Object.clone (the JavaScript VM's bridge copies the record object; here the record is memory): a copy of the record's memory and of its companion
     const bridgeCore = proto.bridgeCore;
     rt.bridgeCore = function (method, words, mode, knownKey, resolution) {
@@ -365,6 +386,8 @@ export class WasmEngine {
     return mi;
   }
 
+  /** Nothing to initialize: a class without DEX code, or one already initialized. */
+  initialized(type) { return !this.runtime.classes.has(type) || this.r32(this.linker.classOf(type).address + CLASS.initState) === INITIALIZED; }
   /** APKRuntime.initialize in the core: a class with DEX code is initialized by a nested run whose entry is a static `return-void` of its own (the <clinit> chain runs above it). */
   initialize(type) {
     if (!this.runtime.classes.has(type)) return;
@@ -418,26 +441,32 @@ export class WasmEngine {
     }
   }
   runOn(owner, id, words, result, initClass, uncount, parked) {
-    const x = this.x, t = this.t, u32 = this.u32, view = this.view;
-    if (words.length > 440) throw new APKError(`vmcore: ${words.length} argument words`);
-    const saved = { frame: u32[(t + THREAD.frame) >> 2], pc: u32[(t + THREAD.pc) >> 2], depth: u32[(t + THREAD.depth) >> 2], stackTop: u32[(t + THREAD.stackTop) >> 2],
-      throwing: u32[(t + THREAD.throwing) >> 2], status: u32[(t + THREAD.status) >> 2], detail: u32[(t + THREAD.detail) >> 2], result: view.getBigUint64(t + THREAD.result, true) };
-    words.forEach((w, i) => { u32[((t + THREAD.args) >> 2) + i] = w >>> 0; });
+    // a few thousand nested runs a frame on a large Compose screen: the thread's state is kept in locals (no record, no BigInt) and the base step is shared when nothing is parked
+    const x = this.x, t = this.t, u32 = this.u32, n = words.length;
+    if (n > 440) throw new APKError(`vmcore: ${n} argument words`);
+    const at = t >> 2;
+    const sFrame = u32[at + (THREAD.frame >> 2)], sPc = u32[at + (THREAD.pc >> 2)], sDepth = u32[at + (THREAD.depth >> 2)], sStackTop = u32[at + (THREAD.stackTop >> 2)];
+    const sThrowing = u32[at + (THREAD.throwing >> 2)], sStatus = u32[at + (THREAD.status >> 2)], sDetail = u32[at + (THREAD.detail >> 2)];
+    const sResultLo = u32[at + (THREAD.result >> 2)], sResultHi = u32[at + (THREAD.result >> 2) + 1];
+    for (let i = 0, args = at + (THREAD.args >> 2); i < n; i++) u32[args + i] = words[i] >>> 0;
     this.stats.nested++;
-    let status, raw, detail;
-    const steps = owner.core.steps, base = steps.length; steps.push({ kind: 'own', parked });   // the base of this run among the thread's host steps (CoreThreads.pump)
+    let status, detail, value, thrown = 0;
+    const steps = owner.core.steps, base = steps.length; steps.push(parked === null ? OWN_STEP : { kind: 'own', parked });   // the base of this run among the thread's host steps (CoreThreads.pump)
     try {
       status = this.threads.finish(owner, x.run_nested(t, id, t + THREAD.args, initClass) >>> 0);   // collections, waits and other threads until the run is over
-      raw = this.view.getBigUint64(t + THREAD.result, true); detail = this.r32(t + THREAD.detail);
+      detail = this.r32(t + THREAD.detail);
+      if (status === Status.OK) value = result === 'V' ? undefined : this.valueAt(result, t + THREAD.result);
+      else if (status === Status.UNCAUGHT) thrown = this.r32(t + THREAD.result);
     } finally {
       steps.length = base;
-      const v = this.view, w = this.u32;
-      w[(t + THREAD.frame) >> 2] = saved.frame; w[(t + THREAD.pc) >> 2] = saved.pc; w[(t + THREAD.depth) >> 2] = saved.depth; w[(t + THREAD.stackTop) >> 2] = saved.stackTop;
-      w[(t + THREAD.throwing) >> 2] = saved.throwing; w[(t + THREAD.status) >> 2] = saved.status; w[(t + THREAD.detail) >> 2] = saved.detail; v.setBigUint64(t + THREAD.result, saved.result, true);
+      const w = this.u32;
+      w[at + (THREAD.frame >> 2)] = sFrame; w[at + (THREAD.pc >> 2)] = sPc; w[at + (THREAD.depth >> 2)] = sDepth; w[at + (THREAD.stackTop >> 2)] = sStackTop;
+      w[at + (THREAD.throwing >> 2)] = sThrowing; w[at + (THREAD.status >> 2)] = sStatus; w[at + (THREAD.detail >> 2)] = sDetail;
+      w[at + (THREAD.result >> 2)] = sResultLo; w[at + (THREAD.result >> 2) + 1] = sResultHi;
     }
-    if (status === Status.OK) { if (uncount) this.view.setBigUint64(t + THREAD.steps, BigInt(this.steps - uncount), true); return this.valueOf(result, raw); }
+    if (status === Status.OK) { if (uncount) this.view.setBigUint64(t + THREAD.steps, BigInt(this.steps - uncount), true); return value; }
     if (status === Status.UNCAUGHT) {
-      const address = Number(raw & 0xffffffffn), handle = this.refValue(address);
+      const address = thrown, handle = this.refValue(address);
       throw new JavaException(handle, this.messageOf(address));
     }
     throw this.stopError(status, detail);
@@ -465,9 +494,10 @@ export class WasmEngine {
       const mi = this.linker.methodsAt.get(caller), entry = mi?.pool?.[constant];
       if (!entry) throw new APKError(`vmcore: no call site at method ${mi?.key ?? caller} constant ${constant}`);
       const reference = mi.def.method.dex.method(entry.index), mode = MODE(op);
-      site = { reference, mode, callerOwner: mi.owner.type, kinds: reference.parameters.map(kindOf), result: reference.result, isStatic: mode === 'static', key: `${reference.owner}->${reference.name}${reference.signature}`,
-        bridge: null, bridgeEpoch: -1, bridgeType: null, bridgePoly: null, stringInit: reference.owner === STRING && reference.name === '<init>',
-        plumbing: LOOPER_PLUMBING.test(mi.owner.type) };   // the caller is Looper/MessageQueue/Handler plumbing: its bridged calls leave no trace entry (APKRuntime.record)
+      site = { reference, mode, callerOwner: mi.owner.type, kinds: reference.parameters.map(kindOf), result: reference.result, resultKind: kindOf(reference.result), isStatic: mode === 'static', key: `${reference.owner}->${reference.name}${reference.signature}`,
+        bridge: null, bridgeEpoch: -1, bridgeType: null, bridgePoly: null, native: null, nativeEpoch: -1, nativeType: null, stringInit: reference.owner === STRING && reference.name === '<init>',
+        plumbing: LOOPER_PLUMBING.test(mi.owner.type),   // the caller is Looper/MessageQueue/Handler plumbing: its bridged calls leave no trace entry (APKRuntime.record)
+        identity: reference.owner === 'Ljava/lang/Thread;' && (reference.name === 'currentThread' || reference.name === 'getId') };   // its bridge's answer fills the thread identity
       this.sites.set(key, site);
     }
     return site;
@@ -493,7 +523,7 @@ export class WasmEngine {
       if (site.stringInit) return this.constructString(site, args, t);
       this.usedBridge = null;
       let outcome = this.call(site, args);
-      if (this.usedBridge !== null) { const used = this.usedBridge; this.usedBridge = null; if (used.vmNative !== 0) this.bindNative(methodId, site, args, used); }
+      if (this.usedBridge !== null) { const used = this.usedBridge; this.usedBridge = null; if (used.vmNative !== 0) this.bindNative(methodId, site, args, used); if (site.identity) this.noteIdentity(used, args, outcome); }
       if (outcome instanceof PendingCall) {
         const mi = this.methodInfo(outcome.method);
         if (mi && (outcome.args === args || sameWords(outcome.args, args))) { this.stats.frames++; this.w32(t + THREAD.detail, mi.address); return Status.HOST_FRAME; }
@@ -503,8 +533,9 @@ export class WasmEngine {
       // ready the host method runs again with the same arguments, as the JavaScript interpreter runs the invoke again (interpreter.js: f.pc = outcome.retry ? start : ...).
       if (outcome instanceof Blocked && outcome.retry) { const again = () => { const next = this.call(site, args); if (next instanceof Blocked && next.retry) next.coreRetry = again; return next; }; outcome.coreRetry = again; }
       if (outcome instanceof PendingCall || outcome instanceof Invoke || outcome instanceof Blocked) { this.parked = { step: outcome, result: site.result }; return Status.HOST_BLOCKED; }
-      this.writeValue(t + THREAD.result, site.result, outcome);
-      if (kindOf(site.result) !== 'W') this.w32(t + THREAD.result + 4, 0);
+      const kind = site.resultKind, slot = (t + THREAD.result) >>> 2;
+      if (kind === 'W') this.view.setBigUint64(t + THREAD.result, BigInt.asUintN(64, BigInt(outcome ?? 0n)), true);
+      else { const word = kind === 'L' ? this.refWord(outcome) : outcome === true ? 1 : outcome === false || outcome === undefined || outcome === null ? 0 : Number(outcome) | 0, u32 = this.u32; u32[slot] = word; u32[slot + 1] = 0; }   // writeValue's forms
       return Status.OK;
     } catch (error) {
       return this.failed(error, t);
@@ -566,8 +597,29 @@ export class WasmEngine {
       if (rt.hostAllocs.length > hostMark && !(outcome instanceof Blocked || outcome instanceof Invoke)) rt.releaseHostAllocs(hostMark);
       return outcome;
     }
-    rt.lastBridge = null; const depthBefore = rt.depth;
+    // A framework native with a curated host binding (APKRuntime.frameworkNative) that this site reached before, for a receiver of the same class: dispatchCore's resolution walk
+    // is not repeated, its bookkeeping is (APKRuntime.frameworkNativeAgain), with the host-allocation scope of APKRuntime.dispatch.
+    const native = site.native;
+    if (native !== null && site.nativeEpoch === rt.resolveEpoch && rt.methodOverrides === null) {
+      let same = site.isStatic || site.mode === 'direct' || site.mode === 'super';
+      if (!same) { const receiver = args[0]; if (receiver !== null && typeof receiver === 'object') { const record = this.space.objectById(receiver.ref); same = record !== undefined && record.type === site.nativeType && record.annotationValues === undefined && record.proxyHandler === undefined; } }
+      if (same) {
+        const hostMark = rt.hostAllocs.length, outcome = rt.frameworkNativeAgain(native, args, site.mode);
+        if (outcome !== FRAMEWORK_NATIVE_GONE) { this.stats.nativeSites++; if (rt.hostAllocs.length > hostMark && !(outcome instanceof Blocked || outcome instanceof Invoke)) rt.releaseHostAllocs(hostMark); return outcome; }
+        site.native = null;
+      }
+    }
+    rt.lastBridge = null; rt.lastNative = null; const depthBefore = rt.depth;
     const outcome = rt.dispatch(site.reference, args, site.mode, site.callerOwner, true);
+    if (rt.lastNative !== null) {
+      const resolution = rt.lastNative; rt.lastNative = null;
+      if (rt.lastNativeDepth === depthBefore + 1 && resolution.kind === 'definition' && resolution.fast === undefined) {
+        const receiver = args[0], record = !site.isStatic && site.mode === 'virtual' && receiver !== null && typeof receiver === 'object' ? this.space.objectById(receiver.ref) : null;
+        if (site.isStatic || site.mode !== 'virtual' || (record !== null && record !== undefined && record.annotationValues === undefined && record.proxyHandler === undefined)) {
+          site.native = resolution; site.nativeEpoch = rt.resolveEpoch; site.nativeType = record?.type ?? null;
+        }
+      }
+    }
     if (rt.lastBridge !== null && rt.lastBridgeDepth === depthBefore + 1) {
       const receiver = args[0], record = !site.isStatic && site.mode === 'virtual' && typeof receiver !== 'string' ? rt.vmObject(receiver) : null;
       if (record === null || (record.annotationValues === undefined && record.proxyHandler === undefined)) {
@@ -652,6 +704,20 @@ export class WasmEngine {
     }
     mi.kind = entry.id; this.w32(mi.address + METHOD.kind, entry.id); this.patched.push(mi);
     this.patchEpoch = this.runtime.dex.dynamicFiles?.length ?? 0;
+  }
+  /**
+   * The thread identity (natives.h HostState) from what a Thread bridge just answered: Thread.currentThread()'s Thread record, valid until the runtime clears it
+   * (APKRuntime.onThreadIdentity); then getId() of that same record. Only the bridges the natives stand for fill it (a subclass's own getId, a DEX body, is not one of them).
+   */
+  noteIdentity(used, args, outcome) {
+    const base = this.linker.hostState;
+    if (used.key === CURRENT_THREAD_KEY) {
+      const address = outcome !== null && typeof outcome === 'object' ? this.refWord(outcome) : 0; if (!address) return;
+      this.w32(base + HOST_STATE_THREAD.object, address); this.w32(base + HOST_STATE_THREAD.idValid, 0); this.w32(base + HOST_STATE_THREAD.valid, 1);
+    } else if (used.key === THREAD_GET_ID_KEY && args.length === 1 && this.r32(base + HOST_STATE_THREAD.valid) === 1 && (typeof outcome === 'bigint' || typeof outcome === 'number')) {
+      if (args[0] === null || typeof args[0] !== 'object' || this.refWord(args[0]) !== this.r32(base + HOST_STATE_THREAD.object)) return;
+      this.view.setBigUint64(base + HOST_STATE_THREAD.id, BigInt.asUintN(64, BigInt(outcome)), true); this.w32(base + HOST_STATE_THREAD.idValid, 1);
+    }
   }
   /** The bound natives go back to the trampoline (the routing may answer differently now). */
   unbindNatives() { for (const mi of this.patched) { mi.kind = METHOD_KIND_UNBOUND; this.w32(mi.address + METHOD.kind, METHOD_KIND_UNBOUND); } this.patched.length = 0; }
@@ -899,26 +965,55 @@ function boxFacade(letter, property = 'boxed') {
   boxFacades.set(key, facade); return facade;
 }
 
+/**
+ * The facade of a record with a reference payload (AtomicReference's `atomicValue`: the reference at +8, traced by the collector, and a state word at +12): a host's value is
+ * stored in memory when it is an object reference (its card marked, as a reference store of the interpreter marks it) or null; anything else (a JavaScript string, a number)
+ * stays on the facade (state 2: the native defers to the bridge), with the slot cleared. Never written: undefined (state 0).
+ */
+const referenceFacades = new Map();
+function referenceFacade(property) {
+  let facade = referenceFacades.get(property); if (facade !== undefined) return facade;
+  facade = class ReferenceFacade extends ObjectFacade {
+    #fallback = undefined;
+    #read() { const space = this.space, at = this.address, state = space.u32[(at + 12) >> 2]; return state === 1 ? space.refValue(space.u32[(at + 8) >> 2]) : state === 2 ? this.#fallback : undefined; }
+    #write(value) {
+      const space = this.space, at = this.address;
+      if (value === undefined) { space.u32[(at + 8) >> 2] = 0; space.u32[(at + 12) >> 2] = 0; this.#fallback = undefined; return; }
+      if (value === null || (typeof value === 'object' && typeof value.ref === 'number')) {
+        const target = value === null ? 0 : space.refWord(value);
+        space.u32[(at + 8) >> 2] = target; space.u32[(at + 12) >> 2] = 1; this.#fallback = undefined;
+        if (target !== 0) { space.markCard?.(at + 8); if (space.onReferenceStore !== null) space.onReferenceStore(at, target); }   // the card of the slot, as aput-object / iput-object mark it (gc.h)
+        return;
+      }
+      space.u32[(at + 8) >> 2] = 0; space.u32[(at + 12) >> 2] = 2; this.#fallback = value;
+    }
+    static { Object.defineProperty(this.prototype, property, { get() { return this.#read(); }, set(value) { this.#write(value); }, configurable: true }); }
+  };
+  referenceFacades.set(property, facade); return facade;
+}
+
 /** Class layouts for the record facades, made from the linker's records on first use (a Map whose get() lays the layout out). */
-class LazyLayouts extends Map {
+export class LazyLayouts extends Map {
   constructor(engine) { super(); this.engine = engine; this.byAddress = new Map(); }
   get(address) {
     const known = super.get(address); if (known !== undefined) return known;
-    const linker = this.engine.linker;
-    if (this.byAddress.size !== linker.classList.length) for (const info of linker.classList) this.byAddress.set(info.address, info);
-    const info = this.byAddress.get(address); if (info === undefined) return undefined;
+    const info = this.infoAt(address); if (info === undefined) return undefined;
     const fields = [];
     for (let c = info; c; c = c.superInfo) if (!c.isInterface) for (const field of c.fields.values()) fields.push({ key: field.key, offset: field.offset, type: field.type });
     const layout = this.engine.space.registerClass(address, { type: info.facadeType ?? info.type, fields });
     if (info.type === CLASS_TYPE) layout.onCreate = facade => { facade.classType = this.typeAt(this.engine.r32(facade.address + CLASS_OBJECT_CLASS)); };
     if (info.boxKind !== undefined) layout.facadeClass = boxFacade(BOX_LETTERS[info.boxKind]);
     else if (info.memoryProperty === 'atomicValue') layout.facadeClass = boxFacade('I', 'atomicValue');
+    else if (info.memoryProperty === 'atomicReference') layout.facadeClass = referenceFacade('atomicValue');
     return layout;
   }
   /** The descriptor of the class whose Class record is at `address`. */
-  typeAt(address) {
-    const linker = this.engine.linker;
-    if (this.byAddress.size !== linker.classList.length) for (const info of linker.classList) this.byAddress.set(info.address, info);
-    return this.byAddress.get(address)?.type;
+  typeAt(address) { return this.infoAt(address)?.type; }
+  /** The linker's record of the class at `address`. The linker's class list only grows (one record per address), so only the classes laid out since the last call are added:
+   *  walking the whole list again whenever it had grown was quadratic over a launch (a Class object's facade asks for its type; ~45 ms of a large app's launch). */
+  infoAt(address) {
+    const list = this.engine.linker.classList, byAddress = this.byAddress;
+    for (let i = byAddress.size; i < list.length; i++) { const info = list[i]; byAddress.set(info.address, info); }
+    return byAddress.get(address);
   }
 }

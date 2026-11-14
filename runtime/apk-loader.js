@@ -1,17 +1,18 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=da7619ccc1f1';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=da7619ccc1f1';
-import { inspectELF } from './native-inspector.js?v=da7619ccc1f1';
-import { elfBuildId } from './elf-build-id.js?v=da7619ccc1f1';
-import { inflateRaw } from './inflate.js?v=da7619ccc1f1';
-import { resolveDevice } from './device-profile.js?v=da7619ccc1f1';
-import { resourceProfileFor } from './device-configuration.js?v=da7619ccc1f1';
-import { JniBridge } from './jni-host.js?v=da7619ccc1f1';
-import { providerForApk } from './native-provider-variants.js?v=da7619ccc1f1';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=da7619ccc1f1';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=da7619ccc1f1';
-import { AndroidResources } from './android-resources.js?v=da7619ccc1f1';
-import { AndroidPlatform } from './android-platform.js?v=da7619ccc1f1';
-import { FrameworkProvider } from './framework-provider.js?v=da7619ccc1f1';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=a104526a388b';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=a104526a388b';
+import { inspectELF } from './native-inspector.js?v=a104526a388b';
+import { elfBuildId } from './elf-build-id.js?v=a104526a388b';
+import { inflateRaw } from './inflate.js?v=a104526a388b';
+import { crc32, inflateEntry } from './zip-entry.js?v=a104526a388b';
+import { resolveDevice } from './device-profile.js?v=a104526a388b';
+import { resourceProfileFor } from './device-configuration.js?v=a104526a388b';
+import { JniBridge } from './jni-host.js?v=a104526a388b';
+import { providerForApk } from './native-provider-variants.js?v=a104526a388b';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=a104526a388b';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=a104526a388b';
+import { AndroidResources } from './android-resources.js?v=a104526a388b';
+import { AndroidPlatform } from './android-platform.js?v=a104526a388b';
+import { FrameworkProvider } from './framework-provider.js?v=a104526a388b';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -24,24 +25,8 @@ export const MAX_DEX_TOTAL = 768 * 1024 * 1024;
 const MAX_DEX_FILES = 1024;
 // The ZIP end record counts entries in 16 bits; this accepts every non-ZIP64 APK.
 const MAX_ZIP_ENTRIES = 65535;
-// CRC-32 (ZIP, reflected 0xEDB88320), slicing-by-8: eight tables, eight bytes per step (an APK's entries are checked as they are extracted; byte at a time this was
-// about 45 ms of every launch in the browser Worker for a few megabytes of DEX).
-const CRC_TABLES = (() => {
-  const t = new Uint32Array(8 * 256);
-  for (let n = 0; n < 256; n++) { let c = n; for (let j = 0; j < 8; j++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
-  for (let n = 0; n < 256; n++) for (let k = 1; k < 8; k++) t[k * 256 + n] = (t[(k - 1) * 256 + n] >>> 8) ^ t[t[(k - 1) * 256 + n] & 255];
-  return t;
-})();
-export function crc32(bytes) {
-  const t = CRC_TABLES, n = bytes.length; let crc = ~0, i = 0;
-  for (const end = n - (n & 7); i < end; i += 8) {
-    const a = crc ^ (bytes[i] | bytes[i + 1] << 8 | bytes[i + 2] << 16 | bytes[i + 3] << 24);
-    crc = t[1792 + (a & 255)] ^ t[1536 + ((a >>> 8) & 255)] ^ t[1280 + ((a >>> 16) & 255)] ^ t[1024 + (a >>> 24)]
-      ^ t[768 + bytes[i + 4]] ^ t[512 + bytes[i + 5]] ^ t[256 + bytes[i + 6]] ^ t[bytes[i + 7]];
-  }
-  for (; i < n; i++) crc = t[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
-  return ~crc >>> 0;
-}
+// CRC-32 and the deflate-raw expansion of an entry live in src/zip-entry.js, shared with the helper Workers that expand DEX files in parallel (src/zip-inflate-pool.js).
+export { crc32 };
 
 async function frameworkBytesHash(files) {
   if (!globalThis.crypto?.subtle) fail('Source profile framework compatibility verification requires Web Crypto');
@@ -118,35 +103,32 @@ export class APKArchive {
     if (data.length !== e.size || crc32(data) !== e.crc) fail(`APK entry size/CRC mismatch: ${name}`);
     return data;
   }
+  /** Starts expanding `names` (deflated entries within `limit`) in the helper Workers of `pool` (src/zip-inflate-pool.js); extract() then takes the result instead of expanding
+   *  on this thread. Nothing is checked or reported here: extract() does every check, and an entry whose helper failed is expanded again by extract() itself. */
+  prefetch(names, limit, pool) {
+    if (!pool) return;
+    this.prefetched ??= new Map();
+    for (const name of names) {
+      const e = this.entries.get(name);
+      if (!e || e.method !== 8 || !Number.isSafeInteger(limit) || e.size > limit || this.prefetched.has(name)) continue;
+      let compressed; try { ({ compressed } = this.payload(name)); } catch { continue; }   // a malformed entry fails in extract(), with its own message
+      this.prefetched.set(name, { limit, job: pool.inflate({ compressed, name, size: e.size, limit }).catch(() => null) });
+    }
+  }
   async extract(name, limit) {
     const e = this.entries.get(name);
     if (!Number.isSafeInteger(limit) || limit < 0) fail('APK extraction requires a nonnegative byte limit');
     if (e?.size > limit) fail(`${name} exceeds ${Math.round(limit / 1024 / 1024)} MiB limit`);
     const { compressed } = this.payload(name);
-    let data;
+    let data, crc = null;
     if (e.method === 0) data = compressed.slice();
     else {
-      if (typeof DecompressionStream !== 'function') fail('This browser requires DecompressionStream with deflate-raw support');
-      let decompressor;
-      try { decompressor = new DecompressionStream('deflate-raw'); }
-      catch { fail('This browser does not support local ZIP deflate-raw decompression; use a recent Chromium browser'); }
-      const stream = new ReadableStream({ start(controller) { controller.enqueue(compressed); controller.close(); } });
-      const reader = stream.pipeThrough(decompressor).getReader(), chunks = [];
-      let length = 0;
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          length += value.length;
-          if (length > e.size || length > limit) { await reader.cancel(); fail(`ZIP expansion exceeds declared size/limit: ${name}`); }
-          chunks.push(value);
-        }
-      } catch (error) { fail(`Unable to decompress ${name}: ${error.message ?? error}`); }
-      data = new Uint8Array(length);
-      let p = 0;
-      for (const chunk of chunks) { data.set(chunk, p); p += chunk.length; }
+      const ahead = this.prefetched?.get(name); if (ahead) this.prefetched.delete(name);
+      const done = ahead && ahead.limit === limit ? await ahead.job : null;   // a helper's result, or null: expand here (a helper error is reproduced with this thread's message)
+      if (done) { data = done.bytes; crc = done.crc; }
+      else data = await inflateEntry(compressed, { name, size: e.size, limit });
     }
-    if (data.length !== e.size || crc32(data) !== e.crc) fail(`APK entry size/CRC mismatch: ${name}`);
+    if (data.length !== e.size || (crc ?? crc32(data)) !== e.crc) fail(`APK entry size/CRC mismatch: ${name}`);
     return data;
   }
   /** Header-only probe: bounded output, deliberately does not claim full-entry CRC validation. */
@@ -462,6 +444,32 @@ export function nameFrameworkAttributes(node, nameOf) {
   }
   for (const child of node.children ?? []) nameFrameworkAttributes(child, nameOf);
 }
+/**
+ * The load's default yield: gives the event loop a turn once at least `sliceMs` of work ran since the last turn, and is a no-op before that. A timer turn costs about 4 ms in a
+ * Worker once timers nest (HTML clamps a nested setTimeout(0)), so yielding after every few files spent most of a large APK's resource phases waiting (the XML loop of an app
+ * with 800 compiled XML files: ~28 ms of work, ~210 ms of yields). The Worker still answers messages at least every slice.
+ */
+export function slicedYield(sliceMs = 8, now = () => performance.now(), turn = () => new Promise(resolve => setTimeout(resolve, 0))) {
+  let last = now();
+  return async () => { if (now() - last < sliceMs) return; await turn(); last = now(); };
+}
+/**
+ * Starts `work(hold)` now and holds what it reports until release(): hold.progress(p) queues a progress report (sent to `onProgress` once released, in order, and directly after),
+ * hold.warnings collects warnings (appended to `warnings` at release). release() sends what was held and resolves with the work's result, or rejects with its error; an error
+ * before release() is not an unhandled rejection (whoever never releases, because an earlier step failed, never sees it).
+ */
+export function holdUntilReleased(work, { onProgress = null, warnings }) {
+  let released = false; const held = [];
+  const hold = { warnings: [], progress: progress => { if (!released) held.push(progress); else return onProgress?.(progress); } };
+  const running = Promise.resolve().then(() => work(hold)); running.catch(() => {});
+  return {
+    async release() {
+      released = true;
+      for (const progress of held.splice(0)) await onProgress?.(progress);
+      try { return await running; } finally { warnings.push(...hold.warnings.splice(0)); }
+    },
+  };
+}
 let defaultFrameworkProvider = null;
 /** Node tests: a factory of the framework provider loadAPK uses when the caller names none (the browser Worker always passes its own). */
 export function setDefaultFrameworkProvider(factory) { defaultFrameworkProvider = factory; }
@@ -488,10 +496,11 @@ export async function loadAPK(arrayBuffer, options = {}) {
     totalDexBytes += size;
     if (totalDexBytes > MAX_DEX_TOTAL) fail(`APK DEX files exceed the combined ${MAX_DEX_TOTAL / 1048576} MiB limit: parsing them needs about 5x that in browser memory`);
   }
+  archive.prefetch(dexFiles, MAX_DEX, options.inflatePool);   // every DEX file expands at once in the helper Workers (the browser Worker's pool), while this thread reads the manifest and parses each file as it arrives
   const report = async (phase, completed, total, filename, message) => {
     if (options.onProgress) await options.onProgress({ phase, completed, total, ...(filename ? { filename } : {}), message });
   };
-  const yieldControl = options.yieldControl ?? (() => new Promise(resolve => setTimeout(resolve, 0)));
+  const yieldControl = options.yieldControl ?? slicedYield();
   const nativeLibraries = names.filter(name => name.endsWith('.so')).sort();
   const nativeLibraryDetails = nativeLibraries.map(path => {
     const entry = archive.entries.get(path), match = /^lib\/([^/]+)\/([^/]+)$/.exec(path);
@@ -515,6 +524,26 @@ export async function loadAPK(arrayBuffer, options = {}) {
     catch (error) { warnings.push(`Manifest launcher detection unavailable: ${error.message}`); }
   } else warnings.push('AndroidManifest.xml is absent; choose an Activity or use the sole DEX Activity');
   await report('manifest', 1, 1, 'AndroidManifest.xml', 'Android manifest read');
+  // The resources need nothing from the DEX files: they are prepared (framework resource data, the resource configuration, resources.arsc and the compiled XML) while the DEX files
+  // expand, which on a large APK is a wait for its largest file in a helper Worker with this thread idle. What they report (progress, warnings, a failure) is held and given back
+  // where the load used to prepare them, after Skia, so the progress order, the warnings and which error a broken APK reports are those of the sequential load.
+  const resourcesReady = holdUntilReleased(async (hold) => {
+    let frameworkResources = null;
+    if (options.frameworkResourceProvider) {
+      const source = options.frameworkResourceProvider;
+      frameworkResources = typeof source === 'function' ? await source({ onProgress: hold.progress }) : await source.load({ onProgress: hold.progress });
+    } else if (options.frameworkResources) frameworkResources = options.frameworkResources.table
+      ? options.frameworkResources : { table: options.frameworkResources, metadata: options.frameworkResourceMetadata ?? {} };
+    if (frameworkResources && (typeof frameworkResources.table?.resolve !== 'function' || typeof frameworkResources.table?.resolveBag !== 'function')) fail('Invalid framework resource provider result');
+    let resourceConfiguration=options.resourceConfiguration??null;
+    if(options.resourceConfigProvider){const source=options.resourceConfigProvider;resourceConfiguration=typeof source==='function'?await source({onProgress:hold.progress}):await source.load({onProgress:hold.progress});}
+    if(resourceConfiguration&&typeof resourceConfiguration.chooseConfiguration!=='function')fail('Invalid original resource configuration provider result');
+    if(resourceConfiguration?.reconfigure&&options.device){const device=resolveDevice(options.device);resourceConfiguration.reconfigure(resourceProfileFor(device,{left:0,right:0,top:device.statusBarHeightDp??24,bottom:device.navigation==='buttons'?48:24}));}
+    if(resourceConfiguration&&frameworkResources)frameworkResources.table.options.chooseConfiguration=resourceConfiguration.chooseConfiguration;
+    const resources = await prepareResources(archive, names, { ...options, frameworkResources: frameworkResources?.table,
+      frameworkGetXml: frameworkResources?.getXml,resourceConfiguration }, (phase, completed, total, filename, message) => hold.progress({ phase, completed, total, ...(filename ? { filename } : {}), message }), yieldControl, hold.warnings);
+    return { frameworkResources, resourceConfiguration, resources };
+  }, { onProgress: options.onProgress, warnings });
   const files = [], dexSummaries = [];
   for (let i = 0; i < dexFiles.length; i++) {
     const filename = dexFiles[i];
@@ -605,20 +634,8 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const usesImageCodecs=program.types.some(type=>/^Landroid\/graphics\/(BitmapFactory|ImageDecoder)(\$|;)/.test(type)||type==='Landroid/graphics/Bitmap$CompressFormat;'||type==='Landroid/media/ImageReader;')||[...archive.entries.keys()].some(name=>/\.(jpe?g|webp|avif)$/i.test(name));
   if(skia&&usesImageCodecs&&typeof skia.prepareCodecs==='function')await skia.prepareCodecs();
   if(skia&&(typeof skia.createHost!=='function'||typeof skia.rasterizeCanvas!=='function'))fail('Invalid official Skia provider result');
-  let frameworkResources = null;
-  if (options.frameworkResourceProvider) {
-    const source = options.frameworkResourceProvider;
-    frameworkResources = typeof source === 'function' ? await source({ onProgress: options.onProgress }) : await source.load({ onProgress: options.onProgress });
-  } else if (options.frameworkResources) frameworkResources = options.frameworkResources.table
-    ? options.frameworkResources : { table: options.frameworkResources, metadata: options.frameworkResourceMetadata ?? {} };
-  if (frameworkResources && (typeof frameworkResources.table?.resolve !== 'function' || typeof frameworkResources.table?.resolveBag !== 'function')) fail('Invalid framework resource provider result');
-  let resourceConfiguration=options.resourceConfiguration??null;
-  if(options.resourceConfigProvider){const source=options.resourceConfigProvider;resourceConfiguration=typeof source==='function'?await source({onProgress:options.onProgress}):await source.load({onProgress:options.onProgress});}
-  if(resourceConfiguration&&typeof resourceConfiguration.chooseConfiguration!=='function')fail('Invalid original resource configuration provider result');
-  if(resourceConfiguration?.reconfigure&&options.device){const device=resolveDevice(options.device);resourceConfiguration.reconfigure(resourceProfileFor(device,{left:0,right:0,top:device.statusBarHeightDp??24,bottom:device.navigation==='buttons'?48:24}));}
-  if(resourceConfiguration&&frameworkResources)frameworkResources.table.options.chooseConfiguration=resourceConfiguration.chooseConfiguration;
-  const resources = await prepareResources(archive, names, { ...options, frameworkResources: frameworkResources?.table,
-    frameworkGetXml: frameworkResources?.getXml,resourceConfiguration }, report, yieldControl, warnings);
+  // the resources prepared since the manifest was read (above): their progress reports and warnings take their place here, in their order, and so do their errors
+  const { frameworkResources, resourceConfiguration, resources } = await resourcesReady.release();
   let icuBreakBackend=options.icuBreakBackend??null;
   if(!icuBreakBackend&&options.icuBreakProvider&&program.types.some(type=>['Ljava/text/BreakIterator;','Landroid/icu/text/BreakIterator;','Ljava/util/regex/Pattern;','Ljava/util/regex/Matcher;'].includes(type)||type.startsWith('Landroid/database/')||type.startsWith('Ljava/time/')||type.startsWith('Ljava/math/'))){ // android.database.sqlite's own SQLiteDatabaseConfiguration compiles a java.util.regex.Pattern
     const provider=options.icuBreakProvider;icuBreakBackend=typeof provider==='function'?await provider():await provider.load();

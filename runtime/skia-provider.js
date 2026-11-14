@@ -1,8 +1,8 @@
-import {APKError} from './apk-runtime.js?v=da7619ccc1f1';
-import {PathApproxProvider} from './path-approx-provider.js?v=da7619ccc1f1';
-import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=da7619ccc1f1';
-import {createFontFallback} from './font-fallback.js?v=da7619ccc1f1';
-import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=da7619ccc1f1';
+import {APKError} from './apk-runtime.js?v=a104526a388b';
+import {PathApproxProvider} from './path-approx-provider.js?v=a104526a388b';
+import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=a104526a388b';
+import {createFontFallback} from './font-fallback.js?v=a104526a388b';
+import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=a104526a388b';
 const MAX_WASM=16*1024*1024,MAX_FONT=4*1024*1024,MAX_MODULE=1024*1024;
 const hash=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
 async function read(fetchImpl,url,limit){
@@ -28,6 +28,23 @@ export class SkiaProvider{
   this.baseURL=baseURL;this.codecTimeoutMs=codecTimeoutMs;this.codecReadBytes=codecReadBytes;this.fontReader=fontReader;this.metadata=metadata;this.wasmBytes=wasmBytes;this.fontBytes=fontBytes;this.moduleBytes=moduleBytes;this.fetch=typeof fetchImpl==='function'?fetchImpl.bind(globalThis):null;this.initialize=initialize;this.pathApproxProvider=pathApproxProvider;this.pending=null;
  }
  load({onProgress=null}={}){return this.pending??=this.loadOnce(onProgress).catch(error=>{this.pending=null;throw error;});}
+ // Asset bytes fetched ahead, while the Worker waits for an APK (src/apk-worker.js warmAssets): the image codec modules apk-loader prepares for most apps, and the font fallback
+ // manifest (android-fonts) that the first text run Roboto cannot cover reads with a synchronous XMLHttpRequest inside the launch. Nothing is checked or parsed here: the reads
+ // that take these bytes apply the limits and integrity checks they always did, and a prefetch that failed (or exceeds the reader's limit) is read again by that reader.
+ prefetch(){
+  if(this.prefetched||typeof this.fetch!=='function'||this.codecReadBytes||this.fontReader)return this.prefetched??null;
+  const node=typeof globalThis.process==='object'&&!!globalThis.process.versions?.node;if(node)return null;
+  this.prefetched={bytes:new Map(),sync:new Map()};
+  const codecs=this.codecBaseURL();
+  for(const[name,limit]of[['provenance.json',1<<20],['lab-codecs.mjs',1<<20],['lab-codecs.wasm',16<<20],['lab-avif.mjs',1<<20],['lab-avif.wasm',16<<20]]){const url=new URL(name,codecs);const job=read(this.fetch,url,limit);job.catch(()=>{});this.prefetched.bytes.set(url.href,job);}
+  const manifest=new URL('manifest.json',this.fallbackBaseURL());
+  read(this.fetch,manifest,2*1024*1024).then(bytes=>{this.prefetched.sync.set(manifest.href,bytes);},()=>{});
+  return this.prefetched;
+ }
+ codecBaseURL(){return new URL('../../lab-codecs/'+LAB_CODECS_VERSION+'/',this.baseURL);}
+ fallbackBaseURL(){return new URL('../../android-fonts/android-13.0.0_r1/',this.baseURL);}
+ /** The prefetched bytes of `url` (taken once), else a read. */
+ readCodecBytes(url,limit){const job=this.prefetched?.bytes.get(String(url));if(job){this.prefetched.bytes.delete(String(url));return job.then(bytes=>bytes.length>limit?read(this.fetch,url,limit):bytes,()=>read(this.fetch,url,limit));}return read(this.fetch,url,limit);}
  async loadOnce(onProgress){
   await onProgress?.({phase:'skia',completed:0,total:3,message:'Loading official Skia CPU WebAssembly'});
   const metadata=this.metadata??JSON.parse(new TextDecoder().decode(await read(this.fetch,new URL('provenance.json',this.baseURL),1024*1024)));
@@ -64,12 +81,13 @@ export class SkiaProvider{
   const selectTypeface=(weight=400,italic=false)=>{if(!Number.isInteger(weight)||weight<0||weight>1000)throw new APKError('Roboto font weight must be0..1000',{kind:'font-unavailable'});const key=weight+':'+italic;if(!selectedFaces.has(key)){const face=fontManager.matchFamilyStyle('Roboto',{weight,width:5,slant:italic?1:0});if(!face)throw new APKError('Skia FontMgr did not find an installed Roboto face');selectedFaces.set(key,face);}return selectedFaces.get(key);};
   let readSync=this.fontReader??browserSyncReader;
   if(!this.fontReader&&node){const fs=await import('node:fs'),{fileURLToPath}=await import('node:url');readSync=(url,limit)=>{const bytes=new Uint8Array(fs.readFileSync(fileURLToPath(url)));if(bytes.length>limit)throw new APKError('Skia fallback font exceeds VM limit');return bytes;};}
-  const fallback=createFontFallback({CK,baseURL:new URL('../../android-fonts/android-13.0.0_r1/',this.baseURL),readSync,robotoFiles:fonts.map(f=>({file:f.file,bytes:assets[f.file]})),selectTypeface});
+  if(!this.fontReader&&!node){const direct=readSync;readSync=(url,limit)=>{const key=String(url),hit=this.prefetched?.sync.get(key);if(hit){this.prefetched.sync.delete(key);if(hit.length<=limit)return hit;}return direct(url,limit);};}   // a prefetched manifest instead of a synchronous request
+  const fallback=createFontFallback({CK,baseURL:this.fallbackBaseURL(),readSync,robotoFiles:fonts.map(f=>({file:f.file,bytes:assets[f.file]})),selectTypeface});
   const pathApprox=await(this.pathApproxProvider??new PathApproxProvider({fetchImpl:this.fetch})).load();
   const result={pathApprox,codecs:null,codecsError:null,prepareCodecs:null,CanvasKit:CK,typeface,fontManager,selectTypeface,fallback,metadata:{...metadata,enabled:true,backend:'official-Skia-Wasm/CPU-MakeSurface',integrity:'verified-SHA-256',wasmTransport:node?'verified-local-file':'verified-Blob-URL',heapBytes:CK.HEAPU8.buffer.byteLength,font:'Roboto Regular',fontMatching:'original-Skia-FontMgr/nearest-installed-style',domRequired:false,webGLRequired:false,pathApproximation:pathApprox.metadata,textShaping:'Roboto simple glyph runs; other text is itemized through the Android 13 fallback chain (vendor/android-fonts) and shaped by SkParagraph/HarfBuzz; code points no chain font has fail explicitly'},createHost:runtime=>createSkiaCanvasHost(runtime,result),measureText:(text,state={})=>measureSkiaText(result,text,state),rasterizeCanvas:(runtime,graphics,receiver,width,height,options)=>rasterizeSkiaCanvas(runtime,result,graphics,receiver,width,height,options)};
   // JPEG/WebP/AVIF codecs (vendor/lab-codecs) are not part of Skia's own load: apk-loader prepares them when the APK can decode or encode images. The load is bounded; a failure is recorded in codecsError
   // (the hosts that need a codec then fail with that message) instead of blocking the run.
-  result.prepareCodecs=()=>this.codecsPending??=loadLabCodecs({baseURL:new URL('../../lab-codecs/'+LAB_CODECS_VERSION+'/',this.baseURL),readBytes:this.codecReadBytes??((url,limit)=>read(this.fetch,url,limit)),timeoutMs:this.codecTimeoutMs}).then(codecs=>{result.codecs=codecs;return codecs;},error=>{result.codecsError=error;return null;});
+  result.prepareCodecs=()=>this.codecsPending??=loadLabCodecs({baseURL:this.codecBaseURL(),readBytes:this.codecReadBytes??((url,limit)=>this.readCodecBytes(url,limit)),timeoutMs:this.codecTimeoutMs}).then(codecs=>{result.codecs=codecs;return codecs;},error=>{result.codecsError=error;return null;});
   await onProgress?.({phase:'skia',completed:3,total:3,message:'Skia CPU rasterizer ready'});return result;
  }
 }

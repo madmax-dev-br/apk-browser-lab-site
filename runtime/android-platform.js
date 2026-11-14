@@ -1,129 +1,130 @@
-import { hostDefinitions } from './host-contract.js?v=da7619ccc1f1';
-import { Invoke } from './interpreter.js?v=da7619ccc1f1';
-import { PACKAGE_VALUE_PARENTS } from './package-value-fields.js?v=da7619ccc1f1';
-import { createComposeCanvasHost } from './compose-canvas-host.js?v=da7619ccc1f1';
-import { createViewTransformHost } from './view-transform-host.js?v=da7619ccc1f1';
-import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=da7619ccc1f1';
-import { createViewOutlineHost } from './view-outline-host.js?v=da7619ccc1f1';
-import { createShaderHost } from './shader-host.js?v=da7619ccc1f1';
-import { createSystemBarsHost } from './system-bars-host.js?v=da7619ccc1f1';
-import { createDeviceStateHost } from './device-state-host.js?v=da7619ccc1f1';
-import { createJobSchedulerHost } from './job-scheduler-host.js?v=da7619ccc1f1';
-import { createPendingIntentHost } from './pending-intent-host.js?v=da7619ccc1f1';
-import { ActivityStarter, activityInfoOf, FLAG as LAUNCH_FLAG } from './activity-starter.js?v=da7619ccc1f1';
-import { ignoreActivityStart } from './ignored-activities.js?v=da7619ccc1f1';
-import { resolveIntentFields } from './intent-resolver.js?v=da7619ccc1f1';
-import { createBinderHost } from './binder-host.js?v=da7619ccc1f1';
-import { createInputManagerHost } from './input-native.js?v=da7619ccc1f1';
-import { createBackDispatcherHost } from './back-dispatcher-host.js?v=da7619ccc1f1';
-import { createRenderThreadAnimators } from './rt-animators.js?v=da7619ccc1f1';
-import { renderNodeByHandle } from './rendernode-native.js?v=da7619ccc1f1';
-import { resolveDevice } from './device-profile.js?v=da7619ccc1f1';
-import { configurationFor } from './device-configuration.js?v=da7619ccc1f1';
-import { createViewCoordinateHost } from './view-coordinate-host.js?v=da7619ccc1f1';
-import { createEditableTextHost } from './editable-text-host.js?v=da7619ccc1f1';
-import { createComponentCallbacksHost } from './component-callbacks-host.js?v=da7619ccc1f1';
-import { createViewStateHost } from './view-state-host.js?v=da7619ccc1f1';
-import { createLocaleServiceHost } from './locale-service-host.js?v=da7619ccc1f1';
-import { APKError } from './apk-runtime.js?v=da7619ccc1f1';
-import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=da7619ccc1f1';
-import { createViewTreeHost } from './view-tree-host.js?v=da7619ccc1f1';
-import { createDialogWindowHost } from './dialog-window-host.js?v=da7619ccc1f1';
-import { createStrictModeHost } from './strictmode-host.js?v=da7619ccc1f1';
-import { createProgressBarApiHost } from './progress-bar-api-host.js?v=da7619ccc1f1';
-import { createViewGroupApiHost } from './viewgroup-api-host.js?v=da7619ccc1f1';
-import { createViewInternalsHost } from './view-internals-host.js?v=da7619ccc1f1';
-import { createViewWindowHost } from './view-window-host.js?v=da7619ccc1f1';
-import { createVectorCanvasHost } from './vector-native.js?v=da7619ccc1f1';
-import { createPaintHost } from './paint-host.js?v=da7619ccc1f1';
-import { createContentResolverHost } from './content-resolver-host.js?v=da7619ccc1f1';
-import { createDrawableViewHost } from './drawable-view-host.js?v=da7619ccc1f1';
-import { createDeviceServicesHost } from './device-services-host.js?v=da7619ccc1f1';
-import { createSystemServicesHost } from './system-services-host.js?v=da7619ccc1f1';
-import { createJavaIoHost } from './java-io-host.js?v=da7619ccc1f1';
-import { createClassLoaderHost } from './class-loader-host.js?v=da7619ccc1f1';
-import { createAppServicesHost } from './app-services-host.js?v=da7619ccc1f1';
-import { createConcurrencyHost } from './concurrency-host.js?v=da7619ccc1f1';
-import { createLooperHost } from './looper-host.js?v=da7619ccc1f1';
-import { createDateTimeHost } from './datetime-host.js?v=da7619ccc1f1';
+import { hostDefinitions } from './host-contract.js?v=a104526a388b';
+import { Invoke } from './interpreter.js?v=a104526a388b';
+import { PACKAGE_VALUE_PARENTS } from './package-value-fields.js?v=a104526a388b';
+import { createComposeCanvasHost } from './compose-canvas-host.js?v=a104526a388b';
+import { createViewTransformHost } from './view-transform-host.js?v=a104526a388b';
+import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=a104526a388b';
+import { createViewOutlineHost } from './view-outline-host.js?v=a104526a388b';
+import { createShaderHost } from './shader-host.js?v=a104526a388b';
+import { createSystemBarsHost } from './system-bars-host.js?v=a104526a388b';
+import { createDeviceStateHost } from './device-state-host.js?v=a104526a388b';
+import { createJobSchedulerHost } from './job-scheduler-host.js?v=a104526a388b';
+import { createPendingIntentHost } from './pending-intent-host.js?v=a104526a388b';
+import { ActivityStarter, activityInfoOf, FLAG as LAUNCH_FLAG } from './activity-starter.js?v=a104526a388b';
+import { ignoreActivityStart } from './ignored-activities.js?v=a104526a388b';
+import { resolveIntentFields } from './intent-resolver.js?v=a104526a388b';
+import { createBinderHost } from './binder-host.js?v=a104526a388b';
+import { createInputManagerHost } from './input-native.js?v=a104526a388b';
+import { createBackDispatcherHost } from './back-dispatcher-host.js?v=a104526a388b';
+import { createRenderThreadAnimators } from './rt-animators.js?v=a104526a388b';
+import { renderNodeByHandle } from './rendernode-native.js?v=a104526a388b';
+import { resolveDevice } from './device-profile.js?v=a104526a388b';
+import { configurationFor } from './device-configuration.js?v=a104526a388b';
+import { createViewCoordinateHost } from './view-coordinate-host.js?v=a104526a388b';
+import { createEditableTextHost } from './editable-text-host.js?v=a104526a388b';
+import { createComponentCallbacksHost } from './component-callbacks-host.js?v=a104526a388b';
+import { createViewStateHost } from './view-state-host.js?v=a104526a388b';
+import { createLocaleServiceHost } from './locale-service-host.js?v=a104526a388b';
+import { APKError } from './apk-runtime.js?v=a104526a388b';
+import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=a104526a388b';
+import { createViewTreeHost } from './view-tree-host.js?v=a104526a388b';
+import { createDialogWindowHost } from './dialog-window-host.js?v=a104526a388b';
+import { createStrictModeHost } from './strictmode-host.js?v=a104526a388b';
+import { createProgressBarApiHost } from './progress-bar-api-host.js?v=a104526a388b';
+import { createViewGroupApiHost } from './viewgroup-api-host.js?v=a104526a388b';
+import { createViewInternalsHost } from './view-internals-host.js?v=a104526a388b';
+import { createViewWindowHost } from './view-window-host.js?v=a104526a388b';
+import { createVectorCanvasHost } from './vector-native.js?v=a104526a388b';
+import { createPaintHost } from './paint-host.js?v=a104526a388b';
+import { createContentResolverHost } from './content-resolver-host.js?v=a104526a388b';
+import { createDrawableViewHost } from './drawable-view-host.js?v=a104526a388b';
+import { createDeviceServicesHost } from './device-services-host.js?v=a104526a388b';
+import { createSystemServicesHost } from './system-services-host.js?v=a104526a388b';
+import { createJavaIoHost } from './java-io-host.js?v=a104526a388b';
+import { createClassLoaderHost } from './class-loader-host.js?v=a104526a388b';
+import { createAppServicesHost } from './app-services-host.js?v=a104526a388b';
+import { createConcurrencyHost } from './concurrency-host.js?v=a104526a388b';
+import { createLooperHost } from './looper-host.js?v=a104526a388b';
+import { createDateTimeHost } from './datetime-host.js?v=a104526a388b';
 const LOCALE_CONSTANTS = { US: 'en-US', UK: 'en-GB', ENGLISH: 'en', ROOT: 'und', CANADA: 'en-CA', CANADA_FRENCH: 'fr-CA', FRANCE: 'fr-FR', FRENCH: 'fr', GERMAN: 'de', GERMANY: 'de-DE', ITALIAN: 'it', ITALY: 'it-IT', JAPAN: 'ja-JP', JAPANESE: 'ja', KOREA: 'ko-KR', KOREAN: 'ko', CHINA: 'zh-CN', CHINESE: 'zh', PRC: 'zh-CN', SIMPLIFIED_CHINESE: 'zh-CN', TAIWAN: 'zh-TW', TRADITIONAL_CHINESE: 'zh-TW' };
-import { createNumberFormatHost } from './number-format-host.js?v=da7619ccc1f1';
-import { createCookieHost } from './cookie-host.js?v=da7619ccc1f1';
-import { createViewApiHost } from './view-api-host.js?v=da7619ccc1f1';
-import { createActionModeHost } from './action-mode-host.js?v=da7619ccc1f1';
-import { createTextViewApiHost } from './textview-api-host.js?v=da7619ccc1f1';
-import { createIntentApiHost } from './intent-api-host.js?v=da7619ccc1f1';
-import { createImageDecoderHost } from './image-decoder-host.js?v=da7619ccc1f1';
-import { createAnimatedImageHost } from './animated-image-host.js?v=da7619ccc1f1';
-import { createPlatformDataClassesHost } from './platform-data-classes-host.js?v=da7619ccc1f1';
-import { createToastHost } from './toast-host.js?v=da7619ccc1f1';
-import { createIcuTextHost } from './icu-text-host.js?v=da7619ccc1f1';
-import { createMiscPlatformHost } from './misc-platform-host.js?v=da7619ccc1f1';
-import { createRemoteViewsHost } from './remote-views-host.js?v=da7619ccc1f1';
-import { createPackageManagerApiHost } from './package-manager-api-host.js?v=da7619ccc1f1';
-import { createPackageValueObjectsHost } from './package-value-objects.js?v=da7619ccc1f1';
-import { createNetworkInfoHost } from './network-info-host.js?v=da7619ccc1f1';
-import { createApkChecksumsHost } from './apk-checksums-host.js?v=da7619ccc1f1';
-import { createContentResolverApiHost } from './content-resolver-api-host.js?v=da7619ccc1f1';
-import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=da7619ccc1f1';
-import { createImageViewApiHost } from './image-view-api-host.js?v=da7619ccc1f1';
-import { createUriApiHost } from './uri-api-host.js?v=da7619ccc1f1';
-import { createFormatterHost } from './formatter-host.js?v=da7619ccc1f1';
-import { createJcaHost } from './jca-host.js?v=da7619ccc1f1';
-import { createIcuBidiHost } from './icu-bidi-host.js?v=da7619ccc1f1';
-import { createSecurityHost } from './security-host.js?v=da7619ccc1f1';
-import { createReflectionHost } from './reflection-host.js?v=da7619ccc1f1';
-import { createSerializationHost } from './serialization-host.js?v=da7619ccc1f1';
-import { createBitmapCodecHost } from './bitmap-codec-host.js?v=da7619ccc1f1';
-import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=da7619ccc1f1';
-import { createImageViewHost } from './image-view-host.js?v=da7619ccc1f1';
-import { createWebViewHost } from './webview-host.js?v=da7619ccc1f1';
-import { createContentExtrasHost } from './content-extras-host.js?v=da7619ccc1f1';
-import { createPreferenceManagerHost } from './preference-manager-host.js?v=da7619ccc1f1';
-import { createProcessHost } from './process-host.js?v=da7619ccc1f1';
-import { createStatsHost } from './stats-host.js?v=da7619ccc1f1';
-import { createTelephonyHost } from './telephony-host.js?v=da7619ccc1f1';
-import { createSurfaceTextureHost } from './surface-texture-host.js?v=da7619ccc1f1';
-import { createCameraHost } from './camera-host.js?v=da7619ccc1f1';
-import { createScaleGestureHost } from './scale-gesture-host.js?v=da7619ccc1f1';
-import { createBuildHost } from './build-host.js?v=da7619ccc1f1';
-import { createSensorHost } from './sensor-host.js?v=da7619ccc1f1';
-import { createGeocoderHost } from './geocoder-host.js?v=da7619ccc1f1';
-import { createCoreLangHost } from './core-lang-host.js?v=da7619ccc1f1';
-import { createResourcesExtrasHost } from './resources-extras-host.js?v=da7619ccc1f1';
-import { createSimpleTimeZoneHost } from './simple-timezone-host.js?v=da7619ccc1f1';
-import { createActivityManagerExtrasHost } from './activity-manager-extras-host.js?v=da7619ccc1f1';
-import { createManagersExtrasHost } from './managers-extras-host.js?v=da7619ccc1f1';
-import { createStrictMathHost } from './strict-math-host.js?v=da7619ccc1f1';
-import { createLocaleExtrasHost } from './locale-extras-host.js?v=da7619ccc1f1';
-import { createUnicodeHost } from './unicode-host.js?v=da7619ccc1f1';
-import { createMessageFormatHost } from './message-format-host.js?v=da7619ccc1f1';
-import { createSettingsHost } from './settings-host.js?v=da7619ccc1f1';
-import { createHardwareServicesHost } from './hardware-services-host.js?v=da7619ccc1f1';
-import { createPermissionHost } from './permission-host.js?v=da7619ccc1f1';
-import { createPeripheralServicesHost } from './peripheral-services-host.js?v=da7619ccc1f1';
-import { createStorageServicesHost } from './storage-services-host.js?v=da7619ccc1f1';
-import { createSharedStorageHost } from './shared-storage-host.js?v=da7619ccc1f1';
-import { createSystemManagersHost } from './system-managers-host.js?v=da7619ccc1f1';
-import { createJavaServicesHost } from './java-services-host.js?v=da7619ccc1f1';
-import { DEVICE_FEATURES } from './service-kit.js?v=da7619ccc1f1';
-import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=da7619ccc1f1';
-import { createViewTouchHost } from './view-touch-host.js?v=da7619ccc1f1';
-import { createMagnifierHost } from './magnifier-host.js?v=da7619ccc1f1';
-import { createDisplayHost } from './display-host.js?v=da7619ccc1f1';
-import { createNotificationHost } from './notification-host.js?v=da7619ccc1f1';
-import { createDatabaseSupportHost } from './database-support-host.js?v=da7619ccc1f1';
-import { VMClock } from './vm-clock.js?v=da7619ccc1f1';
-import { createWindowInsetsHost } from './window-insets-host.js?v=da7619ccc1f1';
-import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=da7619ccc1f1';
-import { createViewLayoutHost } from './view-layout-host.js?v=da7619ccc1f1';
-import { createInputMethodServiceHost } from './input-method-service-host.js?v=da7619ccc1f1';
-import { createAutofillServiceHost } from './autofill-service-host.js?v=da7619ccc1f1';
-import { createClipboardServiceHost } from './clipboard-service-host.js?v=da7619ccc1f1';
-import { createViewInputHost } from './view-input-host.js?v=da7619ccc1f1';
-import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=da7619ccc1f1';
-import { WEB_DEVICE_CONFIGURATION } from './resource-config-provider.js?v=da7619ccc1f1';
-import { maybeCollect, ephemeronMap } from './heap-gc.js?v=da7619ccc1f1';
+import { createNumberFormatHost } from './number-format-host.js?v=a104526a388b';
+import { createCookieHost } from './cookie-host.js?v=a104526a388b';
+import { createViewApiHost } from './view-api-host.js?v=a104526a388b';
+import { createActionModeHost } from './action-mode-host.js?v=a104526a388b';
+import { createTextViewApiHost } from './textview-api-host.js?v=a104526a388b';
+import { createIntentApiHost } from './intent-api-host.js?v=a104526a388b';
+import { createImageDecoderHost } from './image-decoder-host.js?v=a104526a388b';
+import { createAnimatedImageHost } from './animated-image-host.js?v=a104526a388b';
+import { createPlatformDataClassesHost } from './platform-data-classes-host.js?v=a104526a388b';
+import { createToastHost } from './toast-host.js?v=a104526a388b';
+import { createIcuTextHost } from './icu-text-host.js?v=a104526a388b';
+import { createMiscPlatformHost } from './misc-platform-host.js?v=a104526a388b';
+import { createRemoteViewsHost } from './remote-views-host.js?v=a104526a388b';
+import { createPackageManagerApiHost } from './package-manager-api-host.js?v=a104526a388b';
+import { createPackageValueObjectsHost } from './package-value-objects.js?v=a104526a388b';
+import { createNetworkInfoHost } from './network-info-host.js?v=a104526a388b';
+import { createApkChecksumsHost } from './apk-checksums-host.js?v=a104526a388b';
+import { createContentResolverApiHost } from './content-resolver-api-host.js?v=a104526a388b';
+import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=a104526a388b';
+import { createImageViewApiHost } from './image-view-api-host.js?v=a104526a388b';
+import { createUriApiHost } from './uri-api-host.js?v=a104526a388b';
+import { createFormatterHost } from './formatter-host.js?v=a104526a388b';
+import { createJcaHost } from './jca-host.js?v=a104526a388b';
+import { createIcuBidiHost } from './icu-bidi-host.js?v=a104526a388b';
+import { createSecurityHost } from './security-host.js?v=a104526a388b';
+import { createReflectionHost } from './reflection-host.js?v=a104526a388b';
+import { createSerializationHost } from './serialization-host.js?v=a104526a388b';
+import { createBitmapCodecHost } from './bitmap-codec-host.js?v=a104526a388b';
+import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=a104526a388b';
+import { createImageViewHost } from './image-view-host.js?v=a104526a388b';
+import { createWebViewHost } from './webview-host.js?v=a104526a388b';
+import { createContentExtrasHost } from './content-extras-host.js?v=a104526a388b';
+import { createPreferenceManagerHost } from './preference-manager-host.js?v=a104526a388b';
+import { createProcessHost } from './process-host.js?v=a104526a388b';
+import { createStatsHost } from './stats-host.js?v=a104526a388b';
+import { createTelephonyHost } from './telephony-host.js?v=a104526a388b';
+import { createSurfaceTextureHost } from './surface-texture-host.js?v=a104526a388b';
+import { createCameraHost } from './camera-host.js?v=a104526a388b';
+import { createScaleGestureHost } from './scale-gesture-host.js?v=a104526a388b';
+import { createBuildHost } from './build-host.js?v=a104526a388b';
+import { createSensorHost } from './sensor-host.js?v=a104526a388b';
+import { createGeocoderHost } from './geocoder-host.js?v=a104526a388b';
+import { createCoreLangHost } from './core-lang-host.js?v=a104526a388b';
+import { createResourcesExtrasHost } from './resources-extras-host.js?v=a104526a388b';
+import { createSimpleTimeZoneHost } from './simple-timezone-host.js?v=a104526a388b';
+import { createActivityManagerExtrasHost } from './activity-manager-extras-host.js?v=a104526a388b';
+import { createManagersExtrasHost } from './managers-extras-host.js?v=a104526a388b';
+import { createStrictMathHost } from './strict-math-host.js?v=a104526a388b';
+import { createLocaleExtrasHost } from './locale-extras-host.js?v=a104526a388b';
+import { createUnicodeHost } from './unicode-host.js?v=a104526a388b';
+import { createMessageFormatHost } from './message-format-host.js?v=a104526a388b';
+import { createSettingsHost } from './settings-host.js?v=a104526a388b';
+import { createHardwareServicesHost } from './hardware-services-host.js?v=a104526a388b';
+import { createPermissionHost } from './permission-host.js?v=a104526a388b';
+import { createPeripheralServicesHost } from './peripheral-services-host.js?v=a104526a388b';
+import { createStorageServicesHost } from './storage-services-host.js?v=a104526a388b';
+import { createSharedStorageHost } from './shared-storage-host.js?v=a104526a388b';
+import { createSystemManagersHost } from './system-managers-host.js?v=a104526a388b';
+import { createJavaServicesHost } from './java-services-host.js?v=a104526a388b';
+import { DEVICE_FEATURES } from './service-kit.js?v=a104526a388b';
+import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=a104526a388b';
+import { createViewTouchHost } from './view-touch-host.js?v=a104526a388b';
+import { createMagnifierHost } from './magnifier-host.js?v=a104526a388b';
+import { createDisplayHost } from './display-host.js?v=a104526a388b';
+import { createNotificationHost } from './notification-host.js?v=a104526a388b';
+import { createDatabaseSupportHost } from './database-support-host.js?v=a104526a388b';
+import { VMClock } from './vm-clock.js?v=a104526a388b';
+import { createWindowInsetsHost } from './window-insets-host.js?v=a104526a388b';
+import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=a104526a388b';
+import { createViewLayoutHost } from './view-layout-host.js?v=a104526a388b';
+import { createInputMethodServiceHost } from './input-method-service-host.js?v=a104526a388b';
+import { createAutofillServiceHost } from './autofill-service-host.js?v=a104526a388b';
+import { createClipboardServiceHost } from './clipboard-service-host.js?v=a104526a388b';
+import { createViewInputHost } from './view-input-host.js?v=a104526a388b';
+import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=a104526a388b';
+import { WEB_DEVICE_CONFIGURATION } from './resource-config-provider.js?v=a104526a388b';
+import { maybeCollect, ephemeronMap } from './heap-gc.js?v=a104526a388b';
+import { BackgroundFloor, BACKGROUND_FLOOR_SLICE_MAX_MS } from './background-floor.js?v=a104526a388b';
 
 const ACTIVITY = 'Landroid/app/Activity;', INTENT = 'Landroid/content/Intent;', BUNDLE = 'Landroid/os/Bundle;';
 const APPLICATION = 'Landroid/app/Application;', APP_CONTEXT = 'Landroid/app/ContextImpl;';
@@ -145,6 +146,24 @@ const PACKAGE_MANAGER = 'Landroid/content/pm/PackageManager;', APPLICATION_INFO 
 const CONFIGURATION = 'Landroid/content/res/Configuration;', METRICS = 'Landroid/util/DisplayMetrics;';
 const INFLATER = 'Landroid/view/LayoutInflater;', ATTRIBUTES = 'Lapkweb/bridge/AttributeSet;';
 const WINDOW = 'Landroid/view/Window;', PORTER_MODE = 'Landroid/graphics/PorterDuff$Mode;';
+// AndroidPlatform.invoke's dispatch chain after the contract hosts, in its order: each entry says whether its host claims a key (a fixed key set) and serves the call, or answers
+// CHAIN_NEXT to let the next claiming host have it (the dialog window host serves only the calls on its own windows).
+const CHAIN_NEXT = Symbol('next host of the chain'), NO_ROUTE = Object.freeze([]);
+const chainEntry = (field, serve = function (runtime, method, args) { return this[field].invoke(runtime, method, args); }) => Object.assign(serve, { claims: (platform, key) => platform[field].supports(key) });
+const CHAIN_HOSTS = [
+  chainEntry('systemBarsHost', function (runtime, method, args) {
+    const name = method.name, receiver = args[0];
+    if (method.owner === WINDOW && runtime.object(receiver).webPhoneWindow) { if (name === 'getInsetsController') return this.systemBarsHost.windowController(runtime, receiver); return /^get/.test(name) ? (name.startsWith('is') ? 0 : 0) : undefined; }
+    return this.systemBarsHost.invoke(runtime, method, args);
+  }),
+  chainEntry('dialogWindowHost', function (runtime, method, args) { return this.dialogWindowHost.handles(runtime, method, args) ? this.dialogWindowHost.invoke(runtime, method, args) : CHAIN_NEXT; }),
+  ...['viewOutlineHost', 'composeCanvasHost', 'viewTransformHost', 'viewPropertyAnimatorHost', 'viewCoordinateHost', 'editableTextHost', 'componentCallbacksHost', 'viewStateHost', 'localeService',
+    'viewWindowHost', 'canvasHost', 'paintHost', 'contentHost', 'drawableViewHost', 'deviceServices', 'insetsHost', 'accessibilityService', 'viewLayoutHost', 'inputMethodService',
+    'autofillService', 'clipboardService', 'viewInputHost'].map(field => chainEntry(field)),
+  Object.assign(function (runtime, method, args) { return this.xmlHost.invoke(runtime, method, args); }, { claims: (platform, key) => XML_METHODS.has(key) }),
+  chainEntry('viewTreeHost'),
+  Object.assign(function (runtime, method, args) { return this.styleBackend.invoke(runtime, method, args); }, { claims: (platform, key) => STYLE_METHODS.has(key) }),
+];
 const LAYOUT_PARAMS = 'Landroid/view/ViewGroup$LayoutParams;', MARGIN_PARAMS = 'Landroid/view/ViewGroup$MarginLayoutParams;';
 const EDITABLE = 'Lapkweb/bridge/Editable;';
 const PROCESS_INFO = 'Landroid/app/ActivityManager$RunningAppProcessInfo;';
@@ -976,16 +995,19 @@ export class AndroidPlatform {
 
   viewRoots(runtime) { return this.dialogWindowHost.roots(runtime); }
   back(runtime) { if(this.dialogWindowHost.back(runtime))return; if (!runtime.activity) error('No active Activity to navigate back from'); if (this.backDispatcher.dispatchBack(runtime, runtime.activity)) return; return runtime.dispatch({ owner: ACTIVITY, name: 'onBackPressed', signature: '()V', parameters: [], result: 'V' }, [runtime.activity], 'virtual'); }
-  /** Does any host of the dispatch chain in invoke() claim this method? Memoised per key: most bridged calls (collections, atomics, threads) are claimed by none, and asking about fifty hosts cost more than the call. */
-  chainTouches(key) {
-    if (this.chainCacheFor !== this.contractHosts.length) { this.chainCache = new Map(); this.chainCacheFor = this.contractHosts.length; }
-    const cache = this.chainCache; let answer = cache.get(key);
-    if (answer === undefined) cache.set(key, answer = this.contractHosts.some(host => host.supports(key)) || this.systemBarsHost.supports(key) || this.dialogWindowHost.supports(key) || this.viewOutlineHost.supports(key) || this.composeCanvasHost.supports(key) || this.viewTransformHost.supports(key) || this.viewPropertyAnimatorHost.supports(key) || this.viewCoordinateHost.supports(key) || this.editableTextHost.supports(key) || this.componentCallbacksHost.supports(key) || this.viewStateHost.supports(key) || this.localeService.supports(key) || this.viewWindowHost.supports(key) || this.canvasHost.supports(key) || this.paintHost.supports(key) || this.contentHost.supports(key) || this.drawableViewHost.supports(key) || this.deviceServices.supports(key) || this.insetsHost.supports(key) || this.accessibilityService.supports(key) || this.viewLayoutHost.supports(key) || this.inputMethodService.supports(key) || this.autofillService.supports(key) || this.clipboardService.supports(key) || this.viewInputHost.supports(key) || this.viewTreeHost.supports(key) || XML_METHODS.has(key) || STYLE_METHODS.has(key));
-    return answer;
+  /**
+   * The hosts of invoke()'s dispatch chain that claim `key`, in the chain's order (CHAIN_HOSTS), memoised per key like chainTouches: every host's `supports` is a fixed key set, so
+   * the answer depends on the key alone. Before, every bridged call into the chain rebuilt the key text once per host it asked (up to 26 strings, flattened and hashed for each lookup).
+   */
+  chainRoute(key) {
+    if (this.chainRouteFor !== this.contractHosts.length) { this.chainRoutes = new Map(); this.chainRouteFor = this.contractHosts.length; }
+    let route = this.chainRoutes.get(key);
+    if (route === undefined) { route = CHAIN_HOSTS.filter(entry => entry.claims(this, key)); this.chainRoutes.set(key, route = route.length ? route : NO_ROUTE); }
+    return route;
   }
-  invoke(runtime, method, args) {
+  invoke(runtime, method, args, mode, knownKey) {
     const owner = method.owner, name = method.name, receiver = args[0];
-    const key = `${owner}->${name}${method.signature}`;
+    const key = knownKey ?? `${owner}->${name}${method.signature}`;   // knownKey: the bridge's key (APKRuntime.bridgeCore), the same text
     {   // the contract host that serves the key is remembered once found (about thirty hosts were asked on every bridged call); a miss is remembered while no host defines a method (hostDefinitions)
       // and the host list is the same, since hosts can define methods later
       const routes = this.contractRoutes ??= new Map(); let host = routes.get(key);
@@ -996,35 +1018,8 @@ export class AndroidPlatform {
       }
       if (host !== undefined) return host.invoke(runtime, method, args);
     }
-    if (this.chainTouches(key)) {
-      if (this.systemBarsHost.supports(`${owner}->${name}${method.signature}`)) { if (owner === WINDOW && runtime.object(receiver).webPhoneWindow) { if (name === 'getInsetsController') return this.systemBarsHost.windowController(runtime, receiver); return /^get/.test(name) ? (name.startsWith('is') ? 0 : 0) : undefined; } return this.systemBarsHost.invoke(runtime, method, args); }
-      if (this.dialogWindowHost.supports(`${owner}->${name}${method.signature}`) && this.dialogWindowHost.handles(runtime,method,args)) return this.dialogWindowHost.invoke(runtime,method,args);
-      if (this.viewOutlineHost.supports(`${owner}->${name}${method.signature}`)) return this.viewOutlineHost.invoke(runtime, method, args);
-      if (this.composeCanvasHost.supports(`${owner}->${name}${method.signature}`)) return this.composeCanvasHost.invoke(runtime, method, args);
-      if (this.viewTransformHost.supports(`${owner}->${name}${method.signature}`)) return this.viewTransformHost.invoke(runtime, method, args);
-      if (this.viewPropertyAnimatorHost.supports(`${owner}->${name}${method.signature}`)) return this.viewPropertyAnimatorHost.invoke(runtime, method, args);
-      if (this.viewCoordinateHost.supports(`${owner}->${name}${method.signature}`)) return this.viewCoordinateHost.invoke(runtime, method, args);
-      if (this.editableTextHost.supports(`${owner}->${name}${method.signature}`)) return this.editableTextHost.invoke(runtime, method, args);
-      if (this.componentCallbacksHost.supports(`${owner}->${name}${method.signature}`)) return this.componentCallbacksHost.invoke(runtime, method, args);
-      if (this.viewStateHost.supports(`${owner}->${name}${method.signature}`)) return this.viewStateHost.invoke(runtime, method, args);
-      if (this.localeService.supports(`${owner}->${name}${method.signature}`)) return this.localeService.invoke(runtime, method, args);
-      if (this.viewWindowHost.supports(`${owner}->${name}${method.signature}`)) return this.viewWindowHost.invoke(runtime, method, args);
-      if (this.canvasHost.supports(`${owner}->${name}${method.signature}`)) return this.canvasHost.invoke(runtime, method, args);
-      if (this.paintHost.supports(`${owner}->${name}${method.signature}`)) return this.paintHost.invoke(runtime, method, args);
-      if (this.contentHost.supports(`${owner}->${name}${method.signature}`)) return this.contentHost.invoke(runtime, method, args);
-      if (this.drawableViewHost.supports(`${owner}->${name}${method.signature}`)) return this.drawableViewHost.invoke(runtime, method, args);
-      if (this.deviceServices.supports(`${owner}->${name}${method.signature}`)) return this.deviceServices.invoke(runtime, method, args);
-      if (this.insetsHost.supports(`${owner}->${name}${method.signature}`)) return this.insetsHost.invoke(runtime, method, args);
-      if (this.accessibilityService.supports(`${owner}->${name}${method.signature}`)) return this.accessibilityService.invoke(runtime, method, args);
-      if (this.viewLayoutHost.supports(`${owner}->${name}${method.signature}`)) return this.viewLayoutHost.invoke(runtime, method, args);
-      if (this.inputMethodService.supports(`${owner}->${name}${method.signature}`)) return this.inputMethodService.invoke(runtime, method, args);
-      if (this.autofillService.supports(`${owner}->${name}${method.signature}`)) return this.autofillService.invoke(runtime, method, args);
-      if (this.clipboardService.supports(`${owner}->${name}${method.signature}`)) return this.clipboardService.invoke(runtime, method, args);
-      if (this.viewInputHost.supports(`${owner}->${name}${method.signature}`)) return this.viewInputHost.invoke(runtime, method, args);
-      if (XML_METHODS.has(`${owner}->${name}${method.signature}`)) return this.xmlHost.invoke(runtime, method, args);
-      if (this.viewTreeHost.supports(`${owner}->${name}${method.signature}`)) return this.viewTreeHost.invoke(runtime, method, args);
-      if (STYLE_METHODS.has(`${owner}->${name}${method.signature}`)) return this.styleBackend.invoke(runtime, method, args);
-    }
+    const route = this.chainRoute(key);
+    for (let i = 0; i < route.length; i++) { const result = route[i].call(this, runtime, method, args); if (result !== CHAIN_NEXT) return result; }
     if (owner === 'Landroid/app/ActivityManager;') { const fields = runtime.object(args[0]).fields, running = !this.taskClosed; for (const [field, value] of Object.entries({ pid: this.virtualProcess.pid, uid: this.virtualProcess.uid, importance: running ? 100 : 400, lastTrimLevel: 0, lru: 0, importanceReasonCode: 0, processState: this.frames.some(frame => frame.lifecycleStage === 4) ? 2 : 6 })) runtime.storeField(fields, `${PROCESS_INFO}->${field}:I`, value); runtime.record('PROCESS virtual foreground state (logical IDs; no host telemetry)'); return; }
     if (owner === PROCESS_INFO) {
       const fields = runtime.object(receiver).fields;
@@ -2032,7 +2027,9 @@ export class AndroidPlatform {
     if (!this.vmRuntime?.gcDeferral || this.mainThreadMotion() !== 'input') return null;
     return Math.max(1, Math.ceil(GC_INPUT_SETTLE_MS - (performance.now() - this.lastInputAt)) + 1);
   }
-  drainEvents(runtime, { now = this.clock.now(), maxEvents = 32 } = {}) {
+  // `untilFrame`: the pump ends once a Choreographer frame (or traversal) committed a new frame, so its caller can show it before the next one runs (the Worker's frame pacing,
+  // src/apk-worker.js drainReadyEvents); the events still due stay queued, in their order, for the next pump.
+  drainEvents(runtime, { now = this.clock.now(), maxEvents = 32, untilFrame = false } = {}) {
     if (!Number.isFinite(now) || !Number.isInteger(maxEvents) || maxEvents < 1 || maxEvents > 256) error('Invalid bounded message queue drain');
     this.vmRuntime = runtime;
     if (now > this.clock.now()) this.clock.skip(now - this.clock.now() + 1e-6);   // a caller that names a later time (tests, tools) says that time has arrived: the Java queue reads the VM clock
@@ -2051,7 +2048,21 @@ export class AndroidPlatform {
     const firstFrameDone = (this.viewWindowHost?.frameState?.().framesRun ?? 1) > 0, MAIN_BUDGET_MS = 16;
     const inMotion = () => { const motion = this.mainThreadMotion(); return motion === 'frame-pending' || motion === 'frame-running' || motion === 'input'; };
     let backgroundMs = 0;
-    const drainStart = performance.now();
+    const floor = this.backgroundFloor ??= new BackgroundFloor(), floorPending = () => runtime.multiThreaded && runtime.scheduler.hasRunnable();
+    floor.observe(performance.now(), firstFrameDone && floorPending());
+    // The background floor (src/background-floor.js): what background threads are owed runs between two main-thread events, before the next one, in slices of at most
+    // BACKGROUND_FLOOR_SLICE_MAX_MS; only once the screen has frames (the launch has its own 2 ms slices).
+    const payFloor = () => {
+      if (!firstFrameDone || !runtime.multiThreaded) return;
+      for (let n = 0; n < 4; n++) {
+        floor.observe(performance.now(), floorPending()); const owed = floor.owed();
+        if (owed < 1 || !floor.pending) return;
+        const at = performance.now(); runtime.steps = 0; runtime.sliceDeadline = at + Math.min(owed, BACKGROUND_FLOOR_SLICE_MAX_MS);
+        try { runtime.monitor.sliceRan(); runtime.runThreads(); } finally { runtime.sliceDeadline = 0; const ms = performance.now() - at; floor.record(ms); backgroundMs += ms; }
+      }
+    };
+    const drainStart = performance.now(), framesRun = () => this.viewWindowHost?.frameState?.().framesRun ?? 0, framesBefore = untilFrame ? framesRun() : 0;
+    let framed = false;
     // One main-thread event: the watchdog, the clock and the collector see it as they always did; the original Looper.loopOnce (or, for a UI event that jumps the queue, the Runnable itself) runs it.
     const runEvent = due => {
       const event = due.event, hostMark = runtime.hostAllocs.length;
@@ -2078,22 +2089,24 @@ export class AndroidPlatform {
     };
     for (let round = 0, slices = 0; round < 64 && (round === 0 || performance.now() - drainStart < DRAIN_HOST_BUDGET_MS); round++) {   // one pump returns to its caller within ~DRAIN_HOST_BUDGET_MS of host time (the page, input and the next pump get their turn)
       let ran = 0; const roundStart = performance.now();
-      for (let due; processed < maxEvents && (due = nextDue());) {
+      for (let due; processed < maxEvents && (payFloor(), due = nextDue());) {   // the floor runs before the next event is chosen (what it posts is then in the queue, as on a device)
         if (runtime.monitor.active) runtime.monitor.tick();
         runtime.stressCollect();   // APKWEB_GC_STRESS: whatever the next task needs must be reachable now
         ran++; runEvent(due); processed++;
+        if (untilFrame && framesRun() > framesBefore) { framed = true; break; }
         if (performance.now() - roundStart > MAIN_BUDGET_MS && runtime.multiThreaded && runtime.scheduler.hasRunnable()) break;   // background work gets its turn between main-thread events
       }
+      if (framed) break;   // a committed frame goes to the page before any background slice: a slice here (one that could not be preempted ran 20-70 ms) would hold the frame back
       const moving = firstFrameDone && inMotion(), sliceMs = !firstFrameDone ? 2 : moving ? MOTION_SLICE_MS : 8;
-      if (moving && backgroundMs >= MOTION_BACKGROUND_BUDGET_MS) { if (!ran) break; continue; }   // the screen moves: background had its share of this pump; the main thread's next event or frame comes first
-      if (runtime.multiThreaded && slices < 64 && runtime.scheduler.hasRunnable()) { const sliceStart = performance.now(); runtime.steps = 0; runtime.sliceDeadline = performance.now() + sliceMs; try { runtime.monitor.sliceRan(); runtime.runThreads(); } finally { runtime.sliceDeadline = 0; backgroundMs += performance.now() - sliceStart; } processed++; slices++; ran++;
+      if (moving && backgroundMs >= MOTION_BACKGROUND_BUDGET_MS) { if (!ran || framed) break; continue; }   // the screen moves: background had its share of this pump; the main thread's next event or frame comes first
+      if (runtime.multiThreaded && slices < 64 && runtime.scheduler.hasRunnable()) { const sliceStart = performance.now(), sliceLog = runtime.sliceLog, mark = sliceLog ? sliceLog.sliceBegin(runtime) : null; runtime.steps = 0; runtime.sliceDeadline = performance.now() + sliceMs; try { runtime.monitor.sliceRan(); runtime.runThreads(); } finally { runtime.sliceDeadline = 0; backgroundMs += performance.now() - sliceStart; if (mark) sliceLog.sliceEnd(runtime, mark, runtime.scheduler.lastPicked?.name, false); floor.record(performance.now() - sliceStart); } processed++; slices++; ran++;
         // A slice that could not be preempted (one thread inside a long native call) kept the processor far beyond its share while the other runnable threads waited. On a device they would
         // have run in parallel during that time, so they get that time now (bounded), before the main thread's next event, even while the screen moves (the frame was already late by the whole overrun): work an app starts on a second thread and expects done "long before"
         // a slow first thread finishes (an initialization queue next to a script-loading thread) otherwise loses to the first frame.
         const overrun = performance.now() - sliceStart - sliceMs;
-        if (overrun > PARALLEL_CREDIT_MIN_MS && runtime.scheduler.hasRunnable()) { runtime.steps = 0; runtime.sliceDeadline = performance.now() + Math.min(overrun, PARALLEL_CREDIT_MAX_MS); try { runtime.monitor.sliceRan(); runtime.runThreads(); } finally { runtime.sliceDeadline = 0; } slices++; }
+        if (overrun > PARALLEL_CREDIT_MIN_MS && runtime.scheduler.hasRunnable()) { const creditMark = sliceLog ? sliceLog.sliceBegin(runtime) : null, creditStart = performance.now(); runtime.steps = 0; runtime.sliceDeadline = performance.now() + Math.min(overrun, PARALLEL_CREDIT_MAX_MS); try { runtime.monitor.sliceRan(); runtime.runThreads(); } finally { runtime.sliceDeadline = 0; if (creditMark) sliceLog.sliceEnd(runtime, creditMark, runtime.scheduler.lastPicked?.name, true); floor.record(performance.now() - creditStart); } slices++; }
       }
-      if (!ran) break;
+      if (!ran || framed) break;
     }
     // MessageQueue.next(): the thread that finished a message goes back to next(), which runs the IdleHandlers when nothing is due and then blocks (the call ends with a LooperYield).
     if (looper.armed && !this.runningIdle && !nextDue()) {

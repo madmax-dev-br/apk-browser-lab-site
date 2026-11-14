@@ -1,4 +1,4 @@
-import { sharedAssetBytes } from './shared-asset-bytes.js?v=da7619ccc1f1';
+import { sharedAssetBytes } from './shared-asset-bytes.js?v=a104526a388b';
 
 const TYPES = { character: 0, word: 1, line: 2, sentence: 3 };
 const MAX_HANDLES = 16384, MAX_TEXT = 65536, MAX_WASM = 4 * 1024 * 1024, MAX_DATA = 8 * 1024 * 1024;

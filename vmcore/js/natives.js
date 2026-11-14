@@ -5,7 +5,7 @@
 // instance methods the JavaScript VM bridges for them (src/apk-runtime.js addBridge lists): a virtual call then resolves as it does there, to the C native when there is one
 // and to an unbound method otherwise, and a DEX class that overrides hashCode/equals/toString takes the slot of Object's.
 const STRING = 'Ljava/lang/String;', OBJECT = 'Ljava/lang/Object;';
-export const ATOMIC_INTEGER = 'Ljava/util/concurrent/atomic/AtomicInteger;';
+export const ATOMIC_INTEGER = 'Ljava/util/concurrent/atomic/AtomicInteger;', ATOMIC_REFERENCE = 'Ljava/util/concurrent/atomic/AtomicReference;';
 export const NATIVE_KEYS = [
   null,
   'Ljava/lang/Float;->floatToIntBits(F)I', 'Ljava/lang/Double;->doubleToLongBits(D)J', `${OBJECT}-><init>()V`,
@@ -25,8 +25,17 @@ export const NATIVE_KEYS = [
   // natives bound by the bridge the JavaScript VM selects (BRIDGE_NATIVES below), not by method key: no entry here
   null, null, null, null, null, null, null, null, null, null, null, null,
   `${OBJECT}->notify()V`, `${OBJECT}->notifyAll()V`, `${OBJECT}->wait()V`, `${OBJECT}->wait(J)V`, `${OBJECT}->wait(JI)V`,   // vmcore/threads.c
+  // pure statics a Compose frame calls hundreds of times (each a host crossing before): the bridge chunk's answers
+  'Ljava/lang/Float;->isNaN(F)Z', 'Ljava/lang/Float;->isInfinite(F)Z', 'Ljava/lang/Float;->isFinite(F)Z', 'Ljava/lang/Double;->isNaN(D)Z', 'Ljava/lang/Double;->isInfinite(D)Z',
+  'Ljava/lang/Double;->isFinite(D)Z', 'Ljava/lang/Math;->round(F)I', 'Ljava/lang/Integer;->hashCode(I)I',
+  // bound by bridge (BRIDGE_NATIVES): Thread.currentThread / Thread.getId over the thread identity of HostState, Class.isInstance / Class.getComponentType (classes.c)
+  null, null, null, null,
+  null,   // bound by bridge: AtomicReference.get over its reference payload
+  'Ljava/lang/Float;->compare(FF)I', 'Ljava/lang/Double;->compare(DD)I',   // pure statics a Compose frame calls about 150 times
 ];
 const BRIDGE_FIRST = NATIVE_KEYS.indexOf(`${STRING}-><init>([CII)V`) + 1;   // natives.h NATIVE_BOX_VALUE_OF_B
+const IDENTITY_FIRST = NATIVE_KEYS.indexOf('Ljava/lang/Integer;->hashCode(I)I') + 1;   // natives.h NATIVE_THREAD_CURRENT
+export const THREAD = 'Ljava/lang/Thread;', CURRENT_THREAD_KEY = `${THREAD}->currentThread()${THREAD}`, THREAD_GET_ID_KEY = `${THREAD}->getId()J`;
 /** The java.lang box classes by kind (natives.h BOX_*: Z B S C I J F D). */
 export const BOX_CLASSES = ['Ljava/lang/Boolean;', 'Ljava/lang/Byte;', 'Ljava/lang/Short;', 'Ljava/lang/Character;', 'Ljava/lang/Integer;', 'Ljava/lang/Long;', 'Ljava/lang/Float;', 'Ljava/lang/Double;'];
 export const BOX_LETTERS = 'ZBSCIJFD';
@@ -45,6 +54,12 @@ export const BRIDGE_NATIVES = new Map([
   [`${OBJECT}->getClass()Ljava/lang/Class;`, { id: NATIVE_KEYS.indexOf(`${OBJECT}->getClass()Ljava/lang/Class;`), anyReceiver: true }],   // NATIVE_OBJECT_GET_CLASS: the receiver's class's Class object, the one classObject(type) answers
   // DIRECT_BRIDGES' AtomicInteger.get and compareAndSet over `atomicValue`; the natives check the receiver's class themselves (a subclass defers to the bridge)
   [`${ATOMIC_INTEGER}->get()I`, { id: BRIDGE_FIRST + 10, anyReceiver: true }], [`${ATOMIC_INTEGER}->compareAndSet(II)Z`, { id: BRIDGE_FIRST + 11, anyReceiver: true }],
+  // the thread identity the bridges last answered (natives.h HostState, filled and cleared by host-bridge.js); getId answers only for the current thread's own object
+  [CURRENT_THREAD_KEY, { id: IDENTITY_FIRST }], [THREAD_GET_ID_KEY, { id: IDENTITY_FIRST + 1, anyReceiver: true }],
+  // the Class bridges' isInstance and getComponentType over the receiver's Class record (java.lang.Class is final: every receiver is a Class object)
+  ['Ljava/lang/Class;->isInstance(Ljava/lang/Object;)Z', { id: IDENTITY_FIRST + 2, anyReceiver: true }], ['Ljava/lang/Class;->getComponentType()Ljava/lang/Class;', { id: IDENTITY_FIRST + 3, anyReceiver: true }],
+  // the atomics bridge's AtomicReference.get over `atomicValue`, a reference payload (host-linking.js); the native checks the receiver's class itself
+  [`${ATOMIC_REFERENCE}->get()Ljava/lang/Object;`, { id: IDENTITY_FIRST + 4, anyReceiver: true }],
 ]);
 /** The String constructors the core serves (the linker rewrites calls of them to INVOKE_STRING_INIT, classes.h). */
 export const STRING_CONSTRUCTORS = new Set(NATIVE_KEYS.filter(key => key?.startsWith(`${STRING}-><init>`)));

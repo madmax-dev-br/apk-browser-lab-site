@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=da7619ccc1f1';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=da7619ccc1f1';
-import { colorLongToArgb } from './color-long.js?v=da7619ccc1f1';
+import { APKError } from './apk-error.js?v=a104526a388b';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=a104526a388b';
+import { colorLongToArgb } from './color-long.js?v=a104526a388b';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -14,6 +14,8 @@ const float = raw => { bits.setInt32(0, raw, true); return bits.getFloat32(0, tr
 const rawFloat = value => { bits.setFloat32(0, value, true); return bits.getInt32(0, true); };
 const paintHandles = new WeakMap();
 function handleRegistry(runtime) { let state=paintHandles.get(runtime);if(!state){state={next:0x500000000n,values:new Map()};paintHandles.set(runtime,state);}return state; }
+/** How many Paint.getNativeInstance() tokens are live (tests). */
+export const paintTokenCount=runtime=>handleRegistry(runtime).values.size;
 export function getPaintStateByHandle(runtime,handle){
   const reference=handleRegistry(runtime).values.get(handle);if(!reference)fail('Invalid VM Paint token; this is not a native memory address');
   return getPaintState(runtime,reference);
@@ -123,7 +125,9 @@ export function createPaintHost() {
         if(sameTextLocales(runtime,value,paint.textLocalesRef))return;paint.textLocalesRef=value;paint.textLocaleTag=runtime.javaString(invokeLocale(runtime,locale,'toLanguageTag',[],'Ljava/lang/String;',invokeLocale(runtime,list,'get',['I'],locale,value,[0])));return;
       }
       if(name==='getNativeInstance'){
-        const registry=handleRegistry(runtime);if(!object.paintHandle){if(registry.values.size>=65536)fail('VM Paint token limit exceeded');object.paintHandle=registry.next++;registry.values.set(object.paintHandle,args[0]);}
+        // The token goes with its Java owner, as Paint's NativeAllocationRegistry frees the native Paint: a screen that makes Paints on every frame (text measured and drawn anew) must
+        // not use the table up. A full table collects first, so the cleaners of unreachable Paints release theirs.
+        const registry=handleRegistry(runtime);if(!object.paintHandle){if(registry.values.size>=65536)runtime.collectForNativeHandles?.('android.graphics.Paint');if(registry.values.size>=65536)fail('VM Paint token limit exceeded');const handle=object.paintHandle=registry.next++,previous=object.onFree;registry.values.set(handle,args[0]);object.onFree=()=>{if(typeof previous==='function')previous();registry.values.delete(handle);};}
         runtime.record('HOST Paint.getNativeInstance [opaque VM Paint token; not native memory]');return object.paintHandle;
       }
       if(name==='getStartHyphenEdit')return paint.hyphenEdit>>>3;

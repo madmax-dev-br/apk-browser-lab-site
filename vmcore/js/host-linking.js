@@ -22,17 +22,19 @@
 //     answers (RESOLVE_THROW: NoClassDefFoundError, NoSuchMethodError...) stand: the JavaScript VM throws them at the same instruction.
 //  7. The java.lang box classes get a payload (natives.h: the value and a state word; 16 bytes, 24 for Long and Double) and the HostState record (VM.hostState) names their
 //     Class records and the boxPrimitive caches, so the box natives (natives.c, bound by vmcore/js/host-bridge.js to the bridges the JavaScript VM selects) and the record
-//     facades' `boxed` (host-bridge.js) share one value. AtomicInteger gets the same payload for its `atomicValue` (its get/compareAndSet natives).
+//     facades' `boxed` (host-bridge.js) share one value. AtomicInteger gets the same payload for its `atomicValue` (its get/compareAndSet natives); AtomicReference a reference
+//     payload for its `atomicValue` (its get native).
 //  8. An interface method of the app that only a host superclass implements (linker.buildVtable leaves the abstract interface method in the slot): a host-dispatch record of
 //     the nearest host superclass, selected by APKRuntime.dispatch.
 //  5. Constructors of Throwable classes without DEX code are host methods like any other (not METHOD_THROWABLE_INIT): the JavaScript VM's constructor bridges keep the message,
 //     cause and captured stack on the record, which here is the companion, where Throwable's host methods read them.
 
-import { BOX_CLASSES, ATOMIC_INTEGER } from './natives.js?v=da7619ccc1f1';
+import { BOX_CLASSES, ATOMIC_INTEGER, ATOMIC_REFERENCE } from './natives.js?v=a104526a388b';
 
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;';
-// natives.h HostState: boxClass[8] then boxCache[8]; the box payload sizes; the kinds with a boxPrimitive cache (B S C I J)
-const VM_HOST_STATE = 44, HOST_STATE_BYTES = 72, HOST_STATE_ATOMIC_INTEGER = 64, BOX_CACHE_SLOTS = 256, CACHED_KINDS = [1, 2, 3, 4, 5], CLASS_INSTANCE_SIZE = 4;
+// natives.h HostState: boxClass[8] then boxCache[8], atomicIntegerClass, the thread identity (HOST_STATE_THREAD); the box payload sizes; the kinds with a boxPrimitive cache (B S C I J)
+export const HOST_STATE_THREAD = { valid: 72, object: 76, idValid: 80, id: 88 };
+const VM_HOST_STATE = 44, HOST_STATE_BYTES = 104, HOST_STATE_ATOMIC_INTEGER = 64, HOST_STATE_ATOMIC_REFERENCE = 96, CLASS_REF_MAP = 8, BOX_CACHE_SLOTS = 256, CACHED_KINDS = [1, 2, 3, 4, 5], CLASS_INSTANCE_SIZE = 4;
 const CLASS_VTABLE = 24, CLASS_ITABLE = 32, METHOD_KIND = 12, METHOD_FLAGS = 20, METHOD_VTABLE_INDEX = 24;
 const METHOD_UNBOUND = 0x7fff0003, METHOD_THROWABLE_INIT = 0x7fff0004, METHOD_HOST_DISPATCH = 64, M_INTERFACE = 32, M_ABSTRACT = 16, NO_SLOT = 0xffffffff;
 const K_NEW = 3, K_IFIELD = 4, K_SFIELD = 5, K_VIRTUAL = 6, K_SUPER = 7, K_DIRECT = 8, K_STATIC = 9, K_INTERFACE = 10, RESOLVE_CODE = 0xffffffff, RESOLVE_WELL_KNOWN = 0xffffff00, UNRESOLVED = 34;
@@ -95,6 +97,9 @@ export function installHostLinking(linker, runtime, { staticValue }) {
       this.w32(hostState + 4 * box, info.address); info.boxKind = box;
     } else if (type === ATOMIC_INTEGER) {   // (7): `atomicValue` as an Integer's payload
       info.instanceSize = 16; this.w32(info.address + CLASS_INSTANCE_SIZE, 16); this.w32(hostState + HOST_STATE_ATOMIC_INTEGER, info.address); info.memoryProperty = 'atomicValue';
+    } else if (type === ATOMIC_REFERENCE) {   // (7): `atomicValue` as a reference at +8 (in the refMap: the collector traces it, subclasses inherit it) with a state word at +12
+      info.instanceSize = 16; info.refs = [8]; this.w32(info.address + CLASS_INSTANCE_SIZE, 16); this.w32(info.address + CLASS_REF_MAP, this.countedList(info.refs));
+      this.w32(hostState + HOST_STATE_ATOMIC_REFERENCE, info.address); info.memoryProperty = 'atomicReference';
     }
     if (type === OBJECT || type === STRING || info.isInterface) return info;
     let changed = false;

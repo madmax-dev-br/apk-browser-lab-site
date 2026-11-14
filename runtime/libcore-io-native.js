@@ -1,12 +1,12 @@
-import { APKError } from './apk-error.js?v=da7619ccc1f1';
-import { throwNew } from './java-throw.js?v=da7619ccc1f1';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=da7619ccc1f1';
-import { networkOf, isIpLiteral } from './network-native.js?v=da7619ccc1f1';
-import { Blocked } from './scheduler.js?v=da7619ccc1f1';
-import { installUdp } from './udp-native.js?v=da7619ccc1f1';
-import { createLoopback } from './loopback-socket.js?v=da7619ccc1f1';
-import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=da7619ccc1f1';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=da7619ccc1f1';
+import { APKError } from './apk-error.js?v=a104526a388b';
+import { throwNew } from './java-throw.js?v=a104526a388b';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=a104526a388b';
+import { networkOf, isIpLiteral } from './network-native.js?v=a104526a388b';
+import { Blocked } from './scheduler.js?v=a104526a388b';
+import { installUdp } from './udp-native.js?v=a104526a388b';
+import { createLoopback } from './loopback-socket.js?v=a104526a388b';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=a104526a388b';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=a104526a388b';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -100,7 +100,9 @@ function bufferAccess(runtime, buffer, offset, count) {
   const object = runtime.object(buffer);
   if (object.type === '[B') {
     if (offset < 0 || count < 0 || offset > object.elements.length - count) runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `length=${object.elements.length}; regionStart=${offset}; regionLength=${count}`);
-    return { get: () => Uint8Array.from(object.elements.slice(offset, offset + count), v => v & 255), put: bytes => { for (let i = 0; i < bytes.length; i++) object.elements[offset + i] = (bytes[i] << 24) >> 24; } };
+    // the array's storage is read and written once per call, not through the record per element (an asset read 8 KiB at a time crossed ~16 000 accessors per read)
+    return { get: () => { const cells = object.elements; return ArrayBuffer.isView(cells) && cells.BYTES_PER_ELEMENT === 1 ? new Uint8Array(cells.buffer, cells.byteOffset + offset, count).slice() : Uint8Array.from(cells.slice(offset, offset + count), v => v & 255); },
+      put: bytes => { const cells = object.elements; if (ArrayBuffer.isView(cells) && cells.BYTES_PER_ELEMENT === 1 && bytes.length <= count) new Uint8Array(cells.buffer, cells.byteOffset + offset, bytes.length).set(bytes); else for (let i = 0; i < bytes.length; i++) cells[offset + i] = (bytes[i] << 24) >> 24; } };
   }
   const address = BigInt.asIntN(64, object.fields.get('Ljava/nio/Buffer;->address:J') ?? 0n) + BigInt(offset);   // direct ByteBuffer: libcore reads it through GetDirectBufferAddress
   return { get: () => readNativeBytes(runtime, address, count), put: bytes => writeNativeBytes(runtime, address, bytes) };

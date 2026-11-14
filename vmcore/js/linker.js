@@ -31,9 +31,9 @@
 // Threads (vmcore/threads.h, vmcore/js/threads.js): the linker lives in one thread, its owner; Workers send their env.resolve requests to it through a slot in ThreadsState.
 // Whatever a reader tests to see a record as published (a constant's `a`, Method.kind, the class and string counts) is written last, with Atomics.store.
 
-import { CORE_NATIVES, HOST_VIRTUALS, HOST_INTERFACE_METHODS, STRING_CONSTRUCTORS } from './natives.js?v=da7619ccc1f1';
-import { CLASS_STRING, STRING_LAYOUT, literalBytes, writeLiteral } from './strings.js?v=da7619ccc1f1';
-import { WELL_KNOWN, RESOLVE_WELL_KNOWN } from './exceptions.js?v=da7619ccc1f1';
+import { CORE_NATIVES, HOST_VIRTUALS, HOST_INTERFACE_METHODS, STRING_CONSTRUCTORS } from './natives.js?v=a104526a388b';
+import { CLASS_STRING, STRING_LAYOUT, literalBytes, writeLiteral } from './strings.js?v=a104526a388b';
+import { WELL_KNOWN, RESOLVE_WELL_KNOWN } from './exceptions.js?v=a104526a388b';
 
 export const CLASS = { super: 0, instanceSize: 4, refMap: 8, flags: 12, depth: 16, display: 20, vtable: 24, vtableLength: 28, itable: 32, itableLength: 36, statics: 40, staticRefMap: 44,
   initState: 48, initThread: 52, initList: 56, clinit: 60, component: 64, accessFlags: 68, id: 72, SIZE: 76 };
@@ -77,6 +77,13 @@ for (let op = 0xd0; op <= 0xe2; op++) UNITS[op] = 2;
 for (const op of [0x03, 0x06, 0x09, 0x14, 0x17, 0x1b, 0x24, 0x25, 0x26, 0x2a, 0x2b, 0x2c, 0xfc, 0xfd]) UNITS[op] = 3;
 for (const op of [0x6e, 0x6f, 0x70, 0x71, 0x72, 0x74, 0x75, 0x76, 0x77, 0x78, 0xf0, 0xf1]) UNITS[op] = 3;
 UNITS[0xfa] = 4; UNITS[0xfb] = 4; UNITS[0x18] = 5;
+/** The constant kind of each opcode's pool operand (0: none): const-string(/jumbo), const-class, check-cast / instance-of, new-instance, the array allocations, field and invoke ops. */
+const OPERAND_KIND = new Uint8Array(256);
+OPERAND_KIND[0x1a] = K_STRING; OPERAND_KIND[0x1b] = K_STRING; OPERAND_KIND[0x1c] = K_CLASS; OPERAND_KIND[0x1f] = K_TYPE; OPERAND_KIND[0x20] = K_TYPE; OPERAND_KIND[0x22] = K_NEW;
+for (const op of [0x23, 0x24, 0x25]) OPERAND_KIND[op] = K_ARRAY;
+for (let op = 0x52; op <= 0x5f; op++) OPERAND_KIND[op] = K_IFIELD;
+for (let op = 0x60; op <= 0x6d; op++) OPERAND_KIND[op] = K_SFIELD;
+for (const [op, kind] of Object.entries(INVOKE_KIND)) OPERAND_KIND[op] = kind;
 const payloadUnits = (units, pc) => {
   const ident = units[pc];
   if (ident === 0x0100) return units[pc + 1] * 2 + 4;
@@ -85,6 +92,7 @@ const payloadUnits = (units, pc) => {
   return 1;
 };
 
+const LITTLE_ENDIAN = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 const width = type => type === 'J' || type === 'D' ? 8 : type === 'B' || type === 'Z' ? 1 : type === 'S' || type === 'C' ? 2 : 4;
 const isReference = type => type[0] === 'L' || type[0] === '[';
 const wordCount = parameters => parameters.reduce((n, type) => n + (type === 'J' || type === 'D' ? 2 : 1), 0);
@@ -96,7 +104,7 @@ export class Linker {
    * -> native id for methods without DEX code (the core's NATIVE_* ids).
    */
   constructor(runtime, { memory, metaStart, metaEnd, natives = DEFAULT_NATIVES, maxMethods = 1 << 16, maxClasses = 1 << 16, maxStrings = 1 << 16 }) {
-    this.r = runtime; this.memory = memory; this.top = metaStart; this.end = metaEnd; this.natives = natives;
+    this.r = runtime; this.memory = memory; this.unsharedMemory = !(typeof SharedArrayBuffer === 'function' && memory.buffer instanceof SharedArrayBuffer); this.top = metaStart; this.end = metaEnd; this.natives = natives;
     this.maxMethods = maxMethods; this.maxClasses = maxClasses; this.maxStrings = maxStrings;
     this.classes = new Map(); this.classList = []; this.methodList = []; this.methodsAt = new Map(); this.strings = new Map(); this.error = null;
     this.core = null; this.thread = 0; this.defaultThread = 0;   // bindCore: the exports that make interned String records for static initial values, and a thread to allocate as
@@ -112,13 +120,21 @@ export class Linker {
   }
 
   // ---- memory
-  get u32() { if (this.view?.buffer.byteLength !== this.memory.buffer.byteLength) this.view = new Uint32Array(this.memory.buffer); return this.view; }
+  // The view of the memory, renewed when the memory grew. Unshared, a grow detaches the old buffer (its view's length drops to 0), so a live view is current without asking the
+  // memory for its buffer: that getter, on every word read or written, was ~17 ms of a launch (heavy example). Shared, the old buffer stays valid but short: compare lengths.
+  get u32() {
+    const view = this.view;
+    if (view !== undefined && (this.unsharedMemory ? view.length !== 0 : view.buffer.byteLength === this.memory.buffer.byteLength)) return view;
+    return this.view = new Uint32Array(this.memory.buffer);
+  }
+  /** A byte view of the same buffer as `u32` (renewed with it). */
+  get u8() { const words = this.u32; if (this.view8 === undefined || this.view8Of !== words) { this.view8 = new Uint8Array(words.buffer); this.view8Of = words; } return this.view8; }
   w32(at, value) { this.u32[at >>> 2] = value >>> 0; }
   r32(at) { return this.u32[at >>> 2]; }
   w64(at, value) { const v = BigInt.asUintN(64, value); this.w32(at, Number(v & 0xffffffffn)); this.w32(at + 4, Number(v >> 32n)); }
   alloc(bytes, alignment = 8) {
     const at = align(this.top, alignment); if (at + bytes > this.end) throw new Error(`vmcore linker: metaspace exhausted (${this.end - at} bytes left, ${bytes} wanted)`);
-    this.top = at + bytes; new Uint8Array(this.memory.buffer, at, bytes).fill(0); return at;
+    this.top = at + bytes; this.u8.fill(0, at, at + bytes); return at;
   }
   words(values) { const at = this.alloc(4 * Math.max(1, values.length), 4); values.forEach((v, i) => this.w32(at + 4 * i, v)); return at; }
   countedList(values) { return values.length ? this.words([values.length, ...values]) : 0; }
@@ -432,28 +448,28 @@ export class Linker {
   linkCode(mi) {
     if (this.r32(mi.address + METHOD.kind) !== METHOD_UNLINKED) return;
     const code = mi.def.code, dex = mi.def.method.dex, bytes = dex.reader.bytes, n = code.units;
-    const units = new Uint16Array(n); for (let i = 0; i < n; i++) units[i] = bytes[code.offset + 2 * i] | (bytes[code.offset + 2 * i + 1] << 8);
+    // the code units are little-endian in the file: on a little-endian host an aligned range is copied as it is
+    let units; const at = bytes.byteOffset + code.offset;
+    if (LITTLE_ENDIAN && (at & 1) === 0) units = new Uint16Array(bytes.buffer, at, n).slice();
+    else { units = new Uint16Array(n); for (let i = 0; i < n; i++) units[i] = bytes[code.offset + 2 * i] | (bytes[code.offset + 2 * i + 1] << 8); }
     mi.original = units.slice(); const pool = [], entries = new Map();
     const constant = (kind, index) => {
-      const key = kind * 0x100000000 + index; let at = entries.get(key);
+      const key = index * 16 + kind; let at = entries.get(key);   // kind < 16: one key per (kind, index), a small integer for every 16-bit index
       if (at === undefined) { at = pool.length; if (at > 0xffff) throw new Error(`${mi.key}: more than 65536 constants`); pool.push({ kind, index }); entries.set(key, at); }
       return at;
     };
     for (let pc = 0; pc < n;) {
-      const op = units[pc] & 255;
-      if (op === 0 && units[pc] !== 0) { pc += payloadUnits(units, pc); continue; }
-      if (op === 0x1a) units[pc + 1] = constant(K_STRING, units[pc + 1]);
-      else if (op === 0x1b) { units[pc + 1] = constant(K_STRING, units[pc + 1] | (units[pc + 2] << 16)); units[pc + 2] = 0; }
-      else if (op === 0x1c) units[pc + 1] = constant(K_CLASS, units[pc + 1]);
-      else if (op === 0x1f || op === 0x20) units[pc + 1] = constant(K_TYPE, units[pc + 1]);
-      else if (op === 0x22) units[pc + 1] = constant(K_NEW, units[pc + 1]);
-      else if (op === 0x23 || op === 0x24 || op === 0x25) units[pc + 1] = constant(K_ARRAY, units[pc + 1]);
-      else if (op >= 0x52 && op <= 0x5f) units[pc + 1] = constant(K_IFIELD, units[pc + 1]);
-      else if (op >= 0x60 && op <= 0x6d) units[pc + 1] = constant(K_SFIELD, units[pc + 1]);
-      else if ((op === 0x70 || op === 0x76) && this.stringConstructor(dex.method(units[pc + 1]))) {   // a String constructor: the core's own opcode (classes.h), a C native or the host's
-        units[pc] = (units[pc] & 0xff00) | (INVOKE_STRING_INIT + (op === 0x76 ? 1 : 0)); units[pc + 1] = constant(K_DIRECT, units[pc + 1]);
+      const unit = units[pc], op = unit & 255;
+      if (op === 0 && unit !== 0) { pc += payloadUnits(units, pc); continue; }
+      const kind = OPERAND_KIND[op];
+      if (kind !== 0) {
+        if (op === 0x1b) { units[pc + 1] = constant(K_STRING, units[pc + 1] | (units[pc + 2] << 16)); units[pc + 2] = 0; }
+        // a String constructor: the core's own opcode (classes.h), a C native or the host's (the owner is read first: most direct calls are not String's, and their ids stay undecoded)
+        else if ((op === 0x70 || op === 0x76) && dex.methodOwner(units[pc + 1]) === STRING && this.stringConstructor(dex.method(units[pc + 1]))) {
+          units[pc] = (unit & 0xff00) | (INVOKE_STRING_INIT + (op === 0x76 ? 1 : 0)); units[pc + 1] = constant(K_DIRECT, units[pc + 1]);
+        }
+        else units[pc + 1] = constant(kind, units[pc + 1]);
       }
-      else if (INVOKE_KIND[op] !== undefined) units[pc + 1] = constant(INVOKE_KIND[op], units[pc + 1]);
       pc += UNITS[op];
     }
     const tries = this.linkTries(mi, constant);

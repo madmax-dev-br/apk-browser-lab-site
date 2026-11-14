@@ -29,16 +29,22 @@
 //   - One flag and one set of monitors: Thread.interrupted of a VMThread is the record's word (thr_interrupt also takes the thread out of Object.wait); the runtime's monitor
 //     entry points used by host code (monitorTryEnter, monitorExit, monitorFree, monitorEnter, ownsMonitor) are the core's lock words; a thread that ends wakes whoever waits on
 //     its Thread object (ART's notifyAll at thread exit).
-import { Blocked } from '../../runtime/scheduler.js?v=da7619ccc1f1';
+import { Blocked } from '../../runtime/scheduler.js?v=a104526a388b';
 const MAX_LIVE_THREADS = 1000;   // threads.h: tids 1..1022, the collector's thread table holds 1024 (host-bridge.js)
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=da7619ccc1f1';
-import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=da7619ccc1f1';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=a104526a388b';
+import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=a104526a388b';
 
 export const CORE_STATUS = Object.freeze({ OK: 0, OUT_OF_MEMORY: 5, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81, HOST_THROW: 0x7fff0110 });
 const S = CORE_STATUS, CORE_UNSUPPORTED = 6;   // vmcore/abi.h: also what resume/resume_host answer for a record with nothing to resume (detail 0)
 const T = { status: 12, detail: 16, steps: 32, result: 48, calls: 56, stackTop: 2128, frame: 2132, pc: 2136, depth: 2140, throwing: 2144, maxDepth: 2148,
   tid: 2152, state: 2156, flags: 2160, blockWord: 2164, blockValue: 2168, blockedOn: 2172, waitNext: 2176, waitState: 2180, waitMonitor: 2184, waitCount: 2188, waitPhase: 2192,
-  interrupted: 2196, gcSeen: 2200, waitMillis: 2204 };
+  interrupted: 2196, gcSeen: 2200, waitMillis: 2204, quantum: 76 };
+// A background thread's quantum during a slice of the event pump (android-platform.js drainEvents): the slice's deadline is seen only where a quantum ends (YIELDED), and a
+// quantum of 20 000 polls lasts well under a millisecond in plain Java but 20-70 ms when most calls link a method on first use or cross to a host. The scheduler sizes each
+// background thread's quantum (Thread.quantum, abi.h) from how long its last one took, toward QUANTUM_TARGET_MS, within [QUANTUM_MIN, QUANTUM_MAX]: a slice then ends near its
+// deadline, as a preemptive scheduler would end it, and a thread in plain Java yields at most every few hundred microseconds. Nothing the thread runs changes, only where it is
+// preempted. The main thread and runs outside a slice keep the core's own quantum (0).
+const QUANTUM_TARGET_MS = 1, QUANTUM_MIN = 256, QUANTUM_MAX = 20000;
 export const THREADS_STATE_BYTES = 96 + 4 * 1024, MONITOR_BYTES = 48, MONITORS = 4096;
 const FLAG_NO_BLOCK = 1, FLAG_GREEN = 2, WAIT_LISTED = 1, WAIT_REACQUIRE = 2;
 const PARKED = -1, YIELD = -2, DONE = -3;   // advance(): the thread is parked, yielded, or its work is done
@@ -282,6 +288,7 @@ export class CoreThreads {
           stuck = count; engine.collect('run'); status = x.resume(t) >>> 0; continue;
         }
         case S.YIELDED:
+          if (thread.coreQuantum !== 0) this.sizeQuantum(thread, t);
           if (this.mustYield(thread, owner)) { thread.coreWait = { kind: 'yield' }; thread.state = 'runnable'; this.stats.yields++; return YIELD; }
           status = x.resume(t) >>> 0; continue;
         case S.THREAD_BLOCKED:
@@ -296,6 +303,12 @@ export class CoreThreads {
       if (steps.length !== 0 && steps[steps.length - 1].kind === 'own') return status;   // the end of a run host code waits for
       status = this.leave(thread, status);
     }
+  }
+  /** A quantum of a background thread in a slice ended: the next one is sized from how long this one took (the geometric mean of its size and the size that would have taken QUANTUM_TARGET_MS). */
+  sizeQuantum(thread, t) {
+    const now = performance.now(), took = now - thread.coreQuantumAt, size = thread.coreQuantum; thread.coreQuantumAt = now;
+    const wanted = took > 0 ? Math.min(QUANTUM_MAX, Math.max(QUANTUM_MIN, size * QUANTUM_TARGET_MS / took)) : QUANTUM_MAX, mean = Math.round(Math.sqrt(size * wanted)), next = Math.abs(mean - wanted) <= 1 ? Math.round(wanted) : mean;
+    if (next !== size) { thread.coreQuantum = thread.coreQuantumSize = next; this.u32[(t + T.quantum) >> 2] = next; }
   }
   mustYield(thread, owner) {
     const rt = this.rt;
@@ -323,11 +336,19 @@ export class CoreThreads {
       try { sched.idle(choice.earliest, `${owner.name} is blocked (${owner.blocked?.reason ?? 'unknown'})`); } finally { rt.thread = owner; }
     }
   }
+  /** The quantum `thread` runs with: sized for a background thread in a slice with a deadline (QUANTUM_TARGET_MS), the core's own otherwise. */
+  quantumFor(thread, sliced) {
+    const core = thread.core; if (core === undefined || thread === this.sched.mainThread()) return;
+    const size = sliced ? (thread.coreQuantumSize ||= QUANTUM_MAX) : 0;
+    thread.coreQuantum = size; this.u32[(core.t + T.quantum) >> 2] = size;   // written every time: a nested run may have lent the thread another record (borrow)
+    if (sliced) thread.coreQuantumAt = performance.now();
+  }
   /** One slice of `thread` (not the owner): it runs until it parks, yields, or its work is done. */
   guest(thread, owner) {
     const rt = this.rt, previous = rt.thread;
     if (thread !== this.last) this.sched.switching(rt, this.last, thread);
     this.last = thread; rt.thread = thread; this.stats.slices++;
+    this.quantumFor(thread, owner === null && rt.sliceDeadline !== 0 && rt.sliceDeadline !== undefined);
     try { return this.advance(thread, owner, this.resume(thread)); }
     catch (error) { if (thread !== this.sched.mainThread()) rt.noteThreadFailure(thread, error); throw error; }   // a lab error on a background thread: recorded where it happens, whoever catches it
     finally { rt.thread = previous; }

@@ -1,6 +1,6 @@
-import { TimeBreakdown } from './time-breakdown.js?v=da7619ccc1f1';
-import { APKError } from './apk-error.js?v=da7619ccc1f1';
-import { gcBlockReason } from './heap-gc.js?v=da7619ccc1f1';
+import { TimeBreakdown } from './time-breakdown.js?v=a104526a388b';
+import { APKError } from './apk-error.js?v=a104526a388b';
+import { gcBlockReason } from './heap-gc.js?v=a104526a388b';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -50,7 +50,7 @@ export class OperationMonitor {
     event.captured++; event.capturedAt = now;
     let hot = []; try { hot = rt.profile.recentTopOf('main', 3); if (!hot.length) hot = rt.profile.topOf('main', 3); } catch { /* profile not collecting yet */ }
     const inside = main?.nestedDepth > 0 || rt.thread !== main;
-    this.mainBusy = { event: event.what, busyMs: Math.round(now - event.start), frames, hot, hostCall: rt.hostCall ? short(rt.hostCall) : null, resourceCall: rt.lastResourceCall ?? null, thread: rt.thread?.name ?? null, nested: !!inside, ended: false, overdue: this.overdueMessages() };
+    this.mainBusy = { event: event.what, busyMs: Math.round(now - event.start), frames, hot, hostCall: rt.hostCall ? short(rt.hostCall) : null, resourceCall: typeof rt.lastResourceCall === 'function' ? rt.lastResourceCall() : rt.lastResourceCall ?? null, thread: rt.thread?.name ?? null, nested: !!inside, ended: false, overdue: this.overdueMessages() };
   }
   overdueMessages() { const platform = this.rt.platform, queue = platform?.eventQueue ?? [], clock = platform?.clock?.now?.() ?? 0, late = queue.filter(event => !event.front && Number.isFinite(event.when) && event.when < clock - 50); return { count: late.length, oldestMs: late.length ? Math.round(Math.max(...late.map(event => clock - event.when))) : 0 }; }
   mainBusyText() { const b = this.mainBusy; return b ? `Laço da thread principal: ${b.hot.join(', ') || '(sem amostras)'}; frames: ${b.frames.join(' <- ') || '(nenhum)'}${b.hostCall ? `; dentro da chamada do host ${b.hostCall}` : ''}${b.resourceCall ? ` [${b.resourceCall}]` : ''}.` : ''; }

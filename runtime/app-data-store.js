@@ -73,6 +73,8 @@ export function createIndexedDbBackend({ indexedDB = globalThis.indexedDB, name 
   const toBytes = value => value instanceof Uint8Array ? value : new Uint8Array(value);
   return {
     kind: 'indexeddb',
+    /** Opens the database ahead of the first read (the VM Worker does it while the user picks an APK); a failure is forgotten and the next use opens again and reports it. */
+    warm() { return open().then(() => true, () => false); },
     async manifest(key) { const db = await open(); return (await wrap(db.transaction('manifests', 'readonly').objectStore('manifests').get(key))) ?? null; },
     async load(key) {
       const db = await open(), manifest = await wrap(db.transaction('manifests', 'readonly').objectStore('manifests').get(key)); if (!manifest) return null;

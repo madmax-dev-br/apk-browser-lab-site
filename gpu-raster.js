@@ -46,7 +46,13 @@ export function createWebGLRasterEngine(CK, { createCanvas = null } = {}) {
   let gl = null; try { gl = canvas.getContext?.('webgl2') ?? null; } catch { gl = null; } if (!gl) { try { gl = canvas.getContext?.('webgl') ?? null; } catch { gl = null; } }
   const info = { api: gl && typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext ? 'WebGL2' : 'WebGL', renderer: null };
   try { const ext = gl?.getExtension?.('WEBGL_debug_renderer_info'); if (ext) info.renderer = String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) ?? '').slice(0, 160) || null; } catch { /* not exposed */ }
-  let width = 0, height = 0, frames = 0, disposed = false;
+  let width = 0, height = 0, frames = 0, disposed = false, screen = null, screenBase = 1;
+  /** The canvas state of a fresh surface: identity matrix, the whole surface as the clip. */
+  const pristine = (drawing, w, h) => {
+    const m = drawing.getTotalMatrix(), clip = drawing.getDeviceClipBounds();
+    return m[0] === 1 && m[1] === 0 && m[2] === 0 && m[3] === 0 && m[4] === 1 && m[5] === 0 && m[6] === 0 && m[7] === 0 && m[8] === 1 && clip[0] === 0 && clip[1] === 0 && clip[2] === w && clip[3] === h;
+  };
+  const dropScreen = () => { if (screen !== null) { try { screen.delete(); } catch { /* lost context */ } screen = null; } };
   return {
     kind: 'webgl', info,
     isLost() { try { return lost || !!gl?.isContextLost?.(); } catch { return true; } },
@@ -56,13 +62,23 @@ export function createWebGLRasterEngine(CK, { createCanvas = null } = {}) {
       if (disposed) throw new GpuRasterError('o contexto GPU foi descartado');
       if (this.isLost()) throw new GpuRasterError('contexto WebGL perdido');
       if (offscreen) { const target = CK.MakeRenderTarget(gr, w, h); if (!target) throw new GpuRasterError(`o Skia não criou a textura GPU (${w}×${h})`); return target; }
-      if (w !== width || h !== height) { canvas.width = w; canvas.height = h; width = w; height = h; }
-      // A fresh Skia surface on the drawing buffer every frame (a wrapper of the default framebuffer: no allocation), so no matrix or clip of the last replay survives.
-      const surface = CK.MakeOnScreenGLSurface(gr, w, h, CK.ColorSpace.SRGB);
-      if (!surface) throw new GpuRasterError(`o Skia não criou a superfície GPU (${w}×${h})`);
-      return surface;
+      if (w !== width || h !== height) { canvas.width = w; canvas.height = h; width = w; height = h; dropScreen(); }
+      // One Skia surface on the drawing buffer (a wrapper of the default framebuffer) while the size stays: making it again every frame queried the GL state
+      // (getParameter, synchronous) each time. The replay draws inside a save of its own, so restoring to the base count gives the next frame the fresh surface's
+      // identity matrix and open clip; transferToImageBitmap swaps the buffer under the same framebuffer, and every replay clears it first.
+      if (screen !== null) {   // a replay that restored past its own saves changed the base state: that surface is not reused
+        const drawing = screen.getCanvas(); drawing.restoreToCount(screenBase);
+        if (!pristine(drawing, w, h)) dropScreen();
+      }
+      if (screen === null) {
+        screen = CK.MakeOnScreenGLSurface(gr, w, h, CK.ColorSpace.SRGB);
+        if (!screen) throw new GpuRasterError(`o Skia não criou a superfície GPU (${w}×${h})`);
+        screenBase = screen.getCanvas().getSaveCount();
+      }
+      screen.getCanvas().save();
+      return screen;
     },
-    release(target) { try { target?.delete(); } catch { /* lost context */ } },
+    release(target) { if (target === screen) { try { target.getCanvas().restoreToCount(screenBase); } catch { /* lost context */ } return; } try { target?.delete(); } catch { /* lost context */ } },
     finish(target) {
       target.flush();
       let bitmap;
@@ -75,6 +91,7 @@ export function createWebGLRasterEngine(CK, { createCanvas = null } = {}) {
     memory() { let cache = null; try { cache = typeof gr._getResourceCacheUsageBytes === 'function' ? gr._getResourceCacheUsageBytes() : null; } catch { cache = null; } return { drawingBufferBytes: width * height * 4, skiaCacheBytes: Number.isFinite(cache) ? cache : null, frames }; },
     dispose() {
       if (disposed) return; disposed = true;
+      dropScreen();
       try { if (!lost) gr.releaseResourcesAndAbandonContext?.(); } catch { /* lost context */ }
       try { gr.delete(); } catch { /* lost context */ }
       try { gl?.getExtension?.('WEBGL_lose_context')?.loseContext(); } catch { /* not exposed */ }

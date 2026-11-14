@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=da7619ccc1f1';
+import { APKError } from './apk-runtime.js?v=a104526a388b';
 
 const fail = message => { throw new APKError(message, { kind: 'skia-paragraph-unsupported' }); };
 const fontWeightOf = (CK, weight) => { if(!Number.isInteger(weight)||weight<0||weight>1000)fail('Font weight must be in [0,1000]'); return Object.values(CK.FontWeight).find(value=>value?.value===weight)??{value:weight}; };
@@ -172,17 +172,68 @@ export function drawSkiaTextRun(backend,canvas,text,x,y,state={},isRtl=false,pai
  if(![size,scale,skew].every(Number.isFinite)||size<0||size>512||Math.abs(scale)>16||Math.abs(skew)>16)fail('Recorded text font state exceeds limits');
  if(start===end||!size||!scale)return;
  const weight=state.weight??400,italic=!!state.italic;backend.selectTypeface(weight,italic);
+ const decorated=(state.flags&0x18)!==0,cache=shapedRunsOf(CK);
+ // the shaping of a run depends only on these inputs (and on the fonts registered with the paragraph font provider so far): a list re-recorded every frame draws the same runs again
+ const inputs=`${start}|${end}|${isRtl?1:0}|${size}|${weight}|${italic?1:0}|${state.families?.join('\u0002')??''}|${state.fontVariations?.length?JSON.stringify(state.fontVariations):''}|${state.textLocaleTag??'en-US'}|${state.letterSpacing??0}|${state.wordSpacing??0}|${state.flags&0x100?1:0}|${state.hinting===0?1:0}|`;
+ let key=inputs+(backend.fallback?.generation??0)+'|'+text,entry=cache.entries.get(key);
+ if(entry!==undefined&&decorated&&entry.advance===undefined){evictShaped(cache,key,entry);entry=undefined;}   // shaped without the decoration advance: shape again
+ if(entry===undefined){
+  entry=shapeRun(backend,CK,text,state,isRtl,start,end,size,weight,italic,decorated);
+  key=inputs+(backend.fallback?.generation??0)+'|'+text;   // the shaping may have registered the fallback fonts it needed: it is the result for the fonts registered now
+  const stale=cache.entries.get(key);if(stale!==undefined)evictShaped(cache,key,stale);
+  rememberShaped(cache,key,entry);
+ }
+ else{cache.entries.delete(key);cache.entries.set(key,entry);}   // least recently used order
+ if(entry.selected.length===0)return;
+ const fonts=fontsFor(CK,entry,state,skew);
+ canvas.save();try{canvas.translate(x,y);canvas.scale(scale,1);for(let i=0;i<entry.selected.length;i++)canvas.drawGlyphs(entry.selected[i].glyphs,entry.selected[i].positions,0,0,fonts.fonts[i],paint);
+    if(decorated){const metrics=fonts.metrics,advance=entry.advance,decoration=paint.copy();decoration.setStyle(CK.PaintStyle.Fill);if(state.flags&8)canvas.drawRect(CK.XYWHRect(0,metrics.underlinePosition,advance,metrics.underlineThickness),decoration);if(state.flags&16)canvas.drawRect(CK.XYWHRect(0,metrics.strikeoutPosition,advance,metrics.strikeoutThickness),decoration);decoration.delete();}
+ }finally{canvas.restore();}
+}
+/** SkParagraph's shaping of one recorded run: the glyphs and positions of the selected range (origin applied), the typefaces they use (kept), the decoration advance when asked. */
+function shapeRun(backend,CK,text,state,isRtl,start,end,size,weight,italic,decorated){
  const style={fontFamilies:familiesOf(state.families),fontSize:size,...variationsOf(state.fontVariations),locale:state.textLocaleTag??'en-US',fontStyle:{weight:fontWeightOf(CK,weight),width:CK.FontWidth.Normal,slant:italic?CK.FontSlant.Italic:CK.FontSlant.Upright},letterSpacing:(state.letterSpacing??0)*size,wordSpacing:state.wordSpacing??0,fontFeatures:[{name:'kern',value:state.flags&0x100?1:0}]};
- let builder,paragraph,shapedLines;const itemized=itemizeFonts(backend,text,weight,italic);
+ let builder,paragraph,shapedLines,kept=null;const itemized=itemizeFonts(backend,text,weight,italic);
  try{builder=makeParagraphBuilder(backend,CK,new CK.ParagraphStyle({textDirection:isRtl?CK.TextDirection.RTL:CK.TextDirection.LTR,textAlign:CK.TextAlign.Left,disableHinting:state.hinting===0,textStyle:style}),itemized,!!state.families);if(itemized)addParagraphText(backend,builder,text,style,itemized);else builder.addText(text);paragraph=builder.build();paragraph.layout(Math.max(4096,size*(text.length+1)*4+Math.abs((state.letterSpacing??0)*size+(state.wordSpacing??0))*(text.length+1)));
   const missing=unresolved(paragraph);if(missing.length)fail('Recorded text font lacks glyphs: '+missing.slice(0,8).map(c=>'U+'+c.toString(16)).join(','));
   const lines=shapedLines=paragraph.getShapedLines();if(lines.length!==1)fail('Recorded shaping item unexpectedly wraps');const line=lines[0],encoder=new TextEncoder(),from=encoder.encode(text.slice(0,start)).length,to=encoder.encode(text.slice(0,end)).length,clusters=new Set([0,encoder.encode(text).length]);for(const run of line.runs)for(const offset of run.offsets)clusters.add(offset);
   if(!clusters.has(from)||!clusters.has(to))fail('Draw range splits a shaped glyph cluster; native Minikin cluster slicing is required');
   const selected=line.runs.map(run=>{const glyphs=[],positions=[];for(let i=0;i<run.glyphs.length;i++)if(run.offsets[i]>=from&&run.offsets[i]<to){glyphs.push(run.glyphs[i]);positions.push(run.positions[i*2],run.positions[i*2+1]-line.baseline);}return{run,glyphs,positions};}).filter(v=>v.glyphs.length);
-  if(!selected.length)return;const origin=start===0&&!isRtl||start===0&&end===text.length?0:Math.min(...selected.flatMap(v=>v.positions.filter((_,i)=>!(i&1))))-(state.letterSpacing??0)*size/2;let decorationMetrics=null;
-  canvas.save();try{canvas.translate(x,y);canvas.scale(scale,1);for(const{run,glyphs,positions}of selected){const font=new CK.Font(run.typeface,run.size);try{font.setScaleX(run.scaleX);font.setSkewX(skew);font.setEmbolden(!!state.fakeBold);font.setLinearMetrics(!!(state.flags&0x40));font.setSubpixel(!!(state.flags&0x80));font.setEmbeddedBitmaps(!!(state.flags&0x400));font.setEdging(state.flags&1?CK.FontEdging.AntiAlias:{value:0});font.setHinting(state.hinting===0?CK.FontHinting.None:CK.FontHinting.Normal);decorationMetrics??=font.getMetrics();canvas.drawGlyphs(glyphs,positions.map((v,i)=>i&1?v:v-origin),0,0,font,paint);
-   }finally{font.delete();}}
-    if(state.flags&0x18){const metrics=decorationMetrics,boxes=paragraph.getRectsForRange(start,end,CK.RectHeightStyle.Tight,CK.RectWidthStyle.Tight),advance=boxes.reduce((n,v)=>n+v.rect[2]-v.rect[0],0),decoration=paint.copy();decoration.setStyle(CK.PaintStyle.Fill);if(state.flags&8)canvas.drawRect(CK.XYWHRect(0,metrics.underlinePosition,advance,metrics.underlineThickness),decoration);if(state.flags&16)canvas.drawRect(CK.XYWHRect(0,metrics.strikeoutPosition,advance,metrics.strikeoutThickness),decoration);decoration.delete();}
-   }finally{canvas.restore();}
- }finally{for(const line of shapedLines??[])for(const run of line.runs)run.typeface.delete();paragraph?.delete();builder?.delete();}
+  if(!selected.length)return {selected:[],glyphCount:0,advance:decorated?0:undefined,fonts:new Map()};
+  const origin=start===0&&!isRtl||start===0&&end===text.length?0:Math.min(...selected.flatMap(v=>v.positions.filter((_,i)=>!(i&1))))-(state.letterSpacing??0)*size/2;
+  kept=new Set(selected.map(v=>v.run));
+  const entry={selected:selected.map(({run,glyphs,positions})=>({typeface:run.typeface,size:run.size,scaleX:run.scaleX,glyphs:Uint16Array.from(glyphs),positions:Float32Array.from(positions,(v,i)=>i&1?v:v-origin)})),glyphCount:selected.reduce((n,v)=>n+v.glyphs.length,0),advance:undefined,fonts:new Map()};
+  if(decorated)entry.advance=paragraph.getRectsForRange(start,end,CK.RectHeightStyle.Tight,CK.RectWidthStyle.Tight).reduce((n,v)=>n+v.rect[2]-v.rect[0],0);
+  return entry;
+ }finally{for(const line of shapedLines??[])for(const run of line.runs)if(kept===null||!kept.has(run))run.typeface.delete();paragraph?.delete();builder?.delete();}
 }
+/** The Fonts a shaped run draws with under the draw's font state (skew, embolden, metrics, subpixel, bitmaps, edging, hinting), made once per state; the first one's metrics place decorations. */
+function fontsFor(CK,entry,state,skew){
+ const signature=`${skew}|${state.fakeBold?1:0}|${state.flags&0x4c1}|${state.hinting===0?1:0}`;
+ let made=entry.fonts.get(signature);
+ if(made===undefined){
+  const fonts=entry.selected.map(run=>{const font=new CK.Font(run.typeface,run.size);font.setScaleX(run.scaleX);font.setSkewX(skew);font.setEmbolden(!!state.fakeBold);font.setLinearMetrics(!!(state.flags&0x40));font.setSubpixel(!!(state.flags&0x80));font.setEmbeddedBitmaps(!!(state.flags&0x400));font.setEdging(state.flags&1?CK.FontEdging.AntiAlias:{value:0});font.setHinting(state.hinting===0?CK.FontHinting.None:CK.FontHinting.Normal);return font;});
+  made={fonts,metrics:fonts.length?fonts[0].getMetrics():null};
+  if(entry.fonts.size>=8){for(const old of entry.fonts.values())for(const font of old.fonts)font.delete();entry.fonts.clear();}
+  entry.fonts.set(signature,made);
+ }
+ return made;
+}
+/**
+ * Shaped runs kept between replays, per CanvasKit instance: SkParagraph shaping (builder, layout, shaped lines) was most of the cost of drawing text, and a screen re-records
+ * and replays the same runs frame after frame. Bounded by entries and glyphs, least recently used first; an evicted entry frees its typefaces and fonts. A run whose shaping
+ * fails is not kept (the next draw fails the same way).
+ */
+const SHAPED_ENTRIES=4096,SHAPED_GLYPHS=262144,shapedRuns=new WeakMap();
+const shapedRunsOf=CK=>{let cache=shapedRuns.get(CK);if(!cache)shapedRuns.set(CK,cache={entries:new Map(),glyphs:0});return cache;};
+function rememberShaped(cache,key,entry){
+ cache.entries.set(key,entry);cache.glyphs+=entry.glyphCount;
+ for(const [oldKey,old] of cache.entries){if(cache.entries.size<=SHAPED_ENTRIES&&cache.glyphs<=SHAPED_GLYPHS)break;if(old!==entry)evictShaped(cache,oldKey,old);}
+}
+function evictShaped(cache,key,entry){
+ cache.entries.delete(key);cache.glyphs-=entry.glyphCount;
+ for(const made of entry.fonts.values())for(const font of made.fonts)font.delete();entry.fonts.clear();
+ for(const run of entry.selected)run.typeface.delete();
+}
+/** Frees every shaped run of a CanvasKit instance (the Skia host is being disposed). */
+export function disposeShapedRuns(CK){const cache=shapedRuns.get(CK);if(!cache)return;for(const [key,entry] of [...cache.entries])evictShaped(cache,key,entry);shapedRuns.delete(CK);}

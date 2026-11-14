@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=da7619ccc1f1';
-import { getSolidPaint } from './paint-host.js?v=da7619ccc1f1';
-import { getMatrixValues } from './matrix-native.js?v=da7619ccc1f1';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=da7619ccc1f1';
+import { APKError } from './apk-error.js?v=a104526a388b';
+import { getSolidPaint } from './paint-host.js?v=a104526a388b';
+import { getMatrixValues } from './matrix-native.js?v=a104526a388b';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=a104526a388b';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -79,7 +79,18 @@ export class VectorGraphics {
  releaseWithOwner(owner,handle){const record=this.runtime.object(owner),previous=record.onFree;record.onFree=()=>{if(typeof previous==='function')previous();const object=this.handles.get(handle);if(object?.kind==='canvas')this.handles.delete(handle);};}
  canvasDraws(handle){return this.get(handle,'canvas').draws.slice();}
  captureVector(handle){const tree=this.get(handle,'tree'),active=new Set();let count=0;const capture=(pointer,depth=0)=>{if(depth>128||active.has(pointer)||++count>20000)problem('Cyclic/excessive vector draw snapshot');active.add(pointer);const node=this.get(pointer),copy={kind:node.kind,props:{...node.props},path:node.path??''};if(node.kind==='group')copy.children=node.children.map(child=>capture(child,depth+1));active.delete(pointer);return copy;};return {...tree,root:capture(tree.root)};}
- reserveDrawStorage(extra){let used=extra;for(const object of this.handles.values())if(object.kind==='canvas')for(const draw of object.draws){used+=(draw.svg?.length??0)+(draw.commands?.length??0)*4+(draw.text?.length??0);if(used>32*1024*1024)problem('Aggregate recorded graphics storage limit exceeded');}}
+ /** Every recorded command checks the storage of all live canvases' draws plus `extra` against the limit. Each canvas's sum is kept and extended by the draws appended since
+  *  (a draw is not changed once recorded); a canvas whose list was cleared, shortened or replaced is summed again. It was a walk of every draw of every canvas per command. */
+ reserveDrawStorage(extra){
+  let used=extra;
+  for(const object of this.handles.values())if(object.kind==='canvas'){
+   const draws=object.draws,n=draws.length;let memo=object.drawBytes;
+   if(memo===undefined||memo.draws!==draws||memo.count>n||(memo.count>0&&draws[memo.count-1]!==memo.last))memo=object.drawBytes={draws,count:0,bytes:0,last:undefined};
+   for(let i=memo.count;i<n;i++){const draw=draws[i];memo.bytes+=(draw.svg?.length??0)+(draw.commands?.length??0)*4+(draw.text?.length??0);}
+   memo.count=n;memo.last=n?draws[n-1]:undefined;used+=memo.bytes;
+   if(used>32*1024*1024)problem('Aggregate recorded graphics storage limit exceeded');
+  }
+ }
  resetCanvas(receiver,width=null,height=null){const canvas=this.get(this.runtime.object(receiver).nativeCanvasHandle,'canvas');canvas.draws.length=0;canvas.matrix=[1,0,0,1,0,0];canvas.stack.length=0;canvas.clips=[];if(width!==null)canvas.width=width;if(height!==null)canvas.height=height;}
  snapshotCanvas(receiver,width,height,options){
   if(!(width>0&&height>0&&width*height<=16*1024*1024))problem('Invalid canvas snapshot extent');

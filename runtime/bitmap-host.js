@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=da7619ccc1f1';
-import {getVectorGraphics} from './vector-native.js?v=da7619ccc1f1';
-import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=da7619ccc1f1';
-import { gcRoot } from './heap-gc.js?v=da7619ccc1f1';
+import {APKError} from './apk-error.js?v=a104526a388b';
+import {getVectorGraphics} from './vector-native.js?v=a104526a388b';
+import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=a104526a388b';
+import { gcRoot } from './heap-gc.js?v=a104526a388b';
 const BITMAP='Landroid/graphics/Bitmap;',CONFIG='Landroid/graphics/Bitmap$Config;',SPACE='Landroid/graphics/ColorSpace;',NAMED='Landroid/graphics/ColorSpace$Named;',CANVAS='Landroid/graphics/Canvas;';
 // android.graphics.Bitmap.Config declaration order (android-13.0.0_r1: RGBA_1010102 is API 33 and last) / ColorSpace.Named order (API 34 HLG/PQ appended).
 const CONFIGS=['ALPHA_8','RGB_565','ARGB_4444','ARGB_8888','RGBA_F16','HARDWARE','RGBA_1010102'];
@@ -42,8 +42,26 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
  const bytesPerPixel=b=>CONFIG_INFO[storage(b)].bytes;
  const canvasOf=b=>getVectorGraphics(runtime).get(b.handle,'canvas');
  const holderOf=b=>{const holder=b.canvasObject??=runtime.allocate(CANVAS);if(!runtime.object(holder).nativeCanvasHandle)runtime.object(holder).nativeCanvasHandle=b.handle;return holder;};
+ /**
+  * The raster of a bitmap whose pixels are one opaque 8-bit sRGB PNG the lab encoded itself from N32 pixels (BitmapFactory's decode: `opaqueN32`), recorded at the origin over its whole
+  * extent with no paint: replaying it on a fresh N32 surface and encoding the snapshot gives that PNG's pixels again (opaque, so no premultiplication round trip), so the decoded
+  * PNG is the answer as it is. Before, every first draw of a newly decoded photo replayed it and encoded a second PNG (and the replay of the frame then decoded that one).
+  */
+ const plainRaster=b=>{
+  if(storage(b)!=='ARGB_8888')return null;   // an N32 bitmap (sRGB: the only space the lab gives ARGB_8888)
+  const draws=canvasOf(b).draws;if(draws.length!==1)return null;
+  const d=draws[0],r=d.raster;
+  if(d.op!=='raster'||r?.kind!=='raster'||r.opaqueN32!==true||typeof r.dataURL!=='string'||r.width!==b.width||r.height!==b.height||r.scale!==undefined)return null;
+  if(d.paint!=null||!Array.isArray(d.args)||d.args.length!==2||d.args[0]!==0||d.args[1]!==0)return null;
+  const m=d.matrix;if(m!==undefined&&!(Array.isArray(m)&&m.length===6&&m[0]===1&&m[1]===0&&m[2]===0&&m[3]===1&&m[4]===0&&m[5]===0))return null;   // the canvas state recordNative adds: identity, no clip
+  if(d.clips!==undefined&&!(Array.isArray(d.clips)&&d.clips.length===0))return null;
+  for(const key in d)if(key!=='op'&&key!=='raster'&&key!=='args'&&key!=='paint'&&key!=='kind'&&key!=='matrix'&&key!=='clips')return null;
+  if(d.kind!==undefined&&d.kind!=='skia')return null;
+  return {...r};
+ };
  const render=(b,extra)=>{
   const surfaceType=CONFIG_INFO[storage(b)].surface,options=surfaceType||extra?{...(surfaceType?{surfaceType}:{}),...extra}:undefined;
+  if(options===undefined){const plain=plainRaster(b);if(plain!==null)return plain;}
   return getVectorGraphics(runtime).snapshotCanvas(holderOf(b),b.width,b.height,options);
  };
  /** getGenerationId: changes on every mutation, drawing through a Canvas included (every recorded command counts). */

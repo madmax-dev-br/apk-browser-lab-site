@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=da7619ccc1f1';
-import {getVectorGraphics} from './vector-native.js?v=da7619ccc1f1';
-import {getSolidPaintByHandle} from './paint-host.js?v=da7619ccc1f1';
-import {createMatrixNativeBindings} from './matrix-native.js?v=da7619ccc1f1';
+import {APKError} from './apk-error.js?v=a104526a388b';
+import {getVectorGraphics} from './vector-native.js?v=a104526a388b';
+import {getSolidPaintByHandle} from './paint-host.js?v=a104526a388b';
+import {createMatrixNativeBindings} from './matrix-native.js?v=a104526a388b';
 
 const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;',RECORD='Landroid/view/RecordingCanvas;';
 const NODE33='Landroid/graphics/RenderNode;',RC33='Landroid/graphics/RecordingCanvas;',BRC='Landroid/graphics/BaseRecordingCanvas;';
@@ -19,7 +19,11 @@ const node=(r,h,retained=false)=>{const value=stateFor(r).nodes.get(h);if(!value
 const finite=values=>{if(values.some(v=>!Number.isFinite(v)))fail('Non-finite RenderNode geometry');return values;};
 const identity=()=>[1,0,0,0,1,0,0,0,1];
 function newNode(r,name){const s=stateFor(r);if(s.nodes.size>=4096)fail('RenderNode handle limit4096 exceeded');const h=s.next++;s.nodes.set(h,{name,displayList:null,left:0,top:0,right:0,bottom:0,alpha:1,translationX:0,translationY:0,translationZ:0,elevation:0,rotation:0,rotationX:0,rotationY:0,scaleX:1,scaleY:1,pivotX:0,pivotY:0,pivotExplicit:false,clipToBounds:true,clipBounds:null,clipToOutline:false,outline:null,overlap:false,layerType:0,layerPaint:null,staticMatrix:null,animationMatrix:null,spotShadowColor:0xff000000|0,ambientShadowColor:0xff000000|0,cameraDistance:8,stretch:null});return h;}
-function copyCommand(c){return {...c,args:c.args?.slice(),matrix:c.matrix?.slice(),clips:c.clips?.map(v=>({...v,rect:v.rect?.slice(),matrix:v.matrix?.slice(),commands:v.commands?new Float32Array(v.commands):undefined})),commands:c.commands?new Float32Array(c.commands):undefined,paint:c.paint?{...c.paint}:null};}
+// A recorded clip is immutable (Canvas.clip* pushes a new one), so the copy of one clip is made once and shared by every command recorded under it, as the recording shares the
+// clip itself: the replay then applies one clip path per clip (src/skia-canvas-host.js clipShape), not one per command.
+const CLIP_COPIES=new WeakMap();
+const copyClip=v=>{let copy=CLIP_COPIES.get(v);if(copy===undefined)CLIP_COPIES.set(v,copy={...v,rect:v.rect?.slice(),matrix:v.matrix?.slice(),commands:v.commands?new Float32Array(v.commands):undefined});return copy;};
+function copyCommand(c){return {...c,args:c.args?.slice(),matrix:c.matrix?.slice(),clips:c.clips?.map(copyClip),commands:c.commands?new Float32Array(c.commands):undefined,paint:c.paint?{...c.paint}:null};}
 function canvas(r,h){return getVectorGraphics(r).get(h,'canvas');}
 function storageBytes(commands){let bytes=0;for(const c of commands)bytes+=128+(c.commands?.byteLength??0)+(c.text?.length??0)*2+(c.raster?.dataURL?.length??0)+(c.clips??[]).reduce((n,v)=>n+64+(v.commands?.byteLength??0),0);return bytes;}
 function finish(r,h){const c=canvas(r,h);if(c.stack.length)fail('Unbalanced Canvas save/restore in RenderNode recording');const s=stateFor(r);if(s.recordings.size>=8192)fail('RenderNode display-list limit exceeded');let total=storageBytes(c.draws);for(const n of s.nodes.values())total+=storageBytes(n.displayList??[]);for(const list of s.recordings.values())total+=storageBytes(list);if(total>32*1024*1024)fail('RenderNode aggregate display-list storage limit32MiB exceeded');const id=s.next++;s.recordings.set(id,c.draws.map(copyCommand));return id;}
