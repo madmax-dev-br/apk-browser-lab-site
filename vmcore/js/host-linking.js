@@ -29,7 +29,7 @@
 //  5. Constructors of Throwable classes without DEX code are host methods like any other (not METHOD_THROWABLE_INIT): the JavaScript VM's constructor bridges keep the message,
 //     cause and captured stack on the record, which here is the companion, where Throwable's host methods read them.
 
-import { BOX_CLASSES, ATOMIC_INTEGER, ATOMIC_REFERENCE } from './natives.js?v=a104526a388b';
+import { BOX_CLASSES, ATOMIC_INTEGER, ATOMIC_REFERENCE } from './natives.js?v=d8fff06341bc';
 
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;';
 // natives.h HostState: boxClass[8] then boxCache[8], atomicIntegerClass, the thread identity (HOST_STATE_THREAD); the box payload sizes; the kinds with a boxPrimitive cache (B S C I J)

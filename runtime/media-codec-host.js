@@ -1,11 +1,11 @@
-import { APKError } from './apk-error.js?v=a104526a388b';
-import { Blocked } from './scheduler.js?v=a104526a388b';
-import { bitsDouble, doubleBits } from './host-contract.js?v=a104526a388b';
-import { ByteCells } from './java-arrays.js?v=a104526a388b';
-import { state as ioState } from './libcore-io-native.js?v=a104526a388b';
-import { FORMAT, supportsSize } from './camera-frames.js?v=a104526a388b';
-import { splitAnnexB, joinAnnexB, nalType, NAL, createMp4Writer } from './media-mp4.js?v=a104526a388b';
-import { AVC_PROFILE } from './media-codec-backend.js?v=a104526a388b';
+import { APKError } from './apk-error.js?v=d8fff06341bc';
+import { Blocked } from './scheduler.js?v=d8fff06341bc';
+import { bitsDouble, doubleBits } from './host-contract.js?v=d8fff06341bc';
+import { ByteCells } from './java-arrays.js?v=d8fff06341bc';
+import { state as ioState } from './libcore-io-native.js?v=d8fff06341bc';
+import { FORMAT, supportsSize } from './camera-frames.js?v=d8fff06341bc';
+import { splitAnnexB, joinAnnexB, nalType, NAL, createMp4Writer } from './media-mp4.js?v=d8fff06341bc';
+import { AVC_PROFILE } from './media-codec-backend.js?v=d8fff06341bc';
 
 // android.media for recording video (android-13.0.0_r1: MediaFormat.java, MediaCodecList.java, MediaCodecInfo.java, MediaCodec.java, MediaMuxer.java, MediaRecorder.java,
 // CamcorderProfile.java, EncoderProfiles.java, AudioRecord.java), over the codec backend of the host (src/media-codec-backend.js: the browser's WebCodecs) and the MP4 writer of

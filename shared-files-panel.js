@@ -1,7 +1,7 @@
 // "Arquivos do dispositivo" in the Controles panel and the system file picker shown over the phone screen. The tester attaches files from the computer (button or drag and drop); they
 // become the virtual device's shared storage (src/shared-storage.js, src/shared-storage-host.js): what the pickers offer and what MediaStore lists. The bytes never leave the browser:
 // the page keeps them (IndexedDB when available, so they survive a reload; this page session otherwise) and hands copies to the VM's Worker.
-import { MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, kindOf, safeName, uniqueName } from './shared-storage.js?v=a104526a388b';
+import { MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, kindOf, safeName, uniqueName } from './shared-storage.js?v=d8fff06341bc';
 
 const DB_NAME = 'apkweb-shared-storage', STORE = 'files', FIRST_ID = 1001;
 const KIND_LABEL = { image: 'imagem', video: 'vídeo', audio: 'áudio', document: 'documento' };

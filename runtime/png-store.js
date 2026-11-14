@@ -6,7 +6,7 @@
 // (filter 0) in deflate blocks of at most 65 535 bytes, the zlib Adler-32 and the chunk CRCs. PNG is lossless either way and the replay decodes it with the same Skia codec, so
 // the pixels drawn are the ones decoded. Only for images that are fully opaque (every alpha 255, so premultiplied and straight values agree and RGB is exact) and small enough
 // that the uncompressed data stays well inside the raster bound (decodeRasterImage refuses a data URL above 12 MiB); everything else keeps Skia's encoder. DOM-free, no process.*.
-import { crc32 } from './apk-loader.js?v=a104526a388b';
+import { crc32 } from './apk-loader.js?v=d8fff06341bc';
 
 export const STORED_PNG_MAX_PIXELS = 1024 * 1024;   // 3 MiB of RGB: a 4 MiB data URL, a third of the raster bound
 const SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], BLOCK = 65535;

@@ -14,7 +14,7 @@
 // This module is VM-free: the network bridge (`net`) is passed in and the failures are plain JavaScript errors the natives (src/libcore-io-native.js) turn into Java exceptions.
 
 export const HIGH_WATER = 256 * 1024, CHUNK = 64 * 1024, MAX_HEAD = 64 * 1024, MAX_BODY = 128 * 1024 * 1024;
-import { websocketRequest, acceptKey, FrameDecoder, encodeFrame, closePayload, OPCODE } from './websocket-bridge.js?v=a104526a388b';
+import { websocketRequest, acceptKey, FrameDecoder, encodeFrame, closePayload, OPCODE } from './websocket-bridge.js?v=d8fff06341bc';
 const TUNNEL_PREFIX = 64 * 1024;   // the bytes kept until the first request is recognised: a conversation that is not HTTP/1.1 starts the tunnel with them
 const encoder = new TextEncoder();
 const latin1 = bytes => { let text = ''; for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode(...bytes.subarray(i, i + 8192)); return text; };

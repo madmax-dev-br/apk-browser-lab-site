@@ -1,46 +1,46 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=a104526a388b';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=a104526a388b';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=a104526a388b';
-import { initCollapsibleSections } from './panel-sections.js?v=a104526a388b';
-import { warmupLabel } from './warmup.js?v=a104526a388b';
-import { createApkShelf, indexedDbShelfBackend } from './apk-shelf.js?v=a104526a388b';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=a104526a388b';
-import { initHelpTips } from './help-tips.js?v=a104526a388b';
-import { createToolDock } from './tool-dock.js?v=a104526a388b';
-import { createPermissionsPanel } from './permissions-panel.js?v=a104526a388b';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=a104526a388b';
-import { createAppDataPanel } from './app-data-panel.js?v=a104526a388b';
-import { createCameraLab } from './camera-lab.js?v=a104526a388b';
-import { createOverridesPanel } from './overrides-panel.js?v=a104526a388b';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=a104526a388b';
-import { createHostMapPanel } from './host-map-panel.js?v=a104526a388b';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=a104526a388b';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=a104526a388b';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=a104526a388b';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=a104526a388b';
-import { createDeviceView, createViewState } from './device-view.js?v=a104526a388b';
-import { createTaskSwitcher } from './task-switcher.js?v=a104526a388b';
-import { createDeviceZoom } from './device-zoom.js?v=a104526a388b';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=a104526a388b';
-import { formatApiGapReport } from './api-gap-scan.js?v=a104526a388b';
-import { createLogcatPanel } from './logcat-panel.js?v=a104526a388b';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=a104526a388b';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=a104526a388b';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=a104526a388b';
-import { captureImage } from './screen-capture.js?v=a104526a388b';
-import { createPluginsPanel } from './plugins-panel.js?v=a104526a388b';
-import { createMcpTools } from './mcp-tools.js?v=a104526a388b';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=a104526a388b';
-import { createModalHost } from './lab-modal.js?v=a104526a388b';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=a104526a388b';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=a104526a388b';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=a104526a388b';
-import { createDragLayer } from './lab-drag.js?v=a104526a388b';
-import { createLabScroll } from './lab-scroll.js?v=a104526a388b';
-import { createGlSurfaces } from './gl-surfaces.js?v=a104526a388b';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=a104526a388b';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=a104526a388b';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=a104526a388b';
+import { APKWorkerClient } from './apk-worker-client.js?v=d8fff06341bc';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=d8fff06341bc';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=d8fff06341bc';
+import { initCollapsibleSections } from './panel-sections.js?v=d8fff06341bc';
+import { warmupLabel } from './warmup.js?v=d8fff06341bc';
+import { createApkShelf, indexedDbShelfBackend } from './apk-shelf.js?v=d8fff06341bc';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=d8fff06341bc';
+import { initHelpTips } from './help-tips.js?v=d8fff06341bc';
+import { createToolDock } from './tool-dock.js?v=d8fff06341bc';
+import { createPermissionsPanel } from './permissions-panel.js?v=d8fff06341bc';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=d8fff06341bc';
+import { createAppDataPanel } from './app-data-panel.js?v=d8fff06341bc';
+import { createCameraLab } from './camera-lab.js?v=d8fff06341bc';
+import { createOverridesPanel } from './overrides-panel.js?v=d8fff06341bc';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=d8fff06341bc';
+import { createHostMapPanel } from './host-map-panel.js?v=d8fff06341bc';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=d8fff06341bc';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=d8fff06341bc';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=d8fff06341bc';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=d8fff06341bc';
+import { createDeviceView, createViewState } from './device-view.js?v=d8fff06341bc';
+import { createTaskSwitcher } from './task-switcher.js?v=d8fff06341bc';
+import { createDeviceZoom } from './device-zoom.js?v=d8fff06341bc';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=d8fff06341bc';
+import { formatApiGapReport } from './api-gap-scan.js?v=d8fff06341bc';
+import { createLogcatPanel } from './logcat-panel.js?v=d8fff06341bc';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=d8fff06341bc';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=d8fff06341bc';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=d8fff06341bc';
+import { captureImage } from './screen-capture.js?v=d8fff06341bc';
+import { createPluginsPanel } from './plugins-panel.js?v=d8fff06341bc';
+import { createMcpTools } from './mcp-tools.js?v=d8fff06341bc';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=d8fff06341bc';
+import { createModalHost } from './lab-modal.js?v=d8fff06341bc';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=d8fff06341bc';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=d8fff06341bc';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=d8fff06341bc';
+import { createDragLayer } from './lab-drag.js?v=d8fff06341bc';
+import { createLabScroll } from './lab-scroll.js?v=d8fff06341bc';
+import { createGlSurfaces } from './gl-surfaces.js?v=d8fff06341bc';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=d8fff06341bc';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=d8fff06341bc';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=d8fff06341bc';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -258,14 +258,23 @@ function notePhase(phase) {
   if (last) last.ms = Math.round(now - last.at);
   times.phases.push({ phase, at: now, ms: 0 });
 }
-const PHASE_LABEL = { manifest: 'manifesto', dex: 'código (DEX)', framework: 'framework', 'framework-resources': 'estilos Android', resources: 'recursos', native: 'bibliotecas nativas' };
+const PHASE_LABEL = { manifest: 'manifesto', dex: 'código (DEX)', framework: 'framework', 'framework-resources': 'estilos Android', resources: 'recursos', 'resources-xml': 'layouts e XML', native: 'bibliotecas nativas', core: 'núcleo da VM' };
+/** The phases of a load as the line shows them: the Worker's own measurement when it sent one (loadTiming: the loader prepares resources while the DEX files expand and releases its
+ *  progress reports together, so the intervals between the reports the page receives are not the phases' times), else those intervals. Phases without a label add up as "outros". */
+function loadPhaseParts(times) {
+  const rows = times.workerPhases ?? times.phases.map(item => [item.phase, item.ms]), byLabel = new Map(); let other = 0;
+  for (const [phase, ms] of rows) { if (!(ms > 0)) continue; const label = PHASE_LABEL[phase]; if (label) byLabel.set(label, (byLabel.get(label) ?? 0) + ms); else if (times.workerPhases) other += ms; }
+  const parts = [...byLabel].map(([label, ms]) => `${label} ${ms} ms`); if (other > 0) parts.push(`outros ${other} ms`);
+  return parts;
+}
+/** "Carregado em 0,21 s (...)" and, once an Activity opened, "Activity aberta em 1,14 s": two times, each of its own operation (a launch can come long after the load, or again). */
 function showLoadTimes() {
   const times = state.loadTimes; if (!times) return;
-  const parts = [`leitura do arquivo ${times.readMs} ms`, ...times.phases.filter(item => item.ms > 0 && PHASE_LABEL[item.phase]).map(item => `${PHASE_LABEL[item.phase]} ${item.ms} ms`)];
-  if (times.launchMs !== undefined) parts.push(`abertura da Activity ${times.launchMs} ms`);
-  const total = times.loadMs + (times.launchMs ?? 0);
+  const seconds = ms => (ms / 1000).toFixed(2).replace('.', ',');
+  let text = `Carregado em ${seconds(times.loadMs)} s (${[`leitura do arquivo ${times.readMs} ms`, ...loadPhaseParts(times)].join(' · ')})`;
+  if (times.launchMs !== undefined) text += ` · Activity aberta em ${seconds(times.launchMs)} s`;
   $('load-times').hidden = false;
-  $('load-times').textContent = `${times.launchMs !== undefined ? 'Do arquivo à tela' : 'Carregado'} em ${(total / 1000).toFixed(2)} s · ${parts.join(' · ')}`;
+  $('load-times').textContent = text;
 }
 function onWorkerProgress(progress = {}) {
   notePhase(progress.phase);
@@ -584,7 +593,7 @@ async function importSource(source, autoRun = false) {
     const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceForVM(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB, eventSeconds: deviceState.settings.eventSeconds, motionRaster: params.get('raster') !== 'full', rasterScale: deviceState.settings.raster?.motionScale ?? 1, rasterNavigation: deviceState.settings.raster?.navigation === true, rasterSettled: deviceState.settings.raster?.stillScale ?? 1, logcatStreaming: logcatPanel.streaming, renderer: deviceState.settings.renderer ?? 'cpu', engine: engineForLoad(), coreMemory: deviceState.settings.coreMemory }); state.loadedEngine = engineForLoad(); showRendererStatus(result.renderer); state.loadedMemoryMiB = deviceState.settings.memoryMiB; state.loadedCoreMemory = { ...deviceState.settings.coreMemory }; updateVmMemoryHint(); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
     state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);
-    { const times = state.loadTimes, last = times.phases.at(-1); if (last && !last.ms) last.ms = Math.round(performance.now() - last.at); times.loadMs = Math.round(performance.now() - times.startedAt); times.done = true; times.prepared = !!result.inventory.prepared;
+    { const times = state.loadTimes, last = times.phases.at(-1); if (last && !last.ms) last.ms = Math.round(performance.now() - last.at); times.loadMs = Math.round(performance.now() - times.startedAt); times.done = true; times.prepared = !!result.inventory.prepared; if (Array.isArray(result.loadTiming?.phases)) times.workerPhases = result.loadTiming.phases;
       showLoadTimes(); appendTrace(`Carregado em ${times.loadMs} ms: ${times.phases.filter(item => item.ms > 0).map(item => `${item.phase} ${item.ms} ms`).join(', ')}`); }
     await permissionsPanel.attach(result.inventory); await filesPanel.attach(); cameraLab.attach(); await overridesPanel.attach(result.inventory); await ignoredPanel.attach(result.inventory); await mocksPanel.attach(result.inventory); pluginHost.vmChanged(); if (logcatPanelOpen || pluginHost.wantsLogs) syncLogcatStreaming(true).catch(() => {});   // before any app code runs: permission state, simulated location, method return overrides, ignored Activities, endpoint mocks
     showInventory(result.inventory); showDeviceHome('installed');

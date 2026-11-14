@@ -1,7 +1,7 @@
 // What expands one deflated (or stored) APK ZIP entry and checks it: CRC-32 and the bounded deflate-raw expansion. Shared by APKArchive (src/apk-loader.js) and by the helper
 // Workers that expand an APK's DEX files in parallel (src/zip-inflate-pool.js, src/zip-inflate-worker.js), so both run the same code. It imports nothing but APKError: a helper
 // Worker loads this module and nothing of the VM.
-import { APKError } from './apk-error.js?v=a104526a388b';
+import { APKError } from './apk-error.js?v=d8fff06341bc';
 
 const fail = message => { throw new APKError(message); };
 // CRC-32 (ZIP, reflected 0xEDB88320), slicing-by-8: eight tables, eight bytes per step (an APK's entries are checked as they are extracted; byte at a time this was
