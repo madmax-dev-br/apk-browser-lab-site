@@ -59,20 +59,20 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=1727a869a704';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=1727a869a704';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=1727a869a704';
-import { HandleTable } from './handles.js?v=1727a869a704';
-import { Exceptions } from './exceptions.js?v=1727a869a704';
-import { coreImports } from './boundary-imports.js?v=1727a869a704';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=1727a869a704';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=1727a869a704';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=1727a869a704';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=1727a869a704';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=1727a869a704';
-import { Blocked } from '../../runtime/scheduler.js?v=1727a869a704';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=1727a869a704';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=1727a869a704';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=a6c2214802a2';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=a6c2214802a2';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=a6c2214802a2';
+import { HandleTable } from './handles.js?v=a6c2214802a2';
+import { Exceptions } from './exceptions.js?v=a6c2214802a2';
+import { coreImports } from './boundary-imports.js?v=a6c2214802a2';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=a6c2214802a2';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=a6c2214802a2';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=a6c2214802a2';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=a6c2214802a2';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=a6c2214802a2';
+import { Blocked } from '../../runtime/scheduler.js?v=a6c2214802a2';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=a6c2214802a2';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=a6c2214802a2';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -86,7 +86,7 @@ export const HANDLE_PACE_MIN = 131072;
 export const LAYOUT = coreLayout(CORE_MEMORY_DEFAULT);
 export const DEFAULT_PAGES = LAYOUT.pages;   // 2 GiB of memory (the most this module's memory may have): a collected heap of 512 MiB above LAYOUT.HEAP
 export const LINKER_LIMITS = Object.freeze({ maxMethods: 1 << 21, maxClasses: 1 << 18, maxStrings: 1 << 20 });
-export const THREAD = Object.freeze({ vm: 0, stackBase: 4, stackEnd: 8, status: 12, detail: 16, interrupt: 20, ringIndex: 24, steps: 32, maxSteps: 40, result: 48, calls: 56, peakDepth: 64,
+export const THREAD = Object.freeze({ vm: 0, stackBase: 4, stackEnd: 8, status: 12, detail: 16, interrupt: 20, ringIndex: 24, quantumCut: 28, steps: 32, maxSteps: 40, result: 48, calls: 56, peakDepth: 64,
   tlabTop: 68, tlabEnd: 72, stackTop: 2128, frame: 2132, pc: 2136, depth: 2140, throwing: 2144, maxDepth: 2148, args: 2304, javaStack: 4096, javaStackBytes: 2 * MiB });
 const GC = Object.freeze({ base: 4, end: 8, startBits: 12, threadCap: 44, rootCap: 56, roots: 52, rootCount: 60, reports: 76, reportCap: 80, reportCount: 84, reportOverflow: 88, freed: 92, freedCap: 96, freedCount: 100,
   trigger: 116, collectRequested: 120, collections: 124, liveObjects: 128, liveBytes: 132, freedObjects: 136, marked: 152, badRefs: 168, stress: 436, threadsState: 440, slowPaths: 444, SIZE: 448 });
@@ -594,6 +594,9 @@ export class WasmEngine {
       }
       this.usedBridge = bridge;
       const hostMark = rt.hostAllocs.length, outcome = this.bridgeBody(rt, bridge, args, site.mode); rt.hostCall = null;
+      // A background thread in a slice with a deadline: its quantum is counted in polls, so one holding several long host calls (image decodes) ran them all before the deadline
+      // was seen and held the next frame back by their sum. A host call that returns past the deadline ends the quantum at the next poll (Thread.quantumCut, abi.h).
+      if (rt.sliceDeadline !== 0 && rt.sliceDeadline !== undefined && rt.thread !== null && rt.thread.coreQuantum > 0 && performance.now() > rt.sliceDeadline) this.u32[(this.t + THREAD.quantumCut) >>> 2] = 1;
       if (rt.hostAllocs.length > hostMark && !(outcome instanceof Blocked || outcome instanceof Invoke)) rt.releaseHostAllocs(hostMark);
       return outcome;
     }

@@ -1,6 +1,6 @@
 // "Tela" -> "Personalizado" in the device panel: width, height and a dp/px unit, converted with the VM density (device-profile.js checkCustomScreen).
 // The panel only reads and writes these inputs; the value goes through sanitizeSettings / resolveDevice like a preset does.
-import { checkCustomScreen, SCREEN_DENSITY } from './device-profile.js?v=1727a869a704';
+import { checkCustomScreen, SCREEN_DENSITY } from './device-profile.js?v=a6c2214802a2';
 
 /**
  * @param $ id -> element
