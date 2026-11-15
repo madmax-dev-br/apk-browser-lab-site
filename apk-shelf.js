@@ -15,24 +15,30 @@ export function shelfKey(packageName, name) { return name ? (packageName ? `${pa
 /** The shelf over a backend { all(), get(id), put(entry), delete(id) } (async). Entries: { id, name, packageName, label, icon: { bytes, mime } | null, size, addedAt, openedAt,
  *  blob (the APK bytes at the last open), handle (FileSystemFileHandle | null) }. */
 export function createApkShelf(backend, { now = () => Date.now() } = {}) {
+  // Saving an APK and recording its label and icon are each a read, then a write, of the same entry, and the page starts them independently (the icon arrives from the VM
+  // while the APK is still being saved): they run one at a time, so neither writes back an entry read before the other finished (an icon recorded and then lost).
+  let queue = Promise.resolve();
+  const serial = task => { const run = queue.then(task, task); queue = run.catch(() => {}); return run; };
   const summary = entry => ({ id: entry.id, name: entry.name, packageName: entry.packageName ?? null, label: entry.label ?? null, icon: entry.icon ?? null, size: entry.size ?? 0, addedAt: entry.addedAt, openedAt: entry.openedAt, hasHandle: !!entry.handle });
+  const saveNow = async ({ id, name, packageName = null, blob, handle = null, previousId = null }) => {
+    const key = shelfKey(packageName, name) ?? id; if (!key || !blob) throw new Error('An APK shelf entry needs a key and the APK bytes');
+    const legacy = packageName ? await backend.get(packageName) : null;   // the one-per-package format: the same app under the same file name is this entry
+    if (legacy && legacy.name === name && !previousId) previousId = packageName;
+    const old = await backend.get(key) ?? (previousId && previousId !== key ? await backend.get(previousId) : null), time = now();
+    const entry = { ...(old ?? {}), id: key, name: name ?? old?.name ?? key, packageName: packageName ?? old?.packageName ?? null, blob, size: blob.size ?? old?.size ?? 0, handle: handle ?? old?.handle ?? null, addedAt: old?.addedAt ?? time, openedAt: time };
+    await backend.put(entry); if (previousId && previousId !== key) await backend.delete(previousId);
+    const all = await backend.all();
+    if (all.length > SHELF_LIMIT) for (const stale of all.sort((a, b) => a.openedAt - b.openedAt).slice(0, all.length - SHELF_LIMIT)) if (stale.id !== key) await backend.delete(stale.id);
+    return summary(entry);
+  };
+  const describeNow = async (id, { label = null, icon = null } = {}) => { const entry = await backend.get(id); if (!entry) return null; if (label) entry.label = label; if (icon?.bytes) entry.icon = { bytes: icon.bytes, mime: icon.mime || 'image/png' }; await backend.put(entry); return summary(entry); };
   return {
     /** Every entry in the order they were first added (the launcher's order: one beside the other, a new app at the end). */
     async list() { return (await backend.all()).sort((a, b) => a.addedAt - b.addedAt || String(a.id).localeCompare(String(b.id))).map(summary); },
     /** Stores an APK that was just opened. `previousId` (the file-name key used before the package was known) is merged into the package's entry. Returns its summary. */
-    async save({ id, name, packageName = null, blob, handle = null, previousId = null }) {
-      const key = shelfKey(packageName, name) ?? id; if (!key || !blob) throw new Error('An APK shelf entry needs a key and the APK bytes');
-      const legacy = packageName ? await backend.get(packageName) : null;   // the one-per-package format: the same app under the same file name is this entry
-      if (legacy && legacy.name === name && !previousId) previousId = packageName;
-      const old = await backend.get(key) ?? (previousId && previousId !== key ? await backend.get(previousId) : null), time = now();
-      const entry = { ...(old ?? {}), id: key, name: name ?? old?.name ?? key, packageName: packageName ?? old?.packageName ?? null, blob, size: blob.size ?? old?.size ?? 0, handle: handle ?? old?.handle ?? null, addedAt: old?.addedAt ?? time, openedAt: time };
-      await backend.put(entry); if (previousId && previousId !== key) await backend.delete(previousId);
-      const all = await backend.all();
-      if (all.length > SHELF_LIMIT) for (const stale of all.sort((a, b) => a.openedAt - b.openedAt).slice(0, all.length - SHELF_LIMIT)) if (stale.id !== key) await backend.delete(stale.id);
-      return summary(entry);
-    },
+    save(options) { return serial(() => saveNow(options)); },
     /** The launcher's label and icon of an entry (read from the app's PackageManager once it ran). */
-    async describe(id, { label = null, icon = null } = {}) { const entry = await backend.get(id); if (!entry) return null; if (label) entry.label = label; if (icon?.bytes) entry.icon = { bytes: icon.bytes, mime: icon.mime || 'image/png' }; await backend.put(entry); return summary(entry); },
+    describe(id, details) { return serial(() => describeNow(id, details)); },
     /** The APK of an entry as a File: from its file handle when the browser lets the page read it now (`ask`: may prompt), else the stored copy. { file, fromDisk } or null. */
     async file(id, { ask = true } = {}) {
       const entry = await backend.get(id); if (!entry) return null;
@@ -45,7 +51,7 @@ export function createApkShelf(backend, { now = () => Date.now() } = {}) {
       }
       return entry.blob ? { file: new File([entry.blob], entry.name, { type: 'application/vnd.android.package-archive' }), fromDisk: false } : null;
     },
-    async remove(id) { await backend.delete(id); },
+    remove(id) { return serial(() => backend.delete(id)); },
   };
 }
 

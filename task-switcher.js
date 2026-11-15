@@ -49,7 +49,7 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
   const targets = () => [$('android-content'), $('android-window-layer'), $('android-action-mode-layer')].filter(Boolean);
   let mode = 'foreground', info = null, infoFor = null, iconURL = null, drag = null, working = false, pendingLabel = '';
   // the saved apps (src/apk-shelf.js), one beside the other in the order they were added; the app of this run keeps its own icon (`app`) at its place among them
-  let shelfItems = [], shelfCurrent = null, shelfButtons = [], shelfURLs = [];
+  let shelfItems = [], shelfCurrent = null, shelfButtons = [], shelfURLs = [], savedIconURL = null, savedLabel = '';   // savedIconURL, savedLabel: the icon and label stored with the app of this run, shown until its PackageManager answers (opening a saved app does not lose its icon meanwhile)
   const renderShelf = () => {
     for (const node of shelfButtons) node.remove(); shelfButtons = []; for (const url of shelfURLs.splice(0)) URL.revokeObjectURL(url);
     let placed = false;
@@ -87,8 +87,8 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     announce(next);
   };
   const paintIcon = () => {
-    label.textContent = info?.label || info?.packageName || pendingLabel || 'App'; iconBox.replaceChildren(); iconBox.classList.remove('generic');
-    if (iconURL) { const img = doc.createElement('img'); img.alt = ''; img.src = iconURL; img.draggable = false; iconBox.append(img); }
+    label.textContent = info?.label || info?.packageName || savedLabel || pendingLabel || 'App'; iconBox.replaceChildren(); iconBox.classList.remove('generic');
+    const url = iconURL ?? savedIconURL; if (url) { const img = doc.createElement('img'); img.alt = ''; img.src = url; img.draggable = false; iconBox.append(img); }
     else { iconBox.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${ANDROID_HEAD}"/></svg>`; iconBox.classList.add('generic'); }
     app.setAttribute('aria-label', mode === 'installing' ? `Instalando ${label.textContent}` : `Abrir ${label.textContent}`);
   };
@@ -211,7 +211,7 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     /** Settles once the launcher's label and icon request (a VM request) is answered: the page waits for it before sending the next one. */
     infoSettled: () => infoPending.catch(() => {}),
     /** The app's launcher icon as a URL (null until it is known, or when the package has none the page can show). */
-    icon: () => iconURL,
+    icon: () => iconURL ?? savedIconURL,
     /** Every rendered snapshot: the launcher data for this run, and the VM's own word on whether the task is in the background (an app can call moveTaskToBack itself). */
     sync(snapshot, key) {
       loadInfo(key);
@@ -228,9 +228,17 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
       show(next); if (next !== 'idle') paintIcon(); if (next === 'installed' && key) loadInfo(key);
     },
     /** The saved apps to show on the launcher (src/apk-shelf.js list()), and which of them is the app of this run (its icon is the live one: running, closed, installing). */
-    setShelf(items, currentId = null) { shelfItems = Array.isArray(items) ? items : []; shelfCurrent = currentId; renderShelf(); },
+    setShelf(items, currentId = null) {
+      shelfItems = Array.isArray(items) ? items : []; shelfCurrent = currentId; renderShelf();
+      const current = shelfItems.find(item => item.id === currentId), saved = current?.icon, hadSaved = !!savedIconURL, name = current?.label ?? ''; const relabel = name !== savedLabel; savedLabel = name; if (savedIconURL) { URL.revokeObjectURL(savedIconURL); savedIconURL = null; }
+      if (saved?.bytes) savedIconURL = URL.createObjectURL(new Blob([saved.bytes], { type: saved.mime || 'image/png' }));
+      if ((!iconURL && (hadSaved || savedIconURL)) || (relabel && !info?.label)) paintIcon();
+    },
     /** After a render repainted the page's status: say again that the app is in the background. */
     restate() { if (mode === 'overview' || mode === 'home') announce(mode); },
-    reset() { drag = null; pull = null; card = null; swallowClick = false; dismissing = false; bubble.hidden = true; working = false; info = null; infoFor = null; pendingLabel = ''; delete screen.dataset.launcher; if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; } mode = 'foreground'; delete screen.dataset.task; launcher.hidden = true; hit.hidden = true; for (const node of targets()) { node.style.transition = 'none'; node.style.transform = ''; node.style.borderRadius = ''; node.style.opacity = ''; } },
+    reset() { drag = null; pull = null; card = null; swallowClick = false; dismissing = false; bubble.hidden = true; working = false; info = null; infoFor = null; pendingLabel = ''; delete screen.dataset.launcher; if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; } mode = 'idle'; screen.dataset.task = 'home'; launcher.hidden = false; hit.hidden = true;
+      // The windows of the run that ends stay out of sight, at once and without a transition: shown again at full size here they would flash on screen (with what the previous app last drew)
+      // and then shrink into the launcher when the next run shows it. The launcher stays on screen until the page says what comes next (installing, idle).
+      const height = screen.offsetHeight; for (const node of targets()) { node.style.transition = 'none'; node.style.transformOrigin = '50% 50%'; node.style.transform = `translateY(${-height * 0.02}px) scale(0.2)`; node.style.borderRadius = '28px'; node.style.opacity = '0'; } },
   };
 }
