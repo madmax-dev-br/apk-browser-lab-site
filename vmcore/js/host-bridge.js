@@ -59,20 +59,21 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=6e2e49883bb2';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=6e2e49883bb2';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=6e2e49883bb2';
-import { HandleTable } from './handles.js?v=6e2e49883bb2';
-import { Exceptions } from './exceptions.js?v=6e2e49883bb2';
-import { coreImports } from './boundary-imports.js?v=6e2e49883bb2';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=6e2e49883bb2';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=6e2e49883bb2';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=6e2e49883bb2';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=6e2e49883bb2';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=6e2e49883bb2';
-import { Blocked } from '../../runtime/scheduler.js?v=6e2e49883bb2';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=6e2e49883bb2';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=6e2e49883bb2';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=3a2c769ef5ff';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=3a2c769ef5ff';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=3a2c769ef5ff';
+import { HandleTable } from './handles.js?v=3a2c769ef5ff';
+import { Exceptions } from './exceptions.js?v=3a2c769ef5ff';
+import { coreImports } from './boundary-imports.js?v=3a2c769ef5ff';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=3a2c769ef5ff';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=3a2c769ef5ff';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=3a2c769ef5ff';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=3a2c769ef5ff';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=3a2c769ef5ff';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=3a2c769ef5ff';
+import { Blocked } from '../../runtime/scheduler.js?v=3a2c769ef5ff';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=3a2c769ef5ff';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=3a2c769ef5ff';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -94,7 +95,7 @@ const HOST_CALL = Object.freeze({ op: 0, caller: 4, constant: 8, count: 12, args
 export const Status = Object.freeze({ OK: 0, BUDGET: 1, OUT_OF_MEMORY: 5, UNSUPPORTED: 6, UNRESOLVED: 34, UNBOUND_NATIVE: 35, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81,
   HOST_THROW: 0x7fff0110, HOST_FRAME: 0x7fff0111 });
 export const STATUS_NAMES = Object.freeze({ ...STATUS, 64: 'host step not supported', 65: 'host failed', 66: 'host wait', 80: 'thread blocked', 81: 'yielded' });
-const METHOD_KIND_UNBOUND = 0x7fff0003;
+const METHOD_KIND_UNBOUND = 0x7fff0003, METHOD_KIND_UNLINKED = 0x7fff0001;
 const TIME_SAMPLE = 16;   // one bridged call in 16 per bridge reads the clock (bridgeBody)
 const wordCount = parameters => parameters.reduce((n, type) => n + (type === 'J' || type === 'D' ? 2 : 1), 0);
 const OWN_STEP = Object.freeze({ kind: 'own', parked: null });   // CoreThreads' base step of a nested run with nothing parked (runOn)
@@ -137,6 +138,51 @@ export class WasmEngine {
     this.pins = []; this.pendingHost = []; this.patched = []; this.patchEpoch = 0; this.usedBridge = null; this.hostDepth = 0; this.sites = new Map(); this.methodInfos = new WeakMap(); this.lastError = null; this.stopReason = null; this.fieldSites = new Map(); this.parked = null;
     this.stats = { bridged: 0, frames: 0, steps: 0, nested: 0, nativeSites: 0, collections: 0, hostCollections: 0, markMs: 0, sweepMs: 0, companionScans: 0, pinsAtCollection: 0, rootIds: 0 };
     installHostLinking(this.linker, runtime, { staticValue: (reference, slot) => this.writeValue(slot, reference.type, runtime.readStatic(reference)) });
+    this.installRouting();
+  }
+
+  // ---- methods routed to the host (src/method-overrides.js: return overrides and method interceptors)
+  // A DEX method the core calls directly never reaches APKRuntime.dispatchCore, where the overrides and interceptors are honoured. While a method's key is hooked, its Method
+  // record is the host's: its kind is METHOD_UNBOUND, so every invoke of it (by vtable, itable cache, direct, super or static) crosses to env.bridge, whose dispatch answers the
+  // hook's value or hands back the body (HOST_FRAME). The body runs from a twin record with the same DEX code, made when first needed (bodyInfo); the original record keeps its id,
+  // address and vtable slots. Unhooked again, the record gets its kind back. Nothing is routed while no hook exists: the cost is one size test per laid-out class.
+  installRouting() {
+    const engine = this, linker = this.linker, rt = this.runtime, dexClass = linker.dexClass.bind(linker);
+    this.routedKeys = new Set(); this.routedRecords = new Map();
+    linker.dexClass = (type, cls) => {
+      const info = dexClass(type, cls);
+      if (engine.routedKeys.size !== 0) for (const mi of info.methods.values()) if (engine.routedKeys.has(mi.key)) engine.route(mi);
+      return info;
+    };
+    rt.onMethodHooksChanged = () => engine.syncRouting();
+  }
+  /** Routes every hooked key's laid-out record (a class not laid out yet is routed when it is: installRouting) and gives the unhooked ones their kind back. */
+  syncRouting() {
+    const wanted = hookedMethodKeys(this.runtime);
+    for (const [key, mi] of this.routedRecords) if (!wanted.has(key)) this.unroute(mi);
+    this.routedKeys = wanted;
+    for (const key of wanted) {
+      if (this.routedRecords.has(key)) continue;
+      const arrow = key.indexOf('->'), info = this.linker.classes.get(key.slice(0, arrow));
+      const mi = info?.methods?.get(key.slice(arrow + 2));
+      if (mi !== undefined) this.route(mi);
+    }
+  }
+  route(mi) {
+    if (mi.routed === true || !mi.def?.code) return;   // only a method with DEX code has a body to hand back (a native or abstract one keeps its own path)
+    mi.routed = true; mi.routedKind = this.r32(mi.address + METHOD.kind); this.routedRecords.set(mi.key, mi);
+    Atomics.store(this.u32, (mi.address + METHOD.kind) >>> 2, METHOD_KIND_UNBOUND);
+  }
+  unroute(mi) {
+    if (mi.routed !== true) return;
+    mi.routed = false; this.routedRecords.delete(mi.key);
+    Atomics.store(this.u32, (mi.address + METHOD.kind) >>> 2, mi.routedKind === 0 ? 0 : METHOD_KIND_UNLINKED);   // linked before: its code is still in place; otherwise it links on its next call
+  }
+  /** The record whose body runs for `method`: its own, or the twin of a routed one (same DEX code, its own copy linked on first call; not in its class's method table). */
+  bodyInfo(method) {
+    const mi = this.methodInfo(method);
+    if (mi === null || mi.routed !== true) return mi;
+    return mi.routedBody ??= this.linker.newMethod(mi.owner, mi.name, mi.nameSig.slice(mi.name.length), { def: mi.def, accessFlags: mi.accessFlags, kind: METHOD_KIND_UNLINKED, flags: mi.flags, registers: mi.registers, ins: mi.ins, vtableIndex: this.r32(mi.address + METHOD.vtableIndex) });
   }
 
   async instantiate(module) {
@@ -399,7 +445,7 @@ export class WasmEngine {
 
   /** APKRuntime.execute in the core: `args` are the JavaScript VM's argument words (WIDE_HIGH after each long/double). */
   execute(method, args) {
-    const mi = this.methodInfo(method);
+    const mi = this.bodyInfo(method);
     if (!mi) throw new APKError(`vmcore: ${method.owner}->${method.name}${method.signature} is not a method the core's linker knows`);
     return this.runNested(mi.id, this.wordsOf(args), method.result ?? method.signature.slice(method.signature.indexOf(')') + 1));
   }
@@ -526,7 +572,7 @@ export class WasmEngine {
       let outcome = this.call(site, args);
       if (this.usedBridge !== null) { const used = this.usedBridge; this.usedBridge = null; if (used.vmNative !== 0) this.bindNative(methodId, site, args, used); if (site.identity) this.noteIdentity(used, args, outcome); }
       if (outcome instanceof PendingCall) {
-        const mi = this.methodInfo(outcome.method);
+        const mi = this.bodyInfo(outcome.method);
         if (mi && (outcome.args === args || sameWords(outcome.args, args))) { this.stats.frames++; this.w32(t + THREAD.detail, mi.address); return Status.HOST_FRAME; }
       }
       // a host step (a wait, a call into Java with a continuation): the run stops here and the thread takes the step where it can park and resume (CoreThreads.pump)

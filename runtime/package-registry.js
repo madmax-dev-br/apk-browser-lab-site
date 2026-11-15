@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=6e2e49883bb2';
-import { gcRoot } from './heap-gc.js?v=6e2e49883bb2';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=6e2e49883bb2';
-import { AndroidResources } from './android-resources.js?v=6e2e49883bb2';
+import { APKError } from './apk-error.js?v=3a2c769ef5ff';
+import { gcRoot } from './heap-gc.js?v=3a2c769ef5ff';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=3a2c769ef5ff';
+import { AndroidResources } from './android-resources.js?v=3a2c769ef5ff';
 
 // The installed packages of the virtual device beyond the app being run (docs/MULTI-PACKAGE.md). Without a companion this registry is inert: `multi` is false and every
 // caller keeps its single-package path, so a device with one package behaves exactly as before.
@@ -114,7 +114,7 @@ export function createPackageRegistry(platform) {
   // ---- class loading ----------------------------------------------------------------------------------------------------------------------------------------------
   const loaderOf = (runtime, entry) => {
     if (entry.main) return runtime.applicationClassLoader ??= platform.classLoaders.createApplicationLoader(runtime);
-    if (!entry.loader) { entry.loader = platform.classLoaders.createPackageLoader(runtime, entry); refs.set(`${entry.name}:loader`, entry.loader); }
+    if (!entry.loader) { entry.loader = platform.classLoaders.createPackageLoader(runtime, entry); refs.set(`${entry.name}:loader`, entry.loader); platform.onPackageCodeDefined?.(runtime, entry); }   // a device option that hooks the package's methods (src/microg-device.js) resolves their loader-alias keys now
     return entry.loader;
   };
   /** The VM class-table type of class `className` (dotted) as package `entry` sees it, or null when that package has no such class. */

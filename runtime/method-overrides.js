@@ -152,8 +152,28 @@ export function applyMethodOverrides(rt, specs) {
   rt.methodOverridesAll = nextAll;
   rt.methodOverrides = next.size ? next : null;
   rt.methodOverrideEpoch = (rt.methodOverrideEpoch ?? 0) + 1;
-  if (changed.size) resetCachedSites(rt, changed);
+  if (changed.size) { resetCachedSites(rt, changed); rt.onMethodHooksChanged?.(); }   // the WebAssembly core routes the calls of these methods to the host (vmcore/js/host-bridge.js syncRouting)
   return statuses;
+}
+
+/**
+ * Method interceptors: the same hook as the overrides, for device code that decides per call (src/microg-device.js: the entry points of microG's forbidden features). `rt.methodInterceptors`
+ * (null while none is installed: the idle cost is the null test next to the overrides' one in dispatchCore) maps a resolved definition's key to `fn(rt, definition, args, mode)`, which
+ * answers the call's value (the body does not run) or RUN_BODY (the body runs as usual). A call that went through an interceptor never fills an inline call-site cache, so every call of
+ * the method reaches it again; the sites that cached it before are reset here. Calls inside the WebAssembly core reach it through the same routing as the overrides.
+ */
+export const RUN_BODY = Symbol('run the method body');
+export function setMethodInterceptor(rt, key, fn) {
+  const map = rt.methodInterceptors ?? new Map();
+  if (fn) map.set(key, fn); else map.delete(key);
+  rt.methodInterceptors = map.size ? map : null;
+  resetCachedSites(rt, new Set([key])); rt.onMethodHooksChanged?.();
+}
+/** The keys whose calls the WebAssembly core must route through the host's dispatch: every enabled override and every interceptor. */
+export function hookedMethodKeys(rt) {
+  const keys = new Set(rt.methodOverrides?.keys() ?? []);
+  for (const key of rt.methodInterceptors?.keys() ?? []) keys.add(key);
+  return keys;
 }
 
 /** Forgets every inline call-site cache entry that enters one of `keys`: the next call at those sites resolves again through dispatchCore (which answers the override, or fills the cache again). */

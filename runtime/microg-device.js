@@ -1,4 +1,10 @@
-import { APKError } from './apk-error.js?v=6e2e49883bb2';
+import { APKError } from './apk-error.js?v=3a2c769ef5ff';
+import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=3a2c769ef5ff';
+import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=3a2c769ef5ff';
+import { parseReturnValue } from './method-overrides.js?v=3a2c769ef5ff';
+
+const DEALIAS = /\$\$ldr\d+;/g;   // a companion package's classes are defined under a loader alias (Lfoo/Bar$$ldrN;): the de-aliased form matches the table's plain descriptors
+const dealias = text => String(text).replace(DEALIAS, ';');
 
 // The "com microG" device option (CLAUDE.md, docs/MICROG.md "Integration"): off by default. When on, the virtual device has the two microG packages built from the pinned
 // source (vendor/microg/<version>/) installed as preinstalled companion packages, and PackageManager reports for THOSE packages only the certificate each declares in its
@@ -107,7 +113,108 @@ export function enableMicrog(runtime, { version }) {
     r.record(`DEVICE microG REFUSED DroidGuard code load: ${path}`);
     throw new APKError(`DroidGuard: the virtual device never loads DroidGuard's downloaded code (${path}); DroidGuard, SafetyNet and Play Integrity attestation are not available with the microG option`, { kind: 'microg-droidguard-refused' });
   };
-  platform.microg = { version, packages: names, failures: [], refusedPermissions: [...MICROG_REFUSED_PERMISSIONS], defaultGrants: [...MICROG_DEFAULT_GRANTS], settings: { ...MICROG_LOCKED_SETTINGS } };
+  const microg = platform.microg = { version, packages: names, failures: [], refusedPermissions: [...MICROG_REFUSED_PERMISSIONS], defaultGrants: [...MICROG_DEFAULT_GRANTS], settings: { ...MICROG_LOCKED_SETTINGS }, mocks: new Map(), entries: new Map() };
+  installMicrogEntryPoints(runtime, microg, registry);
   runtime.record(`DEVICE microG ${version}: ${names.join(', ')} preinstalled (option "com microG"); signatures from their fake-signature meta-data; locked off: check-in, GCM, SafetyNet/Play Integrity, DroidGuard, licensing, billing (${MICROG_SETTINGS_PATH}); refused permission: ${MICROG_REFUSED_PERMISSIONS.join(', ')}; default grants to ${MICROG_GMS}: location`);
   return platform.microg;
+}
+
+// ---- The entry points of the forbidden features (docs/MICROG.md section 9, src/microg-entry-points.js) -----------------------------------------------------------------------
+// Each entry point's microG method is intercepted (src/method-overrides.js setMethodInterceptor, honoured by both engines). A companion package's classes are defined under a loader
+// alias, so the method's VM key is resolved from the laid-out class once the package's code exists (onPackageCodeDefined). Without a mock the device reports one uniform failure per
+// entry point and microG's own body then runs; with a mock the mock's value is returned instead. Nothing is intercepted until the package's loader is built, so a run that never
+// reaches a microG package pays nothing.
+function installMicrogEntryPoints(runtime, microg, registry) {
+  for (const def of MICROG_ENTRY_POINTS) microg.entries.set(def.id, { def, key: null, hits: 0, mockHits: 0, resolved: false });
+  // API the page/Node use to supply a mock (loadAPK option mocks are applied by the caller through this).
+  microg.mock = (id, handler) => {
+    if (!microg.entries.has(id)) throw new APKError(`microG: no entry point "${id}" (known: ${[...microg.entries.keys()].join(', ')})`, { kind: 'microg-entry-point' });
+    if (typeof handler !== 'function') throw new APKError(`microG: the mock of "${id}" must be a function`, { kind: 'microg-entry-point' });
+    microg.mocks.set(id, handler);
+  };
+  microg.unmock = id => microg.mocks.delete(id);
+  // Resolves and installs the interceptor for every entry point of the package whose code was just defined.
+  const installFor = (rt, entry) => {
+    for (const state of microg.entries.values()) {
+      if (state.resolved || state.def.pkg !== entry.name) continue;
+      const aliasOwner = entry.descriptors?.get(state.def.method.owner); if (!aliasOwner) continue;
+      const cls = rt.classes.get(aliasOwner); if (!cls) continue;
+      let nameSig = null;
+      for (const candidate of cls.methods.keys()) if (candidate.startsWith(state.def.method.name + '(') && dealias(candidate) === state.def.method.name + state.def.method.signature) { nameSig = candidate; break; }
+      if (!nameSig) throw new APKError(`microG entry point ${state.def.id}: ${microgEntryMethodSmali(state.def)} is not a method of the installed ${entry.name}`, { kind: 'microg-entry-point' });
+      state.key = `${aliasOwner}->${nameSig}`; state.result = nameSig.slice(nameSig.indexOf(')') + 1); state.resolved = true;
+      setMethodInterceptor(rt, state.key, (r, definition, args) => intercept(r, microg, state, definition, args));
+    }
+  };
+  // Install for packages whose loader already exists, and hook later creations.
+  for (const entry of registry.companions().filter(e => e.deviceOption === 'microg')) if (entry.loader) installFor(runtime, entry);
+  const previous = runtime.platform.onPackageCodeDefined;
+  runtime.platform.onPackageCodeDefined = (rt, entry) => { previous?.(rt, entry); if (entry.deviceOption === 'microg') installFor(rt, entry); };
+}
+
+/** One intercepted call of an entry point's method: the mock's value, or a reported "not implemented" failure followed by microG's own body (RUN_BODY). */
+function intercept(runtime, microg, state, definition, args) {
+  const def = state.def, handler = microg.mocks.get(def.id);
+  if (!handler) {
+    state.hits++;
+    let failure = microg.failures.find(item => item.kind === 'microg-not-implemented' && item.entryPoint === def.id);
+    if (!failure) { failure = { kind: 'microg-not-implemented', entryPoint: def.id, api: def.label, method: microgEntryMethodSmali(def), hits: 0 }; microg.failures.push(failure); }
+    failure.hits = state.hits;
+    if (state.hits === 1 || state.hits % 100 === 0) runtime.record(`LOG W APKWebLab: microG ${def.id} (${def.label}): não implementado, sem mock; ponto de entrada ${microgEntryMethodSmali(def)} (${state.hits} chamadas)`);
+    if (state.hits === 1) runtime.record(`DEVICE microG NOT IMPLEMENTED ${def.id}: ${def.label}; entry point ${dealias(definition.method.owner).slice(1, -1).replaceAll('/', '.')}.${def.method.name}; no mock registered`);
+    return RUN_BODY;   // microG's own locked body runs: the app gets that API's ordinary failure
+  }
+  state.mockHits++;
+  if (state.mockHits === 1 || state.mockHits % 100 === 0) runtime.record(`LOG W APKWebLab: microG MOCK ${def.id} (${def.label}): valor fornecido substitui ${microgEntryMethodSmali(def)} (${state.mockHits} chamadas)`);
+  if (state.mockHits === 1) runtime.record(`DEVICE microG MOCK ${def.id}: ${def.label}; entry point ${microgEntryMethodSmali(def)}`);
+  const receiver = (definition.flags & 8) ? null : args[0];   // ACC_STATIC
+  let value;
+  try { value = handler({ id: def.id, runtime, args, receiver, method: state.key }); }
+  catch (error) {
+    if (error?.name === 'JavaException') throw error;   // the handler threw a Java exception through the runtime: the app sees it thrown from this call
+    throw new APKError(`microG mock "${def.id}" threw: ${error?.message ?? error}`, { kind: 'microg-mock-error', entryPoint: def.id });
+  }
+  return coerceMockValue(runtime, state.result, value);
+}
+
+/** The handler's value in the VM register form for the method's return type. References pass through (a `{ ref }`, a JavaScript string, or null); primitives are taken as given. */
+function coerceMockValue(runtime, result, value) {
+  if (result === 'V') return undefined;
+  if (result[0] === 'L' || result[0] === '[') return value === undefined ? null : typeof value === 'string' ? runtime.javaString(value) : value;
+  if (result === 'Z') return value === true || value === 1 ? 1 : 0;
+  if (result === 'J') return typeof value === 'bigint' ? value : BigInt(Math.trunc(Number(value) || 0));
+  return Number(value) | 0;
+}
+
+/**
+ * The page's constant-value mocks for the entry points (the Worker has no way to receive a handler function). `specs`: [{ id, value }] with `value` written as for a method return
+ * override (src/method-overrides.js parseReturnValue, against the entry point's own return type): for a reference type only "null" or a quoted "string"; a primitive as its literal. An id
+ * absent from `specs` is unmocked. A value the type does not accept is reported as `error` on that row and leaves the entry point unmocked. Richer values (a Bundle, a byte[], a built
+ * object) are the Node API's `platform.microg.mock(id, handler)`. Returns the entry-point rows (describeMicrogEntryPoints) with the error, if any, per id.
+ */
+export function applyMicrogMocks(runtime, specs) {
+  const microg = runtime.platform?.microg;
+  if (!microg) return [];
+  const wanted = new Map((Array.isArray(specs) ? specs : []).map(spec => [spec?.id, spec]));
+  const errors = new Map();
+  for (const def of MICROG_ENTRY_POINTS) {
+    const spec = wanted.get(def.id);
+    if (spec === undefined) { microg.unmock(def.id); continue; }
+    const state = microg.entries.get(def.id), result = state?.result ?? null;
+    if (result === null) { errors.set(def.id, 'O ponto de entrada ainda não foi resolvido (abra o app e alcance o microG uma vez).'); continue; }
+    const parsed = parseReturnValue(dealias(result), spec.value);   // the return type without the loader alias, so a reference is "null"/"string" and a primitive its literal
+    if (!parsed.ok) { errors.set(def.id, parsed.error); microg.unmock(def.id); continue; }
+    microg.mock(def.id, ({ runtime: r }) => typeof parsed.value === 'string' ? r.javaString(parsed.value) : parsed.value);
+  }
+  return describeMicrogEntryPoints(microg).map(row => errors.has(row.id) ? { ...row, error: errors.get(row.id) } : row);
+}
+
+/** For the snapshot and the page: one row per entry point (src/microg-entry-points.js), with its resolved key, whether it is mocked and its hit counts. */
+export function describeMicrogEntryPoints(microg) {
+  if (!microg?.entries) return [];
+  return MICROG_ENTRY_POINTS.map(def => {
+    const state = microg.entries.get(def.id);
+    return { id: def.id, label: def.label, package: def.pkg, method: microgEntryMethodSmali(def), returnType: def.returnType, valueless: def.valueless === true, note: def.note,
+      resolved: state?.resolved === true, mocked: microg.mocks.has(def.id), hits: state?.hits ?? 0, mockHits: state?.mockHits ?? 0 };
+  });
 }

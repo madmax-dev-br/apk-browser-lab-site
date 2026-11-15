@@ -641,3 +641,15 @@ body.lab-dragging{user-select:none;-webkit-user-select:none}
 @media (max-width:700px){.appdata-db-main{grid-template-columns:1fr}}
 /* lab.overlay (src/lab-overlays.js): a plugin's HTML beside or over the device; the layer covers the viewport and lets the pointer through, an overlay takes it only when interactive */
 .lab-overlay-layer{position:fixed;inset:0;z-index:42;pointer-events:none;overflow:hidden;contain:strict}.lab-overlay{position:absolute;left:0;top:0;will-change:transform}.lab-overlay[hidden]{display:none}.lab-overlay-frame{display:block;width:100%;height:100%;border:0;background:transparent;color-scheme:light}
+.cp-microg-entries{margin-top:12px}
+.cp-microg-entries>.cp-note{margin-top:0}
+.cp-microg-entries .cp-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.cp-microg-entry{padding:8px;border:1px solid var(--line);border-radius:6px;min-width:0}
+.cp-microg-entry-head{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.cp-microg-entry-label{font-weight:600}
+.cp-microg-entry-hits{font-size:11px;color:var(--muted);white-space:nowrap}
+.cp-microg-entry-method{display:block;margin:4px 0 6px;font-family:var(--mono);font-size:11px;color:var(--muted);word-break:break-all}
+.cp-microg-entry-field{display:flex;flex-direction:column;gap:4px}
+.cp-microg-entry-value{font-family:var(--mono);font-size:12px;width:100%;min-width:0;box-sizing:border-box}
+.cp-microg-entry-meta{font:400 11px/1.4 var(--sans);color:var(--muted)}
+.cp-microg-entry-meta[data-state=error]{color:var(--warn)}

@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=6e2e49883bb2") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=6e2e49883bb2">
-  <link rel="stylesheet" href="./lab-theme.css?v=6e2e49883bb2">
-  <meta name="apk-browser-build" content="6e2e49883bb2">
+  <style>@import url("./styles.css?v=3a2c769ef5ff") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=3a2c769ef5ff">
+  <link rel="stylesheet" href="./lab-theme.css?v=3a2c769ef5ff">
+  <meta name="apk-browser-build" content="3a2c769ef5ff">
 </head>
 <body>
   <header class="topbar">
@@ -88,6 +88,10 @@
                 <label for="dev-microg">Com microG <em id="dev-microg-hint" class="vm-memory-hint" role="status" hidden>reabra o APK para aplicar</em></label><input id="dev-microg" type="checkbox" aria-describedby="dev-microg-note">
               </div>
               <p id="dev-microg-note" class="cp-note">Com microG: o aparelho ganha o microG 0.3.18 (substituto de código aberto do Google Play services, compilado aqui do código-fonte) e a Play Store dele. Apps que usam o Play services passam a encontrá-lo e recebem as respostas locais do microG (disponibilidade, App Set ID, ID de publicidade, localização). Continuam indisponíveis, com erro explícito: registro do aparelho, login com conta Google, push (FCM), SafetyNet, Play Integrity e DroidGuard. Desligado (padrão), o aparelho não tem Play services. Vale ao reabrir o APK.</p>
+              <div id="dev-microg-entries" class="cp-microg-entries" hidden>
+                <p class="cp-note">Pontos de entrada das funções que o laboratório não executa (check-in, token de conta, push, SafetyNet, Play Integrity, DroidGuard, licenciamento, faturamento). Sem mock, cada chamada registra uma falha "não implementado" e o corpo travado do microG roda. Para mockar daqui, informe um valor constante para o tipo de retorno (uma referência aceita só <code>null</code> ou <code>"texto"</code>); valores ricos (Bundle, byte[], objeto) são só pela API de Node (<code>platform.microg.mock</code>). Alguns pontos entregam o resultado por callback/corrotina: o mock de valor é contado como acerto, mas não alimenta o resultado.</p>
+                <ul id="dev-microg-entry-list" class="cp-list"></ul>
+              </div>
               <p id="dev-hosts-note" class="cp-note">Com "Permitir todos os hosts" ligado (padrão) qualquer nome pode ser acessado, ainda sujeito a CORS no servidor (ou a um proxy seu). Desligado, só os hosts da lista são acessíveis e, sem hosts na lista, todo nome falha como em um telefone offline.</p>
             </div></details>
             <details class="cp-group" id="cp-sec-perms" data-section="perms">
@@ -271,7 +275,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=6e2e49883bb2"></script>
+  <script type="module" src="./app.js?v=3a2c769ef5ff"></script>
   <script>
   // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
   // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.

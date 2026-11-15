@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=6e2e49883bb2';
-import { createRasterReceiver } from './raster-cache.js?v=6e2e49883bb2';
+import { createWebAudioPlayer } from './web-audio-player.js?v=3a2c769ef5ff';
+import { createRasterReceiver } from './raster-cache.js?v=3a2c769ef5ff';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=6e2e49883bb2', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=3a2c769ef5ff', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
@@ -141,6 +141,8 @@ export class APKWorkerClient {
   /** A page plugin's read-only query (src/plugin-queries.js; queued and served at low priority by the Worker). Rejects with `code` 'no-apk' when no APK is loaded. */
   async pluginQuery(query, args = {}) { if (!this.worker) throw Object.assign(new Error('Nenhum APK em execução.'), { code: 'no-apk' }); const reply = await this.sideCall('plugin-query', { query, args }, 10000); return { value: reply.value, ms: reply.ms }; }
   async setEndpointMocks(mocks) { return (await this.sideCall('endpoint-mocks', { mocks })).statuses; }
+  /** The "com microG" entry points (src/microg-entry-points.js): sets the page's constant-value mocks ([{ id, value }]; an id left out is unmocked) and resolves the entry-point rows. */
+  async setMicrogMocks(mocks) { return (await this.sideCall('microg-mocks', { mocks })).entryPoints ?? []; }
   async setIgnoredActivities(entries) { return (await this.sideCall('ignored-activities', { entries })).statuses; }
   /** The permission states and the simulated location ({ config, location }), applied between two VM events; either part may be left out. */
   async setPermissions(payload) { return this.sideCall('permissions-config', payload); }

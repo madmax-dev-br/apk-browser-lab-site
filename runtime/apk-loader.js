@@ -1,19 +1,19 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=6e2e49883bb2';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=6e2e49883bb2';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=6e2e49883bb2';
-import { inspectELF } from './native-inspector.js?v=6e2e49883bb2';
-import { elfBuildId } from './elf-build-id.js?v=6e2e49883bb2';
-import { inflateRaw } from './inflate.js?v=6e2e49883bb2';
-import { crc32, inflateEntry } from './zip-entry.js?v=6e2e49883bb2';
-import { resolveDevice } from './device-profile.js?v=6e2e49883bb2';
-import { resourceProfileFor } from './device-configuration.js?v=6e2e49883bb2';
-import { JniBridge } from './jni-host.js?v=6e2e49883bb2';
-import { providerForApk } from './native-provider-variants.js?v=6e2e49883bb2';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=6e2e49883bb2';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=6e2e49883bb2';
-import { AndroidResources } from './android-resources.js?v=6e2e49883bb2';
-import { AndroidPlatform } from './android-platform.js?v=6e2e49883bb2';
-import { FrameworkProvider } from './framework-provider.js?v=6e2e49883bb2';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=3a2c769ef5ff';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=3a2c769ef5ff';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=3a2c769ef5ff';
+import { inspectELF } from './native-inspector.js?v=3a2c769ef5ff';
+import { elfBuildId } from './elf-build-id.js?v=3a2c769ef5ff';
+import { inflateRaw } from './inflate.js?v=3a2c769ef5ff';
+import { crc32, inflateEntry } from './zip-entry.js?v=3a2c769ef5ff';
+import { resolveDevice } from './device-profile.js?v=3a2c769ef5ff';
+import { resourceProfileFor } from './device-configuration.js?v=3a2c769ef5ff';
+import { JniBridge } from './jni-host.js?v=3a2c769ef5ff';
+import { providerForApk } from './native-provider-variants.js?v=3a2c769ef5ff';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=3a2c769ef5ff';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=3a2c769ef5ff';
+import { AndroidResources } from './android-resources.js?v=3a2c769ef5ff';
+import { AndroidPlatform } from './android-platform.js?v=3a2c769ef5ff';
+import { FrameworkProvider } from './framework-provider.js?v=3a2c769ef5ff';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -743,7 +743,11 @@ export async function loadAPK(arrayBuffer, options = {}) {
     runtime.platform.packages.install(companion);
     if (companion.nativeLibraries.length) warnings.push(`Companion package ${companion.packageName} packages ${companion.nativeLibraries.length} native files; they are not offered to JNI (a companion's System.loadLibrary fails naming the library)`);
   }
-  if (options.microg) enableMicrog(runtime, { version: options.microg.version });   // the signer hook, the locked settings file, the refused permissions; before any app code runs
+  if (options.microg) {
+    const microg = enableMicrog(runtime, { version: options.microg.version });   // the signer hook, the locked settings file, the refused permissions, the forbidden-feature entry points; before any app code runs
+    const mocks = options.microg.mocks;   // optional { [entryPointId]: handler }: a mock value for a forbidden feature's entry point (src/microg-entry-points.js); the lab ships none
+    if (mocks) for (const [id, handler] of Object.entries(mocks)) microg.mock(id, handler);
+  }
   runtime.platform.resourceSelector = resourceConfiguration ?? null; // live device changes re-select resources through the same original ResTable_config matcher
   if (nativeLibraryProvider && [...nativeLibraryProvider.modules.values()].some(entry => entry.apkSha256)) {
     // libraries scoped to one APK (its own generated native code) are offered only to that APK: compared by the SHA-256 of the file
