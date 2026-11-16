@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=d62efce0f056';
-import { APKError } from './apk-error.js?v=d62efce0f056';
-import { gcRoot } from './heap-gc.js?v=d62efce0f056';
+import { createHostRegistry } from './host-contract.js?v=deffd920e05b';
+import { APKError } from './apk-error.js?v=deffd920e05b';
+import { gcRoot } from './heap-gc.js?v=deffd920e05b';
 
 // Action modes and their menus, with the semantics of android-13.0.0_r1:
 //   * View.startActionMode / ViewGroup.startActionModeForChild (View.java, ViewGroup.java: the typed / legacy call dance with SENTINEL_ACTION_MODE) carry the request up the parent

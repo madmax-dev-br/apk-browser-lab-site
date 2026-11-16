@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=d62efce0f056';
-import { gcRoot } from './heap-gc.js?v=d62efce0f056';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=d62efce0f056';
-import { AndroidResources } from './android-resources.js?v=d62efce0f056';
+import { APKError } from './apk-error.js?v=deffd920e05b';
+import { gcRoot } from './heap-gc.js?v=deffd920e05b';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=deffd920e05b';
+import { AndroidResources } from './android-resources.js?v=deffd920e05b';
 
 // The installed packages of the virtual device beyond the app being run (docs/MULTI-PACKAGE.md). Without a companion this registry is inert: `multi` is false and every
 // caller keeps its single-package path, so a device with one package behaves exactly as before.

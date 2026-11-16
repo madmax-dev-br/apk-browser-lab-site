@@ -7,9 +7,9 @@
 // createAdb(device).run({ command | args }, io) -> { stdout, stderr, code, images: [{ blob, type }], notes: [] }
 //   io.localFile(path) -> File of the machine that runs the bridge (adb install / push); io.writeLocal(path, blob, { append }) writes one there (adb pull, `> file`).
 // The command-line syntax (quotes, | grep, &&, >) is src/adb-shell.js. No process.*.
-import { AdbError, unsupported, usage, parseLine, runList, FILTERS } from './adb-shell.js?v=d62efce0f056';
-import { formatThreadtime } from './logcat.js?v=d62efce0f056';
-import { kindOf, directoryOf } from './shared-storage.js?v=d62efce0f056';
+import { AdbError, unsupported, usage, parseLine, runList, FILTERS } from './adb-shell.js?v=deffd920e05b';
+import { formatThreadtime } from './logcat.js?v=deffd920e05b';
+import { kindOf, directoryOf } from './shared-storage.js?v=deffd920e05b';
 
 export const SERIAL = 'apkweb-lab';
 const SHARED_ROOT = '/storage/emulated/0', SHARED_ALIASES = ['/sdcard', '/mnt/sdcard', '/storage/self/primary'];

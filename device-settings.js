@@ -1,10 +1,10 @@
-import { coreMemorySetting } from './core-memory.js?v=d62efce0f056';
-import { isMemoryStep } from './memory-budget.js?v=d62efce0f056';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=d62efce0f056';
-import { sanitizeHostMap } from './host-map.js?v=d62efce0f056';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=d62efce0f056';
-import { sanitizeLocation } from './runtime-permissions.js?v=d62efce0f056';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=d62efce0f056';
+import { coreMemorySetting } from './core-memory.js?v=deffd920e05b';
+import { isMemoryStep } from './memory-budget.js?v=deffd920e05b';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=deffd920e05b';
+import { sanitizeHostMap } from './host-map.js?v=deffd920e05b';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=deffd920e05b';
+import { sanitizeLocation } from './runtime-permissions.js?v=deffd920e05b';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=deffd920e05b';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
