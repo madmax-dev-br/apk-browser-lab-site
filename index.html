@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=1eab5b3f5bf8") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=1eab5b3f5bf8">
-  <link rel="stylesheet" href="./lab-theme.css?v=1eab5b3f5bf8">
-  <meta name="apk-browser-build" content="1eab5b3f5bf8">
+  <style>@import url("./styles.css?v=1d7de62ac467") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=1d7de62ac467">
+  <link rel="stylesheet" href="./lab-theme.css?v=1d7de62ac467">
+  <meta name="apk-browser-build" content="1d7de62ac467">
 </head>
 <body>
   <header class="topbar">
@@ -207,7 +207,7 @@
             </div></details>
           <details class="cp-group" id="cp-sec-mcp" data-section="mcp">
               <summary><h3 id="cp-mcp-title">MCP</h3><span id="mcp-summary" class="cp-badge">desligado</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <p class="cp-note">Liga esta página a um agente (Claude Code, Claude Desktop ou outro cliente MCP): ele pode tirar print da tela ou de um componente, tocar, digitar e ler a saída dos plugins, a árvore do Compose, os ViewModels, o Logcat e a rede do app aberto aqui. Uma ponte pequena (<a href="tools/lab-mcp.mjs" download>lab-mcp.mjs</a>, Node.js) fica rodando no seu computador e o agente se conecta a ela por um endereço (veja <a href="plugins.html#mcp">como funciona</a>).</p>
+              <p class="cp-note">Liga esta página a um agente (Claude Code, Claude Desktop ou outro cliente MCP): ele pode tirar print da tela ou de um componente, tocar, digitar e ler a saída dos plugins, a árvore do Compose, os ViewModels, o Logcat e a rede do app aberto aqui, e instalar um APK do seu computador, abrir e fechar os apps da tela inicial. Uma ponte pequena (<a href="tools/lab-mcp.mjs" download>lab-mcp.mjs</a>, Node.js) fica rodando no seu computador e o agente se conecta a ela por um endereço (veja <a href="plugins.html#mcp">como funciona</a>).</p>
               <div class="mcp-config"><div class="mcp-config-head"><span id="mcp-config-title">1. Rode no terminal e deixe aberto</span><button id="mcp-copy" type="button" class="cp-button">Copiar</button></div><pre class="mcp-config-json" aria-labelledby="mcp-config-title"><code id="mcp-config-json"></code></pre></div>
               <label class="cp-check" for="mcp-lan"><input id="mcp-lan" type="checkbox"><span>Aceitar agentes de outras máquinas da rede<small>A ponte passa a escutar também no IP local deste computador e mostra os endereços ao iniciar. Quem estiver na rede alcança a porta: o token no endereço é a única proteção e o tráfego vai sem criptografia. Use só em redes de confiança.</small></span></label>
               <div class="mcp-config"><div class="mcp-config-head"><span id="mcp-agent-title">2. Conecte o agente a este endereço</span><button id="mcp-copy-agent" type="button" class="cp-button">Copiar</button></div><div id="mcp-agent-pick" class="mcp-agent-pick" role="group" aria-label="Agente"><button type="button" class="cp-button" data-agent="claude" aria-pressed="true">Claude</button><button type="button" class="cp-button" data-agent="codex" aria-pressed="false">Codex</button><button type="button" class="cp-button" data-agent="cursor" aria-pressed="false">Cursor</button></div><p id="mcp-agent-where" class="cp-note mcp-agent-where"></p><pre class="mcp-config-json" aria-labelledby="mcp-agent-title"><code id="mcp-agent-command"></code></pre><a id="mcp-agent-link" class="mcp-agent-link" hidden>Adicionar ao Cursor com um clique</a></div>
@@ -275,7 +275,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=1eab5b3f5bf8"></script>
+  <script type="module" src="./app.js?v=1d7de62ac467"></script>
   <script>
   // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
   // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.

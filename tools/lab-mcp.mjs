@@ -14,14 +14,16 @@
 //   node lab-mcp.mjs token                prints the token of ~/.apk-web-lab-mcp-token (only used when neither --token nor APK_WEB_LAB_MCP_TOKEN is given)
 //   options: --port 8790  --origin <lab origin> (repeatable)  --token <token>  --timeout-ms 60000
 //
-// Every tool call is answered by the page, with what the page shows at that moment; the bridge stores nothing. Safety: it listens on 127.0.0.1 only; the page's requests must come
+// Every tool call is answered by the page, with what the page shows at that moment; the bridge stores nothing. One tool also reads a file here: install_apk takes the path of an
+// .apk on this machine, and the page fetches its bytes from this bridge (GET /<token>/file/<id>, same origin and token checks, only while that call is in flight). Safety: it listens on 127.0.0.1 only; the page's requests must come
 // from one of the allowed origins (the public lab and a local copy by default: another site open in the same browser is refused by its Origin) and carry the pairing token. The
 // token is always required: the page generates it (shown in its MCP JSON) and the client passes it in APK_WEB_LAB_MCP_TOKEN (or --token); without either, the token kept in
 // ~/.apk-web-lab-mcp-token (created once, readable only by you) is used, as before. Tokens are compared in constant time and never logged. Node.js built-ins only. Protocol logs
 // go to stderr; stdout carries MCP messages only.
 import http from 'node:http';
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { networkInterfaces } from 'node:os';
 import path from 'node:path';
@@ -30,8 +32,10 @@ import { fileURLToPath } from 'node:url';
 export const DEFAULT_PORT = 8790;
 export const DEFAULT_ORIGINS = ['https://madmax-dev-br.github.io', 'http://127.0.0.1:8765', 'http://localhost:8765'];
 export const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
-export const SERVER_INFO = { name: 'apk-web-lab', title: 'APK Web Lab (página aberta no navegador)', version: '1.0.0' };
+export const SERVER_INFO = { name: 'apk-web-lab', title: 'APK Web Lab (página aberta no navegador)', version: '1.1.0' };
 const MAX_RESULT_BYTES = 24 * 1024 * 1024;
+export const MAX_APK_BYTES = 1024 * 1024 * 1024;   // the lab's own limit for an APK (src/app.js)
+const LONG_CALL_MS = 300000;   // reading, loading and starting an app can take minutes for a large APK
 
 const obj = (properties = {}, required = []) => ({ type: 'object', properties, required, additionalProperties: false });
 const str = description => ({ type: 'string', description }), num = description => ({ type: 'number', description }), bool = description => ({ type: 'boolean', description });
@@ -87,7 +91,13 @@ export const TOOLS = [
   { name: 'edit_row', description: 'Muda uma linha de uma tabela SQLite do app por uma segunda conexão ao banco: set (colunas novas) ou remove numa linha dada por rowid (ou key = chave primária de uma tabela WITHOUT ROWID), ou insert (uma linha nova). Valores por parâmetro, nunca colados no SQL.', inputSchema: obj({ db: str('banco'), table: str('tabela'), rowid: num('rowid da linha'), key: { type: 'object', description: 'chave primária { coluna: valor } (tabela sem rowid)' }, set: { type: 'object', description: '{ coluna: valor }' }, insert: { type: 'object', description: '{ coluna: valor } da linha nova' }, remove: bool('apaga a linha') }, ['db', 'table']) },
   { name: 'sql', description: 'Um comando SQL num banco do app (segunda conexão, como o sqlite3 do adb): uma consulta devolve colunas e linhas (até limit), uma mudança devolve quantas linhas mudou. params: os valores dos ?.', inputSchema: obj({ db: str('banco'), sql: str('um comando SQL'), params: { type: 'array', description: 'valores dos ?' }, limit: num('linhas (200, até 500)') }, ['db', 'sql']) },
   { name: 'device', description: 'Os ajustes do dispositivo (Controles › Aparência, Dispositivo, Execução): sem set, os atuais e as opções; set muda e aplica na hora, como o painel (connectivity online|metered|offline desliga a internet; language (en, pt, es …) e region (qualquer país ISO, ex. BR, PT, US) formam o locale, ou locale direto como pt-BR; darkTheme; orientation portrait|landscape; fontScale; animatorScale; hour24; timeZone; battery { level, charging }; screen; navigation gesture|buttons; renderer gpu|cpu e engine wasm|js valem no próximo lançamento).', inputSchema: obj({ set: { type: 'object', description: 'ajustes a mudar' } }) },
-  { name: 'apps', description: 'Os apps da tela inicial do emulador e o app aberto: action list (padrão), open (id de list: abre e inicia), restart (reabre o APK atual e inicia de novo) ou stop (encerra a VM).', inputSchema: obj({ action: str('list | open | restart | stop'), id: str('id do app salvo (de list)'), wait_ms: num('espera da tela pronta depois de open/restart (15000)') }) },
+  { name: 'apps', description: 'Os apps instalados na tela inicial do emulador (id, pacote, rótulo, arquivo, qual é o atual e se está aberto): action list (padrão). Também restart (reabre o APK atual e inicia de novo) e stop (encerra a VM); open é o mesmo que open_app. Para instalar, abrir e fechar: install_apk, open_app e close_app.', inputSchema: obj({ action: str('list | open | restart | stop'), id: str('id do app instalado (de list)'), wait_ms: num('espera da tela pronta depois de open/restart (15000)') }) },
+  { name: 'install_apk', description: 'Instala um APK na tela inicial do emulador, como soltar o arquivo na página: path é um arquivo .apk na máquina onde a ponte lab-mcp roda (a ponte entrega os bytes à página aberta no navegador; nada vai para a rede). O aparelho roda um app por vez: instalar encerra o app que estiver aberto. Com open: true o app é aberto em seguida e a resposta espera a tela pronta. Devolve o id do app (o de open_app e close_app), o pacote e a Activity inicial; um APK que o lab não consegue ler volta como erro com o motivo.',
+    inputSchema: obj({ path: str('caminho do arquivo .apk: absoluto, relativo à pasta onde a ponte foi iniciada, ou ~/…'), open: bool('abrir depois de instalar (padrão false)'), wait_ms: num('com open: espera da tela pronta (padrão 15000)') }, ['path']) },
+  { name: 'open_app', description: 'Abre um app já instalado, como tocar no ícone dele na tela inicial: id (de apps ou install_apk), package ou name (o rótulo ou o nome do arquivo). Sem nenhum dos três, o app atual (o último instalado ou aberto). Se ele já está aberto, volta à frente (alreadyOpen); outro app que esteja aberto é encerrado antes (um por vez). Espera a tela pronta; se o app parou ao abrir, a resposta traz o erro.',
+    inputSchema: obj({ id: str('id do app instalado (de apps ou install_apk)'), package: str('ou o pacote, ex. com.exemplo.app'), name: str('ou o rótulo do app ou o nome do arquivo .apk'), wait_ms: num('espera da tela pronta (padrão 15000)') }) },
+  { name: 'close_app', description: 'Fecha o app aberto, como jogá-lo para fora dos recentes: o processo dele termina, o ícone continua na tela inicial e open_app abre de novo numa VM nova. Com id, package ou name, só fecha se esse for o app aberto. Sem app aberto (ou outro app aberto), responde closed: false e diz o que está aberto.',
+    inputSchema: obj({ id: str('id do app instalado (de apps ou install_apk)'), package: str('ou o pacote'), name: str('ou o rótulo do app ou o nome do arquivo .apk') }) },
   { name: 'open_link', description: 'Abre um deep link / Intent no app, como Controles › Abrir link: resolvido pelos filtros do manifesto e iniciado como am start.', inputSchema: obj({ link: str('a URI, ex. https://… ou meuapp://…'), action: str('ação do Intent (padrão VIEW)'), component: str('Activity explícita, opcional') }) },
   { name: 'host_redirects', description: 'As regras de Redirecionar hosts (o app pede um host, o lab atende de outro, ex. um servidor local): sem rules, as atuais; rules troca todas: [{ from: "api.exemplo.com", to: "localhost:8080", enabled: true }].', inputSchema: obj({ rules: { type: 'array', items: { type: 'object' }, description: 'as regras novas (troca todas)' } }) },
   { name: 'permissions', description: 'As permissões de execução do app (Controles › Permissões): sem name, a lista com estado (ask|allow|deny) e se está concedida; name + state muda uma (vale na próxima checkSelfPermission).', inputSchema: obj({ name: str('ex. CAMERA ou android.permission.CAMERA'), state: str('ask | allow | deny') }) },
@@ -117,7 +127,7 @@ export function readOrCreateToken(file = tokenFile()) {
 /** The bridge: an HTTP side for the page and an MCP side (handle(message) -> response or null). */
 export function createBridge({ port = DEFAULT_PORT, host = '127.0.0.1', origins = DEFAULT_ORIGINS, token, timeoutMs = 60000, log = message => process.stderr.write(`[lab-mcp] ${message}\n`) } = {}) {
   if (!TOKEN_PATTERN.test(String(token ?? ''))) throw new Error('lab-mcp: a ponte precisa de um token (16 ou mais letras, números, _ ou -)');
-  const allowed = new Set(origins), pending = new Map(); let page = null, nextId = 1, server = null, refused = null, refusedLogged = 0;
+  const allowed = new Set(origins), pending = new Map(), files = new Map(); let page = null, nextId = 1, server = null, refused = null, refusedLogged = 0;
   const cors = (origin, res, extra = {}) => { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); for (const [name, value] of Object.entries(extra)) res.setHeader(name, value); };
   const send = (res, status, body, origin) => { if (origin) cors(origin, res); res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
   /** MCP over HTTP (Streamable HTTP, JSON responses only): POST /mcp/<token> with one JSON-RPC message or a batch. A browser page of another site is refused by its Origin;
@@ -178,6 +188,11 @@ export function createBridge({ port = DEFAULT_PORT, host = '127.0.0.1', origins 
       });
       return;
     }
+    if (req.method === 'GET' && action === 'file') {   // the APK of an install_apk call in flight, streamed from disk to the page (nothing is kept here)
+      const entry = files.get(url.pathname.split('/')[3] ?? ''); if (!entry) { send(res, 404, { error: 'arquivo desconhecido: a chamada install_apk dele já terminou' }, origin); return; }
+      cors(origin, res); res.writeHead(200, { 'content-type': 'application/vnd.android.package-archive', 'content-length': String(entry.size), 'cache-control': 'no-store' });
+      const stream = createReadStream(entry.file, { start: 0, end: entry.size - 1 }); stream.on('error', () => res.destroy()); res.on('close', () => stream.destroy()); stream.pipe(res); return;
+    }
     if (req.method === 'GET' && action === 'hello') { send(res, 200, { server: SERVER_INFO, connected: !!page }, origin); return; }
     send(res, 404, { error: 'não encontrado' }, origin);
   }
@@ -187,12 +202,29 @@ export function createBridge({ port = DEFAULT_PORT, host = '127.0.0.1', origins 
       const mismatch = refused && Date.now() - refused.at < 10 * 60 * 1000 ? ` Uma página (${refused.origin}) tentou conectar há ${Math.round((Date.now() - refused.at) / 1000)} s com outro token e foi recusada: rode de novo o comando de Controles › MCP (o token mudou?) para a configuração do cliente MCP e reinicie o servidor MCP.` : '';
       return Promise.resolve({ isError: true, content: [{ type: 'text', text: `A página do APK Web Lab não está conectada. Abra o lab no navegador, carregue o APK e em Controles › MCP clique em Conectar.${mismatch}` }] });
     }
-    const id = nextId++, wait = name === 'wait_ready' ? Math.max(timeoutMs, Number(args?.timeout_ms ?? 15000) + 5000) : timeoutMs;
+    const long = name === 'install_apk' || name === 'open_app' || (name === 'apps' && (args?.action === 'open' || args?.action === 'restart'));
+    const id = nextId++, wait = name === 'wait_ready' ? Math.max(timeoutMs, Number(args?.timeout_ms ?? 15000) + 5000) : long ? Math.max(timeoutMs, LONG_CALL_MS + (Number(args?.wait_ms) || 15000)) : timeoutMs;
     return new Promise(resolve => {
       const timer = setTimeout(() => { pending.delete(id); resolve({ isError: true, content: [{ type: 'text', text: `A página não respondeu em ${Math.round(wait / 1000)} s (aba em segundo plano ou ocupada?).` }] }); }, wait);
       pending.set(id, { resolve: body => resolve(body.ok === false ? { isError: true, content: [{ type: 'text', text: String(body.error ?? 'falha na página') }] } : { content: Array.isArray(body.content) ? body.content : [{ type: 'text', text: JSON.stringify(body.content ?? null) }], isError: !!body.isError }), timer });
       page.res.write(`event: call\ndata: ${JSON.stringify({ id, tool: name, args: args ?? {} })}\n\n`);
     });
+  }
+  /** install_apk: the .apk named by `path` is checked here and offered to the page for the length of the call; the page gets its name and size, never the path. */
+  async function installApk(args) {
+    const refuse = message => ({ isError: true, content: [{ type: 'text', text: message }] });
+    const given = typeof args?.path === 'string' ? args.path.trim() : '';
+    if (!given) return refuse('install_apk: path é obrigatório (o caminho de um arquivo .apk na máquina onde a ponte lab-mcp roda).');
+    const file = path.resolve(given === '~' || given.startsWith('~/') ? path.join(homedir(), given.slice(1)) : given);
+    if (!/\.apk$/i.test(file)) return refuse(`install_apk: ${path.basename(file)} não é um arquivo .apk.`);
+    let info; try { info = await stat(file); } catch (error) { return refuse(`install_apk: não foi possível ler ${file} (${error?.code ?? error?.message ?? error}). O caminho é da máquina onde a ponte lab-mcp roda.`); }
+    if (!info.isFile()) return refuse(`install_apk: ${file} não é um arquivo.`);
+    if (info.size === 0) return refuse(`install_apk: ${file} está vazio.`);
+    if (info.size > MAX_APK_BYTES) return refuse(`install_apk: ${path.basename(file)} tem ${Math.round(info.size / 1048576)} MiB; o limite do lab é 1 GiB por APK.`);
+    if (!page) return callPage('install_apk', {});   // says that the page is not connected
+    const id = randomBytes(16).toString('hex'), { path: _path, ...rest } = args;
+    files.set(id, { file, size: info.size });
+    try { return await callPage('install_apk', { ...rest, file: { id, name: path.basename(file), size: info.size } }); } finally { files.delete(id); }
   }
   /** One MCP JSON-RPC message -> the response (or null for a notification). */
   async function handle(message) {
@@ -201,12 +233,12 @@ export function createBridge({ port = DEFAULT_PORT, host = '127.0.0.1', origins 
     if (id === undefined || id === null) return null;   // notifications (initialized, cancelled ...)
     switch (method) {
       case 'initialize': return reply({ protocolVersion: PROTOCOL_VERSIONS.includes(params?.protocolVersion) ? params.protocolVersion : PROTOCOL_VERSIONS[0], capabilities: { tools: { listChanged: false } }, serverInfo: SERVER_INFO,
-        instructions: 'Ferramentas da página do APK Web Lab aberta no navegador (um app Android rodando no navegador). Comece por lab_status; screenshot devolve imagens; compose_tree e layout_bounds dão handles e chaves para as outras ferramentas.' });
+        instructions: 'Ferramentas da página do APK Web Lab aberta no navegador (um app Android rodando no navegador). Comece por lab_status; screenshot devolve imagens; compose_tree e layout_bounds dão handles e chaves para as outras ferramentas. install_apk instala um .apk desta máquina, apps lista os instalados, open_app e close_app abrem e fecham (um app por vez).' });
       case 'ping': return reply({});
       case 'tools/list': return reply({ tools: TOOLS });
       case 'tools/call': {
         const name = params?.name; if (!TOOLS.some(tool => tool.name === name)) return fail(-32602, `ferramenta desconhecida: ${name}`);
-        return reply(await callPage(name, params?.arguments ?? {}));
+        return reply(name === 'install_apk' ? await installApk(params?.arguments ?? {}) : await callPage(name, params?.arguments ?? {}));
       }
       default: return fail(-32601, `Method not found: ${method}`);
     }

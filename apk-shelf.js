@@ -12,6 +12,26 @@ export const SHELF_LIMIT = 24;   // entries kept; the least recently opened go f
 /** The key of a saved APK: its package and its file name (the file name alone while the package is not known). */
 export function shelfKey(packageName, name) { return name ? (packageName ? `${packageName}\u0000${name}` : name) : packageName || null; }
 
+/** An entry's id as text an agent or a log can carry (the key's separator is U+0000): "package/file.apk"; a key without a package is unchanged. Neither part can hold a "/". */
+export function printableShelfId(id) { return String(id ?? '').replace('\u0000', '/'); }
+
+/**
+ * The installed app a selector names, among list()'s summaries: { id } (the entry's key or its printable form), { packageName }, or { name } (the launcher label or the file
+ * name, with or without ".apk", case-insensitive). Throws when nothing or more than one app matches, naming what is installed (code 'not-found' | 'ambiguous' | 'bad-args').
+ */
+export function resolveShelfApp(items, { id = null, packageName = null, name = null } = {}) {
+  const list = Array.isArray(items) ? items : [], lower = value => String(value ?? '').trim().toLowerCase(), error = (code, message) => Object.assign(new Error(message), { code });
+  const show = item => `${printableShelfId(item.id)}${item.label ? ` (${item.label})` : ''}`, installed = list.length ? `Instalados: ${list.map(show).join(', ')}.` : 'Nenhum app instalado: use install_apk.';
+  let found, what;
+  if (id) { found = list.filter(item => item.id === id || printableShelfId(item.id) === id); what = `id "${printableShelfId(id)}"`; }
+  else if (packageName) { found = list.filter(item => item.packageName === packageName); what = `pacote "${packageName}"`; }
+  else if (name) { const wanted = lower(name); found = list.filter(item => lower(item.label) === wanted || lower(item.name) === wanted || lower(item.name) === `${wanted}.apk`); what = `nome "${name}"`; }
+  else throw error('bad-args', 'Diga qual app: id, package ou name.');
+  if (!found.length) throw error('not-found', `Nenhum app instalado com ${what}. ${installed}`);
+  if (found.length > 1) throw error('ambiguous', `Mais de um app instalado com ${what}: passe o id (${found.map(show).join(', ')}).`);
+  return found[0];
+}
+
 /** The shelf over a backend { all(), get(id), put(entry), delete(id) } (async). Entries: { id, name, packageName, label, icon: { bytes, mime } | null, size, addedAt, openedAt,
  *  blob (the APK bytes at the last open), handle (FileSystemFileHandle | null) }. */
 export function createApkShelf(backend, { now = () => Date.now() } = {}) {

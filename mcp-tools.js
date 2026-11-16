@@ -72,6 +72,10 @@ export function createMcpTools({ controls = null, query, plugins = () => [], cli
     if (args.screenshot) { const shot = await query('screenshot', { maxWidth: args.max_width }); content.unshift(await image(shot)); }
     return content;
   }
+  /** Which installed app a call names: its id (apps, install_apk), its package, or its label / file name. */
+  const appSelector = args => ({ id: args.id === undefined ? null : String(args.id), packageName: args.package === undefined ? null : String(args.package), name: args.name === undefined ? null : String(args.name) });
+  /** After an app was opened: "Tela pronta" (up to wait_ms) and the Activity on screen. */
+  async function settled(waitMs) { const ready = await waitReady(waitMs ?? 15000); return { ready: ready.ready, activity: ready.screen?.activity ?? null, ...(ready.ready ? {} : { waitingFor: ready.screen?.ready?.waitingFor ?? [] }) }; }
   const tools = {
     async lab_status() {
       const screen = await query('screen', {});
@@ -201,6 +205,19 @@ export function createMcpTools({ controls = null, query, plugins = () => [], cli
     },
     async device(args) { if (!controls?.device) throw fail('Ajustes do dispositivo não estão disponíveis nesta página.'); return [text(controls.device(args.set ?? null))]; },
     async apps(args) { if (!controls?.apps) throw fail('Apps salvos não estão disponíveis nesta página.'); const result = await controls.apps(args.action ?? 'list', args.id ?? null); if ((args.action ?? 'list') === 'list') return [text(result)]; const ready = await waitReady(args.wait_ms ?? 15000); return [text({ ...result, ready: ready.ready })]; },
+    // ---- the device's apps (src/app.js mcpControls: the same paths as dropping a file on the page, the launcher icon and throwing the app off the recents) ----
+    async install_apk(args, context) {
+      if (!controls?.installApk) throw fail('Instalar um APK não está disponível nesta página.');
+      if (!args.file?.id || typeof context?.fetchFile !== 'function') throw fail('install_apk precisa do arquivo entregue pela ponte: passe path (um .apk na máquina onde a ponte roda) e use a ponte lab-mcp.mjs atual.');
+      const result = await controls.installApk(await context.fetchFile(args.file), { open: args.open === true });
+      return [text(args.open === true && result.running ? { ...result, ...(await settled(args.wait_ms)) } : result)];
+    },
+    async open_app(args) {
+      if (!controls?.openApp) throw fail('Abrir um app instalado não está disponível nesta página.');
+      const result = await controls.openApp(appSelector(args));
+      return [text(result.running ? { ...result, ...(await settled(args.wait_ms)) } : result)];
+    },
+    async close_app(args) { if (!controls?.closeApp) throw fail('Fechar um app não está disponível nesta página.'); return [text(await controls.closeApp(appSelector(args)))]; },
     async open_link(args) { if (!controls?.openLink) throw fail('Deep links não estão disponíveis nesta página.'); if (!args.link && !args.component) throw fail('link (ou component) é obrigatório.'); return [text(await controls.openLink({ link: String(args.link ?? ''), action: String(args.action ?? ''), component: String(args.component ?? '') }))]; },
     async host_redirects(args) { if (!controls?.hostRedirects) throw fail('Redirecionar hosts não está disponível nesta página.'); return [text(controls.hostRedirects(Array.isArray(args.rules) ? args.rules : null))]; },
     async permissions(args) { if (!controls?.permissions) throw fail('Permissões não estão disponíveis nesta página.'); return [text(controls.permissions(args.name ?? null, args.state ?? null))]; },
@@ -208,10 +225,10 @@ export function createMcpTools({ controls = null, query, plugins = () => [], cli
   };
   return {
     names: Object.keys(tools),
-    /** One MCP tool call -> { content, isError }. Errors are tool errors (the client sees the message), never thrown. */
-    async execute(name, args = {}) {
+    /** One MCP tool call -> { content, isError }. Errors are tool errors (the client sees the message), never thrown. `context.fetchFile(file)`: a file the bridge offers with the call. */
+    async execute(name, args = {}, context = {}) {
       const tool = tools[name]; if (!tool) return { isError: true, content: [text(`Ferramenta desconhecida nesta página: ${name}. Atualize a página do lab (a ponte é mais nova).`)] };
-      try { return { content: await tool(args && typeof args === 'object' ? args : {}) }; }
+      try { return { content: await tool(args && typeof args === 'object' ? args : {}, context ?? {}) }; }
       catch (error) { return { isError: true, content: [text(`${error?.code ? `[${error.code}] ` : ''}${error?.message ?? error}`)] }; }
     },
   };

@@ -65,7 +65,7 @@ export function mcpAgentSetup(agent, options = {}) {
 }
 
 /**
- * execute(tool, args) -> Promise<{ content, isError }>. onState({ state: 'desconectado' | 'conectando' | 'conectado' | 'erro', message, server, calls }).
+ * execute(tool, args, context) -> Promise<{ content, isError }>; context.fetchFile(file) reads a file the bridge offers with the call (install_apk). onState({ state: 'desconectado' | 'conectando' | 'conectado' | 'erro', message, server, calls }).
  * Returns { connect({ url, token }), disconnect(), get connected(), state }.
  */
 export function createMcpLink({ execute, onState = () => {}, EventSourceImpl = globalThis.EventSource, fetchImpl = (...args) => globalThis.fetch(...args) }) {
@@ -73,10 +73,19 @@ export function createMcpLink({ execute, onState = () => {}, EventSourceImpl = g
   const emit = (state, message = '') => { S.state = state; S.message = message; onState({ state, message, server: S.server, calls: S.calls, lastTool: S.lastTool }); };
   async function answer(call) {
     const base = S.base; if (!base) return;
-    let result; try { result = await execute(call.tool, call.args ?? {}); } catch (error) { result = { isError: true, content: [{ type: 'text', text: String(error?.message ?? error) }] }; }
+    let result; try { result = await execute(call.tool, call.args ?? {}, { fetchFile: file => fetchFile(base, file) }); } catch (error) { result = { isError: true, content: [{ type: 'text', text: String(error?.message ?? error) }] }; }
     S.calls++; S.lastTool = call.tool; if (S.state === 'conectado') emit('conectado', S.message);
     try { await fetchImpl(`${base}/result`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: call.id, ...result }) }); }
     catch (error) { emit('erro', `a resposta não chegou à ponte: ${error?.message ?? error}`); }
+  }
+  /** A file the bridge offers for the call in flight (install_apk: { id, name, size }), read from the bridge on this machine into a File. */
+  async function fetchFile(base, { id, name, size } = {}) {
+    if (!/^[0-9a-f]{16,64}$/.test(String(id ?? ''))) throw new Error('A ponte não entregou o arquivo desta chamada.');
+    const res = await fetchImpl(`${base}/file/${id}`, { cache: 'no-store' });
+    if (!res?.ok) throw new Error(`A ponte não entregou o arquivo (HTTP ${res?.status ?? '?'}).`);
+    const blob = await res.blob();
+    if (Number.isFinite(size) && blob.size !== size) throw new Error(`O arquivo chegou incompleto da ponte (${blob.size} de ${size} bytes).`);
+    return new File([blob], String(name ?? 'app.apk'), { type: 'application/vnd.android.package-archive' });
   }
   function connect({ url, token }) {
     disconnect(false);
