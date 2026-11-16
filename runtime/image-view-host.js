@@ -1,5 +1,5 @@
-import { gcRoot } from './heap-gc.js?v=49b0f144f57b';
-import { createHostRegistry } from './host-contract.js?v=49b0f144f57b';
+import { gcRoot } from './heap-gc.js?v=ca92aaad0948';
+import { createHostRegistry } from './host-contract.js?v=ca92aaad0948';
 
 // android.widget.ImageView members that the drawable-view-host does not cover: the ScaleType enum (getScaleType / setScaleType, ordinal = the XML android:scaleType value that
 // drawable-view-host already honours when drawing) and setImageBitmap (ImageView wraps the Bitmap in a BitmapDrawable, android-13.0.0_r1 ImageView.setImageBitmap).

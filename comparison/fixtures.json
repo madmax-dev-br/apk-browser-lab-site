@@ -1,0 +1,318 @@
+{
+  "device": {
+    "serial": "emulator-5554",
+    "avd": "Pixel_API36",
+    "api": 36,
+    "arch": "arm64",
+    "usage": "local QA only; end-user runtime remains in browser"
+  },
+  "captureMethod": "Instrumentation UiAutomation.takeScreenshot; adb file pull only; no adb UI input",
+  "tests": {
+    "xml-dashboard": {
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "4.308"
+    },
+    "compose-feature": {
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "4.845"
+    },
+    "compose-state": {
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "4.093"
+    },
+    "compose-navigation": {
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "5.455"
+    },
+    "fragments-navigation": {
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "4.764"
+    },
+    "hybrid-navigation": {
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "5.293"
+    }
+  },
+  "apks": {
+    "xml-dashboard": {
+      "path": "fixtures/xml-dashboard.apk",
+      "bytes": 17783,
+      "sha256": "ac20266815d63e2ca2d028d065ffa6cb0355a5d5e010beb55c391cf5a77369cb"
+    },
+    "compose-feature": {
+      "path": "fixtures/compose-debug.apk",
+      "bytes": 9441875,
+      "sha256": "e3229076cf249fa9725375b420bb1b064c245e7a09f1ad56e66eceeab574dab7"
+    },
+    "compose-state": {
+      "path": "fixtures/compose-state-debug.apk",
+      "bytes": 9388660,
+      "sha256": "4dc5a9a7de9477b8c93fd35e3fc574a5c1af22e94623702332360fcdba7477d6",
+      "unchangedTargetAPK": true
+    },
+    "compose-navigation": {
+      "path": "fixtures/compose-navigation-debug.apk",
+      "bytes": 9761987,
+      "sha256": "586daf8851d1c2f2e7aea2b683b0edc115dfc2c6a040b554e9bd98ac3e5357c6",
+      "unchangedTargetAPK": true
+    },
+    "fragments-navigation": {
+      "path": "fixtures/fragments-navigation-debug.apk",
+      "bytes": 4309689,
+      "sha256": "13119b09283a5700524468af1beabdad9581425ba970868f81f046183b3ddcbc",
+      "unchangedTargetAPK": true
+    },
+    "hybrid-navigation": {
+      "path": "fixtures/hybrid-navigation-debug.apk",
+      "bytes": 10385581,
+      "sha256": "ef96393f87ebed63a6ef83b6ca44b28f8cb79ca66456878e2159eab13ae31334",
+      "unchangedTargetAPK": true
+    }
+  },
+  "sharedComposeSource": {
+    "path": "compose-feature/src/commonMain/kotlin/dev/apkweb/feature/RequestFeature.kt",
+    "bytes": 11074,
+    "sha256": "c9d13ca1fee31717c7a4cb7617da29a659d17f9d4b8b58f372eee12cac290112"
+  },
+  "wasmArtifacts": [
+    {
+      "path": "dist/compose/30a881932f975b9cf43b.wasm",
+      "bytes": 2905547,
+      "sha256": "36e8d1cda4902007cd7ee41805975e614ae6e720082f796b483488cb72850d18"
+    },
+    {
+      "path": "dist/compose/8bc1b48ee28fd6b51bb9.wasm",
+      "bytes": 8401701,
+      "sha256": "b6429186b9a8a72a4f69f0c2048291681bf11001ebb68464ab1f1f9b3cdf3218"
+    },
+    {
+      "path": "dist/compose/compose-feature.js",
+      "bytes": 558567,
+      "sha256": "a784c0434d4651e846371380500fefbe8e84e1ab12831e8dadba887603831761"
+    },
+    {
+      "path": "dist/compose/compose-feature.js.LICENSE.txt",
+      "bytes": 1298,
+      "sha256": "85a703daf937b69e6a45c75947dcea43f4026a835b84a7ea4300843217311baf"
+    },
+    {
+      "path": "dist/compose/compose-feature.js.map",
+      "bytes": 1462540,
+      "sha256": "ede2f469c97ffd2fff31b7fe7722c3ced668afe47eb6aab01da9fc97b373485c"
+    },
+    {
+      "path": "dist/compose/compose-feature.wasm.map",
+      "bytes": 13848,
+      "sha256": "fd91680160d7916681bbba94a31aedc1471c7906c76cdff1fce4f92d4098734b"
+    },
+    {
+      "path": "dist/compose/index.html",
+      "bytes": 675,
+      "sha256": "d0b4f7e6a726c61a4b34eeb5b541d58f8d87119ddaa9ca3fc21705ad6fc87420"
+    }
+  ],
+  "androidCaptures": {
+    "android-compose-dialog": {
+      "state": "detail dialog: title=Solicitação web;category=Compras;urgent=true;done=false;query=Solicitação web;filter=Pendentes",
+      "capture": "UiAutomation.takeScreenshot",
+      "screenshotWidthPx": 1080,
+      "screenshotHeightPx": 2400,
+      "contentBoundsPx": {
+        "left": 0,
+        "top": 132,
+        "right": 1080,
+        "bottom": 2337
+      },
+      "density": 2.625,
+      "densityDpi": 420,
+      "fontScale": 1
+    },
+    "android-compose-edited": {
+      "state": "title=Solicitação web;category=Compras;urgent=true;total=4,pending=3,added=1,progress=25;query empty;filter=Todas",
+      "capture": "UiAutomation.takeScreenshot",
+      "screenshotWidthPx": 1080,
+      "screenshotHeightPx": 2400,
+      "contentBoundsPx": {
+        "left": 0,
+        "top": 132,
+        "right": 1080,
+        "bottom": 2337
+      },
+      "density": 2.625,
+      "densityDpi": 420,
+      "fontScale": 1
+    },
+    "android-compose-filtered": {
+      "state": "title=Solicitação web;category=Compras;urgent=true;total=4,pending=3,added=1,progress=25;query=Solicitação web;filter=Pendentes",
+      "capture": "UiAutomation.takeScreenshot",
+      "screenshotWidthPx": 1080,
+      "screenshotHeightPx": 2400,
+      "contentBoundsPx": {
+        "left": 0,
+        "top": 132,
+        "right": 1080,
+        "bottom": 2337
+      },
+      "density": 2.625,
+      "densityDpi": 420,
+      "fontScale": 1
+    },
+    "android-compose-initial": {
+      "state": "total=3,pending=2,added=0,progress=33; query empty; filter=Todas",
+      "capture": "UiAutomation.takeScreenshot",
+      "screenshotWidthPx": 1080,
+      "screenshotHeightPx": 2400,
+      "contentBoundsPx": {
+        "left": 0,
+        "top": 132,
+        "right": 1080,
+        "bottom": 2337
+      },
+      "density": 2.625,
+      "densityDpi": 420,
+      "fontScale": 1
+    },
+    "android-compose-navigation-baseline": {
+      "capture": "UiAutomation.takeScreenshot",
+      "state": "Initial baseline, before test actions",
+      "packageName": "dev.apkweb.fixtures.navigation",
+      "screenshotWidthPx": 1080,
+      "screenshotHeightPx": 2400,
+      "contentBoundsPx": {
+        "left": 0,
+        "top": 0,
+        "right": 1080,
+        "bottom": 2400
+      },
+      "density": 2.625,
+      "densityDpi": 420,
+      "fontScale": 1
+    },
+    "android-compose-state-baseline": {
+      "capture": "UiAutomation.takeScreenshot",
+      "state": "Initial baseline, before test actions",
+      "packageName": "dev.apkweb.fixtures.state",
+      "screenshotWidthPx": 1080,
+      "screenshotHeightPx": 2400,
+      "contentBoundsPx": {
+        "left": 0,
+        "top": 0,
+        "right": 1080,
+        "bottom": 2400
+      },
+      "density": 2.625,
+      "densityDpi": 420,
+      "fontScale": 1
+    },
+    "android-fragments-navigation-baseline": {
+      "capture": "UiAutomation.takeScreenshot",
+      "state": "Initial baseline, before test actions",
+      "packageName": "dev.apkweb.fragments",
+      "screenshotWidthPx": 1080,
+      "screenshotHeightPx": 2400,
+      "contentBoundsPx": {
+        "left": 0,
+        "top": 0,
+        "right": 1080,
+        "bottom": 2400
+      },
+      "density": 2.625,
+      "densityDpi": 420,
+      "fontScale": 1
+    },
+    "android-hybrid-navigation-baseline": {
+      "capture": "UiAutomation.takeScreenshot",
+      "state": "Initial baseline, before test actions",
+      "packageName": "dev.apkweb.hybrid",
+      "screenshotWidthPx": 1080,
+      "screenshotHeightPx": 2400,
+      "contentBoundsPx": {
+        "left": 0,
+        "top": 0,
+        "right": 1080,
+        "bottom": 2400
+      },
+      "density": 2.625,
+      "densityDpi": 420,
+      "fontScale": 1
+    },
+    "android-xml-edited": {
+      "screenshotWidthPx": 1080,
+      "screenshotHeightPx": 2400,
+      "state": "title=Solicitação web;urgent=true;total=4,pending=3,added=1,progress=25; query empty;pendingOnly=false",
+      "capture": "UiAutomation.takeScreenshot",
+      "contentBoundsPx": {
+        "left": 0,
+        "top": 132,
+        "right": 1080,
+        "bottom": 2337
+      },
+      "density": 2.625,
+      "densityDpi": 420,
+      "fontScale": 1
+    },
+    "android-xml-filtered": {
+      "screenshotWidthPx": 1080,
+      "screenshotHeightPx": 2400,
+      "state": "title=Solicitação web;urgent=true;pendingOnly=true;query=Solicitação web;total=4,pending=3,added=1,progress=25",
+      "capture": "UiAutomation.takeScreenshot",
+      "contentBoundsPx": {
+        "left": 0,
+        "top": 132,
+        "right": 1080,
+        "bottom": 2337
+      },
+      "density": 2.625,
+      "densityDpi": 420,
+      "fontScale": 1
+    },
+    "android-xml-initial": {
+      "screenshotWidthPx": 1080,
+      "screenshotHeightPx": 2400,
+      "state": "3 seed requests; total=3,pending=2,added=0,progress=33; query empty; urgent=false; pendingOnly=false",
+      "capture": "UiAutomation.takeScreenshot",
+      "contentBoundsPx": {
+        "left": 0,
+        "top": 132,
+        "right": 1080,
+        "bottom": 2337
+      },
+      "density": 2.625,
+      "densityDpi": 420,
+      "fontScale": 1
+    }
+  },
+  "comparisonNotes": [
+    "XML is the same signed APK in browser DEX VM and native Android. Native widget/theme drawing and CSS bridge drawing differ.",
+    "Compose Android and browser Wasm compile the same Kotlin source; this is not APK-to-Wasm conversion.",
+    "Shared feature adapts at 760dp; current Android content width411.43dp uses compact form dialog, browser wide screenshots may use two columns.",
+    "Raw screenshots are preserved, including system bars. Per-image JSON records density/content bounds/state for honest crop and scaling."
+  ],
+  "browserVMValidation": {
+    "fixture": "fixtures/xml-dashboard.apk",
+    "sha256": "ac20266815d63e2ca2d028d065ffa6cb0355a5d5e010beb55c391cf5a77369cb",
+    "test": "complex XML dashboard input/check callbacks update real DEX filters, progress and two Activities",
+    "command": "node --test --test-name-pattern='dashboard' tests/worker.test.mjs",
+    "tests": 1,
+    "failures": 0,
+    "log": "results/xml-dashboard-worker.txt"
+  }
+}

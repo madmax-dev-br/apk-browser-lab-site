@@ -1,0 +1,45 @@
+{
+  "crop": {
+    "height": 638.4000244140625,
+    "width": 312.6806640625,
+    "x": 987.65185546875,
+    "y": 94.20437622070312
+  },
+  "inputs": [
+    {
+      "checked": false,
+      "label": "Buscar solicitação",
+      "value": "Solicitação web"
+    },
+    {
+      "checked": true,
+      "label": "Só pendentes",
+      "value": "on"
+    },
+    {
+      "checked": false,
+      "label": "Nome da solicitação",
+      "value": "Solicitação web"
+    },
+    {
+      "checked": true,
+      "label": "Urgente",
+      "value": "on"
+    }
+  ],
+  "progress": [
+    {
+      "max": "100",
+      "value": "25"
+    }
+  ],
+  "text": "Painel de solicitações\nCentral interna · Android XML\nTotal\n4\nPendentes\n3\nAdicionadas\n1\nConclusão · 25%\nSó pendentes\nCriar solicitação\nUrgente\nSalvar solicitação\nSolicitação salva.\n1 resultados\nCompras\nSolicitação web\nPendente · Urgente\nAbrir detalhe",
+  "url": "http://127.0.0.1:8874/?build=5da70460a0af",
+  "viewport": {
+    "dpr": 1,
+    "height": 1314,
+    "width": 1935
+  },
+  "roundTripActivityVerified": true,
+  "framework": "18 classes from original AOSP DEX, auto-loaded by browser Worker"
+}

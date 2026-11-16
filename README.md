@@ -34,6 +34,24 @@ Interfaces em Jetpack Compose e em Views/XML, Fragments, navegação entre telas
 
 <sub>Apps de exemplo do projeto: Compose com estado, Navigation Compose, Views com Fragments e uma lista pesada com imagens.</sub>
 
+### Um app do tamanho de um app de produção
+
+[![O app de exemplo grande rodando no laboratório: abre, rola a tela inicial e passa pelas abas Feed, Grade, Chat, Painel, Views e Diagnóstico](readme/app-grande.gif)](https://madmax-dev-br.github.io/apk-browser-lab-site/)
+
+<sub>O exemplo "App grande" na página, em tempo real: toques e rolagens de verdade, do arquivo até a última aba.</sub>
+
+O maior exemplo do projeto tem o porte de um app Compose de produção: **17 arquivos DEX com cerca de 250 mil métodos**, com Compose e Material 3, Navigation, Room, Koin, kotlinx.serialization, DataStore, WorkManager, Coil, Lottie e Views clássicas. Na abertura, o próprio código do app monta um grafo Koin de 1,7 mil definições, lê catálogos JSON e cria um banco Room com 6,6 mil linhas. Depois disso, tudo continua rodando ao mesmo tempo:
+
+- **Início**: carrossel, chips, histórias e uma lista com 20 tipos de item.
+- **Feed**: 1500 publicações com colagens de fotos e reações.
+- **Grade**: 3000 fotos em grade escalonada.
+- **Chat**: 3600 mensagens em ordem inversa.
+- **Painel**: gráficos animados desenhados com `Canvas`.
+- **Views**: `RecyclerView` com nove tipos de linha, `ViewPager2` e `DiffUtil` atualizando a cada segundo.
+- **Diagnóstico**: o tempo de cada etapa da inicialização e a memória do app.
+
+A faixa no alto da tela é do app: quadros por segundo, quadros perdidos e o heap Java. Embaixo do aparelho, a página mostra o que o laboratório está usando. Todo o conteúdo (textos, fotos, fontes e animações) é gerado por script, sem dados de ninguém.
+
 ## O que dá para fazer com ele
 
 ### Um aparelho que você controla

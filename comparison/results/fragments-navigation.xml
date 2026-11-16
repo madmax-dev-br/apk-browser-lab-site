@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="dev.apkweb.fragments.NavigationFlowTest" tests="1" failures="0" errors="0" skipped="0" time="4.764" timestamp="2026-10-25T10:51:06" hostname="localhost">
+  <properties>
+    <property name="device" value="Pixel_API36(AVD) - 16" />
+    <property name="flavor" value="" />
+    <property name="project" value=":fragments-navigation" />
+  </properties>
+  <testcase name="editNoteAndReturnActivityResult" classname="dev.apkweb.fragments.NavigationFlowTest" time="4.453" />
+</testsuite>

@@ -1,10 +1,10 @@
-import { coreMemorySetting } from './core-memory.js?v=49b0f144f57b';
-import { isMemoryStep } from './memory-budget.js?v=49b0f144f57b';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=49b0f144f57b';
-import { sanitizeHostMap } from './host-map.js?v=49b0f144f57b';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=49b0f144f57b';
-import { sanitizeLocation } from './runtime-permissions.js?v=49b0f144f57b';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=49b0f144f57b';
+import { coreMemorySetting } from './core-memory.js?v=ca92aaad0948';
+import { isMemoryStep } from './memory-budget.js?v=ca92aaad0948';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=ca92aaad0948';
+import { sanitizeHostMap } from './host-map.js?v=ca92aaad0948';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=ca92aaad0948';
+import { sanitizeLocation } from './runtime-permissions.js?v=ca92aaad0948';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=ca92aaad0948';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -40,7 +40,7 @@ export function sanitizeSettings(input = {}) {
   out.raster = { motionScale: [1, 0.75, 0.5, 0.35, 0.25].includes(Number(input.raster?.motionScale)) ? Number(input.raster.motionScale) : 1, navigation: input.raster?.navigation === true, stillScale: [1, 0.9, 0.8].includes(Number(input.raster?.stillScale)) ? Number(input.raster.stillScale) : 1 };   // "Resolução no movimento" / "Tela nova em baixa resolução" (src/motion-raster.js MOTION_SCALE_STEPS)
   out.renderer = sanitizeRendererSetting(input.renderer);   // "Renderização": 'gpu' (default: WebGL replay in the Worker, src/gpu-raster.js, falling back to CPU by itself) or 'cpu'; applied live, never part of the device model the app sees
   out.engine = input.engine === 'wasm' || input.engine === 'js' ? input.engine : DEFAULT_ENGINE;   // the VM engine: 'wasm' (default: the WebAssembly core, docs/WASM-CORE-PLANO.md) or 'js' (the JavaScript VM); applies at the next load, never part of the device model the app sees
-  out.coreMemory = coreMemorySetting(input.coreMemory);   // "Memória do núcleo Wasm" { heapMiB, metaMiB, threads } (src/core-memory.js): the sizes of the WebAssembly core's memory; applies at the next load, only with engine 'wasm', never part of the device model the app sees
+  out.coreMemory = coreMemorySetting(input.coreMemory);   // "Memória do núcleo Wasm" { mode, heapMiB, metaMiB, threads } (src/core-memory.js): the mode (dynamic by default, or fixed) and the sizes of the WebAssembly core's memory; applies at the next load, only with engine 'wasm', never part of the device model the app sees
   out.layoutBounds = input.layoutBounds === true;   // page-only developer option ("Mostrar limites de layout"); the VM never sees it
   out.microg = input.microg === true;   // "Com microG" (src/microg-device.js, docs/MICROG.md): off by default; read by the next load (the Worker installs the microG packages), never applied live
   if (typeof input.locale === 'string' && /^[a-z]{2}-[A-Z]{2}$/.test(input.locale)) out.locale = input.locale;

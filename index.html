@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=49b0f144f57b") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=49b0f144f57b">
-  <link rel="stylesheet" href="./lab-theme.css?v=49b0f144f57b">
-  <meta name="apk-browser-build" content="49b0f144f57b">
+  <style>@import url("./styles.css?v=ca92aaad0948") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=ca92aaad0948">
+  <link rel="stylesheet" href="./lab-theme.css?v=ca92aaad0948">
+  <meta name="apk-browser-build" content="ca92aaad0948">
 </head>
 <body>
   <header class="topbar">
@@ -28,9 +28,8 @@
           <div class="demo-row"><span>Sem um APK à mão?</span><button id="demo-button">Rodar demo</button></div>
           <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div></div>
           <div id="load-times" class="load-times" role="status" hidden></div>
-          <div id="operation-panel" class="operation-panel" hidden><div><span class="spinner"></span><strong id="operation-message">Processando no Web Worker…</strong><button id="cancel-operation">Cancelar</button></div><progress id="operation-progress" max="1"></progress><small id="operation-detail">A página continua respondendo. A inspeção tem limite de 120 s.</small></div>
           <details id="inspection-panel" class="inspection-panel">
-          <summary class="inspection-label"><h2 class="rail-title">Pacote</h2><span id="inspection-badge" class="quiet-badge">Aguardando</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
+          <summary class="inspection-label"><h2 class="rail-title">Pacote</h2><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
           <div id="inventory-empty" class="inventory-empty"><p>Abra um APK para ver o pacote, as classes e as dependências.</p></div>
           <div id="inventory" class="inventory" hidden>
             <div class="inventory-heading"><span class="tiny-label">Nome do pacote</span><strong id="package-name"></strong></div>
@@ -41,7 +40,6 @@
           <details id="native-inspection" class="native-inspection" hidden><summary>Analisar bibliotecas nativas <span>ELF</span></summary><p>Inspeção de metadados de uma biblioteca por vez, até 32 MiB. Não executa código nativo nem implementa JNI.</p><label for="native-abi">ABI</label><select id="native-abi"></select><label for="native-library">Biblioteca</label><select id="native-library"></select><button id="inspect-native-button">Analisar biblioteca</button><pre id="native-result" hidden></pre></details>
           </details>
           <div id="unsupported-notice" class="unsupported-notice" role="status" hidden><strong>Este APK ainda não pode ser executado</strong><p>O relatório indica limites de arquivo que impedem a tentativa. Veja os detalhes abaixo; uma inspeção parcial não comprova compatibilidade.</p><ul id="unsupported-list"></ul></div>
-          <p class="support-note">VM experimental para Android Views e bytecode DEX. Multidex é inspecionado no Worker; Android, Compose e JNI ainda podem exigir APIs não implementadas.</p>
         </section>
         <section class="controls controls-card" aria-label="Controles">
           <details id="control-panel" class="device-panel control-panel" open>
@@ -126,14 +124,15 @@
               <p id="vm-memory-device" class="cp-note"></p>
               <fieldset class="cp-core" id="vm-core">
                 <legend>Memória do núcleo Wasm <em id="vm-core-hint" class="vm-memory-hint" role="status" hidden>reabra o APK para aplicar</em></legend>
+                <label class="cp-field cp-core-mode" for="vm-core-mode"><span>Modo<small>como o heap e as threads usam a memória</small></span><select id="vm-core-mode" aria-describedby="vm-core-note"><option value="dynamic">Dinâmico (padrão)</option><option value="fixed">Travado</option></select></label>
                 <div class="cp-core-grid">
-                  <label for="vm-core-heap">Heap Java<small>MiB · 64 a 1536</small></label><input id="vm-core-heap" type="number" inputmode="numeric" min="64" max="1536" step="32" aria-describedby="vm-core-note">
+                  <label for="vm-core-heap" data-fixed>Heap Java<small>MiB · 64 a 1536</small></label><input id="vm-core-heap" data-fixed type="number" inputmode="numeric" min="64" max="1536" step="32" aria-describedby="vm-core-note">
                   <label for="vm-core-meta">Metaspace<small>MiB · 64 a 1024</small></label><input id="vm-core-meta" type="number" inputmode="numeric" min="64" max="1024" step="32" aria-describedby="vm-core-note">
-                  <label for="vm-core-threads">Threads vivas<small>16 a 1000 · 1 MiB cada</small></label><input id="vm-core-threads" type="number" inputmode="numeric" min="16" max="1000" step="10" aria-describedby="vm-core-note">
+                  <label for="vm-core-threads" data-fixed>Threads vivas<small>16 a 1000 · 1 MiB cada</small></label><input id="vm-core-threads" data-fixed type="number" inputmode="numeric" min="16" max="1000" step="10" aria-describedby="vm-core-note">
                 </div>
                 <p id="vm-core-total" class="cp-note" role="status"></p>
                 <p id="vm-core-usage" class="cp-note" hidden></p>
-                <p id="vm-core-note" class="cp-note">Só vale com o motor "Núcleo WebAssembly" (o padrão), quando o APK é aberto de novo. Heap: objetos e arrays do app. Metaspace: classes e métodos ligados (cresce com o tamanho do app). Threads: quantas threads Java podem estar vivas ao mesmo tempo. Os três dividem uma memória de no máximo 2048 MiB; o resumo do diagnóstico mostra quanto de cada um está em uso.</p>
+                <p id="vm-core-note" class="cp-note">Só vale com o motor "Núcleo WebAssembly" (o padrão), quando o APK é aberto de novo. <strong>Dinâmico</strong>: o heap começa pequeno e cresce conforme o app mantém objetos vivos, e cada thread nova pega 1 MiB; os dois dividem, sem divisa entre eles, tudo o que fica acima do metaspace. <strong>Travado</strong>: heap, metaspace e threads têm cada um o tamanho fixado aqui, e passar de um teto falha com o nome dele. Metaspace (classes e métodos ligados, cresce com o tamanho do app) é um tamanho dos dois modos. A memória tem no máximo 2048 MiB e só ocupa RAM quando é usada; o resumo do diagnóstico mostra quanto de cada parte está em uso.</p>
                 <button id="vm-core-reset" class="cp-button" type="button">Restaurar padrão do núcleo</button>
               </fieldset>
               <label class="cp-field" for="vm-event-time"><span>Tempo máximo por evento<small>Quanto a VM espera um evento terminar antes de encerrá-lo com o relatório; vale na hora</small></span><select id="vm-event-time" aria-describedby="vm-event-note"></select></label>
@@ -230,7 +229,7 @@
           </div>
           <div id="error-panel" class="error-panel" role="alert" hidden><span class="error-icon">!</span><h2 id="error-title">Não foi possível executar</h2><p id="error-message"></p><details id="error-diagnostics" hidden><summary>Detalhes técnicos da execução</summary><pre id="error-detail" hidden></pre></details><button id="error-close" type="button" title="Fecha esta janela; o app fica na tela inicial do dispositivo para abrir de novo (Esc)">Fechar</button> <button id="error-copy" type="button">Copiar diagnóstico</button> <button id="error-summary" type="button" title="Mostra só o resumo (memória, quem retém, exceções, thread principal) em letras grandes: uma foto basta">Mostrar resumo</button></div>
         </div>
-        <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Aguardando um aplicativo</span></span><span id="memory-meter" class="memory-meter" role="status" hidden><i></i><span></span></span><span id="execution-engine">411 × 914 dp · densidade 1</span></div>
+        <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Aguardando um aplicativo</span></span><div id="operation-panel" class="operation-panel" hidden><span class="spinner" aria-hidden="true"></span><strong id="operation-message">Processando no Web Worker…</strong><progress id="operation-progress" max="1" aria-label="Progresso do carregamento"></progress><small id="operation-detail" title="Execução em Web Worker: a página continua respondendo; Cancelar encerra a VM"></small><button id="cancel-operation" type="button">Cancelar</button></div><span id="memory-meter" class="memory-meter" role="status" hidden><i></i><span></span></span><span id="execution-engine">411 × 914 dp · densidade 1</span></div>
         <details id="trace" class="trace"><summary><span>Log de execução</span><span id="trace-count">0 eventos</span><span class="trace-actions"><button id="screen-state-summary" type="button" title="Mostra só o resumo (memória, quem retém, exceções, thread principal) em letras grandes: uma foto basta">Resumo</button><button id="screen-state-copy" type="button" title="Copia um resumo do que a VM mostra (Activities, árvore de views, Compose, quadros, fila, threads, memória) mesmo sem erro">Estado</button></span><span class="trace-chevron">⌄</span></summary><pre id="trace-output">O log aparecerá após a execução.</pre></details>
         <details id="logcat" class="trace logcat"><summary><span>Logcat</span><span class="logcat-count">0 linhas</span><span class="trace-chevron">⌄</span></summary>
           <div class="logcat-bar"><input class="logcat-filter" type="search" placeholder="Filtrar por tag ou texto" aria-label="Filtrar logcat por tag ou texto"><select class="logcat-level" aria-label="Nível mínimo"><option value="V">V Verbose</option><option value="D">D Debug</option><option value="I">I Info</option><option value="W">W Warning</option><option value="E">E Error</option></select><label class="logcat-auto"><input class="logcat-autoscroll" type="checkbox" checked> Rolar</label><button class="logcat-clear" type="button">Limpar</button><select class="logcat-scope" aria-label="O que salvar"><option value="all">Salvar tudo</option><option value="filtered">Salvar o filtrado</option></select><button class="logcat-save" type="button">Salvar</button></div>
@@ -239,8 +238,10 @@
           <div class="logcat-bar"><input class="netlog-filter" type="search" placeholder="Filtrar por host, caminho ou método" aria-label="Filtrar requisições por host, caminho ou método"><select class="netlog-category" aria-label="Filtrar por resultado"><option value="all">Todas</option><option value="ok">2xx</option><option value="redirect">3xx</option><option value="fail">4xx / 5xx</option><option value="refused">Recusadas</option><option value="error">Erros</option><option value="pending">Em andamento</option><option value="mocked">Mockadas</option><option value="redirected">Redirecionadas</option></select><label class="logcat-auto"><input class="netlog-autoscroll" type="checkbox" checked> Rolar</label><button class="netlog-clear" type="button">Limpar</button><select class="netlog-scope" aria-label="O que salvar"><option value="all">Salvar tudo</option><option value="filtered">Salvar o filtrado</option></select><select class="netlog-format" aria-label="Formato"><option value="har">HAR 1.2</option><option value="text">Texto</option></select><button class="netlog-save" type="button">Salvar</button></div>
           <div class="netlog-rows" role="log" aria-live="off"></div></details>
         <details id="adb-terminal" class="trace logcat adb-terminal"><summary><span>Terminal</span><span class="adb-count">adb</span><span class="trace-actions"><button class="adb-clear" type="button" title="Limpa a saída do terminal">Limpar</button></span><span class="trace-chevron">⌄</span></summary>
-          <div class="adb-output" role="log" aria-live="polite" aria-label="Saída dos comandos adb" tabindex="0"></div>
-          <form class="adb-form" autocomplete="off"><label class="adb-prompt" for="adb-input" aria-hidden="true">$</label><input id="adb-input" class="adb-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="adb shell am start -a android.intent.action.VIEW -d meuapp://item/1   ·   adb help lista os comandos" aria-label="Comando adb"><button class="cp-button adb-run" type="submit">Rodar</button></form>
+          <div class="adb-screen" tabindex="-1">
+            <div class="adb-output" role="log" aria-live="polite" aria-label="Saída dos comandos adb"></div>
+            <form class="adb-form" autocomplete="off"><label class="adb-prompt" for="adb-input" aria-hidden="true">$</label><input id="adb-input" class="adb-input" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" enterkeyhint="go" aria-label="Comando adb (Enter roda)"></form>
+          </div>
           <input class="adb-file" type="file" hidden></details>
         <details id="compose-inspector" class="trace logcat compose-inspector"><summary><span>Compose</span><span class="ci-count">fechado</span><span class="trace-chevron">⌄</span></summary>
           <div class="logcat-bar"><button class="ci-capture" type="button" title="Inspeciona a tela agora: árvore de layout do Compose, Views e um recorte de cada elemento">Capturar</button><label class="logcat-auto" title="Captura de novo quando a tela navega (outra Activity ou outro destino)"><input class="ci-follow" type="checkbox"> Atualizar ao navegar</label><label class="logcat-auto" title="Mostra cada LayoutNode da árvore do Compose; desligado, mostra as caixas de &quot;Mostrar limites de layout&quot;"><input class="ci-tree" type="checkbox"> Árvore completa</label><input class="ci-filter" type="search" placeholder="Filtrar por nome, texto, tag ou modificador" aria-label="Filtrar elementos por nome, texto, testTag ou modificador"><button class="ci-copy" type="button" title="Copia os dados da inspeção (sem imagens) em JSON">Copiar JSON</button></div>
@@ -266,7 +267,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=49b0f144f57b"></script>
+  <script type="module" src="./app.js?v=ca92aaad0948"></script>
   <script>
   // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
   // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.

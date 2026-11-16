@@ -1,0 +1,15 @@
+{
+  "screenshotWidthPx": 1080,
+  "screenshotHeightPx": 2400,
+  "state": "title=Solicitação web;urgent=true;pendingOnly=true;query=Solicitação web;total=4,pending=3,added=1,progress=25",
+  "capture": "UiAutomation.takeScreenshot",
+  "contentBoundsPx": {
+    "left": 0,
+    "top": 132,
+    "right": 1080,
+    "bottom": 2337
+  },
+  "density": 2.625,
+  "densityDpi": 420,
+  "fontScale": 1
+}

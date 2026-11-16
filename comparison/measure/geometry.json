@@ -1,0 +1,112 @@
+{
+  "apkSha256": "dbf9e7a750f98bff9465049b05939eea46631b2fd0732633892055a0d2b2a1db",
+  "androidDensity": 1,
+  "webDensity": 1,
+  "browserCssScale": 0.7599999643590328,
+  "toleranceLogicalPixels": 0.002,
+  "checks": [
+    {
+      "phase": "initial",
+      "text": "Filho criado no DEXMedir novamente",
+      "androidBounds": [
+        0,
+        0,
+        411,
+        75
+      ],
+      "browserLogicalBounds": [
+        0,
+        0,
+        411,
+        75.00000351720087
+      ],
+      "passed": true
+    },
+    {
+      "phase": "initial",
+      "text": "Filho criado no DEX",
+      "androidBounds": [
+        0,
+        0,
+        411,
+        19
+      ],
+      "browserLogicalBounds": [
+        0,
+        0,
+        411,
+        19.000004103401018
+      ],
+      "passed": true
+    },
+    {
+      "phase": "initial",
+      "text": "Medir novamente",
+      "androidBounds": [
+        0,
+        23,
+        411,
+        71
+      ],
+      "browserLogicalBounds": [
+        0,
+        23.000015534303845,
+        411,
+        70.99999208629804
+      ],
+      "passed": true
+    },
+    {
+      "phase": "edited",
+      "text": "Filho criado no DEXMedir novamente 2",
+      "androidBounds": [
+        0,
+        0,
+        411,
+        75
+      ],
+      "browserLogicalBounds": [
+        0,
+        0,
+        411,
+        75.00000351720087
+      ],
+      "passed": true
+    },
+    {
+      "phase": "edited",
+      "text": "Filho criado no DEX",
+      "androidBounds": [
+        0,
+        0,
+        411,
+        19
+      ],
+      "browserLogicalBounds": [
+        0,
+        0,
+        411,
+        19.000004103401018
+      ],
+      "passed": true
+    },
+    {
+      "phase": "edited",
+      "text": "Medir novamente 2",
+      "androidBounds": [
+        0,
+        23,
+        411,
+        71
+      ],
+      "browserLogicalBounds": [
+        0,
+        23.000015534303923,
+        411,
+        70.99999208629812
+      ],
+      "passed": true
+    }
+  ],
+  "passed": true
+}

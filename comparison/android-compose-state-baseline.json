@@ -1,0 +1,16 @@
+{
+  "capture": "UiAutomation.takeScreenshot",
+  "state": "Initial baseline, before test actions",
+  "packageName": "dev.apkweb.fixtures.state",
+  "screenshotWidthPx": 1080,
+  "screenshotHeightPx": 2400,
+  "contentBoundsPx": {
+    "left": 0,
+    "top": 0,
+    "right": 1080,
+    "bottom": 2400
+  },
+  "density": 2.625,
+  "densityDpi": 420,
+  "fontScale": 1
+}

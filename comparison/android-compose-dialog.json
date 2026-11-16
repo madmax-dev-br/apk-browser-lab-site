@@ -1,0 +1,15 @@
+{
+  "state": "detail dialog: title=Solicitação web;category=Compras;urgent=true;done=false;query=Solicitação web;filter=Pendentes",
+  "capture": "UiAutomation.takeScreenshot",
+  "screenshotWidthPx": 1080,
+  "screenshotHeightPx": 2400,
+  "contentBoundsPx": {
+    "left": 0,
+    "top": 132,
+    "right": 1080,
+    "bottom": 2337
+  },
+  "density": 2.625,
+  "densityDpi": 420,
+  "fontScale": 1
+}

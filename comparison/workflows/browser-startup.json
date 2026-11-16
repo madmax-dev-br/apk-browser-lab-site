@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-10-25T17:24:21.227Z",
+  "framework": {
+    "sha256": "71b01147c7d1d3680903618c6acd3c484abf475e4c8747d8589566f3bc4f25f4",
+    "classCount": 502,
+    "sizeBytes": 898144,
+    "tag": "android-13.0.0_r1"
+  },
+  "scope": "Actual APK startup in the same VM modules as the browser; Android instrumentation and browser screenshots are separate evidence.",
+  "scenarios": [
+    {
+      "file": "xml-projects-debug.apk",
+      "sha256": "d547095772c2d35bbec4a13df468cb32cc7b0d84fb535c5ea99b84bc97869d97",
+      "status": "launch-error",
+      "firstUnsupported": "Drawable <shape> requires its original compiled drawable implementation and drawing backend",
+      "instructions": 9556,
+      "fullUserFlowVerified": false
+    },
+    {
+      "file": "compose-approvals-debug.apk",
+      "sha256": "161bdadb309d758db59016d5a045f87c3c41959fee2c612663179ef92ea96ffa",
+      "status": "launch-error",
+      "firstUnsupported": "Landroid/text/TextDirectionHeuristics;->LTR:Landroid/text/TextDirectionHeuristic;",
+      "instructions": 342460,
+      "fullUserFlowVerified": false
+    }
+  ]
+}

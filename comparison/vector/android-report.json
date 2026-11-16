@@ -1,0 +1,117 @@
+{
+  "nativePaintDefaultTextSize": 12,
+  "android-vector-initial": {
+    "screenshotWidthPx": 1080,
+    "screenshotHeightPx": 2400,
+    "content": [
+      0,
+      132,
+      1080,
+      2205
+    ],
+    "image": [
+      53,
+      312,
+      420,
+      420
+    ],
+    "density": 2.625,
+    "activity": "dev.apkweb.vectorprobe.MainActivity",
+    "centerPixel": "ff315cc5"
+  },
+  "android-vector-edited": {
+    "screenshotWidthPx": 1080,
+    "screenshotHeightPx": 2400,
+    "content": [
+      0,
+      132,
+      1080,
+      2205
+    ],
+    "image": [
+      53,
+      312,
+      420,
+      420
+    ],
+    "density": 2.625,
+    "activity": "dev.apkweb.vectorprobe.MainActivity",
+    "centerPixel": "ffeab088"
+  },
+  "android-vector-detail": {
+    "screenshotWidthPx": 1080,
+    "screenshotHeightPx": 2400,
+    "content": [
+      0,
+      132,
+      1080,
+      2205
+    ],
+    "image": [
+      53,
+      270,
+      420,
+      420
+    ],
+    "density": 2.625,
+    "activity": "dev.apkweb.vectorprobe.DetailActivity",
+    "centerPixel": "ffeab088"
+  },
+  "android-vector-returned": {
+    "screenshotWidthPx": 1080,
+    "screenshotHeightPx": 2400,
+    "content": [
+      0,
+      132,
+      1080,
+      2205
+    ],
+    "image": [
+      53,
+      312,
+      420,
+      420
+    ],
+    "density": 2.625,
+    "activity": "dev.apkweb.vectorprobe.MainActivity",
+    "centerPixel": "ffeab088"
+  },
+  "passed": true,
+  "assertions": [
+    "output directory",
+    "status: Alpha 255 · espelho 0 · ativa 0",
+    "Android screenshot: android-vector-initial",
+    "PNG: android-vector-initial",
+    "actual Android center pixel: android-vector-initial = ff315cc5",
+    "button exists: alpha",
+    "real Android click: alpha",
+    "status: Alpha 128 · espelho 0 · ativa 0",
+    "original VectorDrawable alpha=128",
+    "button exists: mirror",
+    "real Android click: mirror",
+    "button exists: active",
+    "real Android click: active",
+    "status: Alpha 128 · espelho 1 · ativa 1",
+    "original VectorDrawable RTL",
+    "drawable stateful=false class=android.graphics.drawable.VectorDrawable state=[16842909, 16842910, 16843547, 16842919]",
+    "Android screenshot: android-vector-edited",
+    "PNG: android-vector-edited",
+    "actual Android center pixel: android-vector-edited = ffeab088",
+    "button exists: open",
+    "real Android click: open",
+    "second Activity opened",
+    "status: Alpha 128 · espelho 1 · ativa 1",
+    "Android screenshot: android-vector-detail",
+    "PNG: android-vector-detail",
+    "actual Android center pixel: android-vector-detail = ffeab088",
+    "button exists: back",
+    "real Android click: back",
+    "main Activity resumed",
+    "status: Alpha 128 · espelho 1 · ativa 1",
+    "Android screenshot: android-vector-returned",
+    "PNG: android-vector-returned",
+    "actual Android center pixel: android-vector-returned = ffeab088"
+  ],
+  "sdk": 36,
+  "source": "Android emulator, original APK and platform VectorDrawable"
+}

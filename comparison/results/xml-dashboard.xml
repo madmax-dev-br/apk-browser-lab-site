@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="dev.apkweb.dashboard.DashboardComparisonTest" tests="1" failures="0" errors="0" skipped="0" time="4.308" timestamp="2026-10-25T10:47:04" hostname="localhost">
+  <properties>
+    <property name="device" value="Pixel_API36(AVD) - 16" />
+    <property name="flavor" value="" />
+    <property name="project" value=":" />
+  </properties>
+  <testcase name="editFilterNavigateAndCapture" classname="dev.apkweb.dashboard.DashboardComparisonTest" time="4.048" />
+</testsuite>

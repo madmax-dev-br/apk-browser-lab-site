@@ -1,0 +1,100 @@
+{
+  "referenceTag": "android-13.0.0_r1",
+  "purpose": "Android API contract reference for this VM subset; this is not a complete AOSP runtime or proof of Android compatibility.",
+  "sources": [
+    {
+      "file": "app/Activity.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/Activity.java",
+      "sha256": "7f036c73ee18f9f8fb8908672551c8dc99fdeaca2d44ad951b6092fbbf67db5c",
+      "bytes": 390956
+    },
+    {
+      "file": "app/ActivityManager.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/ActivityManager.java",
+      "sha256": "1a6d75283397373185997b96d01100aed92eeb5f267abcea849c0ac2f6f16894",
+      "bytes": 203941
+    },
+    {
+      "file": "app/Fragment.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/Fragment.java",
+      "sha256": "9c8e9d5858ccda93c6fcaee4e44bd1dbc6455ad9c2778bb09cf6447704452c34",
+      "bytes": 122462
+    },
+    {
+      "file": "app/FragmentManager.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/FragmentManager.java",
+      "sha256": "b31f613e5e487bd7beb4711c7677876b43ad58c73dcba9778c8e9f7b35516978",
+      "bytes": 149433
+    },
+    {
+      "file": "widget/LinearLayout.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/LinearLayout.java",
+      "sha256": "ab889453a73dba31034478e8c5e5c5bc149f42ae0c6c1b3632c53defd7d1ce0e",
+      "bytes": 84076
+    },
+    {
+      "file": "widget/FrameLayout.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/FrameLayout.java",
+      "sha256": "6a04023a4daba7d8f1959a34b433460afa8ba9cc2d0ef031def9eb4e30f7a6c2",
+      "bytes": 19813
+    },
+    {
+      "file": "widget/ScrollView.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ScrollView.java",
+      "sha256": "9bbb1ecb2dc0e0111657098d0a4afed087743af4af09f0bf26e8ad3b8ade708d",
+      "bytes": 75415
+    },
+    {
+      "file": "widget/EditText.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/EditText.java",
+      "sha256": "fc6aa8fc0448b937c885842274b30ec92f1aad59dc9286660bf0e18a14d7dba0",
+      "bytes": 6201
+    },
+    {
+      "file": "widget/CompoundButton.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/CompoundButton.java",
+      "sha256": "42b4e1f3c132fdf40b836d39f669fea48135887a51b7058b41ba246e9a3368a8",
+      "bytes": 23976
+    },
+    {
+      "file": "widget/ProgressBar.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ProgressBar.java",
+      "sha256": "c8ae1f61b1bb89629b51e385247339eb427126b7cc829dc4130c94699c99553a",
+      "bytes": 90286
+    },
+    {
+      "file": "view/View.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/View.java",
+      "sha256": "8b2dfece3297e044d9e79c35b3af7654f1d098498efff8fb0c86e00c3f80e7fc",
+      "bytes": 1293532
+    },
+    {
+      "file": "content/res/Resources.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/res/Resources.java",
+      "sha256": "e6d25a752d6fbb986d86b3b8b6876ba47f4cafc0dc8296cb066989af25a88dc3",
+      "bytes": 107865
+    }
+  ],
+  "reviewedContracts": [
+    {
+      "file": "app/Activity.java",
+      "member": "getLastNonConfigurationInstance / lifecycle / onRetainNonConfigurationInstance",
+      "behavior": "No retained object on first creation; retention callback occurs between stop and destroy."
+    },
+    {
+      "file": "widget/CompoundButton.java",
+      "member": "performClick / setChecked",
+      "behavior": "Click toggles before View click; changed listener fires on a value change and prevents recursive rebroadcast."
+    },
+    {
+      "file": "widget/LinearLayout.java",
+      "member": "layout_weight / measurement",
+      "behavior": "Positive weight distributes available space; margins and padding are separate from that allocation."
+    },
+    {
+      "file": "app/ActivityManager.java",
+      "member": "getMyMemoryState",
+      "behavior": "AOSP delegates to the process service; the browser VM models only its own logical process and must not claim host Android telemetry."
+    }
+  ]
+}

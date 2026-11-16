@@ -164,7 +164,7 @@
 .cp-grid input[type=checkbox],.cp-check input{accent-color:var(--accent);justify-self:start}
 .cp-core{margin:12px 0;padding:10px 12px 12px;border:1px solid var(--line);border-radius:8px;min-width:0}.cp-core legend{padding:0 6px;font-size:10px;font-weight:600;color:#6e7384}.cp-core .cp-note:first-of-type{margin-top:10px}
 .cp-core-grid{display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:8px 10px;align-items:center;font-size:10px;color:#6e7384}.cp-core-grid label{display:flex;flex-direction:column;gap:2px}.cp-core-grid small{font-size:9px;color:#9aa0ae}.cp-core-grid input{width:100%;min-width:0;text-align:right}
-.cp-core [data-state=error]{color:#c62828}.cp-core .cp-button{margin-top:10px}
+.cp-core-mode{margin:0 0 10px}.cp-core[data-mode=dynamic] .cp-core-grid [data-fixed]{opacity:.45}.cp-core [data-state=error]{color:#c62828}.cp-core .cp-button{margin-top:10px}
 :root[data-theme=dark] .cp-core{border-color:#2c2a3a}:root[data-theme=dark] .cp-core legend,:root[data-theme=dark] .cp-core-grid{color:#a9a6b8}:root[data-theme=dark] .cp-core [data-state=error]{color:#ff8a80}
 .cp-note{margin:8px 0 0;font-size:9px;line-height:1.55;color:#9aa0ae}.cp-note code{font:9px ui-monospace,monospace}
 .cp-field{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:6px 10px;align-items:start;font-size:10px;color:#6e7384;margin:0 0 10px}
@@ -644,13 +644,4 @@ body.lab-dragging{user-select:none;-webkit-user-select:none}
 .cp-microg-entry-meta{font:400 11px/1.4 var(--sans);color:var(--muted)}
 .cp-microg-entry-meta[data-state=error]{color:var(--warn)}
 
-/* The adb terminal of the tool dock (src/adb-terminal.js): the output above, the command line fixed below */
-.adb-terminal .adb-output{background:#0f1320;color:#d5dae6;font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;padding:8px 12px;height:260px;overflow:auto;white-space:pre-wrap;word-break:break-word;border-top:1px solid #eceef3}
-.adb-terminal .adb-line{margin:0}.adb-terminal .adb-command{color:#8fb4ff;margin-top:6px}.adb-terminal .adb-command::before{content:"$ ";color:#6c7488}
-.adb-terminal .adb-error{color:#ff9d94}.adb-terminal .adb-note{color:#8f97aa}.adb-terminal .adb-note::before{content:"lab: "}.adb-terminal .adb-hint{color:#8f97aa}
-.adb-terminal .adb-image{display:block;max-width:220px;max-height:360px;margin:4px 0;border:1px solid #2b3246;border-radius:6px}
-.adb-terminal .adb-pick{margin:4px 0;font:inherit}
-.adb-form{display:flex;align-items:center;gap:8px;padding:6px 12px;background:#0b0e18;border-top:1px solid #20263a}
-.adb-prompt{color:#6c7488;font:12px ui-monospace,monospace}
-.adb-input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:#e7ebf5;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 0}
-.adb-input::placeholder{color:#59617a}.adb-form .adb-run{flex:none}.adb-form[data-busy=true] .adb-input{opacity:.55}
+/* The adb terminal of the tool dock is styled in lab-theme.css (unlayered: this file is the `legacy` layer, which the theme's form rules always win over) */

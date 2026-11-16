@@ -1,0 +1,358 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-25T17:19:59.135022+00:00",
+  "scope": "Two new unmodified Android applications; emulator is reference QA only and is never the web execution engine.",
+  "androidReference": {
+    "avd": "Pixel_API36",
+    "serial": "emulator-5554",
+    "api": 36,
+    "abi": "arm64-v8a",
+    "tests": 4,
+    "passed": 4,
+    "wmBefore": {
+      "size": "Physical size: 1080x2400",
+      "density": "Physical density: 420"
+    },
+    "wmAfter": {
+      "size": "Physical size: 1080x2400",
+      "density": "Physical density: 420"
+    },
+    "overridesChanged": false,
+    "emulatorStoppedAfterQA": true
+  },
+  "apps": [
+    {
+      "file": "xml-projects-debug.apk",
+      "packageName": "dev.apkweb.projects",
+      "launcherActivity": "dev.apkweb.projects.MainActivity",
+      "activities": [
+        {
+          "name": "dev.apkweb.projects.ReviewActivity",
+          "exported": 0,
+          "launcher": false,
+          "descriptor": "Ldev/apkweb/projects/ReviewActivity;"
+        },
+        {
+          "name": "dev.apkweb.projects.HelpActivity",
+          "exported": 0,
+          "launcher": false,
+          "descriptor": "Ldev/apkweb/projects/HelpActivity;"
+        },
+        {
+          "name": "dev.apkweb.projects.MainActivity",
+          "exported": 4294967295,
+          "launcher": true,
+          "descriptor": "Ldev/apkweb/projects/MainActivity;"
+        }
+      ],
+      "classes": 5881,
+      "methods": 51735,
+      "dexFiles": [
+        "classes.dex",
+        "classes2.dex",
+        "classes3.dex"
+      ],
+      "nativeSummary": {
+        "files": 0,
+        "uniqueLibraries": 0,
+        "abiCount": 0,
+        "bytes": 0,
+        "executableInBrowser": false,
+        "executionRequired": "determined-at-use"
+      },
+      "resourceSummary": {
+        "present": true,
+        "tableBytes": 277408,
+        "tableParsed": true,
+        "entries": 1405,
+        "layoutFiles": 52,
+        "parsedLayouts": 52,
+        "skippedLayouts": 0,
+        "parsedLayoutBytes": 65044,
+        "inspectionComplete": true,
+        "errors": [],
+        "omittedErrors": 0,
+        "xml": {
+          "files": 177,
+          "parsed": 177,
+          "skipped": 0,
+          "bytes": 168788
+        }
+      },
+      "sha256": "d547095772c2d35bbec4a13df468cb32cc7b0d84fb535c5ea99b84bc97869d97",
+      "bytes": 4372611,
+      "sourceModule": "android-fixtures/workflow-suite/xml-projects",
+      "buildCommand": "scripts/build-workflow-fixtures.sh",
+      "androidTest": {
+        "class": "dev.apkweb.projects.ProjectWorkflowTest",
+        "runner": "dev.apkweb.projects.test/androidx.test.runner.AndroidJUnitRunner",
+        "tests": 2,
+        "passed": 2,
+        "testApkSha256": "e4220a346f04fb56fceae660f525c9fb04fcb0f5ee5cd3f75f50066a509efb82",
+        "log": "evidence/workflow-suite/android/xml-projects/instrumentation.txt"
+      },
+      "screenshots": [
+        {
+          "file": "evidence/workflow-suite/android/xml-projects/xml-projects-created-restored.png",
+          "sha256": "5fdb0403705899351e0875993a5534b79c27c53a67283a9c94fbd708e7ce9dba",
+          "metadata": "evidence/workflow-suite/android/xml-projects/xml-projects-created-restored.json"
+        },
+        {
+          "file": "evidence/workflow-suite/android/xml-projects/xml-projects-draft-restored.png",
+          "sha256": "a6285dc09f2e13a8b74f52a2fc9a6cebf5751211a31cc718eb40a423e3ef281b",
+          "metadata": "evidence/workflow-suite/android/xml-projects/xml-projects-draft-restored.json"
+        },
+        {
+          "file": "evidence/workflow-suite/android/xml-projects/xml-projects-final-filtered.png",
+          "sha256": "b215a646c1915bdb6cf8a3020e3620b6b149e74baa7318dcd70953ae4e53b086",
+          "metadata": "evidence/workflow-suite/android/xml-projects/xml-projects-final-filtered.json"
+        },
+        {
+          "file": "evidence/workflow-suite/android/xml-projects/xml-projects-initial.png",
+          "sha256": "fab4555bdf59fe0d07cba169cedefe8b8b522f9f65da2e4e34a1ac476467c4f9",
+          "metadata": "evidence/workflow-suite/android/xml-projects/xml-projects-initial.json"
+        },
+        {
+          "file": "evidence/workflow-suite/android/xml-projects/xml-projects-review-result.png",
+          "sha256": "18ac5f9561ac0bd6e5c6266385f2334f4a353fef94c62e4a0ec61b71928cb773",
+          "metadata": "evidence/workflow-suite/android/xml-projects/xml-projects-review-result.json"
+        }
+      ],
+      "browserExecution": {
+        "status": "not-fully-validated",
+        "proof": "evidence/workflow-suite/projects-browser-vm.json"
+      },
+      "sourceFiles": [
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/build.gradle.kts",
+          "sha256": "00d960e94d6ab53ef6718aea84b98b686da081ed5f0a335c17175cf2d0836420"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/androidTest/java/dev/apkweb/projects/ProjectWorkflowTest.kt",
+          "sha256": "100b3ce261b7411ce23be5eed6d12d83a70fb26e5b6dc025256ddfd275dc8354"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/androidTest/java/dev/apkweb/projects/ReferenceCapture.kt",
+          "sha256": "e1be719d793d25d35e236da541b7eaca0f5207a04327c25ad6e3709ae4fcd55b"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/AndroidManifest.xml",
+          "sha256": "2993130f96042c5488bfa40f4f03f4027efc85cd7896fce30d0c5ea994c63337"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/java/dev/apkweb/projects/Activities.kt",
+          "sha256": "178b6369121d69fcebd6b32cefb55a2ca143e4f85337b1e686108d5befa2c22c"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/java/dev/apkweb/projects/Fragments.kt",
+          "sha256": "f103386d85867102a743aaa9c58aeff852b206bf65943ad06d0160006c4c359c"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/java/dev/apkweb/projects/ProjectModel.kt",
+          "sha256": "18b95a705b8e0c5f926386ba6a5ddaa6f2b82c21599f77b3c29765d3563a901b"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/res/drawable/badge.xml",
+          "sha256": "9c7534c1d5421ef50fd470aebaa5152bfaff9604bd30695554cb0e6195b482e3"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/res/drawable/card.xml",
+          "sha256": "26ad93e86ad9d85cc3b1ec28817274db0b2578ac91a75818bcff9fc7cfe4eb13"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/res/layout/activity_help.xml",
+          "sha256": "6436a9cac448017d035d24adb0449fbce9e384bd8d43d32cab1e4050835a0457"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/res/layout/activity_main.xml",
+          "sha256": "d45100de3b960c2db6bf3a934ec54b6703d2b1e1b78d02608a476c2b73998d35"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/res/layout/activity_review.xml",
+          "sha256": "11735f830761cf1aa18555f567308437b6ecd40180249545ef3f4b2dcfeb8ea4"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/res/layout/fragment_confirmation.xml",
+          "sha256": "c1e7a64568ec2265ceb0838d13cddad84ed1159e380b1461aaa4c7a80b9d1c94"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/res/layout/fragment_detail.xml",
+          "sha256": "f868c9accddcb0aa3f5e8a77d6f4108d6605bbd9a95d34deec4fcedea5145d22"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/res/layout/fragment_edit.xml",
+          "sha256": "59650a9b981c08f9a89ced7e6541cbfab398e43348436d9c88034057244b29e9"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/res/layout/fragment_list.xml",
+          "sha256": "cd680ba203a902ed681233e2109213798fe26ea956c539ad8127299a28e044e9"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/res/layout/row_project.xml",
+          "sha256": "5a4763ddafc13d59c96edd0ae85db8e49c58672338430879e743853b99434746"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/res/navigation/project_graph.xml",
+          "sha256": "96d89562411f41bc5f6ccf7bbdeb50ed4783e4bd1e7423b9a01a94f8bd1acdeb"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/xml-projects/src/main/res/values/styles.xml",
+          "sha256": "30970cf252409c30bb7890b832ad485c78539dbf0b5ae19871d0b48d38cd436a"
+        }
+      ]
+    },
+    {
+      "file": "compose-approvals-debug.apk",
+      "packageName": "dev.apkweb.approvals",
+      "launcherActivity": "dev.apkweb.approvals.MainActivity",
+      "activities": [
+        {
+          "name": "dev.apkweb.approvals.BudgetActivity",
+          "exported": 0,
+          "launcher": false,
+          "descriptor": "Ldev/apkweb/approvals/BudgetActivity;"
+        },
+        {
+          "name": "dev.apkweb.approvals.MainActivity",
+          "exported": 4294967295,
+          "launcher": true,
+          "descriptor": "Ldev/apkweb/approvals/MainActivity;"
+        }
+      ],
+      "classes": 13387,
+      "methods": 98865,
+      "dexFiles": [
+        "classes.dex",
+        "classes2.dex",
+        "classes3.dex",
+        "classes4.dex"
+      ],
+      "nativeSummary": {
+        "files": 4,
+        "uniqueLibraries": 1,
+        "abiCount": 4,
+        "bytes": 37392,
+        "executableInBrowser": false,
+        "executionRequired": "determined-at-use"
+      },
+      "resourceSummary": {
+        "present": true,
+        "tableBytes": 427412,
+        "tableParsed": true,
+        "entries": 290,
+        "layoutFiles": 9,
+        "parsedLayouts": 9,
+        "skippedLayouts": 0,
+        "parsedLayoutBytes": 8456,
+        "inspectionComplete": true,
+        "errors": [],
+        "omittedErrors": 0,
+        "xml": {
+          "files": 22,
+          "parsed": 22,
+          "skipped": 0,
+          "bytes": 19260
+        }
+      },
+      "sha256": "161bdadb309d758db59016d5a045f87c3c41959fee2c612663179ef92ea96ffa",
+      "bytes": 9822027,
+      "sourceModule": "android-fixtures/workflow-suite/compose-approvals",
+      "buildCommand": "scripts/build-workflow-fixtures.sh",
+      "androidTest": {
+        "class": "dev.apkweb.approvals.ApprovalWorkflowTest",
+        "runner": "dev.apkweb.approvals.test/androidx.test.runner.AndroidJUnitRunner",
+        "tests": 2,
+        "passed": 2,
+        "testApkSha256": "15107bf8f45b2213256d5f0fe385b011b43f6a07c77f206875fd064944d575c9",
+        "log": "evidence/workflow-suite/android/compose-approvals/instrumentation.txt"
+      },
+      "screenshots": [
+        {
+          "file": "evidence/workflow-suite/android/compose-approvals/compose-approvals-approved.png",
+          "sha256": "fb28d82d86e43d87ebc1c9d254436de31b8216ded2e262f80592b55c9b528bd2",
+          "metadata": "evidence/workflow-suite/android/compose-approvals/compose-approvals-approved.json"
+        },
+        {
+          "file": "evidence/workflow-suite/android/compose-approvals/compose-approvals-draft-restored.png",
+          "sha256": "d0e822f1b1f4d8d3a33dc5dc5b94c572b57f810eb8e1926051a632e8d70e178c",
+          "metadata": "evidence/workflow-suite/android/compose-approvals/compose-approvals-draft-restored.json"
+        },
+        {
+          "file": "evidence/workflow-suite/android/compose-approvals/compose-approvals-initial.png",
+          "sha256": "12402a0a465ea5003f651a3258d3edf3b2706b6e91462c161b83a1442be34723",
+          "metadata": "evidence/workflow-suite/android/compose-approvals/compose-approvals-initial.json"
+        },
+        {
+          "file": "evidence/workflow-suite/android/compose-approvals/compose-approvals-summary-result.png",
+          "sha256": "8892c7815eeb81d0437bb2af6bd499580a5d47166803a147c63c58b391d45196",
+          "metadata": "evidence/workflow-suite/android/compose-approvals/compose-approvals-summary-result.json"
+        }
+      ],
+      "browserExecution": {
+        "status": "not-fully-validated",
+        "proof": null
+      },
+      "sourceFiles": [
+        {
+          "path": "android-fixtures/workflow-suite/compose-approvals/build.gradle.kts",
+          "sha256": "123e1e9374850b6cf4563cd794ba3cdf72b9a87a90926361d4318d631dc76902"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/compose-approvals/src/androidTest/java/dev/apkweb/approvals/ApprovalWorkflowTest.kt",
+          "sha256": "d7f65485c5a7c7a6cc353e7b7c4f9b1c4ad122ee6e42bec5a853b4f21b7f721b"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/compose-approvals/src/androidTest/java/dev/apkweb/approvals/ReferenceCapture.kt",
+          "sha256": "acfc68283733af1a9674be15050ab1e975f66b78ab8576afb9fa7e91e8ff206b"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/compose-approvals/src/main/AndroidManifest.xml",
+          "sha256": "5ff6adedc5e796d31c272a9baed900473aab3a94e08e324ced2b50730285318c"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/compose-approvals/src/main/java/dev/apkweb/approvals/BudgetActivity.kt",
+          "sha256": "7b909843542c32f7d4b9b509933a614dca777176870dd7b47848a7ed630bb849"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/compose-approvals/src/main/java/dev/apkweb/approvals/ExpenseModel.kt",
+          "sha256": "60450280f68e5022855d4dff674414d2b8b8b751b8690d26fc6bcf23f3ee15af"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/compose-approvals/src/main/java/dev/apkweb/approvals/MainActivity.kt",
+          "sha256": "972649e7e56b3816b1d0b0a660d843cf264f807a6d097ead017fd86fc7219ae9"
+        },
+        {
+          "path": "android-fixtures/workflow-suite/compose-approvals/src/main/res/values/styles.xml",
+          "sha256": "e32de973332eb669ad98f26dfa32df5732242373e193768b4d28b0ea1e8327c4"
+        }
+      ]
+    }
+  ],
+  "pinnedOriginals": [
+    {
+      "file": "compose-debug.apk",
+      "sha256": "e3229076cf249fa9725375b420bb1b064c245e7a09f1ad56e66eceeab574dab7",
+      "unchangedAgainstHead": true
+    },
+    {
+      "file": "compose-state-debug.apk",
+      "sha256": "4dc5a9a7de9477b8c93fd35e3fc574a5c1af22e94623702332360fcdba7477d6",
+      "unchangedAgainstHead": true
+    },
+    {
+      "file": "compose-navigation-debug.apk",
+      "sha256": "586daf8851d1c2f2e7aea2b683b0edc115dfc2c6a040b554e9bd98ac3e5357c6",
+      "unchangedAgainstHead": true
+    },
+    {
+      "file": "fragments-navigation-debug.apk",
+      "sha256": "13119b09283a5700524468af1beabdad9581425ba970868f81f046183b3ddcbc",
+      "unchangedAgainstHead": true
+    },
+    {
+      "file": "hybrid-navigation-debug.apk",
+      "sha256": "ef96393f87ebed63a6ef83b6ca44b28f8cb79ca66456878e2159eab13ae31334",
+      "unchangedAgainstHead": true
+    }
+  ]
+}

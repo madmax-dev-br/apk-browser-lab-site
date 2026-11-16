@@ -1,0 +1,50 @@
+{
+  "build": "8b827ed3b4ae",
+  "apk": "fragments-navigation-debug.apk",
+  "noteId": 2,
+  "scope": "Browser interactions with the unchanged original APK; separate from VM-only canonical note1 acceptance",
+  "steps": [
+    {
+      "stage": "saved-confirmation",
+      "text": "Notas · Fragments + XML\nActivity principal · resultado pendente\nAbrir AboutActivity\n4 · Confirmação\nNota 2\nNovo título: Revisão QA web\nConcluir e voltar ao detalhe"
+    },
+    {
+      "stage": "reopened",
+      "input": "Revisão QA web"
+    },
+    {
+      "stage": "updated-list-after-back",
+      "text": "Notas · Fragments + XML\nActivity principal · resultado pendente\nAbrir AboutActivity\n1 · Lista RecyclerView\nToque em uma nota para passar noteId ao destino XML.\n1. Planejar a viagem\n2. Revisão QA web\n3. Organizar a semana"
+    },
+    {
+      "stage": "about-extras",
+      "text": "AboutActivity\nIntent recebido de MainActivity\n3 notas no catálogo.\n\nActivity separada, extras e retorno real.\nRetornar resultado à MainActivity"
+    },
+    {
+      "stage": "activity-result",
+      "text": "Notas · Fragments + XML\nAboutActivity confirmou 3 notas.\nAbrir AboutActivity\n2 · Detalhe\nnoteId = 2\nRevisão QA web\nAinda sem edição confirmada.\nEditar esta nota\nVoltar à lista"
+    },
+    {
+      "stage": "final-list",
+      "text": "Notas · Fragments + XML\nAboutActivity confirmou 3 notas.\nAbrir AboutActivity\n1 · Lista RecyclerView\nToque em uma nota para passar noteId ao destino XML.\n1. Planejar a viagem\n2. Revisão QA web\n3. Organizar a semana"
+    }
+  ],
+  "sha256": "13119b09283a5700524468af1beabdad9581425ba970868f81f046183b3ddcbc",
+  "frameworkSHA256": "d536eea50cc11b5e6365f7dc856b6c014484b22e476769d9844c60dd86d4aa06",
+  "passed": true,
+  "generatedAt": "2026-10-25T16:39:03.799Z",
+  "screenshot": "fragments-web-full-flow.jpg",
+  "confirmationScreenshot": "fragments-web-saved-confirmation.jpg",
+  "geometry": {
+    "crop": {
+      "height": 638.4000244140625,
+      "width": 312.6806640625,
+      "x": 987.65185546875,
+      "y": 349.2043762207031
+    },
+    "viewport": {
+      "height": 1314,
+      "width": 1935
+    }
+  }
+}

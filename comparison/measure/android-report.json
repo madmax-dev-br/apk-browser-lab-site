@@ -1,0 +1,144 @@
+{
+  "initial": {
+    "screenBounds": [
+      0,
+      50,
+      411,
+      75
+    ],
+    "measuredWidth": 411,
+    "measuredHeight": 75,
+    "measureCalls": 2,
+    "layoutCalls": 1,
+    "clicks": 0,
+    "children": [
+      {
+        "className": "android.widget.TextView",
+        "bounds": [
+          0,
+          0,
+          411,
+          19
+        ],
+        "measured": [
+          411,
+          19
+        ]
+      },
+      {
+        "className": "android.widget.Button",
+        "bounds": [
+          0,
+          23,
+          411,
+          71
+        ],
+        "measured": [
+          411,
+          48
+        ]
+      }
+    ]
+  },
+  "android-measure-initialScreen": [
+    411,
+    915
+  ],
+  "edited": {
+    "screenBounds": [
+      0,
+      50,
+      411,
+      75
+    ],
+    "measuredWidth": 411,
+    "measuredHeight": 75,
+    "measureCalls": 4,
+    "layoutCalls": 3,
+    "clicks": 2,
+    "children": [
+      {
+        "className": "android.widget.TextView",
+        "bounds": [
+          0,
+          0,
+          411,
+          19
+        ],
+        "measured": [
+          411,
+          19
+        ]
+      },
+      {
+        "className": "android.widget.Button",
+        "bounds": [
+          0,
+          23,
+          411,
+          71
+        ],
+        "measured": [
+          411,
+          48
+        ]
+      }
+    ]
+  },
+  "android-measure-editedScreen": [
+    411,
+    915
+  ],
+  "passed": true,
+  "assertions": [
+    "output directory",
+    "actual app ProbeLayout instance",
+    "initial: app onMeasure executed",
+    "initial: app onLayout executed",
+    "initial: exactly two app-created children",
+    "initial: actual width measured and laid out",
+    "initial: actual height measured and laid out",
+    "initial: child 0 native laid out",
+    "initial: child 0 follows app vertical layout",
+    "initial: child 0 actual width",
+    "initial: child 0 actual height",
+    "initial: child 1 native laid out",
+    "initial: child 1 follows app vertical layout",
+    "initial: child 1 actual width",
+    "initial: child 1 actual height",
+    "initial: parent matches app sum of measured child heights and gaps",
+    "Android screenshot android-measure-initial",
+    "PNG android-measure-initial",
+    "real Android performClick 1",
+    "actual app click counter 1",
+    "requestLayout invokes app onMeasure 1",
+    "requestLayout invokes app onLayout 1",
+    "actual button text 1",
+    "real Android performClick 2",
+    "actual app click counter 2",
+    "requestLayout invokes app onMeasure 2",
+    "requestLayout invokes app onLayout 2",
+    "actual button text 2",
+    "edited: app onMeasure executed",
+    "edited: app onLayout executed",
+    "edited: exactly two app-created children",
+    "edited: actual width measured and laid out",
+    "edited: actual height measured and laid out",
+    "edited: child 0 native laid out",
+    "edited: child 0 follows app vertical layout",
+    "edited: child 0 actual width",
+    "edited: child 0 actual height",
+    "edited: child 1 native laid out",
+    "edited: child 1 follows app vertical layout",
+    "edited: child 1 actual width",
+    "edited: child 1 actual height",
+    "edited: parent matches app sum of measured child heights and gaps",
+    "Android screenshot android-measure-edited",
+    "PNG android-measure-edited"
+  ],
+  "assertionCount": 44,
+  "apkSha256": "dbf9e7a750f98bff9465049b05939eea46631b2fd0732633892055a0d2b2a1db",
+  "sdk": 36,
+  "density": 1,
+  "source": "Real Android emulator platform traversal, unchanged signed application APK"
+}

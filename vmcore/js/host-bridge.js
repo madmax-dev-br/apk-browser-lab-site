@@ -59,21 +59,21 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=49b0f144f57b';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=49b0f144f57b';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=49b0f144f57b';
-import { HandleTable } from './handles.js?v=49b0f144f57b';
-import { Exceptions } from './exceptions.js?v=49b0f144f57b';
-import { coreImports } from './boundary-imports.js?v=49b0f144f57b';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=49b0f144f57b';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=49b0f144f57b';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=49b0f144f57b';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=49b0f144f57b';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=49b0f144f57b';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=49b0f144f57b';
-import { Blocked } from '../../runtime/scheduler.js?v=49b0f144f57b';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=49b0f144f57b';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=49b0f144f57b';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=ca92aaad0948';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=ca92aaad0948';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=ca92aaad0948';
+import { HandleTable } from './handles.js?v=ca92aaad0948';
+import { Exceptions } from './exceptions.js?v=ca92aaad0948';
+import { coreImports } from './boundary-imports.js?v=ca92aaad0948';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=ca92aaad0948';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=ca92aaad0948';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=ca92aaad0948';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=ca92aaad0948';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=ca92aaad0948';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=ca92aaad0948';
+import { Blocked } from '../../runtime/scheduler.js?v=ca92aaad0948';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=ca92aaad0948';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=ca92aaad0948';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -83,14 +83,22 @@ export const HANDLE_PACE_MIN = 131072;
 // Sized for a large app (hundreds of thousands of methods, hundreds of threads), not for the lab's examples: the memory is address space until it is written, so a region nobody uses costs nothing.
 // Metaspace 511 MiB (the tables of LINKER_LIMITS and every linked method's code and constants), the main thread's record, a record for each of the other threads the core has
 // ids for (core-threads.js MAX_LIVE_THREADS: none is taken from metaspace, which an app with hundreds of live threads would exhaust a MiB at a time), then the collected heap.
-// The sizes are the caller's (attachWasmEngine `memory`: { heapMiB, metaMiB, threads }, src/core-memory.js; the lab's Controles › Execução); LAYOUT is the map of the defaults.
-export const LAYOUT = coreLayout(CORE_MEMORY_DEFAULT);
+// The sizes are the caller's (attachWasmEngine `memory`: { mode, heapMiB, metaMiB, threads }, src/core-memory.js; the lab's Controles › Execução). LAYOUT is the map of the
+// default sizes in the FIXED mode (what the tests' harness and a caller that passes `pages` get). The default mode is 'dynamic': the heap starts small and grows
+// (WasmEngine.extend) and the other threads' records are taken as threads start, both from the area above LAYOUT.HEAP (gc.h GcGrow: a block of thread records is a hole of the
+// heap's address range). The WebAssembly memory has its full size from the start in both modes (src/core-memory.js says why it is never grown).
+export const LAYOUT = coreLayout({ ...CORE_MEMORY_DEFAULT, mode: 'fixed' });
 export const DEFAULT_PAGES = LAYOUT.pages;   // 2 GiB of memory (the most this module's memory may have): a collected heap of 512 MiB above LAYOUT.HEAP
 export const LINKER_LIMITS = Object.freeze({ maxMethods: 1 << 21, maxClasses: 1 << 18, maxStrings: 1 << 20 });
 export const THREAD = Object.freeze({ vm: 0, stackBase: 4, stackEnd: 8, status: 12, detail: 16, interrupt: 20, ringIndex: 24, quantumCut: 28, steps: 32, maxSteps: 40, result: 48, calls: 56, peakDepth: 64,
   tlabTop: 68, tlabEnd: 72, stackTop: 2128, frame: 2132, pc: 2136, depth: 2140, throwing: 2144, maxDepth: 2148, args: 2304, javaStack: 4096, javaStackBytes: 2 * MiB });
 const GC = Object.freeze({ base: 4, end: 8, startBits: 12, threadCap: 44, rootCap: 56, roots: 52, rootCount: 60, reports: 76, reportCap: 80, reportCount: 84, reportOverflow: 88, freed: 92, freedCap: 96, freedCount: 100,
-  trigger: 116, collectRequested: 120, collections: 124, liveObjects: 128, liveBytes: 132, freedObjects: 136, marked: 152, badRefs: 168, stress: 436, threadsState: 440, slowPaths: 444, SIZE: 448 });
+  trigger: 116, collectRequested: 120, collections: 124, liveObjects: 128, liveBytes: 132, freedObjects: 136, marked: 152, badRefs: 168, stress: 436, threadsState: 440, slowPaths: 444, grow: 196, SIZE: 448 });
+const GROW = Object.freeze({ limit: 0, holeBytes: 4, holeCount: 8, wanted: 16 });   // gc.h GcGrow
+/** Dynamic memory: the heap grows by at least this much at a time, and the other threads' records are taken from the area this many at a time. */
+const ARENA_STEP = 16 * MiB, GUEST_BLOCK = 8;
+/** Dynamic memory: what the app may allocate past twice what survived before the next collection. An eighth of the fixed mode's default heap (gc.c pace), so both modes collect at the same points. */
+const ARENA_SLACK = 64 * MiB;
 const HOST_CALL = Object.freeze({ op: 0, caller: 4, constant: 8, count: 12, args: 16 });
 export const Status = Object.freeze({ OK: 0, BUDGET: 1, OUT_OF_MEMORY: 5, UNSUPPORTED: 6, UNRESOLVED: 34, UNBOUND_NATIVE: 35, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81,
   HOST_THROW: 0x7fff0110, HOST_FRAME: 0x7fff0111 });
@@ -127,16 +135,18 @@ export async function attachWasmEngine(runtime, { module, shared = true, memory 
 export class WasmEngine {
   constructor(runtime, { shared = true, memory = null, pages = null, stress, stressHost, trigger, maxDepth, natives }) {
     this.runtime = runtime; this.stressHost = stressHost; this.fixedTrigger = trigger;
-    const layout = this.layout = coreLayout(memory ?? CORE_MEMORY_DEFAULT), LAYOUT = layout; pages ??= layout.pages;
+    // `pages` given: a memory of exactly that size, laid out in the fixed mode (the default sizes unless `memory` says otherwise). Else the caller's mode, 'dynamic' by default.
+    const layout = this.layout = coreLayout(pages != null ? { ...(memory ?? CORE_MEMORY_DEFAULT), mode: 'fixed' } : memory ?? CORE_MEMORY_DEFAULT), LAYOUT = layout; pages ??= layout.pages;
+    this.dynamic = layout.dynamic && pages === layout.pages;
     try { this.memory = new WebAssembly.Memory({ initial: Math.min(pages, 2048), maximum: 32768, shared }); if (pages > 2048) this.memory.grow(pages - 2048); }
-    catch (error) { throw new APKError(`vmcore: o navegador recusou ${Math.round(pages / 16)} MiB de memória para o núcleo Wasm (${String(error?.message ?? error).slice(0, 120)}); reduza heap, metaspace ou threads em Controles › Execução`, { kind: 'vmcore-memory' }); }   // `shared: false` needs the module of vmcore/js/unshared.js; the memory only grows here, before any view of it exists
-    this.pages = pages; this.maxDepth = maxDepth; this.stress = stress;
+    catch (error) { throw new APKError(`vmcore: o navegador recusou ${Math.round(pages / 16)} MiB de memória para o núcleo Wasm (${String(error?.message ?? error).slice(0, 120)}); ${layout.dynamic ? 'use o modo travado com tamanhos menores' : 'reduza heap, metaspace ou threads'} em Controles › Execução`, { kind: 'vmcore-memory' }); }   // `shared: false` needs the module of vmcore/js/unshared.js; the memory only grows here, before any view of it exists
+    this.pages = pages; this.maxDepth = maxDepth; this.stress = stress; this.guestNext = this.guestBlockEnd = 0;
     if (pages * 65536 <= LAYOUT.HEAP + 16 * MiB) throw new Error(`vmcore: ${pages} pages leave no heap above the ${LAYOUT.HEAP / MiB} MiB of metaspace and thread records`);
     this.linker = new Linker(runtime, { memory: this.memory, metaStart: LAYOUT.META, metaEnd: LAYOUT.META_END, natives, ...LINKER_LIMITS });
     this.exceptions = new Exceptions(this.linker);
     this.WIDE_HIGH = runtime.argumentWords(['J'], [0n])[1];   // the JavaScript VM's marker of a long/double's second register
     this.pins = []; this.pendingHost = []; this.patched = []; this.patchEpoch = 0; this.usedBridge = null; this.hostDepth = 0; this.sites = new Map(); this.methodInfos = new WeakMap(); this.lastError = null; this.stopReason = null; this.fieldSites = new Map(); this.parked = null;
-    this.stats = { bridged: 0, frames: 0, steps: 0, nested: 0, nativeSites: 0, collections: 0, hostCollections: 0, markMs: 0, sweepMs: 0, companionScans: 0, pinsAtCollection: 0, rootIds: 0 };
+    this.stats = { bridged: 0, frames: 0, steps: 0, nested: 0, nativeSites: 0, collections: 0, hostCollections: 0, markMs: 0, sweepMs: 0, companionScans: 0, pinsAtCollection: 0, rootIds: 0, grows: 0, grownBytes: 0 };
     installHostLinking(this.linker, runtime, { staticValue: (reference, slot) => this.writeValue(slot, reference.type, runtime.readStatic(reference)) });
     this.installRouting();
   }
@@ -200,13 +210,15 @@ export class WasmEngine {
     // the collected heap
     const h = this.h = linker.alloc(GC.SIZE);
     this.w32(h + GC.threadCap, 1024); this.w32(h + GC.rootCap, 1 << 19); this.w32(h + GC.reportCap, 1 << 16); this.w32(h + GC.freedCap, 1 << 14);
-    if (!exports.gc_init(h, LAYOUT.HEAP, this.pages * 65536)) throw new Error('vmcore: gc_init refused the region');
+    if (!(this.dynamic ? exports.gc_init_growable(h, LAYOUT.HEAP, this.pages * 65536, LAYOUT.firstPages * 65536) : exports.gc_init(h, LAYOUT.HEAP, this.pages * 65536))) throw new Error('vmcore: gc_init refused the region');
+    this.grow = this.r32(h + GC.grow);   // the GcGrow record (0: a heap of fixed size)
     this.w32(h + GC.stress, this.stress ? 1 : 0); if (this.fixedTrigger !== undefined) this.w32(h + GC.trigger, this.fixedTrigger);
+    else if (this.dynamic) this.paceDynamic();
     else this.w32(h + GC.trigger, Math.min(this.r32(h + GC.trigger), 64 * MiB));   // the first collection after 64 MiB allocated, not after half of a large heap: the hosts' handle and native tables are only trimmed by collections (gc.c paces the later ones by what survived)
     this.w32(linker.vm + VM_GC, h);
     this.initRecord(this.mainRecord, this.mainRecord + THREAD.javaStack, this.mainRecord + THREAD.javaStack + THREAD.javaStackBytes);
     // threads (vmcore/js/core-threads.js): ThreadsState, the main thread's record attached, the scheduler driving the core's threads
-    this.threads = new CoreThreads(this, { main: this.mainRecord, guestBase: LAYOUT.GUESTS, guestSpan: LAYOUT.GUEST_SPAN, guestCount: LAYOUT.GUEST_COUNT, javaStack: THREAD.javaStack });
+    this.threads = new CoreThreads(this, { main: this.mainRecord, guestBase: LAYOUT.GUESTS, guestSpan: LAYOUT.GUEST_SPAN, guestCount: LAYOUT.GUEST_COUNT, javaStack: THREAD.javaStack, take: this.dynamic ? () => this.takeGuestRecord() : null });
     this.threads.setup();
     this.stackScratch = linker.alloc(8 * 1024);
     // handles: every record that gets an id is exported (the sweep reports its death); every handle made while host code runs is pinned (see the header)
@@ -243,8 +255,8 @@ export class WasmEngine {
   }
 
   // ---- memory
-  // The memory never grows after the constructor (its pages are fixed: the heap is everything above LAYOUT.HEAP), so the views are made once: reading a shared memory's `buffer` costs
-  // more than the access (about 10 % of a bridged call when it was checked on every access).
+  // The memory never grows after the constructor (its pages are fixed in both modes: a dynamic heap grows inside it, WasmEngine.extend), so the views are made once: reading a
+  // shared memory's `buffer` costs more than the access (about 10 % of a bridged call when it was checked on every access).
   get u32() { if (this.u32view === undefined) { this.u32view = new Uint32Array(this.memory.buffer); this.dv = new DataView(this.memory.buffer); } return this.u32view; }
   get view() { void this.u32; return this.dv; }
   w32(at, value) { this.u32[at >>> 2] = value >>> 0; }
@@ -286,11 +298,63 @@ export class WasmEngine {
     return kind === 'L' ? this.refValue(low) : low | 0;
   }
 
+  // ---- dynamic memory (src/core-memory.js mode 'dynamic'; gc.h GcGrow)
+  /**
+   * Moves the end of what the heap's area uses up by `bytes` (rounded up to 64 KiB) and gives the new span to the heap, or keeps it out of the heap as a hole (`hole`: thread
+   * records). The pages are already in the memory (never written: zero, and no RAM until now). Returns where the span starts, 0 when the memory is fixed, the area is used up,
+   * or the hole table is full (the caller fails by name: OutOfMemoryError, or the thread that cannot start).
+   */
+  extend(bytes, hole = false) {
+    if (!this.grow || !(bytes > 0)) return 0;
+    const h = this.h, end = this.r32(h + GC.end), to = end + Math.ceil(bytes / 65536) * 65536;
+    if (to > this.r32(this.grow + GROW.limit)) return 0;
+    const at = this.x.gc_extend(h, to, hole ? 1 : 0) >>> 0; if (!at) return 0;
+    this.stats.grows++; this.stats.grownBytes += to - end;
+    return at;
+  }
+  /** The most `extend` can still add, in bytes (whole 64 KiB under the area's limit). */
+  get room() { if (!this.grow) return 0; const end = this.r32(this.h + GC.end), limit = this.r32(this.grow + GROW.limit); return Math.max(0, Math.floor((limit - end) / 65536) * 65536); }
+  /** Bytes of collected heap the memory holds now (the holes of a dynamic memory are not heap). */
+  get heapBytes() { const h = this.h; return this.r32(h + GC.end) - this.r32(h + GC.base) - (this.grow ? this.r32(this.grow + GROW.holeBytes) : 0); }
+  /**
+   * After a collection of a dynamic memory. The next collection is due where the default fixed heap would have it: after twice what survived plus ARENA_SLACK. The heap is
+   * grown (in steps of ARENA_STEP) to hold that with an eighth to spare, so the two modes collect equally often and the dynamic one is not a small heap collected every few MiB.
+   */
+  paceArena() {
+    if (!this.grow || this.fixedTrigger !== undefined) return;
+    const due = 2 * this.r32(this.h + GC.liveBytes) + ARENA_SLACK, want = Math.ceil(due * 8 / 7 / ARENA_STEP) * ARENA_STEP, heap = this.heapBytes;
+    if (want > heap) this.extend(Math.min(want - heap, this.room));
+    this.paceDynamic();
+  }
+  /** The trigger of a dynamic heap (see paceArena), never past 7/8 of the heap there is (when the area is used up the heap collects more often, as a full fixed heap does). */
+  paceDynamic() { const heap = this.heapBytes, live = this.stats.collections || this.r32(this.h + GC.collections) ? this.r32(this.h + GC.liveBytes) : 0; this.w32(this.h + GC.trigger, Math.min(2 * live + ARENA_SLACK, heap - heap / 8) >>> 0); }
+  /**
+   * An allocation of `bytes` found no room after a collection: grows a dynamic heap by at least that (one free range that holds it). False when it cannot (fixed memory, no
+   * room left in the area): the caller throws OutOfMemoryError.
+   */
+  makeRoom(bytes) {
+    if (!this.grow) return false;
+    this.w32(this.grow + GROW.wanted, 0);
+    const need = Math.ceil((bytes + 65536) / 65536) * 65536, room = this.room;
+    if (need > room || !this.extend(Math.min(Math.max(need, ARENA_STEP), room))) return false;
+    if (this.fixedTrigger === undefined) this.paceDynamic();
+    return true;
+  }
+  /** A run stopped twice at the same allocation with a collection in between (core-threads.js): room for what it asked for (gc.c records the size), false when there is none. */
+  makeRoomForRun() { if (!this.grow) return false; const wanted = this.r32(this.grow + GROW.wanted); return wanted > 0 && this.makeRoom(wanted); }
+  /** Dynamic memory: the record of another Java thread, from a block of GUEST_BLOCK records taken from the area as a hole; 0 when the area has no room for another block. */
+  takeGuestRecord() {
+    const span = this.layout.GUEST_SPAN;
+    if (this.guestNext === this.guestBlockEnd) { const at = this.extend(GUEST_BLOCK * span, true); if (!at) return 0; this.guestNext = at; this.guestBlockEnd = at + GUEST_BLOCK * span; }
+    const t = this.guestNext; this.guestNext += span; return t;
+  }
+
   // ---- allocation (host side)
   alloc(bytes) {
     if (this.stressHost) this.collect('host-stress');
     let at = this.x.gc_alloc(this.h, this.t, bytes) >>> 0;
     if (!at) { this.collect('host-allocation'); at = this.x.gc_alloc(this.h, this.t, bytes) >>> 0; }
+    if (!at && this.makeRoom(bytes)) at = this.x.gc_alloc(this.h, this.t, bytes) >>> 0;
     if (!at) this.runtime.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate ${bytes} bytes: the core's heap is full after a collection`);
     return at;
   }
@@ -302,6 +366,7 @@ export class WasmEngine {
     if (this.stressHost) this.collect('host-stress');
     let at = this.x.vm_box(this.t, kind, lo >>> 0, hi >>> 0) >>> 0;
     if (!at) { this.collect('host-allocation'); at = this.x.vm_box(this.t, kind, lo >>> 0, hi >>> 0) >>> 0; }
+    if (!at && this.makeRoom(64)) at = this.x.vm_box(this.t, kind, lo >>> 0, hi >>> 0) >>> 0;
     if (!at) this.runtime.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate a ${BOX_CLASSES[kind]}: the core's heap is full after a collection`);
     return this.handles.handleOf(at);
   }
@@ -309,6 +374,7 @@ export class WasmEngine {
     if (this.stressHost) this.collect('host-stress');
     let at = this.x.vm_string_new(this.t, length) >>> 0;
     if (!at) { this.collect('host-allocation'); at = this.x.vm_string_new(this.t, length) >>> 0; }
+    if (!at && this.makeRoom(64 + 2 * length)) at = this.x.vm_string_new(this.t, length) >>> 0;
     return at;
   }
 
@@ -355,6 +421,7 @@ export class WasmEngine {
         if (engine.stressHost) engine.collect('host-stress');
         at = engine.x.vm_class_object(engine.t, info.address) >>> 0;
         if (!at) { engine.collect('host-allocation'); at = engine.x.vm_class_object(engine.t, info.address) >>> 0; }
+        if (!at && engine.makeRoom(4096)) at = engine.x.vm_class_object(engine.t, info.address) >>> 0;
         if (!at) rt.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate the Class object of ${type}: the core's heap is full after a collection`);
       }
       return handles.handleOf(at);
@@ -922,6 +989,7 @@ export class WasmEngine {
     release(); x.gc_freed_clear(h);
     for (const map of ephemeronMaps) for (const key of [...map.keys()]) if (typeof key === 'number' && !handles.addressById.has(key)) map.delete(key);   // the key died: so does the entry
     if (this.fixedTrigger !== undefined) this.w32(h + GC.trigger, this.fixedTrigger);
+    this.paceArena();
     const t2 = performance.now();
     handles.issuedSinceCollection = 0; handles.collectAfter = Math.max(HANDLE_PACE_MIN, handles.size);   // the next one after as many new ids as survived (at least HANDLE_PACE_MIN)
     this.runtime.nativeCollected?.();
@@ -973,7 +1041,7 @@ export class WasmEngine {
   /** The record (facade) of the object at `address`, as runtime.object() gives it. */
   recordAt(address) { return this.space.objectAt(address); }
   /** The core's heap for reports: its size in bytes, what the last collection left alive, how many collections ran, and how many objects the hosts hold a handle of. */
-  memoryInfo() { const h = this.h, LAYOUT = this.layout; return { threadCapacity: LAYOUT.GUEST_COUNT, metaBytes: this.linker.top - LAYOUT.META, metaCapacity: LAYOUT.META_END - LAYOUT.META, classes: this.linker.classList.length, methods: this.linker.methodList.length, threadRecords: this.threads?.nextGuest ?? 0, threadRecordsFree: this.threads?.free.length ?? 0, heapBytes: this.r32(h + GC.end) - this.r32(h + GC.base), liveBytes: this.stats.collections ? this.r32(h + GC.liveBytes) : null, liveObjects: this.stats.collections ? this.r32(h + GC.liveObjects) : null, collections: this.stats.collections, handles: Number(this.runtime.heap?.size ?? 0) }; }
+  memoryInfo() { const h = this.h, LAYOUT = this.layout; return { threadCapacity: LAYOUT.GUEST_COUNT, metaBytes: this.linker.top - LAYOUT.META, metaCapacity: LAYOUT.META_END - LAYOUT.META, classes: this.linker.classList.length, methods: this.linker.methodList.length, threadRecords: this.threads?.nextGuest ?? 0, threadRecordsFree: this.threads?.free.length ?? 0, heapBytes: this.heapBytes, dynamic: this.dynamic, areaBytes: this.dynamic ? this.r32(h + GC.end) - LAYOUT.HEAP : 0, areaLimit: this.dynamic ? this.pages * 65536 - LAYOUT.HEAP : 0, heapRoom: this.room, grows: this.stats.grows, liveBytes: this.stats.collections ? this.r32(h + GC.liveBytes) : null, liveObjects: this.stats.collections ? this.r32(h + GC.liveObjects) : null, collections: this.stats.collections, handles: Number(this.runtime.heap?.size ?? 0) }; }
   /** Drops the pins of top-level host code (between top-level calls of a test or a driver that keeps nothing in JavaScript locals). */
   unpinTopLevel() { if (this.hostDepth === 0) this.pins.length = 0; }
   /** 0, or the number of the first broken heap invariant (gc_verify). */

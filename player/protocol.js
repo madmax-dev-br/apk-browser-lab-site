@@ -1,10 +1,10 @@
 // Versioned host <-> frame message schema and the <apk-player> configuration model. No DOM: shared by the host script, the frame and the tests.
-import { checkCoreMemory } from '../core-memory.js?v=49b0f144f57b';
-import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=49b0f144f57b';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=49b0f144f57b';
-import { parseRule } from '../host-map.js?v=49b0f144f57b';
-import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=49b0f144f57b';
-import { isMemoryStep } from '../memory-budget.js?v=49b0f144f57b';
+import { checkCoreMemory } from '../core-memory.js?v=ca92aaad0948';
+import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=ca92aaad0948';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=ca92aaad0948';
+import { parseRule } from '../host-map.js?v=ca92aaad0948';
+import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=ca92aaad0948';
+import { isMemoryStep } from '../memory-budget.js?v=ca92aaad0948';
 export const PROTOCOL = 'apk-player';
 /** Envelope version: every message carries it; a frame or host of another version is refused. Unchanged since the first release, so old hosts keep working. */
 export const VERSION = 1;
@@ -76,7 +76,7 @@ export function parseLabValue(key, raw) {
     case 'strictCrash': case 'layoutBounds': return bool(raw);
     case 'permissionDialog': return PERMISSION_DIALOG.includes(raw) ? raw : undefined;
     case 'renderer': return raw === 'cpu' || raw === 'gpu' ? raw : undefined;   // 'gpu' (default: WebGL replay in the Worker, src/gpu-raster.js, falling back to CPU by itself) or 'cpu'; applied live
-    case 'coreMemory': { if (!raw || typeof raw !== 'object') return undefined; const checked = checkCoreMemory(raw); return checked.error ? undefined : checked.value; }   // { heapMiB, metaMiB, threads }: the sizes of the WebAssembly core's memory (src/core-memory.js); only with engine 'wasm', applies at the next launch
+    case 'coreMemory': { if (!raw || typeof raw !== 'object') return undefined; const checked = checkCoreMemory(raw); return checked.error ? undefined : checked.value; }   // { mode, heapMiB, metaMiB, threads }: the mode ('dynamic' by default, or 'fixed') and sizes of the WebAssembly core's memory (src/core-memory.js); only with engine 'wasm', applies at the next launch
     case 'engine': return raw === 'js' || raw === 'wasm' ? raw : undefined;   // 'wasm' (default: the Java heap, frames and interpreter in vmcore/core.wasm, docs/WASM-CORE-PLANO.md) or 'js' (the JavaScript VM); applies at the next launch
     case 'hostMap': {   // [{ from, to, enabled }] or, as an attribute, "api.example.com -> localhost:8080, *.cdn.example.com -> 127.0.0.1:9000"
       const list = typeof raw === 'string' ? raw.split(/[,;\n]+/).map(item => item.trim()).filter(Boolean).map(item => { const at = item.indexOf('->'); return at < 0 ? { from: item, to: '' } : { from: item.slice(0, at).trim(), to: item.slice(at + 2).trim() }; }) : raw;

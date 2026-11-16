@@ -1,0 +1,109 @@
+{
+  "browser": {
+    "generatedAt": "2026-10-25T15:33:17.757Z",
+    "build": "05cc070b23ac",
+    "runtime": "In-app browser, actual Worker and local static assets",
+    "scenarios": {
+      "fragments": {
+        "crop": {
+          "height": 638.4000244140625,
+          "width": 312.6806640625,
+          "x": 987.65185546875,
+          "y": 349.2043762207031
+        },
+        "fullFlowVerified": false,
+        "screenshot": "fragments-web-initial.jpg",
+        "stage": "initial",
+        "texts": "Notas · Fragments + XML\nActivity principal · resultado pendente\nAbrir AboutActivity\n1 · Lista RecyclerView\nToque em uma nota para passar noteId ao destino XML.\n1. Planejar a viagem\n2. Revisar o projeto\n3. Organizar a semana",
+        "url": "http://127.0.0.1:8874/?build=05cc070b23ac",
+        "viewport": {
+          "height": 1314,
+          "width": 1935
+        },
+        "detail": {
+          "screenshot": "fragments-web-detail.jpg",
+          "texts": "Notas · Fragments + XML\nActivity principal · resultado pendente\nAbrir AboutActivity\n2 · Detalhe\nnoteId = 1\nPlanejar a viagem\nAinda sem edição confirmada.\nEditar esta nota\nVoltar à lista"
+        },
+        "backToListVerified": true,
+        "activityResultFailure": "Intent.setExtrasClassLoader(ClassLoader) not yet connected in captured build",
+        "apk": "fragments-navigation-debug.apk",
+        "sha256": "13119b09283a5700524468af1beabdad9581425ba970868f81f046183b3ddcbc"
+      },
+      "hybrid": {
+        "crop": {
+          "height": 638.4000244140625,
+          "width": 312.6806640625,
+          "x": 987.65185546875,
+          "y": 349.2043762207031
+        },
+        "fullFlowVerified": false,
+        "screenshot": "hybrid-web-initial.jpg",
+        "stage": "initial XML Fragment",
+        "texts": "Híbrido · XML + Compose\nCatálogo XML\nEste Fragment XML abre um editor ComposeView. O editor usa Material3, estado saveable e um EditText Android nativo dentro de AndroidView.\nAbrir editor Compose",
+        "url": "http://127.0.0.1:8874/?build=05cc070b23ac",
+        "viewport": {
+          "height": 1314,
+          "width": 1935
+        },
+        "navigationFailure": "Kotlin Strings.repeat -> unsupported java.lang.String allocation while composing OutlinedTextField",
+        "composeScreenVisible": false,
+        "navigationAttempted": true,
+        "apk": "hybrid-navigation-debug.apk",
+        "sha256": "ef96393f87ebed63a6ef83b6ca44b28f8cb79ca66456878e2159eab13ae31334"
+      }
+    }
+  },
+  "android": {
+    "device": {
+      "serial": "emulator-5554",
+      "avd": "Pixel_API36",
+      "api": 36,
+      "arch": "arm64",
+      "usage": "local QA only; end-user runtime remains in browser"
+    },
+    "tests": {
+      "xml-dashboard": {
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "4.308"
+      },
+      "compose-feature": {
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "4.845"
+      },
+      "compose-state": {
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "4.093"
+      },
+      "compose-navigation": {
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "5.455"
+      },
+      "fragments-navigation": {
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "4.764"
+      },
+      "hybrid-navigation": {
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "5.293"
+      }
+    }
+  }
+}
