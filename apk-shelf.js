@@ -51,13 +51,16 @@ export function createApkShelf(backend, { now = () => Date.now() } = {}) {
     if (all.length > SHELF_LIMIT) for (const stale of all.sort((a, b) => a.openedAt - b.openedAt).slice(0, all.length - SHELF_LIMIT)) if (stale.id !== key) await backend.delete(stale.id);
     return summary(entry);
   };
-  const describeNow = async (id, { label = null, icon = null } = {}) => { const entry = await backend.get(id); if (!entry) return null; if (label) entry.label = label; if (icon?.bytes) entry.icon = { bytes: icon.bytes, mime: icon.mime || 'image/png' }; await backend.put(entry); return summary(entry); };
+  const describeNow = async (id, { label = null, icon = null, activities = null } = {}) => { const entry = await backend.get(id); if (!entry) return null; if (label) entry.label = label; if (icon?.bytes) entry.icon = { bytes: icon.bytes, mime: icon.mime || 'image/png' }; if (Array.isArray(activities)) entry.activities = activities; await backend.put(entry); return summary(entry); };
   return {
     /** Every entry in the order they were first added (the launcher's order: one beside the other, a new app at the end). */
     async list() { return (await backend.all()).sort((a, b) => a.addedAt - b.addedAt || String(a.id).localeCompare(String(b.id))).map(summary); },
     /** Stores an APK that was just opened. `previousId` (the file-name key used before the package was known) is merged into the package's entry. Returns its summary. */
     save(options) { return serial(() => saveNow(options)); },
-    /** The launcher's label and icon of an entry (read from the app's PackageManager once it ran). */
+    /** What each installed app's manifest answers Intents with: [{ id, packageName, openedAt, activities: [{ name, enabled, filters }] | null }] (null: saved before this was kept;
+     *  opening the app once records it). The page resolves a deep link over these to find the app that handles it (src/intent-resolver.js). */
+    async manifests() { return (await backend.all()).map(entry => ({ id: entry.id, packageName: entry.packageName ?? null, openedAt: entry.openedAt ?? 0, activities: Array.isArray(entry.activities) ? entry.activities : null })); },
+    /** The launcher's label and icon of an entry (read from the app's PackageManager once it ran), and the Activities with intent filters of its manifest (`activities`). */
     describe(id, details) { return serial(() => describeNow(id, details)); },
     /** The APK of an entry as a File: from its file handle when the browser lets the page read it now (`ask`: may prompt), else the stored copy. { file, fromDisk } or null. */
     async file(id, { ask = true } = {}) {

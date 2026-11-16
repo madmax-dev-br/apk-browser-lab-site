@@ -1,15 +1,15 @@
-import {APKError} from './apk-runtime.js?v=deffd920e05b';
-import {getVectorGraphics} from './vector-native.js?v=deffd920e05b';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=deffd920e05b';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=deffd920e05b';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=deffd920e05b';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=deffd920e05b';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=deffd920e05b';
-import {createBitmapHost} from './bitmap-host.js?v=deffd920e05b';
-import { gcRoot } from './heap-gc.js?v=deffd920e05b';
-import {sha256Hex} from './sha256-sync.js?v=deffd920e05b';
-import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=deffd920e05b';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=deffd920e05b';
+import {APKError} from './apk-runtime.js?v=7d37d37a6ae5';
+import {getVectorGraphics} from './vector-native.js?v=7d37d37a6ae5';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=7d37d37a6ae5';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=7d37d37a6ae5';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=7d37d37a6ae5';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=7d37d37a6ae5';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=7d37d37a6ae5';
+import {createBitmapHost} from './bitmap-host.js?v=7d37d37a6ae5';
+import { gcRoot } from './heap-gc.js?v=7d37d37a6ae5';
+import {sha256Hex} from './sha256-sync.js?v=7d37d37a6ae5';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=7d37d37a6ae5';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=7d37d37a6ae5';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -66,7 +66,7 @@ function buildGradientShader(CK,shader,overrides){
 }
 /** Android BitmapShader over a snapshot raster. ALPHA_8 bitmaps are coverage only: Skia exposes them as (0,0,0,a), later tinted by the Paint's color filter. */
 function attachShader(CK,paint,shader,overrides){const built=buildShader(CK,shader,overrides);paint.setShader(built);built.delete();}
-function makePaint(CK,state){const paint=new CK.Paint();paint.setAntiAlias(!!(state.flags&1));paint.setColor(argb(CK,state.argb));paint.setBlendMode({value:state.blendMode??3});paint.setStyle([CK.PaintStyle.Fill,CK.PaintStyle.Stroke,CK.PaintStyle.StrokeAndFill][state.style]);paint.setStrokeWidth(state.strokeWidth);paint.setStrokeMiter(state.strokeMiter);paint.setStrokeCap([CK.StrokeCap.Butt,CK.StrokeCap.Round,CK.StrokeCap.Square][state.strokeCap]);paint.setStrokeJoin([CK.StrokeJoin.Miter,CK.StrokeJoin.Round,CK.StrokeJoin.Bevel][state.strokeJoin]);if(state.colorFilterSnapshot){const filter=makeSkiaColorFilter(CK,state.colorFilterSnapshot);paint.setColorFilter(filter);filter?.delete();}if(state.pathEffect){const effect=state.pathEffect.dash?CK.PathEffect.MakeDash(state.pathEffect.dash.intervals,state.pathEffect.dash.phase):CK.PathEffect.MakeCorner(state.pathEffect.corner);if(effect){paint.setPathEffect(effect);effect.delete();}}if(state.shader)attachShader(CK,paint,state.shader);return paint;}
+function makePaint(CK,state){const paint=new CK.Paint();paint.setAntiAlias(!!(state.flags&1));paint.setColor(argb(CK,state.argb));paint.setBlendMode({value:state.blendMode??3});paint.setStyle([CK.PaintStyle.Fill,CK.PaintStyle.Stroke,CK.PaintStyle.StrokeAndFill][state.style]);paint.setStrokeWidth(state.strokeWidth);paint.setStrokeMiter(state.strokeMiter);paint.setStrokeCap([CK.StrokeCap.Butt,CK.StrokeCap.Round,CK.StrokeCap.Square][state.strokeCap]);paint.setStrokeJoin([CK.StrokeJoin.Miter,CK.StrokeJoin.Round,CK.StrokeJoin.Bevel][state.strokeJoin]);if(state.colorFilterSnapshot){const filter=makeSkiaColorFilter(CK,state.colorFilterSnapshot);paint.setColorFilter(filter);filter?.delete();}if(state.pathEffect){const effect=state.pathEffect.dash?CK.PathEffect.MakeDash(state.pathEffect.dash.intervals,state.pathEffect.dash.phase):CK.PathEffect.MakeCorner(state.pathEffect.corner);if(effect){paint.setPathEffect(effect);effect.delete();}}if(state.maskFilter?.blur){const blur=CK.MaskFilter.MakeBlur([CK.BlurStyle.Normal,CK.BlurStyle.Solid,CK.BlurStyle.Outer,CK.BlurStyle.Inner][state.maskFilter.blur.style]??CK.BlurStyle.Normal,state.maskFilter.blur.sigma,true);if(!blur)fail('Skia made no blur mask filter for this Paint');paint.setMaskFilter(blur);blur.delete();}if(state.shader)attachShader(CK,paint,state.shader);return paint;}
 function makeFont(backend,state,text){
  const CK=backend.CanvasKit;if(typeof text!=='string'||text.length>65536)fail('Skia text run exceeds65536characters');
  const size=state.textSize??12,scale=state.textScaleX??1,skew=state.textSkewX??0;if(![size,scale,skew].every(Number.isFinite)||size<0||size>512||Math.abs(scale)>16||Math.abs(skew)>16)fail('Skia font extent exceeds VM limits');
@@ -406,7 +406,7 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
     }
     else if(command.op==='color')canvas.drawColor(argb(CK,command.color),{value:command.blendMode??3});
     else if(command.op==='paint')canvas.drawPaint(paint);
-    else if(command.op==='raster'){const image=recordedImage(CK,command);try{if(image.width()>4096||image.height()>4096||image.width()*image.height()>4*1024*1024)fail('Recorded widget raster exceeds Skia bounds');const drawImage=p=>{if(command.mesh){drawBitmapMesh(CK,canvas,image,command.mesh,p);return;}if(command.imageMatrix)canvas.concat(command.imageMatrix);if(command.src&&command.dst){if(command.filter)canvas.drawImageRectOptions(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImageRect(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),p);}else{if(command.imageScale&&command.imageScale!==1){canvas.translate(command.args[0],command.args[1]);canvas.scale(command.imageScale,command.imageScale);if(command.filter)canvas.drawImageOptions(image,0,0,CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,0,0,p);}else if(command.filter)canvas.drawImageOptions(image,command.args[0],command.args[1],CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,command.args[0],command.args[1],p);}};
+    else if(command.op==='raster'){if(command.paint?.maskFilter)fail('Drawing a bitmap with a Paint that carries a BlurMaskFilter is not implemented');const image=recordedImage(CK,command);try{if(image.width()>4096||image.height()>4096||image.width()*image.height()>4*1024*1024)fail('Recorded widget raster exceeds Skia bounds');const drawImage=p=>{if(command.mesh){drawBitmapMesh(CK,canvas,image,command.mesh,p);return;}if(command.imageMatrix)canvas.concat(command.imageMatrix);if(command.src&&command.dst){if(command.filter)canvas.drawImageRectOptions(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImageRect(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),p);}else{if(command.imageScale&&command.imageScale!==1){canvas.translate(command.args[0],command.args[1]);canvas.scale(command.imageScale,command.imageScale);if(command.filter)canvas.drawImageOptions(image,0,0,CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,0,0,p);}else if(command.filter)canvas.drawImageOptions(image,command.args[0],command.args[1],CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,command.args[0],command.args[1],p);}};
      if(command.alpha8){
       // ALPHA_8 is coverage only: Skia tints it with the Paint color, then applies the Paint's alpha/filter/blend to the result.
       const c=(command.paint?.argb??0xff000000)>>>0,filter=CK.ColorFilter.MakeMatrix([0,0,0,0,((c>>>16)&255)/255,0,0,0,0,((c>>>8)&255)/255,0,0,0,0,(c&255)/255,0,0,0,1,0]),mask=new CK.Paint();

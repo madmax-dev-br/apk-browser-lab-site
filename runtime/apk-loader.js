@@ -1,19 +1,19 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=deffd920e05b';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=deffd920e05b';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=deffd920e05b';
-import { inspectELF } from './native-inspector.js?v=deffd920e05b';
-import { elfBuildId } from './elf-build-id.js?v=deffd920e05b';
-import { inflateRaw } from './inflate.js?v=deffd920e05b';
-import { crc32, inflateEntry } from './zip-entry.js?v=deffd920e05b';
-import { resolveDevice } from './device-profile.js?v=deffd920e05b';
-import { resourceProfileFor } from './device-configuration.js?v=deffd920e05b';
-import { JniBridge } from './jni-host.js?v=deffd920e05b';
-import { providerForApk } from './native-provider-variants.js?v=deffd920e05b';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=deffd920e05b';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=deffd920e05b';
-import { AndroidResources } from './android-resources.js?v=deffd920e05b';
-import { AndroidPlatform } from './android-platform.js?v=deffd920e05b';
-import { FrameworkProvider } from './framework-provider.js?v=deffd920e05b';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=7d37d37a6ae5';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=7d37d37a6ae5';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=7d37d37a6ae5';
+import { inspectELF } from './native-inspector.js?v=7d37d37a6ae5';
+import { elfBuildId } from './elf-build-id.js?v=7d37d37a6ae5';
+import { inflateRaw } from './inflate.js?v=7d37d37a6ae5';
+import { crc32, inflateEntry } from './zip-entry.js?v=7d37d37a6ae5';
+import { resolveDevice } from './device-profile.js?v=7d37d37a6ae5';
+import { resourceProfileFor } from './device-configuration.js?v=7d37d37a6ae5';
+import { JniBridge } from './jni-host.js?v=7d37d37a6ae5';
+import { providerForApk } from './native-provider-variants.js?v=7d37d37a6ae5';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=7d37d37a6ae5';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=7d37d37a6ae5';
+import { AndroidResources } from './android-resources.js?v=7d37d37a6ae5';
+import { AndroidPlatform } from './android-platform.js?v=7d37d37a6ae5';
+import { FrameworkProvider } from './framework-provider.js?v=7d37d37a6ae5';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -162,7 +162,28 @@ export class APKArchive {
 /** Reads binary Android XML launcher declarations; no Android process or remote service. */
 // AOSP frameworks/base/core/res/res/values/public-final.xml (api 1-34) ids for the AndroidManifest attributes this loader reads.
 // Production bundles blank the attribute-name strings; Android's XmlBlock then resolves them from the RES_XML_RESOURCE_MAP chunk.
-const MANIFEST_ATTRIBUTE_IDS = new Map(Object.entries({ scheme: 0x01010027, host: 0x01010028, autoVerify: 0x010104ee, theme: 0x01010000, label: 0x01010001, icon: 0x01010002, name: 0x01010003, permission: 0x01010006, readPermission: 0x01010007, writePermission: 0x01010008, protectionLevel: 0x01010009, enabled: 0x0101000e, exported: 0x01010010, process: 0x01010011, authorities: 0x01010018, initOrder: 0x0101001a, multiprocess: 0x01010013, grantUriPermissions: 0x0101001b, launchMode: 0x0101001d, taskAffinity: 0x01010012, finishOnTaskLaunch: 0x01010014, clearTaskOnLaunch: 0x01010015, excludeFromRecents: 0x01010017, alwaysRetainTaskState: 0x01010203, allowTaskReparenting: 0x01010204, noHistory: 0x0101022d, documentLaunchMode: 0x01010445, autoRemoveFromRecents: 0x01010447, screenOrientation: 0x0101001e, configChanges: 0x0101001f, value: 0x01010024, resource: 0x01010025, targetActivity: 0x01010202, minSdkVersion: 0x0101020c, versionCode: 0x0101021b, versionName: 0x0101021c, windowSoftInputMode: 0x0101022b, targetSdkVersion: 0x01010270, maxSdkVersion: 0x01010271, allowBackup: 0x01010280, parentActivityName: 0x010103a7, appComponentFactory: 0x0101057a, extractNativeLibs: 0x010104ea, usesCleartextTraffic: 0x010104ec, enableOnBackInvokedCallback: 0x0101066c, networkSecurityConfig: 0x01010527, foregroundServiceType: 0x01010599 }).map(([name, id]) => [id, name]));
+const MANIFEST_ATTRIBUTE_IDS = new Map(Object.entries({ scheme: 0x01010027, host: 0x01010028, autoVerify: 0x010104ee, theme: 0x01010000, label: 0x01010001, icon: 0x01010002, name: 0x01010003, permission: 0x01010006, readPermission: 0x01010007, writePermission: 0x01010008, protectionLevel: 0x01010009, enabled: 0x0101000e, exported: 0x01010010, process: 0x01010011, authorities: 0x01010018, initOrder: 0x0101001a, multiprocess: 0x01010013, grantUriPermissions: 0x0101001b, launchMode: 0x0101001d, taskAffinity: 0x01010012, finishOnTaskLaunch: 0x01010014, clearTaskOnLaunch: 0x01010015, excludeFromRecents: 0x01010017, alwaysRetainTaskState: 0x01010203, allowTaskReparenting: 0x01010204, noHistory: 0x0101022d, documentLaunchMode: 0x01010445, autoRemoveFromRecents: 0x01010447, screenOrientation: 0x0101001e, configChanges: 0x0101001f, value: 0x01010024, resource: 0x01010025, targetActivity: 0x01010202, minSdkVersion: 0x0101020c, versionCode: 0x0101021b, versionName: 0x0101021c, windowSoftInputMode: 0x0101022b, targetSdkVersion: 0x01010270, maxSdkVersion: 0x01010271, allowBackup: 0x01010280, parentActivityName: 0x010103a7, appComponentFactory: 0x0101057a, extractNativeLibs: 0x010104ea, usesCleartextTraffic: 0x010104ec, enableOnBackInvokedCallback: 0x0101066c, networkSecurityConfig: 0x01010527, foregroundServiceType: 0x01010599,
+  // <intent-filter> and <data>: without these a bundle with blanked attribute names lost the port, the path rules, the MIME type and the priority of every filter
+  priority: 0x0101001c, mimeType: 0x01010026, port: 0x01010029, path: 0x0101002a, pathPrefix: 0x0101002b, pathPattern: 0x0101002c, pathSuffix: 0x0101061e, pathAdvancedPattern: 0x01010620 }).map(([name, id]) => [id, name]));
+export const MANIFEST_ATTRIBUTES = MANIFEST_ATTRIBUTE_IDS;   // id -> name (tests check every id against android.R.attr)
+const FILTER_DATA_ATTRIBUTES = ['scheme', 'host', 'port', 'path', 'pathPrefix', 'pathPattern', 'pathAdvancedPattern', 'pathSuffix', 'mimeType'];
+/**
+ * <data> attributes written as a reference (android:host="@string/link_host") are resolved from the app's resources, as the package parser does when it reads the filter
+ * (ParsedIntentInfoUtils: getNonConfigurationString). parseManifest keeps the reference (entry.refs) and a placeholder that matches nothing; this replaces it with the string.
+ * A reference that does not resolve to a string keeps the placeholder and is reported. `resolve(id)` -> { kind, value } (the resource table's resolve).
+ */
+export function resolveManifestReferences(manifest, resolve, warnings = []) {
+  for (const activity of manifest?.activities ?? []) for (const filter of activity.filters ?? []) for (const entry of filter.data ?? []) {
+    if (!entry.refs) continue;
+    for (const [key, id] of Object.entries(entry.refs)) {
+      let value = null; try { const resource = resolve(id); if (resource && ((resource.kind === 'string' && typeof resource.value === 'string') || (key === 'port' && resource.kind !== 'color' && Number.isInteger(resource.value)))) value = String(resource.value); } catch { value = null; }
+      if (value === null || value === '') { warnings.push(`Manifest: <data android:${key}> of ${activity.name} is resource 0x${id.toString(16)}, which is not a string; that filter matches no ${key}`); continue; }
+      entry[key] = value; delete entry.refs[key];
+    }
+    if (!Object.keys(entry.refs).length) delete entry.refs;
+  }
+  return manifest;
+}
 export function parseManifest(data) {
   const b = new BinaryReader(data);
   let resourceMap = null;
@@ -252,7 +273,16 @@ export function parseManifest(data) {
       const filter = [...stack].reverse().find(n => n.filter)?.filter;
       if (name === 'action' && filter && typeof attrs.name === 'string') filter.record.actions.push(attrs.name);
       if (name === 'category' && filter && typeof attrs.name === 'string') filter.record.categories.push(attrs.name);
-      if (name === 'data' && filter) { const entry = {}; for (const key of ['scheme', 'host', 'port', 'path', 'pathPrefix', 'pathPattern', 'pathAdvancedPattern', 'pathSuffix', 'mimeType']) if (attrs[key] !== undefined && attrs[key] !== null && attrs[key] !== '') entry[key] = typeof attrs[key] === 'string' ? attrs[key] : String(attrs[key]); filter.record.data.push(entry); }
+      if (name === 'data' && filter) {
+        const entry = {};
+        for (const key of FILTER_DATA_ATTRIBUTES) {
+          if (attrs[key] === undefined || attrs[key] === null || attrs[key] === '') continue;
+          if (typeof attrs[key] === 'string') entry[key] = attrs[key];
+          else if (attrTypes[key] === 1 || attrTypes[key] === 2) { (entry.refs ??= {})[key] = attrs[key] >>> 0; entry[key] = `@0x${(attrs[key] >>> 0).toString(16)}`; }   // a reference: resolved once the resources are read (resolveManifestReferences)
+          else entry[key] = String(attrs[key]);
+        }
+        filter.record.data.push(entry);
+      }
       if (name === 'action' && filter && attrs.name === 'android.intent.action.MAIN') filter.main = true;
       if (name === 'action' && filter && attrs.name === 'android.intent.action.VIEW') filter.view = true;
       if (name === 'category' && filter && attrs.name === 'android.intent.category.BROWSABLE') filter.browsable = true;
@@ -667,6 +697,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   if(skia&&(typeof skia.createHost!=='function'||typeof skia.rasterizeCanvas!=='function'))fail('Invalid official Skia provider result');
   // the resources prepared since the manifest was read (above): their progress reports and warnings take their place here, in their order, and so do their errors
   const { frameworkResources, resourceConfiguration, resources } = await resourcesReady.release();
+  if (typeof resources?.environment?.resolve === 'function') resolveManifestReferences(manifest, id => resources.environment.resolve(id), warnings);   // android:scheme / host / path written as @string/...
   let icuBreakBackend=options.icuBreakBackend??null;
   // A companion package's code (options.companionPackages, the microG option) is not scanned at load: it may need any of the lazily chosen backends below, so with one installed
   // every one of them is prepared (a device with the app alone decides by the app's types, as before).

@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=deffd920e05b';
-import { floatBits } from './host-contract.js?v=deffd920e05b';
-import { getSolidPaint } from './paint-host.js?v=deffd920e05b';
-import { premultiply, unpremultiply } from './image-codecs.js?v=deffd920e05b';
+import { APKError } from './apk-error.js?v=7d37d37a6ae5';
+import { floatBits } from './host-contract.js?v=7d37d37a6ae5';
+import { getSolidPaint } from './paint-host.js?v=7d37d37a6ae5';
+import { premultiply, unpremultiply } from './image-codecs.js?v=7d37d37a6ae5';
 
 // The public android.graphics.Bitmap API (API 33) over the Skia-backed bitmap model of bitmap-host.js: construction (createBitmap overloads, createScaledBitmap, copy, extractAlpha), pixel access
 // (getPixel(s)/setPixel(s)/getColor/copyPixelsTo|FromBuffer/eraseColor), reconfiguration, density, color space and compress(). Validation, messages and exceptions follow Bitmap.java / Bitmap.cpp of
@@ -147,7 +147,7 @@ export function createBitmapOps(registry, { bitmaps, CK, vcall }) {
   const extractAlpha = (r, self, paint, offsetXY) => {
     const s = live(r, self, "Can't extractAlpha on a recycled bitmap"), h = host(r);
     if (offsetXY !== null && r.array(offsetXY).elements.length < 2) iae(r, 'offsetXY must be null or have at least 2 elements');
-    if (paint !== null) getSolidPaint(r, paint);   // a Paint with a MaskFilter (blur) would change the mask and its offset: refused by the Paint snapshot, never ignored
+    if (paint !== null && getSolidPaint(r, paint).maskFilter) throw new Error('Bitmap.extractAlpha with a Paint that carries a BlurMaskFilter is not implemented (the blur changes the mask and its offset)');   // refused, never ignored
     const { straight } = h.read(s), n = s.width * s.height, bytes = new Uint8Array(n * 4);
     for (let i = 0; i < n; i++) bytes[i * 4 + 3] = straight[i * 4 + 3];
     const dest = h.create(s.width, s.height, configRef(r, 'ALPHA_8'), true, null, { mutable: true });

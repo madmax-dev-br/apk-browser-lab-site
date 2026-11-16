@@ -1,49 +1,51 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=deffd920e05b';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=deffd920e05b';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=deffd920e05b';
-import { initCollapsibleSections } from './panel-sections.js?v=deffd920e05b';
-import { warmupLabel } from './warmup.js?v=deffd920e05b';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=deffd920e05b';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=deffd920e05b';
-import { initHelpTips } from './help-tips.js?v=deffd920e05b';
-import { createToolDock } from './tool-dock.js?v=deffd920e05b';
-import { createPermissionsPanel } from './permissions-panel.js?v=deffd920e05b';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=deffd920e05b';
-import { createAppDataPanel } from './app-data-panel.js?v=deffd920e05b';
-import { createCameraLab } from './camera-lab.js?v=deffd920e05b';
-import { createOverridesPanel } from './overrides-panel.js?v=deffd920e05b';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=deffd920e05b';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=deffd920e05b';
-import { createHostMapPanel } from './host-map-panel.js?v=deffd920e05b';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=deffd920e05b';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=deffd920e05b';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=deffd920e05b';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=deffd920e05b';
-import { createDeviceView, createViewState } from './device-view.js?v=deffd920e05b';
-import { createTaskSwitcher } from './task-switcher.js?v=deffd920e05b';
-import { createDeviceZoom } from './device-zoom.js?v=deffd920e05b';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=deffd920e05b';
-import { formatApiGapReport } from './api-gap-scan.js?v=deffd920e05b';
-import { createLogcatPanel } from './logcat-panel.js?v=deffd920e05b';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=deffd920e05b';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=deffd920e05b';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=deffd920e05b';
-import { captureImage, paintScreen } from './screen-capture.js?v=deffd920e05b';
-import { createScreenRecorder } from './screen-recorder.js?v=deffd920e05b';
-import { createPluginsPanel } from './plugins-panel.js?v=deffd920e05b';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=deffd920e05b';
-import { createAdb } from './adb-commands.js?v=deffd920e05b';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=deffd920e05b';
-import { createModalHost } from './lab-modal.js?v=deffd920e05b';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=deffd920e05b';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=deffd920e05b';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=deffd920e05b';
-import { createDragLayer } from './lab-drag.js?v=deffd920e05b';
-import { createLabScroll } from './lab-scroll.js?v=deffd920e05b';
-import { createGlSurfaces } from './gl-surfaces.js?v=deffd920e05b';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=deffd920e05b';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=deffd920e05b';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=deffd920e05b';
+import { APKWorkerClient } from './apk-worker-client.js?v=7d37d37a6ae5';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=7d37d37a6ae5';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=7d37d37a6ae5';
+import { initCollapsibleSections } from './panel-sections.js?v=7d37d37a6ae5';
+import { warmupLabel } from './warmup.js?v=7d37d37a6ae5';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=7d37d37a6ae5';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=7d37d37a6ae5';
+import { initHelpTips } from './help-tips.js?v=7d37d37a6ae5';
+import { createToolDock } from './tool-dock.js?v=7d37d37a6ae5';
+import { createPermissionsPanel } from './permissions-panel.js?v=7d37d37a6ae5';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=7d37d37a6ae5';
+import { createAppDataPanel } from './app-data-panel.js?v=7d37d37a6ae5';
+import { createCameraLab } from './camera-lab.js?v=7d37d37a6ae5';
+import { createOverridesPanel } from './overrides-panel.js?v=7d37d37a6ae5';
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=7d37d37a6ae5';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=7d37d37a6ae5';
+import { createHostMapPanel } from './host-map-panel.js?v=7d37d37a6ae5';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=7d37d37a6ae5';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=7d37d37a6ae5';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=7d37d37a6ae5';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=7d37d37a6ae5';
+import { createDeviceView, createViewState } from './device-view.js?v=7d37d37a6ae5';
+import { createTaskSwitcher } from './task-switcher.js?v=7d37d37a6ae5';
+import { createDeviceZoom } from './device-zoom.js?v=7d37d37a6ae5';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=7d37d37a6ae5';
+import { formatApiGapReport } from './api-gap-scan.js?v=7d37d37a6ae5';
+import { createLogcatPanel } from './logcat-panel.js?v=7d37d37a6ae5';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=7d37d37a6ae5';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=7d37d37a6ae5';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=7d37d37a6ae5';
+import { captureImage, paintScreen } from './screen-capture.js?v=7d37d37a6ae5';
+import { createScreenRecorder } from './screen-recorder.js?v=7d37d37a6ae5';
+import { createPluginsPanel } from './plugins-panel.js?v=7d37d37a6ae5';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=7d37d37a6ae5';
+import { createAdb } from './adb-commands.js?v=7d37d37a6ae5';
+import { createAdbTerminal } from './adb-terminal.js?v=7d37d37a6ae5';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=7d37d37a6ae5';
+import { createModalHost } from './lab-modal.js?v=7d37d37a6ae5';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=7d37d37a6ae5';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=7d37d37a6ae5';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=7d37d37a6ae5';
+import { createDragLayer } from './lab-drag.js?v=7d37d37a6ae5';
+import { createLabScroll } from './lab-scroll.js?v=7d37d37a6ae5';
+import { createGlSurfaces } from './gl-surfaces.js?v=7d37d37a6ae5';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=7d37d37a6ae5';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=7d37d37a6ae5';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=7d37d37a6ae5';
+import { resolveIntentFields } from './intent-resolver.js?v=7d37d37a6ae5';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -53,6 +55,9 @@ function describeSavedApp() {
   if (!apkShelf || !state.shelfId || !info || known.inventory !== state.inventory || !(info.label || info.icon)) return;
   apkShelf.describe(state.shelfId, { label: info.label ?? null, icon: info.icon ?? null }).then(refreshShelf).catch(() => {});
 }
+/** The Activities of a manifest that answer Intents (those with filters), as the home screen keeps them for each installed app: what a deep link is resolved against while the
+ *  app is not the one in the VM. */
+const intentActivities = inventory => (inventory?.activities ?? []).filter(activity => activity.filters?.length).map(activity => ({ name: activity.name, enabled: activity.enabled ?? null, filters: activity.filters }));
 async function refreshShelf() { if (!apkShelf) return; try { taskSwitcher?.setShelf(await apkShelf.list(), state.shelfId ?? null); } catch (error) { appendTrace(`Tela inicial: ${error?.message ?? error}`); } }
 async function openSavedApp(id) {
   if (!apkShelf) return;   // another app while one loads or runs: importSource ends the current VM first
@@ -336,6 +341,11 @@ const modalHost = createModalHost();   // src/lab-modal.js: plugin screens (lab.
 const pluginModals = new Map();   // modal id -> { modal, pluginId }
 /** What a plugin may do with the lab (src/plugin-host.js ACTION_METHODS): the page's own controls, which show in Controles and in the Logcat like the user's. */
 const pluginActions = {
+  /** lab.adb: an adb command line run by the page's interpreter, as the adb terminal runs it (no files of the computer: a plugin runs in a sandboxed Worker). */
+  async adb(plugin, { command = null, args = null } = {}) {
+    const result = await runAdb(`plugin ${plugin.name}`, Array.isArray(args) && args.length ? { args } : { command: String(command ?? '') });
+    return { stdout: result.stdout, stderr: result.stderr, code: result.code, notes: result.notes ?? [], images: (result.images ?? []).map(image => ({ blob: image.blob, type: image.type })) };
+  },
   async reload(plugin, { mode }) {
     if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('Nenhum app rodando para recarregar.'), { code: 'no-apk' });
     await reloadActivity(mode === 'reopen' ? 'reopen' : 'recreate'); const screen = await pluginHost.query('screen', {}).catch(() => null);
@@ -624,7 +634,7 @@ async function importSource(source, autoRun = false) {
     await permissionsPanel.attach(result.inventory); await filesPanel.attach(); cameraLab.attach(); await overridesPanel.attach(result.inventory); await ignoredPanel.attach(result.inventory); await mocksPanel.attach(result.inventory); pluginHost.vmChanged(); if (logcatPanelOpen || pluginHost.wantsLogs) syncLogcatStreaming(true).catch(() => {});   // before any app code runs: permission state, simulated location, method return overrides, ignored Activities, endpoint mocks
     showInventory(result.inventory); showDeviceHome('installed');
     if (source.file && apkShelf) {   // an APK from a file is kept on the home screen (one entry per package: a new build replaces the old one); a hosted example is not
-      try { const saved = await apkShelf.save({ name: source.name, packageName: result.inventory.packageName || null, blob: source.file, handle: source.handle ?? null, previousId: source.shelfId ?? null }); state.shelfId = saved.id; source.shelfId = saved.id; describeSavedApp(); navigator.storage?.persist?.().catch(() => {}); }
+      try { const saved = await apkShelf.save({ name: source.name, packageName: result.inventory.packageName || null, blob: source.file, handle: source.handle ?? null, previousId: source.shelfId ?? null }); state.shelfId = saved.id; source.shelfId = saved.id; describeSavedApp(); apkShelf.describe(saved.id, { activities: intentActivities(result.inventory) }).catch(() => {}); navigator.storage?.persist?.().catch(() => {}); }
       catch (error) { appendTrace(`Tela inicial: não foi possível guardar o APK (${error?.message ?? error})`); }
       await refreshShelf();
     }
@@ -811,8 +821,10 @@ const mcpControls = {
     return { closed: !state.apkRunning, ...mcpAppState() };
   },
   async openLink({ link = '', action = '', component = '' } = {}) {
-    await waitIdle(); $('deeplink-input').value = link; if (action) $('deeplink-action').value = action; $('deeplink-component').value = component;
-    await openDeepLink(); await waitIdle(); const note = $('deeplink-result'); return { state: note?.dataset.state ?? null, message: note?.textContent ?? '' };
+    const request = buildDeepLinkRequest({ link, action: action || undefined, component }), packageName = request.component?.includes('/') ? request.component.split('/')[0] : null;
+    if (packageName) { const note = await adbDevice.ensureLoaded(packageName); if (note) appendTrace(note); }
+    const outcome = await adbDevice.startIntent(request, { packageName }); await waitIdle(); const result = describeDeepLink(outcome);
+    return { state: result.state, message: result.message, ...(result.detail ? { detail: result.detail } : {}), packageName: outcome.packageName ?? null, ...(outcome.notes?.length ? { notes: outcome.notes } : {}) };
   },
   hostRedirects(rules = null) {
     if (Array.isArray(rules)) applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, network: { ...deviceState.settings.network, hostMap: rules } }));
@@ -881,12 +893,35 @@ const adbDevice = {
   },
   async openApp() { const result = await mcpControls.openApp({}); return { opened: !!result.opened, error: result.error ?? (result.cannotRun ? result.cannotRun.join('; ') : null) }; },
   async closeApp() { return mcpControls.closeApp({}); },
-  async startIntent(intent) {
-    await waitIdle(); if (!state.runtime && state.currentSource) { await importSource(state.currentSource); await waitIdle(); }
-    if (!state.runtime) throw adbFail('Nenhum app carregado: o Intent é resolvido pelos filtros do manifesto do app.');
+  /** Which installed app answers an implicit Intent: the app in the VM first, then the others by their kept filters (most recently opened first), as resolveActivity would
+   *  over the installed packages. -> { packageName | null (none answers), others: [packages that also answer], unknown: [packages installed before their filters were kept] } */
+  async intentHandler(intent) {
+    const fields = { action: intent.action ?? null, data: intent.data ?? null, type: intent.type ?? null, categories: intent.category ?? [] }, answers = manifest => resolveIntentFields(manifest, fields).matches.length > 0;
+    const current = state.inventory?.packageName && state.currentSource ? state.inventory.packageName : null, handlers = [], unknown = [];
+    if (current && answers(state.inventory)) handlers.push(current);
+    const entries = (apkShelf ? await apkShelf.manifests() : []).sort((a, b) => b.openedAt - a.openedAt), known = new Set(entries.filter(entry => entry.activities).map(entry => entry.packageName));
+    for (const entry of entries) {
+      if (!entry.packageName || entry.packageName === current || handlers.includes(entry.packageName)) continue;
+      if (!entry.activities) { if (!known.has(entry.packageName) && !unknown.includes(entry.packageName)) unknown.push(entry.packageName); continue; }   // another file of the same package may carry the filters
+      if (answers({ packageName: entry.packageName, activities: entry.activities })) handlers.push(entry.packageName);
+    }
+    return { packageName: handlers[0] ?? null, others: handlers.slice(1), unknown };
+  },
+  /** Starts an Activity from an Intent, as `am start`: an explicit component or package names its app; an implicit Intent goes to the installed app whose filters answer it. That
+   *  app is loaded when it is not the one in the VM (one app at a time) and the Intent starts it; an app already running receives it as a new start from the system. */
+  async startIntent(intent, { packageName = null } = {}) {
+    await waitIdle(); const notes = [];
+    if (!packageName && !intent.component) {
+      const handler = await this.intentHandler(intent);
+      if (handler.packageName && handler.packageName !== state.inventory?.packageName) { const note = await this.ensureLoaded(handler.packageName); if (note) notes.push(note); }
+      if (handler.others.length) notes.push(`Outros apps instalados também atendem este Intent: ${handler.others.join(', ')} (num aparelho o sistema mostraria a escolha).`);
+      if (!handler.packageName && handler.unknown.length) notes.push(`Apps instalados antes de o lab guardar os filtros do manifesto não entraram na busca: ${handler.unknown.join(', ')}. Abra cada um uma vez para registrá-los.`);
+    }
+    if (!state.runtime && state.currentSource) { await importSource(state.currentSource); await waitIdle(); }
+    if (!state.runtime) throw adbFail(`Nenhum app instalado atende este Intent.${notes.length ? ' ' + notes.join(' ') : ' Instale o app (adb install) ou diga o componente (-n pacote/.Activity).'}`);
     await flushPendingInputs(); switchMode('apk'); hideError(); state.lastAPKError = null; state.stickyError = false;
-    const token = beginOperation('Abrindo Intent (adb)…'); state.runStartedAt = Date.now();
-    try { const { deepLink, snapshot } = await state.runtime.startIntent(intent, { onProgress: onWorkerProgress }); if (token === state.operation) { if (deepLink?.ok && deepLink.launched) state.launchAttempted = true; if (snapshot) renderSnapshot(snapshot); } return deepLink; }
+    const token = beginOperation('Abrindo Intent…'); state.runStartedAt = Date.now();
+    try { const { deepLink, snapshot } = await state.runtime.startIntent(intent, { onProgress: onWorkerProgress }); if (token === state.operation) { if (deepLink?.ok && deepLink.launched) state.launchAttempted = true; if (snapshot) renderSnapshot(snapshot); } return { ...deepLink, packageName: state.inventory?.packageName ?? null, notes }; }
     catch (error) { if (token === state.operation && error?.name !== 'TypeError') reportAPKError(error, 'Não foi possível abrir o Intent', { crash: true }); throw error; }
     finally { finishOperation(token); }
   },
@@ -962,7 +997,10 @@ mcpControls.recordScreen = {
   status: () => screenRecorder.status(), discard: () => screenRecorder.discard(),
 };
 const adbInterpreter = createAdb(adbDevice);
-mcpControls.adb = (input, io) => { appendTrace(`adb (MCP): ${typeof input.command === 'string' ? input.command : (input.args ?? []).join(' ')}`.slice(0, 400)); return adbInterpreter.run(input, io); };
+mcpControls.adb = (input, io) => runAdb('MCP', input, io);
+// The adb terminal of the tool dock and lab.adb of the plugins run the same interpreter; every command is written to the execution log with who ran it
+const runAdb = (who, input, io) => { appendTrace(`adb (${who}): ${typeof input.command === 'string' ? input.command : (input.args ?? []).join(' ')}`.slice(0, 400)); return adbInterpreter.run(input, io); };
+if ($('adb-terminal')?.querySelector?.('.adb-output')) window.apkLabTerminal = createAdbTerminal({ root: $('adb-terminal'), run: (command, io) => runAdb('terminal', { command }, io) });
 window.apkLabAdb = adbInterpreter;   // test and console access: await apkLabAdb.run({ command: 'adb shell wm size' })
 const mcpTools = createMcpTools({ controls: mcpControls, input: mcpInput, actions: { mock: spec => pluginActions.mock(mcpCaller, spec), unmock: id => pluginActions.unmock(mcpCaller, { id }), mocks: () => pluginActions.mocks(mcpCaller), reload: mode => pluginActions.reload(mcpCaller, { mode }) }, query: (method, args) => pluginHost.query(method, args), plugins: () => pluginHost.list?.() ?? [], clickButton: (id, button) => pluginHost.clickButton(id, button, { by: 'mcp' }), logcat: () => logcatPanel.store.entries, network: () => netlogPanel.store.entries,
   status: () => ({ running: !!apkVM.worker, packageName: state.inventory?.packageName ?? null, file: state.fileName ?? null }) });
@@ -1016,6 +1054,7 @@ const toolDock = createToolDock({ root: $('tool-dock'), tools: [
   { id: 'trace', label: 'Log de execução', icon: '☰', details: $('trace'), count: $('trace-count') },
   { id: 'logcat', label: 'Logcat', icon: '▤', details: $('logcat'), count: $('logcat')?.querySelector?.('.logcat-count') },
   { id: 'netlog', label: 'Rede', icon: '⇅', details: $('netlog'), count: $('netlog')?.querySelector?.('.netlog-count') },
+  { id: 'terminal', label: 'Terminal', icon: '❯', details: $('adb-terminal'), count: $('adb-terminal')?.querySelector?.('.adb-count') },   // the adb terminal (src/adb-terminal.js): adb command lines typed by the person
   { id: 'examples', label: 'Exemplos', icon: '▤', details: $('scenario-catalog'), count: $('catalog-count') },   // the bundled test APKs: a dock tab, so the page itself does not scroll
   { id: 'compose', label: 'Compose', icon: '◫', details: $('compose-inspector'), count: $('compose-inspector')?.querySelector?.('.ci-count') },
   { id: 'plugins', label: 'Plugins', icon: '⧉', details: $('plugins-output'), count: $('plugins-output')?.querySelector?.('.po-count') },
@@ -1182,49 +1221,6 @@ function initDevicePanel() {
   $('device-reset').addEventListener('click', () => { applyDeviceSettings(defaultDeviceSettings()); hostMapPanel.refresh(); permissionsPanel.refreshLocation(); if (apkVM.worker) apkVM.setPermissions({ location: deviceState.settings.location }).catch(() => {}); });
 }
 // ---- "Abrir": a deep link / Intent resolved against the manifest's intent filters (src/deep-link-host.js) ----
-const deepLinkPanel = { history: [], busy: false };
-function showDeepLinkResult(state, message, detail = '') {
-  const note = $('deeplink-result'); note.dataset.state = state; note.textContent = message;
-  if (detail) { const small = document.createElement('small'); small.textContent = detail; note.append(small); }
-}
-function renderDeepLinkHistory() {
-  const list = $('deeplink-history-list'), items = deepLinkPanel.history;
-  $('deeplink-history').hidden = !items.length;
-  list.replaceChildren(...items.map((entry) => {
-    const item = document.createElement('li'), button = document.createElement('button');
-    button.type = 'button'; button.textContent = historyLabel(entry); button.title = historyLabel(entry);
-    button.addEventListener('click', () => { $('deeplink-input').value = entry.link; $('deeplink-component').value = entry.component; $('deeplink-action').value = entry.action; $('deeplink-input').focus(); });
-    item.append(button); return item;
-  }));
-}
-async function openDeepLink() {
-  if (deepLinkPanel.busy) return;
-  let request;
-  try { request = buildDeepLinkRequest({ link: $('deeplink-input').value, action: $('deeplink-action').value, component: $('deeplink-component').value }); }
-  catch (error) { showDeepLinkResult('error', error.message); return; }
-  if (!state.runtime || state.busy) { showDeepLinkResult('error', state.runtime ? 'A VM está ocupada; tente de novo em instantes.' : 'Abra um APK primeiro: o link é resolvido pelos filtros do manifesto dele.'); return; }
-  deepLinkPanel.busy = true; $('deeplink-open').disabled = true;
-  try {
-    await flushPendingInputs(); switchMode('apk'); hideError(); state.lastAPKError = null; state.stickyError = false;
-    const token = beginOperation('Abrindo link…'); state.runStartedAt = Date.now();
-    try {
-      const { deepLink, snapshot } = await state.runtime.startIntent(request, { onProgress: onWorkerProgress });
-      if (token === state.operation) {
-        if (deepLink?.ok && deepLink.launched) state.launchAttempted = true;
-        if (snapshot) renderSnapshot(snapshot);
-        const result = describeDeepLink(deepLink); showDeepLinkResult(result.state, result.message, result.detail);
-        deepLinkPanel.history = addToHistory(deepLinkPanel.history, { link: $('deeplink-input').value, action: $('deeplink-action').value, component: $('deeplink-component').value });
-        saveHistory(deepLinkPanel.history); renderDeepLinkHistory();
-      }
-    } catch (error) { if (token === state.operation) { showDeepLinkResult('error', 'A Activity encontrada não pôde ser iniciada: ' + (error?.message || error)); reportAPKError(error, 'Não foi possível abrir o link', { crash: true }); } }
-    finally { finishOperation(token); }
-  } finally { deepLinkPanel.busy = false; $('deeplink-open').disabled = false; }
-}
-function initDeepLinkPanel() {
-  deepLinkPanel.history = loadHistory(); renderDeepLinkHistory();
-  $('deeplink-form').addEventListener('submit', (event) => { event.preventDefault(); openDeepLink(); });
-  $('deeplink-history-clear').addEventListener('click', () => { deepLinkPanel.history = []; saveHistory([]); renderDeepLinkHistory(); });
-}
 async function runAPK() {
   if (!(state.runtime || (state.needsRestart && state.currentSource)) || state.busy || state.runStarting) return;
   if (state.inventory?.unsupportedFeatures?.length) { switchMode('apk'); showDeviceHome('installed'); showError(new Error(`Este APK ainda não pode ser executado: ${state.inventory.unsupportedFeatures.join('; ')}`), 'Limite de arquivo'); return; }   // the launcher icon of an APK the lab cannot run says why
@@ -1388,4 +1384,3 @@ notifyParent('apk-lab-ready');
 if (params.get('demo') === '1') catalogReady.then(() => runDemo());   // after the catalog check: a site without APKs has no demo
 initDevicePanel();
 initCollapsibleSections($('control-panel')); initHelpTips($('control-panel'));   // all sections collapsed; long explanations behind "?" icons (src/help-tips.js)
-initDeepLinkPanel();

@@ -38,7 +38,7 @@ Interfaces em Jetpack Compose e em Views/XML, Fragments, navegação entre telas
 
 ### Um aparelho que você controla
 
-Tamanho de tela, orientação, tema claro ou escuro, idioma e região, fuso, escala de fonte, bateria e rede (online, dados móveis, offline). As permissões de execução do app são suas para conceder ou negar, e os links profundos abrem como num `am start`.
+Tamanho de tela, orientação, tema claro ou escuro, idioma e região, fuso, escala de fonte, bateria e rede (online, dados móveis, offline). As permissões de execução do app são suas para conceder ou negar. Um **terminal de adb** na própria página aceita os comandos que você usa num emulador, e um link profundo aberto com `am start` vai para o app instalado que o atende.
 
 ### Ver o app por dentro
 

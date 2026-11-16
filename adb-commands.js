@@ -7,9 +7,9 @@
 // createAdb(device).run({ command | args }, io) -> { stdout, stderr, code, images: [{ blob, type }], notes: [] }
 //   io.localFile(path) -> File of the machine that runs the bridge (adb install / push); io.writeLocal(path, blob, { append }) writes one there (adb pull, `> file`).
 // The command-line syntax (quotes, | grep, &&, >) is src/adb-shell.js. No process.*.
-import { AdbError, unsupported, usage, parseLine, runList, FILTERS } from './adb-shell.js?v=deffd920e05b';
-import { formatThreadtime } from './logcat.js?v=deffd920e05b';
-import { kindOf, directoryOf } from './shared-storage.js?v=deffd920e05b';
+import { AdbError, unsupported, usage, parseLine, runList, FILTERS } from './adb-shell.js?v=7d37d37a6ae5';
+import { formatThreadtime } from './logcat.js?v=7d37d37a6ae5';
+import { kindOf, directoryOf } from './shared-storage.js?v=7d37d37a6ae5';
 
 export const SERIAL = 'apkweb-lab';
 const SHARED_ROOT = '/storage/emulated/0', SHARED_ALIASES = ['/sdcard', '/mnt/sdcard', '/storage/self/primary'];
@@ -174,7 +174,7 @@ const BUILD_PROPS = [['ro.product.model', 'MODEL'], ['ro.product.manufacturer', 
  * The interpreter over a device facade (src/app.js adbDevice; tests pass a fake). Every method of the facade does what the page's own control does:
  *   info() -> { packageName, running, loaded, activity, tasks: [{ id, activityStack }], dialogs, background, widthPx, heightPx, densityDpi, inventory: { packageName, versionName, versionCode, minSdk, targetSdk, requestedPermissions } | null }
  *   packages() -> [{ packageName, system }]; install(file, { grant }); uninstall(packageName, { keepData }) -> boolean; clearData(packageName); ensureLoaded(packageName) -> note | null
- *   openApp(packageName | null) -> { opened, error }; closeApp(); startIntent(intent) -> deepLink; waitReady(ms) -> { ready, activity }
+ *   openApp(packageName | null) -> { opened, error }; closeApp(); startIntent(intent, { packageName }) -> deepLink + { notes } (an implicit Intent: the installed app that answers it); waitReady(ms) -> { ready, activity }
  *   permissions() -> [{ name, state, granted }]; setPermission(name, state)
  *   tap(x, y) -> via; swipe(x1, y1, x2, y2, ms) -> via; text(text) -> via; key(code) -> via; keyCode(name) -> number | null; nav('back' | 'home' | 'recents')
  *   screenshot() -> { blob }; snapshot() -> page snapshot; resourceNames(ids) -> Map; logcat() -> entries; clearLogcat()
@@ -214,19 +214,22 @@ export function createAdb(device, { sleep = ms => new Promise(resolve => setTime
       if (sub === 'start' || sub === 'start-activity') {
         const { intent, packageName, wait, stopFirst } = parseIntentArgs(rest), started = now();
         if (packageName) { await requirePackage(packageName, 'am start').catch(() => { throw new AdbError(`Error: Activity class {${intent.component ?? packageName}} does not exist. (o pacote ${packageName} não está instalado)`); }); await load(packageName, env.notes); }
-        const before = await current(); if (!before.loaded) throw new AdbError('Error: Activity not started: nenhum app carregado no aparelho. Instale com adb install ou diga o pacote (-n pacote/.Activity).');
+        const before = await current();
         if (stopFirst && before.running) await device.closeApp();
         const bare = !intent.component && !intent.data && !intent.type && Object.keys(intent.extras).length === 0;
         const launcherOnly = bare && intent.action === 'android.intent.action.MAIN' && intent.category.length === 1 && intent.category[0] === 'android.intent.category.LAUNCHER';
         if (bare && !intent.action) { if (!packageName) throw usage('am start: diga o que iniciar (-n pacote/.Activity, -a ação, -d uri)'); throw new AdbError(`Starting: Intent { pkg=${packageName} }\nError: Activity not started, unable to resolve Intent { pkg=${packageName} } (um pacote sozinho não diz qual Activity; para abrir o app: am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p ${packageName}, ou monkey -p ${packageName} 1)`); }
         let text, activity, cold;
         if (launcherOnly) {   // the launcher Intent of the package: what the tap on its icon sends
+          if (!before.loaded) throw new AdbError('Error: Activity not started: nenhum app carregado no aparelho. Instale com adb install ou diga o pacote (-p pacote).');
           cold = !before.running; const opened = await device.openApp(null);
           text = `Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] pkg=${before.packageName} }\n`;
           if (!opened.opened) throw new AdbError(`${text}Error: Activity not started: ${opened.error ?? 'o app não abriu'}`);
           activity = (await current()).activity;
         } else {
-          const outcome = await device.startIntent({ ...intent, category: intent.category.length ? intent.category : undefined, extras: Object.keys(intent.extras).length ? intent.extras : undefined });
+          // an implicit Intent (a deep link) goes to the installed app whose filters answer it: the device loads that app when it is not the one in the VM
+          const outcome = await device.startIntent({ ...intent, category: intent.category.length ? intent.category : undefined, extras: Object.keys(intent.extras).length ? intent.extras : undefined }, { packageName });
+          for (const note of outcome?.notes ?? []) env.notes.push(note);
           text = `Starting: ${outcome?.intent ?? 'Intent'}\n`;
           if (!outcome?.ok) { if (outcome?.error) env.notes.push(outcome.error); throw new AdbError(`${text}Error: Activity not started, unable to resolve ${outcome?.intent ?? 'Intent'}`); }
           if (outcome.alternatives?.length) env.notes.push(`Mais de uma Activity atende este Intent; o lab abriu ${outcome.activity} (num aparelho o sistema mostraria a escolha). Outras: ${outcome.alternatives.map(item => item.activity).join(', ')}.`);

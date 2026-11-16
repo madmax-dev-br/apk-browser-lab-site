@@ -6,8 +6,8 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=deffd920e05b">
-  <link rel="stylesheet" href="./lab-tokens.css?v=deffd920e05b">
+  <link rel="stylesheet" href="./site-pages.css?v=7d37d37a6ae5">
+  <link rel="stylesheet" href="./lab-tokens.css?v=7d37d37a6ae5">
 </head>
 <body>
   <header class="topbar">
@@ -242,6 +242,7 @@
               <li><a href="#api-reload"><code>reload</code></a></li>
               <li><a href="#api-mock"><code>mock</code></a></li>
               <li><a href="#api-unmock"><code>unmock</code>, <code>mocks</code></a></li>
+              <li><a href="#api-adb"><code>adb</code></a></li>
               <li><a href="#api-modal-open"><code>modal.open</code></a></li>
               <li><a href="#api-modal-handle"><code>m.update</code>, <code>m.post</code>…</a></li>
               <li><a href="#api-dataurl"><code>dataUrl</code></a></li>
@@ -603,6 +604,16 @@
         <div class="api" id="api-unmock">
           <h4 class="api-sig"><code>await lab.unmock(id)</code><code>await lab.mocks()</code></h4>
           <p>Remove um mock; lista os mocks do pacote com as respostas dadas.</p>
+        </div>
+
+        <div class="api" id="api-adb">
+          <h4 class="api-sig"><code>const r = await lab.adb('adb shell input tap 200 400')</code></h4>
+          <p>Roda uma linha de comando do <code>adb</code> no aparelho do lab, pelo mesmo interpretador do <b>Terminal</b> da barra de ferramentas e da ferramenta <a href="#mcp-adb"><code>adb</code> do MCP</a>. O <code>adb</code> inicial é opcional; um array passa as palavras já separadas: <code>lab.adb(['shell', 'input', 'text', 'olá mundo'])</code>.</p>
+          <dl class="facts">
+            <div><dt>Devolve</dt><dd><code class="shape">{ stdout, stderr, code, notes, images: [{ blob, type }] }</code> Um comando que falha ou que a página não alcança não lança erro: volta com <code>code</code> diferente de 0 (127 para o que não está implementado) e o motivo em <code>stderr</code>. <code>notes</code> diz por qual caminho a página atendeu. <code>screencap -p</code> traz a imagem em <code>images</code>.</dd></div>
+            <div><dt>Arquivos</dt><dd>Um plugin não tem acesso aos arquivos do computador: <code>adb install</code>, <code>push</code>, <code>pull</code> e <code>&gt; arquivo</code> respondem isso.</dd></div>
+            <div><dt>Exemplo</dt><dd><code>await lab.adb('shell am start -a android.intent.action.VIEW -d meuapp://item/42')</code> abre um link no app instalado que o atende.</dd></div>
+          </dl>
         </div>
 
         <div class="api" id="api-modal-open">
@@ -1095,7 +1106,7 @@ url = "http://127.0.0.1:8790/mcp/&lt;o token da página&gt;"</code></pre></div>
 
         <div class="api" id="mcp-adb">
           <h4 class="api-sig names"><code>adb</code></h4>
-          <p>Roda uma linha de comando do <code>adb</code> contra o aparelho do lab, para reaproveitar os comandos que você usa num emulador. Não é o adb: é um interpretador que faz, pelos caminhos da própria página, o que cada comando faz num aparelho. Passe <code>command</code> (a linha, como num terminal; o <code>adb</code> inicial é opcional) ou <code>args</code> (as palavras de um comando). <code>adb help</code> lista o que há.</p>
+          <p>Roda uma linha de comando do <code>adb</code> contra o aparelho do lab, para reaproveitar os comandos que você usa num emulador. Os mesmos comandos podem ser digitados na página, no <b>Terminal</b> da barra de ferramentas (ao lado de Rede), e chamados de um plugin com <a href="#api-adb"><code>lab.adb</code></a>. Não é o adb: é um interpretador que faz, pelos caminhos da própria página, o que cada comando faz num aparelho. Passe <code>command</code> (a linha, como num terminal; o <code>adb</code> inicial é opcional) ou <code>args</code> (as palavras de um comando). <code>adb help</code> lista o que há.</p>
           <div class="code" data-name="exemplos"><pre><code>adb install -r -g app-debug.apk
 adb shell am start -W -n com.exemplo.app/.MainActivity
 adb shell am start -a android.intent.action.VIEW -d "meuapp://item/42"
@@ -1110,6 +1121,7 @@ adb shell settings put global animator_duration_scale 0
 adb push contrato.pdf /sdcard/Download/ &amp;&amp; adb pull /sdcard/Download/contrato.pdf copia.pdf</code></pre></div>
           <dl class="facts">
             <div><dt>Linha de comando</dt><dd>Aspas e <code>\</code> como num shell, <code>| grep</code> / <code>head</code> / <code>tail</code> / <code>wc</code> / <code>sort</code> / <code>uniq</code>, <code>&amp;&amp;</code>, <code>||</code>, <code>;</code> e <code>&gt; arquivo</code>. Variáveis (<code>$X</code>), <code>$(…)</code> e curingas não são interpretados: a linha é recusada.</dd></div>
+            <div><dt>Links</dt><dd><code>adb shell am start -a android.intent.action.VIEW -d &lt;link&gt;</code> abre um deep link: o link vai para o app instalado cujos filtros do manifesto o atendem. Se esse app não é o que está aberto, ele é carregado e iniciado com o link; se já está aberto, recebe o link como num aparelho. Quando nada atende, a resposta mostra os filtros que chegaram perto e por que não casaram.</dd></div>
             <div><dt>Apps</dt><dd><code>install</code> (<code>-g</code> concede as permissões de execução), <code>uninstall</code> (<code>-k</code> mantém os dados), <code>am start</code> (<code>-n</code>, <code>-a</code>, <code>-d</code>, <code>-t</code>, <code>-c</code>, <code>-e</code>/<code>--es</code>, <code>--ez</code>, <code>--ei</code>, <code>-p</code>, <code>-W</code>, <code>-S</code>), <code>am force-stop</code>, <code>monkey -p pacote 1</code>, <code>pm list packages</code>, <code>pm clear</code>, <code>pm grant</code> / <code>revoke</code>. Um app por vez: um comando que nomeia outro pacote carrega esse pacote e encerra o que estava aberto.</dd></div>
             <div><dt>Entrada</dt><dd><code>input tap</code> é o toque real (Compose) ou o clique (View); <code>input swipe</code> é um arrasto real em Compose e <code>View.scrollBy</code> numa View rolável; o mesmo ponto duas vezes é o toque longo. <code>input text</code> e <code>input keyevent</code> escrevem no campo com foco pelo teclado do Android (toque no campo antes): letras, números, pontuação, <code>ENTER</code>, <code>DEL</code> e, num campo Compose, as teclas de cursor. Fora de um campo, só <code>BACK</code>, <code>HOME</code> e <code>APP_SWITCH</code> têm caminho.</dd></div>
             <div><dt>Tela e log</dt><dd><code>screencap -p</code> devolve a imagem; <code>uiautomator dump</code> devolve a hierarquia (Views e os nós de semântica do Compose, com limites da janela; 1 px = 1 dp); <code>logcat</code> aceita <code>-d</code>, <code>-c</code>, <code>-t</code>, <code>-s</code>, <code>-v</code>, <code>--pid</code>, <code>-e</code> e filtros <code>TAG:P</code>; <code>dumpsys activity</code>, <code>window</code>, <code>package</code> e <code>battery</code> trazem o que a página conhece, no formato do Android.</dd></div>
@@ -1534,6 +1546,6 @@ await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=deffd920e05b"></script>
+  <script type="module" src="./site-pages.js?v=7d37d37a6ae5"></script>
 </body>
 </html>

@@ -196,6 +196,10 @@ export function pluginWorkerMain(scope) {
     mock: (spec = {}) => call('mock', { ...spec, headers: spec?.headers, body: typeof spec?.body === 'string' || spec?.body === undefined ? spec?.body : JSON.stringify(spec.body) }),
     unmock: id => call('unmock', { id: String(id ?? '') }),
     mocks: () => call('mocks', {}),
+    /** An adb command line on the lab's device (src/adb-commands.js: the interpreter the adb terminal and the MCP tool use): lab.adb('shell input tap 200 400') or
+     *  lab.adb(['shell', 'input', 'text', 'olá mundo']) -> { stdout, stderr, code, notes, images: [{ blob, type }] }. A command the page has no path for comes back with code 127
+     *  and its name in stderr; nothing throws for a failed command. A plugin has no files of the computer: adb install / push / pull and `> file` answer that. */
+    adb: command => call('adb', Array.isArray(command) ? { args: command.map(String) } : { command: String(command ?? '') }),
     /** A Blob (a screenshot) as a data: URL, to put in a modal's HTML. */
     async dataUrl(image) { const blob = image && typeof image === 'object' && 'blob' in image ? image.blob : image; const bytes = new Uint8Array(await blob.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return `data:${blob.type || 'application/octet-stream'};base64,${btoa(binary)}`; },
     modal: Object.freeze({

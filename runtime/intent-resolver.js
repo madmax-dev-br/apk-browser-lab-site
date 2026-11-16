@@ -233,9 +233,16 @@ export function resolveIntentFields(manifest, { action = null, data = null, type
   return { matches: unique, considered };
 }
 
-/** The message shown when nothing matches (the page prints it as is). */
+/** The message shown when nothing matches (the page prints it as is): the filters that came closest first (the action matched and the data, type or category did not), then
+ *  a count of the rest. An app has many Activities with no filter or with another action, and listing them all hid the one line that says why the link did not resolve. */
 export function unresolvedMessage(resolution) {
   if (resolution.error) return `Activity not started: ${resolution.error}`;
-  const rows = resolution.considered.slice(0, 24).map(entry => `  ${entry.activity}${entry.filter ? ` [${entry.filter}]` : ''}: ${entry.reason}`);
-  return `Activity not started, unable to resolve ${describeIntent(resolution.request)}; ${resolution.considered.length} filter(s) considered:\n${rows.join('\n') || '  (the manifest declares no Activity)'}${resolution.considered.length > 24 ? `\n  ... ${resolution.considered.length - 24} more` : ''}`;
+  const considered = resolution.considered ?? [], head = `Activity not started, unable to resolve ${describeIntent(resolution.request)}`;
+  if (!considered.length) return `${head}: the manifest declares no Activity`;
+  const noFilter = considered.filter(entry => !entry.filter), otherAction = considered.filter(entry => entry.filter && /^action .* is not declared$|^the filter declares no action$/.test(entry.reason ?? '')), close = considered.filter(entry => entry.filter && !otherAction.includes(entry));
+  const rows = close.slice(0, 12).map(entry => `  ${entry.activity} [${entry.filter}]: ${entry.reason}`), rest = [];
+  if (close.length > 12) rest.push(`${close.length - 12} more filter(s) with this action`);
+  if (otherAction.length) rest.push(`${otherAction.length} filter(s) declare another action`);
+  if (noFilter.length) rest.push(`${noFilter.length} Activit${noFilter.length === 1 ? 'y has' : 'ies have'} no filter or are disabled`);
+  return `${head}. ${close.length ? `Filters with this action that did not match:\n${rows.join('\n')}` : 'No filter declares this action.'}${rest.length ? `\n  (${rest.join('; ')})` : ''}`;
 }

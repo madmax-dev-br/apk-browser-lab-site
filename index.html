@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=deffd920e05b") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=deffd920e05b">
-  <link rel="stylesheet" href="./lab-theme.css?v=deffd920e05b">
-  <meta name="apk-browser-build" content="deffd920e05b">
+  <style>@import url("./styles.css?v=7d37d37a6ae5") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=7d37d37a6ae5">
+  <link rel="stylesheet" href="./lab-theme.css?v=7d37d37a6ae5">
+  <meta name="apk-browser-build" content="7d37d37a6ae5">
 </head>
 <body>
   <header class="topbar">
@@ -46,19 +46,6 @@
         <section class="controls controls-card" aria-label="Controles">
           <details id="control-panel" class="device-panel control-panel" open>
             <summary><h2 class="rail-title">Controles</h2><span id="device-summary" class="quiet-badge" title="Tela e orientação do dispositivo virtual">411 × 914 · retrato</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
-            <details class="cp-group" id="cp-sec-open" data-section="open">
-              <summary><h3 id="cp-open-title">Abrir</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <form id="deeplink-form" class="deeplink-form" autocomplete="off">
-                <label for="deeplink-input">Link ou URI</label>
-                <div class="deeplink-row"><input id="deeplink-input" type="text" spellcheck="false" autocapitalize="off" placeholder="meuapp://caminho?id=1 ou https://exemplo.com/p/1"><button id="deeplink-open" class="cp-button primary" type="submit">Abrir</button></div>
-                <div class="cp-grid">
-                  <label for="deeplink-action">Ação</label><select id="deeplink-action"><option value="android.intent.action.VIEW" selected>VIEW (padrão)</option><option value="android.intent.action.SEND">SEND</option><option value="android.intent.action.EDIT">EDIT</option><option value="">Sem ação</option></select>
-                  <label for="deeplink-component">Componente (opcional)</label><input id="deeplink-component" type="text" spellcheck="false" autocapitalize="off" placeholder="pacote/.MinhaActivity">
-                </div>
-              </form>
-              <p id="deeplink-result" class="cp-note deeplink-result" role="status" aria-live="polite">Resolvido pelos intent-filters do manifesto, como <code>am start -a VIEW -d</code>. Sem app em execução, a Activity encontrada é iniciada com esse Intent.</p>
-              <div id="deeplink-history" class="deeplink-history" hidden><span class="cp-subtitle">Recentes</span><ul id="deeplink-history-list"></ul><button id="deeplink-history-clear" class="cp-link" type="button">Limpar histórico</button></div>
-            </div></details>
             <details class="cp-group" id="cp-sec-look" data-section="look">
               <summary><h3 id="cp-look-title">Aparência</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
               <div class="cp-grid">
@@ -251,6 +238,10 @@
         <details id="netlog" class="trace logcat netlog"><summary><span>Rede</span><span class="netlog-count">0 requisições</span><span class="trace-chevron">⌄</span></summary>
           <div class="logcat-bar"><input class="netlog-filter" type="search" placeholder="Filtrar por host, caminho ou método" aria-label="Filtrar requisições por host, caminho ou método"><select class="netlog-category" aria-label="Filtrar por resultado"><option value="all">Todas</option><option value="ok">2xx</option><option value="redirect">3xx</option><option value="fail">4xx / 5xx</option><option value="refused">Recusadas</option><option value="error">Erros</option><option value="pending">Em andamento</option><option value="mocked">Mockadas</option><option value="redirected">Redirecionadas</option></select><label class="logcat-auto"><input class="netlog-autoscroll" type="checkbox" checked> Rolar</label><button class="netlog-clear" type="button">Limpar</button><select class="netlog-scope" aria-label="O que salvar"><option value="all">Salvar tudo</option><option value="filtered">Salvar o filtrado</option></select><select class="netlog-format" aria-label="Formato"><option value="har">HAR 1.2</option><option value="text">Texto</option></select><button class="netlog-save" type="button">Salvar</button></div>
           <div class="netlog-rows" role="log" aria-live="off"></div></details>
+        <details id="adb-terminal" class="trace logcat adb-terminal"><summary><span>Terminal</span><span class="adb-count">adb</span><span class="trace-actions"><button class="adb-clear" type="button" title="Limpa a saída do terminal">Limpar</button></span><span class="trace-chevron">⌄</span></summary>
+          <div class="adb-output" role="log" aria-live="polite" aria-label="Saída dos comandos adb" tabindex="0"></div>
+          <form class="adb-form" autocomplete="off"><label class="adb-prompt" for="adb-input" aria-hidden="true">$</label><input id="adb-input" class="adb-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="adb shell am start -a android.intent.action.VIEW -d meuapp://item/1   ·   adb help lista os comandos" aria-label="Comando adb"><button class="cp-button adb-run" type="submit">Rodar</button></form>
+          <input class="adb-file" type="file" hidden></details>
         <details id="compose-inspector" class="trace logcat compose-inspector"><summary><span>Compose</span><span class="ci-count">fechado</span><span class="trace-chevron">⌄</span></summary>
           <div class="logcat-bar"><button class="ci-capture" type="button" title="Inspeciona a tela agora: árvore de layout do Compose, Views e um recorte de cada elemento">Capturar</button><label class="logcat-auto" title="Captura de novo quando a tela navega (outra Activity ou outro destino)"><input class="ci-follow" type="checkbox"> Atualizar ao navegar</label><label class="logcat-auto" title="Mostra cada LayoutNode da árvore do Compose; desligado, mostra as caixas de &quot;Mostrar limites de layout&quot;"><input class="ci-tree" type="checkbox"> Árvore completa</label><input class="ci-filter" type="search" placeholder="Filtrar por nome, texto, tag ou modificador" aria-label="Filtrar elementos por nome, texto, testTag ou modificador"><button class="ci-copy" type="button" title="Copia os dados da inspeção (sem imagens) em JSON">Copiar JSON</button></div>
           <div class="ci-body" aria-live="polite"></div></details>
@@ -275,7 +266,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Ferramentas de diagnóstico"></div>
   </div>
-  <script type="module" src="./app.js?v=deffd920e05b"></script>
+  <script type="module" src="./app.js?v=7d37d37a6ae5"></script>
   <script>
   // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
   // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.

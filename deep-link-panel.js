@@ -1,11 +1,8 @@
-// "Abrir" group of the Controles panel, DOM-free: the Intent request built from the form, the recent-links history (kept in localStorage, every access guarded) and the
-// wording of the result. app.js owns the elements; src/deep-link-host.js (Worker) does the resolution and the start.
-export const HISTORY_KEY = 'apk-lab-deeplinks-v1';
-export const HISTORY_LIMIT = 10;
+// An Intent request from a link, an action and a component (the MCP tool open_link), and the wording of the result. DOM-free; src/deep-link-host.js (Worker) does the
+// resolution and the start. (The Controles panel had an "Abrir" form built on this; links are now opened from the adb terminal: adb shell am start -a VIEW -d <link>.)
 export const DEFAULT_ACTION = 'android.intent.action.VIEW';
 
 const text = value => typeof value === 'string' ? value.trim() : '';
-const sameEntry = (a, b) => a.link === b.link && a.action === b.action && a.component === b.component;
 
 /** An Intent that names neither a link nor a component is still resolvable by its action (SEND, a custom action), with the MIME type when it has one: `am start -a ACTION -t TYPE`. */
 const implicitByAction = (act, type) => !!text(type) || (!!act && act !== DEFAULT_ACTION);
@@ -24,29 +21,6 @@ export function buildDeepLinkRequest({ link = '', action = DEFAULT_ACTION, compo
   if (cmp) request.component = cmp;
   return request;
 }
-
-/** Newest first, no duplicates, at most HISTORY_LIMIT entries. Returns a new list; the input is untouched. */
-export function addToHistory(list, entry) {
-  const clean = { link: text(entry?.link), action: text(entry?.action), component: text(entry?.component) };
-  if (!clean.link && !clean.component && !implicitByAction(clean.action)) return [...list];
-  return [clean, ...list.filter(item => !sameEntry(item, clean))].slice(0, HISTORY_LIMIT);
-}
-
-/** What the history row shows: the link (or the component) with a short action prefix when it is not the default VIEW. */
-export function historyLabel(entry) {
-  const action = entry.action && entry.action !== DEFAULT_ACTION ? `${entry.action.replace(/^android\.intent\.action\./, '')} ` : '';
-  return `${action}${entry.link || entry.component || ''}${entry.link && entry.component ? `  → ${entry.component}` : ''}`.trim();
-}
-
-export function parseHistory(raw) {
-  try {
-    const list = JSON.parse(raw);
-    if (!Array.isArray(list)) return [];
-    return list.filter(item => item && typeof item === 'object').map(item => ({ link: text(item.link), action: text(item.action), component: text(item.component) })).filter(item => item.link || item.component || implicitByAction(item.action)).slice(0, HISTORY_LIMIT);
-  } catch { return []; }
-}
-export function loadHistory(storage = globalThis.localStorage) { try { return parseHistory(storage?.getItem(HISTORY_KEY) ?? '[]'); } catch { return []; } }
-export function saveHistory(list, storage = globalThis.localStorage) { try { storage?.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_LIMIT))); return true; } catch { return false; } }
 
 const shortName = name => String(name ?? '').split('.').pop();
 /** The inline result for a Worker `deepLink` outcome: { state: 'ok' | 'error', message, detail }. */

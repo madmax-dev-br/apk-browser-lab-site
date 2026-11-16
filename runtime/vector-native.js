@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=deffd920e05b';
-import { getSolidPaint } from './paint-host.js?v=deffd920e05b';
-import { getMatrixValues } from './matrix-native.js?v=deffd920e05b';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=deffd920e05b';
+import { APKError } from './apk-error.js?v=7d37d37a6ae5';
+import { getSolidPaint } from './paint-host.js?v=7d37d37a6ae5';
+import { getMatrixValues } from './matrix-native.js?v=7d37d37a6ae5';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=7d37d37a6ae5';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -174,10 +174,12 @@ export function createVectorCanvasHost(){
     else{[left,top,right,bottom]=args.slice(1,5).map(f32);paint=args[5];}
     for(const n of [left,top,right,bottom])finite(n);
     const width=right-left,height=bottom-top;if(width<=0||height<=0)return;if(width*height>16*1024*1024)problem('Canvas rectangle exceeds VM extent limit');
-    const solid=getSolidPaint(runtime,paint);if(canvas.draws.length>=1024)problem('Canvas command limit exceeded');
+    const solid=getSolidPaint(runtime,paint);if(solid.maskFilter&&solid.maskFilter.blur?.style!==0)problem('BlurMaskFilter styles other than Blur.NORMAL are not implemented for Canvas.drawRect');if(canvas.draws.length>=1024)problem('Canvas command limit exceeded');
     if(![0,1,2].includes(solid.style))problem('Unsupported Paint style');
+    // BlurMaskFilter(radius, Blur.NORMAL): a Gaussian blur of the shape with Skia's sigma (the Skia replay applies it from the paint; the SVG carries the same blur)
+    const blur=solid.maskFilter?.blur??null,spread=blur?Math.ceil(blur.sigma*3):0,blurFilter=blur?`<filter id="blur" filterUnits="userSpaceOnUse" x="${-spread}" y="${-spread}" width="${width+2*spread}" height="${height+2*spread}"><feGaussianBlur stdDeviation="${blur.sigma}"/></filter>`:'';
     const fill=solid.style===1?'none':solid.color,stroke=solid.style===0?'':` stroke="${solid.color}" stroke-opacity="${solid.alpha}" stroke-width="${solid.strokeWidth||1}" stroke-miterlimit="${solid.strokeMiter}" stroke-linecap="${['butt','round','square'][solid.strokeCap]}" stroke-linejoin="${['miter','round','bevel'][solid.strokeJoin]}"${solid.strokeWidth===0?' vector-effect="non-scaling-stroke"':''}`;
-    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" overflow="visible"><rect width="${width}" height="${height}" fill="${fill}" fill-opacity="${solid.alpha}"${stroke}${solid.flags&1?'':' shape-rendering="crispEdges"'}/></svg>`;graphics.reserveDrawStorage(svg.length);canvas.draws.push({kind:'svg',svg,x:left,y:top,width,height,matrix:canvas.matrix.slice(),clips:(canvas.clips??[]).slice(),argb:solid.argb,paint:solid,source:'original-Drawable.draw/web-Paint/Canvas'});return;
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" overflow="visible">${blurFilter}<rect width="${width}" height="${height}" fill="${fill}" fill-opacity="${solid.alpha}"${stroke}${solid.flags&1?'':' shape-rendering="crispEdges"'}${blur?' filter="url(#blur)"':''}/></svg>`;graphics.reserveDrawStorage(svg.length);canvas.draws.push({kind:'svg',svg,x:left,y:top,width,height,matrix:canvas.matrix.slice(),clips:(canvas.clips??[]).slice(),argb:solid.argb,paint:solid,source:'original-Drawable.draw/web-Paint/Canvas'});return;
    }
    if(name==='getSaveCount')return canvas.stack.length+1;
    if(name==='save'){if(canvas.stack.length>=256)problem('Canvas save stack limit exceeded');const count=canvas.stack.length+1;canvas.stack.push({matrix:canvas.matrix.slice(),clips:(canvas.clips??[]).slice()});return count;}

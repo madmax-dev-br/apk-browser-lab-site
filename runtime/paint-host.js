@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=deffd920e05b';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=deffd920e05b';
-import { colorLongToArgb } from './color-long.js?v=deffd920e05b';
+import { APKError } from './apk-error.js?v=7d37d37a6ae5';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=7d37d37a6ae5';
+import { colorLongToArgb } from './color-long.js?v=7d37d37a6ae5';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -69,6 +69,14 @@ const referenceEffects = ['Shader', 'PathEffect', 'MaskFilter'];
 // "intervals array must contain at least 2 elements" and an even count). Other PathEffect subclasses fail explicitly when a paint carrying them draws.
 const PATH_EFFECT = 'Landroid/graphics/PathEffect;', DASH = 'Landroid/graphics/DashPathEffect;', CORNER = 'Landroid/graphics/CornerPathEffect;';
 for (const key of [`${DASH}-><init>([FF)V`, `${CORNER}-><init>(F)V`]) keys.add(key);
+// android.graphics.MaskFilter and BlurMaskFilter(float radius, BlurMaskFilter.Blur style) (android-13.0.0_r1 BlurMaskFilter.java: native_instance = nativeConstructor(radius,
+// style.native_int); libs/hwui/jni/MaskFilter.cpp createBlur: sigma = SkBlurMask::ConvertRadiusToSigma(radius), SkMaskFilter::MakeBlur((SkBlurStyle)style, sigma), and
+// IllegalArgumentException when Skia makes no filter, which is a sigma that is not positive). The Skia backend applies it to what the paint draws; EmbossMaskFilter and other
+// MaskFilter subclasses are not implemented and fail by name when instantiated.
+const MASK_FILTER = 'Landroid/graphics/MaskFilter;', BLUR_FILTER = 'Landroid/graphics/BlurMaskFilter;';
+export const BLUR_STYLE = 'Landroid/graphics/BlurMaskFilter$Blur;', BLUR_STYLE_NAMES = ['NORMAL', 'SOLID', 'OUTER', 'INNER'];   // the enum's order is its native_int: SkBlurStyle
+export const BLUR_SIGMA_SCALE = 0.57735;   // SkBlurMask::ConvertRadiusToSigma: radius > 0 ? 0.57735f * radius + 0.5f : 0
+for (const key of [`${MASK_FILTER}-><init>()V`, `${BLUR_FILTER}-><init>(F${BLUR_STYLE})V`]) keys.add(key);
 const floatOf = bits => { const view = new DataView(new ArrayBuffer(4)); view.setInt32(0, bits | 0, true); return view.getFloat32(0, true); };
 for (const effect of referenceEffects) { const type = `Landroid/graphics/${effect};`; keys.add(`${PAINT}->get${effect}()${type}`); keys.add(`${PAINT}->set${effect}(${type})${type}`); }
 
@@ -92,8 +100,8 @@ function initializeTextLocales(runtime,paint){
 export function createPaintHost() {
   return {
     supports: key => keys.has(key),
-    canAllocate: type => type === PAINT || type === PDX || type === DASH || type === CORNER,
-    parent: type => type === PAINT || type === PATH_EFFECT ? 'Ljava/lang/Object;' : type === PDX ? XFERMODE : type === DASH || type === CORNER ? PATH_EFFECT : null,
+    canAllocate: type => type === PAINT || type === PDX || type === DASH || type === CORNER || type === MASK_FILTER || type === BLUR_FILTER,
+    parent: type => type === PAINT || type === PATH_EFFECT || type === MASK_FILTER ? 'Ljava/lang/Object;' : type === PDX ? XFERMODE : type === DASH || type === CORNER ? PATH_EFFECT : type === BLUR_FILTER ? MASK_FILTER : null,
     invoke(runtime, method, args) {
       const object = runtime.object(args[0]), name = method.name;
       if (method.owner === DASH) {
@@ -102,6 +110,13 @@ export function createPaintHost() {
         object.pathEffect = { dash: { intervals: values.map(floatOf), phase: floatOf(args[2]) } }; return;
       }
       if (method.owner === CORNER) { object.pathEffect = { corner: floatOf(args[1]) }; return; }
+      if (method.owner === MASK_FILTER) return;   // MaskFilter(): the base class holds no filter (native_instance 0)
+      if (method.owner === BLUR_FILTER) {
+        if (nullish(args[2])) runtime.throwJava('Ljava/lang/NullPointerException;', null);   // style.native_int
+        const radius = floatOf(args[1]), style = runtime.object(args[2]).enumOrdinal | 0, sigma = radius > 0 ? Math.fround(Math.fround(BLUR_SIGMA_SCALE * radius) + 0.5) : 0;
+        if (!(sigma > 0) || !Number.isFinite(sigma)) runtime.throwJava('Ljava/lang/IllegalArgumentException;', null);
+        object.maskFilter = { blur: { radius, sigma, style } }; return;
+      }
       if (method.owner === PDX) {
         // Original API28 PorterDuffXfermode(Mode): Xfermode.porterDuffMode = mode.nativeInt.
         if (nullish(args[1])) runtime.throwJava('Ljava/lang/NullPointerException;', 'mode is null');
@@ -379,12 +394,13 @@ export function createPaintHost() {
 /** A native Canvas may draw this state only when it can preserve the paint's meaning. */
 export function getSolidPaint(runtime, receiver) {
   const paint = getPaintState(runtime, receiver);
-  for (const effect of referenceEffects) if (effect !== 'Shader' && effect !== 'PathEffect' && !nullish(paint[effect[0].toLowerCase() + effect.slice(1)])) fail(`This paint needs an implemented ${effect} drawing backend`);
+  const maskFilter = nullish(paint.maskFilter) ? null : (runtime.object(paint.maskFilter).maskFilter ?? fail('This paint needs an implemented MaskFilter drawing backend (only BlurMaskFilter is)'));
+  if (maskFilter && !runtime.skiaHost) fail('A Paint with a BlurMaskFilter requires the Skia backend');
   const pathEffect = nullish(paint.pathEffect) ? null : (runtime.object(paint.pathEffect).pathEffect ?? fail('This paint needs an implemented PathEffect drawing backend (only DashPathEffect and CornerPathEffect are)'));
   const shader = nullish(paint.shader) ? null : (runtime.platform?.shaderHost?.snapshot?.(runtime, paint.shader) ?? fail('This paint needs an implemented Shader drawing backend'));
   const colorFilterSnapshot=snapshotPaintColorFilter(runtime,paint.colorFilter);
   const blendMode=nullish(paint.xfermode)?3:runtime.object(paint.xfermode).fields.get(`${XFERMODE}->porterDuffMode:I`);
   if(!Number.isInteger(blendMode)||blendMode<0||blendMode>28)fail('This paint needs a known original Skia transfer-mode value');
   if(blendMode!==3&&!runtime.skiaHost)fail('Nondefault Paint BlendMode requires the verified Skia CPU backend');
-  return { ...paint, shader, pathEffect, blendMode, colorFilterSnapshot, argb: paint.color >>> 0, color: '#' + (paint.color & 0xffffff).toString(16).padStart(6, '0'), alpha: (paint.color >>> 24) / 255 };
+  return { ...paint, shader, pathEffect, maskFilter, blendMode, colorFilterSnapshot, argb: paint.color >>> 0, color: '#' + (paint.color & 0xffffff).toString(16).padStart(6, '0'), alpha: (paint.color >>> 24) / 255 };
 }
