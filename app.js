@@ -1,52 +1,52 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=d422379a2a38';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=d422379a2a38';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE, proxyState } from './device-settings.js?v=d422379a2a38';
-import { initCollapsibleSections } from './panel-sections.js?v=d422379a2a38';
-import { warmupLabel } from './warmup.js?v=d422379a2a38';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=d422379a2a38';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=d422379a2a38';
-import { initHelpTips } from './help-tips.js?v=d422379a2a38';
-import { createToolDock } from './tool-dock.js?v=d422379a2a38';
-import { createPermissionsPanel } from './permissions-panel.js?v=d422379a2a38';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=d422379a2a38';
-import { createAppDataPanel } from './app-data-panel.js?v=d422379a2a38';
-import { createCameraLab } from './camera-lab.js?v=d422379a2a38';
-import { createOverridesPanel } from './overrides-panel.js?v=d422379a2a38';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=d422379a2a38';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=d422379a2a38';
-import { createHostMapPanel } from './host-map-panel.js?v=d422379a2a38';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=d422379a2a38';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=d422379a2a38';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=d422379a2a38';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=d422379a2a38';
-import { createDeviceView, createViewState } from './device-view.js?v=d422379a2a38';
-import { createTaskSwitcher } from './task-switcher.js?v=d422379a2a38';
-import { createDeviceZoom } from './device-zoom.js?v=d422379a2a38';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=d422379a2a38';
-import { formatApiGapReport } from './api-gap-scan.js?v=d422379a2a38';
-import { createLogcatPanel } from './logcat-panel.js?v=d422379a2a38';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=d422379a2a38';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=d422379a2a38';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=d422379a2a38';
-import { captureImage, paintScreen } from './screen-capture.js?v=d422379a2a38';
-import { createScreenRecorder } from './screen-recorder.js?v=d422379a2a38';
-import { createPluginsPanel } from './plugins-panel.js?v=d422379a2a38';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=d422379a2a38';
-import { createAdb } from './adb-commands.js?v=d422379a2a38';
-import { createAdbTerminal } from './adb-terminal.js?v=d422379a2a38';
-import { workerMemoryText } from './worker-memory.js?v=d422379a2a38';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=d422379a2a38';
-import { createModalHost } from './lab-modal.js?v=d422379a2a38';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=d422379a2a38';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=d422379a2a38';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=d422379a2a38';
-import { createDragLayer } from './lab-drag.js?v=d422379a2a38';
-import { createLabScroll } from './lab-scroll.js?v=d422379a2a38';
-import { createGlSurfaces } from './gl-surfaces.js?v=d422379a2a38';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=d422379a2a38';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=d422379a2a38';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=d422379a2a38';
-import { resolveIntentFields } from './intent-resolver.js?v=d422379a2a38';
+import { APKWorkerClient } from './apk-worker-client.js?v=a53ed9c13aa0';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=a53ed9c13aa0';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE, proxyState } from './device-settings.js?v=a53ed9c13aa0';
+import { initCollapsibleSections } from './panel-sections.js?v=a53ed9c13aa0';
+import { warmupLabel } from './warmup.js?v=a53ed9c13aa0';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=a53ed9c13aa0';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=a53ed9c13aa0';
+import { initHelpTips } from './help-tips.js?v=a53ed9c13aa0';
+import { createToolDock } from './tool-dock.js?v=a53ed9c13aa0';
+import { createPermissionsPanel } from './permissions-panel.js?v=a53ed9c13aa0';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=a53ed9c13aa0';
+import { createAppDataPanel } from './app-data-panel.js?v=a53ed9c13aa0';
+import { createCameraLab } from './camera-lab.js?v=a53ed9c13aa0';
+import { createOverridesPanel } from './overrides-panel.js?v=a53ed9c13aa0';
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=a53ed9c13aa0';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=a53ed9c13aa0';
+import { createHostMapPanel } from './host-map-panel.js?v=a53ed9c13aa0';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=a53ed9c13aa0';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=a53ed9c13aa0';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=a53ed9c13aa0';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=a53ed9c13aa0';
+import { createDeviceView, createViewState } from './device-view.js?v=a53ed9c13aa0';
+import { createTaskSwitcher } from './task-switcher.js?v=a53ed9c13aa0';
+import { createDeviceZoom } from './device-zoom.js?v=a53ed9c13aa0';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=a53ed9c13aa0';
+import { formatApiGapReport } from './api-gap-scan.js?v=a53ed9c13aa0';
+import { createLogcatPanel } from './logcat-panel.js?v=a53ed9c13aa0';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=a53ed9c13aa0';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=a53ed9c13aa0';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=a53ed9c13aa0';
+import { captureImage, paintScreen } from './screen-capture.js?v=a53ed9c13aa0';
+import { createScreenRecorder } from './screen-recorder.js?v=a53ed9c13aa0';
+import { createPluginsPanel } from './plugins-panel.js?v=a53ed9c13aa0';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=a53ed9c13aa0';
+import { createAdb } from './adb-commands.js?v=a53ed9c13aa0';
+import { createAdbTerminal } from './adb-terminal.js?v=a53ed9c13aa0';
+import { workerMemoryText } from './worker-memory.js?v=a53ed9c13aa0';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=a53ed9c13aa0';
+import { createModalHost } from './lab-modal.js?v=a53ed9c13aa0';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=a53ed9c13aa0';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=a53ed9c13aa0';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=a53ed9c13aa0';
+import { createDragLayer } from './lab-drag.js?v=a53ed9c13aa0';
+import { createLabScroll } from './lab-scroll.js?v=a53ed9c13aa0';
+import { createGlSurfaces } from './gl-surfaces.js?v=a53ed9c13aa0';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=a53ed9c13aa0';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=a53ed9c13aa0';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=a53ed9c13aa0';
+import { resolveIntentFields } from './intent-resolver.js?v=a53ed9c13aa0';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -93,7 +93,7 @@ function setStatus(message, kind = '') {
   notifyParent('apk-lab-state', { mode: state.mode, status: message, running: kind === 'ok' });
 }
 // "Recriar" / "Reabrir" the Activity: shown while an APK runs (an Activity is on screen), disabled while the VM is busy.
-function syncReloadButton() { for (const id of ['reopen-activity']) { const button = $(id); if (!button) continue; button.hidden = state.mode !== 'apk' || !state.apkRunning || !state.runtime; button.disabled = state.busy || !state.runtime || !state.apkRunning; } }
+function syncReloadButton() { for (const id of ['reopen-activity']) { const button = $(id); if (!button) continue; button.hidden = state.mode !== 'apk' || !state.currentSource; button.disabled = state.busy || !!state.runStarting; } }   // Reopen restarts the app from zero (reopenApp): also after it failed or ended
 // "Tela pronta" (src/screen-ready.js): the Activity and its fragments loaded and the screen is still; the title says what it still waits for.
 function showScreenReady(ready) {
   const chip = $('screen-ready'); if (!chip) return;
@@ -1249,6 +1249,7 @@ async function runAPKOnce(retried = false) {
   }
   await taskSwitcher?.infoSettled?.();   // the launcher's label and icon request of the load just finished (the VM client takes one request at a time)
   switchMode('apk'); hideError(); state.lastAPKError = null; state.stickyError = false; state.launchAttempted = true;
+  if (!state.bootVisible) showBoot('Starting the app…');   // a run after a failure reopens the APK first, and the end of that load hides the overlay: the launch gets it back
   const token = beginOperation('Trying to start the Activity…');
   state.runStartedAt = Date.now(); const launchStarted = performance.now();
   try { const snapshot = await state.runtime.launch(activity, { onProgress: onWorkerProgress }); if (token === state.operation) { renderSnapshot(snapshot); if ($('cp-sec-appdata')?.open) setTimeout(() => appDataPanel.refresh(), 0); if (state.loadTimes) { state.loadTimes.launchMs = Math.round(performance.now() - launchStarted); showLoadTimes(); appendTrace(`Activity opened in ${state.loadTimes.launchMs} ms`); } } }
@@ -1372,7 +1373,15 @@ $('error-close').addEventListener('click', dismissError);
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('error-panel').hidden && !event.target?.closest?.('input,textarea,select,[contenteditable]')) { event.preventDefault(); dismissError(); } });
 $('back-button').addEventListener('click', backAPK);
 $('recreate-activity')?.addEventListener('click', () => reloadActivity('recreate'));   // the toolbar no longer has this button; lab.reloadActivity still recreates
-$('reopen-activity').addEventListener('click', () => reloadActivity('reopen'));
+/** "Reopen" in the toolbar: the app starts from zero, as after killing its process. The running VM's Worker is terminated (nothing it held stays in memory), the APK is opened
+ *  again in a fresh Worker and the launcher Activity starts; app data on the virtual device is kept or cleared as Controls › Execution says. lab.reloadActivity / the MCP
+ *  `reload` tool keep their in-VM modes (recreate, reopen). */
+function reopenApp() {
+  if (!state.currentSource || state.busy || state.runStarting) return;
+  state.needsRestart = true; appendTrace?.('Reopen: VM terminated, the app opens again from zero in a fresh Worker');
+  return runAPK();
+}
+$('reopen-activity').addEventListener('click', () => reopenApp());
 $('cancel-operation').addEventListener('click', cancelOperation);
 $('native-abi').addEventListener('change', populateNativeLibraries);
 $('inspect-native-button').addEventListener('click', inspectSelectedNative);

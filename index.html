@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=d422379a2a38") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=d422379a2a38">
-  <link rel="stylesheet" href="./lab-theme.css?v=d422379a2a38">
-  <meta name="apk-browser-build" content="d422379a2a38">
+  <style>@import url("./styles.css?v=a53ed9c13aa0") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=a53ed9c13aa0">
+  <link rel="stylesheet" href="./lab-theme.css?v=a53ed9c13aa0">
+  <meta name="apk-browser-build" content="a53ed9c13aa0">
 </head>
 <body>
   <header class="topbar">
@@ -207,11 +207,10 @@
         </section>
       </aside>
       <section class="preview" aria-label="Running app">
-        <div class="preview-bar"><div class="preview-title"><span id="preview-name">App preview</span></div><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reopen: like closing and opening the same screen again. A new instance with the same Intent, no saved state and new ViewModels: the content is loaded again">Reopen</button><button id="back-button" class="back-button" hidden>Back</button><button id="network-toggle" class="back-button network-toggle" type="button" aria-pressed="false" title="Device internet: when off, the app sees the device with no connection (ConnectivityManager with no network, every connection fails), as in airplane mode. It is the Connectivity option in Controls › Device; applies immediately">Internet</button><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Full screen: shows the enlarged device over the page (Esc closes). The VM resolution does not change" aria-pressed="false">Full screen</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Plugin buttons" hidden></span><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inactive</span></div>
+        <div class="preview-bar"><div class="preview-title"><span id="preview-name">App preview</span></div><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reopen: ends the VM and opens the app from zero in a new one, as after killing its process (nothing of the previous run stays in memory; app data follows Controls › Execution)">Reopen</button><button id="back-button" class="back-button" hidden>Back</button><button id="network-toggle" class="back-button network-toggle" type="button" aria-pressed="false" title="Device internet: when off, the app sees the device with no connection (ConnectivityManager with no network, every connection fails), as in airplane mode. It is the Connectivity option in Controls › Device; applies immediately">Internet</button><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Full screen: shows the enlarged device over the page (Esc closes). The VM resolution does not change" aria-pressed="false">Full screen</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Plugin buttons" hidden></span><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inactive</span></div>
         <div class="preview-stage" id="preview-stage">
           <button id="fullscreen-close" class="fullscreen-close" type="button" hidden title="Exit full screen (Esc)" aria-label="Exit full screen">✕</button>
           <div id="lab-overlay-layer" class="lab-overlay-layer"></div>
-          <div id="stage-callouts" class="stage-callouts" aria-hidden="true" hidden><div class="callout callout-w"><span id="callout-w"></span></div><div class="callout callout-h"><span id="callout-h"></span></div><p id="callout-note" class="callout-note"></p></div>
           <div id="empty-preview" class="empty-preview"><h2>Your app starts here.</h2><p>Select an APK: it is installed and opened right away.<br>Or pick one of the examples in the Examples tab, on the bottom bar.</p></div>
           <div id="boot-overlay" class="boot-overlay" hidden role="status" aria-live="polite"><div class="boot-screen"><img id="boot-app-icon" class="boot-app-icon" alt="" hidden><svg class="boot-logo" viewBox="0 0 24 24" width="84" height="84" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85-.29-.15-.65-.06-.83.22l-1.88 3.24a11.463 11.463 0 00-8.94 0L5.65 5.67c-.19-.29-.58-.38-.87-.2-.28.18-.37.54-.22.83L6.4 9.48A10.78 10.78 0 001 18h22a10.78 10.78 0 00-5.4-8.52zM7 15.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm10 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"/></svg><div class="boot-bar"><i></i></div><p id="boot-caption" class="boot-caption">Starting…</p></div></div>
           <div id="android-device" class="android-device" hidden>
@@ -268,37 +267,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=d422379a2a38"></script>
-  <script>
-  // Stage callouts (lab-theme.css .stage-callouts): the dimension lines drawn around the device. Read-only: measures the visible device (or the boot frame, or the
-  // empty outline) and writes its box and its size in dp into #stage-callouts. Nothing in the device or in app.js depends on it.
-  (() => {
-    const $ = id => document.getElementById(id), stage = $('preview-stage'), box = $('stage-callouts'); if (!stage || !box || !('ResizeObserver' in window)) return;
-    const device = $('android-device'), boot = $('boot-overlay'), empty = $('empty-preview'), engine = $('execution-engine'), summary = $('device-summary');
-    let queued = false;
-    const dp = (element, w, h) => { const a = Number(element.style.getPropertyValue(w)), b = Number(element.style.getPropertyValue(h)); return a > 0 && b > 0 ? [a, b] : null; };
-    const fromText = text => { const m = /(\d+)\s*×\s*(\d+)/.exec(text ?? ''); return m ? [Number(m[1]), Number(m[2])] : null; };
-    const draw = () => {
-      queued = false;
-      const target = !device.hidden ? device : !boot.hidden ? boot : !empty.hidden ? empty : null;
-      if (!target || stage.classList.contains('device-fullscreen')) { box.hidden = true; return; }
-      const size = (target === device ? dp(device, '--screen-w', '--screen-h') : target === boot ? dp(boot, '--boot-w', '--boot-h') : null) ?? fromText(summary?.textContent) ?? fromText(engine?.textContent);
-      const s = stage.getBoundingClientRect(), r = target.getBoundingClientRect(); if (!size || r.width < 40) { box.hidden = true; return; }
-      const x = r.left - s.left, y = r.top - s.top, density = /density\s*([\d.,]+)/i.exec(engine?.textContent ?? '')?.[1];
-      box.style.setProperty('--x', x + 'px'); box.style.setProperty('--y', y + 'px'); box.style.setProperty('--w', r.width + 'px'); box.style.setProperty('--h', r.height + 'px');
-      box.dataset.top = y >= 28 ? 'line' : 'none'; box.dataset.side = s.width - (x + r.width) >= 132 ? 'line' : 'none';
-      $('callout-w').textContent = size[0] + ' dp'; $('callout-h').textContent = box.dataset.top === 'none' ? size[0] + ' × ' + size[1] + ' dp' : size[1] + ' dp';
-      $('callout-note').textContent = (density ? 'density ' + density + '\n' : '') + 'scale ' + Math.round(r.width / (size[0] + 10) * 100) + '%';
-      box.hidden = false;
-    };
-    const queue = () => { if (!queued) { queued = true; requestAnimationFrame(draw); } };
-    const resize = new ResizeObserver(queue); for (const element of [stage, device, boot, empty]) resize.observe(element);
-    const mutation = new MutationObserver(queue);
-    for (const element of [stage, device, boot, empty]) mutation.observe(element, { attributes: true, attributeFilter: ['style', 'hidden', 'class'] });
-    for (const element of [engine, summary]) if (element) mutation.observe(element, { childList: true, characterData: true, subtree: true });
-    addEventListener('resize', queue); queue();
-  })();
-  </script>
+  <script type="module" src="./app.js?v=a53ed9c13aa0"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

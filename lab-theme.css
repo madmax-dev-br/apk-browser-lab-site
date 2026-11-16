@@ -270,18 +270,6 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 #preview-stage.device-fullscreen>.fullscreen-close{border:1px solid var(--line-strong);background-color:var(--surface);color:var(--ink);font:400 16px/1 var(--sans)}
 #preview-stage.device-fullscreen>.fullscreen-close:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 /* dimension lines (positions and texts come from the small script at the end of index.html) */
-.stage-callouts{position:absolute;inset:0;z-index:0;pointer-events:none;color:var(--accent-ink);font:500 12px/16px var(--sans);font-variant-numeric:tabular-nums}
-.callout{position:absolute;box-sizing:border-box;border:0 solid currentColor}
-.callout::before{content:"";position:absolute;background:currentColor}
-.callout span{position:absolute;white-space:nowrap;padding:1px 8px;background:var(--bg)}
-.callout-w{left:var(--x);top:calc(var(--y) - 22px);width:var(--w);height:11px;border-width:0 1px}
-.callout-w::before{left:0;right:0;top:5px;height:1px}
-.callout-w span{left:50%;top:50%;transform:translate(-50%,-50%)}
-.callout-h{left:calc(var(--x) + var(--w) + 13px);top:var(--y);width:11px;height:var(--h);border-width:1px 0}
-.callout-h::before{top:0;bottom:0;left:5px;width:1px}
-.callout-h span{left:18px;top:50%;transform:translateY(-50%);padding:1px 0 1px 4px;background:none}
-.callout-note{position:absolute;left:calc(var(--x) + var(--w) + 35px);top:calc(var(--y) + var(--h) - 34px);margin:0;white-space:pre;color:var(--muted);font-weight:400}
-.stage-callouts[data-top=none] .callout-w,.stage-callouts[data-side=none] .callout-h,.stage-callouts[data-side=none] .callout-note{display:none}
 /* empty: the outline of the device that will be drawn here */
 .empty-preview{box-sizing:border-box;height:min(647px,calc(var(--stage-h,100%) - 72px));aspect-ratio:421/924;max-width:calc(100% - 32px);display:flex;flex-direction:column;justify-content:center;gap:8px;padding:28px;text-align:left;
   border:1.5px dashed var(--accent);border-radius:26px;background-color:color-mix(in srgb,var(--surface) 72%,transparent);color:var(--ink)}
@@ -688,7 +676,6 @@ span.files-thumb svg{width:22px;height:22px;fill:currentColor}
 .stage-zoom button[aria-pressed=false]{color:var(--accent-ink)}
 .has-device-fullscreen .stage-zoom{display:none}
 #preview-stage[data-zoomed]{overflow:auto;justify-content:safe center;align-items:safe center}
-#preview-stage[data-zoomed] .stage-callouts{display:none}
 #preview-stage[data-panning]{cursor:grabbing}
 #preview-stage[data-panning] *{cursor:grabbing!important}
 /* "Dados do app" modal (src/app-data-panel.js): two tabs, then a row of files above the editor of the chosen one */
@@ -727,3 +714,14 @@ span.files-thumb svg{width:22px;height:22px;fill:currentColor}
 .adb-terminal .adb-form[data-busy=true]{display:none}.adb-terminal .adb-screen[data-busy=true]::after{content:"▋";color:#3fb950;animation:adb-blink 1s steps(2,start) infinite}
 @keyframes adb-blink{to{visibility:hidden}}
 @media (prefers-reduced-motion:reduce){.adb-terminal .adb-screen[data-busy=true]::after{animation:none}}
+/* ---- Input feedback on the device (src/device-view.js): a mark where the finger went down, at once, and, while the VM has not answered an input for 350 ms, a bar along the top
+   of the screen with the time it has been working. Both over the app, never taking pointer events. */
+.android-screen .touch-mark{position:absolute;z-index:30;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;background:rgba(120,120,128,.28);pointer-events:none;animation:touch-mark .5s ease-out forwards}
+@keyframes touch-mark{from{transform:scale(.35);opacity:1}to{transform:scale(1.25);opacity:0}}
+.android-screen .input-wait{position:absolute;z-index:31;left:0;right:0;top:0;display:flex;justify-content:center;pointer-events:none}
+.android-screen .input-wait[hidden]{display:none}
+.android-screen .input-wait i{position:absolute;left:0;right:0;top:0;height:3px;overflow:hidden;background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.android-screen .input-wait i::after{content:"";position:absolute;top:0;bottom:0;width:35%;background:var(--accent);animation:input-wait 1.1s ease-in-out infinite}
+@keyframes input-wait{from{left:-35%}to{left:100%}}
+.android-screen .input-wait span{margin-top:8px;padding:3px 10px;border-radius:999px;background:rgba(20,22,30,.82);color:#fff;font:500 12px/16px var(--sans);font-variant-numeric:tabular-nums;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+@media (prefers-reduced-motion:reduce){.android-screen .touch-mark{animation:none;opacity:.5}.android-screen .input-wait i::after{animation:none;left:0;width:100%}}

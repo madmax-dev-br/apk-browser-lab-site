@@ -1,15 +1,15 @@
-import {APKError} from './apk-runtime.js?v=d422379a2a38';
-import {getVectorGraphics} from './vector-native.js?v=d422379a2a38';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=d422379a2a38';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=d422379a2a38';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=d422379a2a38';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=d422379a2a38';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=d422379a2a38';
-import {createBitmapHost} from './bitmap-host.js?v=d422379a2a38';
-import { gcRoot } from './heap-gc.js?v=d422379a2a38';
-import {sha256Hex} from './sha256-sync.js?v=d422379a2a38';
-import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=d422379a2a38';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=d422379a2a38';
+import {APKError} from './apk-runtime.js?v=a53ed9c13aa0';
+import {getVectorGraphics} from './vector-native.js?v=a53ed9c13aa0';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=a53ed9c13aa0';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=a53ed9c13aa0';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=a53ed9c13aa0';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=a53ed9c13aa0';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=a53ed9c13aa0';
+import {createBitmapHost} from './bitmap-host.js?v=a53ed9c13aa0';
+import { gcRoot } from './heap-gc.js?v=a53ed9c13aa0';
+import {sha256Hex} from './sha256-sync.js?v=a53ed9c13aa0';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=a53ed9c13aa0';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=a53ed9c13aa0';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -66,7 +66,19 @@ function buildGradientShader(CK,shader,overrides){
 }
 /** Android BitmapShader over a snapshot raster. ALPHA_8 bitmaps are coverage only: Skia exposes them as (0,0,0,a), later tinted by the Paint's color filter. */
 function attachShader(CK,paint,shader,overrides){const built=buildShader(CK,shader,overrides);paint.setShader(built);built.delete();}
-function makePaint(CK,state){const paint=new CK.Paint();paint.setAntiAlias(!!(state.flags&1));paint.setColor(argb(CK,state.argb));paint.setBlendMode({value:state.blendMode??3});paint.setStyle([CK.PaintStyle.Fill,CK.PaintStyle.Stroke,CK.PaintStyle.StrokeAndFill][state.style]);paint.setStrokeWidth(state.strokeWidth);paint.setStrokeMiter(state.strokeMiter);paint.setStrokeCap([CK.StrokeCap.Butt,CK.StrokeCap.Round,CK.StrokeCap.Square][state.strokeCap]);paint.setStrokeJoin([CK.StrokeJoin.Miter,CK.StrokeJoin.Round,CK.StrokeJoin.Bevel][state.strokeJoin]);if(state.colorFilterSnapshot){const filter=makeSkiaColorFilter(CK,state.colorFilterSnapshot);paint.setColorFilter(filter);filter?.delete();}if(state.pathEffect){const effect=state.pathEffect.dash?CK.PathEffect.MakeDash(state.pathEffect.dash.intervals,state.pathEffect.dash.phase):CK.PathEffect.MakeCorner(state.pathEffect.corner);if(effect){paint.setPathEffect(effect);effect.delete();}}if(state.maskFilter?.blur){const blur=CK.MaskFilter.MakeBlur([CK.BlurStyle.Normal,CK.BlurStyle.Solid,CK.BlurStyle.Outer,CK.BlurStyle.Inner][state.maskFilter.blur.style]??CK.BlurStyle.Normal,state.maskFilter.blur.sigma,true);if(!blur)fail('Skia made no blur mask filter for this Paint');paint.setMaskFilter(blur);blur.delete();}if(state.shader)attachShader(CK,paint,state.shader);return paint;}
+function makePaint(CK,state){const paint=new CK.Paint();paint.setAntiAlias(!!(state.flags&1));paint.setColor(argb(CK,state.argb));paint.setBlendMode({value:state.blendMode??3});paint.setStyle([CK.PaintStyle.Fill,CK.PaintStyle.Stroke,CK.PaintStyle.StrokeAndFill][state.style]);paint.setStrokeWidth(state.strokeWidth);paint.setStrokeMiter(state.strokeMiter);paint.setStrokeCap([CK.StrokeCap.Butt,CK.StrokeCap.Round,CK.StrokeCap.Square][state.strokeCap]);paint.setStrokeJoin([CK.StrokeJoin.Miter,CK.StrokeJoin.Round,CK.StrokeJoin.Bevel][state.strokeJoin]);if(state.colorFilterSnapshot){const filter=makeSkiaColorFilter(CK,state.colorFilterSnapshot);paint.setColorFilter(filter);filter?.delete();}if(state.pathEffect){const effect=state.pathEffect.dash?CK.PathEffect.MakeDash(state.pathEffect.dash.intervals,state.pathEffect.dash.phase):CK.PathEffect.MakeCorner(state.pathEffect.corner);if(effect){paint.setPathEffect(effect);effect.delete();}}if(state.maskFilter?.blur){const blur=CK.MaskFilter.MakeBlur([CK.BlurStyle.Normal,CK.BlurStyle.Solid,CK.BlurStyle.Outer,CK.BlurStyle.Inner][state.maskFilter.blur.style]??CK.BlurStyle.Normal,state.maskFilter.blur.sigma,true);if(!blur)fail('Skia made no blur mask filter for this Paint');paint.setMaskFilter(blur);blur.delete();}if(state.shadowLayer)setShadowLayer(CK,paint,state);if(state.shader)attachShader(CK,paint,state.shader);return paint;}
+/**
+ * Paint.setShadowLayer(radius, dx, dy, color): what hwui's BlurDrawLooper does, a copy of the draw in the shadow color, blurred and offset by (dx, dy), below the draw itself, as one
+ * drop-shadow image filter. Sigma is SkBlurMask::ConvertRadiusToSigma (0.57735 × radius + 0.5, as BlurMaskFilter). The shadow takes the shape's coverage; its alpha follows
+ * Paint.setShadowLayer's contract: the paint's alpha when the shadow color is opaque, the color's own alpha otherwise (the filter multiplies by the drawn alpha, so that alpha is divided
+ * back out of the color's).
+ */
+function setShadowLayer(CK,paint,state){
+ const {radius,dx,dy,color}=state.shadowLayer,sigma=0.57735*radius+0.5,shadowAlpha=(color>>>24)/255,paintAlpha=((state.argb>>>0)>>>24)/255;
+ const alpha=shadowAlpha>=1?1:paintAlpha>0?Math.min(1,shadowAlpha/paintAlpha):0;
+ const filter=CK.ImageFilter.MakeDropShadow(dx,dy,sigma,sigma,CK.Color(((color>>>16)&255),((color>>>8)&255),(color&255),alpha),null);
+ if(!filter)fail('Skia made no drop-shadow filter for this Paint shadow layer');paint.setImageFilter(filter);filter.delete();
+}
 function makeFont(backend,state,text){
  const CK=backend.CanvasKit;if(typeof text!=='string'||text.length>65536)fail('Skia text run exceeds65536characters');
  const size=state.textSize??12,scale=state.textScaleX??1,skew=state.textSkewX??0;if(![size,scale,skew].every(Number.isFinite)||size<0||size>512||Math.abs(scale)>16||Math.abs(skew)>16)fail('Skia font extent exceeds VM limits');

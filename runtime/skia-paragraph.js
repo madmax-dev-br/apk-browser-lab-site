@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=d422379a2a38';
+import { APKError } from './apk-runtime.js?v=a53ed9c13aa0';
 
 const fail = message => { throw new APKError(message, { kind: 'skia-paragraph-unsupported' }); };
 const fontWeightOf = (CK, weight) => { if(!Number.isInteger(weight)||weight<0||weight>1000)fail('Font weight must be in [0,1000]'); return Object.values(CK.FontWeight).find(value=>value?.value===weight)??{value:weight}; };
@@ -76,7 +76,16 @@ export function measureSkiaParagraph(backend, text, { width, textSize = 14, weig
  * hyphen edits remain explicit gaps; slicing context and estimating widths
  * would change kerning and cluster advances.
  */
+/**
+ * A shaping run is one line: Minikin lays out a drawn or measured run on a single line, and only StaticLayout breaks lines (at '\n'). SkParagraph, which shapes the runs here, would
+ * also start a new line at the other Unicode hard breaks (VT, FF, NEL U+0085, LINE SEPARATOR U+2028, PARAGRAPH SEPARATOR U+2029), which a run may carry (text that came from a
+ * server). On a device they draw nothing visible inside a run, so they are shaped as ZERO WIDTH SPACE (U+200B, one UTF-16 unit like them: every index and cluster offset of the run
+ * stays the same). '\n', '\r' and '\t' are not mapped: the callers refuse them by name.
+ */
+const RUN_HARD_BREAKS=/[\u000B\u000C\u0085\u2028\u2029]/g;
+export const oneLineRun=text=>RUN_HARD_BREAKS.test(text)?(RUN_HARD_BREAKS.lastIndex=0,text.replace(RUN_HARD_BREAKS,'\u200B')):text;
 export function measureSkiaRun(backend,text,{isRtl=false,start=0,offset=text.length,textSize=12,weight=400,italic=false,letterSpacing=0,wordSpacing=0,textScaleX=1,hinting=1,flags=0x503,textLocaleTag='en-US',families=null,fontVariations=null}={}){
+  if(typeof text==='string')text=oneLineRun(text);   // see oneLineRun
   if(typeof text!=='string'||text.length>65536||/[\u0000-\u001f]/.test(text))fail('Run advance currently requires a complete single-line shaping run without control characters');
   if(!Number.isInteger(offset)||offset<0||offset>text.length||!Number.isInteger(start)||start<0||start>offset)fail('Invalid UTF16 run offset');
   if(![textSize,letterSpacing,wordSpacing,textScaleX].every(Number.isFinite)||textSize<0||textSize>512||textScaleX<0||textScaleX>16)fail('Run advance font state exceeds backend limits');
@@ -104,6 +113,7 @@ export function measureSkiaRun(backend,text,{isRtl=false,start=0,offset=text.len
  * combining marks, letter/word spacing): itemized through the Android fallback chain and shaped run by run by SkParagraph/HarfBuzz.
  * Returns the advance, the glyph count and the font metrics of every font used (Minikin extents are the union over the fonts of a run). */
 export function measureSkiaShapedText(backend,text,{isRtl=false,textSize=12,weight=400,italic=false,letterSpacing=0,wordSpacing=0,textScaleX=1,hinting=1,flags=0x503,textLocaleTag='en-US',families=null,fontVariations=null}={}){
+  if(typeof text==='string')text=oneLineRun(text);   // see oneLineRun
   if(typeof text!=='string'||text.length>65536||/[\u0000-\u001f]/.test(text))fail('Shaped text measurement needs one line without control characters');
   if(![textSize,letterSpacing,wordSpacing,textScaleX].every(Number.isFinite)||textSize<0||textSize>512||textScaleX<0||textScaleX>16)fail('Shaped text font state exceeds backend limits');
   if(flags&0x20||flags&0x800)fail('Shaped text needs a backend for synthetic bold/forced auto-hinting');
@@ -131,6 +141,7 @@ export function measureSkiaShapedText(backend,text,{isRtl=false,textSize=12,weig
 
 /** Ink bounds of an actual shaped Latin glyph run; no character-box estimate. */
 export function measureSkiaTextBounds(backend,text,state={}){
+  if(typeof text==='string')text=oneLineRun(text);   // see oneLineRun
   // The run validator establishes the same installed font/script/state contract.
   measureSkiaRun(backend,text,{...state,offset:0});
   if(!text.length||state.textSize===0||state.textScaleX===0)return[0,0,0,0];
@@ -163,6 +174,7 @@ export function measureSkiaTextBounds(backend,text,state={}){
  * actual glyph IDs/positions. UTF16 ranges map to UTF8 cluster offsets; splitting
  * a cluster and partial RTL origins remain explicit unsupported boundaries. */
 export function drawSkiaTextRun(backend,canvas,text,x,y,state={},isRtl=false,paint=null,{start=0,end=text.length}={}){
+  if(typeof text==='string')text=oneLineRun(text);   // see oneLineRun
  const CK=backend.CanvasKit;
  if(typeof text!=='string'||text.length>65536||/[\r\n\t]/.test(text))fail('Recorded text needs one bounded shaping item');
  if(text.isWellFormed&&!text.isWellFormed())fail('Ill-formed UTF16 text requires a lossless native text boundary');

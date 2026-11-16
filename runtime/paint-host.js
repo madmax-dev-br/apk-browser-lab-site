@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=d422379a2a38';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=d422379a2a38';
-import { colorLongToArgb } from './color-long.js?v=d422379a2a38';
+import { APKError } from './apk-error.js?v=a53ed9c13aa0';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=a53ed9c13aa0';
+import { colorLongToArgb } from './color-long.js?v=a53ed9c13aa0';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -317,9 +317,9 @@ export function createPaintHost() {
       }
       if (name === 'clearShadowLayer') { paint.shadowLayer = null; return; }
       if (name === 'hasShadowLayer') return paint.shadowLayer ? 1 : 0;
-      if (name === 'setShadowLayer') {   // radius 0 clears the layer (Paint.setShadowLayer); a real blurred shadow needs Skia's drop-shadow looper, which the recorded-command Canvas does not carry yet
-        if (!(float(args[1]) > 0)) { paint.shadowLayer = null; return; }
-        fail('Paint.setShadowLayer with a positive radius is not implemented (the Skia canvas model has no shadow-layer looper)');
+      if (name === 'setShadowLayer') {   // Paint.setShadowLayer(radius, dx, dy, color): radius 0 clears the layer; otherwise every draw with this paint gets a blurred copy below it (src/skia-canvas-host.js makePaint)
+        const radius = float(args[1]); if (!(radius > 0)) { paint.shadowLayer = null; return; }
+        paint.shadowLayer = { radius, dx: float(args[2]), dy: float(args[3]), color: args[4] >>> 0 }; return;
       }
       if (name === 'getColor') return paint.color;
       // Paint.setColor(@ColorLong long) (API 29) keeps the long it was given (getColorLong answers it, as mColor does) and draws its sRGB 8-bit value, Color.toArgb(long)
@@ -396,6 +396,7 @@ export function getSolidPaint(runtime, receiver) {
   const paint = getPaintState(runtime, receiver);
   const maskFilter = nullish(paint.maskFilter) ? null : (runtime.object(paint.maskFilter).maskFilter ?? fail('This paint needs an implemented MaskFilter drawing backend (only BlurMaskFilter is)'));
   if (maskFilter && !runtime.skiaHost) fail('A Paint with a BlurMaskFilter requires the Skia backend');
+  if (paint.shadowLayer && !runtime.skiaHost) fail('A Paint with a shadow layer (Paint.setShadowLayer) requires the Skia backend');
   const pathEffect = nullish(paint.pathEffect) ? null : (runtime.object(paint.pathEffect).pathEffect ?? fail('This paint needs an implemented PathEffect drawing backend (only DashPathEffect and CornerPathEffect are)'));
   const shader = nullish(paint.shader) ? null : (runtime.platform?.shaderHost?.snapshot?.(runtime, paint.shader) ?? fail('This paint needs an implemented Shader drawing backend'));
   const colorFilterSnapshot=snapshotPaintColorFilter(runtime,paint.colorFilter);

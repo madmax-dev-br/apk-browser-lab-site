@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=d422379a2a38';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=d422379a2a38';
-import { isTrustedRasterURL } from './raster-cache.js?v=d422379a2a38';
+import { updateWebViewSlot } from './webview-slot.js?v=a53ed9c13aa0';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=a53ed9c13aa0';
+import { isTrustedRasterURL } from './raster-cache.js?v=a53ed9c13aa0';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -517,10 +517,16 @@ function bindPointerInput(host, owner) {
     // Interim: taps on clickable controls keep the semantic OnClick path until the press ripple (RippleHostView/RenderNode recording) runs under real MotionEvents;
     // gestures that semantics cannot express (slider drags, touch scrolling and flings, anything on non-clickable content) are real pointer input.
     if (!pointerClicks() && event.target.closest?.('button,textarea,input,[role=button],[role=switch],[role=checkbox]')) return;
-    active = event.pointerId;
+    active = event.pointerId; markTouch(event);
     win.addEventListener('pointermove', track, true); win.addEventListener('pointerup', onUp, true); win.addEventListener('pointercancel', onCancel, true);
     send(0, event);
   });
+}
+/** A mark where the finger went down, at once (the app's own press ripple only shows when the VM's next frame arrives). */
+function markTouch(event) {
+  const screen = document.getElementById('android-screen'); if (!screen?.getBoundingClientRect) return;
+  const r = screen.getBoundingClientRect(), scale = r.width / (screen.offsetWidth || r.width || 1), mark = document.createElement('span'); mark.className = 'touch-mark';
+  mark.style.left = `${(event.clientX - r.left) / scale}px`; mark.style.top = `${(event.clientY - r.top) / scale}px`; screen.append(mark); setTimeout(() => mark.remove(), 520);
 }
 function renderComposeSemantics(snapshot) {
   if (!document.getElementById('compose-accessibility-style')) {
@@ -671,11 +677,12 @@ async function flushPendingInputs() {
   if (state.busy || !state.runtime || !state.pendingInputs.size && !state.pendingFocus.length && !state.pendingComposeActions.length && !state.pendingScrolls.size && !state.pendingPointers.length && !state.pendingScrollBys.size) return;
   const token = state.operation;
   state.inputPromise = (async () => {
+    watchInputWait();
     while ((state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length || state.pendingScrollBys.size) && !state.busy && token === state.operation) {
       if (!state.pendingPointers.length && state.pendingScrollBys.size) {
         const [id, delta] = state.pendingScrollBys.entries().next().value; state.pendingScrollBys.delete(id);
         try { const snapshot = await state.runtime.scrollBy(id, delta.dx, delta.dy); if (token === state.operation) renderSnapshot(snapshot); }
-        catch (error) { if (token === state.operation) reportAPKError(error, 'Rolagem da lista interrompida'); state.pendingScrollBys.clear(); break; }
+        catch (error) { if (token === state.operation) reportAPKError(error, 'List scrolling interrupted'); state.pendingScrollBys.clear(); break; }
         continue;
       }
       if (state.pendingPointers.length) {
@@ -683,7 +690,7 @@ async function flushPendingInputs() {
         while (state.pendingPointers.length > 1 && state.pendingPointers[0].action === 2 && state.pendingPointers[1].action === 2 && state.pendingPointers[0].ownerViewId === state.pendingPointers[1].ownerViewId) state.pendingPointers.shift();
         const sample = state.pendingPointers.shift(); state.pointerInFlight = sample; (state.pointerLog ??= []).push([sample.action, Math.round(sample.x * 10) / 10, Math.round(sample.y * 10) / 10, sample.ownerViewId]); if (state.pointerLog.length > 12) state.pointerLog.shift();
         try { const snapshot = await state.runtime.pointer(sample); if (token === state.operation) renderSnapshot(snapshot); }
-        catch (error) { if (token === state.operation) reportAPKError(error, 'Entrada de ponteiro interrompida'); state.pendingPointers.length = 0; break; }
+        catch (error) { if (token === state.operation) reportAPKError(error, 'Pointer input interrupted'); state.pendingPointers.length = 0; break; }
         finally { state.pointerInFlight = null; }
         continue;
       }
@@ -693,7 +700,7 @@ async function flushPendingInputs() {
         try {
           const snapshot = await state.runtime.scroll(id, position.x, position.y);
           if (token === state.operation) { state.scrollAcknowledging = id; try { renderSnapshot(snapshot); } finally { state.scrollAcknowledging = null; } }
-        } catch (error) { if (token === state.operation) reportAPKError(error, 'Callback de rolagem interrompido'); state.pendingScrolls.clear(); break; }
+        } catch (error) { if (token === state.operation) reportAPKError(error, 'Scroll callback interrupted'); state.pendingScrolls.clear(); break; }
         finally { state.scrollInFlight = null; }
         continue;
       }
@@ -711,12 +718,40 @@ async function flushPendingInputs() {
       }
       const [id, text] = state.pendingInputs.entries().next().value; state.pendingInputs.delete(id); state.inputInFlight = id;
       try { const snapshot = await state.runtime.input(id, text); if (token === state.operation) renderSnapshot(snapshot); }
-      catch (error) { if (token === state.operation) reportAPKError(error, 'Callback de texto interrompido'); state.pendingInputs.clear(); break; }
+      catch (error) { if (token === state.operation) reportAPKError(error, 'Text callback interrupted'); state.pendingInputs.clear(); break; }
       finally { state.inputInFlight = null; }
     }
-  })().finally(() => { state.inputPromise = null; });
+  })().finally(() => { state.inputPromise = null; stopInputWait(); });
   return state.inputPromise;
 }
+/**
+ * While the page waits for the VM to answer an input (a tap, a key, a scroll), the device shows that it is working instead of looking frozen: a thin bar along the top of the
+ * screen and the seconds since the VM last answered, once that passes INPUT_WAIT_SHOW_MS. Each answer (renderSnapshot) restarts the count, so a gesture that gets its frames does
+ * not show it. The VM itself cannot draw while the app's code holds its main thread (a long onClick, a new screen's first composition, first-time class loading): on a device that
+ * takes milliseconds, here it can take seconds; the app's own frames follow as soon as it lets go. The last VM signal (heartbeat) names what it is doing, in the bar's title.
+ */
+const INPUT_WAIT_SHOW_MS = 350;
+let inputWaitTimer = null, inputWaitStart = 0;
+const nowMs = () => globalThis.performance?.now?.() ?? Date.now();
+function inputWaitElement() {
+  const screen = document.getElementById('android-screen'); if (!screen) return null;
+  let bar = document.getElementById('input-wait');
+  if (!bar) { bar = document.createElement('div'); bar.id = 'input-wait'; bar.className = 'input-wait'; bar.setAttribute('role', 'status'); bar.setAttribute('aria-live', 'polite'); bar.hidden = true; bar.innerHTML = '<i aria-hidden="true"></i><span></span>'; screen.append(bar); }
+  return bar;
+}
+function watchInputWait() {
+  stopInputWait(); inputWaitStart = nowMs();
+  inputWaitTimer = setInterval(() => {
+    const bar = inputWaitElement(); if (!bar) return;
+    const waited = nowMs() - Math.max(inputWaitStart, state.lastSnapshotAt ?? 0);
+    if (waited < INPUT_WAIT_SHOW_MS) { bar.hidden = true; return; }
+    const beat = state.runtime?.lastHeartbeat, doing = beat?.hostCall ?? beat?.stack?.[0] ?? null;
+    bar.querySelector('span').textContent = `Working… ${(waited / 1000).toFixed(1)} s`;
+    bar.title = doing ? `The app is running: ${doing}` : 'The app is running';
+    bar.hidden = false;
+  }, 100);
+}
+function stopInputWait() { if (inputWaitTimer !== null) clearInterval(inputWaitTimer); inputWaitTimer = null; const bar = document.getElementById?.('input-wait'); if (bar) bar.hidden = true; }
 async function checkView(id, checked) {
   if (!state.runtime || state.busy) return;
   await flushPendingInputs(); const token = beginOperation('Updating option in the DEX…');
@@ -827,6 +862,7 @@ function renderActionModes(modes = []) {
   reconcileChildren(layer, toolbars);
 }
 function renderSnapshot(snapshot) {
+  state.lastSnapshotAt = nowMs();   // the input wait indicator (watchInputWait) counts from the VM's last answer
   if (runtimeFrames.pending && state.runtime?.ackFrame) state.runtime.ackFrame(runtimeFrames.seq);   // an RPC reply replaces a queued scheduled-event snapshot: it counts as drawn
   runtimeFrames.pending = null; runtimeFrames.rendered++; if (runtimeFrames.drawn.length < 50000) runtimeFrames.drawn.push(Date.now());
   if (snapshot && 'ime' in snapshot) state.imeState = snapshot.ime;
