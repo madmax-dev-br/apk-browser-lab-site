@@ -20,21 +20,40 @@ const fail = message => Object.assign(new Error(message), { code: 'bad-args' });
 /** The scrollable a scroll_to / scroll_info call names: element_key, test_tag, text or a point (x, y) inside it; none = the largest scrollable on screen. */
 const scrollTargetOf = args => args.element_key || args.test_tag || args.text || (Number.isFinite(args.x) && Number.isFinite(args.y)) ? { key: args.element_key, testTag: args.test_tag, text: args.text, x: args.x, y: args.y } : null;
 
+export const NETWORK_WAIT_MS = 5000;
+/**
+ * Waits for "Tela pronta" without letting an endpoint hold the caller: the screen is not ready while a network exchange is in flight, so a slow or hanging request (a long poll,
+ * a stream, a server that does not answer) would keep every wait until its timeout. Once the screen is drawn and still and only the network is pending (screen.ready.onlyNetwork),
+ * the wait gives the requests `networkMs` more and then returns, saying which requests are still open. -> { ready, screen, networkPending: [{ method, url, seconds }] | undefined }
+ * screen(): the page's screen (src/plugin-host.js screenFromSnapshot); requests(): the network log's entries; sleep(ms); now().
+ */
+export async function waitScreenReady({ screen, requests = () => [], sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }, timeoutMs = 15000, networkMs = NETWORK_WAIT_MS) {
+  const until = now() + timeoutMs; let onlyNetworkSince = null, current;
+  const open = () => { const at = Date.now(); return requests().filter(entry => entry && entry.complete === false).slice(-8).map(entry => ({ method: entry.method ?? null, url: String(entry.url ?? '').slice(0, 300), seconds: Number.isFinite(entry.wall) ? Math.max(0, Math.round((at - entry.wall) / 100) / 10) : null })); };
+  for (;;) {
+    current = await screen();
+    if (current?.ready?.ready) return { ready: true, screen: current };
+    if (current?.ready?.onlyNetwork) { onlyNetworkSince ??= now(); if (now() - onlyNetworkSince >= networkMs) return { ready: false, screen: current, networkPending: open() }; }
+    else onlyNetworkSince = null;
+    if (now() >= until) return { ready: false, screen: current };
+    await sleep(150);
+  }
+}
+/** What a wait reports to the MCP client: ready, the Activity and, when not ready, why; a wait that ended on open requests names them. */
+export function readyReport(result) {
+  const report = { ready: result.ready, activity: result.screen?.activity ?? null };
+  if (!result.ready) report.waitingFor = result.screen?.ready?.waitingFor ?? [];
+  if (result.networkPending) { report.networkPending = result.networkPending; report.note = 'A tela está desenhada e parada; só há rede em andamento, então a espera não seguiu até o fim. Se o conteúdo depende dessa resposta, chame wait_ready com network_ms maior.'; }
+  return report;
+}
+
 /**
  * query(method, args): the plugin host's page-level query (screen, layoutBounds, screenshot, composeTree, viewModels, inspect, field, statics, staticField, classes,
  * instances, referrers, compositionLocals, findCompositionLocal). plugins(): the host's read model of the plugins. logcat() / network(): the entries of the page stores.
  * status(): what the page knows about the loaded APK. clickButton(pluginId, buttonId): a click on a plugin's button (lab.button), resolved when its handler finished. sleep(ms).
  */
 export function createMcpTools({ controls = null, query, plugins = () => [], clickButton = null, logcat = () => [], network = () => [], status = () => ({}), actions = null, input = null, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
-  async function waitReady(timeoutMs = 15000) {
-    const until = now() + bounded(timeoutMs, 15000, 100, 120000);
-    for (;;) {
-      const screen = await query('screen', {});
-      if (screen?.ready?.ready) return { ready: true, screen };
-      if (now() >= until) return { ready: false, screen };
-      await sleep(150);
-    }
-  }
+  const waitReady = (timeoutMs = 15000, networkMs = NETWORK_WAIT_MS) => waitScreenReady({ screen: () => query('screen', {}), requests: network, sleep, now }, bounded(timeoutMs, 15000, 100, 120000), bounded(networkMs, NETWORK_WAIT_MS, 0, 120000));
   /** instances / referrers: the runtime's short pages, walked until `limit` items or the end (as lab.instances does). */
   async function paged(method, args, limit) {
     const items = []; let after = 0, scanned = 0, done = false;
@@ -66,16 +85,16 @@ export function createMcpTools({ controls = null, query, plugins = () => [], cli
   }
   /** After an input: wait for the screen to settle (up to wait_ms), then the screen and, when asked, its image. */
   async function afterInput(result, args) {
-    const wait = bounded(args.wait_ms, 2000, 0, 20000), until = now() + wait; let screen = await query('screen', {});
-    while (!screen?.ready?.ready && now() < until) { await sleep(150); screen = await query('screen', {}); }
-    const content = [text({ ...result, activity: screen?.activity ?? null, ready: !!screen?.ready?.ready, ...(screen?.ready?.ready ? {} : { waitingFor: screen?.ready?.waitingFor ?? [] }) })];
+    const wait = bounded(args.wait_ms, 2000, 0, 20000), settledNow = wait > 0 ? await waitScreenReady({ screen: () => query('screen', {}), requests: network, sleep, now }, wait, Math.min(wait, NETWORK_WAIT_MS)) : { ready: false, screen: await query('screen', {}) };
+    if (wait === 0 && settledNow.screen?.ready?.ready) settledNow.ready = true;
+    const { note, ...report } = readyReport(settledNow), content = [text({ ...result, ...report })];
     if (args.screenshot) { const shot = await query('screenshot', { maxWidth: args.max_width }); content.unshift(await image(shot)); }
     return content;
   }
   /** Which installed app a call names: its id (apps, install_apk), its package, or its label / file name. */
   const appSelector = args => ({ id: args.id === undefined ? null : String(args.id), packageName: args.package === undefined ? null : String(args.package), name: args.name === undefined ? null : String(args.name) });
   /** After an app was opened: "Tela pronta" (up to wait_ms) and the Activity on screen. */
-  async function settled(waitMs) { const ready = await waitReady(waitMs ?? 15000); return { ready: ready.ready, activity: ready.screen?.activity ?? null, ...(ready.ready ? {} : { waitingFor: ready.screen?.ready?.waitingFor ?? [] }) }; }
+  async function settled(waitMs, networkMs) { return readyReport(await waitReady(waitMs ?? 15000, networkMs)); }
   const tools = {
     async lab_status() {
       const screen = await query('screen', {});
@@ -204,31 +223,62 @@ export function createMcpTools({ controls = null, query, plugins = () => [], cli
       return [text(await controls.appData({ op: 'sql', db: String(args.db), sql: String(args.sql), params: Array.isArray(args.params) ? args.params : [], limit: bounded(args.limit, 200, 1, 500) }))];
     },
     async device(args) { if (!controls?.device) throw fail('Ajustes do dispositivo não estão disponíveis nesta página.'); return [text(controls.device(args.set ?? null))]; },
-    async apps(args) { if (!controls?.apps) throw fail('Apps salvos não estão disponíveis nesta página.'); const result = await controls.apps(args.action ?? 'list', args.id ?? null); if ((args.action ?? 'list') === 'list') return [text(result)]; const ready = await waitReady(args.wait_ms ?? 15000); return [text({ ...result, ready: ready.ready })]; },
+    async apps(args) { if (!controls?.apps) throw fail('Apps salvos não estão disponíveis nesta página.'); const result = await controls.apps(args.action ?? 'list', args.id ?? null); if ((args.action ?? 'list') === 'list' || !result.running) return [text(result)]; return [text({ ...result, ...(await settled(args.wait_ms)) })]; },
     // ---- the device's apps (src/app.js mcpControls: the same paths as dropping a file on the page, the launcher icon and throwing the app off the recents) ----
     async install_apk(args, context) {
       if (!controls?.installApk) throw fail('Instalar um APK não está disponível nesta página.');
       if (!args.file?.id || typeof context?.fetchFile !== 'function') throw fail('install_apk precisa do arquivo entregue pela ponte: passe path (um .apk na máquina onde a ponte roda) e use a ponte lab-mcp.mjs atual.');
       const result = await controls.installApk(await context.fetchFile(args.file), { open: args.open === true });
-      return [text(args.open === true && result.running ? { ...result, ...(await settled(args.wait_ms)) } : result)];
+      return [text(args.open === true && result.running ? { ...result, ...(await settled(args.wait_ms, args.network_ms)) } : result)];
     },
     async open_app(args) {
       if (!controls?.openApp) throw fail('Abrir um app instalado não está disponível nesta página.');
       const result = await controls.openApp(appSelector(args));
-      return [text(result.running ? { ...result, ...(await settled(args.wait_ms)) } : result)];
+      return [text(result.running ? { ...result, ...(await settled(args.wait_ms, args.network_ms)) } : result)];
     },
     async close_app(args) { if (!controls?.closeApp) throw fail('Fechar um app não está disponível nesta página.'); return [text(await controls.closeApp(appSelector(args)))]; },
+    /** A video of the screen (src/screen-recorder.js): start, then the other tools act on the app, then stop writes the file on the bridge's machine (`args.local.outputs.recording`). */
+    async record_screen(args, context) {
+      const recorder = controls?.recordScreen; if (!recorder) throw fail('A gravação da tela não está disponível nesta página.');
+      const action = String(args.action ?? '');
+      if (action === 'start') return [text({ ...recorder.start({ fps: args.fps, maxWidth: args.max_width, maxSeconds: args.max_seconds, format: args.format ?? null }), note: 'Gravando. Use as outras ferramentas e depois record_screen com action "stop" (e path) para gravar o arquivo.' })];
+      if (action === 'status') return [text(recorder.status())];
+      if (action === 'discard') return [text({ discarded: recorder.discard() })];
+      if (action !== 'stop') throw fail('action é start, stop, status ou discard.');
+      const { blob, ...video } = await recorder.stop(), slot = args.local?.outputs?.recording;
+      const kept = 'O vídeo continua guardado na página: chame stop de novo com um path válido, ou discard.';
+      if (!slot?.id || typeof context?.sendFile !== 'function') throw fail(`${args.local?.missing?.recording ?? 'a ponte não abriu o arquivo de saída (use a ponte lab-mcp.mjs atual)'}. ${kept}`);
+      if (slot.ext && slot.ext !== video.container) throw fail(`A gravação é ${video.container} (${video.type}): use um path terminado em .${video.container}. ${kept}`);
+      await context.sendFile(slot, blob, { ext: video.container }); recorder.discard();
+      return [text({ saved: true, ...video })];
+    },
+    /** An adb command line run by the page's interpreter (src/adb-commands.js). `args.local`, put there by the bridge: the local files the command names ({ files: { path: { id, name, size } }, missing: { path: reason }, outputs: { path: { id } } }). */
+    async adb(args, context) {
+      if (!controls?.adb) throw fail('O interpretador de comandos adb não está disponível nesta página.');
+      const command = typeof args.command === 'string' && args.command.trim() ? args.command : null, words = Array.isArray(args.args) && args.args.length ? args.args.map(String) : null;
+      if (!command && !words) throw fail('Passe command (a linha, ex. "adb shell input tap 200 400") ou args (as palavras de um comando adb). "adb help" lista o que há.');
+      const local = args.local ?? {}, io = {
+        localFile: async path => { const file = local.files?.[path]; if (file && typeof context?.fetchFile === 'function') return context.fetchFile(file); throw Object.assign(new Error(`adb: ${path}: ${local.missing?.[path] ?? 'a ponte não ofereceu este arquivo (use a ponte lab-mcp.mjs atual)'}`), { name: 'AdbError', exitCode: 1 }); },
+        writeLocal: async (path, blob) => { const slot = local.outputs?.[path]; if (slot?.id && typeof context?.sendFile === 'function') return context.sendFile(slot, blob); throw Object.assign(new Error(`adb: gravar ${path.replace(/^pull:/, '')}: ${local.missing?.[path] ?? 'a ponte não abriu este arquivo de saída (use a ponte lab-mcp.mjs atual)'}`), { name: 'AdbError', exitCode: 1 }); },
+      };
+      const result = await controls.adb(command ? { command } : { args: words }, io), content = [];
+      for (const picture of result.images ?? []) content.push(await image({ blob: picture.blob, type: picture.type }));
+      const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+      content.push(text(output || (result.images?.length ? '(imagem)' : '(sem saída)')));
+      if (result.code !== 0 || result.notes?.length) content.push(text({ exit: result.code, ...(result.notes?.length ? { lab: result.notes } : {}) }));
+      return Object.assign(content, { isError: result.code !== 0 });
+    },
     async open_link(args) { if (!controls?.openLink) throw fail('Deep links não estão disponíveis nesta página.'); if (!args.link && !args.component) throw fail('link (ou component) é obrigatório.'); return [text(await controls.openLink({ link: String(args.link ?? ''), action: String(args.action ?? ''), component: String(args.component ?? '') }))]; },
     async host_redirects(args) { if (!controls?.hostRedirects) throw fail('Redirecionar hosts não está disponível nesta página.'); return [text(controls.hostRedirects(Array.isArray(args.rules) ? args.rules : null))]; },
     async permissions(args) { if (!controls?.permissions) throw fail('Permissões não estão disponíveis nesta página.'); return [text(controls.permissions(args.name ?? null, args.state ?? null))]; },
-    async wait_ready(args) { const result = await waitReady(args.timeout_ms); return [text({ ready: result.ready, activity: result.screen?.activity ?? null, waitingFor: result.screen?.ready?.waitingFor ?? [] })]; },
+    async wait_ready(args) { const report = readyReport(await waitReady(args.timeout_ms, args.network_ms)); return [text({ ...report, waitingFor: report.waitingFor ?? [] })]; },
   };
   return {
     names: Object.keys(tools),
     /** One MCP tool call -> { content, isError }. Errors are tool errors (the client sees the message), never thrown. `context.fetchFile(file)`: a file the bridge offers with the call. */
     async execute(name, args = {}, context = {}) {
       const tool = tools[name]; if (!tool) return { isError: true, content: [text(`Ferramenta desconhecida nesta página: ${name}. Atualize a página do lab (a ponte é mais nova).`)] };
-      try { return { content: await tool(args && typeof args === 'object' ? args : {}, context ?? {}) }; }
+      try { const content = await tool(args && typeof args === 'object' ? args : {}, context ?? {}); return content.isError ? { content: [...content], isError: true } : { content }; }
       catch (error) { return { isError: true, content: [text(`${error?.code ? `[${error.code}] ` : ''}${error?.message ?? error}`)] }; }
     },
   };

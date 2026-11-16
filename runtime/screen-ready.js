@@ -7,7 +7,7 @@
 // and all of that held for READY_QUIET_MS (a short quiet period, so a response that triggers the next request or a postDelayed of a few frames is not "ready" in between).
 // A screen that keeps animating forever (a progress spinner, a blinking cursor of a focused field) never becomes ready: `waitingFor` names why. The Worker attaches the result
 // to every snapshot (snapshot.screenReady) and wakes once the quiet period ends so the flip to ready is posted even when nothing else happens. DOM-free, no process.*.
-import { runPluginQuery } from './plugin-queries.js?v=1d7de62ac467';
+import { runPluginQuery } from './plugin-queries.js?v=d62efce0f056';
 
 export const READY_QUIET_MS = 300;
 const FRAGMENT_RESUMED = 7;   // androidx.fragment.app.Fragment.RESUMED (INITIALIZING -1 … AWAITING_ENTER_EFFECTS 6, RESUMED 7)
@@ -54,7 +54,8 @@ export function waitingFor(probe) {
 export class ScreenReadyTracker {
   constructor({ quietMs = READY_QUIET_MS } = {}) { this.quietMs = quietMs; this.reset(); }
   reset() { this.activityRef = null; this.settledSince = null; this.readySince = null; this.state = null; this.lastSettled = false; }
-  /** Records a probe; returns the public state { ready, activity, readySince, settledForMs, quietMs, waitingFor, fragments }. */
+  /** Records a probe; returns the public state { ready, activity, readySince, settledForMs, quietMs, waitingFor, network, onlyNetwork, fragments }. `network`: exchanges in
+   *  flight; `onlyNetwork`: they are the one thing the screen waits for (it is drawn and still), which is how a caller tells a slow or hanging endpoint from a screen that loads. */
   observe(probe, now) {
     if (probe.activityRef !== this.activityRef) { this.activityRef = probe.activityRef; this.settledSince = null; this.readySince = null; }
     const reasons = waitingFor(probe), settled = reasons.length === 0;
@@ -65,6 +66,7 @@ export class ScreenReadyTracker {
     this.lastSettled = settled;
     this.state = { ready, activity: probe.activity, readySince: ready ? Date.now() - Math.round(now - this.readySince) : null, settledForMs: settled ? Math.round(now - this.settledSince) : 0, quietMs: this.quietMs,
       waitingFor: settled && !ready ? [`tela parada há ${Math.round(now - this.settledSince)} ms (pronta após ${this.quietMs} ms)`] : reasons,
+      network: probe.network ?? 0, onlyNetwork: (probe.network ?? 0) > 0 && waitingFor({ ...probe, network: 0 }).length === 0,
       fragments: probe.fragments.map(fragment => ({ className: fragment.className, state: fragment.state, hidden: fragment.hidden, ready: fragment.hidden || fragment.state === null || fragment.state >= FRAGMENT_RESUMED })) };
     return this.state;
   }

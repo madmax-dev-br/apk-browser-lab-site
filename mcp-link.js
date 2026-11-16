@@ -65,7 +65,7 @@ export function mcpAgentSetup(agent, options = {}) {
 }
 
 /**
- * execute(tool, args, context) -> Promise<{ content, isError }>; context.fetchFile(file) reads a file the bridge offers with the call (install_apk). onState({ state: 'desconectado' | 'conectando' | 'conectado' | 'erro', message, server, calls }).
+ * execute(tool, args, context) -> Promise<{ content, isError }>; context.fetchFile(file) reads a file the bridge offers with the call (install_apk, adb install / push) and context.sendFile(slot, blob) hands it one to write (adb pull). onState({ state: 'desconectado' | 'conectando' | 'conectado' | 'erro', message, server, calls }).
  * Returns { connect({ url, token }), disconnect(), get connected(), state }.
  */
 export function createMcpLink({ execute, onState = () => {}, EventSourceImpl = globalThis.EventSource, fetchImpl = (...args) => globalThis.fetch(...args) }) {
@@ -73,7 +73,7 @@ export function createMcpLink({ execute, onState = () => {}, EventSourceImpl = g
   const emit = (state, message = '') => { S.state = state; S.message = message; onState({ state, message, server: S.server, calls: S.calls, lastTool: S.lastTool }); };
   async function answer(call) {
     const base = S.base; if (!base) return;
-    let result; try { result = await execute(call.tool, call.args ?? {}, { fetchFile: file => fetchFile(base, file) }); } catch (error) { result = { isError: true, content: [{ type: 'text', text: String(error?.message ?? error) }] }; }
+    let result; try { result = await execute(call.tool, call.args ?? {}, { fetchFile: file => fetchFile(base, file), sendFile: (slot, blob, options) => sendFile(base, slot, blob, options) }); } catch (error) { result = { isError: true, content: [{ type: 'text', text: String(error?.message ?? error) }] }; }
     S.calls++; S.lastTool = call.tool; if (S.state === 'conectado') emit('conectado', S.message);
     try { await fetchImpl(`${base}/result`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: call.id, ...result }) }); }
     catch (error) { emit('erro', `a resposta não chegou à ponte: ${error?.message ?? error}`); }
@@ -86,6 +86,12 @@ export function createMcpLink({ execute, onState = () => {}, EventSourceImpl = g
     const blob = await res.blob();
     if (Number.isFinite(size) && blob.size !== size) throw new Error(`O arquivo chegou incompleto da ponte (${blob.size} de ${size} bytes).`);
     return new File([blob], String(name ?? 'app.apk'), { type: 'application/vnd.android.package-archive' });
+  }
+  /** Bytes for a file the bridge will write on its machine for the call in flight (adb pull, `> file`: { id }). */
+  async function sendFile(base, { id } = {}, blob, { ext = null } = {}) {   // ext: the extension of a file the bridge named without one (a screen recording: mp4 or webm)
+    if (!/^[0-9a-f]{16,64}$/.test(String(id ?? ''))) throw new Error('A ponte não abriu um arquivo de saída para esta chamada.');
+    const res = await fetchImpl(`${base}/file/${id}${/^[a-z0-9]{1,8}$/.test(String(ext ?? '')) ? `?ext=${ext}` : ''}`, { method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: blob });
+    if (!res?.ok) { let reason = ''; try { reason = (await res.json())?.error ?? ''; } catch { /* no body */ } throw new Error(`A ponte não gravou o arquivo (HTTP ${res?.status ?? '?'}${reason ? `: ${reason}` : ''}).`); }
   }
   function connect({ url, token }) {
     disconnect(false);

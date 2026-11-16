@@ -1,7 +1,7 @@
 // Images of what the page shows, for plugins (lab.screenshot, docs/PLUGINS.md): the whole screen or one element of "Mostrar limites de layout", cut from the content
 // rasters the page already drew (the same frame the user sees; nothing is asked of the VM). Views that the page draws with its own DOM (plain XML widgets) have no
 // raster and do not appear in a whole-screen image: the result says how many were left out.
-import { flattenViews, cropRect } from './compose-inspector-panel.js?v=1d7de62ac467';
+import { flattenViews, cropRect } from './compose-inspector-panel.js?v=d62efce0f056';
 
 export const MAX_CAPTURE_WIDTH = 2048, MAX_DOM_NODES = 600, MAX_PADDING = 64;
 const TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -15,6 +15,33 @@ function layerSize(layer) {
 function toBlob(canvas, type) {
   if (typeof canvas.convertToBlob === 'function') return canvas.convertToBlob({ type });
   return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(failure('encode', 'O navegador não codificou a imagem.')), type));
+}
+
+/**
+ * Paints the whole screen on `canvas` from the content rasters the page shows (no encoding, nothing asked of the VM): what a whole-screen screenshot holds, and one frame of a
+ * screen recording (src/screen-recorder.js). `fit`: keep the canvas's size and draw the screen scaled into it (a recording's frames share one size); otherwise the canvas takes
+ * the screen's size, at most `limit` wide. -> { width, height, drawn, domViews }. Throws 'no-image' when nothing on the screen has a raster.
+ */
+export function paintScreen(snapshot, getHost, canvas, { limit = 1080, fit = false } = {}) {
+  if (!snapshot) throw failure('no-apk', 'Nenhuma tela exibida.');
+  const views = flattenViews(snapshot), roots = views.filter(view => view.depth === 0 && view.bounds && view.visible);
+  const width = Math.max(0, ...roots.map(view => view.bounds.right)), height = Math.max(0, ...roots.map(view => view.bounds.bottom));
+  if (!(width > 0 && height > 0)) throw failure('no-image', 'A tela ainda não tem conteúdo desenhado.');
+  const layers = []; let domViews = 0;
+  for (const view of views) {
+    if (!view.visible || !view.bounds) continue;
+    if (view.rasterHostId === null || view.rasterHostId === undefined) { if (view.depth > 0 && !view.compose) domViews++; continue; }
+    if (view.rasterHostId !== view.id) continue;   // drawn inside an ancestor's raster
+    const layer = getHost(view.id)?._contentLayer, size = layerSize(layer); if (!(size.width > 0 && size.height > 0)) continue;
+    layers.push({ layer, size, b: view.bounds });
+  }
+  if (!layers.length) throw failure('no-image', 'Nenhuma View da tela tem raster de conteúdo (a tela é desenhada pelo DOM da página).');
+  let k, dx = 0, dy = 0;
+  if (fit) { k = Math.min(canvas.width / width, canvas.height / height); dx = (canvas.width - width * k) / 2; dy = (canvas.height - height * k) / 2; }
+  else { k = Math.min(1, limit / width); canvas.width = Math.max(1, Math.round(width * k)); canvas.height = Math.max(1, Math.round(height * k)); }
+  const ctx = canvas.getContext('2d'); if (fit) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+  for (const { layer, size, b } of layers) ctx.drawImage(layer, 0, 0, size.width, size.height, dx + b.left * k, dy + b.top * k, (b.right - b.left) * k, (b.bottom - b.top) * k);
+  return { width: canvas.width, height: canvas.height, drawn: layers.length, domViews };
 }
 
 /**
@@ -105,20 +132,8 @@ export async function captureImage({ snapshot, getHost, element = null, region =
     const k = Math.min(1, limit / r.sw); canvas.width = Math.max(1, Math.round(r.sw * k)); canvas.height = Math.max(1, Math.round(r.sh * k));
     canvas.getContext('2d').drawImage(layer, r.sx, r.sy, r.sw, r.sh, 0, 0, canvas.width, canvas.height);
   } else {
-    const views = flattenViews(snapshot), roots = views.filter(view => view.depth === 0 && view.bounds && view.visible);
-    const width = Math.max(0, ...roots.map(view => view.bounds.right)), height = Math.max(0, ...roots.map(view => view.bounds.bottom));
-    if (!(width > 0 && height > 0)) throw failure('no-image', 'A tela ainda não tem conteúdo desenhado.');
-    const k = Math.min(1, limit / width); canvas.width = Math.max(1, Math.round(width * k)); canvas.height = Math.max(1, Math.round(height * k));
-    const ctx = canvas.getContext('2d'); let drawn = 0, domViews = 0;
-    for (const view of views) {
-      if (!view.visible || !view.bounds) continue;
-      if (view.rasterHostId === null || view.rasterHostId === undefined) { if (view.depth > 0 && !view.compose) domViews++; continue; }
-      if (view.rasterHostId !== view.id) continue;   // drawn inside an ancestor's raster
-      const layer = getHost(view.id)?._contentLayer, size = layerSize(layer); if (!(size.width > 0 && size.height > 0)) continue;
-      const b = view.bounds; ctx.drawImage(layer, 0, 0, size.width, size.height, b.left * k, b.top * k, (b.right - b.left) * k, (b.bottom - b.top) * k); drawn++;
-    }
-    if (!drawn) throw failure('no-image', 'Nenhuma View da tela tem raster de conteúdo (a tela é desenhada pelo DOM da página).');
-    if (domViews) notes.push(`${domViews} Views desenhadas pelo DOM da página não aparecem na imagem`);
+    const painted = paintScreen(snapshot, getHost, canvas, { limit });
+    if (painted.domViews) notes.push(`${painted.domViews} Views desenhadas pelo DOM da página não aparecem na imagem`);
   }
   let blob; try { blob = await toBlob(canvas, format); } catch (error) { if (!dom || error?.code) throw error; throw failure('no-image', 'Este navegador não deixa ler a imagem de uma View montada a partir do DOM da página (canvas marcado como de outra origem).'); }
   const width = canvas.width, height = canvas.height; canvas.width = 0; canvas.height = 0;   // the pixels live in the Blob only

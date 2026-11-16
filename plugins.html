@@ -6,8 +6,8 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="Como configurar plugins no APK Browser Lab: onde ficam, como adicionar, a API lab, limites de custo, o que não é permitido e exemplos prontos para copiar.">
-  <link rel="stylesheet" href="./site-pages.css?v=1d7de62ac467">
-  <link rel="stylesheet" href="./lab-tokens.css?v=1d7de62ac467">
+  <link rel="stylesheet" href="./site-pages.css?v=d62efce0f056">
+  <link rel="stylesheet" href="./lab-tokens.css?v=d62efce0f056">
 </head>
 <body>
   <header class="topbar">
@@ -355,7 +355,7 @@
           <h4 class="api-sig"><code>await lab.screen()</code></h4>
           <p>A tela atual, no mesmo formato do evento, sem trabalho na VM.</p>
           <dl class="facts">
-            <div><dt>Tela pronta</dt><dd><code>screen.ready</code> é a “Tela pronta”: <code class="shape">{ ready, activity, readySince, waitingFor, fragments }</code> Fica pronta quando a Activity está em onResume com o primeiro quadro desenhado, os fragments em RESUMED, e não há quadro, layout, mensagem da thread principal nem requisição de rede pendente por 300 ms.</dd></div>
+            <div><dt>Tela pronta</dt><dd><code>screen.ready</code> é a “Tela pronta”: <code class="shape">{ ready, activity, readySince, waitingFor, network, onlyNetwork, fragments }</code> Fica pronta quando a Activity está em onResume com o primeiro quadro desenhado, os fragments em RESUMED, e não há quadro, layout, mensagem da thread principal nem requisição de rede pendente por 300 ms.</dd></div>
           </dl>
         </div>
 
@@ -983,7 +983,7 @@ url = "http://127.0.0.1:8790/mcp/&lt;o token da página&gt;"</code></pre></div>
 }</code></pre></div>
             Com outra porta, o JSON traz <code>--port</code>; numa cópia do lab em outra origem, <code>--origin</code>.</li>
           <li><b>Conecte:</b> em <b>Controles › MCP</b>, clique em <b>Conectar</b>. O navegador pode pedir permissão para a página acessar a rede local: permita. Se a ponte tem outro token (você gerou um novo, ou o cliente usa uma configuração antiga), os dois lados recusam com uma mensagem clara: copie o JSON de novo e reinicie o servidor MCP no cliente.</li>
-          <li><b>Peça ao Claude:</b> “tire um print do botão Salvar”, “qual LocalContentColor cada texto da tela recebe?”, “o que o plugin X está mostrando?”, “quais requisições falharam?”, “faça /v1/perfil devolver um usuário premium e recarregue a tela”, “acompanhe o Logcat por erros enquanto eu navego”, “filtre por Pendentes, busque Monitor e me mostre o resultado”, “instale o app-debug.apk que acabei de compilar, abra e me mostre a primeira tela”.</li>
+          <li><b>Peça ao Claude:</b> “tire um print do botão Salvar”, “qual LocalContentColor cada texto da tela recebe?”, “o que o plugin X está mostrando?”, “quais requisições falharam?”, “faça /v1/perfil devolver um usuário premium e recarregue a tela”, “acompanhe o Logcat por erros enquanto eu navego”, “filtre por Pendentes, busque Monitor e me mostre o resultado”, “instale o app-debug.apk que acabei de compilar, abra e me mostre a primeira tela”, “rode no lab os comandos adb deste script de teste”.</li>
         </ol>
 
         <h3 id="mcp-ferramentas">Ferramentas</h3>
@@ -992,6 +992,9 @@ url = "http://127.0.0.1:8790/mcp/&lt;o token da página&gt;"</code></pre></div>
         <div class="api" id="mcp-lab-status">
           <h4 class="api-sig names"><code>lab_status</code><code>wait_ready</code></h4>
           <p>A tela atual e a “Tela pronta”; espera a tela assentar.</p>
+          <dl class="facts">
+            <div><dt>Rede lenta</dt><dd>A tela só fica pronta sem requisição de rede em andamento, mas um endpoint lento ou pendurado (um long poll, um servidor que não responde) não segura a espera até o fim: com a tela já desenhada e parada e só a rede pendente, <code>wait_ready</code> espera mais <code>network_ms</code> (padrão 5000) e devolve <code>ready: false</code> com <code>networkPending</code>, a lista das requisições abertas (método, URL e há quantos segundos). O mesmo vale para a espera de <code>open_app</code>, <code>install_apk</code> com <code>open</code>, <code>tap</code>, <code>type</code>, <code>scroll</code> e <code>back</code>. Se o conteúdo depende da resposta, chame <code>wait_ready</code> de novo com <code>network_ms</code> maior.</dd></div>
+          </dl>
         </div>
 
         <div class="api" id="mcp-screenshot">
@@ -1076,10 +1079,51 @@ url = "http://127.0.0.1:8790/mcp/&lt;o token da página&gt;"</code></pre></div>
           </ul>
         </div>
 
+        <div class="api" id="mcp-record-screen">
+          <h4 class="api-sig names"><code>record_screen</code></h4>
+          <p>Grava a tela do app em vídeo. <code>action: "start"</code> começa; enquanto grava, o agente usa as outras ferramentas (<code>tap</code>, <code>type</code>, <code>adb</code> …); <code>action: "stop"</code> encerra e grava o arquivo na máquina onde a ponte roda.</p>
+          <ul class="params">
+            <li><code>start</code>: <code>fps</code> (1 a 30, padrão 12), <code>max_width</code> (padrão 1080; a tela tem 1 px por dp), <code>max_seconds</code> (1 a 300, padrão 60: a gravação para sozinha) e <code>format</code> (<code>mp4</code> ou <code>webm</code>; sem ele, mp4 quando o navegador grava mp4, senão webm). Devolve o formato e o tamanho do vídeo.</li>
+            <li><code>stop</code>: <code>path</code> é o arquivo (<code>.mp4</code> ou <code>.webm</code>, a extensão do formato) ou uma pasta; sem ele, <code>gravacao-tela-&lt;data e hora&gt;</code> na pasta da ponte. Se o arquivo não pôde ser gravado, o vídeo continua guardado na página para um novo <code>stop</code>.</li>
+            <li><code>status</code> diz se está gravando, há quanto tempo e quantos quadros; <code>discard</code> joga fora um vídeo já encerrado.</li>
+          </ul>
+          <dl class="facts">
+            <div><dt>O que aparece</dt><dd>O mesmo que num <code>screenshot</code>: telas Compose e Views com raster. Views que a página desenha com o próprio DOM não aparecem, e uma tela só delas não tem imagem: <code>start</code> diz isso em vez de gravar um vídeo vazio.</dd></div>
+            <div><dt>Aba visível</dt><dd>O vídeo é codificado pelo navegador (MediaRecorder) em tempo real; com a aba em segundo plano o navegador reduz os quadros.</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="mcp-adb">
+          <h4 class="api-sig names"><code>adb</code></h4>
+          <p>Roda uma linha de comando do <code>adb</code> contra o aparelho do lab, para reaproveitar os comandos que você usa num emulador. Não é o adb: é um interpretador que faz, pelos caminhos da própria página, o que cada comando faz num aparelho. Passe <code>command</code> (a linha, como num terminal; o <code>adb</code> inicial é opcional) ou <code>args</code> (as palavras de um comando). <code>adb help</code> lista o que há.</p>
+          <div class="code" data-name="exemplos"><pre><code>adb install -r -g app-debug.apk
+adb shell am start -W -n com.exemplo.app/.MainActivity
+adb shell am start -a android.intent.action.VIEW -d "meuapp://item/42"
+adb shell input tap 200 400 &amp;&amp; adb shell input text ola%smundo &amp;&amp; adb shell input keyevent KEYCODE_ENTER
+adb shell input swipe 200 700 200 200 300
+adb exec-out screencap -p &gt; tela.png
+adb exec-out uiautomator dump /dev/tty
+adb logcat -d -v brief *:E | grep -i timeout
+adb shell "dumpsys window | grep mCurrentFocus"
+adb shell pm grant com.exemplo.app android.permission.CAMERA
+adb shell settings put global animator_duration_scale 0
+adb push contrato.pdf /sdcard/Download/ &amp;&amp; adb pull /sdcard/Download/contrato.pdf copia.pdf</code></pre></div>
+          <dl class="facts">
+            <div><dt>Linha de comando</dt><dd>Aspas e <code>\</code> como num shell, <code>| grep</code> / <code>head</code> / <code>tail</code> / <code>wc</code> / <code>sort</code> / <code>uniq</code>, <code>&amp;&amp;</code>, <code>||</code>, <code>;</code> e <code>&gt; arquivo</code>. Variáveis (<code>$X</code>), <code>$(…)</code> e curingas não são interpretados: a linha é recusada.</dd></div>
+            <div><dt>Apps</dt><dd><code>install</code> (<code>-g</code> concede as permissões de execução), <code>uninstall</code> (<code>-k</code> mantém os dados), <code>am start</code> (<code>-n</code>, <code>-a</code>, <code>-d</code>, <code>-t</code>, <code>-c</code>, <code>-e</code>/<code>--es</code>, <code>--ez</code>, <code>--ei</code>, <code>-p</code>, <code>-W</code>, <code>-S</code>), <code>am force-stop</code>, <code>monkey -p pacote 1</code>, <code>pm list packages</code>, <code>pm clear</code>, <code>pm grant</code> / <code>revoke</code>. Um app por vez: um comando que nomeia outro pacote carrega esse pacote e encerra o que estava aberto.</dd></div>
+            <div><dt>Entrada</dt><dd><code>input tap</code> é o toque real (Compose) ou o clique (View); <code>input swipe</code> é um arrasto real em Compose e <code>View.scrollBy</code> numa View rolável; o mesmo ponto duas vezes é o toque longo. <code>input text</code> e <code>input keyevent</code> escrevem no campo com foco pelo teclado do Android (toque no campo antes): letras, números, pontuação, <code>ENTER</code>, <code>DEL</code> e, num campo Compose, as teclas de cursor. Fora de um campo, só <code>BACK</code>, <code>HOME</code> e <code>APP_SWITCH</code> têm caminho.</dd></div>
+            <div><dt>Tela e log</dt><dd><code>screencap -p</code> devolve a imagem; <code>uiautomator dump</code> devolve a hierarquia (Views e os nós de semântica do Compose, com limites da janela; 1 px = 1 dp); <code>logcat</code> aceita <code>-d</code>, <code>-c</code>, <code>-t</code>, <code>-s</code>, <code>-v</code>, <code>--pid</code>, <code>-e</code> e filtros <code>TAG:P</code>; <code>dumpsys activity</code>, <code>window</code>, <code>package</code> e <code>battery</code> trazem o que a página conhece, no formato do Android.</dd></div>
+            <div><dt>Ajustes</dt><dd><code>settings get|put</code> para as escalas de animação, <code>font_scale</code>, <code>time_12_24</code>, <code>user_rotation</code> e <code>ui_night_mode</code>; <code>wm size</code>, <code>svc wifi|data</code>, <code>cmd uimode night</code>, <code>dumpsys battery set …</code>. São os ajustes de <b>Controles › Dispositivo</b>.</dd></div>
+            <div><dt>Arquivos</dt><dd><code>push</code> grava no armazenamento compartilhado, na pasta do tipo do arquivo (<code>/sdcard/Pictures</code>, <code>Movies</code>, <code>Music</code> ou <code>Download</code>). <code>pull</code>, <code>cat</code>, <code>ls</code> e <code>rm</code> alcançam o que o <code>push</code>, o <code>screencap</code> e o <code>uiautomator dump</code> gravaram; arquivos criados pelo app não chegam à página. Caminhos locais são da máquina onde a ponte roda, relativos à pasta em que ela foi iniciada.</dd></div>
+            <div><dt>O que falha</dt><dd>O que a página não alcança falha com o nome do comando e status 127, e nunca roda como outra coisa: <code>am broadcast</code>, <code>am startservice</code>, teclas que não são de texto nem de cursor (volume, <code>TAB</code>, funções), <code>run-as</code> e os arquivos privados do app (use <code>app_data</code>), <code>getprop ro.product.*</code> / <code>ro.build.*</code>, <code>forward</code> / <code>reverse</code> (use <code>host_redirects</code>), <code>screenrecord</code> (use <code>record_screen</code>), <code>install-multiple</code>, shell interativo.</dd></div>
+            <div><dt>Resposta</dt><dd>A saída do comando como o adb a escreve, a imagem do <code>screencap</code> e, quando há, <code>exit</code> e <code>lab</code>: notas sobre como a página atendeu o comando (por exemplo, por qual caminho um toque entrou) ou onde ele difere de um aparelho.</dd></div>
+          </dl>
+        </div>
+
         <h3 id="mcp-seguranca">Segurança da ponte</h3>
         <ul>
           <li><b>Quem alcança:</b> a ponte escuta só em 127.0.0.1, aceita só as origens do lab (esta página e uma cópia local; outras com <code>--origin</code>) e exige o token, comparado em tempo constante e nunca escrito nos logs; não guarda nada.</li>
-          <li><b>Arquivos:</b> a ponte só lê um arquivo quando o agente chama <code>install_apk</code>: o <code>.apk</code> do caminho pedido (até 1 GiB), entregue a esta página enquanto a chamada dura, com a mesma checagem de origem e token. A página recebe o nome e o tamanho do arquivo, não o caminho. Com <code>--host 0.0.0.0</code>, um agente de outra máquina que tenha o token pode pedir a instalação de qualquer <code>.apk</code> que você possa ler nesta máquina.</li>
+          <li><b>Arquivos:</b> a ponte só lê um arquivo quando o agente chama <code>install_apk</code>: o <code>.apk</code> do caminho pedido (até 1 GiB), entregue a esta página enquanto a chamada dura, com a mesma checagem de origem e token. A página recebe o nome e o tamanho do arquivo, não o caminho. <code>record_screen</code> grava o vídeo no caminho pedido no <code>stop</code>. A ferramenta <code>adb</code> faz o mesmo com os arquivos que a linha de comando cita: lê o de <code>adb install</code> e o de <code>adb push</code>, e grava o destino de <code>adb pull</code> e de <code>&gt; arquivo</code> (sobrescreve, como um shell). Nenhum outro caminho é lido ou gravado. Com <code>--host 0.0.0.0</code>, um agente de outra máquina que tenha o token pode pedir essas leituras e gravações em qualquer caminho que você alcance nesta máquina.</li>
           <li><b>Token:</b> sem <code>APK_WEB_LAB_MCP_TOKEN</code> nem <code>--token</code>, a ponte usa o token de <code>~/.apk-web-lab-mcp-token</code> (<code>node lab-mcp.mjs token</code> mostra), que pode ser colado no campo Token da página, como antes.</li>
           <li><b>O que muda no app:</b> o MCP não muda o app por dentro: além das leituras, toca e digita como você e usa os controles do laboratório (mocks, recarregar a tela, instalar, abrir e fechar apps), que aparecem em Controles, na tela inicial e no log de execução.</li>
           <li><b>Aba visível:</b> mantenha a aba do lab visível enquanto usa (abas em segundo plano ficam lentas).</li>
@@ -1490,6 +1534,6 @@ await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=1d7de62ac467"></script>
+  <script type="module" src="./site-pages.js?v=d62efce0f056"></script>
 </body>
 </html>

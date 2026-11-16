@@ -7,11 +7,11 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=1d7de62ac467';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=1d7de62ac467';
-import { encodeVariantImages } from './render-variant-image.js?v=1d7de62ac467';
-import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=1d7de62ac467';
-import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=1d7de62ac467';
+import { pluginWorkerSource } from './plugin-runtime.js?v=d62efce0f056';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=d62efce0f056';
+import { encodeVariantImages } from './render-variant-image.js?v=d62efce0f056';
+import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=d62efce0f056';
+import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=d62efce0f056';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
@@ -30,7 +30,7 @@ export function screenFromSnapshot(snapshot, { packageName = null, frame = 0 } =
   const navigation = snapshot.navigation ?? {};
   return { activity: snapshot.activityName ?? null, activityStack: Array.isArray(navigation.activityStack) ? [...navigation.activityStack] : [], tasks: Array.isArray(navigation.tasks) ? navigation.tasks.map(task => ({ id: task.id ?? null, activityStack: [...(task.activityStack ?? [])] })) : [],
     windows, dialogs: windows.filter(w => w.kind === 'dialog').length, canGoBack: !!(snapshot.canGoBack ?? navigation.canGoBack), closed: !!snapshot.closed, packageName, frame,
-    ready: snapshot.screenReady ? { ready: !!snapshot.screenReady.ready, activity: snapshot.screenReady.activity ?? null, readySince: snapshot.screenReady.readySince ?? null, waitingFor: [...(snapshot.screenReady.waitingFor ?? [])], fragments: (snapshot.screenReady.fragments ?? []).map(f => ({ ...f })) } : null };
+    ready: snapshot.screenReady ? { ready: !!snapshot.screenReady.ready, activity: snapshot.screenReady.activity ?? null, readySince: snapshot.screenReady.readySince ?? null, waitingFor: [...(snapshot.screenReady.waitingFor ?? [])], network: snapshot.screenReady.network ?? 0, onlyNetwork: !!snapshot.screenReady.onlyNetwork, fragments: (snapshot.screenReady.fragments ?? []).map(f => ({ ...f })) } : null };
 }
 /** What makes two screens different (the frame counter does not). */
 export const screenKey = screen => JSON.stringify([screen.activity, screen.activityStack, screen.windows, screen.closed, screen.packageName, screen.ready?.ready ?? null]);   // the flip to "Tela pronta" is a screen change
@@ -381,11 +381,12 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     },
     /** Reiniciar: a fresh Worker with empty output (also after an error). */
     restart(id) { const plugin = plugins.get(id); if (!plugin) return; stopWorker(plugin); plugin.userStopped = false; plugin.status = 'parado'; plugin.console = []; plugin.errors = []; plugin.errorCount = 0; reconcile(); },
-    /** The page drew a snapshot (device-view `rendered`). Without running plugins this only keeps the reference. */
+    /** The page drew a snapshot (device-view `rendered`): a new frame for every caller, so the screen and the per-frame cache of VM answers are this frame's. That holds with
+     *  no plugin installed too: the page's own callers (query(): the MCP tools, the adb interpreter) read the screen then, and a frame counter that only moved with plugins left
+     *  them the first answer forever (a "Tela pronta" that never arrived, the layout of a screen already left). Without running plugins nothing else happens here. */
     snapshot(snapshot) {
-      lastSnapshot = snapshot ?? null;
-      if (!plugins.size) return;
-      frame++; if (!running().length) return;
+      lastSnapshot = snapshot ?? null; frame++;
+      if (!plugins.size || !running().length) return;
       const next = currentScreen(), sig = screenKey(next);
       if (sig !== screenSig) { screenSig = sig; for (const plugin of subscribed('screen')) send(plugin, { t: 'event', name: 'screen', data: next }); stats.events++; }
     },

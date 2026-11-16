@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=1d7de62ac467';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=1d7de62ac467';
-import { isTrustedRasterURL } from './raster-cache.js?v=1d7de62ac467';
+import { updateWebViewSlot } from './webview-slot.js?v=d62efce0f056';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=d62efce0f056';
+import { isTrustedRasterURL } from './raster-cache.js?v=d62efce0f056';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -71,7 +71,15 @@ const { $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKErr
 // (renderSnapshot called directly) is always newer than a queued event, so renderSnapshot clears the queue.
 let webviews = null;   // the page side of the WebViews of the bound VM (src/webview-frame.js); null when the host disables WebView
 const runtimeFrames = { pending: null, requested: false, vmBusy: false, coalesced: 0, rendered: 0, seq: 0, drawMs: 0, putMs: 0, reducedDrawn: 0, log: [], drawn: [] };   // reducedDrawn: reduced-scale rasters put on a canvas (src/motion-raster.js)   // log: arrival of each runtime snapshot (page clock, frames the Worker had produced, snapshots drawn so far) for the produced-vs-displayed measurement
-const nextFrame = globalThis.requestAnimationFrame ? callback => globalThis.requestAnimationFrame(callback) : callback => setTimeout(callback, 16);
+// The next display frame, or FRAME_FALLBACK_MS later when the browser is not painting this page: a background tab, a covered window or a hidden pane runs no animation frames,
+// and the VM's newest snapshot would wait for one forever. The page then held a stale screen (the last frame it drew, "Tela pronta" never arriving), which is what an MCP client or
+// a plugin reads while nobody is looking at the tab. With the timer the state stays current; a visible page still draws on the display's own frame.
+const FRAME_FALLBACK_MS = 250;
+const nextFrame = globalThis.requestAnimationFrame ? callback => {
+  let done = false, frame = 0, timer = 0;
+  const run = () => { if (done) return; done = true; clearTimeout(timer); globalThis.cancelAnimationFrame?.(frame); callback(); };
+  frame = globalThis.requestAnimationFrame(run); timer = setTimeout(run, FRAME_FALLBACK_MS);
+} : callback => setTimeout(callback, 16);
 function flushRuntimeSnapshot(vm) {
   runtimeFrames.requested = false; const snapshot = runtimeFrames.pending; runtimeFrames.pending = null;
   if (!snapshot || state.runtime !== vm) return;

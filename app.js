@@ -1,47 +1,49 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=1d7de62ac467';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=1d7de62ac467';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=1d7de62ac467';
-import { initCollapsibleSections } from './panel-sections.js?v=1d7de62ac467';
-import { warmupLabel } from './warmup.js?v=1d7de62ac467';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=1d7de62ac467';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=1d7de62ac467';
-import { initHelpTips } from './help-tips.js?v=1d7de62ac467';
-import { createToolDock } from './tool-dock.js?v=1d7de62ac467';
-import { createPermissionsPanel } from './permissions-panel.js?v=1d7de62ac467';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=1d7de62ac467';
-import { createAppDataPanel } from './app-data-panel.js?v=1d7de62ac467';
-import { createCameraLab } from './camera-lab.js?v=1d7de62ac467';
-import { createOverridesPanel } from './overrides-panel.js?v=1d7de62ac467';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=1d7de62ac467';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=1d7de62ac467';
-import { createHostMapPanel } from './host-map-panel.js?v=1d7de62ac467';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=1d7de62ac467';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=1d7de62ac467';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=1d7de62ac467';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=1d7de62ac467';
-import { createDeviceView, createViewState } from './device-view.js?v=1d7de62ac467';
-import { createTaskSwitcher } from './task-switcher.js?v=1d7de62ac467';
-import { createDeviceZoom } from './device-zoom.js?v=1d7de62ac467';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=1d7de62ac467';
-import { formatApiGapReport } from './api-gap-scan.js?v=1d7de62ac467';
-import { createLogcatPanel } from './logcat-panel.js?v=1d7de62ac467';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=1d7de62ac467';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=1d7de62ac467';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=1d7de62ac467';
-import { captureImage } from './screen-capture.js?v=1d7de62ac467';
-import { createPluginsPanel } from './plugins-panel.js?v=1d7de62ac467';
-import { createMcpTools } from './mcp-tools.js?v=1d7de62ac467';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=1d7de62ac467';
-import { createModalHost } from './lab-modal.js?v=1d7de62ac467';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=1d7de62ac467';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=1d7de62ac467';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=1d7de62ac467';
-import { createDragLayer } from './lab-drag.js?v=1d7de62ac467';
-import { createLabScroll } from './lab-scroll.js?v=1d7de62ac467';
-import { createGlSurfaces } from './gl-surfaces.js?v=1d7de62ac467';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=1d7de62ac467';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=1d7de62ac467';
-import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=1d7de62ac467';
+import { APKWorkerClient } from './apk-worker-client.js?v=d62efce0f056';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=d62efce0f056';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=d62efce0f056';
+import { initCollapsibleSections } from './panel-sections.js?v=d62efce0f056';
+import { warmupLabel } from './warmup.js?v=d62efce0f056';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=d62efce0f056';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=d62efce0f056';
+import { initHelpTips } from './help-tips.js?v=d62efce0f056';
+import { createToolDock } from './tool-dock.js?v=d62efce0f056';
+import { createPermissionsPanel } from './permissions-panel.js?v=d62efce0f056';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=d62efce0f056';
+import { createAppDataPanel } from './app-data-panel.js?v=d62efce0f056';
+import { createCameraLab } from './camera-lab.js?v=d62efce0f056';
+import { createOverridesPanel } from './overrides-panel.js?v=d62efce0f056';
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=d62efce0f056';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=d62efce0f056';
+import { createHostMapPanel } from './host-map-panel.js?v=d62efce0f056';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=d62efce0f056';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=d62efce0f056';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=d62efce0f056';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=d62efce0f056';
+import { createDeviceView, createViewState } from './device-view.js?v=d62efce0f056';
+import { createTaskSwitcher } from './task-switcher.js?v=d62efce0f056';
+import { createDeviceZoom } from './device-zoom.js?v=d62efce0f056';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=d62efce0f056';
+import { formatApiGapReport } from './api-gap-scan.js?v=d62efce0f056';
+import { createLogcatPanel } from './logcat-panel.js?v=d62efce0f056';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=d62efce0f056';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=d62efce0f056';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=d62efce0f056';
+import { captureImage, paintScreen } from './screen-capture.js?v=d62efce0f056';
+import { createScreenRecorder } from './screen-recorder.js?v=d62efce0f056';
+import { createPluginsPanel } from './plugins-panel.js?v=d62efce0f056';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=d62efce0f056';
+import { createAdb } from './adb-commands.js?v=d62efce0f056';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=d62efce0f056';
+import { createModalHost } from './lab-modal.js?v=d62efce0f056';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=d62efce0f056';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=d62efce0f056';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=d62efce0f056';
+import { createDragLayer } from './lab-drag.js?v=d62efce0f056';
+import { createLabScroll } from './lab-scroll.js?v=d62efce0f056';
+import { createGlSurfaces } from './gl-surfaces.js?v=d62efce0f056';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=d62efce0f056';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=d62efce0f056';
+import { buildDeepLinkRequest, addToHistory, historyLabel, loadHistory, saveHistory, describeDeepLink } from './deep-link-panel.js?v=d62efce0f056';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -818,6 +820,150 @@ const mcpControls = {
   },
   permissions(name = null, value = null) { if (!permissionsPanel) throw new Error('Permissões não estão disponíveis'); return { permissions: name ? permissionsPanel.set(name, value) : permissionsPanel.list() }; },
 };
+/** The device as the adb interpreter drives it (src/adb-commands.js, the `adb` MCP tool): each method is the page's own path for that action, the same ones the panels, the launcher and
+ * the other MCP tools use. Failures are Errors with what is missing; nothing answers for a path the page does not have. */
+const adbFail = message => Object.assign(new Error(message), { code: 'adb' });
+const adbFocusedFieldNow = () => {   // the text field keys go to: the focused editable Compose node (of the owner the VM's InputMethodManager serves, when there is one), else the focused View text field
+  const editable = item => item.focused === true && (item.editableText != null || (item.actions ?? []).some(action => (action.name ?? action) === 'SetText'));
+  const owners = (state.lastSnapshot?.composeSemantics?.owners ?? []).filter(item => item.attached !== false), served = state.imeState?.connected ? state.imeState.servedViewId : null;
+  const owner = owners.find(item => item.ownerViewId === served && (item.nodes ?? []).some(editable)) ?? owners.find(item => (item.nodes ?? []).some(editable)), node = owner?.nodes?.find(editable) ?? null;
+  if (node) return { compose: true, ownerViewId: owner.ownerViewId, nodeId: node.nodeId, text: node.editableText ?? '', served: owner.ownerViewId === served };
+  let found = null; (function walk(view) { if (!view || found) return; if (view.focused && typeof view.text === 'string' && view.inputType !== undefined && !view.readOnly && state.viewElements.get(String(view.id))?.dataset?.kind === 'input') found = view; for (const child of view.children ?? []) walk(child); })({ children: state.lastSnapshot?.views ?? [] });
+  return found ? { compose: false, id: found.id, text: found.text ?? '' } : null;
+};
+/** The focused field, waiting a little for it: the focus of a tap reaches the page with the frame that follows it, and a Compose field's input session (its InputConnection) a
+ *  frame later still. A field that has none after the wait is returned as it is: its keys then take the SetText fallback, which the result says. */
+const adbFocusedField = async () => { for (const until = Date.now() + 2000; ;) { await flushPendingInputs(); const field = adbFocusedFieldNow(); if ((field && (!field.compose || field.served)) || Date.now() >= until) return field; await new Promise(resolve => setTimeout(resolve, 100)); } };
+// What a key of `input keyevent` is to a focused text field: the character an unmodified key of a standard keyboard types (android.view.KeyEvent key codes: digits 7-16, letters 29-54,
+// punctuation), committed as a keyboard commits it, or a cursor key (D-pad, Page Up/Down, Home/End), sent as a KeyEvent through the field's InputConnection as the page's own
+// keyboard sends it. Other keys would have to be dispatched to the window, which the page cannot do.
+const ADB_CURSOR_KEYS = new Set([19, 20, 21, 22, 92, 93, 122, 123]);
+const ADB_KEY_CHARACTERS = new Map([...'0123456789'].map((ch, i) => [7 + i, ch]).concat([...'abcdefghijklmnopqrstuvwxyz'].map((ch, i) => [29 + i, ch]), [[17, '*'], [18, '#'], [55, ','], [56, '.'], [62, ' '], [68, '`'], [69, '-'], [70, '='], [71, '['], [72, ']'], [73, '\\'], [74, ';'], [75, "'"], [76, '/'], [77, '@'], [81, '+']]));
+const adbDevice = {
+  async info() {
+    const d = resolveDevice(deviceState.settings), inventory = state.inventory, screen = state.apkRunning ? await pluginHost.query('screen', {}).catch(() => null) : null, mode = taskSwitcher?.state?.();
+    return { packageName: inventory?.packageName ?? null, loaded: !!state.currentSource && !!inventory, running: !!state.runtime && state.apkRunning, starting: state.busy || state.runStarting, background: mode === 'home' || mode === 'overview',
+      activity: screen?.activity ?? null, tasks: screen?.tasks ?? [], dialogs: screen?.dialogs ?? 0, widthPx: d.widthDp, heightPx: d.heightDp, densityDpi: 160, pid: logcatPanel.store.entries.at(-1)?.pid ?? null,
+      inventory: inventory ? { packageName: inventory.packageName, versionName: inventory.manifestAttrs?.versionName ?? null, versionCode: inventory.manifestAttrs?.versionCode ?? null, minSdk: inventory.usesSdk?.minSdkVersion ?? null, targetSdk: inventory.usesSdk?.targetSdkVersion ?? null, requestedPermissions: (inventory.usesPermissions ?? []).map(item => item.name) } : null };
+  },
+  async packages() {
+    const out = (apkShelf ? await apkShelf.list() : []).filter(item => item.packageName).map(item => ({ packageName: item.packageName, system: false }));
+    if (state.inventory?.packageName && !out.some(item => item.packageName === state.inventory.packageName)) out.push({ packageName: state.inventory.packageName, system: false });   // a hosted example is not on the home screen
+    for (const companion of state.inventory?.companionPackages ?? []) out.push({ packageName: companion.packageName, system: true });   // the packages of a device option (microG)
+    return out;
+  },
+  async install(file, { grant = false } = {}) {
+    await mcpControls.installApk(file, { open: false });
+    if (grant) for (const permission of permissionsPanel?.list() ?? []) if (permission.applicable && permission.state !== 'allow') permissionsPanel.set(permission.name, 'allow');
+  },
+  /** Loads the package's APK into the VM (not started) when it is not the one there: one app at a time. -> a note, or null when it was already loaded. */
+  async ensureLoaded(packageName) {
+    await waitIdle();
+    if (state.inventory?.packageName === packageName && state.currentSource) { if (!state.runtime) { await importSource(state.currentSource); await waitIdle(); if (!state.inventory) throw adbFail(`Não foi possível carregar ${packageName}: ${state.lastAPKError ? String(state.lastAPKError.error?.message ?? state.lastAPKError.error) : 'a leitura do APK foi cancelada'}`); } return null; }
+    const entry = (apkShelf ? await apkShelf.list() : []).filter(item => item.packageName === packageName).sort((a, b) => b.openedAt - a.openedAt)[0]; if (!entry) throw adbFail(`O pacote ${packageName} não está instalado.`);
+    const replaced = state.apkRunning ? state.inventory?.packageName : null, got = await apkShelf.file(entry.id); if (!got) throw adbFail(`O APK de ${packageName} não está mais guardado neste navegador.`);
+    await importSource({ file: got.file, name: got.file.name, shelfId: entry.id }, false); await waitIdle();
+    if (state.inventory?.packageName !== packageName) throw adbFail(`Não foi possível carregar ${packageName}: ${state.lastAPKError ? String(state.lastAPKError.error?.message ?? state.lastAPKError.error) : 'a leitura do APK foi cancelada'}`);
+    return `${packageName} foi carregado no aparelho${replaced ? `; ${replaced}, que estava aberto, foi encerrado (um app por vez)` : ''}.`;
+  },
+  async uninstall(packageName, { keepData = false } = {}) {
+    const entries = (apkShelf ? await apkShelf.list() : []).filter(item => item.packageName === packageName), isCurrent = state.inventory?.packageName === packageName;
+    if (!entries.length && !isCurrent) return false;
+    if (!keepData) { await this.ensureLoaded(packageName); await waitIdle(); showAppData(await apkVM.clearAppData()); }   // the data goes with the package, as on a device
+    await waitIdle();
+    if (state.inventory?.packageName === packageName) { cancelOperation(); markLastRunEnded(); state.currentSource = null; state.inventory = null; state.shelfId = null; state.needsRestart = false; $('file-info').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('preview-name').textContent = 'Prévia do aplicativo'; setStatus(`${packageName} desinstalado`); }
+    for (const entry of entries) await apkShelf.remove(entry.id);
+    await refreshShelf(); appendTrace(`adb: ${packageName} desinstalado${keepData ? ' (dados mantidos)' : ' (dados apagados)'}`); return true;
+  },
+  async clearData() {   // Settings > Apps > Clear storage: the data is wiped and the app's process ends (the APK stays loaded, not started)
+    await waitIdle(); if (!state.runtime) { await importSource(state.currentSource); await waitIdle(); } if (!state.runtime) throw adbFail('Nenhum app carregado.');
+    showAppData(await apkVM.clearAppData()); appendTrace('adb: dados do app apagados (pm clear)'); if (state.currentSource) await importSource(state.currentSource); await waitIdle();
+  },
+  async openApp() { const result = await mcpControls.openApp({}); return { opened: !!result.opened, error: result.error ?? (result.cannotRun ? result.cannotRun.join('; ') : null) }; },
+  async closeApp() { return mcpControls.closeApp({}); },
+  async startIntent(intent) {
+    await waitIdle(); if (!state.runtime && state.currentSource) { await importSource(state.currentSource); await waitIdle(); }
+    if (!state.runtime) throw adbFail('Nenhum app carregado: o Intent é resolvido pelos filtros do manifesto do app.');
+    await flushPendingInputs(); switchMode('apk'); hideError(); state.lastAPKError = null; state.stickyError = false;
+    const token = beginOperation('Abrindo Intent (adb)…'); state.runStartedAt = Date.now();
+    try { const { deepLink, snapshot } = await state.runtime.startIntent(intent, { onProgress: onWorkerProgress }); if (token === state.operation) { if (deepLink?.ok && deepLink.launched) state.launchAttempted = true; if (snapshot) renderSnapshot(snapshot); } return deepLink; }
+    catch (error) { if (token === state.operation && error?.name !== 'TypeError') reportAPKError(error, 'Não foi possível abrir o Intent', { crash: true }); throw error; }
+    finally { finishOperation(token); }
+  },
+  async waitReady(ms = 15000) { const result = await waitScreenReady({ screen: () => pluginHost.query('screen', {}).catch(() => null), requests: () => netlogPanel.store.entries }, ms); return { ready: result.ready, activity: result.screen?.activity ?? null }; },
+  async permissions() { return permissionsPanel?.list() ?? []; },
+  async setPermission(name, value) { if (!permissionsPanel) throw adbFail('Permissões não estão disponíveis'); permissionsPanel.set(name, value); },
+  async tap(x, y) { const result = await mcpInput.tap({ x, y }); return result.via; },
+  async swipe(x1, y1, x2, y2, ms) {
+    if (!state.runtime || !state.apkRunning) throw adbFail('Nenhum app aberto.');
+    await flushPendingInputs(); const from = { x: x1, y: y1 }, owner = mcpInput.ownerAt(from), still = Math.hypot(x2 - x1, y2 - y1) < 1;
+    if (owner && still) {   // `input swipe x y x y 1000` is how adb long-presses: the OnLongClick action of the component at the point
+      const inside = item => item.bounds && x1 >= item.bounds.left && x1 < item.bounds.right && y1 >= item.bounds.top && y1 < item.bounds.bottom, area = item => (item.bounds.right - item.bounds.left) * (item.bounds.bottom - item.bounds.top);
+      const target = (await pluginHost.query('layoutBounds', { names: false })).filter(item => item.kind === 'compose' && item.actions?.includes('OnLongClick') && inside(item)).sort((a, b) => area(a) - area(b))[0];
+      if (!target) throw adbFail('Toque longo: nenhum componente nesse ponto tem a ação OnLongClick.');
+      const [, ownerId, node] = String(target.key).split(':'); deviceView.queueComposeAction(Number(ownerId), Number(node), 'OnLongClick'); await flushPendingInputs(); return `toque longo em ${target.name} (ação OnLongClick do componente)`;
+    }
+    if (owner) {   // a real drag through the window: DOWN, MOVEs and UP with the gesture's own clock, one sample per request so none is merged
+      const steps = Math.max(2, Math.min(40, Math.round(ms / 16))), t0 = performance.now(), at = k => ({ x: x1 + (x2 - x1) * k - owner.bounds.left, y: y1 + (y2 - y1) * k - owner.bounds.top, t: t0 + ms * k });
+      for (let i = 0; i <= steps + 1; i++) { const k = Math.min(1, i / steps), sample = at(k); state.pendingPointers.push({ ownerViewId: owner.id, action: i === 0 ? 0 : i === steps + 1 ? 1 : 2, x: sample.x, y: sample.y, t: i === steps + 1 ? sample.t + 1 : sample.t }); await flushPendingInputs(); }
+      return `arrasto real (MotionEvents) de ${Math.round(x1)},${Math.round(y1)} a ${Math.round(x2)},${Math.round(y2)} em ${ms} ms`;
+    }
+    const view = mcpInput.views().filter(item => /ScrollView|RecyclerView|ListView|NestedScrollView|ViewPager/.test(String(item.type)) && x1 >= item.bounds.left && x1 < item.bounds.right && y1 >= item.bounds.top && y1 < item.bounds.bottom).sort((a, b) => b.depth - a.depth)[0];
+    if (!view) throw adbFail('Nada nesse ponto recebe o gesto: fora de uma tela Compose a página rola Views roláveis (View.scrollBy), e não há uma ali.');
+    const previous = state.pendingScrollBys.get(view.id) ?? { dx: 0, dy: 0 }; state.pendingScrollBys.set(view.id, { dx: previous.dx + (x1 - x2), dy: previous.dy + (y1 - y2) }); await flushPendingInputs();
+    return `rolagem da View ${view.id} por View.scrollBy (fora do Compose a página não envia MotionEvents)`;
+  },
+  async text(text) {
+    const field = await adbFocusedField(); if (!field) throw adbFail('Nenhum campo de texto com foco: toque no campo antes (input tap).');
+    if (!field.compose) { state.pendingInputs.set(field.id, field.text + text); await flushPendingInputs(); return 'acrescentado ao fim do campo (View)'; }
+    const characters = [...text], fallbacks = state.imeFallbacks ?? 0;
+    deviceView.queueComposeAction(field.ownerViewId, field.nodeId, 'ime', characters.map((character, index) => ({ kind: 'commit', text: character, fallbackText: field.text + characters.slice(0, index + 1).join('') }))); await flushPendingInputs();
+    return (state.imeFallbacks ?? 0) > fallbacks ? 'SetText (o campo não tem InputConnection)' : 'teclado (InputConnection), caractere por caractere';
+  },
+  async key(code) {
+    const enter = code === 66 || code === 160, character = ADB_KEY_CHARACTERS.get(code);
+    const cursor = ADB_CURSOR_KEYS.has(code);
+    if (!enter && code !== 67 && code !== 112 && character === undefined && !cursor) throw adbFail(`Tecla ${code}: a página não tem despacho de KeyEvent para a janela. Têm caminho BACK (4), HOME (3), APP_SWITCH (187) e, num campo de texto com foco, letras, números, pontuação, espaço, ENTER, DEL, FORWARD_DEL e as teclas de cursor.`);
+    const field = await adbFocusedField();
+    if (!field) throw adbFail(`Tecla ${code}: nenhum campo de texto com foco (toque no campo antes). A página não tem despacho de KeyEvent para a janela; fora de um campo só BACK (4), HOME (3) e APP_SWITCH (187) têm caminho.`);
+    if (!field.compose) {
+      if (code === 67) { state.pendingInputs.set(field.id, [...field.text].slice(0, -1).join('')); await flushPendingInputs(); return 'último caractere apagado (View)'; }
+      if (character !== undefined) { state.pendingInputs.set(field.id, field.text + character); await flushPendingInputs(); return `"${character}" acrescentado ao fim do campo (View)`; }
+      throw adbFail(`Tecla ${code}: num campo de View a página escreve caracteres e apaga o último (DEL, 67); as teclas de cursor só têm caminho num campo Compose.`);
+    }
+    const op = enter ? { kind: 'enter' } : code === 67 ? { kind: 'deleteBackward', fallbackText: [...field.text].slice(0, -1).join('') } : code === 112 ? { kind: 'deleteForward' } : cursor ? { kind: 'key', code, meta: 0, fallbackText: null } : { kind: 'commit', text: character, fallbackText: field.text + character };
+    deviceView.queueComposeAction(field.ownerViewId, field.nodeId, 'ime', [op]); await flushPendingInputs();
+    return op.kind === 'key' ? 'tecla de cursor pelo InputConnection do campo com foco (sendKeyEvent)' : op.kind === 'enter' ? 'ação do teclado (Enter) no campo com foco' : op.kind === 'commit' ? `"${character}" pelo teclado (commitText) no campo com foco` : 'apagar no campo com foco';
+  },
+  async keyCode(name) { const table = (await import('./framework-constants-data.js')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
+  async nav(button) {
+    await waitIdle(); const done = await taskSwitcher?.navigate?.(button);
+    if (!done) throw adbFail(button === 'back' ? 'BACK: não há app na frente.' : button === 'home' ? 'HOME: o aparelho já está na tela inicial.' : 'APP_SWITCH: não há app aberto.');
+    await waitIdle(); return { back: 'voltou uma tela (onBackPressed)', home: 'app em segundo plano, tela inicial', overview: 'recentes', foreground: 'de volta ao app' }[done];
+  },
+  async screenshot() { return pluginHost.query('screenshot', {}); },
+  async snapshot() { await flushPendingInputs(); return state.lastSnapshot; },
+  async resourceNames(ids) { const names = new Map(); for (let i = 0; i < ids.length; i += 256) { const reply = await pluginHost.query('resourceIds', { ids: ids.slice(i, i + 256) }).catch(() => null); for (const [id, name] of Object.entries(reply?.names ?? {})) if (name) names.set(Number(id), name); } return names; },
+  async logcat() { return logcatPanel.store.entries; },
+  async clearLogcat() { logcatPanel.reset(); },
+  async settings() { return deviceState.settings; },
+  async setSettings(patch) { applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, ...patch })); await waitIdle(); },
+  async buildProps() { return null; },   // android.os.Build is modelled by the VM's hosts inside the Worker and no request reads it yet: getprop ro.product.* / ro.build.* fail by name
+  async sharedFiles() { await filesPanel.ready?.catch?.(() => {}); return filesPanel.state.files.map(file => ({ id: file.id, name: file.name, mime: file.mime, size: file.size, modified: file.modified })); },
+  async pushShared(file) { const before = new Set(filesPanel.state.files.map(item => item.id)); await filesPanel.addFiles([file]); const added = filesPanel.state.files.find(item => !before.has(item.id)); if (!added) throw adbFail(filesPanel.state.note || 'O arquivo não foi aceito pelo armazenamento do dispositivo.'); return { name: added.name }; },
+  async removeShared(id) { await filesPanel.removeFile(id); },
+  async sharedBlob(id) { const file = filesPanel.state.files.find(item => item.id === id); if (!file) throw adbFail('O arquivo não está mais no dispositivo.'); return file.blob; },
+};
+// record_screen (MCP): the video is painted from the rasters on screen (src/screen-recorder.js); starting and stopping show in the execution log and the status line
+const screenRecorder = createScreenRecorder({ paint: (canvas, options) => paintScreen(state.lastSnapshot, id => state.viewElements.get(String(id)) ?? null, canvas, options) });
+mcpControls.recordScreen = {
+  start(options) { if (!state.runtime || !state.apkRunning) throw new Error('Nenhum app aberto: abra um app antes de gravar a tela.'); const started = screenRecorder.start(options); appendTrace(`MCP (record_screen): gravando a tela, ${started.width}×${started.height} a ${started.fps} quadros/s, até ${started.maxSeconds} s (${started.container})`); return started; },
+  async stop() { const video = await screenRecorder.stop(); appendTrace(`MCP (record_screen): gravação encerrada, ${video.seconds} s, ${video.frames} quadros, ${formatSize(video.bytes)}`); return video; },
+  status: () => screenRecorder.status(), discard: () => screenRecorder.discard(),
+};
+const adbInterpreter = createAdb(adbDevice);
+mcpControls.adb = (input, io) => { appendTrace(`adb (MCP): ${typeof input.command === 'string' ? input.command : (input.args ?? []).join(' ')}`.slice(0, 400)); return adbInterpreter.run(input, io); };
+window.apkLabAdb = adbInterpreter;   // test and console access: await apkLabAdb.run({ command: 'adb shell wm size' })
 const mcpTools = createMcpTools({ controls: mcpControls, input: mcpInput, actions: { mock: spec => pluginActions.mock(mcpCaller, spec), unmock: id => pluginActions.unmock(mcpCaller, { id }), mocks: () => pluginActions.mocks(mcpCaller), reload: mode => pluginActions.reload(mcpCaller, { mode }) }, query: (method, args) => pluginHost.query(method, args), plugins: () => pluginHost.list?.() ?? [], clickButton: (id, button) => pluginHost.clickButton(id, button, { by: 'mcp' }), logcat: () => logcatPanel.store.entries, network: () => netlogPanel.store.entries,
   status: () => ({ running: !!apkVM.worker, packageName: state.inventory?.packageName ?? null, file: state.fileName ?? null }) });
 mcpLink = createMcpLink({ execute: (tool, args, context) => mcpTools.execute(tool, args, context), onState: ({ state: linkState, message, calls, lastTool }) => {

@@ -36,7 +36,7 @@ export function backPull(dx) {
 
 export function createTaskSwitcher({ document: doc = document, $, vm, render, back, relaunch, canGoBack, busy, begin, finish, report, dismiss = () => {}, announce = () => {}, shelf: shelfActions = {}, onInfo = () => {} }) {
   const screen = $('android-screen');
-  if (!screen || typeof screen.prepend !== 'function' || typeof screen.querySelector !== 'function') return { sync() {}, closed() {}, home() {}, restate() {}, reset() {}, setShelf() {}, infoSettled: async () => {}, icon: () => null, state: () => 'foreground', resume: async () => {} };   // no device on this page (or a host without a full DOM): nothing to navigate
+  if (!screen || typeof screen.prepend !== 'function' || typeof screen.querySelector !== 'function') return { sync() {}, closed() {}, home() {}, restate() {}, reset() {}, setShelf() {}, infoSettled: async () => {}, icon: () => null, state: () => 'foreground', resume: async () => {}, navigate: async () => null };   // no device on this page (or a host without a full DOM): nothing to navigate
   const el = (tag, className, parent) => { const node = doc.createElement(tag); node.className = className; parent?.append(node); return node; };
   const launcher = el('div', 'launcher-layer'); launcher.hidden = true; screen.prepend(launcher);
   const wall = el('div', 'launcher-hint', launcher); wall.textContent = 'Solte um APK aqui para instalar';
@@ -208,6 +208,14 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     state: () => mode,
     /** A tap on the app's launcher icon: an app in the background comes back to the front (onRestart, onStart, onResume); a closed or just installed one is started. */
     resume: () => resume(),
+    /** What the system bar's buttons do (Back, Home, Recents), for a caller that is not a click on them: -> 'back' | 'home' | 'overview' | 'foreground' | null (nothing to do: no app on screen, or busy). */
+    async navigate(button) {
+      if (working || busy()) return null;
+      if (button === 'back') { if (mode === 'overview') { await resume(); return 'foreground'; } if (away()) return null; if (canGoBack()) { await back(); return 'back'; } await leave('home'); return 'home'; }   // Back on the root Activity leaves the task in the background (Android 12+)
+      if (button === 'home') { if (mode === 'overview' || !away()) { await leave('home'); return 'home'; } return null; }
+      if (button === 'recents') { if (mode === 'overview') { await resume(); return 'foreground'; } if (!away()) { await leave('overview'); return 'overview'; } return null; }
+      return null;
+    },
     /** Keyboard focus on the app's launcher icon (after the error window closes: Enter opens the app again); false when the launcher does not show it. */
     focusApp: () => { if (!away() || app.hidden || app.disabled) return false; app.focus?.(); return true; },
     /** Settles once the launcher's label and icon request (a VM request) is answered: the page waits for it before sending the next one. */
