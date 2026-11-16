@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=a53ed9c13aa0';
-import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=a53ed9c13aa0';
-import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=a53ed9c13aa0';
-import { parseReturnValue } from './method-overrides.js?v=a53ed9c13aa0';
+import { APKError } from './apk-error.js?v=9546195269e2';
+import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=9546195269e2';
+import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=9546195269e2';
+import { parseReturnValue } from './method-overrides.js?v=9546195269e2';
 
 const DEALIAS = /\$\$ldr\d+;/g;   // a companion package's classes are defined under a loader alias (Lfoo/Bar$$ldrN;): the de-aliased form matches the table's plain descriptors
 const dealias = text => String(text).replace(DEALIAS, ';');
