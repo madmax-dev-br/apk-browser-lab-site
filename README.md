@@ -102,7 +102,7 @@ flowchart LR
 - O APK é lido num **Web Worker**: ZIP, manifesto, recursos e DEX, sem passar pela página.
 - O bytecode roda numa **VM Dalvik** cujo núcleo é WebAssembly. Threads, relógio, coletor de lixo e limite de memória são modelados.
 - As classes `android.*` vêm do **AOSP 13 compilado da fonte**, com as adaptações registradas. As fronteiras com o mundo (janela, rede, arquivos, banco) são pontes para APIs da web.
-- O **Compose** desenha com o Skia de verdade, em WebAssembly, e recebe `MotionEvent`s reais.
+- O **Compose** desenha com o Skia de verdade, em WebAssembly, e recebe toques como eventos `MotionEvent` reais.
 - A página só mostra os quadros e envia a entrada. O que o app faz é decidido pelo código do app.
 
 A explicação completa, passo a passo, está na página [Arquitetura](https://madmax-dev-br.github.io/apk-browser-lab-site/arquitetura.html).
