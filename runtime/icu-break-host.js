@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=7d37d37a6ae5';
+import { APKError } from './apk-error.js?v=49b0f144f57b';
 
 export const ICU_BREAK = 'Landroid/icu/text/BreakIterator;';
 export const ICU_BREAK_INSTANCE = 'Lapkweb/bridge/ICUBreakIterator;';

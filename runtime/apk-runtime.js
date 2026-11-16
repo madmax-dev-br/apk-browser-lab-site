@@ -1,32 +1,32 @@
-import { VMClock } from './vm-clock.js?v=7d37d37a6ae5';
-import { overrideHit, RUN_BODY } from './method-overrides.js?v=7d37d37a6ae5';
-import { OperationMonitor } from './operation-monitor.js?v=7d37d37a6ae5';
-import { ExecutionProfile } from './execution-profile.js?v=7d37d37a6ae5';
-import { SamplingProfiler } from './sampling-profiler.js?v=7d37d37a6ae5';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=7d37d37a6ae5';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=7d37d37a6ae5';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=7d37d37a6ae5';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=7d37d37a6ae5';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=7d37d37a6ae5';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=7d37d37a6ae5';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=7d37d37a6ae5';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=7d37d37a6ae5';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=7d37d37a6ae5';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=7d37d37a6ae5';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=7d37d37a6ae5';
-import { APKError } from './apk-error.js?v=7d37d37a6ae5';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=7d37d37a6ae5';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=7d37d37a6ae5';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=7d37d37a6ae5';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=7d37d37a6ae5';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=7d37d37a6ae5';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=7d37d37a6ae5';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=7d37d37a6ae5';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=7d37d37a6ae5';
+import { VMClock } from './vm-clock.js?v=49b0f144f57b';
+import { overrideHit, RUN_BODY } from './method-overrides.js?v=49b0f144f57b';
+import { OperationMonitor } from './operation-monitor.js?v=49b0f144f57b';
+import { ExecutionProfile } from './execution-profile.js?v=49b0f144f57b';
+import { SamplingProfiler } from './sampling-profiler.js?v=49b0f144f57b';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=49b0f144f57b';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=49b0f144f57b';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=49b0f144f57b';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=49b0f144f57b';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=49b0f144f57b';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=49b0f144f57b';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=49b0f144f57b';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=49b0f144f57b';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=49b0f144f57b';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=49b0f144f57b';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=49b0f144f57b';
+import { APKError } from './apk-error.js?v=49b0f144f57b';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=49b0f144f57b';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=49b0f144f57b';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=49b0f144f57b';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=49b0f144f57b';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=49b0f144f57b';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=49b0f144f57b';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=49b0f144f57b';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=49b0f144f57b';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=7d37d37a6ae5';
-import { bootClassLacksMember } from './boot-class-members.js?v=7d37d37a6ae5';
-export { APKError } from './apk-error.js?v=7d37d37a6ae5';
+import { Scheduler, Blocked } from './scheduler.js?v=49b0f144f57b';
+import { bootClassLacksMember } from './boot-class-members.js?v=49b0f144f57b';
+export { APKError } from './apk-error.js?v=49b0f144f57b';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -2085,14 +2085,20 @@ export class APKRuntime {
    */
   registerNativeAllocation(bytes) {
     if (!(bytes > 0)) return () => {};
-    this.nativeBytes = (this.nativeBytes ?? 0) + bytes;
+    this.nativeBytesRegistered(bytes);
+    let released = false;
+    return () => { if (!released) { released = true; this.nativeBytes -= bytes; } };
+  }
+  /** Native bytes registered (delta > 0) or freed (delta < 0) with the VM, as ART's Heap::RegisterNativeAllocation / RegisterNativeFree keep them: growth past the watermark asks for
+   *  a collection; a free of more than is registered leaves zero (ART clamps it the same way). Returns what the registered total changed by. */
+  nativeBytesRegistered(delta) {
+    const before = this.nativeBytes ?? 0, after = Math.max(0, before + delta); this.nativeBytes = after;
     const base = this.nativeBytesAtCollection ?? 0;
-    if (this.nativeBytes - base > Math.max(NATIVE_PACE_MIN, base)) {
+    if (delta > 0 && after - base > Math.max(NATIVE_PACE_MIN, base)) {
       if (this.engine === 'wasm') this.wasm?.requestCollection('native');
       else if (this.gcEnabled) this.gcPressure = true;   // heap-gc.js collectionDue: a native resource asked for it
     }
-    let released = false;
-    return () => { if (!released) { released = true; this.nativeBytes -= bytes; } };
+    return after - before;
   }
   /** A collection finished: native growth is measured from here (registerNativeAllocation). */
   nativeCollected() { this.nativeBytesAtCollection = this.nativeBytes ?? 0; }

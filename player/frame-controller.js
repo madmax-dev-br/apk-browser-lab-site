@@ -5,20 +5,20 @@
 // device settings -> setDevice, "Tempo máximo por evento" -> setTimeLimits, "Retornos de métodos" -> setMethodOverrides, "Activities ignoradas" -> setIgnoredActivities,
 // "Mock de endpoints" -> setEndpointMocks, "Permissões" / location / dialog -> setPermissions + permissionResponse, "Abrir" -> startIntent, Logcat -> setLogcatStreaming,
 // Compose -> inspectCompose, plugins -> src/plugin-host.js. The host page is another origin: everything it sends is validated here before it reaches the VM.
-import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=7d37d37a6ae5';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=7d37d37a6ae5';
-import { formatApiGapReport } from '../api-gap-scan.js?v=7d37d37a6ae5';
-import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=7d37d37a6ae5';
-import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=7d37d37a6ae5';
-import { parseMethodSpec } from '../method-overrides.js?v=7d37d37a6ae5';
-import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=7d37d37a6ae5';
-import { normalizeIntentRequest } from '../intent-resolver.js?v=7d37d37a6ae5';
-import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=7d37d37a6ae5';
-import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=7d37d37a6ae5';
-import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=7d37d37a6ae5';
-import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=7d37d37a6ae5';
-import { rowToEntry } from '../logcat.js?v=7d37d37a6ae5';
-import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=7d37d37a6ae5';
+import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=49b0f144f57b';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=49b0f144f57b';
+import { formatApiGapReport } from '../api-gap-scan.js?v=49b0f144f57b';
+import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=49b0f144f57b';
+import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=49b0f144f57b';
+import { parseMethodSpec } from '../method-overrides.js?v=49b0f144f57b';
+import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=49b0f144f57b';
+import { normalizeIntentRequest } from '../intent-resolver.js?v=49b0f144f57b';
+import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=49b0f144f57b';
+import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=49b0f144f57b';
+import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=49b0f144f57b';
+import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=49b0f144f57b';
+import { rowToEntry } from '../logcat.js?v=49b0f144f57b';
+import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=49b0f144f57b';
 
 export const SCREENSHOT_GAP_MS = 250, PLUGIN_OUTPUT_MS = 100, MAX_STREAM_BATCH = MAX_LOG_BATCH;
 const LAB_LIVE = ['methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog'];

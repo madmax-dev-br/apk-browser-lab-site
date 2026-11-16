@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=7d37d37a6ae5';
-import { getSolidPaint } from './paint-host.js?v=7d37d37a6ae5';
-import { getMatrixValues } from './matrix-native.js?v=7d37d37a6ae5';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=7d37d37a6ae5';
+import { APKError } from './apk-error.js?v=49b0f144f57b';
+import { getSolidPaint } from './paint-host.js?v=49b0f144f57b';
+import { getMatrixValues } from './matrix-native.js?v=49b0f144f57b';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=49b0f144f57b';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -148,9 +148,16 @@ export function createVectorNativeBindings(){
   if(w*h>16*1024*1024)problem('Vector raster extent exceeds VM pixel limit');const draw=g.snapshot(tree,{width:w,height:h,mirrored:!!mirror});draw.colorFilter=colorFilter;draw.x=get('left');draw.y=get('top');const output=g.get(canvas,'canvas');draw.matrix=output.matrix.slice();draw.clips=(output.clips??[]).slice();draw.vectorTree=tree;draw.vectorState=g.captureVector(tree);draw.mirrored=!!mirror;if(output.draws.length>=1024)problem('Vector canvas command limit exceeded');g.reserveDrawStorage(draw.svg.length);output.draws.push(draw);return Math.ceil(w*h);
  });
  for(const [name,delta]of [['nIncStrong',1],['nDecStrong',-1]])add('Lcom/android/internal/util/VirtualRefBasePtr;',name,['J'],'V',(g,[h])=>{const object=g.get(h);if(object.refs+delta<0)problem('Unbalanced vector handle release');object.refs+=delta;if(!object.refs&&delta<0)g.release(h);});
- for(const [name,delta]of [['registerNativeAllocation',1n],['registerNativeFree',-1n]])add('Ldalvik/system/VMRuntime;',name,['J'],'V',(g,args)=>{
-  // Instance native receives receiver before the declared long parameter.
-  const bytes=args[1];if(typeof bytes!=='bigint'||bytes<0n)problem('Invalid VM native allocation accounting');g.accountedBytes+=delta*bytes;if(g.accountedBytes<0n||g.accountedBytes>64n*1024n*1024n)problem('Vector native allocation accounting limit exceeded');});
+ for(const [name,delta]of [['registerNativeAllocation',1n],['registerNativeFree',-1n]])add('Ldalvik/system/VMRuntime;',name,['J'],'V',(g,args,vm)=>{
+  // dalvik.system.VMRuntime.registerNativeAllocation(long) / registerNativeFree(long) (art runtime/native/dalvik_system_VMRuntime.cc): a negative size is a RuntimeException
+  // ("allocation size negative N"); otherwise the bytes are added to, or taken from, what the heap has registered (Heap::RegisterNativeAllocation / RegisterNativeFree: a free of
+  // more than is registered leaves zero), and growth paces the collector. There is no ceiling: an app and the framework's own classes (VectorDrawable, Bitmap owners, Compose
+  // layers) register whatever native memory they hold, and a fixed 64 MiB cap here ended the run of an app that registered more. The instance native gets its receiver first.
+  const bytes=args[1];if(typeof bytes!=='bigint')problem('Invalid VM native allocation accounting');
+  if(bytes<0n)vm.throwJava('Ljava/lang/RuntimeException;',`allocation size negative ${bytes}`);
+  const amount=bytes>BigInt(Number.MAX_SAFE_INTEGER)?Number.MAX_SAFE_INTEGER:Number(bytes);
+  if(delta>0n)g.accountedBytes+=bytes;else g.accountedBytes-=bytes<g.accountedBytes?bytes:g.accountedBytes;
+  vm.nativeBytesRegistered?.(delta>0n?amount:-amount);});
  return bindings;
 }
 
